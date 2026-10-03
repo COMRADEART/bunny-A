@@ -87,3 +87,14 @@ test("MA0R: approval wording distinguishes one capability action from matching a
   assert.equal(permissionLabel(m, "s"), "Allow this skill run");
   assert.equal(permissionLabel(m, "c"), "Allow once");
 });
+test("MA1: a stopped or skipped step never reads as running", () => {
+  const stopped = mission("a", "stopped", [
+    step("1", "Test", "stopped", { executor: { kind: "skill", skillId: "project.test", params: {} } }),
+    step("2", "Run", "stopped", { executor: { kind: "capability", action: "terminal.exec", params: {} } }),
+    step("3", "Code", "stopped", { taskId: "t1" }),
+    step("4", "Docs", "skipped"),
+  ]);
+  const task = { id: "t1", provider: "codex", latestEvent: { type: "agent.editing", detail: "x", at: 1, label: "Editing" } } as unknown as OrchTask;
+  assert.deepEqual(agentRows(stopped, [task], 4).rows.map((r) => r.activity), ["Stopped", "Stopped", "Stopped", "Skipped"]);
+  assert.equal(agentDetail(stopped, "1", [task])!.activity, "Stopped");
+});

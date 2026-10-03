@@ -54,6 +54,8 @@ export function stepActivity(step: MissionStep, task: OrchTask | null): string {
   if (step.state === "waiting_for_approval") return "Needs your permission";
   if (step.state === "failed") return step.failure ? `Failed: ${step.failure.category.replaceAll("_", " ")}` : "Failed";
   if (step.state === "blocked") return "Blocked by a failed dependency";
+  if (step.state === "stopped") return "Stopped";
+  if (step.state === "skipped") return "Skipped";
   if (step.state === "completed") return step.result?.verified ? "Verified by Bunny" : "Done";
   if (step.state === "pending" || step.state === "ready") return step.evidence.some((line) => line.startsWith("waiting for workspace")) ? "Waiting for the workspace" : "Waiting";
   if (step.state === "verifying") return "Bunny is checking the result";
