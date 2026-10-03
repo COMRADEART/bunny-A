@@ -13,7 +13,7 @@ import { CapabilityBus, type CapabilityRequest } from "./capabilities/bus.server
 import { FilesystemCapability, GitCapability, NotificationsCapability, TerminalCapability } from "./capabilities/local.server.ts";
 import { BrowserCapability, blockedHost, safeUrl } from "./capabilities/browser.server.ts";
 import { ComputerCapability } from "./capabilities/computer.server.ts";
-import { resolveCommand } from "./capabilities/process.server.ts";
+import { realGit, resolveCommand } from "./capabilities/process.server.ts";
 import { SkillLibrary } from "./skills.server.ts";
 import { communicationConnectors } from "./capabilities/connectors.server.ts";
 import { envelopeFrom, scopeFor } from "./authorization.server.ts";
@@ -311,4 +311,24 @@ test("Host HTTP: snapshot stays backward compatible, mission commands are valida
     await command("device.revoke", { id: device.deviceId });
     assert.equal((await command("mission.get", { id: created.body.mission.id }, device.token)).status, 401);
   } finally { await host.close(); rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("MA1: git resolves past the Git for Windows cmd launcher so a Host crash cannot leave git running", () => {
+  // The launcher re-spawns the real git outside the Host's kill-on-close process job (M-A-1 Phase S).
+  const root = mkdtempSync(join(tmpdir(), "ma1-git-"));
+  try {
+    const launcher = join(root, "Git", "cmd", "git.exe"); const real = join(root, "Git", "mingw64", "bin", "git.exe");
+    mkdirSync(join(root, "Git", "cmd"), { recursive: true }); mkdirSync(join(root, "Git", "mingw64", "bin"), { recursive: true });
+    writeFileSync(launcher, ""); writeFileSync(real, "");
+    assert.equal(realGit(launcher, "win32"), real);
+    assert.equal(realGit(launcher, "linux"), launcher, "only Windows has the launcher");
+    assert.equal(realGit(real, "win32"), real, "the real binary is kept");
+    const lone = join(root, "Other", "cmd", "git.exe"); mkdirSync(join(root, "Other", "cmd"), { recursive: true }); writeFileSync(lone, "");
+    assert.equal(realGit(lone, "win32"), lone, "no sibling binary: unchanged");
+    if (process.platform === "win32") {
+      const saved = process.env.PATH;
+      try { process.env.PATH = join(root, "Git", "cmd"); assert.equal(resolveCommand("git")?.file.toLowerCase(), real.toLowerCase()); }
+      finally { process.env.PATH = saved; }
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });

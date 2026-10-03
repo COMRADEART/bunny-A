@@ -37,7 +37,18 @@ export function resolveCommand(command: string, cwd = process.cwd()): Resolved |
     return existsSync(path) && statSync(path).isFile() && (process.platform !== "win32" || /\.(exe|com)$/i.test(name)) ? { file: realpathSync(path), prefix: [], display: name } : null;
   }
   const found = onPath(name);
-  return found ? { file: realpathSync(found), prefix: [], display: lower } : null;
+  return found ? { file: realpathSync(lower === "git" ? realGit(found) : found), prefix: [], display: lower } : null;
+}
+
+/**
+ * Git for Windows puts a launcher (<Git>\cmd\git.exe) on PATH that re-spawns the real git outside the
+ * Host's process job: Stop's tree kill still reaches it, but after a Host crash it keeps running and
+ * can finish an operation Bunny recorded as interrupted. Launch the real binary next to it instead.
+ */
+export function realGit(found: string, platform = process.platform): string {
+  if (platform !== "win32" || !/^cmd$/i.test(dirname(found).split(/[\\/]/).at(-1) ?? "")) return found;
+  const root = dirname(dirname(found));
+  return ["mingw64", "clangarm64", "mingw32"].map((folder) => join(root, folder, "bin", "git.exe")).find((candidate) => existsSync(candidate)) ?? found;
 }
 
 export type RunResult = { exitCode: number | null; stdout: string; stderr: string; durationMs: number; timedOut: boolean; aborted: boolean };
