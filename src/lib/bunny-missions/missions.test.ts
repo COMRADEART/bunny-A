@@ -683,6 +683,38 @@ test("MA1: mission children are routed on the step objective, not on Bunny's age
     assert.equal(direct.routingPrompt, undefined, "direct tasks are unchanged");
   } finally { await env.cleanup(); }
 });
+test("MA1: Ollama locality is per model: local-only missions get a local model; cloud-hosted tags count as external", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "bunny-ma1-ollama-"));
+  const root = join(dir, "project"); mkdirSync(root);
+  const db = new HostDatabase(join(dir, "host.sqlite"));
+  const launched: Launched[] = [];
+  const base = fakeAdapter("ollama", launched);
+  // As observed on the M-A-1 workstation: the first installed tag proxies to ollama.com.
+  const ollama: ProviderAdapter = { ...base, detect: async () => ({ ...ready("ollama"), current_model: "deepseek-v4.1-flash:cloud", models: ["deepseek-v4.1-flash:cloud", "qwen2.5-coder:7b"], remoteModels: ["deepseek-v4.1-flash:cloud"] }) };
+  const tasks = new TaskManager(db, root, [ollama]);
+  await tasks.discover();
+  const missions = new MissionManager(tasks, { dataDirectory: dir, adapters: [] });
+  missions.configure({ enabled: true }, "test");
+  try {
+    const local = missions.create({ objective: "Summarize", mode: "fast", origin: "workstation", localOnly: true, steps: [model("Writer", "Summarize hello")] });
+    missions.approve(local.id, "workstation");
+    await until(() => launched.length === 1, "local launch");
+    assert.equal(launched[0].task.model, "qwen2.5-coder:7b", "a local-only envelope never launches a cloud-hosted tag");
+    launched[0].finish({ ok: true, output: "hello" });
+    await until(() => missions.mission(local.id).state === "completed", "local completion");
+    assert.equal(missions.mission(local.id).accounting.localModelCalls, 1);
+    assert.equal(missions.mission(local.id).accounting.externalModelCalls, 0);
+
+    const open = missions.create({ objective: "Summarize", mode: "fast", origin: "workstation", providers: ["ollama"], steps: [model("Writer", "Summarize hello")] });
+    missions.approve(open.id, "workstation");
+    await until(() => launched.length === 2, "open launch");
+    assert.equal(launched[1].task.model, "deepseek-v4.1-flash:cloud", "unconstrained routing keeps the legacy default");
+    launched[1].finish({ ok: true, output: "hello" });
+    await until(() => missions.mission(open.id).state === "completed", "open completion");
+    assert.equal(missions.mission(open.id).accounting.externalModelCalls, 1, "a cloud-hosted Ollama tag is an external model call");
+    assert.equal(missions.mission(open.id).accounting.localModelCalls, 0);
+  } finally { await missions.close(); db.close(); rmSync(dir, { recursive: true, force: true }); }
+});
 test("recovery after a Host restart: interrupted steps are reported, never resumed; retry starts a fresh child", async () => {
   const first = await setup();
   const dir = mkdtempSync(join(tmpdir(), "bunny-recover-"));

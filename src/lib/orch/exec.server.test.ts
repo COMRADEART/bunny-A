@@ -26,6 +26,15 @@ test("offline or malformed Ollama discovery fails cleanly", async () => {
   globalThis.fetch = async () => new Response("invalid JSON");
   assert.deepEqual(await probeOllama(), { up: false, models: [] });
 });
+test("MA1: Ollama discovery marks cloud-hosted tags as remote, never as local models", async () => {
+  // Shape observed from Ollama 0.35.0 /api/tags on the M-A-1 workstation.
+  globalThis.fetch = async () => new Response(JSON.stringify({ models: [
+    { name: "deepseek-v4.1-flash:cloud", size: 326, remote_model: "deepseek-v4.1-flash", remote_host: "https://ollama.com" },
+    { name: "qwen2.5-coder:7b", size: 4683087561 },
+    { name: "some-hosted-model", remote_host: "https://example.invalid" },
+  ] }));
+  assert.deepEqual(await probeOllama(), { up: true, models: ["deepseek-v4.1-flash:cloud", "qwen2.5-coder:7b", "some-hosted-model"], remote: ["deepseek-v4.1-flash:cloud", "some-hosted-model"] });
+});
 test("a missing requested model is refused instead of silently switching", async () => {
   let calls = 0;
   globalThis.fetch = async () => {

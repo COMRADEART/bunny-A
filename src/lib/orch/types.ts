@@ -141,6 +141,8 @@ export type ProviderLive = {
   usageObservedAt?: number | null;
   authenticatedState?: AuthState;
   models?: string[];
+  /** Installed models that a local service proxies to a hosted provider (Ollama cloud tags). Never local inference. */
+  remoteModels?: string[];
   usageCapabilities?: UsageCapabilities;
   features?: ProviderFeatures;
   activeSessions?: { taskId: string; providerSessionId: string | null; pid: number | null }[];

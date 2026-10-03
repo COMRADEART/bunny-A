@@ -17,6 +17,7 @@ import {
 } from "./machine.ts";
 import { MissionMemory } from "./memory.server.ts";
 import { scopedPath } from "./paths.server.ts";
+import { runsLocally } from "../bunny-host/router.ts";
 import { planMission, PLANNER_ID } from "./planner.server.ts";
 import { SkillLibrary } from "./skills.server.ts";
 import { MissionStore } from "./store.server.ts";
@@ -402,7 +403,7 @@ export class MissionManager {
       this.stepFailed(mission, this.markRunning(step, task.id, task.provider, workspace), "provider_unavailable", `Step requires model ${step.modelConstraint}; routing selected ${task.model}.`);
       return false;
     }
-    const local = this.tasks.live().find((provider) => provider.id === task.provider)?.local_or_cloud === "local";
+    const local = runsLocally(this.tasks.live().find((provider) => provider.id === task.provider), task.model);
     const sessionsUsed = mission.accounting.externalModelCalls + mission.accounting.localModelCalls;
     const violation = taskViolation(task, envelope, local, usedExternal, Date.now(), step, sessionsUsed);
     if (violation) {
@@ -412,7 +413,7 @@ export class MissionManager {
       return false;
     }
     try {
-      this.tasks.approveDelegated(task.id, { missionId: mission.id, stepId: step.id, authorizationId: envelope.id, check: (child) => taskViolation(child, envelope, this.tasks.live().find((provider) => provider.id === child.provider)?.local_or_cloud === "local", usedExternal, Date.now(), this.store.step(step.id), sessionsUsed) });
+      this.tasks.approveDelegated(task.id, { missionId: mission.id, stepId: step.id, authorizationId: envelope.id, check: (child) => taskViolation(child, envelope, runsLocally(this.tasks.live().find((provider) => provider.id === child.provider), child.model), usedExternal, Date.now(), this.store.step(step.id), sessionsUsed) });
     } catch (error) {
       this.stepFailed(mission, this.markRunning(step, task.id, task.provider, workspace), "provider_unavailable", error instanceof Error ? error.message : String(error));
       return false;
@@ -483,7 +484,7 @@ export class MissionManager {
       const request = this.store.request(step.pendingRequestId);
       if (!request.resolvedAt) this.store.saveRequest({ ...request, resolvedAt: Date.now(), resolution: "allow_once", resolvedBy: "workstation or device (direct task approval)" });
     }
-    const local = this.tasks.live().find((provider) => provider.id === task.provider)?.local_or_cloud === "local";
+    const local = runsLocally(this.tasks.live().find((provider) => provider.id === task.provider), task.model);
     this.countModelCall(step.missionId, local);
     const lock = this.workspace.acquire(step.missionId, step.id, step.workspace ?? task.cwd ?? this.store.mission(step.missionId).root, step.scope.access === "write" ? "exclusive" : "shared");
     if (!lock.ok) this.emit("mission.step.workspace_warning", `${step.role} was approved directly while ${lock.conflict.root} is held ${lock.conflict.mode} by step ${lock.conflict.stepId}; it runs without exclusive ownership (step ${step.id}).`, step.missionId);
@@ -498,7 +499,7 @@ export class MissionManager {
     const mission = this.store.mission(step.missionId);
     const task = this.tasks.db.get(taskId);
     const runtimeMs = Math.max(0, (task.finishedAt ?? Date.now()) - (task.startedAt ?? task.finishedAt ?? Date.now()));
-    const local = this.tasks.live().find((provider) => provider.id === task.provider)?.local_or_cloud === "local";
+    const local = runsLocally(this.tasks.live().find((provider) => provider.id === task.provider), task.model);
     let current = this.setStep(step.state === "waiting_for_approval" ? this.setStep(step, { state: "running" }) : step, {
       accounting: { ...step.accounting, runtimeMs: step.accounting.runtimeMs + runtimeMs, provider: task.provider, model: task.model, local, deterministic: false, inputTokens: task.usage ? (step.accounting.inputTokens ?? 0) + task.usage.inputTokens : step.accounting.inputTokens, outputTokens: task.usage ? (step.accounting.outputTokens ?? 0) + task.usage.outputTokens : step.accounting.outputTokens },
     });

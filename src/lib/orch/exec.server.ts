@@ -15,13 +15,18 @@ function formatDuration(ms: number): string {
   return `${minutes} minute${minutes === 1 ? "" : "s"}`;
 }
 
-export async function probeOllama(): Promise<{ up: boolean; models: string[] }> {
+/** An Ollama tag that proxies to a hosted model (e.g. `name:cloud` with `remote_host: https://ollama.com`). */
+export const isRemoteOllamaTag = (model: { name?: string; remote_host?: unknown; remote_model?: unknown }) =>
+  !!model.remote_host || !!model.remote_model || /(:|-)cloud$/i.test(model.name ?? "");
+
+/** `remote` lists installed tags whose generation runs on a hosted service, not on this machine. */
+export async function probeOllama(): Promise<{ up: boolean; models: string[]; remote?: string[] }> {
   try {
     const response = await fetch("http://127.0.0.1:11434/api/tags", { signal: AbortSignal.timeout(800) });
     if (!response.ok) return { up: false, models: [] };
-    const body = (await response.json()) as { models?: { name?: string }[] };
-    const models = (body.models ?? []).map((model) => model.name).filter((name): name is string => !!name);
-    return { up: true, models };
+    const body = (await response.json()) as { models?: { name?: string; remote_host?: unknown; remote_model?: unknown }[] };
+    const tags = (body.models ?? []).filter((model): model is { name: string } => !!model.name);
+    return { up: true, models: tags.map((model) => model.name), remote: tags.filter(isRemoteOllamaTag).map((model) => model.name) };
   } catch {
     return { up: false, models: [] };
   }

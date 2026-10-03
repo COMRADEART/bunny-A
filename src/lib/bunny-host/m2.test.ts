@@ -111,6 +111,40 @@ test("hard localOnly constraint excludes cloud providers outright, whatever thei
   assert.throws(() => bunnyRoute({ prompt: "Rewrite this", mode: "fast", providers, constraints: { localOnly: true }, override: "codex" }), /not eligible/);
 });
 
+test("MA1: local-only routing never inherits an Ollama cloud-hosted default; other routing is unchanged", () => {
+  const cloudFirst = ready("ollama", { current_model: "deepseek-v4.1-flash:cloud", models: ["deepseek-v4.1-flash:cloud", "qwen2.5-coder:7b"], remoteModels: ["deepseek-v4.1-flash:cloud"] });
+  const local = bunnyRoute({ prompt: "Summarize hello", mode: "fast", providers: [ready("codex"), cloudFirst], constraints: { localOnly: true } });
+  assert.equal(local.recommended_provider, "ollama");
+  assert.equal(local.recommended_model, "qwen2.5-coder:7b");
+  assert.ok(local.reasons?.some((reason) => /not the cloud-hosted default deepseek-v4\.1-flash:cloud/.test(reason)));
+  assert.equal(bunnyRoute({ prompt: "Summarize hello", mode: "fast", providers: [cloudFirst], constraints: { offlineOnly: true } }).recommended_model, "qwen2.5-coder:7b");
+  // Without a locality constraint the legacy default is kept (the UI labels it as Ollama's cloud service).
+  assert.equal(bunnyRoute({ prompt: "Summarize hello", mode: "fast", providers: [cloudFirst], override: "ollama" }).recommended_model, "deepseek-v4.1-flash:cloud");
+  const onlyCloud = ready("ollama", { current_model: "deepseek-v4.1-flash:cloud", models: ["deepseek-v4.1-flash:cloud"], remoteModels: ["deepseek-v4.1-flash:cloud"] });
+  assert.match(eligibility(onlyCloud, { localOnly: true })!, /cloud-hosted/);
+  assert.throws(() => bunnyRoute({ prompt: "Summarize hello", mode: "fast", providers: [onlyCloud], constraints: { localOnly: true } }), /hard constraints/);
+  // Name-only cloud tags (older Ollama without remote_host) are still never local.
+  assert.match(eligibility(ready("ollama", { current_model: "x:cloud", models: ["x:cloud"] }), { localOnly: true })!, /cloud-hosted/);
+});
+
+test("MA1: a stale local-only task whose model is cloud-hosted is refused at launch", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "bunny-ma1-local-"));
+  const launched: string[] = [];
+  const ollama: ProviderAdapter = { id: "ollama", detect: async () => ready("ollama", { current_model: "deepseek-v4.1-flash:cloud", models: ["deepseek-v4.1-flash:cloud", "qwen2.5-coder:7b"], remoteModels: ["deepseek-v4.1-flash:cloud"] }), launch: (task) => { launched.push(task.model); return { done: new Promise<AdapterResult>(() => {}), stop: async () => {} }; } };
+  const db = new HostDatabase(join(dir, "host.sqlite"));
+  try {
+    const manager = new TaskManager(db, dir, [ollama]);
+    await manager.discover();
+    const task = manager.submit({ prompt: "Summarize hello", mode: "fast", constraints: { localOnly: true } });
+    assert.equal(task.model, "qwen2.5-coder:7b");
+    // A record routed before this guard existed (or edited) still carries the cloud model.
+    db.write({ ...db.get(task.id), model: "deepseek-v4.1-flash:cloud" }, "fixture.stale", "stale route");
+    assert.throws(() => manager.approve(task.id), /not local inference/);
+    assert.deepEqual(launched, []);
+    assert.equal(db.get(task.id).state, "waiting_for_approval");
+  } finally { db.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("automatic routing for a file-and-run task: text-only Ollama is ineligible and the decision is structured", () => {
   const providers = [ready("codex"), ready("claude"), ready("ollama")];
   const decision = bunnyRoute({ prompt: 'Create hello.py containing print("BUNNY_ROUTE_OK"). Run the script and verify stdout.', mode: "balanced", providers });

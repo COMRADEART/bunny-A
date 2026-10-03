@@ -4,7 +4,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { canTransition } from "../orch/machine.ts";
 import type { OrchTask, Project, ProviderId, ProviderLive, TaskState, HostSample, TaskProgress, TokenUsage, ProcessInfo, ProviderExecutionScope } from "../orch/types.ts";
 import { HostDatabase } from "./persistence.server.ts";
-import { bunnyRoute, eligibility, inferredConstraints } from "./router.ts";
+import { bunnyRoute, eligibility, inferredConstraints, runsLocally } from "./router.ts";
 import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask } from "./contracts.ts";
 import { PolicyEngine } from "./learning.server.ts";
@@ -202,6 +202,7 @@ export class TaskManager {
     if(task.executionScope && !["read","write"].includes(task.executionScope.access)) throw new Error("Invalid provider execution authority.");
     const provider=this.live().find(p=>p.id===task.provider);if(!provider) throw new Error("Executor is no longer eligible. Route again.");
     const blocked=eligibility(provider,task.constraints ?? {});if(blocked) throw new Error(`Executor is no longer eligible: ${blocked} Route again.`);
+    if((task.constraints?.localOnly || task.constraints?.offlineOnly) && !runsLocally(provider,task.model)) throw new Error(`Executor is no longer eligible: ${task.model} is not local inference and this task is local-only. Route again.`);
     const adapter=this.adapters.find(a=>a.id===task.provider);if(!adapter) throw new Error("Adapter unsupported.");
     if(!task.cwd || realpathSync(task.cwd)!==task.cwd || !statSync(task.cwd).isDirectory()) throw new Error("Execution root changed or is unavailable.");
     const accepted=this.update(task,{state:"launching",startedAt:Date.now(),activity:"Starting",...(approval.kind==="mission" ? {approval} : {})},approvalEvent,approvalDetail);

@@ -137,8 +137,8 @@ export class OllamaAdapter implements ProviderAdapter {
     live.executable = located.launch?.path ?? null; live.installed = found.up || !!live.executable;
     live.authenticated = found.up; live.authenticatedState = "not_required";
     live.availability = found.up && found.models.length ? "ready" : found.up ? "unavailable" : live.installed ? "offline" : "not_installed";
-    live.models = found.models; live.current_model = found.models[0] ?? null;
-    live.evidence = [`GET http://127.0.0.1:11434/api/tags → ${found.up ? `${found.models.length} models` : "unreachable"}`];
+    live.models = found.models; live.current_model = found.models[0] ?? null; live.remoteModels = found.remote ?? [];
+    live.evidence = [`GET http://127.0.0.1:11434/api/tags → ${found.up ? `${found.models.length} models${live.remoteModels.length ? `, cloud-hosted: ${live.remoteModels.join(", ")}` : ""}` : "unreachable"}`];
     live.detail = found.up ? found.models.join(", ") || "Service reachable; no models installed." : live.installed ? "Installed, but the service is unreachable at 127.0.0.1:11434." : "Not detected on this workstation.";
     if (found.up) {
       try {
