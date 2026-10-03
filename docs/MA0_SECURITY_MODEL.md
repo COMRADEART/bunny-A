@@ -79,13 +79,15 @@ Unchanged authentication (paired, hashed, revocable device token). Mission actio
 
 ## Computer Runtime limits
 
-Window list (READ), control tree (READ, privacy-sensitive), focus, invoke/toggle/select/expand, set value through `ValuePattern`, screen capture (privacy-sensitive), open allowlisted apps (`notepad, calculator, paint, explorer, terminal`) optionally on a non-executable file inside the roots. No raw mouse coordinates and no synthetic keystrokes are offered. All non-READ actions are EXECUTE and need an envelope that enables computer control.
+Window list (READ), control tree (READ, privacy-sensitive), focus, invoke/toggle/select/expand, set value through `ValuePattern`, screen capture (privacy-sensitive), open allowlisted apps (`notepad, calculator, paint, explorer, terminal`) optionally on a non-executable file inside the roots. No raw mouse coordinates and no synthetic keystrokes are offered. All non-READ actions are EXECUTE and need an envelope that enables computer control. The mission scope request adds the EXECUTE risk class only for model or `terminal.exec` steps, so in a capability-only Mission every non-READ computer action asks the user (M-A-1 Phase O; fail-closed, recorded as a LOW limitation).
 
 ## Git merge transaction and Stop
 
 `git.merge` refuses pre-existing Git operations, index locks or tracked/index changes. It captures HEAD/target/status, takes an owned sidecar lock and stages a `--no-ff --no-commit` merge with a unique MERGE_MSG marker before committing. Only matching marker, MERGE_HEAD, ORIG_HEAD, unchanged original HEAD and owned sidecar prove an unfinished merge is Bunny's. Conflict, process failure and cancellation then use bounded `git merge --abort` with a fresh signal and verify HEAD/tree/index restoration. Untracked user files remain; no reset or unrelated merge abort occurs.
 
 Capability cancellation and Mission Stop await adapter cleanup and run persistence; Stop blocks scheduling/finalization races and never retries. `cleanup: {attempted, ok, detail}` is persisted and returned, and failed cleanup appears in the mission Stop result. If ownership cannot be proven, inspection/abort fails or an early process interruption leaves changes/index.lock before ownership is established, the result reports manual attention instead of destructive cleanup. If commit wins a cancellation race, it stays committed and the result says so. A hard Host/process crash cannot guarantee cleanup; automatic destructive recovery is not added.
+
+On Windows, Bunny launches the real `<Git>\mingw64\bin\git.exe` (or the clangarm64/mingw32 sibling) rather than Git for Windows' `<Git>\cmd\git.exe` launcher, which re-spawns git outside the Host's kill-on-close process job (M-A-1 Phase S: with the launcher, a Bunny merge interrupted by a Host crash was committed 27 s later by the orphaned git, after recovery had recorded it as not resumed). With the real binary, git ends with the Host and the repository keeps the interrupted merge (MERGE_HEAD with Bunny's marker plus `.git/bunny-merge.lock`); a later merge refuses and names that state and the manual cleanup. Git hook processes started by MSYS can still outlive a crash; without their git parent they cannot commit.
 
 ## Secrets
 
@@ -104,3 +106,5 @@ Created disabled; fire only if globally enabled **and** individually enabled; mi
 * Executable identity is a canonical path plus launch prefix, not a binary/content integrity guarantee.
 * Unproven Git ownership, failed cleanup or a hard Host crash require manual attention; committed merges are never reset by cancellation.
 * Trigger `contains` matching is plain substring matching on event detail text.
+* (M-A-1) Provider children inherit the Host's environment except `CLAUDECODE`. A Host started from a Claude Code terminal therefore passes that session's `CLAUDE_CODE_*` variables to provider sessions; start the Host from the logon shortcut or a normal shell.
+* (M-A-1) The desktop package ships no `node_modules`; its browser capability reports Playwright unavailable.
