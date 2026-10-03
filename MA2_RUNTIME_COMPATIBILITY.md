@@ -17,4 +17,9 @@ The launcher and worker refuse a missing or changed client.
 Ordinary startup does not download a replacement client.
 
 The manifest records the source SHA, tooling SHA and file hashes.
-The final installed identities will be in the implementation report.
+The installed source is `898c52cbb439cbaa738f6a44e89ca4c526591cc9`.
+The installed tooling is `e7f82de8f82fb427bc00fdb19a715b58df32fadf`.
+The runtime is the packaged Node `v24.18.0`.
+The observed Codex version is still `codex-cli 0.153.4`.
+The observed cloudflared version is `2026.9.3`.
+The complete identities are in the implementation report.

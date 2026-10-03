@@ -20,6 +20,13 @@ The reports contain row fingerprints and file hashes. They do not contain bearer
 Mission and capability authority checks stay unchanged.
 Missions and triggers must retain their pre-migration flags.
 
+The live migration preserved the Host token and all nine paired-device records.
+Unpaired state access returned HTTP 401.
+Missions and triggers stayed OFF.
+The final state tree had no links to the repository.
+The installed manifest matched its configuration hash and all 140 file hashes.
+No new public tunnel or provider task started during T1 acceptance.
+
 ## Open gates
 
 T3 must add fatal-error containment.

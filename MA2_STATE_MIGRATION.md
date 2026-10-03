@@ -3,8 +3,8 @@
 ## Scope
 
 Gate T1 moves active production state outside Git.
-The old repository path will retain a retirement marker only.
-The complete old directory will remain in an external backup.
+The old repository path retains a retirement marker only.
+The complete old directory remains in an external backup.
 
 ## Controlled procedure
 
@@ -64,5 +64,17 @@ The current installation uses a quick tunnel. T1 does not start a new public tun
 
 ## Live evidence
 
-Live migration is pending the full regression gates and the installed candidate test.
-The final result will be recorded in `MA2_IMPLEMENTATION_REPORT.md`.
+Live migration passed on 3 October 2026.
+The controller completed at `21:17:40 UTC`.
+Host PID 2200 uses `C:\Users\allam\AppData\Local\Bunny-A\state\host.sqlite`.
+The real state directory has no junction or multiple file links.
+All 23 user tables and the SQLite sequence table passed preservation checks.
+All 54 original files remain in the external recovery trees with equal hashes.
+Nine project paths changed to the canonical state root.
+All other persistent fields stayed equal, except three provider telemetry fields.
+
+The recovery root is `C:\Users\allam\AppData\Local\Bunny-A\backups\state-migration-20261003-171730-e35e2c8b`.
+Read `cutover\migration.json`, `preservation-live.json`, `transaction.json` and `RECOVERY.md` there.
+Read `MA2_IMPLEMENTATION_REPORT.md` for installed identities and complete table counts.
+A repeat check returned `already-migrated`.
+Real sign-in and the public tunnel remain NOT TESTED.

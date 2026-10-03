@@ -1,6 +1,7 @@
 # Bunny-A M-A-2 architecture
 
 This record covers Gate T1. Gates T2 through T10 remain open.
+The production T1 migration passed on 3 October 2026.
 
 ## Accepted baseline
 
@@ -15,6 +16,11 @@ This record covers Gate T1. Gates T2 through T10 remain open.
 | Independent baseline result | `BUNNY_MA1D_PROMOTION_APPROVED_WITH_LIMITATIONS` |
 
 The accepted commits stay unchanged. The two existing untracked review files stay in place.
+
+The installed T1 source is `898c52cbb439cbaa738f6a44e89ca4c526591cc9`.
+The installed tooling is `e7f82de8f82fb427bc00fdb19a715b58df32fadf`.
+The release name is `Bunny-A-Windows-v17-T1`.
+This release name identifies the T1 checkpoint. It does not imply full M-A-2 acceptance.
 
 ## Installed state layout
 

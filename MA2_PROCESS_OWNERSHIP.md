@@ -15,6 +15,15 @@ An unknown tunnel owner causes refusal.
 The controller does not stop processes by name or port.
 The M3 QA server is outside the owned process set.
 
+The real cutover stopped Host PID 9984 and gateway PID 14532 only.
+Both used the installed v16 runtime before Stop.
+The new Host is PID 2200. The new gateway is PID 42156.
+Both use the installed T1 runtime.
+M3 QA PID 11020 kept its executable, command line and creation time.
+Its creation time is `2026-10-03T03:49:11.7887020Z`.
+Island and tunnel processes were absent before migration.
+The migration left them absent.
+
 ## T4 work
 
 Gate T4 is NOT IMPLEMENTED in this T1 change.
