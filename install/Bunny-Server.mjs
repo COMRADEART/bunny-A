@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+if(process.env.BUNNY_STATE_LAYOUT!=="2" || !process.env.BUNNY_HOST_CREDENTIALS_FILE || !process.env.BUNNY_REMOTE_CONFIG) throw new Error("Start the installed gateway through Start-Bunny-Release.ps1. Installed state must be configured explicitly.");
 import { desktopManifest, allowedOrigins, requestAllowed } from "./manifest.mjs";
 
 const remotePath=resolve(process.env.BUNNY_REMOTE_CONFIG ?? "remote.json");

@@ -5,6 +5,8 @@ $ErrorActionPreference='Stop'
 $release=$PSScriptRoot
 if(-not $InstallConfig) {$InstallConfig=Join-Path (Split-Path -Parent (Split-Path -Parent $release)) 'install.json'}
 $config=if(Test-Path -LiteralPath $InstallConfig) {Get-Content -LiteralPath $InstallConfig -Raw | ConvertFrom-Json} else {$null}
+. (Join-Path $release 'Bunny-State.ps1')
+$paths=if($config) {Get-BunnyStatePaths $config} else {$null}
 $manifestPath=Join-Path $release 'release-manifest.json'
 $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 $node=Join-Path $release 'runtime\node.exe'
@@ -37,13 +39,13 @@ if(-not $Quick) {
   }
 }
 
-$data=if($config) {Join-Path $config.stateRoot '.bunny-a'} else {$null}
+$data=if($paths) {$paths.root} else {$null}
 $dataItem=if($data -and (Test-Path -LiteralPath $data)) {Get-Item -LiteralPath $data} else {$null}
 $port=if($config -and $config.hostPort) {[int]$config.hostPort} else {43119}
 $health=$null; try {$health=Invoke-RestMethod "http://127.0.0.1:$port/health" -TimeoutSec 2} catch {}
 $web=$null; try {$web=Invoke-RestMethod 'http://127.0.0.1:8084/bunny-health' -TimeoutSec 2} catch {}
 $tunnel=$null
-if($data -and (Test-Path -LiteralPath (Join-Path $data 'tunnel-process.json'))) {$tunnel=Get-ProcessInfo ([int](Get-Content -LiteralPath (Join-Path $data 'tunnel-process.json') -Raw | ConvertFrom-Json).pid) 'scripts\bunny-tunnel.mjs'}
+if($paths -and (Test-Path -LiteralPath $paths.tunnelProcess)) {$tunnel=Get-ProcessInfo ([int](Get-Content -LiteralPath $paths.tunnelProcess -Raw | ConvertFrom-Json).pid) 'scripts\bunny-tunnel.mjs'}
 $islands=@(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object {$_.CommandLine -match 'Start-Bunny-Release\.ps1|start-bunny-island\.ps1'} | ForEach-Object {[ordered]@{pid=$_.ProcessId;commandLine=$_.CommandLine;fromThisRelease=$_.CommandLine.Contains((Join-Path $release 'Start-Bunny-Release.ps1'))}})
 $shortcutPath=if($config -and $config.shortcut) {$config.shortcut} else {Join-Path ([Environment]::GetFolderPath('Startup')) 'Bunny-A.lnk'}
 $shortcut=$null
@@ -52,12 +54,12 @@ if(Test-Path -LiteralPath $shortcutPath) {$link=(New-Object -ComObject WScript.S
 [ordered]@{
   checkedAt=(Get-Date).ToUniversalTime().ToString('o')
   release=[ordered]@{name=$manifest.release;version=$manifest.version;sourceCommit=$manifest.sourceCommit;toolingCommit=$manifest.toolingCommit;builtAt=$manifest.builtAt;folder=$release;manifestSha256=(Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLower();hostSchemaUserVersion=$manifest.compatibility.hostSchemaUserVersion;insideGitCheckout=(Get-GitCheckout $release)}
-  integrity=[ordered]@{ok=(-not($changed.Count+$missing.Count+$extra.Count));scope=if($Quick) {'host, launcher and runtime files'} else {'all files'};checked=$checked;changed=$changed;missing=$missing;extra=$extra}
-  install=if($config) {[ordered]@{config=$InstallConfig;stateRoot=$config.stateRoot;dataDirectory=$data;dataDirectoryLinkTarget=if($dataItem -and $dataItem.LinkType) {@($dataItem.Target)[0]} else {$null};workspace=$config.workspace;workspaceInsideGitCheckout=(Get-GitCheckout $config.workspace);currentRelease=$config.currentRelease.name}} else {$null}
+  integrity=[ordered]@{ok=(-not($changed.Count+$missing.Count+$extra.Count));manifestMatchesInstall=($config.currentRelease.manifestSha256 -eq (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLower());scope=if($Quick) {'host, launcher and runtime files'} else {'all files'};checked=$checked;changed=$changed;missing=$missing;extra=$extra}
+  install=if($config) {[ordered]@{config=$InstallConfig;stateLayoutVersion=$config.stateLayoutVersion;stateRoot=$config.stateRoot;dataDirectory=$data;database=$paths.database;credentials=$paths.credentials;cloudflared=$paths.cloudflared;logs=$paths.logs;backups=$paths.backups;stateInsideGitCheckout=(Get-GitCheckout $data);dataDirectoryLinkTarget=if($dataItem -and $dataItem.LinkType) {@($dataItem.Target)[0]} else {$null};workspace=$config.workspace;workspaceInsideGitCheckout=(Get-GitCheckout $config.workspace);currentRelease=$config.currentRelease.name}} else {$null}
   shortcut=$shortcut
   host=if($health) {[ordered]@{instanceId=$health.instanceId;process=(Get-ProcessInfo ([int]$health.pid) 'Bunny-Host.mjs')}} else {$null}
   # The dashboard gateway runs the package named in deployment.json on this release's runtime.
-  gateway=if($web) {[ordered]@{root=$web.root;package=if($data -and (Test-Path -LiteralPath (Join-Path $data 'deployment.json'))) {(Get-Content -LiteralPath (Join-Path $data 'deployment.json') -Raw | ConvertFrom-Json).packagePath} else {$null};process=(Get-ProcessInfo ([int]$web.pid) $null)}} else {$null}
+  gateway=if($web) {[ordered]@{root=$web.root;package=if($paths -and (Test-Path -LiteralPath $paths.deployment)) {(Get-Content -LiteralPath $paths.deployment -Raw | ConvertFrom-Json).packagePath} else {$null};process=(Get-ProcessInfo ([int]$web.pid) $null)}} else {$null}
   tunnelWorker=$tunnel
   island=$islands
 } | ConvertTo-Json -Depth 6

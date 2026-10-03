@@ -1,5 +1,8 @@
 ﻿param(
   [string]$Root = (Split-Path -Parent $PSScriptRoot),
+  [string]$CredentialPath,
+  [string]$DeploymentPath,
+  [string]$PreferencePath,
   [switch]$SmokeTest,
   [switch]$SystemView,
   [switch]$LightView,
@@ -8,8 +11,16 @@
   [scriptblock]$TestHook
 )
 $ErrorActionPreference = 'Stop'
+if((Test-Path -LiteralPath (Join-Path $PSScriptRoot 'release-manifest.json')) -and -not $CredentialPath) {throw 'Start the installed Island through Start-Bunny-Release.ps1. Installed state must be configured explicitly.'}
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
-$bunnyCredentialPath = Join-Path $Root '.bunny-a/credentials.json'
+$bunnyCredentialPath = if($CredentialPath) {$CredentialPath} else {Join-Path $Root '.bunny-a/credentials.json'}
+$bunnyDeploymentPath = if($DeploymentPath) {$DeploymentPath} else {Join-Path $Root '.bunny-a/deployment.json'}
+function Open-BunnyDashboard([string]$Query='') {
+  if(Test-Path -LiteralPath $bunnyDeploymentPath) {Start-Process ('http://127.0.0.1:8084/'+$Query)}
+  elseif($CredentialPath) {throw 'The installed dashboard configuration is missing.'}
+  elseif(Test-Path -LiteralPath (Join-Path $Root 'Bunny-Server.mjs')) {Start-Process ('http://127.0.0.1:8084/'+$Query)}
+  else {& (Join-Path $Root 'scripts/start-bunny-dev.ps1');Start-Process ('http://127.0.0.1:8080/'+$Query)}
+}
 $bunnySnapshot = $null
 $bunnySelectedId = $null
 $bunnyExpanded = $false
@@ -700,7 +711,7 @@ $bunnyControls.TerminalButton.Add_Click({
   # The Host decides per provider; when it cannot attach it says so, and nothing else is opened in its place.
   try { [void](Invoke-Bunny 'terminal' @{ id = $bunnySelectedId }); $bunnyControls.Notice.Text = 'Terminal attached.' } catch { $bunnyControls.Notice.Text = Get-BunnyError $_ }
 })
-$bunnyControls.OpenButton.Add_Click({ if (Test-Path -LiteralPath (Join-Path $Root '.bunny-a/deployment.json')) { Start-Process 'http://127.0.0.1:8084/' } elseif (Test-Path -LiteralPath (Join-Path $Root 'Bunny-Server.mjs')) { Start-Process 'http://127.0.0.1:8084/' } else { & (Join-Path $Root 'scripts/start-bunny-dev.ps1'); Start-Process 'http://127.0.0.1:8080/' } })
+$bunnyControls.OpenButton.Add_Click({Open-BunnyDashboard})
 $bunnyControls.ThemeButton.Add_Click({ Set-BunnyTheme (-not $bunnyLight) })
 if ($LightView) { Set-BunnyTheme $true }
 

@@ -1,7 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomBytes, createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { resolve, join } from "node:path";
 import { HostDatabase } from "./persistence.server.ts";
 import { TaskManager } from "./manager.server.ts";
 import { sampleHost } from "../orch/telemetry.server.ts";
@@ -10,6 +9,7 @@ import type { Mode, OrchTask, Project, ProviderId, TaskConstraints } from "../or
 import type { AgentSession, HostSnapshot } from "./contracts.ts";
 import { MissionManager, type MissionManagerOptions } from "../bunny-missions/manager.server.ts";
 import { MISSION_ACTIONS, missionCommand } from "../bunny-missions/commands.server.ts";
+import { hostStatePaths } from "./state-paths.server.ts";
 
 const PROVIDERS: ProviderId[]=["codex","claude","ollama","opencode","cline","cursor"];
 function record(value: unknown): Record<string,unknown> {if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("Expected an object.");return value as Record<string,unknown>;}
@@ -54,19 +54,20 @@ async function body(request: IncomingMessage) {let data="";for await(const chunk
 function json(response: ServerResponse,value: unknown,status=200) {response.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"});response.end(JSON.stringify(value));}
 
 export async function startHost(options: { dataDirectory?: string; root?: string; port?: number; missions?: Omit<MissionManagerOptions,"dataDirectory"> }={}) {
-  const dataDirectory=resolve(options.dataDirectory ?? process.env.BUNNY_HOST_DATA_DIRECTORY ?? ".bunny-a");
-  mkdirSync(dataDirectory,{recursive:true});
-  const credentialPath=join(dataDirectory,"credentials.json");
+  const paths=hostStatePaths(options.dataDirectory);
+  const dataDirectory=paths.data;
+  if(!paths.installed) mkdirSync(dataDirectory,{recursive:true});
+  const credentialPath=paths.credentials;
   const saved=existsSync(credentialPath) ? JSON.parse(readFileSync(credentialPath,"utf8")) as { token: string } : null;
   const token=saved?.token ?? randomBytes(32).toString("base64url");
   const port=options.port ?? Number(process.env.BUNNY_HOST_PORT ?? 43119);
-  const db=new HostDatabase(join(dataDirectory,"host.sqlite"));
-  const manager=new TaskManager(db,options.root ?? process.cwd(),undefined,{sessionDirectory:join(dataDirectory,"sessions")});
+  const db=new HostDatabase(paths.database);
+  const manager=new TaskManager(db,options.root ?? process.cwd(),undefined,{sessionDirectory:paths.sessions});
   // M-A-0 mission layer: additive tables are created, but nothing runs unless missions are enabled.
   const missions=new MissionManager(manager,{dataDirectory,...options.missions});
   const snapshot=(after:number):HostSnapshot=>({...manager.snapshot(after),missions:missions.snapshot()});
-  manager.remoteConfigured=!!process.env.BUNNY_REMOTE_ORIGIN || existsSync(join(dataDirectory,"remote.json"));
-  if(existsSync(join(dataDirectory,"remote.json"))) manager.remoteUrl=JSON.parse(readFileSync(join(dataDirectory,"remote.json"),"utf8")).url;
+  manager.remoteConfigured=!!process.env.BUNNY_REMOTE_ORIGIN || existsSync(paths.remote);
+  if(existsSync(paths.remote)) manager.remoteUrl=JSON.parse(readFileSync(paths.remote,"utf8")).url;
   let pairing: {codeHash: string;expiresAt:number} | null=null;
   // Per-client limit stops guessing from one source; the global cap stops header rotation.
   // Pairing codes carry 96 bits of entropy, so both limits are defence in depth.
