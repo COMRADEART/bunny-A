@@ -25,10 +25,14 @@ try {
   New-Item -ItemType Directory -Path $bunnyPackage -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $bunnyBuild '.output') -Destination (Join-Path $bunnyPackage '.output') -Recurse
   foreach($name in @('Bunny-Host.mjs','Bunny-Server.mjs','Bunny-Island.ps1','Bunny-Island.Visual.ps1','Bunny-Island.Motion.ps1','Launch-Bunny-A.ps1','Launch-Bunny-A.cmd','manifest.mjs')) {Copy-Item -LiteralPath (Join-Path $bunnyWorkspace ('install/'+$name)) -Destination $bunnyPackage}
-  foreach($directory in @('bunny-host','orch')) {
-    $target=Join-Path $bunnyPackage ('src/lib/'+$directory)
-    New-Item -ItemType Directory -Path $target -Force | Out-Null
-    Get-ChildItem -LiteralPath (Join-Path $bunnyWorkspace ('src/lib/'+$directory)) -Filter '*.ts' | Where-Object Name -notlike '*.test.ts' | Copy-Item -Destination $target
+  # Every folder the Host's import graph reaches (desktop-install.test.mjs checks this list), with subfolders.
+  foreach($directory in @('bunny-host','orch','bunny-missions')) {
+    $source=(Resolve-Path -LiteralPath (Join-Path $bunnyWorkspace ('src/lib/'+$directory))).Path
+    Get-ChildItem -LiteralPath $source -Filter '*.ts' -Recurse -File | Where-Object Name -notlike '*.test.ts' | ForEach-Object {
+      $target=Join-Path $bunnyPackage ('src/lib/'+$directory+$_.FullName.Substring($source.Length))
+      New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+      Copy-Item -LiteralPath $_.FullName -Destination $target
+    }
   }
   # Type-stripped Host files are ESM. No npm install is required for the native Host.
   '{"type":"module"}' | Set-Content -LiteralPath (Join-Path $bunnyPackage 'package.json') -Encoding ascii
