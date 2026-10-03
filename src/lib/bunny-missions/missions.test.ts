@@ -7,6 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { HostDatabase } from "../bunny-host/persistence.server.ts";
 import { TaskManager } from "../bunny-host/manager.server.ts";
 import { providerBase, codexLaunchArgs, claudeLaunchArgs } from "../bunny-host/adapters.server.ts";
+import { runsLocally } from "../bunny-host/router.ts";
 import type { AdapterHooks, AdapterResult, ProviderAdapter } from "../bunny-host/contracts.ts";
 import type { OrchTask, ProviderId, ProviderLive } from "../orch/types.ts";
 import { MissionManager } from "./manager.server.ts";
@@ -666,24 +667,31 @@ test("MA1: mission children are routed on the step objective, not on Bunny's age
   // mission model step, so text-only (local) providers were never eligible and local-only missions could not run.
   const env = await setup({ providers: ["claude", "ollama"] });
   try {
-    const view = env.missions.create({ objective: "Text and file steps", mode: "fast", origin: "workstation", steps: [model("Writer", "Write two sentences about unit tests"), model("Reader", "Read the README file and list its headings")] });
-    env.missions.approve(view.id, "workstation");
-    await until(() => env.launched.length === 2, "both launches");
-    const writer = env.launched.find((l) => l.task.routingPrompt === "Write two sentences about unit tests")!;
-    const reader = env.launched.find((l) => l.task.routingPrompt === "Read the README file and list its headings")!;
-    assert.match(writer.task.prompt, /do not modify any files/, "the provider still receives the full agent prompt");
-    assert.equal(writer.task.constraints?.requiresFilesystem, false);
-    assert.ok(writer.task.decision.eligible_providers?.includes("ollama"), "a text step may use a local text-only provider");
-    assert.equal(reader.task.constraints?.requiresFilesystem, true, "file work in the objective still requires a filesystem-capable agent");
-    assert.equal(reader.task.provider, "claude");
-    for (const l of env.launched) l.finish({ ok: true, output: "done" });
-    await until(() => env.missions.mission(view.id).state === "completed", "completion");
-    // Retargeting keeps routing on the objective too.
+    // Non-local mission: an agent step works in the approved folder, so text-only providers stay ineligible
+    // (live M-A-1: a "Read README.md" step was otherwise routed to text-only Ollama).
+    const open = env.missions.create({ objective: "Open", mode: "fast", origin: "workstation", steps: [model("Reader", "Read README.md and report the secret word")] });
+    env.missions.approve(open.id, "workstation");
+    await until(() => env.launched.length === 1, "open launch");
+    assert.equal(env.launched[0].task.routingPrompt, "Read README.md and report the secret word");
+    assert.match(env.launched[0].task.prompt, /do not modify any files/, "the provider still receives the full agent prompt");
+    assert.equal(env.launched[0].task.constraints?.requiresFilesystem, true);
+    assert.equal(env.launched[0].task.provider, "claude");
+    env.launched[0].finish({ ok: true, output: "done" });
+    await until(() => env.missions.mission(open.id).state === "completed", "open completion");
+    // Local-only mission: the step objective decides, not Bunny's boilerplate.
+    const local = env.missions.create({ objective: "Local", mode: "fast", origin: "workstation", localOnly: true, steps: [model("Writer", "Write two sentences about unit tests"), model("Reader", "Read the README file and list its headings")] });
+    env.missions.approve(local.id, "workstation");
+    await until(() => env.launched.length === 2 && env.missions.store.steps(local.id).some((s) => s.state === "failed"), "local text launch and file step refusal");
+    assert.equal(env.launched[1].task.provider, "ollama", "a local-only text step can use the local text-only model");
+    assert.equal(env.launched[1].task.constraints?.requiresFilesystem, false);
+    const reader = env.missions.store.steps(local.id).find((s) => s.role === "Reader")!;
+    assert.equal(reader.failure?.category, "provider_unavailable", "file work stays impossible without a local filesystem-capable agent (fails closed)");
+    env.launched[1].finish({ ok: true, output: "two sentences" });
     const direct = env.tasks.submit({ prompt: "Write two sentences about unit tests", mode: "fast" });
     assert.equal(direct.routingPrompt, undefined, "direct tasks are unchanged");
   } finally { await env.cleanup(); }
 });
-test("MA1: Ollama locality is per model: local-only missions get a local model; cloud-hosted tags count as external", async () => {
+test("MA1: Ollama locality is per model: local-only missions get a local model; a cloud-hosted tag is never launched as local", async () => {
   const dir = mkdtempSync(join(tmpdir(), "bunny-ma1-ollama-"));
   const root = join(dir, "project"); mkdirSync(root);
   const db = new HostDatabase(join(dir, "host.sqlite"));
@@ -705,14 +713,16 @@ test("MA1: Ollama locality is per model: local-only missions get a local model; 
     assert.equal(missions.mission(local.id).accounting.localModelCalls, 1);
     assert.equal(missions.mission(local.id).accounting.externalModelCalls, 0);
 
+    // A non-local agent step needs a filesystem-capable provider, so text-only Ollama (and its cloud tag) is never launched.
     const open = missions.create({ objective: "Summarize", mode: "fast", origin: "workstation", providers: ["ollama"], steps: [model("Writer", "Summarize hello")] });
     missions.approve(open.id, "workstation");
-    await until(() => launched.length === 2, "open launch");
-    assert.equal(launched[1].task.model, "deepseek-v4.1-flash:cloud", "unconstrained routing keeps the legacy default");
-    launched[1].finish({ ok: true, output: "hello" });
-    await until(() => missions.mission(open.id).state === "completed", "open completion");
-    assert.equal(missions.mission(open.id).accounting.externalModelCalls, 1, "a cloud-hosted Ollama tag is an external model call");
-    assert.equal(missions.mission(open.id).accounting.localModelCalls, 0);
+    await until(() => missions.store.steps(open.id)[0].state === "failed", "open step refused");
+    assert.equal(missions.store.steps(open.id)[0].failure?.category, "provider_unavailable");
+    assert.equal(launched.length, 1, "the cloud-hosted tag was never launched");
+    // Per-model accounting itself: the same provider counts as external for its cloud tag.
+    const live = tasks.live().find((p) => p.id === "ollama")!;
+    assert.equal(runsLocally(live, "deepseek-v4.1-flash:cloud"), false);
+    assert.equal(runsLocally(live, "qwen2.5-coder:7b"), true);
   } finally { await missions.close(); db.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 test("recovery after a Host restart: interrupted steps are reported, never resumed; retry starts a fresh child", async () => {

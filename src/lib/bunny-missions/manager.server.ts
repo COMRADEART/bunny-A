@@ -377,7 +377,9 @@ export class MissionManager {
     const repair = step.attempts.at(-1)?.category === "verification_failed" ? step.attempts.at(-1)!.detail : null;
     const prompt = agentPrompt({ mission, step, cwd: workspace, dependencies: this.dependencyResults(step), facts: this.memory.context(mission.id), repair });
     const constraints: TaskConstraints = {
-      requiresFilesystem: step.scope.access === "write" || step.requiredCapabilities.some((cap) => cap.startsWith("filesystem.")),
+      // An agent step works in the approved folder, so it needs a filesystem-capable provider. Only when local
+      // execution is required do the step's declared capabilities and its objective decide (text-only local models).
+      requiresFilesystem: step.scope.access === "write" || step.requiredCapabilities.some((cap) => cap.startsWith("filesystem.")) || !(envelope.providers.localOnly || step.preferences.local || budgetLocal),
       localOnly: envelope.providers.localOnly || !!step.preferences.local || budgetLocal || undefined,
       ...(allow?.length ? { providerAllowlist: allow } : {}),
       ...(deny.size ? { providerDenylist: [...deny] } : {}),
