@@ -817,3 +817,18 @@ test("MA0R migration: old mission JSON stays byte-identical and missing provider
     assert.equal(env.launched.length, 0, "migration starts no provider");
   } finally { await env.cleanup(); }
 });
+test("MA1: a direct task's approval item leaves the inbox once the task is approved or stopped", async () => {
+  const env = await setup();
+  try {
+    const open = (taskId: string) => env.missions.inbox.recent().filter((e) => e.taskId === taskId && e.kind === "requires_approval" && !e.acknowledgedAt);
+    const approved = env.tasks.submit({ prompt: "Direct task to approve", mode: "fast" });
+    assert.equal(open(approved.id).length, 1, "a waiting direct task asks the user");
+    env.tasks.approve(approved.id, "workstation");
+    assert.equal(open(approved.id).length, 0, "approval answers the item");
+    const stopped = env.tasks.submit({ prompt: "Direct task to stop", mode: "fast" });
+    assert.equal(open(stopped.id).length, 1);
+    await env.tasks.stop(stopped.id);
+    assert.equal(open(stopped.id).length, 0, "a task that ended no longer needs approval");
+    env.launched.forEach((run) => run.finish({ ok: true, output: "done" }));
+  } finally { await env.cleanup(); }
+});

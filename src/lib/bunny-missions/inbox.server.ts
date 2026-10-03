@@ -79,5 +79,9 @@ export class Inbox {
       this.store.saveInbox({ ...entry, acknowledgedAt: Date.now() });
     }
   }
+  /** A direct task's approval item is handled once the task was approved or ended. */
+  resolveTask(taskId: string) {
+    for (const entry of this.store.inbox(200, true)) if (entry.taskId === taskId && entry.kind === "requires_approval") this.store.saveInbox({ ...entry, acknowledgedAt: Date.now() });
+  }
   recent(limit = 40) { return this.store.inbox(limit); }
 }

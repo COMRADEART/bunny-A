@@ -127,7 +127,7 @@ export class MissionManager {
   }
   onHostEvent(event: HostEvent) {
     if (!this.cached.enabled || this.closed) return;
-    try { this.inbox.ingest(event); } catch { /* Inbox is advisory. */ }
+    try { this.inbox.ingest(event); if (event.taskId && (TASK_END.test(event.type) || event.type === "approval.accepted")) this.inbox.resolveTask(event.taskId); } catch { /* Inbox is advisory. */ }
     if (event.taskId && (TASK_END.test(event.type) || event.type === "approval.accepted")) {
       const step = this.store.stepForTask(event.taskId);
       if (step) setImmediate(() => { try { if (this.stopping.has(step.missionId)) return; if (event.type === "approval.accepted") this.childApprovedDirectly(step.id, event.taskId!); else void this.finishModelStep(step.id, event.taskId!); } catch (error) { this.emit("mission.error", `Step ${step.id}: ${error instanceof Error ? error.message : String(error)}`, step.missionId); } });
