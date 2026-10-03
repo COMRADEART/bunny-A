@@ -14,7 +14,7 @@
 | T1 cutover recovery | SIMULATED PASS | Windows controller; three injected failures |
 | T1 repository cleanup isolation | SIMULATED PASS | disposable `git clean -fdx` |
 | T1 tool hash checks | SIMULATED PASS | missing and changed binary tests |
-| T2 Codex compatibility gate | NOT TESTED; not implemented | open |
+| T2 Codex compatibility gate | IMPLEMENTED; native runtime LIVE VERIFIED; refusal cases SIMULATED PASS | policy 1; T2 evidence below |
 | T3 fatal-error containment | NOT TESTED; not implemented | open |
 | T4 Git launcher and hooks | NOT TESTED; not implemented | open |
 | T5 current dashboard promotion | NOT TESTED | v10 remains configured |
@@ -30,3 +30,69 @@ The final full M-A-2 verdict is NOT ISSUED.
 All 439 regression tests passed. Typecheck and build passed.
 Lint had 0 errors and 10 existing warnings.
 The evidence applies to source `898c52cbb439cbaa738f6a44e89ca4c526591cc9` and tooling `e7f82de8f82fb427bc00fdb19a715b58df32fadf`.
+
+# M-A-2 Gate T2
+
+## IMPLEMENTED
+
+| T2 check | Result | Evidence |
+|---|---|---|
+| Exact runtime registry and policy version | PASS | `codex-compatibility.server.ts`; policy 1 |
+| Both Mission access modes require compatibility | PASS | hard router constraint; Mission approval hook; adapter |
+| Manual retarget, including old children | PASS | MissionManager public retarget; router constraint |
+| Retry and replan recalculate eligibility | PASS | fresh child routing; launch validation |
+| Direct legacy policy | PASS | unchanged argv; separate UI readiness |
+| Existing provider observation persistence | PASS | existing JSON; schema 3 unchanged |
+
+## LIVE VERIFIED
+
+| Native check | Result | Evidence |
+|---|---|---|
+| Codex 0.153.4 exact binary | VALIDATED for read and write | `native-profile.json` |
+| Trusted Windows enum | accepted; invalid enum rejected | parser probes and implemented gate |
+| All 12 MA1 tool defaults | reported disabled | `features list` parser check |
+| T1 and user config preservation | PASS | `preservation.json`; equal protected hashes |
+
+Canonical binary: `C:\Users\allam\.codex\packages\standalone\releases\0.153.4-x86_64-pc-windows-msvc\bin\codex.exe`.
+SHA-256: `444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b`.
+
+## SIMULATED
+
+| Refusal or policy check | Result |
+|---|---|
+| Unknown future / old version / other patch | PASS: Mission ineligible |
+| Empty / malformed / nonzero / timeout version | PASS: fail closed |
+| Failed help / missing required flag or sandbox mode | PASS: fail closed |
+| Windows enum or extension control contradiction | PASS: incompatible |
+| Same version, different bytes | PASS: no inherited approval |
+| Binary replacement after discovery, restored size and mtime | PASS: no model starts |
+| Path change before or during checks | PASS: no model starts |
+| Version change with unchanged file bytes | PASS: re-probed and refused |
+| Stale facts / wrong policy / missing evidence | PASS: ineligible |
+| Read and write routing / scoring / manual override | PASS: hard exclusion |
+| New and old child retarget / child direct approval | PASS: refused |
+| Automatic retry / explicit retry / replan after replacement | PASS: no second model session |
+| Stop during metadata probes | PASS: no later model spawn |
+| Restart with saved validated facts | PASS: unknown until this Host probes |
+| Legacy direct launch and retarget | PASS: deliberate old policy |
+| Restricted UI on desktop and mobile | PASS: direct readiness and Mission restriction are separate |
+
+## STATIC VERIFIED
+
+482/482 tests: 233 scripts + 228 application + 21 UI. No test was deleted.
+Typecheck, lint and builds passed. Lint has 10 existing warnings and no errors.
+Dev and desktop middleware browser checks have visible content, no console/page errors and no overflow.
+Live temperature caused baseline text drift; both built screenshots were inspected.
+
+## NOT TESTED
+
+New live Codex model Mission; production T2 activation; other Codex binaries and platforms.
+
+## BLOCKED
+
+None for T2.
+
+## DEFERRED
+
+T3–T10 and final independent operational review remain open.
+T2 does not authorize a full M-A-2 operational verdict.

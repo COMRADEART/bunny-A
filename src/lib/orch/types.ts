@@ -1,3 +1,5 @@
+import type { CodexCompatibilityProfile } from "./compatibility.ts";
+
 export type Mode = "fast" | "balanced" | "deep";
 
 export type ProviderId = "codex" | "claude" | "ollama" | "opencode" | "cline" | "cursor";
@@ -149,6 +151,8 @@ export type ProviderLive = {
   observed?: ObservedUsage;
   probedAt?: number | null;
   evidence?: string[];
+  /** Observed Codex facts; direct task readiness is separate from Mission security eligibility. */
+  securityCompatibility?: CodexCompatibilityProfile;
 };
 
 export type Project = {
@@ -228,6 +232,8 @@ export type VerifySpec =
   | { kind: "python"; name: string; expected: string };
 
 export type TaskConstraints = {
+  /** Host-owned Mission authority. Not accepted as a user-supplied HTTP constraint. */
+  missionAccess?: ProviderExecutionScope["access"];
   localOnly?: boolean;
   offlineOnly?: boolean;
   providerAllowlist?: ProviderId[];

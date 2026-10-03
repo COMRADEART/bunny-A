@@ -18,6 +18,7 @@ import { useIsland } from "@/store/use-island";
 import { finitePlan } from "./ui-model";
 import type { OrchTask } from "@/lib/orch/types";
 import { activityDetail, isPrivateEvent } from "./motion-model";
+import { codexMissionExclusion, codexMissionStatus } from "@/lib/orch/compatibility";
 
 export const NAMES: Record<ProviderId, string> = {
   codex: "Codex",
@@ -105,6 +106,10 @@ export function ProviderIcon({ id }: { id: ProviderId }) {
     </span>
   );
 }
+function providerStatusText(provider: ProviderLive) {
+  const directOnly = provider.id === "codex" && (codexMissionExclusion(provider, "read") || codexMissionExclusion(provider, "write"));
+  return directOnly && provider.availability === "ready" ? "Direct tasks ready" : directOnly && provider.availability === "busy" ? "Direct task active" : STATUS[provider.availability];
+}
 export function ProviderStatus({ provider }: { provider: ProviderLive }) {
   const Icon =
     provider.availability === "authentication_required"
@@ -115,7 +120,7 @@ export function ProviderStatus({ provider }: { provider: ProviderLive }) {
   return (
     <span className="provider-status" data-status={provider.availability}>
       <Icon aria-hidden="true" size={11} />
-      {STATUS[provider.availability]}
+      {providerStatusText(provider)}
     </span>
   );
 }
@@ -147,7 +152,7 @@ export const reportTime = (value: number | null | undefined) =>
       })
     : "Unavailable";
 export function usageDescription(provider: ProviderLive) {
-  return `${NAMES[provider.id]} · ${STATUS[provider.availability]}\n${provider.id === "ollama" ? `Model: ${provider.current_model ?? "Unavailable"}\nVRAM: ${provider.vram ?? "Unavailable"}\nTokens/sec: ${provider.tokens_per_sec ?? "Unavailable"}` : (provider.usageWindows ?? []).map((w) => `${w.label}: ${w.usedPercent}% used · reset ${reportTime(w.resetsAt)}`).join("\n") || "Quota unavailable"}\n${provider.active_jobs} active jobs · Version ${provider.version ?? "unavailable"}`;
+  return `${NAMES[provider.id]} · ${providerStatusText(provider)}\n${provider.id === "ollama" ? `Model: ${provider.current_model ?? "Unavailable"}\nVRAM: ${provider.vram ?? "Unavailable"}\nTokens/sec: ${provider.tokens_per_sec ?? "Unavailable"}` : (provider.usageWindows ?? []).map((w) => `${w.label}: ${w.usedPercent}% used · reset ${reportTime(w.resetsAt)}`).join("\n") || "Quota unavailable"}\n${provider.active_jobs} active jobs · Version ${provider.version ?? "unavailable"}${provider.id === "codex" ? `\nMission execution: ${codexMissionStatus(provider)}` : ""}`;
 }
 export function ProviderMark({
   provider,
@@ -231,6 +236,12 @@ export function ProviderFacts({
   return (
     <>
       <dl className="fact-list">
+        {provider.id === "codex" ? (
+          <div>
+            <dt>Mission execution</dt>
+            <dd>{codexMissionStatus(provider)}</dd>
+          </div>
+        ) : null}
         {provider.id === "ollama" ? (
           <>
             <div>
@@ -289,6 +300,9 @@ export function ProviderFacts({
           </div>
         ) : null}
       </dl>
+      {provider.id === "codex" && !compact ? (
+        <p className="caption">{provider.securityCompatibility?.compatibilityClass === "VALIDATED" && codexMissionStatus(provider) === "Validated" ? `Mission security policy ${provider.securityCompatibility.policyVersion} validated for read and write access.` : codexMissionExclusion(provider, "read") ?? codexMissionExclusion(provider, "write")}</p>
+      ) : null}
       {provider.usageObservedAt && provider.id !== "ollama" ? (
         <p className="caption">
           Reported {reportTime(provider.usageObservedAt)} ·{" "}

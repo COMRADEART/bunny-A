@@ -24,9 +24,11 @@ import type { CapabilityAdapter } from "./capabilities/bus.server.ts";
 import { FilesystemCapability, NotificationsCapability, TerminalCapability } from "./capabilities/local.server.ts";
 import { communicationConnectors } from "./capabilities/connectors.server.ts";
 import type { ActionManifest, MissionStep } from "./types.ts";
+import { simulatedCodexProfile } from "../bunny-host/testing/codex.test.ts";
+import { emptyCodexCompatibility } from "../bunny-host/codex-compatibility.server.ts";
 
 function ready(id: ProviderId): ProviderLive {
-  return { ...providerBase(id), installed: true, authenticated: true, availability: "ready", capabilities: id === "ollama" ? ["text"] : ["filesystem", "terminal", "text"], current_model: id === "ollama" ? "test-local" : null };
+  return { ...providerBase(id), installed: true, authenticated: true, availability: "ready", capabilities: id === "ollama" ? ["text"] : ["filesystem", "terminal", "text"], current_model: id === "ollama" ? "test-local" : null, ...(id === "codex" ? { securityCompatibility: simulatedCodexProfile() } : {}) };
 }
 type Launched = { task: OrchTask; finish: (result: AdapterResult) => void; hooks: AdapterHooks; stopped: boolean };
 function fakeAdapter(id: ProviderId, launched: Launched[]): ProviderAdapter {
@@ -335,6 +337,54 @@ test("MA0R: replan with write authority revokes read approval and cannot run unt
     assert.deepEqual(env.launched[1].task.executionScope, { access: "write" });
     env.launched[1].finish({ ok: true, output: "Done" });
     await until(() => env.missions.mission(view.id).state === "completed", "done");
+  } finally { await env.cleanup(); }
+});
+
+function restrictCodex(tasks: TaskManager) {
+  const previous = tasks.registry.get("codex")!;
+  tasks.registry.providers.set("codex", { ...previous, securityCompatibility: emptyCodexCompatibility("unvalidated replacement binary") });
+}
+for (const access of ["read", "write"] as const) test(`T2: pending ${access} Mission retarget and direct child approval cannot bypass Codex compatibility`, async () => {
+  const env = await setup({ providers: ["claude", "codex"] });
+  try {
+    const view = env.missions.create({ objective: "Inspect", mode: "fast", origin: "workstation", steps: [model("Agent", "Inspect files", [], { access })] });
+    env.missions.approve(view.id, "workstation", false);
+    const child = env.tasks.submit({ prompt: "Inspect files", mode: "fast", override: "claude", constraints: { missionAccess: access } }, { missionId: view.id, stepId: view.steps[0].id, executionScope: { access } });
+    restrictCodex(env.tasks);
+    assert.throws(() => env.missions.retargetTask(child.id, "codex"), /unvalidated replacement binary/);
+    assert.throws(() => env.tasks.retarget(child.id, "codex"), /unvalidated replacement binary/);
+    // Old child records did not have missionAccess. The public retarget entry and approval hook still guard them.
+    env.db.write({ ...child, constraints: {}, provider: "codex" }, "fixture.legacy", "old child without compatibility constraint");
+    assert.throws(() => env.missions.retargetTask(child.id, "codex"), /unvalidated replacement binary/);
+    assert.throws(() => env.tasks.approve(child.id), /unvalidated replacement binary/);
+    assert.equal(env.launched.length, 0);
+    const direct = env.tasks.submit({ prompt: "Direct", mode: "fast", override: "claude" });
+    assert.equal(env.missions.retargetTask(direct.id, "codex").provider, "codex", "legacy direct retarget stays intentional");
+  } finally { await env.cleanup(); }
+});
+for (const action of ["automatic retry", "explicit retry", "replan"] as const) test(`T2: ${action} recalculates eligibility after a validated Codex runtime is replaced`, async () => {
+  const env = await setup({ providers: ["codex"] });
+  try {
+    const view = env.missions.create({ objective: "Inspect", mode: "fast", origin: "workstation", steps: [model("Agent", "Inspect files", [], { access: "read", maxRetries: action === "automatic retry" ? 1 : 0 })] });
+    const approved = env.missions.approve(view.id, "workstation");
+    await until(() => env.launched.length === 1, "initial validated child");
+    if (action === "automatic retry") restrictCodex(env.tasks);
+    env.launched[0].finish({ ok: false, output: "", error: "provider crashed" });
+    await until(() => ["failed", "waiting_for_user"].includes(env.missions.mission(view.id).state), "failed or blocked Mission");
+    if (action !== "automatic retry") {
+      restrictCodex(env.tasks);
+      if (action === "explicit retry") env.missions.retry(view.id, "workstation");
+      else {
+        const next = await env.missions.replan(view.id, "workstation", [model("New agent", "Inspect files", [], { access: "write", maxRetries: 0 })]);
+        assert.equal(next.authorizationId, null);
+        assert.ok(env.missions.store.authorization(approved.authorizationId!)?.revokedAt);
+        env.missions.approve(view.id, "workstation");
+      }
+    }
+    await until(() => env.missions.get(view.id).events.some(event => event.type === "mission.step.failed" && /unvalidated replacement binary/.test(event.detail)), "compatibility refusal on new routing");
+    assert.equal(env.launched.length, 1, "no second provider model session starts");
+    const allChildren = env.db.tasks().filter(task => task.mission?.missionId === view.id);
+    assert.equal(allChildren.length, 1, "routing refuses before a new child task is created");
   } finally { await env.cleanup(); }
 });
 

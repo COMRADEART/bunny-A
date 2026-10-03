@@ -3,8 +3,11 @@ import { statSync } from "node:fs";
 import { promisify } from "node:util";
 import { execute, probeOllama, stopTask } from "../orch/exec.server.ts";
 import type { OrchTask, ProviderFeatures, ProviderId, ProviderLive, UsageWindow } from "../orch/types.ts";
+import { CODEX_COMPATIBILITY_MAX_AGE_MS, CODEX_SECURITY_POLICY_VERSION, codexMissionExclusion } from "../orch/compatibility.ts";
 import type { AdapterHooks, AdapterResult, ProviderAdapter, RunningSession } from "./contracts.ts";
 import { probeCodexCatalog } from "./codex-probe.server.ts";
+import { CODEX_READ_DISABLED_FEATURES, CodexCompatibilityGate, emptyCodexCompatibility, executableStamp } from "./codex-compatibility.server.ts";
+export { CODEX_READ_DISABLED_FEATURES } from "./codex-compatibility.server.ts";
 import { hasTool, locate, systemContext, type DiscoveryContext, type Launchable } from "./discovery.server.ts";
 import { ClaudeNormalizer, CodexNormalizer, normalizedTool as toolType } from "./events.ts";
 
@@ -231,12 +234,26 @@ function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[]
 export class CodexAdapter extends CliBase implements ProviderAdapter {
   id = "codex" as const;
   detected: ProviderLive | null = null;
+  security: CodexCompatibilityGate;
+  compatibilityDirty = false;
+  constructor(ctx: () => DiscoveryContext = () => systemContext(), security?: CodexCompatibilityGate) {
+    super(ctx); this.security = security ?? new CodexCompatibilityGate({ probe });
+  }
   capabilities() { return FEATURES.codex; }
+  async health(previous: ProviderLive): Promise<ProviderLive | null> {
+    const launch = locate(this.ctx(), this.id).launch;
+    const profile = previous.securityCompatibility;
+    if (!launch || this.compatibilityDirty || !profile || profile.policyVersion !== CODEX_SECURITY_POLICY_VERSION || Date.now() - profile.checkedAt >= CODEX_COMPATIBILITY_MAX_AGE_MS) return null;
+    try { if (executableStamp(launch).stamp !== profile.executable?.stamp) return null; } catch { return null; }
+    return super.health(previous);
+  }
   async detect() {
     const live = providerBase(this.id); live.probedAt = Date.now();
     live.usageCapabilities = { shortWindow: false, weekly: false, resetTime: false, tokenUsage: true, activeJobs: true, source: "codex app-server account/rateLimits/read" };
     const launch = this.located(live);
-    if (!launch) { live.detail = "Codex CLI not found on PATH or in known install locations."; return this.detected = live; }
+    this.compatibilityDirty = false;
+    if (!launch) { live.securityCompatibility = emptyCodexCompatibility("Codex executable was not found."); live.detail = "Codex CLI not found on PATH or in known install locations."; return this.detected = live; }
+    live.securityCompatibility = await this.security.inspect(launch, this.ctx());
     const version = await probe(launch, ["--version"]);
     if (version.code !== 0) { live.availability = "unavailable"; live.detail = `Codex found at ${launch.path}, but \`codex --version\` failed: ${version.timedOut ? "timed out" : version.error || firstLine(version.stderr) || `exit ${version.code}`}.`; return this.detected = live; }
     live.version = firstLine(version.stdout);
@@ -278,7 +295,35 @@ export class CodexAdapter extends CliBase implements ProviderAdapter {
     const launch = this.launchTarget;
     if (!launch || !this.detected?.authenticated) throw new Error("Codex is not ready for execution.");
     const args = codexLaunchArgs(task);
-    return spawnSession("codex", launch, args, task, hooks, task.sessionId ?? crypto.randomUUID());
+    if (!task.executionScope && !task.mission) return spawnSession("codex", launch, args, task, hooks, task.sessionId ?? crypto.randomUUID());
+    const access = task.executionScope?.access;
+    if (!access) throw new Error("Codex Mission launch has no approved execution scope.");
+    const exclusion = codexMissionExclusion(this.detected, access);
+    if (exclusion) throw new Error(exclusion);
+    const current = locate(this.ctx(), this.id).launch;
+    if (!current || current.path !== launch.path || current.command !== launch.command || JSON.stringify(current.args) !== JSON.stringify(launch.args)) throw new Error("Codex excluded: resolved executable changed before Mission launch; refresh providers.");
+    let owned: RunningSession | null = null; let stopped = false;
+    const done = (async (): Promise<AdapterResult> => {
+      // Re-probe version and controls, then hash again immediately before spawn. No model has started here.
+      const profile = await this.security.inspect(current, this.ctx(), true);
+      this.compatibilityDirty = JSON.stringify([profile.compatibilityClass, profile.executable, profile.reason]) !== JSON.stringify([this.detected?.securityCompatibility?.compatibilityClass, this.detected?.securityCompatibility?.executable, this.detected?.securityCompatibility?.reason]);
+      this.detected = { ...this.detected!, securityCompatibility: profile };
+      if (stopped) return { ok: false, stopped: true, output: "", error: "Stopped before Codex Mission launch." };
+      const reason = codexMissionExclusion({ id: "codex", securityCompatibility: profile }, access);
+      if (reason) throw new Error(reason);
+      // Re-resolve after async probes so an alias or provider setting change cannot redirect spawn.
+      const final = locate(this.ctx(), this.id).launch;
+      if (!final || final.path !== current.path || final.command !== current.command || JSON.stringify(final.args) !== JSON.stringify(current.args)) throw new Error("Codex excluded: resolved executable changed during Mission compatibility checks.");
+      const authorized = this.security.authorize(final, profile, access);
+      owned = spawnSession("codex", authorized, args, task, hooks, task.sessionId ?? crypto.randomUUID());
+      return owned.done;
+    })().catch((error: unknown): AdapterResult => {
+      this.compatibilityDirty = true;
+      const reason = error instanceof Error ? error.message : "Codex Mission compatibility check failed.";
+      hooks.event("provider.compatibility_rejected", reason);
+      return { ok: false, output: "", error: reason };
+    });
+    return { done, stop: async () => { stopped = true; await owned?.stop(); }, pid: () => owned?.pid?.() ?? null };
   }
 }
 
@@ -330,7 +375,6 @@ export class ClaudeAdapter extends CliBase implements ProviderAdapter {
  * image generation, plugin-install suggestions, hooks and skill MCP installs. M-A-1 observed 228 connector
  * tools in a read session before these were disabled.
  */
-export const CODEX_READ_DISABLED_FEATURES = ["apps", "plugins", "remote_plugin", "multi_agent", "multi_agent_v2", "image_generation", "browser_use", "browser_use_external", "computer_use", "tool_suggest", "hooks", "skill_mcp_dependency_install"] as const;
 /**
  * Isolation flags verified with Bunny-resolved codex-cli 0.153.4 exec --help and live sessions. They apply to
  * every scoped (mission) session: M-A-1 observed a write step launching the user's unsandboxed node_repl and

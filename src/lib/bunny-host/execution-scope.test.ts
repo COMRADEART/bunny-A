@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CodexAdapter, ClaudeAdapter, codexLaunchArgs, providerBase } from "./adapters.server.ts";
 import { systemContext } from "./discovery.server.ts";
+import { fixtureSecurity } from "./testing/codex.test.ts";
 import { HostDatabase } from "./persistence.server.ts";
 import { TaskManager } from "./manager.server.ts";
 import { MissionManager } from "../bunny-missions/manager.server.ts";
@@ -40,6 +41,11 @@ for (const provider of ["codex", "claude"] as const) for (const access of [undef
   const adapter = provider === "codex" ? new CodexAdapter(() => systemContext()) : new ClaudeAdapter(() => systemContext());
   adapter.launchTarget = { command: process.execPath, args: [script], path: script, kind: "node-script", source: "disposable fixture" };
   adapter.detected = { ...providerBase(provider), installed: true, authenticated: true, availability: "ready" };
+  if (adapter instanceof CodexAdapter && access) {
+    const fixture = await fixtureSecurity(script);
+    adapter.ctx = () => fixture.ctx; adapter.security = fixture.gate;
+    adapter.detected.securityCompatibility = fixture.profile;
+  }
   const lines: string[] = [];
   const hooks: AdapterHooks = { event: () => {}, session: () => {}, output: () => {}, raw: (stream, line) => { if (stream === "stdout") lines.push(line); } };
   const task = { id: "fixture", provider, model: "fixture-model", prompt: "Echo arguments only", cwd: directory, ...(access ? { executionScope: { access } as ProviderExecutionScope, mission: { missionId: "fixture-mission", stepId: "fixture-step" } } : {}) } as OrchTask;
@@ -123,8 +129,9 @@ process.stdin.resume(); process.stdin.on('end',()=>{
   if(attempt<=${failures}) {console.error('fixture provider crashed');process.exitCode=1;}
 });\n`);
   const db = new HostDatabase(join(directory, "host.sqlite"));
-  const codex = new CodexAdapter(() => systemContext());
-  const live = { ...providerBase("codex"), installed: true, authenticated: true, availability: "ready" as const, capabilities: ["text", "filesystem", "terminal"], models: ["fixture-model"], current_model: "fixture-model" };
+  const security = await fixtureSecurity(script);
+  const codex = new CodexAdapter(() => security.ctx, security.gate);
+  const live = { ...providerBase("codex"), installed: true, authenticated: true, availability: "ready" as const, capabilities: ["text", "filesystem", "terminal"], models: ["fixture-model"], current_model: "fixture-model", securityCompatibility: security.profile };
   codex.detected = live;
   codex.launchTarget = { command: process.execPath, args: [script], path: script, kind: "node-script", source: "disposable fixture" };
   codex.detect = async () => live;

@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import type { TaskManager } from "../bunny-host/manager.server.ts";
 import type { HostEvent } from "../bunny-host/contracts.ts";
 import type { Mode, OrchTask, ProviderId, TaskConstraints, VerifySpec } from "../orch/types.ts";
+import { codexMissionExclusion } from "../orch/compatibility.ts";
 import { ArtifactStore } from "./artifacts.server.ts";
 import { envelopeFrom, MODE_BUDGET, providerScopeViolation, scopeFor, taskViolation } from "./authorization.server.ts";
 import { CapabilityBus, type CapabilityAdapter, type CapabilityRequest } from "./capabilities/bus.server.ts";
@@ -60,7 +61,9 @@ export class MissionManager {
     tasks.missionScopeCheck = (task) => {
       const mission = this.store.mission(task.mission!.missionId);
       const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
-      return envelope ? providerScopeViolation(task, envelope, this.store.step(task.mission!.stepId)) : "no approved mission envelope";
+      const authority = envelope ? providerScopeViolation(task, envelope, this.store.step(task.mission!.stepId)) : "no approved mission envelope";
+      if (authority) return authority;
+      return task.provider === "codex" ? codexMissionExclusion({ id: "codex", securityCompatibility: this.tasks.live().find(provider => provider.id === "codex")?.securityCompatibility }, task.executionScope!.access) : null;
     };
     this.cached = this.store.config();
     this.artifacts = new ArtifactStore(this.store, options.dataDirectory);
@@ -85,6 +88,16 @@ export class MissionManager {
   // ── configuration / feature flag ──────────────────────────────────────────
   config(): MissionConfig { return this.cached; }
   enabled() { return this.cached.enabled; }
+  /** Includes old persisted Mission children that predate the routing constraint. Direct retarget is unchanged. */
+  retargetTask(id: string, provider: ProviderId) {
+    const task = this.tasks.db.get(id);
+    if (task.mission && provider === "codex") {
+      if (!task.executionScope) throw new Error("Mission retarget has no approved execution scope.");
+      const reason = codexMissionExclusion({ id: "codex", securityCompatibility: this.tasks.live().find(live => live.id === "codex")?.securityCompatibility }, task.executionScope.access);
+      if (reason) throw new Error(reason);
+    }
+    return this.tasks.retarget(id, provider);
+  }
   /** Starts the background parts. Called at construction when enabled, or when the workstation enables missions. */
   activate() {
     if (!this.recovered) { this.recovered = true; this.recover(); }
@@ -377,6 +390,7 @@ export class MissionManager {
     const repair = step.attempts.at(-1)?.category === "verification_failed" ? step.attempts.at(-1)!.detail : null;
     const prompt = agentPrompt({ mission, step, cwd: workspace, dependencies: this.dependencyResults(step), facts: this.memory.context(mission.id), repair });
     const constraints: TaskConstraints = {
+      missionAccess: step.scope.access,
       // An agent step works in the approved folder, so it needs a filesystem-capable provider. Only when local
       // execution is required do the step's declared capabilities and its objective decide (text-only local models).
       requiresFilesystem: step.scope.access === "write" || step.requiredCapabilities.some((cap) => cap.startsWith("filesystem.")) || !(envelope.providers.localOnly || step.preferences.local || budgetLocal),

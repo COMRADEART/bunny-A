@@ -17,7 +17,8 @@ export const SESSION_USAGE = "Reported by the provider during a Bunny-A session"
 
 /** Fields whose change is a real status change. Usage percentages and probe timestamps are not. */
 export function materialSignature(provider: ProviderLive): string {
-  return JSON.stringify([provider.availability, provider.installed, provider.authenticatedState ?? null, provider.version ?? null, provider.executable ?? null, provider.current_model, [...(provider.models ?? [])].sort(), [...(provider.capabilities ?? [])].sort()]);
+  const security = provider.securityCompatibility;
+  return JSON.stringify([provider.availability, provider.installed, provider.authenticatedState ?? null, provider.version ?? null, provider.executable ?? null, provider.current_model, [...(provider.models ?? [])].sort(), [...(provider.capabilities ?? [])].sort(), security ? [security.policyVersion, security.compatibilityClass, security.reason, security.executable?.executablePath, security.executable?.sha256, security.readIsolationValidated, security.writeIsolationValidated] : null]);
 }
 export function describeChange(before: ProviderLive | undefined, after: ProviderLive): string {
   if (!before) return `${after.name}: ${after.availability.replaceAll("_", " ")}${after.version ? ` (${after.version})` : ""}`;
@@ -26,6 +27,8 @@ export function describeChange(before: ProviderLive | undefined, after: Provider
   if ((before.authenticatedState ?? null) !== (after.authenticatedState ?? null)) parts.push(`sign-in ${before.authenticatedState ?? "unknown"} → ${after.authenticatedState ?? "unknown"}`);
   if ((before.version ?? null) !== (after.version ?? null)) parts.push(`version ${before.version ?? "none"} → ${after.version ?? "none"}`);
   if ((before.executable ?? null) !== (after.executable ?? null)) parts.push(`executable ${after.executable ?? "removed"}`);
+  const oldSecurity = before.securityCompatibility; const security = after.securityCompatibility;
+  if (JSON.stringify([oldSecurity?.policyVersion, oldSecurity?.compatibilityClass, oldSecurity?.reason, oldSecurity?.executable?.sha256]) !== JSON.stringify([security?.policyVersion, security?.compatibilityClass, security?.reason, security?.executable?.sha256])) parts.push(`Mission compatibility ${security?.compatibilityClass ?? "check required"}${security ? `: ${security.reason}` : ""}`);
   if (before.current_model !== after.current_model) parts.push(`model ${before.current_model ?? "none"} → ${after.current_model ?? "none"}`);
   if (!parts.length) parts.push("models or capabilities changed");
   return `${after.name}: ${parts.join(", ")}`;

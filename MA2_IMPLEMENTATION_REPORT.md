@@ -198,3 +198,115 @@ Key records are `production-verification.json`, `release-info-live.log`, `live-p
 The external recovery root holds a copy under `evidence`.
 The authoritative cutover reports are `cutover\migration.json`, `preservation-live.json` and `transaction.json`.
 No full M-A-2 verdict is issued at this checkpoint.
+
+# M-A-2 Gate T2
+
+## IMPLEMENTED
+
+T2 adds a structured Codex profile and an exact runtime registry.
+Bunny policy version is **1**. Database schema stays at **3**.
+Only the observed Windows native `codex-cli 0.153.4` has an approved entry.
+Unknown versions and different bytes do not inherit approval.
+
+Discovery uses safe version, help and local parser probes.
+It verifies both sandbox modes, both ignore flags, config overrides, the trusted Windows enum,
+and all 12 existing MA1 tool and extension controls.
+It streams SHA-256 and caches it by file identity for ordinary discovery.
+Before every scoped launch, the adapter resolves again, bypasses the hash cache,
+repeats safe probes, resolves again, and hashes immediately before canonical spawn.
+The final check and spawn have no intervening asynchronous wait.
+Validated metadata expires after 10 minutes.
+
+Both Mission access modes use a hard constraint before ranking.
+Retarget checks current facts, including old children without that constraint.
+Retry and replan route fresh children. Direct child approval also uses the Mission check.
+The existing provider JSON stores observed facts. A new Host must probe them again.
+Material compatibility changes use the existing status-change event.
+Launch refusal emits `provider.compatibility_rejected`. Routine check times do not emit changes.
+TaskManager and scoring were not changed.
+Unscoped direct tasks keep their exact MA1 arguments and existing readiness checks.
+Claude and Ollama retain their current behavior.
+The UI shows direct readiness and Mission compatibility as separate facts.
+
+The desktop build found generated client files in Tailwind's server scan.
+Adding `.output/` to `.gitignore` excludes them.
+Client and server then use the same CSS asset. Source CSS was not changed.
+
+## LIVE VERIFIED
+
+| Current Codex fact | Result |
+|---|---|
+| Requested path | `C:\Users\allam\AppData\Local\Programs\OpenAI\Codex\bin\codex.exe` |
+| Canonical path | `C:\Users\allam\.codex\packages\standalone\releases\0.153.4-x86_64-pc-windows-msvc\bin\codex.exe` |
+| Version | `codex-cli 0.153.4` |
+| Size | `295408944` bytes |
+| SHA-256 | `444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b` |
+| Compatibility | `VALIDATED` |
+| Bunny security policy | `1` |
+| Read / write exclusion | neither access mode was excluded |
+
+The implemented gate performed this check. No model session was started.
+The positive Windows parser probe returned 0. The invalid enum returned 1.
+The exact MA1 isolation arguments remain pinned by the existing tests.
+
+T1 preservation passed. The same production Host instance and PID 2200 remained active.
+The gateway stayed at PID 42156. M3 QA PID 11020 was preserved.
+State root and database remain outside Git. Schema is 3 and integrity is `ok`.
+Historical rows were preserved. The comparison allows only normal telemetry and appended events.
+All protected hashes matched: install config, Startup shortcut, migration journal,
+cutover report and database, T1 manifest, cloudflared binary, and user Codex config.
+The repository `.bunny-a` contains only `state-retired.json`.
+Missions and triggers remain off in production.
+
+## SIMULATED
+
+43 new regression tests cover T2. All 439 baseline tests remain.
+Harmless executable contents can report the same version without sharing approval.
+A replacement after discovery, even with restored size and mtime, starts no model.
+Other cases cover future and old versions, malformed output, timeout, failed probes,
+missing flags, parser contradictions, stale metadata, path changes and Host restart.
+Mission tests cover read/write exclusion, manual override, old and new retarget,
+direct child approval, automatic/explicit retry, and replan after replacement.
+Existing isolation tests still use real owned processes with harmless stand-ins.
+Their metadata approval is explicit and test only. Test helpers do not ship in the release.
+
+A source Host used a disposable production snapshot copy on port 43120.
+Its installed Codex profile was validated. The UI showed Mission execution as validated.
+It then used a harmless `codex-cli 0.999.0` stand-in for the restricted state.
+The stand-in remained ready for direct tasks and refused all model launches.
+The UI showed **Direct tasks ready**, **Restricted**, and the concrete reason.
+Desktop and mobile views were inspected. Production settings were not changed.
+
+## STATIC VERIFIED
+
+482/482 tests passed: 233 script, 228 application and 21 UI tests.
+Typecheck passed. Lint passed with 0 errors and the same 10 warnings.
+Normal and Windows desktop builds passed. Migration compatibility and T1 tests passed.
+Dev and desktop middleware UI checks have content, no errors and no horizontal overflow.
+Live temperature changed the baseline text. Both built viewports were inspected.
+Standard Vite preview does not serve the existing desktop middleware preset.
+The built check used the desktop gateway's middleware and manifest contract on an isolated port.
+
+## NOT TESTED
+
+No new live Codex model Mission. No future binary was certified.
+T2 was not selected for production startup. No production Host restart was performed.
+This checkpoint does not prove immunity to a compromised Host or privileged concurrent tampering.
+
+## BLOCKED
+
+None for the T2 implementation and local acceptance checkpoint.
+
+## DEFERRED
+
+T3–T10 remain open. Production startup stays pinned to v17-T1.
+The v10 dashboard stays configured until T5.
+Full M-A-2 approval and independent final review remain pending.
+
+## T2 evidence entry points
+
+Read `test-results/ma2-gate2/baseline.json`, `native-profile.json`, `preservation.json`,
+`ui-future-runtime.json`, `full-tests.log`, `focused-final.log`, `ui-tests.log`,
+`typecheck.log`, `lint.log`, `build.log`, `build-desktop.log`, `browser-dev.log` and `browser-built.log`.
+Rendered screenshots are under `screenshots/ma2-gate2-*`.
+Release identity and staging facts follow after the exact source is packaged.

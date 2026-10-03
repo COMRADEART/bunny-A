@@ -72,3 +72,67 @@ Read the separate native Host result, duplicate startup result and regression lo
 Check that no stale credential copy has returned to the old repository path.
 The copy found after cutover is retained in the external recovery root.
 The origin of that stale copy is unknown.
+
+# M-A-2 Gate T2
+
+## IMPLEMENTED
+
+Review only the Codex compatibility gate in this checkpoint.
+Read `MA2_RUNTIME_COMPATIBILITY.md`, the T2 matrix and implementation section.
+Policy is 1. It is independent of database schema 3.
+Review the exact registry, safe metadata probes, file identity cache,
+launch revalidation, and hard eligibility before scoring.
+Check both Mission access modes and the existing MA1 connector, plugin and MCP controls.
+Check old-child retarget and Mission approval without changing TaskManager.
+Check direct argv and Claude/Ollama policy. Check that fixtures do not ship.
+
+## LIVE VERIFIED
+
+Native version: `codex-cli 0.153.4`.
+Canonical executable:
+`C:\Users\allam\.codex\packages\standalone\releases\0.153.4-x86_64-pc-windows-msvc\bin\codex.exe`.
+Size: `295408944` bytes.
+SHA-256: `444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b`.
+Compatibility: `VALIDATED`, Bunny policy 1, read and write.
+The registry path is relative to the current user's home and binds this exact release path and bytes.
+Read `test-results/ma2-gate2/native-profile.json` for actual implemented-gate facts.
+The trusted Windows setting parsed. An invalid enum was rejected.
+No model session was needed. User config was not changed.
+Read `preservation.json` for the T1 production checks.
+
+## SIMULATED
+
+Read `codex-compatibility.test.ts` and the new T2 Mission tests.
+The stand-ins are harmless Node executables with explicit injected test entries.
+The production registry accepts only the pinned native binary with no prefix arguments.
+Tests cover unknown versions, control loss, parser contradiction, same-version byte changes,
+replacement before launch, metadata expiry, path changes, cancellation and restart.
+Retarget, direct child approval, automatic/explicit retry and replan cannot grant Codex access.
+The future-version UI fixture is a separate test Host and refuses every model launch.
+
+## STATIC VERIFIED
+
+482 tests passed. All 439 baseline tests remain.
+Typecheck, lint, normal build, desktop build, migration compatibility and T1 tests passed.
+Lint has 0 errors and 10 existing warnings.
+Dev and built desktop/mobile render checks passed with clean consoles and no overflow.
+Baseline text drift came from live temperature and was inspected visually.
+TaskManager, schema, production startup config and user Codex config were not changed.
+
+## NOT TESTED
+
+No new live model Mission. No production T2 activation.
+No approval for other versions, binaries or platforms.
+No protection claim against a compromised Host or privileged concurrent tampering.
+Native launch relies on the operating system between the final synchronous hash and process creation.
+
+## BLOCKED
+
+None for the builder's T2 checkpoint. Independent review is pending.
+
+## DEFERRED
+
+T3–T10, physical device tests, sign-in/reboot and final operational review remain open.
+Do not infer full M-A-2 operational approval from T2.
+Production stays v17-T1 with the v10 dashboard.
+Check the exact candidate identity and staging record below before any future promotion.

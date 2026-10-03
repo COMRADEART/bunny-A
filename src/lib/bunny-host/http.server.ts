@@ -115,7 +115,7 @@ export async function startHost(options: { dataDirectory?: string; root?: string
         case "submit": task=manager.submit(validateSubmit(data));break;
         case "approve": task=manager.approve(text(data.id,200),local ? "workstation" : `device:${device!.id}`);break;
         case "stop": task=await manager.stop(text(data.id,200));break;
-        case "retarget": task=manager.retarget(text(data.id,200),provider(data.provider));break;
+        case "retarget": task=missions.retargetTask(text(data.id,200),provider(data.provider));break;
         case "discover": await manager.discover();break;
         case "session.get": session=manager.getSession(text(data.id,200));break;
         case "input": case "session.input": await manager.sendInput(text(data.id,200),text(data.input,100000));break;

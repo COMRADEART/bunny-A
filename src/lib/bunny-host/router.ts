@@ -1,5 +1,6 @@
 import { analyze, routeTask, scoreProvider, weights } from "../orch/router.ts";
 import type { Mode, ProviderId, ProviderLive, RouteDecision, TaskConstraints } from "../orch/types.ts";
+import { codexMissionExclusion } from "../orch/compatibility.ts";
 
 export function inferredConstraints(prompt: string, constraints: TaskConstraints = {}): TaskConstraints {
   const filesystem=/\b(create|write|read|modify|edit|fix|debug|refactor|repair)\b[\s\S]*\b(file|repository|repo|script|test|code|folder)\b|\b[\w-]+\.(py|ts|tsx|js|mjs|txt)\b/i.test(prompt);
@@ -24,6 +25,10 @@ export function eligibility(provider: ProviderLive, constraints: TaskConstraints
   if (!["ready","busy"].includes(provider.availability)) return `${provider.name} ${STATUS[provider.availability] ?? provider.availability}.`;
   if (!provider.installed) return `${provider.name} is not installed.`;
   if (!provider.authenticated) return `${provider.name} is not signed in.`;
+  if (constraints.missionAccess) {
+    const compatibility = codexMissionExclusion(provider, constraints.missionAccess);
+    if (compatibility) return compatibility;
+  }
   if ((constraints.localOnly || constraints.offlineOnly) && provider.local_or_cloud !== "local") return "Requires local execution; this provider runs in the cloud.";
   if ((constraints.localOnly || constraints.offlineOnly) && !localModel(provider)) return "Requires local execution; every installed model of this provider is cloud-hosted.";
   if (constraints.providerAllowlist && !constraints.providerAllowlist.includes(provider.id)) return "Outside provider allowlist.";
@@ -36,6 +41,7 @@ export function eligibility(provider: ProviderLive, constraints: TaskConstraints
 }
 export function requirementsOf(constraints: TaskConstraints): string[] {
   return [
+    constraints.missionAccess && `validated Mission ${constraints.missionAccess} security`,
     constraints.requiresFilesystem && "filesystem", constraints.requiresTerminal && "terminal", constraints.requiresGit && "git", constraints.requiresGPU && "gpu",
     constraints.localOnly && "local only", constraints.offlineOnly && "offline only", constraints.workingDirectory && `working directory ${constraints.workingDirectory}`,
     constraints.providerAllowlist?.length && `only ${constraints.providerAllowlist.join(", ")}`, constraints.providerDenylist?.length && `never ${constraints.providerDenylist.join(", ")}`,
@@ -49,8 +55,8 @@ function usageNote(provider: ProviderLive): string | null {
 export function bunnyRoute(input: { prompt: string; mode: Mode; providers: ProviderLive[]; override?: ProviderId | "auto"; constraints?: TaskConstraints; learned?: (provider: ProviderId, type: string) => number; policyId?: string }): RouteDecision {
   const constraints = inferredConstraints(input.prompt,input.constraints);
   const pool = input.providers.filter(provider => !eligibility(provider,constraints));
-  if (!pool.length) throw new Error("No ready executor can satisfy this task's hard constraints.");
-  if (input.override && input.override !== "auto" && !pool.some(provider=>provider.id===input.override)) throw new Error("Selected executor is not eligible for this task.");
+  if (!pool.length) throw new Error(`No ready executor can satisfy this task's hard constraints. ${input.providers.map(provider => eligibility(provider, constraints)).filter(Boolean).join(" ")}`);
+  if (input.override && input.override !== "auto" && !pool.some(provider=>provider.id===input.override)) throw new Error(`Selected executor is not eligible for this task. ${input.providers.find(provider => provider.id === input.override) ? eligibility(input.providers.find(provider => provider.id === input.override)!, constraints) : "Provider was not found."}`);
   const features = analyze(input.prompt,input.mode);
   const learned = new Map(pool.map(live=>[live.id,input.learned?.(live.id,features.task_type) ?? 0]));
   const ranked = pool.map(live=>({provider: live.id, score: scoreProvider(live.id,input.prompt,input.mode,live)+learned.get(live.id)!})).sort((a,b)=>b.score-a.score || a.provider.localeCompare(b.provider));
