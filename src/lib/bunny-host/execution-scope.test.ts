@@ -11,8 +11,11 @@ import { MissionManager } from "../bunny-missions/manager.server.ts";
 import type { AdapterHooks, ProviderAdapter } from "./contracts.ts";
 import type { OrchTask, ProviderExecutionScope } from "../orch/types.ts";
 
-function assertReadIsolation(args: string[], platform = process.platform) {
-  assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
+function assertReadIsolation(args: string[], platform = process.platform) { assertScopedIsolation(args, "read-only", platform); }
+/** M-A-1: a scoped write step keeps workspace-write but none of the user's extensions or account tools. */
+function assertWriteIsolation(args: string[], platform = process.platform) { assertScopedIsolation(args, "workspace-write", platform); }
+function assertScopedIsolation(args: string[], sandbox: "read-only" | "workspace-write", platform = process.platform) {
+  assert.equal(args[args.indexOf("--sandbox") + 1], sandbox);
   assert.ok(args.includes("--ignore-user-config"), "all user-configured MCP/plugin/integration definitions are omitted");
   assert.ok(args.includes("--ignore-rules"), "user/project execpolicy cannot expand execution authority");
   const overrides = args.flatMap((arg, index) => arg === "-c" || arg === "--config" ? [args[index + 1]] : []);
@@ -25,7 +28,7 @@ function assertReadIsolation(args: string[], platform = process.platform) {
 }
 
 function assertLegacyCodexArgs(args: string[], task: OrchTask) {
-  // Exact pre-R1 argv, independent of the production helper.
+  // Exact pre-R1 argv for unscoped direct tasks, independent of the production helper.
   assert.deepEqual(args, ["exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check", "--cd", task.cwd, "--model", task.model, "-"]);
 }
 
@@ -46,6 +49,7 @@ for (const provider of ["codex", "claude"] as const) for (const access of [undef
     const args = (JSON.parse(lines.find((line) => line.includes('"argv"'))!) as { argv: string[] }).argv;
     if (provider === "codex") {
       if (access === "read") assertReadIsolation(args);
+      else if (access === "write") assertWriteIsolation(args);
       else assertLegacyCodexArgs(args, task);
     }
     else {
@@ -62,10 +66,9 @@ for (const provider of ["codex", "claude"] as const) for (const access of [undef
 for (const platform of ["win32", "linux", "darwin"] as const) test(`MA0R2: Codex read isolation restores only the ${platform} sandbox policy`, () => {
   const read = { cwd: "/fixture", model: "fixture-model", executionScope: { access: "read" } } as OrchTask;
   assertReadIsolation(codexLaunchArgs(read, platform), platform);
-  for (const access of [undefined, "write"] as const) {
-    const task = { ...read, executionScope: access ? { access } : undefined } as OrchTask;
-    assertLegacyCodexArgs(codexLaunchArgs(task, platform), task);
-  }
+  assertWriteIsolation(codexLaunchArgs({ ...read, executionScope: { access: "write" } } as OrchTask, platform), platform);
+  const legacy = { ...read, executionScope: undefined } as OrchTask;
+  assertLegacyCodexArgs(codexLaunchArgs(legacy, platform), legacy);
 });
 
 test("MA1: Codex read argv is the exact contract verified against live codex-cli 0.153.4 sessions", () => {
@@ -79,8 +82,21 @@ test("MA1: Codex read argv is the exact contract verified against live codex-cli
     "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
     "--skip-git-repo-check", "--cd", "C:\\fixture", "--model", "fixture-model", "-",
   ]);
-  const write = { ...read, executionScope: { access: "write" } } as OrchTask;
-  assert.ok(!codexLaunchArgs(write, "win32").includes("--disable"), "write sessions keep their exact pre-R1 argv");
+});
+
+test("MA1: Codex mission write argv keeps workspace-write without user extensions; direct tasks are unchanged", () => {
+  // A live write Mission with the pre-R1 argv spawned node_repl, the computer-use REPL and a plugin MCP server
+  // directly under codex.exe, outside the sandbox runner (test-results/ma1/codex-write).
+  const write = { cwd: "C:\\fixture", model: "fixture-model", executionScope: { access: "write" } } as OrchTask;
+  assert.deepEqual(codexLaunchArgs(write, "win32"), [
+    "exec", "--json", "--sandbox", "workspace-write", "--ignore-user-config", "--ignore-rules", "-c", 'windows.sandbox="elevated"',
+    "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
+    "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
+    "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
+    "--skip-git-repo-check", "--cd", "C:\\fixture", "--model", "fixture-model", "-",
+  ]);
+  const direct = { cwd: "C:\\fixture", model: "fixture-model" } as OrchTask;
+  assert.deepEqual(codexLaunchArgs(direct, "win32"), ["exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check", "--cd", "C:\\fixture", "--model", "fixture-model", "-"]);
 });
 
 const until = async (check: () => boolean, label: string, detail?: () => unknown) => {
