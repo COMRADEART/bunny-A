@@ -177,6 +177,9 @@ export class BrowserCapability implements CapabilityAdapter {
     if (action === "browser.download") {
       const folder = join(this.dataDirectory, "artifacts", context.missionId ? context.missionId.slice(0, 36) : "direct", "downloads"); mkdirSync(folder, { recursive: true });
       const waiting = page.waitForEvent("download", { timeout: Math.min(timeout, 60_000) });
+      // A refused URL, a navigation error or a missing control abandons this wait. Unhandled, its later timeout
+      // rejection ended the whole Host process (M-A-1); the success path still awaits it below.
+      waiting.catch(() => {});
       if (typeof params.url === "string" && params.url) {
         const url = safeUrl(params.url, this.allowLoopback);
         // Navigating to a file URL raises "Download is starting"; the download event still fires.

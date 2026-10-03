@@ -140,6 +140,26 @@ test("isolated browser: SSRF guard on loopback/private hosts and URL schemes", (
   assert.equal(safeUrl("http://127.0.0.1:9/x", true).hostname, "127.0.0.1");
 });
 
+test("MA1: a refused or failed browser download leaves no unhandled rejection that could end the Host", async () => {
+  // Live M-A-1: a refused private download returned at once, then its abandoned download wait timed out and
+  // the unhandled rejection terminated the test Host 60 s later.
+  const dir = mkdtempSync(join(tmpdir(), "bunny-ma1-download-"));
+  const unhandled: unknown[] = []; const onUnhandled = (reason: unknown) => unhandled.push(reason);
+  process.on("unhandledRejection", onUnhandled);
+  const browser = new BrowserCapability(dir);
+  let waits = 0;
+  const page = { waitForEvent: () => { waits++; return new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout 30ms exceeded while waiting for event \"download\"")), 30)); }, goto: async () => { throw new Error("goto must not run for a refused URL"); }, url: () => "about:blank" };
+  browser.page = async () => ({ id: "fixture", page: page as never });
+  const context = { missionId: null, stepId: null, cwd: dir, roots: [dir], timeoutMs: 1000, signal: new AbortController().signal } as never;
+  try {
+    await assert.rejects(browser.execute("browser.download", { url: "http://127.0.0.1:47901/private" }, context), /loopback/);
+    await assert.rejects(browser.execute("browser.download", {}, context), /Provide role/);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    assert.equal(waits, 2);
+    assert.deepEqual(unhandled, [], "no abandoned download wait may reject unhandled");
+  } finally { process.off("unhandledRejection", onUnhandled); await browser.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("isolated browser drives a real page with DOM/accessibility locators and records evidence", { timeout: 120_000 }, async (t) => {
   const h = harness();
   const browser = new BrowserCapability(h.dir, { allowLoopback: true });
