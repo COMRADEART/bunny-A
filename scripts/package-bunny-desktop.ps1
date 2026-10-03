@@ -1,37 +1,78 @@
-param([string]$PackageName='Bunny-A-Windows-v2')
+param(
+  [string]$PackageName,
+  # Pinned build input (M-A-1D): every runtime file comes from `git archive` of this commit, never from the
+  # working tree, so a branch switch or an uncommitted edit cannot reach a release. Defaults to install/release-pin.json.
+  [string]$SourceCommit,
+  # Commit holding the release launcher and release tools (install/Start-Bunny-Release.ps1, Bunny-Release-Info.ps1).
+  [string]$ToolingCommit='HEAD',
+  [string]$Repository=(Split-Path -Parent $PSScriptRoot),
+  [string]$OutputDirectory,
+  # Tests only: skip the dashboard (Vite/Nitro) build. The installer refuses such a package unless told it is a test.
+  [switch]$SkipDashboardBuild,
+  [switch]$NoArchive
+)
 $ErrorActionPreference='Stop'
-$bunnyWorkspace=Split-Path -Parent $PSScriptRoot
+function Invoke-Git([string[]]$Arguments) {
+  $output=& git -C $Repository @Arguments
+  if($LASTEXITCODE -ne 0) {throw ('git '+($Arguments -join ' ')+' failed.')}
+  $output
+}
+function Export-Commit([string]$Commit,[string]$Destination,[string[]]$Paths) {
+  # core.autocrlf=false: files are the exact committed bytes, so their hashes can be checked against git blobs.
+  $tar=Join-Path ([IO.Path]::GetTempPath()) ('bunny-release-'+[guid]::NewGuid().ToString('N')+'.tar')
+  try {
+    & git -C $Repository -c core.autocrlf=false archive --format=tar -o $tar $Commit @Paths
+    if($LASTEXITCODE -ne 0) {throw "git archive $Commit failed."}
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    & (Join-Path $env:WINDIR 'System32/tar.exe') -xf $tar -C $Destination
+    if($LASTEXITCODE -ne 0) {throw "Extracting $Commit failed."}
+  } finally {Remove-Item -LiteralPath $tar -Force -ErrorAction SilentlyContinue}
+}
+$toolingSha=(Invoke-Git @('rev-parse','--verify',($ToolingCommit+'^{commit}'))).Trim()
+$pin=(Invoke-Git @('-c','core.autocrlf=false','show',($toolingSha+':install/release-pin.json'))) -join "`n" | ConvertFrom-Json
+if(-not $PackageName) {$PackageName=$pin.release}
+if(-not $SourceCommit) {$SourceCommit=$pin.sourceCommit}
+if($PackageName -notmatch '^[A-Za-z0-9-]+$') {throw 'Invalid package name.'}
+$sourceSha=(Invoke-Git @('rev-parse','--verify',($SourceCommit+'^{commit}'))).Trim()
+$bunnyWorkspace=(Resolve-Path -LiteralPath $Repository).Path
+if(-not $OutputDirectory) {$OutputDirectory=Join-Path $bunnyWorkspace 'releases'}
 $lastBuildPath=Join-Path $bunnyWorkspace 'node_modules/.nitro/last-build.json'
 $lastBuildContent=if(Test-Path -LiteralPath $lastBuildPath) {[IO.File]::ReadAllText($lastBuildPath)} else {$null}
-if($PackageName -notmatch '^[A-Za-z0-9-]+$') {throw 'Invalid package name.'}
-$bunnyBuild=Join-Path $bunnyWorkspace ('test-results/bunny-desktop-build-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))
-$bunnyPackage=Join-Path $bunnyWorkspace ('releases/'+$PackageName)
+$bunnyBuild=Join-Path $bunnyWorkspace ('test-results/bunny-release-build-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))
+$bunnyTooling=$bunnyBuild+'-tooling'
+$bunnyPackage=Join-Path $OutputDirectory $PackageName
 if(Test-Path -LiteralPath $bunnyPackage) {throw 'Package exists. Use a new name to preserve it.'}
-New-Item -ItemType Directory -Path $bunnyBuild -Force | Out-Null
-Push-Location $bunnyWorkspace
+$toolingFiles=@('install/Start-Bunny-Release.ps1','install/Bunny-Release-Info.ps1','install/release-pin.json')
+$origins=New-Object System.Collections.ArrayList
+function Add-PackageFile([string]$From,[string]$PackagePath,[string]$Origin,[string]$RepoPath) {
+  $target=Join-Path $bunnyPackage $PackagePath
+  New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+  Copy-Item -LiteralPath $From -Destination $target
+  [void]$origins.Add([pscustomobject]@{path=$PackagePath;origin=$Origin;repoPath=$RepoPath})
+}
 try {
-  foreach($relative in @(git ls-files --cached --others --exclude-standard)) {
-    if($relative.StartsWith('artifacts/') -or $relative.StartsWith('.vercel/')) {continue}
-    $source=Join-Path $bunnyWorkspace $relative
-    if(-not(Test-Path -LiteralPath $source -PathType Leaf)) {continue}
-    $target=Join-Path $bunnyBuild $relative
-    New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
-    Copy-Item -LiteralPath $source -Destination $target
+  Export-Commit $sourceSha $bunnyBuild @()
+  Export-Commit $toolingSha $bunnyTooling $toolingFiles
+  if(-not $SkipDashboardBuild) {
+    $modules=Join-Path $bunnyWorkspace 'node_modules'
+    if(-not(Test-Path -LiteralPath $modules)) {throw 'node_modules is required for the dashboard build.'}
+    New-Item -ItemType Junction -Path (Join-Path $bunnyBuild 'node_modules') -Target $modules | Out-Null
+    $previousPreset=$env:JEV_DESKTOP_BUILD
+    try {$env:JEV_DESKTOP_BUILD='1';npm run build --prefix $bunnyBuild;if($LASTEXITCODE -ne 0) {throw 'Bunny-A standalone build failed.'}}
+    finally {$env:JEV_DESKTOP_BUILD=$previousPreset}
   }
-  New-Item -ItemType Junction -Path (Join-Path $bunnyBuild 'node_modules') -Target (Join-Path $bunnyWorkspace 'node_modules') | Out-Null
-  $previousPreset=$env:JEV_DESKTOP_BUILD
-  try {$env:JEV_DESKTOP_BUILD='1';npm run build --prefix $bunnyBuild;if($LASTEXITCODE -ne 0) {throw 'Bunny-A standalone build failed.'}}
-  finally {$env:JEV_DESKTOP_BUILD=$previousPreset}
   New-Item -ItemType Directory -Path $bunnyPackage -Force | Out-Null
-  Copy-Item -LiteralPath (Join-Path $bunnyBuild '.output') -Destination (Join-Path $bunnyPackage '.output') -Recurse
-  foreach($name in @('Bunny-Host.mjs','Bunny-Server.mjs','Bunny-Island.ps1','Bunny-Island.Visual.ps1','Bunny-Island.Motion.ps1','Launch-Bunny-A.ps1','Launch-Bunny-A.cmd','manifest.mjs')) {Copy-Item -LiteralPath (Join-Path $bunnyWorkspace ('install/'+$name)) -Destination $bunnyPackage}
+  if(-not $SkipDashboardBuild) {Copy-Item -LiteralPath (Join-Path $bunnyBuild '.output') -Destination (Join-Path $bunnyPackage '.output') -Recurse}
+  foreach($name in @('Bunny-Host.mjs','Bunny-Server.mjs','Bunny-Island.ps1','Bunny-Island.Visual.ps1','Bunny-Island.Motion.ps1','Launch-Bunny-A.ps1','Launch-Bunny-A.cmd','manifest.mjs')) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}
+  # The tunnel worker runs from the release too, so remote access never starts code from a checkout.
+  foreach($name in @('bunny-tunnel.mjs','bunny-tunnel-state.mjs')) {Add-PackageFile (Join-Path $bunnyBuild ('scripts/'+$name)) ('scripts/'+$name) 'source' ('scripts/'+$name)}
+  foreach($relative in $toolingFiles) {Add-PackageFile (Join-Path $bunnyTooling $relative) (Split-Path -Leaf $relative) 'tooling' $relative}
   # Every folder the Host's import graph reaches (desktop-install.test.mjs checks this list), with subfolders.
   foreach($directory in @('bunny-host','orch','bunny-missions')) {
-    $source=(Resolve-Path -LiteralPath (Join-Path $bunnyWorkspace ('src/lib/'+$directory))).Path
+    $source=(Resolve-Path -LiteralPath (Join-Path $bunnyBuild ('src/lib/'+$directory))).Path
     Get-ChildItem -LiteralPath $source -Filter '*.ts' -Recurse -File | Where-Object Name -notlike '*.test.ts' | ForEach-Object {
-      $target=Join-Path $bunnyPackage ('src/lib/'+$directory+$_.FullName.Substring($source.Length))
-      New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
-      Copy-Item -LiteralPath $_.FullName -Destination $target
+      $relative=('src/lib/'+$directory+$_.FullName.Substring($source.Length)).Replace('\','/')
+      Add-PackageFile $_.FullName $relative 'source' $relative
     }
   }
   # Type-stripped Host files are ESM. No npm install is required for the native Host.
@@ -39,9 +80,36 @@ try {
   New-Item -ItemType Directory -Path (Join-Path $bunnyPackage 'runtime') -Force | Out-Null
   $nodePath=(Get-Command node).Source
   Copy-Item -LiteralPath $nodePath -Destination (Join-Path $bunnyPackage 'runtime/node.exe')
-  $notice=Join-Path $bunnyWorkspace 'releases/installed/JEV-Windows-v1/runtime/LICENSE'
+  # The Node installer ships no license file; the licensed runtime notice is kept with this packaging script's workspace.
+  $notice=Join-Path (Split-Path -Parent $nodePath) 'LICENSE'
+  if(-not(Test-Path -LiteralPath $notice)) {$notice=Join-Path (Split-Path -Parent $PSScriptRoot) 'releases/installed/JEV-Windows-v1/runtime/LICENSE'}
   if(Test-Path -LiteralPath $notice) {Copy-Item -LiteralPath $notice -Destination (Join-Path $bunnyPackage 'runtime/LICENSE')}
   else {throw 'Node runtime license unavailable; package must not ship without it.'}
-  Compress-Archive -LiteralPath $bunnyPackage -DestinationPath ($bunnyPackage+'.zip')
-  Get-FileHash -LiteralPath ($bunnyPackage+'.zip') -Algorithm SHA256
-} finally {if($null -ne $lastBuildContent) {[IO.File]::WriteAllText($lastBuildPath,$lastBuildContent)};Pop-Location}
+  $lock=Join-Path $bunnyBuild 'package-lock.json'
+  $build=[ordered]@{
+    builtAt=(Get-Date).ToUniversalTime().ToString('o')
+    node=(& $nodePath --version)
+    os=[Environment]::OSVersion.VersionString
+    dashboardBuild=(-not $SkipDashboardBuild)
+    packageLockSha256=if(Test-Path -LiteralPath $lock) {(Get-FileHash -LiteralPath $lock -Algorithm SHA256).Hash.ToLower()} else {$null}
+    dashboardDependencies='node_modules of the build machine workspace (not reinstalled); the native Host imports no npm packages'
+  }
+  $record=[ordered]@{release=$PackageName;version=$pin.version;sourceCommit=$sourceSha;toolingCommit=$toolingSha;builtAt=$build.builtAt;build=$build;compatibility=[ordered]@{hostEntry='Bunny-Host.mjs';launcher='Start-Bunny-Release.ps1';hostPortDefault=43119};origins=$origins}
+  [IO.File]::WriteAllText((Join-Path $bunnyPackage '.release-build.json'),($record | ConvertTo-Json -Depth 6))
+  $helper=Join-Path $PSScriptRoot 'bunny-release.mjs'
+  & $nodePath $helper manifest $bunnyPackage | Out-Null; if($LASTEXITCODE -ne 0) {throw 'Release manifest failed.'}
+  foreach($check in @(@('verify',$bunnyPackage),@('closure',$bunnyPackage),@('source-check',$bunnyWorkspace,$bunnyPackage))) {
+    & $nodePath $helper @check | Out-Null
+    if($LASTEXITCODE -ne 0) {throw ('Release check failed: '+$check[0])}
+  }
+  if(-not $NoArchive) {
+    $zip=$bunnyPackage+'.zip'
+    for($attempt=1;;$attempt++) {
+      try {Compress-Archive -LiteralPath $bunnyPackage -DestinationPath $zip;break}
+      catch {if($attempt -ge 3) {throw};Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue;Start-Sleep -Seconds 2}
+    }
+    $hash=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLower()
+    [IO.File]::WriteAllText($zip+'.sha256',$hash+'  '+(Split-Path -Leaf $zip)+"`n")
+    [pscustomobject]@{package=$zip;sha256=$hash;sourceCommit=$sourceSha;toolingCommit=$toolingSha}
+  } else {[pscustomobject]@{package=$bunnyPackage;sourceCommit=$sourceSha;toolingCommit=$toolingSha}}
+} finally {if($null -ne $lastBuildContent) {[IO.File]::WriteAllText($lastBuildPath,$lastBuildContent)}}
