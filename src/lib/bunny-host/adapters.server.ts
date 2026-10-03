@@ -323,11 +323,20 @@ export class ClaudeAdapter extends CliBase implements ProviderAdapter {
   }
 }
 
-/** Read isolation flags verified with Bunny-resolved codex-cli 0.153.4 exec --help. */
+/**
+ * Default-on codex-cli 0.153.4 features that register tools without any config.toml entry, so
+ * --ignore-user-config leaves them on: ChatGPT connector apps (the codex_apps MCP server, e.g. Gmail
+ * send, GitHub merge, deploys), local/remote plugins and their MCP servers, browser and computer control,
+ * image generation, plugin-install suggestions, hooks and skill MCP installs. M-A-1 observed 228 connector
+ * tools in a read session before these were disabled.
+ */
+export const CODEX_READ_DISABLED_FEATURES = ["apps", "plugins", "remote_plugin", "multi_agent", "multi_agent_v2", "image_generation", "browser_use", "browser_use_external", "computer_use", "tool_suggest", "hooks", "skill_mcp_dependency_install"] as const;
+/** Read isolation flags verified with Bunny-resolved codex-cli 0.153.4 exec --help and live sessions. */
 export function codexLaunchArgs(task: OrchTask, platform = process.platform): string[] {
   const read = task.executionScope?.access === "read";
-  // Ignore extensions and execpolicy from user config; restore only trusted native Windows sandbox policy.
-  const isolation = read ? ["--ignore-user-config", "--ignore-rules", ...(platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : [])] : [];
+  // Ignore extensions and execpolicy from user config; restore only trusted native Windows sandbox policy;
+  // switch off tool-adding defaults and web search, which do not come from user config.
+  const isolation = read ? ["--ignore-user-config", "--ignore-rules", ...(platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : []), ...CODEX_READ_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature]), "-c", 'web_search="disabled"'] : [];
   return ["exec", "--json", "--sandbox", read ? "read-only" : "workspace-write", ...isolation, "--skip-git-repo-check", "--cd", task.cwd!, "--model", task.model, "-"];
 }
 /** Claude read/write contracts verified with installed Claude Code 2.1.288 help. */

@@ -16,7 +16,10 @@ function assertReadIsolation(args: string[], platform = process.platform) {
   assert.ok(args.includes("--ignore-user-config"), "all user-configured MCP/plugin/integration definitions are omitted");
   assert.ok(args.includes("--ignore-rules"), "user/project execpolicy cannot expand execution authority");
   const overrides = args.flatMap((arg, index) => arg === "-c" || arg === "--config" ? [args[index + 1]] : []);
-  assert.deepEqual(overrides, platform === "win32" ? ['windows.sandbox="elevated"'] : [], "only trusted platform sandbox configuration is restored");
+  assert.deepEqual(overrides, [...(platform === "win32" ? ['windows.sandbox="elevated"'] : []), 'web_search="disabled"'], "only trusted platform sandbox configuration is restored; web search is off");
+  // Literal list, independent of the production constant: features whose tools ignore config.toml (M-A-1 live evidence).
+  const disabled = args.flatMap((arg, index) => arg === "--disable" ? [args[index + 1]] : []);
+  assert.deepEqual(disabled, ["apps", "plugins", "remote_plugin", "multi_agent", "multi_agent_v2", "image_generation", "browser_use", "browser_use_external", "computer_use", "tool_suggest", "hooks", "skill_mcp_dependency_install"], "account apps, plugins and tool-adding defaults are switched off");
   assert.ok(!args.includes("--profile") && !args.includes("-p") && !args.includes("--enable"), "no user profile or extension is re-enabled");
   assert.ok(!args.includes("--approve-for-me") && !args.includes("--dangerously-bypass-approvals-and-sandbox"));
 }
@@ -63,6 +66,21 @@ for (const platform of ["win32", "linux", "darwin"] as const) test(`MA0R2: Codex
     const task = { ...read, executionScope: access ? { access } : undefined } as OrchTask;
     assertLegacyCodexArgs(codexLaunchArgs(task, platform), task);
   }
+});
+
+test("MA1: Codex read argv is the exact contract verified against live codex-cli 0.153.4 sessions", () => {
+  // A live read Mission with only the R1 flags registered 228 ChatGPT connector tools (codex_apps) and a
+  // remote-plugin MCP server; this exact argv registered none (test-results/ma1/codex-read).
+  const read = { cwd: "C:\\fixture", model: "fixture-model", executionScope: { access: "read" } } as OrchTask;
+  assert.deepEqual(codexLaunchArgs(read, "win32"), [
+    "exec", "--json", "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules", "-c", 'windows.sandbox="elevated"',
+    "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
+    "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
+    "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
+    "--skip-git-repo-check", "--cd", "C:\\fixture", "--model", "fixture-model", "-",
+  ]);
+  const write = { ...read, executionScope: { access: "write" } } as OrchTask;
+  assert.ok(!codexLaunchArgs(write, "win32").includes("--disable"), "write sessions keep their exact pre-R1 argv");
 });
 
 const until = async (check: () => boolean, label: string, detail?: () => unknown) => {
