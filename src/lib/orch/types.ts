@@ -168,6 +168,8 @@ export type OrchTask = {
   id: string;
   title: string;
   prompt: string;
+  /** Mission children only: the step objective that routing analyses, instead of Bunny's full agent prompt. */
+  routingPrompt?: string;
   projectId: string | null;
   mode: Mode;
   state: TaskState;

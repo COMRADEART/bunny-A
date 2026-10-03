@@ -385,7 +385,7 @@ export class MissionManager {
     const spec = step.verification.find((check) => check.kind === "task_spec") as { kind: "task_spec"; spec: VerifySpec } | undefined;
     const mode: Mode = step.reasoning === "deep" ? "deep" : step.reasoning === "light" ? "fast" : mission.mode;
     let task: OrchTask;
-    const submit = (input: TaskConstraints) => this.tasks.submit({ prompt, mode, projectId: mission.projectId, override: "auto", constraints: input, verify: spec?.spec ?? null }, { missionId: mission.id, stepId: step.id, cwd: workspace, executionScope: { access: step.scope.access } });
+    const submit = (input: TaskConstraints) => this.tasks.submit({ prompt, routingPrompt: step.objective, mode, projectId: mission.projectId, override: "auto", constraints: input, verify: spec?.spec ?? null }, { missionId: mission.id, stepId: step.id, cwd: workspace, executionScope: { access: step.scope.access } });
     try { task = submit(constraints); }
     catch (error) {
       const message = error instanceof Error ? error.message : String(error);

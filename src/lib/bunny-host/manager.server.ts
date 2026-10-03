@@ -134,7 +134,9 @@ export class TaskManager {
     const scope=delegated?.executionScope ?? input.executionScope;
     if(delegated && !scope || scope && !["read","write"].includes(scope.access)) throw new Error("Invalid or missing provider execution scope.");
     const executionScope=scope ? {access:scope.access} : undefined;
-    const constraints=inferredConstraints(input.prompt,input.constraints);
+    // A mission child is routed on its step objective; Bunny's own agent-prompt wording must not add requirements.
+    const routingText=input.routingPrompt ?? input.prompt;
+    const constraints=inferredConstraints(routingText,input.constraints);
     let project=input.projectId ? this.db.projects().find(p=>p.id===input.projectId) ?? null : null;
     if(input.projectId && !project) throw new Error("Project is not registered on this Host.");
     if(constraints.workingDirectory) {
@@ -153,16 +155,17 @@ export class TaskManager {
       cwd=folder;
     }
     const live=this.live();const policy=this.policy.active();
-    const decision=bunnyRoute({...input,providers:live,constraints,policyId:policy.id,learned:id=>this.policy.adjustment(live.find(p=>p.id===id)!,input.prompt,input.mode,policy)});
+    const decision=bunnyRoute({...input,prompt:routingText,providers:live,constraints,policyId:policy.id,learned:id=>this.policy.adjustment(live.find(p=>p.id===id)!,routingText,input.mode,policy)});
     const task: OrchTask={id:crypto.randomUUID(),...(delegated ? {mission:{missionId:delegated.missionId,stepId:delegated.stepId}} : {}),title:input.prompt.trim().split("\n")[0].slice(0,80),prompt:input.prompt,mode:input.mode,projectId:project?.id ?? null,cwd,state:"queued",provider:decision.recommended_provider,model:decision.recommended_model,decision,manual:!!input.override && input.override!=="auto",createdAt:Date.now(),startedAt:null,finishedAt:null,output:"",error:null,logs:[],pauseSupported:false,sessionId:null,pid:null,exitCode:null,constraints,maxRuntimeMs:constraints.maxRuntimeMs ?? 120000,verify:input.verify ?? null,latestEvent:null,progress:null,usage:null,processTree:null,retries:0};
     if(executionScope) task.executionScope=executionScope;
+    if(input.routingPrompt!==undefined) task.routingPrompt=input.routingPrompt;
     this.emit(this.db.write(task,"task.created","Task created on Bunny-A Host."));
     const routing=this.update(task,{state:"routing"},"routing.started","Routing with readiness and hard constraints.");
     return this.update(routing,{state:"waiting_for_approval",activity:"Waiting for approval"},"approval.required",decision.reason);
   }
   retarget(id: string,provider: ProviderId) {
     const task=this.db.get(id);if(task.state!=="waiting_for_approval") throw new Error("Only pending tasks can be retargeted.");
-    const decision=bunnyRoute({prompt:task.prompt,mode:task.mode,providers:this.live(),override:provider,constraints:task.constraints,policyId:this.policy.active().id});
+    const decision=bunnyRoute({prompt:task.routingPrompt ?? task.prompt,mode:task.mode,providers:this.live(),override:provider,constraints:task.constraints,policyId:this.policy.active().id});
     return this.update(task,{provider,model:decision.recommended_model,decision,manual:true},"routing.completed",`User selected ${provider}.`);
   }
   /** Appends raw provider output to the Host's private transcript for this task. */

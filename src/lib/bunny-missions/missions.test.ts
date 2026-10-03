@@ -661,6 +661,28 @@ test("budget: external model calls beyond the envelope fall back to local or fai
     assert.equal(env.missions.mission(view.id).accounting.externalModelCalls, 2);
   } finally { await env.cleanup(); }
 });
+test("MA1: mission children are routed on the step objective, not on Bunny's agent-prompt boilerplate", async () => {
+  // Before: "read-only: do not modify any files … approved working folder" inferred requiresFilesystem for every
+  // mission model step, so text-only (local) providers were never eligible and local-only missions could not run.
+  const env = await setup({ providers: ["claude", "ollama"] });
+  try {
+    const view = env.missions.create({ objective: "Text and file steps", mode: "fast", origin: "workstation", steps: [model("Writer", "Write two sentences about unit tests"), model("Reader", "Read the README file and list its headings")] });
+    env.missions.approve(view.id, "workstation");
+    await until(() => env.launched.length === 2, "both launches");
+    const writer = env.launched.find((l) => l.task.routingPrompt === "Write two sentences about unit tests")!;
+    const reader = env.launched.find((l) => l.task.routingPrompt === "Read the README file and list its headings")!;
+    assert.match(writer.task.prompt, /do not modify any files/, "the provider still receives the full agent prompt");
+    assert.equal(writer.task.constraints?.requiresFilesystem, false);
+    assert.ok(writer.task.decision.eligible_providers?.includes("ollama"), "a text step may use a local text-only provider");
+    assert.equal(reader.task.constraints?.requiresFilesystem, true, "file work in the objective still requires a filesystem-capable agent");
+    assert.equal(reader.task.provider, "claude");
+    for (const l of env.launched) l.finish({ ok: true, output: "done" });
+    await until(() => env.missions.mission(view.id).state === "completed", "completion");
+    // Retargeting keeps routing on the objective too.
+    const direct = env.tasks.submit({ prompt: "Write two sentences about unit tests", mode: "fast" });
+    assert.equal(direct.routingPrompt, undefined, "direct tasks are unchanged");
+  } finally { await env.cleanup(); }
+});
 test("recovery after a Host restart: interrupted steps are reported, never resumed; retry starts a fresh child", async () => {
   const first = await setup();
   const dir = mkdtempSync(join(tmpdir(), "bunny-recover-"));

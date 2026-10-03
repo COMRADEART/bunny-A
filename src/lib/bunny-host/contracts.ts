@@ -26,7 +26,8 @@ export type HostSnapshot = {
   /** M-A-0 mission layer. Optional: older clients ignore it; when missions are disabled it reports enabled:false. */
   missions?: MissionSnapshot;
 };
-export type SubmitTask = { prompt: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };
+/** `routingPrompt` is set in-process by the MissionManager only (never from HTTP input). */
+export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };
 export type AdapterResult = { ok: boolean; output: string; error?: string; stopped?: boolean; exitCode?: number | null };
 export type AdapterHooks = {
   event: (type: string, detail: string) => void;
