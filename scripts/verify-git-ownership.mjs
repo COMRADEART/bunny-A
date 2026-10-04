@@ -23,8 +23,8 @@ if(release){
   copyFileSync(baseline.snapshotPath,join(state,"host.sqlite"));
   writeFileSync(join(state,"state-layout.json"),JSON.stringify({...JSON.parse(readFileSync(join(baseline.config.stateRoot,"state-layout.json"),"utf8")),stateRoot:state}));
 }
-const env={...process.env,BUNNY_HOST_DATA_DIRECTORY:state,BUNNY_HOST_WORKSPACE:workspace,BUNNY_HOST_PORT:"43131",BUNNY_STATE_LAYOUT:release?"2":"1",BUNNY_T4_FIXTURE:JSON.stringify({release}),GIT_CONFIG_NOSYSTEM:"1",GIT_CONFIG_GLOBAL:join(root,"no-global"),GIT_TERMINAL_PROMPT:"0",GCM_INTERACTIVE:"never",BUNNY_T4_SLEEP_MS:"12000"};
-for(const key of ["DATABASE_URL","BUNNY_REMOTE_ENABLED","BUNNY_REMOTE_ORIGIN","BUNNY_MISSIONS"])delete env[key];
+const env={...process.env,BUNNY_HOST_DATA_DIRECTORY:state,BUNNY_HOST_WORKSPACE:workspace,BUNNY_HOST_PORT:"43131",BUNNY_STATE_LAYOUT:release?"2":"1",BUNNY_T4_FIXTURE:JSON.stringify({release}),GIT_CONFIG_NOSYSTEM:"1",GIT_CONFIG_GLOBAL:join(root,"no-global"),GIT_TERMINAL_PROMPT:"0",GCM_INTERACTIVE:"never",BUNNY_T4_SLEEP_MS:"12000",GH_CONFIG_DIR:join(root,"gh-config"),GH_NO_UPDATE_NOTIFIER:"1",GH_PROMPT_DISABLED:"1"};
+for(const key of ["DATABASE_URL","BUNNY_REMOTE_ENABLED","BUNNY_REMOTE_ORIGIN","BUNNY_MISSIONS","GH_TOKEN","GITHUB_TOKEN","GH_ENTERPRISE_TOKEN","GITHUB_ENTERPRISE_TOKEN"])delete env[key];
 const wait=ms=>new Promise(done=>setTimeout(done,ms));
 const until=async(fn,description,limit=15000)=>{const end=Date.now()+limit;while(Date.now()<end){const value=await fn();if(value)return value;await wait(60);}throw new Error("Timed out: "+description);};
 const alive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}};
@@ -100,6 +100,16 @@ try{
     await until(()=>probe.children().length>=3,"alternate launcher hook");await wait(160);const job=await active(mission);const before=identities(job.members.map(p=>p.pid));
     await current.call("stop",mission);const after=identities(job.members.map(p=>p.pid));assert.equal(after.length,0);assert.equal(probe.git("rev-parse","HEAD").trim(),probe.before);
     gate("launcher-"+folder,{job,before,after,workerVisible:job.members.some(p=>/mingw64\\bin\\git\.exe$/i.test(p.file??""))});
+  }
+  const gh="C:\\Program Files\\GitHub CLI\\gh.exe";
+  if(existsSync(gh)) {
+    const wrapper=repository("github-wrapper","wait-child");
+    execFileSync(gh,["alias","set","t4-owned-local","git commit -m wrapped-local","--shell"],{cwd:wrapper.repo,env,windowsHide:true,stdio:"pipe"});
+    const mission=await current.call("mission",{repo:wrapper.repo,name:"Local GitHub wrapper",action:"terminal.exec",params:{command:gh,args:["t4-owned-local"]}});
+    await until(()=>wrapper.children().length>=3,"offline gh shell/Git/hook tree");await wait(160);const job=await active(mission),before=identities(job.members.map(p=>p.pid));
+    assert.equal(job.launcherPath,gh);assert.ok(job.members.some(p=>/[\\/]git\.exe$/i.test(p.file??"")));
+    const stopped=await current.call("stop",mission),after=identities(job.members.map(p=>p.pid));assert.equal(after.length,0);assert.equal(stopped.runs[0].status,"stopped");assert.equal(wrapper.git("rev-parse","HEAD").trim(),wrapper.before);
+    gate("offline-github-wrapper",{job,before,after,stopped,networkInvoked:false,realCredentialsUsed:false,userGhConfigTouched:false});
   }
   for(const mode of ["normal","exit-child","detached","fail"]) {
     const probe=repository("hook-"+mode,mode);const outcome=await current.call("direct",{repo:probe.repo,action:"git.commit",params:{message:"hook probe"}});

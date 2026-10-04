@@ -61,7 +61,7 @@ export type RunOptions = { cwd: string; signal: AbortSignal; timeoutMs: number; 
 
 /** Runs one owned process (argv, no shell) with bounded output; abort ends exactly that process tree. */
 export function runProcess(resolved: Resolved, args: string[], options: RunOptions): Promise<RunResult> {
-  if(resolved.owned) options={...options,env:{...(options.env??process.env),GIT_TERMINAL_PROMPT:"0",GCM_INTERACTIVE:"never",GIT_EDITOR:"false",GIT_SEQUENCE_EDITOR:"false",GIT_PAGER:"cat"}};
+  if(options.owned || resolved.owned) options={...options,env:{...(options.env??process.env),GIT_TERMINAL_PROMPT:"0",GCM_INTERACTIVE:"never",GIT_EDITOR:"false",GIT_SEQUENCE_EDITOR:"false",GIT_PAGER:"cat"}};
   if(process.platform === "win32" && (options.owned || resolved.owned)) return runWindowsOwnedProcess(resolved.file,[...resolved.prefix,...args],options);
   const max = options.maxOutput ?? 200_000; const started = Date.now();
   return new Promise((resolveRun, reject) => {

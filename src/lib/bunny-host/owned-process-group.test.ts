@@ -89,3 +89,21 @@ test("T4: explicit CREATE_BREAKAWAY_FROM_JOB is refused by the kernel",{skip:!wi
     assert.equal(r.exitCode,0);assert.match(r.stdout,/created=0 error=5/);assert.equal(r.ownership?.breakaway,false);
   } finally {f.cleanup();}
 });
+
+test("T4: local GitHub CLI shell wrapper and its Git hook inherit one owned job",{skip:!windows||!existsSync("C:\\Program Files\\GitHub CLI\\gh.exe")},async()=>{
+  const f=fixture("wait-child"),gh="C:\\Program Files\\GitHub CLI\\gh.exe";
+  const env:NodeJS.ProcessEnv={...f.env,GH_CONFIG_DIR:join(f.root,"gh-config"),GH_NO_UPDATE_NOTIFIER:"1",GH_PROMPT_DISABLED:"1"};
+  for(const key of ["GH_TOKEN","GITHUB_TOKEN","GH_ENTERPRISE_TOKEN","GITHUB_ENTERPRISE_TOKEN"])delete env[key];
+  let running: ReturnType<typeof runCommand>|undefined;
+  try {
+    // A local shell alias only: no GitHub request, real token or user config.
+    execFileSync(gh,["alias","set","t4-owned-local","git commit -m wrapped-local","--shell"],{cwd:f.repo,env,windowsHide:true,stdio:"pipe"});
+    running=runCommand(gh,["t4-owned-local"],{cwd:f.repo,env,signal:f.controller.signal,timeoutMs:5000,owned:true,owner:{dataDirectory:f.state,missionId:"wrapper-mission",stepId:"wrapper-step",capabilityRunId:"wrapper-run",action:"github.local-wrapper-test"}});
+    await f.wait();await delay(200);f.controller.abort();const result=await running;
+    assert.equal(result.ownership?.launcherPath,gh);assert.equal(result.ownership?.state,"stopped");
+    assert.ok(result.ownership?.members.some(member=>/[\\/]git\.exe$/i.test(member.file??"")));
+    assert.equal(result.ownership?.capabilityRunId,"wrapper-run");
+    await delay(150);for(const row of f.children())assert.equal(alive(row.pid),false);
+    assert.equal(f.git("rev-parse","HEAD").trim(),f.head);
+  } finally {f.controller.abort();if(running)await running.catch(()=>{});f.cleanup();}
+});
