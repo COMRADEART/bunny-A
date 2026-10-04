@@ -19,6 +19,7 @@ import { finitePlan } from "./ui-model";
 import type { OrchTask } from "@/lib/orch/types";
 import { activityDetail, isPrivateEvent } from "./motion-model";
 import { codexMissionExclusion, codexMissionStatus } from "@/lib/orch/compatibility";
+import { hostHealthMessage, publicEventLabel, taskStatus } from "@/lib/bunny-host/presentation";
 
 export const NAMES: Record<ProviderId, string> = {
   codex: "Codex",
@@ -30,8 +31,8 @@ export const NAMES: Record<ProviderId, string> = {
 };
 export function HostHealthWarning() {
   const health=useIsland(state=>state.hostHealth);
-  if(!health || health.operationalState==="healthy") return null;
-  return <p className="host-health-warning" role="status">{health.operationalState==="degraded" ? health.unavailableSubsystems.includes("*") ? "Host degraded. New execution is unavailable until recovery." : "Host degraded. Dependent execution is unavailable; independent work may continue." : "Host is shutting down after a failure. New execution is refused."}</p>;
+  const message=hostHealthMessage(health);
+  return message ? <p className="host-health-warning" role="status">{message}</p> : null;
 }
 export const STATUS: Record<Availability, string> = {
   ready: "Ready",
@@ -129,7 +130,7 @@ export function ProviderStatus({ provider }: { provider: ProviderLive }) {
     </span>
   );
 }
-export function TaskBadge({ state }: { state: TaskState }) {
+export function TaskBadge({ state, task }: { state: TaskState; task?: OrchTask }) {
   const Icon =
     state === "completed"
       ? Check
@@ -143,7 +144,7 @@ export function TaskBadge({ state }: { state: TaskState }) {
   return (
     <span className="task-badge" data-state={state}>
       <Icon aria-hidden="true" size={12} />
-      {STATES[state]}
+      {task ? taskStatus(task).label : STATES[state]}
     </span>
   );
 }
@@ -241,6 +242,9 @@ export function ProviderFacts({
   return (
     <>
       <dl className="fact-list">
+        <div><dt>Installed</dt><dd>{provider.installed ? "Yes" : "No"}</dd></div>
+        <div><dt>Authentication</dt><dd>{provider.authenticatedState === "not_required" ? "Not required" : provider.authenticated ? "Authenticated" : provider.authenticatedState === "unknown" ? "Unknown" : "Required"}</dd></div>
+        <div><dt>Direct tasks</dt><dd>{["ready","busy"].includes(provider.availability) ? "Ready" : STATUS[provider.availability]}</dd></div>
         {provider.id === "codex" ? (
           <div>
             <dt>Mission execution</dt>
@@ -355,7 +359,7 @@ export function TaskActivity({ task, expanded = false }: { task: OrchTask; expan
         <span>
           {task.latestEvent && isPrivateEvent(task.latestEvent.type)
             ? "Working…"
-            : (task.latestEvent?.label ?? (task.state === "verifying" ? "Verifying" : "Working…"))}
+            : (task.state === "verifying" ? "Bunny verifying" : task.latestEvent ? publicEventLabel(task.latestEvent.type) : taskStatus(task).label)}
         </span>
       </div>
       {task.latestEvent?.detail ? (
@@ -369,7 +373,6 @@ export function TaskActivity({ task, expanded = false }: { task: OrchTask; expan
           <span>
             {plan.completed} / {plan.total} steps
           </span>
-          {plan.current ? <small>{plan.current}</small> : null}
         </div>
       ) : null}
     </div>

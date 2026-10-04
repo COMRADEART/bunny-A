@@ -36,8 +36,9 @@ import { Telemetry } from "./telemetry";
 import { Phone, Pairing } from "./phone";
 import { Settings } from "./settings";
 import { Constellation } from "./motion";
-import { activityDetail, activityLabel, isPrivateEvent } from "./motion-model";
+import { isPrivateEvent } from "./motion-model";
 import { MissionsSection } from "./mission";
+import { ActivityTimeline } from "./activity";
 
 const NAV = [
   { id: "today", label: "Home", icon: Monitor },
@@ -413,49 +414,7 @@ function Today({ now }: { now: number }) {
           )}
         </div>
       </section>
-      {store.events.some(
-        (event) => event.taskId && !event.type.startsWith("audit.") && !isPrivateEvent(event.type),
-      ) ? (
-        <section className="home-activity">
-          <div className="section-heading">
-            <h2 className="eyebrow">Recent activity</h2>
-            <span className="caption">From your Host</span>
-          </div>
-          <ol className="activity-timeline">
-            {store.events
-              .filter(
-                (event) =>
-                  event.taskId &&
-                  !event.type.startsWith("audit.") &&
-                  !isPrivateEvent(event.type) &&
-                  event.type !== "agent.output",
-              )
-              .slice(-4)
-              .reverse()
-              .map((event) => (
-                <li key={event.sequence}>
-                  <time>
-                    {new Date(event.at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </time>
-                  <span className="timeline-dot" />
-                  <div>
-                    <strong>{activityLabel(event.type)}</strong>
-                    <p>
-                      {activityDetail(
-                        event.type,
-                        event.detail,
-                        store.tasks.find((t) => t.id === event.taskId),
-                      )}
-                    </p>
-                  </div>
-                </li>
-              ))}
-          </ol>
-        </section>
-      ) : null}
+      <ActivityTimeline limit={4} />
       <section className="today-section">
         <div className="section-heading">
           <h2 className="eyebrow">Recent</h2>

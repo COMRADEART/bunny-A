@@ -405,3 +405,11 @@ the supported T4 process-tree scope. Independent review is pending and is not cl
 T5-T10, production activation and independent final operational review. The T4 instruction
 expressly forbids automatic activation. No BUNNY_MA2_OPERATIONAL_PASS or full M-A-2 verdict is issued.
 Builder gate result: **BUNNY_MA2_T4_PASS**.
+
+# M-A-2 Gate T5
+
+The T4 floor is 547 tests. T5 adds public projection, correlation, resync and provenance
+regressions. Candidate rendering, native Island and production promotion must also pass.
+The detailed categories, boundaries, OD-1 traceability, rollback and immutable identities
+are in [MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md).
+T5 is not accepted merely because a candidate is staged. T6–T10 remain open.

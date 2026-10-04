@@ -375,8 +375,15 @@
   overflow-wrap: anywhere;
 }
 @media (max-width: 560px) {
+  .bunny-app .mission-strip {
+    flex-wrap: wrap;
+  }
+  .bunny-app .mission-strip-title {
+    flex-basis: 100%;
+  }
   .bunny-app .mission-agents {
-    display: none;
+    max-width: 100%;
+    overflow-x: auto;
   }
   .bunny-app .capability-list li {
     grid-template-columns: 1fr auto;
@@ -385,6 +392,35 @@
     grid-column: 1 / -1;
   }
 }
+
+.bunny-app .verification-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  padding: var(--s3);
+  margin: var(--s3) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.bunny-app .verification-card svg { flex-shrink: 0; }
+.bunny-app .verification-card[data-passed="true"] { color: var(--positive); }
+.bunny-app .verification-card[data-passed="false"] { color: var(--negative); }
+.bunny-app .safe-activity { margin: var(--s4) 0; }
+.bunny-app .activity-outcome { display: inline-block; margin-left: var(--s2); font-size: var(--text-xs); color: var(--muted); }
+.bunny-app .activity-state-icon { margin-top: var(--s1); color: var(--working); }
+.bunny-app [data-activity-state="Verified"] .activity-state-icon,
+.bunny-app [data-activity-state="Succeeded"] .activity-state-icon { color: var(--positive); }
+.bunny-app [data-activity-state="Failed"] .activity-state-icon,
+.bunny-app [data-activity-state="Unknown effect"] .activity-state-icon { color: var(--negative); }
+.bunny-app [data-activity-state="Waiting for approval"] .activity-state-icon { color: var(--warning); }
+.bunny-app .activity-timeline > li > div { min-width: 0; overflow-wrap: anywhere; }
+.bunny-app .mission-artifacts { list-style: none; margin: var(--s2) 0; padding: 0; display: grid; gap: var(--s2); }
+.bunny-app .mission-artifacts li { display: grid; gap: var(--s1); font-size: var(--text-sm); padding: var(--s2); background: var(--field); border-radius: var(--r-sm); }
+.bunny-app .mission-artifacts span,.bunny-app .mission-artifacts b { font-size: var(--text-xs); color: var(--muted); font-weight: 400; }
+.bunny-app .mission-artifacts b[data-verified="verified"] { color: var(--positive); }
+.bunny-app .phone-task > .btn { margin: var(--s2) var(--s3) var(--s3); }
 @keyframes mission-in {
   from {
     opacity: 0;

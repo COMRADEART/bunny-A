@@ -3,6 +3,8 @@ import { commandBunnyHost, readBunnyHost } from "@/lib/orch/host";
 import type { HostEvent, HostSnapshot, PerformanceProfile } from "@/lib/bunny-host/contracts";
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { OperationalHealth } from "@/lib/bunny-host/failure.server";
+import type { PublicActivity } from "@/lib/bunny-host/presentation";
+import { reconcileSnapshot } from "@/components/island/activity-model";
 import type {
   HostPresence,
   HostSample,
@@ -73,6 +75,10 @@ type Island = Preferences & {
   tasks: OrchTask[];
   audit: { at: number; line: string }[];
   events: HostEvent[];
+  activities: PublicActivity[];
+  hostInstanceId: string | null;
+  snapshotRevision: number;
+  syncStatus: string | null;
   connectionChecked: boolean;
   sheet: Sheet;
   providerFocus: ProviderId | null;
@@ -84,6 +90,7 @@ type Island = Preferences & {
   projectId: string | null;
   host: HostPresence;
   hostHealth: OperationalHealth | null;
+  release: HostSnapshot["release"];
   samples: HostSample[];
   ollamaUp: boolean;
   ollamaModels: string[];
@@ -231,18 +238,26 @@ export function liveProviders(state: {
 let refreshing: Promise<void> | null = null;
 let migrationAttempted = false;
 export const useIsland = create<Island>((set, get) => {
-  const apply = (snapshot: HostSnapshot) => {
+  let requestOrder=0, appliedOrder=0, disconnected=false;
+  const apply = (snapshot: HostSnapshot, after=0, order=++requestOrder) => {
+    const state=get();
+    if(order<appliedOrder && snapshot.instanceId!==state.hostInstanceId) return;
+    const reconciled=reconcileSnapshot({instanceId:state.hostInstanceId,revision:state.snapshotRevision,cursor:state.cursor,events:state.events,activities:state.activities},snapshot,after);
+    if(!reconciled) return;
+    appliedOrder=Math.max(appliedOrder,order);
     const ollama = snapshot.providers.find((p) => p.id === "ollama");
     // The first snapshot only seeds the cursor: replaying history would notify about long-finished tasks.
-    const previous = get().cursor;
-    const fresh = get().hydratedFromHost
-      ? snapshot.events.filter((event) => event.sequence > previous)
-      : [];
+    const fresh=reconciled.fresh;
     set({
       hostHealth:snapshot.health ?? null,
+      release:snapshot.release ?? null,
       remoteUrl: snapshot.remoteUrl ?? null,
       devices: snapshot.devices ?? [],
-      events: snapshot.events,
+      events: reconciled.events,
+      activities: reconciled.activities,
+      hostInstanceId: reconciled.instanceId,
+      snapshotRevision: reconciled.revision,
+      syncStatus: reconciled.gap ? "Activity history gap. Current state refreshed from the Host." : reconciled.restarted ? "Host restarted. Current state refreshed; old sessions were not resumed." : disconnected ? "Reconnected. Current state refreshed from the Host." : state.syncStatus,
       connectionChecked: true,
     });
     set({
@@ -253,7 +268,7 @@ export const useIsland = create<Island>((set, get) => {
       projects: snapshot.projects,
       providerList: snapshot.providers,
       samples: snapshot.samples,
-      cursor: Math.max(previous, snapshot.cursor),
+      cursor: reconciled.cursor,
       performance: snapshot.performance,
       remoteConfigured: snapshot.remoteConfigured,
       missions: snapshot.missions ?? null,
@@ -261,11 +276,12 @@ export const useIsland = create<Island>((set, get) => {
       gpuWarn: snapshot.thermal?.gpuWarn ?? 85,
       ollamaUp: ollama?.availability === "ready" || ollama?.availability === "busy",
       ollamaModels: ollama?.current_model ? [ollama.current_model] : [],
-      audit: snapshot.events
+      audit: reconciled.events
         .slice(-80)
         .reverse()
         .map((e) => ({ at: e.at, line: `${e.type}: ${e.detail}` })),
     });
+    disconnected=false;
     for (const event of fresh)
       if (
         // A mission's child tasks are approved and reported by the mission itself.
@@ -297,8 +313,9 @@ export const useIsland = create<Island>((set, get) => {
   };
   const command = async (action: string, data: Record<string, unknown>) => {
     try {
+      const order=++requestOrder;
       const result = await commandBunnyHost({ data: { action, data } });
-      apply(result.snapshot);
+      apply(result.snapshot,0,order);
       return result;
     } catch (error) {
       get().note(error instanceof Error ? error.message : "Host command failed.");
@@ -310,6 +327,10 @@ export const useIsland = create<Island>((set, get) => {
     appearance: DEFAULT_APPEARANCE,
     submitting: false,
     events: [],
+    activities: [],
+    hostInstanceId: null,
+    snapshotRevision: 0,
+    syncStatus: null,
     connectionChecked: false,
     drafts: [],
     extensions: { cline: false, cursor: false },
@@ -346,6 +367,7 @@ export const useIsland = create<Island>((set, get) => {
     devices: [],
     missions: null,
     hostHealth:null,
+    release:null,
     composeKind: "task",
     missionFocus: null,
     setComposeKind: (composeKind) => set({ composeKind }),
@@ -412,6 +434,7 @@ export const useIsland = create<Island>((set, get) => {
         notifications: "extensions",
         compose: "compose",
         constellation: "constellation",
+        missions: "today",
       };
       const requestedView = query.get("view");
       if (requestedView && views[requestedView]) set({ sheet: views[requestedView] });
@@ -420,14 +443,22 @@ export const useIsland = create<Island>((set, get) => {
         set({ theme: requestedTheme, appearance: { ...appearance, theme: requestedTheme } });
       const taskId = query.get("task");
       if (taskId) set({ decisionTaskId: taskId, sheet: "task" });
+      const missionId=query.get("mission");
+      if(missionId) set({missionFocus:missionId,sheet:"today"});
       void get().refreshOllama();
     },
     refreshOllama: async () => {
       if (refreshing) return refreshing;
       refreshing = (async () => {
         try {
-          const snapshot = await readBunnyHost({ data: { after: 0 } });
-          apply(snapshot);
+          const after=disconnected ? 0 : get().cursor;
+          const order=++requestOrder;
+          const snapshot = await readBunnyHost({ data: { after } });
+          apply(snapshot,after,order);
+          if(after>0 && (snapshot.presentation?.retainedFrom ?? 0)>after+1) {
+            const canonical=await readBunnyHost({data:{after:0}});
+            apply(canonical,0,++requestOrder);
+          }
           if (!migrationAttempted) {
             migrationAttempted = true;
             const legacy = load(LEGACY_KEY);
@@ -438,6 +469,7 @@ export const useIsland = create<Island>((set, get) => {
               });
           }
         } catch (error) {
+          disconnected=true;
           set({
             host: "offline",
             connectionChecked: true,

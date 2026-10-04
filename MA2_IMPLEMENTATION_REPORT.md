@@ -662,3 +662,11 @@ the supported T4 process-tree scope. Independent review is pending and is not cl
 T5-T10, production activation and independent final operational review. The T4 instruction
 expressly forbids automatic activation. No BUNNY_MA2_OPERATIONAL_PASS or full M-A-2 verdict is issued.
 Builder gate result: **BUNNY_MA2_T4_PASS**.
+
+# M-A-2 Gate T5
+
+Read-only Host projection, current dashboard/phone/native Island presentation and exact
+package provenance are implemented. Authoritative runtime policy is preserved. Untyped
+provider transcripts stay local to the Host; public activity uses fixed summaries.
+Full report categories and acceptance evidence are maintained in
+[MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md).

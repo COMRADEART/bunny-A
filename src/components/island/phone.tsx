@@ -16,6 +16,7 @@ import { NAMES, ProviderMark, ProviderStatus, TaskActivity, TaskBadge } from "./
 import { openTask } from "./task";
 import { thermalReadingFor } from "./ui-model";
 import { MissionsSection } from "./mission";
+import { ActivityTimeline } from "./activity";
 
 export function Phone({ now }: { now: number }) {
   const store = useIsland();
@@ -50,6 +51,7 @@ export function Phone({ now }: { now: number }) {
           <span className="presence-dot" />
           {store.host === "online" ? `Online · ${presence}` : presence}
         </span>
+        <p className="caption remote-status">{store.remoteConfigured ? "Remote configured · availability not verified" : "Remote unavailable"}</p>
         {store.host !== "online" && !store.pairingRequired ? (
           <p>
             {store.host === "sleeping"
@@ -63,6 +65,7 @@ export function Phone({ now }: { now: number }) {
       ) : (
         <>
           <MissionsSection now={now} />
+          <ActivityTimeline limit={6} />
           <section>
             <div className="section-heading">
               <h2 className="eyebrow">Active</h2>
@@ -103,6 +106,7 @@ export function Phone({ now }: { now: number }) {
                   ) : (
                     <TaskActivity task={task} />
                   )}
+                  {task.state !== "waiting_for_approval" ? <button className="btn danger" onClick={()=>void store.stop(task.id)} aria-label={`Stop task ${task.title}`}>Stop task</button> : null}
                 </article>
               ))
             ) : (

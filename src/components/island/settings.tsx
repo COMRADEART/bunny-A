@@ -351,6 +351,8 @@ export function Settings() {
               >
                 <ShieldCheck size={18} />
               </Setting>
+              <Setting label="Installed Host" detail={store.release ? `${store.release.release} · ${store.release.sourceCommit.slice(0,12)}` : "Development Host or build identity unavailable"}><span className="caption">{store.release?.version ?? "Unavailable"}</span></Setting>
+              <Setting label="Dashboard build" detail={store.release?.dashboard ? `Source ${store.release.dashboard.sourceCommit.slice(0,12)} · ${store.release.dashboard.assets} packaged assets` : "Dashboard build identity unavailable"}><span className="caption">{store.release?.dashboard?.builtAt ? new Date(store.release.dashboard.builtAt).toLocaleDateString() : "Unavailable"}</span></Setting>
             </>
           )}
         </section>

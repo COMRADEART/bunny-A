@@ -1,5 +1,7 @@
 import type { MissionSnapshot } from "../bunny-missions/types.ts";
 import type { OperationalHealth } from "./failure.server.ts";
+import type { HostPresentation } from "./presentation.ts";
+import type { ReleaseIdentity } from "./release-identity.server.ts";
 import type { Mode, OrchTask, Project, ProviderId, ProviderLive, HostSample, TaskConstraints, ProviderFeatures, TaskProgress, TokenUsage, UsageWindow, VerifySpec, ProcessInfo, TaskState, ProviderExecutionScope } from "../orch/types.ts";
 
 /** missionId is null for direct-task and system events (and for every event written before schema v3). */
@@ -13,6 +15,7 @@ export type PerformanceProfile = {
 export type HostSnapshot = {
   app: "Bunny-A";
   instanceId: string;
+  release?: ReleaseIdentity | null;
   health?: OperationalHealth;
   tasks: OrchTask[];
   projects: Project[];
@@ -20,6 +23,8 @@ export type HostSnapshot = {
   samples: HostSample[];
   events: HostEvent[];
   cursor: number;
+  /** Read-only, privacy-safe activity over the existing journal and capability records. */
+  presentation?: HostPresentation;
   performance: PerformanceProfile[];
   remoteConfigured: boolean;
   remoteUrl?: string | null;

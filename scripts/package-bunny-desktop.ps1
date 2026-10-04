@@ -72,6 +72,8 @@ try {
   }
   if(-not $SkipDashboardBuild) {Copy-Item -LiteralPath (Join-Path $bunnyBuild '.output') -Destination (Join-Path $bunnyPackage '.output') -Recurse}
   foreach($name in @('Bunny-Host.mjs','Bunny-Server.mjs','Bunny-Island.ps1','Bunny-Island.Visual.ps1','Bunny-Island.Motion.ps1','Launch-Bunny-A.ps1','Launch-Bunny-A.cmd','manifest.mjs')) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}
+  # Older pinned rollback sources predate the presentation helper.
+  if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'install/Bunny-Island.Presentation.ps1')) {Add-PackageFile (Join-Path $bunnyBuild 'install/Bunny-Island.Presentation.ps1') 'Bunny-Island.Presentation.ps1' 'source' 'install/Bunny-Island.Presentation.ps1'}
   # The tunnel worker runs from the release too, so remote access never starts code from a checkout.
   foreach($name in @('bunny-tunnel.mjs','bunny-tunnel-state.mjs','bunny-tunnel-paths.mjs','bunny-tunnel-worker.mjs')) {if(Test-Path -LiteralPath (Join-Path $bunnyBuild ('scripts/'+$name))) {Add-PackageFile (Join-Path $bunnyBuild ('scripts/'+$name)) ('scripts/'+$name) 'source' ('scripts/'+$name)}}
   foreach($relative in $toolingFiles) {$destination=if($relative.StartsWith('install/')) {Split-Path -Leaf $relative} else {$relative};Add-PackageFile (Join-Path $bunnyTooling $relative) $destination 'tooling' $relative}

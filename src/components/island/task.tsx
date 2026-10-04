@@ -32,7 +32,9 @@ import {
   TaskReplay,
   ActivityRibbon,
 } from "./motion";
-import { activityDetail, activityLabel, isPrivateEvent, publicTaskLogs } from "./motion-model";
+import { publicTaskLogs } from "./motion-model";
+import { ActivityTimeline } from "./activity";
+import { taskStatus } from "@/lib/bunny-host/presentation";
 import { useVoiceInput, VoicePanel } from "./voice";
 
 export function openTask(id: string) {
@@ -448,13 +450,7 @@ export function TaskDetail({ now }: { now: number }) {
   const file = verifiedFile(task);
   const progress = finitePlan(task.progress);
   const provider = liveProviders(store).find((p) => p.id === task.provider)!;
-  const events = store.events.filter(
-    (e) =>
-      e.taskId === task.id &&
-      !e.type.startsWith("audit.") &&
-      !["agent.output"].includes(e.type) &&
-      !isPrivateEvent(e.type),
-  );
+  const role=task.mission ? store.missions?.missions.find(mission=>mission.id===task.mission?.missionId)?.steps.find(step=>step.id===task.mission?.stepId)?.role : null;
   return (
     <article className="task-detail glass">
       <header className="task-detail-header">
@@ -462,14 +458,17 @@ export function TaskDetail({ now }: { now: number }) {
           <ProviderIcon id={task.provider} />
           <div>
             <p className="eyebrow">
-              {NAMES[task.provider]} · {elapsed(task, now)}
+              {role ? `${role} · ` : ""}{NAMES[task.provider]} · {elapsed(task, now)}
             </p>
             <h2>{task.title}</h2>
           </div>
         </div>
-        <TaskBadge state={task.state} />
+        <TaskBadge state={task.state} task={task} />
       </header>
       <TaskJourney task={task} />
+      <div className="verification-card" data-passed={task.verification?.passed ?? "unknown"} role="status">
+        <ShieldCheck size={16} aria-hidden="true" /><div><strong>{taskStatus(task).verification}</strong><p className="caption">Provider turns, task completion and independent verification are separate.</p></div>
+      </div>
       <ActivityRibbon
         task={task}
         onOpen={() =>
@@ -496,52 +495,10 @@ export function TaskDetail({ now }: { now: number }) {
           <p>
             {progress.completed} / {progress.total} steps completed
           </p>
-          {progress.current ? <p className="caption">Current step: {progress.current}</p> : null}
         </section>
       ) : null}
       <section id="task-activity">
-        <h3 className="eyebrow">Activity</h3>
-        {events.length ? (
-          <ol className="activity-timeline">
-            {events.map((e) => (
-              <li key={e.sequence}>
-                <time>
-                  {new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </time>
-                <span className="timeline-dot" />
-                <div>
-                  <strong>{activityLabel(e.type)}</strong>
-                  <p>{activityDetail(e.type, e.detail, task)}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : task.logs.length ? (
-          <>
-            <p className="caption">Retained Host activity · latest 24 entries</p>
-            <ol className="activity-timeline">
-              {publicTaskLogs(task, store.events)
-                .slice(-24)
-                .map((entry, index) => (
-                  <li key={`${entry.at}-${index}`}>
-                    <time>
-                      {new Date(entry.at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </time>
-                    <span className="timeline-dot" />
-                    <div>
-                      <strong>Host log</strong>
-                      <p>{entry.line}</p>
-                    </div>
-                  </li>
-                ))}
-            </ol>
-          </>
-        ) : (
-          <p className="caption">No activity records retained for this task.</p>
-        )}
+        <ActivityTimeline taskId={task.id} limit={24} />
       </section>
       {file ? (
         <section>
@@ -603,11 +560,12 @@ export function TaskDetail({ now }: { now: number }) {
           {task.verification ? (
             <p className="verification" data-passed={task.verification.passed}>
               {task.verification.passed ? <Check size={14} /> : <Square size={14} />}{" "}
-              {task.verification.detail}
+              {taskStatus(task).verification}
             </p>
           ) : null}
         </section>
       ) : null}
+      {!isActive(task) && !task.output ? <p className="caption">Provider transcripts remain on the Host. Files and independent verification are shown above.</p> : null}
       <details className="raw-logs">
         <summary>Technical details & logs</summary>
         <dl className="fact-list">

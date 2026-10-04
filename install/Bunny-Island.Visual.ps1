@@ -49,6 +49,7 @@ $bunnyAnimate = -not $SmokeTest -and [Windows.SystemParameters]::ClientAreaAnima
     <StackPanel x:Name="Providers" Orientation="Horizontal" VerticalAlignment="Center"/>
    </DockPanel>
    <Button x:Name="CompactTask" Visibility="Collapsed" Padding="8,8" HorizontalContentAlignment="Stretch" Margin="0,8,0,0" AutomationProperties.Name="Expand active task"><DockPanel><TextBlock x:Name="CompactTime" DockPanel.Dock="Right" Foreground="{DynamicResource BunnyMuted}" VerticalAlignment="Center"/><StackPanel><TextBlock x:Name="CompactTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="CompactActivity" FontSize="12" Foreground="{DynamicResource BunnyAccent}" TextTrimming="CharacterEllipsis"/></StackPanel></DockPanel></Button>
+   <Button x:Name="CompactMission" Visibility="Collapsed" Padding="8,8" HorizontalContentAlignment="Stretch" Margin="0,8,0,0" AutomationProperties.Name="Open Mission Control"><StackPanel><TextBlock x:Name="MissionTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="MissionWorkers" FontSize="12" Foreground="{DynamicResource BunnyAccent}" TextTrimming="CharacterEllipsis"/></StackPanel></Button>
    <ScrollViewer x:Name="DetailsScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="Details" Visibility="Collapsed" Margin="8,12,8,4">
     <StackPanel Orientation="Horizontal" Margin="0,0,0,16"><Ellipse x:Name="PresenceDot" Width="5" Height="5" Margin="0,0,8,0" VerticalAlignment="Center" Fill="{DynamicResource BunnyPositive}"/><TextBlock x:Name="Presence" Foreground="{DynamicResource BunnyMuted}" FontSize="12"/></StackPanel>
     <StackPanel x:Name="ComposerPanel" Visibility="Collapsed">
@@ -166,6 +167,7 @@ function Resize-Bunny {
  $detailHeight=if($expanded){[Math]::Min($bunnyControls.Details.DesiredSize.Height,$bunnyControls.DetailsScroll.MaxHeight)}else{0}
  $bunnyControls.DetailsScroll.Height=$detailHeight
  $compactHeight=0;if(-not$expanded-and$bunnyControls.CompactTask.Visibility-eq'Visible'){$bunnyControls.CompactTask.Measure([Windows.Size]::new($width-46,[double]::PositiveInfinity));$compactHeight=$bunnyControls.CompactTask.DesiredSize.Height}
+ if(-not$expanded-and$bunnyControls.CompactMission.Visibility-eq'Visible'){$bunnyControls.CompactMission.Measure([Windows.Size]::new($width-46,[double]::PositiveInfinity));$compactHeight+=$bunnyControls.CompactMission.DesiredSize.Height}
  $height=[Math]::Min(86+$detailHeight+$compactHeight,[Windows.SystemParameters]::WorkArea.Height-12)
  Set-BunnyHeight $height
 }
@@ -218,15 +220,16 @@ function Get-BunnyVerifiedFile($Task){
 function Show-BunnyTask {
  $task=@($bunnySnapshot.tasks|Where-Object id -eq $bunnySelectedId)|Select-Object -First 1;if(-not$task){return}
  $provider=@($bunnySnapshot.providers|Where-Object id -eq $task.provider)|Select-Object -First 1;$info=Get-BunnyStateInfo $task.state;$waiting=$task.state-eq'waiting_for_approval';$live=$task.state-notin@('completed','failed','stopped','waiting_for_approval')
- $bunnyControls.TaskProvider.Text=Get-BunnyProviderName $task.provider;$bunnyControls.Elapsed.Text=Get-BunnyElapsed $task;$bunnyControls.TaskTitle.Text=$task.title;$bunnyControls.TaskState.Text=$info.Label;Set-BunnyRef $bunnyControls.TaskState ([Windows.Controls.TextBlock]::ForegroundProperty) $info.Ink
- $bunnyControls.CompactTitle.Text=$(if($task.provider-eq'claude'){'Claude'}else{Get-BunnyProviderName $task.provider})+' '+$bunnyDot+' '+$task.title;$bunnyControls.CompactTime.Text=Get-BunnyElapsed $task;$bunnyControls.CompactActivity.Text=if($live-and$task.latestEvent.label){$task.latestEvent.label}else{$info.Label}
- $bunnyControls.TaskDetail.Text=if($task.state-eq'failed'){($task.error-split"`r?`n")[0]}elseif($task.state-eq'completed'){if($task.verification.passed-and$task.verify){$task.verify.name+' '+$bunnyDot+' verified'}else{'The result is ready in task details.'}}elseif($task.state-eq'stopped'){'The Host stopped this task.'}elseif($task.latestEvent){$task.latestEvent.label+"`n"+$task.latestEvent.detail}else{'Working...'}
- $bunnyControls.TaskDetail.MaxHeight=104;$bunnyControls.TaskDetail.ToolTip=$task.latestEvent.detail
+ $safe=Get-BunnyTaskPresentation $task
+ $bunnyControls.TaskProvider.Text=Get-BunnyProviderName $task.provider;$bunnyControls.Elapsed.Text=Get-BunnyElapsed $task;$bunnyControls.TaskTitle.Text=$task.title;$bunnyControls.TaskState.Text=$safe.label;Set-BunnyRef $bunnyControls.TaskState ([Windows.Controls.TextBlock]::ForegroundProperty) $info.Ink
+ $bunnyControls.CompactTitle.Text=(Get-BunnyProviderName $task.provider)+' '+$bunnyDot+' '+$task.title;$bunnyControls.CompactTime.Text=Get-BunnyElapsed $task;$bunnyControls.CompactActivity.Text=$safe.activity
+ $bunnyControls.TaskDetail.Text=$safe.activity+"`n"+$safe.verification+"`n"+$safe.detail
+ $bunnyControls.TaskDetail.MaxHeight=104;$bunnyControls.TaskDetail.ToolTip=$safe.detail
  $planned=$task.progress-and$task.progress.kind-eq'determinate'-and$task.progress.total-gt0-and$task.progress.completed-ge0-and$task.progress.completed-le$task.progress.total-and[double]$task.progress.total-eq[Math]::Floor([double]$task.progress.total)-and[double]$task.progress.completed-eq[Math]::Floor([double]$task.progress.completed)
  $bunnyControls.TaskProgress.IsIndeterminate=$false;$bunnyControls.TaskProgress.Visibility=if($live-and$planned){'Visible'}else{'Collapsed'}
- if($planned){$bunnyControls.TaskProgress.Maximum=$task.progress.total;$bunnyControls.TaskProgress.Value=$task.progress.completed;$bunnyControls.StepCount.Text=[string]$task.progress.completed+' / '+$task.progress.total+' steps';$bunnyControls.PlanSource.Text=$task.progress.source+$(if($task.progress.current){"`nCurrent: "+$task.progress.current}else{''})}else{$bunnyControls.StepCount.Text='';$bunnyControls.PlanSource.Text='No finite plan reported.'}
+ if($planned){$bunnyControls.TaskProgress.Maximum=$task.progress.total;$bunnyControls.TaskProgress.Value=$task.progress.completed;$bunnyControls.StepCount.Text=[string]$task.progress.completed+' / '+$task.progress.total+' steps';$bunnyControls.PlanSource.Text='Provider plan'}else{$bunnyControls.StepCount.Text='';$bunnyControls.PlanSource.Text='No finite plan reported.'}
  $bunnyControls.StepCount.Visibility=if($live-and$planned){'Visible'}else{'Collapsed'};$bunnyControls.ActivityDots.Visibility=if($live-and-not$planned){'Visible'}else{'Collapsed'}
- $bunnyControls.Output.Text=if($task.error){$task.error}elseif($task.output){$task.output}else{'Output unavailable.'};$bunnyControls.ExpandedTask.Visibility=if($bunnyTaskExpanded){'Visible'}else{'Collapsed'}
+ $bunnyControls.Output.Text='Provider transcripts remain on the Host. Open the application for files and verification.';$bunnyControls.ExpandedTask.Visibility=if($bunnyTaskExpanded){'Visible'}else{'Collapsed'}
  $bunnyControls.StopButton.Visibility=if($live){'Visible'}else{'Collapsed'};$bunnyControls.StopButton.IsEnabled=$bunnyOnline-and-not$bunnyPending;$bunnyControls.TerminalButton.Visibility=if($live-and$bunnyTaskExpanded){'Visible'}else{'Collapsed'};$bunnyControls.TerminalButton.IsEnabled=$false
  $bunnyControls.ExpandButton.Content=if($bunnyTaskExpanded){'Less'}elseif($task.state-eq'failed'){'Details'}else{'Expand'}
  $file=Get-BunnyVerifiedFile $task;$bunnyControls.FileActions.Visibility=if($file){'Visible'}else{'Collapsed'};$bunnyControls.OpenFileButton.Tag=$file;$bunnyControls.ShowFolderButton.Tag=$file
@@ -261,6 +264,7 @@ function Update-Bunny {
   if($bunnyView-eq'system'){Show-BunnySystem};Draw-BunnyProviders;Update-BunnyRouteState
   if($bunnyFinishedAt-and$bunnyPreferences.collapse-gt0-and$bunnyView-eq'task'-and([DateTimeOffset]::Now.ToUnixTimeMilliseconds()-$bunnyFinishedAt)-ge($bunnyPreferences.collapse*1000)){$script:bunnySelectedId=$null;$script:bunnyFinishedAt=$null;Set-BunnyView 'idle'}
   if($bunnyView-eq'idle'-and-not$active.Count-and-not$bunnyFinishedAt){$script:bunnySelectedId=$null;$bunnyControls.CompactTask.Visibility='Collapsed'}elseif($bunnyView-eq'idle'-and$active.Count){$bunnyControls.CompactTask.Visibility='Visible'}
+  Update-BunnyPresentation
   Resize-Bunny
   Update-BunnyMotion
  }catch{$script:bunnyOnline=$false;$script:bunnyLastError=$_.Exception.Message;$bunnyControls.Presence.Text='Host unreachable '+$bunnyDot+' sleep status unavailable';Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyMuted';$bunnyControls.Temperature.Text='--';$bunnyControls.ApproveButton.IsEnabled=$false;$bunnyControls.StopButton.IsEnabled=$false;Update-BunnyRouteState;Draw-BunnyProviders;Update-BunnyMotion}
@@ -282,6 +286,7 @@ function Add-BunnyChoice($Control,$Options,[string]$Key){foreach($pair in $Optio
 function Apply-BunnyAppearance { $light=if($bunnyPreferences.theme-eq'system'){try{(Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize').AppsUseLightTheme-eq1}catch{$false}}else{$bunnyPreferences.theme-eq'light'};Set-BunnyTheme $light;Set-BunnyPosition;if(Get-Command Update-BunnyMotion -ErrorAction SilentlyContinue){$script:bunnyOrbState='';Update-BunnyMotion} }
 $bunnySettingsUpdating=$true
 . (Join-Path $PSScriptRoot 'Bunny-Island.Motion.ps1')
+. (Join-Path $PSScriptRoot 'Bunny-Island.Presentation.ps1')
 Add-BunnyChoice $bunnyControls.SizeChoice @(@('compact','Compact'),@('normal','Normal'),@('detailed','Detailed')) 'size'
 Add-BunnyChoice $bunnyControls.PositionChoice @(@('left','Top left'),@('center','Top center'),@('right','Top right')) 'position'
 Add-BunnyChoice $bunnyControls.IdleChoice @(@('providers','Agents'),@('temperatures','System'),@('tasks','Active tasks'),@('clock','Clock'),@('mixed','Mixed'),@('minimal','Minimal')) 'idle'

@@ -58,7 +58,9 @@ export function writeManifest(release) {
   });
   for (const path of recorded.keys()) if (!files.some((f) => f.path === path)) throw new Error(`Recorded file missing from the release: ${path}`);
   const { origins: _origins, ...meta } = record;
-  const manifest = { schema: "bunny-release-manifest/1", ...meta, compatibility: { ...meta.compatibility, hostSchemaUserVersion: hostSchemaVersion(release) }, files };
+  const assets=files.filter(file=>file.path.startsWith(".output/public/")).map(({path,sha256,bytes})=>({path,sha256,bytes}));
+  const dashboard=record.build?.dashboardBuild ? {sourceCommit:record.sourceCommit,builtAt:record.builtAt,assetManifestSha256:sha256(JSON.stringify(assets)),assets:assets.length} : null;
+  const manifest = { schema: "bunny-release-manifest/1", ...meta, dashboard, compatibility: { ...meta.compatibility, hostSchemaUserVersion: hostSchemaVersion(release) }, files };
   writeFileSync(join(release, MANIFEST), JSON.stringify(manifest, null, 1) + "\n");
   return manifest;
 }

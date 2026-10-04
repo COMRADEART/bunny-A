@@ -16,6 +16,8 @@ import {
   permissionLabel,
 } from "./mission-model";
 import type { ProviderId } from "@/lib/orch/types";
+import { ActivityTimeline } from "./activity";
+import { artifactStatus } from "@/lib/bunny-host/presentation";
 
 /** Inbox text with mission titles instead of raw ids. */
 function readable(detail: string, missions: MissionView[]) {
@@ -30,7 +32,7 @@ const providerName = (id: string | null) => (id && id in NAMES ? NAMES[id as Pro
 /** Compact Bunny Bar strip: mission title and one glyph per agent role. */
 export function MissionStrip({ mission, onOpen }: { mission: MissionView; onOpen: () => void }) {
   const tasks = useIsland((s) => s.tasks);
-  const { rows, more } = agentRows(mission, tasks, 4);
+  const { rows, more } = agentRows(mission, tasks, 3);
   return (
     <button
       className="mission-strip"
@@ -241,6 +243,11 @@ export function MissionPanel({ mission, now }: { mission: MissionView; now: numb
         </ul>
       ) : null}
       {mission.result ? <p className="result-summary">{mission.result.summary}</p> : null}
+      <div className="verification-card" data-passed={mission.state === "completed" && mission.result?.unverifiedSteps === 0 ? "true" : "unknown"}>
+        <ShieldCheck size={16} aria-hidden="true" /><span>{mission.state === "verifying" ? "Bunny verifying mission" : mission.result ? `${mission.result.verifiedSteps} steps verified · ${mission.result.unverifiedSteps} not independently verified` : "Independent verification is separate from provider and capability completion."}</span>
+      </div>
+      {mission.artifacts.length ? <section><h3 className="eyebrow">Artifacts</h3><ul className="mission-artifacts">{mission.artifacts.map(artifact=><li key={artifact.id}><strong>{artifact.title}</strong><span>{artifact.type.replaceAll("_"," ")} · {mission.steps.find(step=>step.id===artifact.stepId)?.role ?? "Bunny"}</span><b data-verified={artifact.verification}>{artifactStatus(artifact)}</b></li>)}</ul></section> : null}
+      <ActivityTimeline missionId={mission.id} />
       {mission.failure && mission.state !== "stopped" ? <p className="mission-failure">{mission.failure.detail}</p> : null}
       <div className="actions">
         {(mission.state === "failed" || mission.state === "waiting_for_user") &&

@@ -15,6 +15,8 @@ import type { ProviderAdapter, HostEvent } from "./contracts.ts";
 import type { HostSample } from "../orch/types.ts";
 import type { EventEmitter } from "node:events";
 import { stopOwnedChildren } from "./owned-processes.server.ts";
+import { projectHostActivity } from "./presentation.ts";
+import { releaseIdentity } from "./release-identity.server.ts";
 
 const PROVIDERS: ProviderId[]=["codex","claude","ollama","opencode","cline","cursor"];
 function record(value: unknown): Record<string,unknown> {if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("Expected an object.");return value as Record<string,unknown>;}
@@ -90,7 +92,13 @@ export async function startHost(options: { dataDirectory?: string; root?: string
   db.onFailure=(error,rollbackFailed)=>{if(rollbackFailed) containment.fatal(error,{subsystem:"persistence"});else containment.degrade("*","A persistence boundary failed; new execution requires Host recovery.");};
   // M-A-0 mission layer: additive tables are created, but nothing runs unless missions are enabled.
   const missions=new MissionManager(manager,{dataDirectory,...options.missions});
-  const snapshot=(after:number):HostSnapshot=>({...manager.snapshot(after),missions:missions.snapshot()});
+  let presentationRevision=0;
+  const installedIdentity=releaseIdentity();
+  const snapshot=(after:number):HostSnapshot=>{
+    const canonical={...manager.snapshot(after),missions:missions.snapshot()};
+    const retainedFrom=Number((db.db.prepare("SELECT COALESCE(MIN(sequence),0) n FROM events").get() as {n:number}).n);
+    return {...canonical,release:installedIdentity,presentation:projectHostActivity(canonical,missions.store.runs({limit:100}),retainedFrom,++presentationRevision)};
+  };
   manager.remoteConfigured=!!process.env.BUNNY_REMOTE_ORIGIN || existsSync(paths.remote);
   if(existsSync(paths.remote)) manager.remoteUrl=JSON.parse(readFileSync(paths.remote,"utf8")).url;
   let pairing: {codeHash: string;expiresAt:number} | null=null;
