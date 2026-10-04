@@ -311,6 +311,13 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
     <section className="approval-view">
       <p className="eyebrow">{phone ? "Recommended" : "Your approval"}</p>
       <h2>{phone ? NAMES[task.provider] : `Use ${NAMES[task.provider]}?`}</h2>
+      <p><strong>{task.title}</strong></p>
+      <dl className="fact-list">
+        <div><dt>Workspace</dt><dd>{store.projects.find(project=>project.id===task.projectId)?.name ?? "Default workspace"}</dd></div>
+        <div><dt>Folder</dt><dd>{task.cwd || "Unavailable"}</dd></div>
+        <div><dt>Authority</dt><dd>Direct task · provider permissions</dd></div>
+      </dl>
+      <p className="caption">The provider may use files and commands within its existing permissions. External effects follow provider policy; Bunny capability approvals remain separate.</p>
       {cloud ? (
         <p className="caption">{task.model} · runs through Ollama’s cloud service.</p>
       ) : null}

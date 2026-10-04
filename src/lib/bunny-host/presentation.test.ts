@@ -68,6 +68,10 @@ test("T5: completed tasks without independent evidence remain unverified", () =>
   assert.equal(taskStatus(t).verification, "Not independently verified");
   assert.match(publicEventDetail("task.completed", "verified!", t), /was not established/);
 });
+test("T5: approval acceptance no longer looks like a pending approval", () => {
+  const rows=projectEvents([event(1,"approval.required"),event(2,"approval.accepted"),event(3,"task.approved")],[task()]);
+  assert.deepEqual(rows.map(row=>row.state),["Waiting for approval","Completed","Completed"]);
+});
 test("T5: independent verification failure after provider completion stays failed", () => {
   const t = task({
     state: "failed",

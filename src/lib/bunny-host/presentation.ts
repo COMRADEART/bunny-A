@@ -232,7 +232,9 @@ function eventState(event: HostEvent, task?: OrchTask): ActivityState {
         : "Failed"
       : "Unknown effect";
   if (/verifying$/.test(event.type)) return "Verifying";
-  if (/approval|required/.test(event.type)) return "Waiting for approval";
+  if (/required$|waiting_for_approval/.test(event.type)) return "Waiting for approval";
+  if (["task.approved", "approval.accepted"].includes(event.type)) return "Completed";
+  if (event.type === "task.created") return "Requested";
   if (/waiting_for_input/.test(event.type)) return "Waiting for user";
   if (/stopped$/.test(event.type)) return "Stopped";
   if (/failed$|degraded$|fatal$/.test(event.type)) return "Failed";
