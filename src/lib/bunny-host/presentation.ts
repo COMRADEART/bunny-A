@@ -174,7 +174,10 @@ export function taskStatus(task: OrchTask): { label: string; verification: strin
     routing: "Routing",
     waiting_for_approval: "Approval required",
     launching: "Provider starting",
-    running: "Provider turn running",
+    running:
+      task.latestEvent?.type === "agent.completed"
+        ? "Provider turn finished"
+        : "Provider turn running",
     waiting_for_input: "Waiting for user",
     waiting_for_agent_approval: "Approval required",
     verifying: "Bunny verifying",
@@ -368,17 +371,25 @@ export function projectHostActivity(
     version: 1,
     revision,
     retainedFrom,
-    tasks: snapshot.tasks.map((task) => ({
-      id: task.id,
-      ...taskStatus(task),
-      activity:
-        task.state === "verifying"
-          ? "Bunny verifying"
-          : task.latestEvent
-            ? publicEventLabel(task.latestEvent.type)
-            : taskStatus(task).label,
-      detail: publicEventDetail(task.latestEvent?.type ?? `task.${task.state}`, "", task),
-    })),
+    tasks: snapshot.tasks.map((task) => {
+      const terminal = ["completed", "failed", "stopped"].includes(task.state);
+      return {
+        id: task.id,
+        ...taskStatus(task),
+        activity: terminal
+          ? taskStatus(task).label
+          : task.state === "verifying"
+            ? "Bunny verifying"
+            : task.latestEvent
+              ? publicEventLabel(task.latestEvent.type)
+              : taskStatus(task).label,
+        detail: publicEventDetail(
+          terminal ? `task.${task.state}` : (task.latestEvent?.type ?? `task.${task.state}`),
+          "",
+          task,
+        ),
+      };
+    }),
     activities: [
       ...projectEvents(snapshot.events, snapshot.tasks),
       ...projectCapabilities(runs, snapshot.missions?.missions ?? []),

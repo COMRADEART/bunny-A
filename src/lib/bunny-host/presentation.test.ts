@@ -69,6 +69,34 @@ test("T5: completed tasks without independent evidence remain unverified", () =>
   assert.equal(taskStatus(t).verification, "Not independently verified");
   assert.match(publicEventDetail("task.completed", "verified!", t), /was not established/);
 });
+test("T5: canonical terminal state wins over stale provider planning and execution signals", () => {
+  for (const type of [
+    "agent.reasoning",
+    "agent.thinking",
+    "agent.verifying",
+    "agent.started",
+    "agent.completed",
+  ]) {
+    for (const state of ["completed", "failed", "stopped"] as const) {
+      const t = task({
+        state,
+        stopReason: state === "stopped" ? "Host restarted; old session was not resumed" : null,
+        latestEvent: { type, label: "private", detail: "private", at: 1 },
+      });
+      const snapshot = { tasks: [t], events: [], cursor: 0 } as unknown as HostSnapshot;
+      const row = projectHostActivity(snapshot, [], 0, 1).tasks![0];
+      assert.equal(row.activity, taskStatus(t).label);
+      assert.doesNotMatch(row.detail, /Provider is working|private/);
+      if (state === "stopped") assert.match(row.detail, /old session was not resumed/);
+      if (state === "completed") assert.equal(row.verification, "Not independently verified");
+    }
+  }
+  const finished = task({
+    latestEvent: { type: "agent.completed", label: "private", detail: "private", at: 1 },
+  });
+  assert.equal(taskStatus(finished).label, "Provider turn finished");
+  assert.equal(taskStatus(finished).verification, "Not independently verified");
+});
 test("T5: approval acceptance no longer looks like a pending approval", () => {
   const rows = projectEvents(
     [event(1, "approval.required"), event(2, "approval.accepted"), event(3, "task.approved")],
