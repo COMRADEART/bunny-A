@@ -53,7 +53,7 @@ export async function hostRequest(path: string, data?: unknown): Promise<HostSna
   const directory = resolve(process.env.BUNNY_HOST_DATA_DIRECTORY ?? developmentStateDirectory());
   let credentials: { token: string; port: number };
   const credentialPath = process.env.BUNNY_HOST_CREDENTIALS_FILE ?? join(directory, process.env.BUNNY_STATE_LAYOUT === "2" ? "credentials/credentials.json" : "credentials.json");
-  try { credentials = JSON.parse(readFileSync(credentialPath, "utf8")); } catch { throw new Error("Bunny-A Host is offline or not installed."); }
+  try { credentials = JSON.parse(readFileSync(credentialPath, "utf8")); } catch { throw new Error("Bunny-A connection is unavailable; installed Host credentials could not be read."); }
   const token = access.local ? credentials.token : access.token;
   if (!token) throw new Error("Pair this device with Bunny-A Host first.");
   const response = await fetch(`http://127.0.0.1:${credentials.port}${path}`, { method: data ? "POST" : "GET", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: data ? JSON.stringify(data) : undefined, signal: AbortSignal.timeout(15000) });

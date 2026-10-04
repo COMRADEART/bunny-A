@@ -33,7 +33,7 @@ export function Phone({ now }: { now: number }) {
           : "Idle"
         : store.host === "sleeping"
           ? "Sleeping"
-          : "Offline";
+          : "Connection unavailable";
   return (
     <div className="phone-home">
       <section className="workstation-card glass">
@@ -54,7 +54,7 @@ export function Phone({ now }: { now: number }) {
           <p>
             {store.host === "sleeping"
               ? "Bunny can run your task when the workstation wakes."
-              : "The workstation is unreachable. Sleep status is unavailable."}
+              : "The connection is unavailable. Host operational health could not be checked."}
           </p>
         ) : null}
       </section>
