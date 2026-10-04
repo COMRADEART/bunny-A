@@ -82,3 +82,14 @@ Read `test-results/ma2-gate3/retired-path-audit.txt`, source-entry tests, produc
 the installed-candidate records. Evidence distinguishes live native process checks, disposable
 state copies, controlled fixture injection and static audit; no simulated model execution is
 represented as a live provider Mission.
+
+## Final installed checkpoint
+
+Read `MA2_T3_FAILURE_INJECTION_MATRIX.md` and the T3 sections of the four required MA2 reports for
+the final exact package, 521 passing regression checks, real installed fatal/gateway evidence,
+one authorized backed-up production cutover and post-update state preservation.
+The separate per-user native Windows entry uses the pinned launcher without a supervisor loop or
+public remote startup. Its evidence writes are bounded, use canonical application data, and refuse
+Git checkout paths, directory/file links and hard links. Compiled-method Windows fixtures verify
+those refusals; the installed WPF window and Bar rendering are checked against the production Host.
+Independent review is pending and T4–T10 remain open.
