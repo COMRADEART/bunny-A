@@ -1,7 +1,6 @@
 # Bunny-A M-A-2 independent review packet
 
-Earlier T1/T2 sections retain their original handoffs. Review the current T3 section below against
-its exact package and native entry identities. Independent T3 review is pending; T4–T10 remain open.
+Earlier sections retain the T1-T3 handoffs. Review the final staged T4 section below against its exact source/package identities. Production remains T3; independent review and T5-T10 remain open.
 
 ## Review scope
 
@@ -325,58 +324,175 @@ also covers source/candidate UI, build preview and the earlier restricted-shell 
 Review status is pending. Issue an independent T3 result after examining these records; leave
 T4–T10 open. The builder result is not an independent milestone certification.
 
-
 # M-A-2 Gate T4
+
+Final builder checkpoint: 2026-10-04T08:24:01.508Z. T4 candidate is staged/tested only; production
+remains the accepted installed T3 release. Earlier sections retain their checkpoint history.
 
 ## IMPLEMENTED
 
-Windows Git operations and terminal wrappers use independent creation-time Job Objects.
-The Host owns the sole non-inheritable handle; kill-on-close is set and breakaway disabled.
-The minimal x64 Node-API module is compiled from pinned C source, packaged and hashed.
-Ownership records are history; restart never trusts saved PIDs/handles. Stop/timeout kill
-only the live operation job. Merge markers/cleanup, workspace locks, T1/T2/T3 and provider
-policy remain intact. See [process ownership](MA2_PROCESS_OWNERSHIP.md) and
-[native architecture](native/README.md) for the API, OS boundary and build proof.
+Each Windows Git capability, terminal wrapper and GitHub connector operation has its own
+kernel-backed OwnedProcessGroup. The minimal x64 Node-API v8 C module creates an unnamed job,
+associates the root at kernel creation, checks membership before resume and keeps the sole
+non-inheritable job handle in the Host. Stop, timeout and completion terminate remaining members
+and close handles; T3 graceful/fatal drain uses the live registry. A hard Host kill closes the
+handle in Windows without callbacks. Gateway, Island, provider authority, TaskManager and
+MissionManager architecture are unchanged. No executable-name-wide termination was introduced.
+
+Safe state records under runtime/git-operations track operation/Mission/step/capability-run IDs,
+logical container ID, canonical launcher path, PID/creation time, observed member images/IDs,
+start/end, repo/cwd, action, terminal state and exit code. They contain no argv/environment
+secrets or live handles. Restart marks history interrupted without PID lookup or killing.
+Actual Windows owned cancellation reports stopped; accepted injected/non-Windows behavior is
+retained. Merge ownership markers, write locks, cleanup and user/stale-merge refusal stay intact.
+Git and indirect wrapper roots receive noninteractive Git environment controls and bounded I/O.
+
+Review the live native external API, creation-time assignment, stdio-only inheritance and last
+job-handle closure first. Review the resolver, terminal and GitHub connector call sites, then
+the existing merge markers/cleanup/write locks. Check native integrity/provenance and Git blob
+closure against the exact source/tooling commits below. History must never become PID authority.
+Do not use production for process-tree/crash review and do not activate the candidate.
 
 ## LIVE VERIFIED
 
-Disposable source Hosts/repositories prove cmd/bin/worker launchers, hooks/nested/detached
-children, breakaway refusal, isolated Stop, timeout, merge cleanup, hard commit/merge crashes,
-no delayed writes, honest restart and T3 fatal integration. Local SSH/credential/GPG stand-ins
-are contained; editors fail noninteractively. Production identities/hashes/rows/settings remain
-unchanged. See `test-results/ma2-gate4/source/gates.json` and preservation records.
+| Item | Final staged value |
+|---|---|
+| Release | `Bunny-A-Windows-v17-T4`, version `17.0.0-T4` |
+| Source commit | `21684ff60ee53e07937194838f1356a18ac158f5` |
+| Tooling commit | `2e8a21cb3168d08ed1adb08544149d3f33ed05af` |
+| Manifest SHA-256 | `db649b05552c1a91232336b4ad52afe3cfc8f7fbf9849700422c065fbfc2fe1d` |
+| ZIP SHA-256 | `6d72a578f456f9fd2bd8ebd7fe2db68e14c0f980033c14bdd242cbbd0dfb1df7` |
+| Native module SHA-256 | `1f1e8e28d80ed346602d0d0e227bf465187750eea6c6513f077634e013761e2b` |
+| Native C source SHA-256 | `da794168deed12b37a0f0e090f2566e0dc1894037de9a9142a4f48f4430a239c` |
+| Inventory / Git blobs | 152 files / 73 exact blobs (66 source, 7 tooling) |
+| Bundled Node / build OS | `v24.18.0` / `Microsoft Windows NT 10.0.26300.0` |
+| Runtime compatibility | layout 2, schema 3, Codex policy 1, fatal policy 1, Git ownership policy 1 |
+| Activation | FALSE; production remains v17-T3 |
+| ZIP | `test-results/ma2-gate4/candidate-final/Bunny-A-Windows-v17-T4.zip` |
+| Disposable staged directory | `C:\Users\allam\AppData\Local\Temp\bunny-t4-final-stage-e0040c1786804a949dbdb4a0f60116de\install\releases\Bunny-A-Windows-v17-T4` |
 
-All 546 local tests pass (240 scripts, 285 application, 21 UI): the 521 T3 floor plus 25 added
-T4 tests, with none removed/skipped on this workstation. Typecheck/normal build pass; lint has
-zero errors and ten preexisting warnings. Desktop/mobile renders are clean. Staged v17-T4
-Windows build and packaged-runtime proof are PENDING at this source checkpoint; the final
-candidate identity/result will be appended after its actual gates pass. No activation occurs.
+| Required T4 case | Classification / result | Evidence |
+|---|---|---|
+| Canonical resolution; cmd/bin/installed worker | LIVE PASS | git-installation.json; source/packaged launcher gates |
+| Real worker and hook shell membership | LIVE PASS | native member list + independent Windows process trees |
+| Hooks A normal, B sleep, C wait, D child/exit, E nested, F fail | LIVE PASS | owned-process-group tests; hook gates; Stop-isolation |
+| Detached/background and explicit breakaway attempts | LIVE PASS | hook-detached; breakaway-denied (Win32 error 5) |
+| Stop kills exactly the owned operation | LIVE PASS | capability/step/Mission stopped; every member gone |
+| Unrelated user Git/shell/sleeper and Mission B survive | LIVE PASS | stop-isolation before/after PID + creation identity |
+| Concurrent independent jobs | LIVE PASS | different container IDs; B stays alive after A Stop |
+| Same-repository conflicting writers | REGRESSION PASS | existing workspace reader/writer/nested and serialized writer tests |
+| Local gh -> shell -> Git -> hooks wrapper | LIVE PASS | offline-github-wrapper; local alias/config, no token/network |
+| Timeout and pipe closure/output | LIVE PASS | timeout-output + four Stop hook variants |
+| status/diff/add/commit/checkout/switch/worktree add/remove | LIVE PASS | direct-actions-and-clean-merge; add inside commit action |
+| Clean merge; conflict; Stop cleanup | LIVE PASS | success/conflict/merge-stop gates; truthful cleanup state |
+| Host hard kill during commit and merge | LIVE PASS | callback-free hard-host-crash + merge-hard-host-crash |
+| No delayed commit/merge/file mutation | LIVE PASS | HEAD and all repo file hashes unchanged beyond hook deadline |
+| Restart interruption, stale markers and no PID adoption | LIVE PASS / STATIC | recovered capability/step/Mission; no restored handles |
+| Pre-existing user merge preserved | LIVE PASS | read/refused write leave MERGE_HEAD/status unchanged |
+| PID reuse not trusted | SIMULATED PASS | unrelated live PID with old creation identity; recovery only |
+| T3 controlled fatal exit; graceful drain | LIVE PASS | fatal-host-crash exit 70; owned-child drain regression |
+| Local SSH/credential/GPG; editor refusal | LIVE PASS | git-helpers-ownership tests, synthetic local stand-ins only |
+| Native API/flags/handle lifetime/integrity/reproducibility | STATIC + LIVE PASS | C/TS source; native build proof; two-directory reproducibility |
+| Staged packaged runtime | LIVE PASS | 18 final packaged gates; real bundled Node/Host/native module |
+| Full/T1/T2/T3/UI/build/state preservation | PASS | 547 tests; final preservation; 152 candidate / 146 production files |
+| usr/bin launcher unavailable | NOT APPLICABLE | installation audit records absent path |
+| Independent review and T5-T10 | PENDING / DEFERRED | not a full M-A-2 acceptance |
+
+Source and staged-runtime live gates both pass: 18 each. The packaged entry is the real
+`Bunny-Host.mjs`, launched by bundled Node against a disposable production-state snapshot,
+workspace, port and token. No test-level global exception/rejection handler replaces T3.
+Evidence is in `test-results/ma2-gate4/source/gates.json`, `packaged/gates.json` and
+`package-evidence.json`. PIDs, creation times, exact images, job membership and repository
+states are recorded. Tests use disposable repositories only.
+
+Stop ends Mission A's launcher, worker, hook and nested children. Its capability, step and
+Mission all report stopped. Mission B, raw user Git, unrelated shell/sleeper, installed Host,
+gateway, native application and M3 QA retain their exact creation identities. Each operation
+has a different container ID. Normal completion closes the job and kills orphan/background
+children. Hooks A-F, explicit breakaway refusal, output during termination and timeout pass.
+
+Real status/diff/add/commit/checkout/switch/worktree add/remove and a clean merge pass. A
+controlled owned conflict reports conflict and runs the accepted cleanup; Stop during a
+slow merge restores clean HEAD and removes only Bunny-owned markers. A pre-existing user
+merge survives a read and refused write untouched. Existing same-workspace writer serialization
+and stale-lock refusal regressions pass.
+
+Hard termination of the test Host during both commit and merge runs no shutdown callback.
+The kernel closes its sole job handle and all observed members disappear. Independent
+observation beyond the hook deadline finds unchanged HEAD, no delayed completion marker and
+identical whole-repository file hashes. Restart never resumes the old operation: running
+history becomes interrupted; capability interrupted, step failed with host_restart, Mission
+waiting_for_user. A hard-interrupted merge retains MERGE_HEAD and its Bunny marker/lock;
+the next merge is refused without deleting that state. This requires review/recovery, not
+silent cleanup. T3 controlled fatal exit drains the operation as stopped and exits 70.
+
+Harmless local SSH, credential and GPG stand-ins are contained; the editor fails noninteractively.
+The offline GitHub CLI alias proves gh -> shell -> Git -> hook/child ownership, with its own
+temporary config, no token, no API request and no user-config change. Real GitHub API use is
+not claimed. The connector's operation roots also use the same ownership mechanism because
+[the official CLI Git client](https://github.com/cli/cli/blob/trunk/git/client.go) starts Git
+for repository inspection. Provider process authority remains unchanged.
+
+All 547 tests pass: 240 scripts + 286 application + 21 UI. All 521 T3 tests are retained,
+26 T4 tests are added, none removed/skipped on this workstation. Typecheck passes; lint has
+zero errors and the same ten pre-existing warnings. Normal build and Windows desktop build
+pass; DATABASE_URL is unset. Dev, final normal build and final packaged desktop/mobile renders
+were visually inspected with clean browser consoles, no page errors and no horizontal overflow.
+The unchanged Vercel preview TCP-peer limitation truthfully renders Connection unavailable;
+the Windows standalone package connects to its disposable Host and renders Host online.
+
+Production preservation passes: v17-T3 Host 33068, instance
+`37ee7306-9511-4115-b261-307f28247efe`, gateway 33116, native application 41220 and M3 QA 11020
+retain their creation identities. State root/layout/schema, 54 tasks, 13 projects, nine device
+rows, all historical rows and protected T1/native/T2/config/tunnel hashes remain intact.
+All 146 installed T3 files and 69 exact source/tooling blobs still verify. Missions/triggers
+remain OFF; no production Git operation, model session, Host restart or public-tunnel change.
+See `final-preservation.json`, `production-release-verification.json` and `production-source-check.json`.
 
 ## SIMULATED
 
-PID reuse uses a historical record with an old creation identity and a currently live unrelated
-PID. Recovery changes history only; that process survives. No forced OS PID-reuse cycle is claimed.
+PID reuse is simulated with an old recorded creation identity/handle field and a currently
+live unrelated PID. Recovery changes history only; that process survives. No forced Windows
+PID-reuse cycle is claimed. Existing controlled T2/T3 injections remain in the full suite.
 
 ## STATIC VERIFIED
 
-Only native live external objects authorize close. JOB_LIST assigns the root before its first
-instruction; stdio-only inheritance prevents descendants retaining the job handle. Jobs are
-per operation and unnamed. Canonical installed Git paths/hashes and absent usr/bin launcher
-are recorded. Package closure checks include native resources; reproducibility passes.
-The explicit Windows service-broker exception and unchanged provider authority boundary are
-documented in the ownership/native documents; independently brokered processes are not captured.
+The native module has three exports: launch, inspect and close. They accept a newly created
+root or the module's own live Node external. No restore-by-PID, integer-handle or job-name API
+exists. JOB_LIST assigns the root atomically during CreateProcess; it is suspended until
+membership is verified. HANDLE_LIST inherits stdio only. Jobs are unnamed, per operation,
+with KILL_ON_JOB_CLOSE (0x2000) only; BREAKAWAY_OK and SILENT_BREAKAWAY_OK are absent. Membership
+inspection rejects changed limits and rechecks the opened process handle's membership before
+recording diagnostic PID/creation time/image. Closing a job never authorizes a kill by saved PID.
+
+Pinned C source, architecture/readme, build script, locally generated module and build/hash proof
+are in the release manifest. Two independent builds produce identical module bytes. The
+compiler is reviewed local MinGW-w64 GCC 16.1.0; no dependency or opaque prebuilt helper was
+downloaded. Imported native libraries are Windows Kernel32/UCRT, with no broad process privilege.
+Module/source/proof/manifest checks fail closed before Git starts. Windows x64 and Windows 10+
+job-list support are required. Linux/macOS retain the previous path behind the platform guard.
+
+[Windows jobs](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects) contain
+ordinary CreateProcess descendants. Independently brokered WMI/elevation/service/remote
+processes are a documented Windows exception, not captured or advertised as contained. Jobs
+are not a sandbox against arbitrary same-user code attacking the Host. Supported Bunny Git
+roots do not request these brokered paths; helpers requesting breakaway fail. External IDE
+processes and long-lived user helpers are not adopted. See `native/README.md` for this boundary
+and [creation-time job assignment](https://devblogs.microsoft.com/oldnewthing/20230209-00/?p=107812).
 
 ## NOT TESTED
 
-Other Windows architectures/older Windows, absent usr/bin Git, real credential/GPG/elevated
-service/remote helpers, physical power loss/reboot, forced OS PID reuse or live Linux/macOS.
-No production Git operation or production Host crash was performed.
+Windows ARM64/x86 or pre-Windows-10, absent usr/bin Git, real credential/GPG/SSH services,
+real GitHub API operations, elevated/service-broker/remote helpers, physical power loss/reboot,
+forced OS PID reuse and live Linux/macOS. Production Git/Host-crash tests were expressly excluded.
 
 ## BLOCKED
 
-Packaged acceptance and independent review are pending at this source checkpoint. No known
-unresolved BLOCKER/HIGH is present in the completed local T4 gates. No final gate verdict yet.
+None in the completed T4 builder gates. There is no known unresolved BLOCKER/HIGH within
+the supported T4 process-tree scope. Independent review is pending and is not claimed by the builder.
 
 ## DEFERRED
 
-T5-T10, production activation and final independent operational review. No full M-A-2 verdict.
+T5-T10, production activation and independent final operational review. The T4 instruction
+expressly forbids automatic activation. No BUNNY_MA2_OPERATIONAL_PASS or full M-A-2 verdict is issued.
+Builder gate result: **BUNNY_MA2_T4_PASS**.
