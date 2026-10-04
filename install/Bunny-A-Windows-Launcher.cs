@@ -10,6 +10,9 @@ using System.Windows.Forms;
 using System.Reflection;
 using System.Diagnostics;
 using System.Windows.Threading;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 [assembly: AssemblyTitle("Bunny-A")]
 [assembly: AssemblyProduct("Bunny-A")]
@@ -21,12 +24,52 @@ using System.Windows.Threading;
 // There is one invocation, no process supervisor or executable-name termination.
 internal static class BunnyWindowsApplication
 {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileInformation
+    {
+        public uint Attributes;
+        public System.Runtime.InteropServices.ComTypes.FILETIME Created, Accessed, Written;
+        public uint Volume, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetFileInformationByHandle(SafeFileHandle file, out FileInformation information);
+
+    private static void WriteInstalledEvidence(string path, string value, bool append, long limit)
+    {
+        string parent = Path.GetDirectoryName(Path.GetFullPath(path));
+        for (string folder = parent; folder != null; folder = Path.GetDirectoryName(folder))
+        {
+            if (Directory.Exists(Path.Combine(folder, ".git")) || File.Exists(Path.Combine(folder, ".git")))
+                throw new InvalidOperationException("Installed evidence cannot use a Git checkout.");
+            if (Directory.Exists(folder) && (File.GetAttributes(folder) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidOperationException("Installed evidence cannot use a directory link.");
+        }
+        Directory.CreateDirectory(parent);
+        if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            throw new InvalidOperationException("Installed evidence cannot use a file link.");
+        byte[] bytes = Encoding.UTF8.GetBytes(value);
+        if (bytes.Length > limit) return;
+        using (var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            FileInformation information;
+            if (!GetFileInformationByHandle(stream.SafeFileHandle, out information) || information.Links != 1)
+                throw new InvalidOperationException("Installed evidence cannot use a hard link.");
+            if (append && stream.Length + bytes.Length > limit) return;
+            if (append) stream.Seek(0, SeekOrigin.End); else stream.SetLength(0);
+            stream.Write(bytes, 0, bytes.Length);
+        }
+    }
+
     [STAThread]
     private static int Main()
     {
-        string root = Path.GetDirectoryName(Application.ExecutablePath);
+        string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bunny-A");
         try
         {
+            if (!String.Equals(Path.GetFullPath(Path.GetDirectoryName(Application.ExecutablePath)), Path.GetFullPath(root), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("The native entry must run from the installed application directory.");
             string configPath = Path.Combine(root, "install.json");
             var json = new JavaScriptSerializer();
             json.MaxJsonLength = 1024 * 1024;
@@ -84,10 +127,8 @@ internal static class BunnyWindowsApplication
                                 status["width"] = window.ActualWidth;
                                 status["height"] = window.ActualHeight;
                                 string runtime = Path.Combine(root, "state", "runtime");
-                                if ((File.GetAttributes(runtime) & FileAttributes.ReparsePoint) != 0) { readyTimer.Stop(); return; }
                                 string statusFile = Path.Combine(runtime, "windows-application.json");
-                                if (File.Exists(statusFile) && (File.GetAttributes(statusFile) & FileAttributes.ReparsePoint) != 0) { readyTimer.Stop(); return; }
-                                File.WriteAllText(statusFile, json.Serialize(status));
+                                WriteInstalledEvidence(statusFile, json.Serialize(status), false, 4096);
                                 readyTimer.Stop();
                                 break;
                             }
@@ -114,10 +155,8 @@ internal static class BunnyWindowsApplication
             try
             {
                 string logs = Path.Combine(root, "state", "logs");
-                Directory.CreateDirectory(logs);
                 string file = Path.Combine(logs, "windows-application.jsonl");
-                if (!File.Exists(file) || new FileInfo(file).Length < 65536)
-                    File.AppendAllText(file, "{\"at\":\"" + DateTime.UtcNow.ToString("o") + "\",\"type\":\"windows.application_failed\",\"errorType\":\"" + error.GetType().Name + "\"}\n");
+                WriteInstalledEvidence(file, "{\"at\":\"" + DateTime.UtcNow.ToString("o") + "\",\"type\":\"windows.application_failed\",\"errorType\":\"" + error.GetType().Name + "\"}\n", true, 65536);
             }
             catch { }
             MessageBox.Show("Bunny-A could not start its pinned Windows application. The installed state was kept. Inspect the installed launch log.", "Bunny-A", MessageBoxButtons.OK, MessageBoxIcon.Error);
