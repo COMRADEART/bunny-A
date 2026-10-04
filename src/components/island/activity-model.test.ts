@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { reconcileSnapshot, type SnapshotPosition } from "./activity-model.ts";
+import { needsCanonicalResync, reconcileSnapshot, type SnapshotPosition } from "./activity-model.ts";
 import { agentRows, progressFraction } from "./mission-model.ts";
 import type { HostEvent, HostSnapshot } from "../../lib/bunny-host/contracts.ts";
 import type { MissionStep, MissionView } from "../../lib/bunny-missions/types.ts";
@@ -96,6 +96,10 @@ test("T5: a new Host instance accepts reset cursor without reconstructing old wo
     [1],
   );
   assert.deepEqual(next.fresh, []);
+});
+test("T5: a fast restart requests full canonical history even without connection loss",()=>{
+  assert.equal(needsCanonicalResync("old-host",snapshot(10,[event(10)],{instanceId:"new-host"}),90),true);
+  assert.equal(needsCanonicalResync("host",snapshot(10,[event(10)]),0),false);
 });
 test("T5: full reconnect still detects a gap from the last known cursor", () => {
   const current = reconcileSnapshot(empty, snapshot(2, [event(1), event(2)]), 0)!;

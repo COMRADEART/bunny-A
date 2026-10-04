@@ -4,7 +4,7 @@ import type { HostEvent, HostSnapshot, PerformanceProfile } from "@/lib/bunny-ho
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { OperationalHealth } from "@/lib/bunny-host/failure.server";
 import type { PublicActivity } from "@/lib/bunny-host/presentation";
-import { reconcileSnapshot } from "@/components/island/activity-model";
+import { needsCanonicalResync, reconcileSnapshot } from "@/components/island/activity-model";
 import type {
   HostPresence,
   HostSample,
@@ -454,8 +454,9 @@ export const useIsland = create<Island>((set, get) => {
           const after=disconnected ? 0 : get().cursor;
           const order=++requestOrder;
           const snapshot = await readBunnyHost({ data: { after } });
+          const resync=needsCanonicalResync(get().hostInstanceId,snapshot,after);
           apply(snapshot,after,order);
-          if(after>0 && (snapshot.presentation?.retainedFrom ?? 0)>after+1) {
+          if(resync) {
             const canonical=await readBunnyHost({data:{after:0}});
             apply(canonical,0,++requestOrder);
           }

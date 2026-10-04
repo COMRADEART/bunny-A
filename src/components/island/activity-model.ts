@@ -8,6 +8,10 @@ export type SnapshotPosition = {
   events: HostEvent[];
   activities: PublicActivity[];
 };
+/** A fast Host restart can change the epoch before a polling request ever fails. */
+export function needsCanonicalResync(instanceId:string|null,snapshot:HostSnapshot,after:number) {
+  return after>0 && ((instanceId!==null && instanceId!==snapshot.instanceId) || (snapshot.presentation?.retainedFrom ?? 0)>after+1);
+}
 /** Snapshot fields are canonical; only bounded journal presentation survives between reads. */
 export function reconcileSnapshot(
   previous: SnapshotPosition,
