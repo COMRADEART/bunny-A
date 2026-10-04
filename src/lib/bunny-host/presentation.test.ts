@@ -5,6 +5,7 @@ import {
   hostHealthMessage,
   capabilityState,
   dashboardSnapshot,
+  dashboardCommand,
   projectCapabilities,
   projectEvents,
   projectHostActivity,
@@ -69,8 +70,14 @@ test("T5: completed tasks without independent evidence remain unverified", () =>
   assert.match(publicEventDetail("task.completed", "verified!", t), /was not established/);
 });
 test("T5: approval acceptance no longer looks like a pending approval", () => {
-  const rows=projectEvents([event(1,"approval.required"),event(2,"approval.accepted"),event(3,"task.approved")],[task()]);
-  assert.deepEqual(rows.map(row=>row.state),["Waiting for approval","Completed","Completed"]);
+  const rows = projectEvents(
+    [event(1, "approval.required"), event(2, "approval.accepted"), event(3, "task.approved")],
+    [task()],
+  );
+  assert.deepEqual(
+    rows.map((row) => row.state),
+    ["Waiting for approval", "Completed", "Completed"],
+  );
 });
 test("T5: independent verification failure after provider completion stays failed", () => {
   const t = task({
@@ -176,7 +183,12 @@ for (const secret of secrets)
       decisionReason: secret,
     });
     const snapshot = {
-      health:{operationalState:"degraded",reason:secret,unavailableSubsystems:["browser"],lastFatal:{at:1,instanceId:"old",reason:secret}},
+      health: {
+        operationalState: "degraded",
+        reason: secret,
+        unavailableSubsystems: ["browser"],
+        lastFatal: { at: 1, instanceId: "old", reason: secret },
+      },
       instanceId: "host",
       cursor: 3,
       tasks: [t],
@@ -216,6 +228,25 @@ test("T5: private projection does not mutate the canonical journal, task or run"
   projectHostActivity(snapshot, [r], 1, 1);
   dashboardSnapshot(snapshot);
   assert.equal(JSON.stringify({ snapshot, r }), before);
+});
+test("T5: public command results omit private sessions and arbitrary capability payloads", () => {
+  const t = task({ output: "private provider transcript" });
+  const result = dashboardCommand({
+    snapshot: { tasks: [t], events: [], cursor: 0 } as unknown as HostSnapshot,
+    task: t,
+    session: { result: "private provider transcript", logs: ["Bearer qa-private-session"] },
+    data: { ordinary: "typed secret in connector payload" },
+  });
+  const text = JSON.stringify(result);
+  for (const secret of [
+    "private provider transcript",
+    "qa-private-session",
+    "typed secret in connector payload",
+  ])
+    assert.ok(!text.includes(secret));
+  assert.equal(result.task?.id, t.id);
+  assert.ok(!("data" in result));
+  assert.ok(!("session" in result));
 });
 test("T5: unknown actions and private reasoning cannot supply public labels", () => {
   assert.equal(

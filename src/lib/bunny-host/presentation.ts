@@ -12,8 +12,10 @@ export const artifactStatus = (artifact: Pick<ArtifactSummary, "verification">) 
       : "Produced";
 export function hostHealthMessage(health: OperationalHealth | null | undefined): string | null {
   if (!health || health.operationalState === "healthy") return null;
-  if (health.operationalState !== "degraded")
-    return "Host is shutting down after a failure. New execution is refused.";
+  if (health.operationalState === "fatal")
+    return "Host recovery required. New execution is refused.";
+  if (health.operationalState === "draining")
+    return "Host is shutting down. New execution is refused.";
   return health.unavailableSubsystems.includes("*")
     ? "Host degraded. New execution is unavailable until recovery."
     : `Host degraded. ${health.unavailableSubsystems.includes("browser") ? "Browser unavailable. " : ""}Dependent execution is unavailable; independent work may continue.`;
@@ -388,7 +390,18 @@ export function projectHostActivity(
 export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
   return {
     ...snapshot,
-    health:snapshot.health ? {...snapshot.health,reason:hostHealthMessage(snapshot.health),lastFatal:snapshot.health.lastFatal ? {...snapshot.health.lastFatal,reason:"Previous Host failure. Old execution was not resumed."} : null} : undefined,
+    health: snapshot.health
+      ? {
+          ...snapshot.health,
+          reason: hostHealthMessage(snapshot.health),
+          lastFatal: snapshot.health.lastFatal
+            ? {
+                ...snapshot.health.lastFatal,
+                reason: "Previous Host failure. Old execution was not resumed.",
+              }
+            : null,
+        }
+      : undefined,
     events: snapshot.events.map((event) => ({
       ...event,
       detail: publicEventDetail(
@@ -525,6 +538,21 @@ export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
                 : "Runtime " + capability.availability,
           })),
         }
+      : undefined,
+  };
+}
+
+/** Only the fields used by the dashboard cross its command boundary. Private session/capability data stays local. */
+export function dashboardCommand<
+  T extends { snapshot: HostSnapshot; task?: OrchTask; mission?: MissionView; pairCode?: string },
+>(result: T) {
+  const snapshot = dashboardSnapshot(result.snapshot);
+  return {
+    snapshot,
+    pairCode: result.pairCode,
+    task: result.task ? snapshot.tasks.find((task) => task.id === result.task!.id) : undefined,
+    mission: result.mission
+      ? snapshot.missions?.missions.find((mission) => mission.id === result.mission!.id)
       : undefined,
   };
 }

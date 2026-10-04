@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { HostSnapshot } from "../bunny-host/contracts.ts";
 import type { MissionView } from "../bunny-missions/types.ts";
 import type { OrchTask } from "./types";
-import { dashboardSnapshot } from "../bunny-host/presentation.ts";
+import { dashboardCommand, dashboardSnapshot } from "../bunny-host/presentation.ts";
 
 export const readBunnyHost = createServerFn({ method: "POST" })
   .validator((data: { after?: number }) => data)
@@ -30,14 +30,6 @@ export const commandBunnyHost = createServerFn({ method: "POST" })
         pairCode?: string;
         mission?: MissionView;
       };
-      const snapshot = dashboardSnapshot(result.snapshot);
-      return {
-        ...result,
-        snapshot,
-        task: result.task ? snapshot.tasks.find((task) => task.id === result.task!.id) : undefined,
-        mission: result.mission
-          ? snapshot.missions?.missions.find((mission) => mission.id === result.mission!.id)
-          : undefined,
-      };
+      return dashboardCommand(result);
     },
   );
