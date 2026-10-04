@@ -3,6 +3,12 @@ import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { homedir } from "node:os";
+
+/** Legacy launchers must never rediscover operational state beneath a checkout. */
+export function developmentStateDirectory(env: NodeJS.ProcessEnv = process.env) {
+  return join(env.LOCALAPPDATA ?? join(env.XDG_STATE_HOME ?? join(homedir(), ".local", "state")), "Bunny-A", "development");
+}
 
 export function assertApplicationDirectory(path: string) {
   const full = resolve(path);
@@ -20,7 +26,8 @@ export function hostStatePaths(directory?: string, env: NodeJS.ProcessEnv = proc
   const installed = env.BUNNY_STATE_LAYOUT === "2";
   const selected = directory ?? env.BUNNY_HOST_DATA_DIRECTORY;
   if (installed && (!selected || !isAbsolute(selected))) throw new Error("Installed Bunny state needs an absolute BUNNY_HOST_DATA_DIRECTORY.");
-  const data = resolve(selected ?? ".bunny-a");
+  const data = resolve(selected ?? developmentStateDirectory(env));
+  if (!selected) assertApplicationDirectory(data);
   if (!installed && existsSync(join(data, "state-layout.json"))) throw new Error("Installed state requires BUNNY_STATE_LAYOUT=2. Legacy fallback was refused.");
   if (!installed && existsSync(join(data, "state-retired.json"))) throw new Error("This state directory was retired by a production migration. Use the installed launcher or a separate development directory.");
   if (installed) {
@@ -48,6 +55,7 @@ export function hostStatePaths(directory?: string, env: NodeJS.ProcessEnv = proc
   }
   return {
     installed, data, database: join(data, "host.sqlite"), sessions: join(data, "sessions"),
+    diagnostics: assertApplicationDirectory(join(data, "logs")), runtime: assertApplicationDirectory(join(data, "runtime")),
     credentials: join(data, installed ? "credentials/credentials.json" : "credentials.json"),
     remote: join(data, installed ? "settings/remote.json" : "remote.json"),
   };

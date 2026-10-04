@@ -12,6 +12,7 @@ import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registr
 import { activityLabel } from "./events.ts";
 import { describeTree, descendants, killProcess, processTable, survivors } from "./process-tree.server.ts";
 import { verifySpec } from "./verification.server.ts";
+import { HostContainment, safeError, type SafeError } from "./failure.server.ts";
 
 const TERMINAL: TaskState[] = ["completed", "failed", "stopped"];
 const TRANSCRIPT_LIMIT = 20 * 1024 * 1024;
@@ -24,6 +25,7 @@ export type ManagerOptions = {
   timing?: RegistryTiming;
   /** Process-table reader, replaceable in tests. */
   processTable?: () => Promise<ProcessInfo[]>;
+  containment?: HostContainment;
 };
 
 export class TaskManager {
@@ -31,7 +33,7 @@ export class TaskManager {
   adapters: ProviderAdapter[];
   registry: ProviderRegistry;
   bus = new EventEmitter();
-  instanceId = crypto.randomUUID();
+  instanceId: string = crypto.randomUUID();
   sessions=new Map<string,RunningSession>();
   stopping=new Set<string>();
   samples: HostSample[]=[];
@@ -49,8 +51,11 @@ export class TaskManager {
   workspaceRoots: string[]=[];
   /** Installed by the mission owner; checked for direct approvals of pending children too. */
   missionScopeCheck: ((task: OrchTask) => string | null) | null=null;
+  containment: HostContainment;
   constructor(db: HostDatabase,defaultRoot: string,adapters?: ProviderAdapter[],options: ManagerOptions={}) {
     this.db=db;this.defaultRoot=realpathSync(defaultRoot);
+    this.containment=options.containment ?? new HostContainment({persist:(type,detail,owner)=>this.emit(db.event(type,owner.taskId ?? null,detail,owner.missionId ?? null))});
+    this.instanceId=this.containment.instanceId;
     this.policy=new PolicyEngine(db);
     this.adapters=adapters ?? defaultAdapters(()=>this.providerPaths());
     this.registry=new ProviderRegistry(this.adapters,db,options.timing ?? DEFAULT_TIMING);
@@ -67,16 +72,30 @@ export class TaskManager {
   }
   /** Compatibility view of the registry. */
   get providers(): ProviderLive[] {return this.registry.list();}
-  emit(event: HostEvent) {this.bus.emit("event",event);}
+  emit(event: HostEvent) {
+    // A broken subscriber (including an async one) cannot throw through a committed task transition.
+    for (const listener of this.bus.rawListeners("event")) {
+      try { const result=listener.call(this.bus,event); if(result && typeof result.then==="function") this.containment.background({subsystem:"event-consumer",...(event.taskId ? {taskId:event.taskId} : {}),...(event.missionId ? {missionId:event.missionId} : {})},()=>result,undefined,"SUBSYSTEM_FAILURE"); }
+      catch(error) {this.containment.background({subsystem:"event-consumer"},()=>this.containment.contain(error,"boundary",{owner:{subsystem:"event-consumer"},failureClass:"SUBSYSTEM_FAILURE"}));}
+    }
+  }
   /** For timers and thermal policy: a stop that fails (e.g. the task already ended) is reported, never an unhandled rejection. */
   stopInBackground(id: string,detail: string) {
-    this.stop(id,detail).catch(error=>{try {this.emit(this.db.event("task.stop_failed",id,error instanceof Error ? error.message : String(error)));} catch { /* Database closed during shutdown. */ }});
+    this.containment.background({subsystem:"tasks",taskId:id},()=>this.stop(id,detail),async error=>{this.emit(this.db.event("task.stop_failed",id,"Background Stop failed; inspect the task state."));await this.failOperation(id,error);});
+  }
+  async failOperation(id:string,error:SafeError) {
+    const current=this.db.get(id);
+    if(TERMINAL.includes(current.state) || this.stopping.has(id)) return;
+    this.stopTree(id);
+    this.update(current,{state:"failed",finishedAt:Date.now(),error:error.message,activity:"Failed"},"task.failed","Unexpected task failure; operation ended without success.");
+    await this.sessions.get(id)?.stop();
   }
   update(task: OrchTask,patch: Partial<OrchTask>,type: string,detail: string,quiet=false): OrchTask {
     const owned=this.db.get(task.id);
+    if(patch.state && TERMINAL.includes(owned.state) && (patch.state!==owned.state || /^task\.(completed|failed|stopped)$/.test(type))) return owned;
     if(JSON.stringify(Object.hasOwn(patch,"executionScope") ? patch.executionScope : task.executionScope)!==JSON.stringify(owned.executionScope) || JSON.stringify(Object.hasOwn(patch,"mission") ? patch.mission : task.mission)!==JSON.stringify(owned.mission)) throw new Error("Task execution authority and mission ownership are immutable; submit a new approved task.");
-    if(patch.state && patch.state!==task.state && !canTransition(task.state,patch.state)) throw new Error(`Invalid transition ${task.state} → ${patch.state}`);
-    const next={...task,...patch,logs:quiet ? task.logs : [...task.logs,{at:Date.now(),line:detail}].slice(-500)};
+    if(patch.state && patch.state!==owned.state && !canTransition(owned.state,patch.state)) throw new Error(`Invalid transition ${owned.state} → ${patch.state}`);
+    const next={...owned,...patch,logs:quiet ? owned.logs : [...owned.logs,{at:Date.now(),line:detail}].slice(-500)};
     this.emit(this.db.write(next,type,detail));return next;
   }
   providerPaths(): Partial<Record<ProviderId,string>> {
@@ -103,7 +122,7 @@ export class TaskManager {
       return {...base,active_jobs:mine.length,activeSessions:mine.map(task=>({taskId:task.id,providerSessionId:task.sessionId ?? null,pid:task.pid ?? null})),availability:mine.length && base.availability === "ready" ? "busy" : base.availability,observed:this.db.observed(provider.id)};
     });
   }
-  snapshot(after=0): HostSnapshot {return {app:"Bunny-A",instanceId:this.instanceId,tasks:this.db.tasks(),projects:this.db.projects(),providers:this.live(),samples:this.samples,events:after ? this.db.events(after) : this.db.recentEvents(),cursor:this.db.cursor(),performance:this.db.performance(),remoteConfigured:this.remoteConfigured,remoteUrl:this.remoteUrl,devices:this.db.db.prepare("SELECT id,name,created_at AS createdAt FROM devices WHERE revoked_at IS NULL").all() as {id:string;name:string;createdAt:number}[],thermal:this.thermal};}
+  snapshot(after=0): HostSnapshot {return {app:"Bunny-A",instanceId:this.instanceId,health:this.containment.snapshot(),tasks:this.db.tasks(),projects:this.db.projects(),providers:this.live(),samples:this.samples,events:after ? this.db.events(after) : this.db.recentEvents(),cursor:this.db.cursor(),performance:this.db.performance(),remoteConfigured:this.remoteConfigured,remoteUrl:this.remoteUrl,devices:this.db.db.prepare("SELECT id,name,created_at AS createdAt FROM devices WHERE revoked_at IS NULL").all() as {id:string;name:string;createdAt:number}[],thermal:this.thermal};}
   configureThermal(cpuWarn:number,gpuWarn:number,autoStop:boolean) {
     if(!Number.isFinite(cpuWarn)||cpuWarn<30||cpuWarn>120||!Number.isFinite(gpuWarn)||gpuWarn<30||gpuWarn>120) throw new Error("Thermal thresholds must be 30–120°C.");
     this.thermal={cpuWarn,gpuWarn,autoStop};this.db.db.prepare("INSERT INTO settings VALUES('thermal_policy',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(this.thermal));
@@ -131,6 +150,7 @@ export class TaskManager {
    * child task to its mission step and may place it in a Host-owned mission workspace.
    */
   submit(input: SubmitTask,delegated?: {missionId:string;stepId:string;cwd?:string|null;executionScope:ProviderExecutionScope}): OrchTask {
+    this.containment.assertAccepting("tasks");
     const scope=delegated?.executionScope ?? input.executionScope;
     if(delegated && !scope || scope && !["read","write"].includes(scope.access)) throw new Error("Invalid or missing provider execution scope.");
     const executionScope=scope ? {access:scope.access} : undefined;
@@ -196,6 +216,7 @@ export class TaskManager {
     return this.launch(id,{kind:"mission",at:Date.now(),authorizationId:delegation.authorizationId,missionId:delegation.missionId,stepId:delegation.stepId},"approval.delegated",`Mission-delegated approval under authorization ${delegation.authorizationId} (mission ${delegation.missionId}, step ${delegation.stepId}). The user approved the mission scope, not this individual child task.`);
   }
   private launch(id: string,approval: NonNullable<OrchTask["approval"]>,approvalEvent: string,approvalDetail: string): OrchTask {
+    this.containment.assertAccepting("tasks");
     const task=this.db.get(id);if(task.state!=="waiting_for_approval") throw new Error("Task is not awaiting approval; duplicate launches are refused.");
     if(task.mission && !task.executionScope) throw new Error("Legacy mission child has no provider execution authority; replan and approve the mission again.");
     if(task.mission) { const outside=this.missionScopeCheck ? this.missionScopeCheck(task) : "mission scope validator is unavailable"; if(outside) throw new Error(`Outside mission execution scope: ${outside}`); }
@@ -241,20 +262,23 @@ export class TaskManager {
           this.update(current,{sessionId:sessionId ?? current.sessionId,pid:pid ?? current.pid},"session.recorded",`Provider session ${sessionId ?? current.sessionId ?? "pending"}; PID ${pid ?? current.pid ?? "none"}.`);if(pid) this.watchTree(id);
         },
         model:model=>{const current=this.db.get(id);if(current.model!==model) this.update(current,{model},"executor.model",`Provider reported model ${model}.`);},
-        output:text=>{pending+=text;if(pending.length>2_000_000) pending=pending.slice(-2_000_000);flushTimer??=setTimeout(flush,300);},
+        output:text=>{pending+=text;if(pending.length>2_000_000) pending=pending.slice(-2_000_000);flushTimer??=setTimeout(this.containment.guard({subsystem:"tasks",taskId:id},flush,error=>this.failOperation(id,error)),300);},
         progress:progress=>{pendingProgress=progress;},
         usage:usage=>{reportedUsage=usage;},
         rateLimits:(windows,status)=>{this.registry.recordSessionUsage(task.provider,windows,status);},
         raw:(stream,text)=>record?.write(stream,text),
       });
-    } catch(error) {this.flushers.delete(id);return this.update(launching,{state:"failed",finishedAt:Date.now(),error:String(error),latestEvent:this.activity(launching,"agent.failed",String(error))},"task.failed",String(error));}
+    } catch(error) {this.flushers.delete(id);const message=safeError(error).message;return this.update(launching,{state:"failed",finishedAt:Date.now(),error:message,latestEvent:this.activity(launching,"agent.failed",message)},"task.failed",message);}
     this.sessions.set(id,session);
     const running=this.update(this.db.get(id),{state:"running",activity:"Running",...(record ? {logs:[...this.db.get(id).logs,{at:Date.now(),line:`Raw session transcript: ${record.path}`}]} : {})},"executor.starting","Execution active. Progress indeterminate until the provider publishes a plan.");
     const timer=setTimeout(()=>this.stopInBackground(id,"Runtime limit reached."),task.maxRuntimeMs ?? 120000);
-    void session.done.then(async result=>{
+    this.containment.background({subsystem:"tasks",taskId:id,...task.mission},async()=>{
+      try {
+      const result=await session.done;
       flush();this.stopTree(id);
       if(this.stopping.has(id)) return;
       const current=this.db.get(id);if(TERMINAL.includes(current.state)) return;
+      if(["draining","fatal"].includes(this.containment.health.operationalState)) {await this.failOperation(id,{name:"HostFatal",message:"Host fatal shutdown interrupted this owned task; no session was resumed."});return;}
       let state:TaskState=result.stopped ? "stopped" : result.ok ? "completed" : "failed";
       let verification=current.verification ?? null;let error=result.error ?? null;
       if(state === "completed" && current.verify) {
@@ -265,11 +289,13 @@ export class TaskManager {
         if(!verification.passed) {state="failed";error=`Bunny-A verification failed: ${verification.detail}`;}
       }
       const latest=this.db.get(id);if(TERMINAL.includes(latest.state) || this.stopping.has(id)) return;
+      if(["draining","fatal"].includes(this.containment.health.operationalState)) {await this.failOperation(id,{name:"HostFatal",message:"Host fatal shutdown interrupted verification; no success was recorded."});return;}
       const detail=state === "completed" ? (verification ? `Completed and verified by Bunny-A: ${verification.detail}` : "Provider process completed; no independent verification was requested.") : error ?? `Provider process ${state}.`;
       const finished=this.update(latest,{state,finishedAt:Date.now(),output:result.output || latest.output,error:state === "completed" ? null : error,exitCode:result.exitCode ?? null,activity:activityLabel(`task.${state}`),verification,usage:reportedUsage ?? latest.usage ?? null,latestEvent:this.activity(latest,`agent.${state}`,detail,verification ? "bunny" : "provider")},`task.${state}`,detail);
-      this.db.outcome(finished);
-      if(finished.provider === "codex") void this.registry.refreshUsage("codex").catch(()=>{});
-    }).catch(error=>{const current=this.db.get(id);if(!TERMINAL.includes(current.state) && !this.stopping.has(id)) this.update(current,{state:"failed",error:String(error),finishedAt:Date.now()},"task.failed",String(error));}).finally(()=>{clearTimeout(timer);if(flushTimer) clearTimeout(flushTimer);this.flushers.delete(id);this.sessions.delete(id);});
+      if(finished.provider === "codex") this.containment.background({subsystem:"provider-usage"},()=>this.registry.refreshUsage("codex"));
+      } catch(error) {await this.containment.contain(error,"boundary",{owner:{subsystem:"tasks",taskId:id,...task.mission},fail:error=>this.failOperation(id,error)});}
+      finally {clearTimeout(timer);if(flushTimer) clearTimeout(flushTimer);this.stopTree(id);this.flushers.delete(id);this.sessions.delete(id);}
+    });
     return running;
   }
   /** Snapshots the owned process tree shortly after launch and then periodically; an event only when it changes. */
@@ -285,9 +311,9 @@ export class TaskManager {
           if(tree.length && tree.map(row=>row.pid).join(",")!==(current.processTree ?? []).map(row=>row.pid).join(",")) this.update(current,{processTree:tree,processTreeAt:Date.now()},"session.process_tree",describeTree(tree),true);
         }
       }
-      if(this.treeTimers.has(id)) this.treeTimers.set(id,setTimeout(()=>void tick(),15000));
+      if(this.treeTimers.has(id)) this.treeTimers.set(id,setTimeout(()=>this.containment.background({subsystem:"process-observation",taskId:id},tick,()=>this.stopTree(id)),15000));
     };
-    this.treeTimers.set(id,setTimeout(()=>void tick(),2000));
+    this.treeTimers.set(id,setTimeout(()=>this.containment.background({subsystem:"process-observation",taskId:id},tick,()=>this.stopTree(id)),2000));
   }
   stopTree(id: string) {const timer=this.treeTimers.get(id);if(timer) clearTimeout(timer);this.treeTimers.delete(id);}
   async stop(id: string,detail="User stopped the selected task.") {
@@ -312,7 +338,6 @@ export class TaskManager {
       } else if(session) cleanup=" No OS process belonged to this session (in-process request).";
       const current=this.db.get(id);if(!canTransition(current.state,"stopped")) return current;
       const stopped=this.update(current,{state:"stopped",finishedAt:Date.now(),activity:"Stopped",stopReason:detail,latestEvent:this.activity(current,"agent.stopped",detail+cleanup,"bunny"),...(before.length ? {processTree:before,processTreeAt:Date.now()} : {})},"task.stopped",detail+cleanup);
-      if(stopped.startedAt) this.db.outcome(stopped);
       return stopped;
     } finally {this.stopping.delete(id);}
   }

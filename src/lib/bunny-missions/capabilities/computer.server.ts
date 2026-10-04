@@ -4,6 +4,7 @@ import { extname, join } from "node:path";
 import { scopedPath } from "../paths.server.ts";
 import type { ActionManifest, CapabilityResult } from "../types.ts";
 import type { CapabilityAdapter, ExecutionContext } from "./bus.server.ts";
+import { trackOwnedChild } from "../../bunny-host/owned-processes.server.ts";
 
 const input = (name: string, type: ActionManifest["inputs"][number]["type"], required: boolean, description: string) => ({ name, type, required, description });
 /** Applications Bunny may start by name. Anything else needs a new skill or capability, not a free-form command. */
@@ -104,10 +105,10 @@ $after = @(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 } | ForEach-Ob
 
 function powershell(script: string, params: Record<string, unknown>, signal: AbortSignal, timeoutMs: number): Promise<unknown> {
   return new Promise((resolveRun, reject) => {
-    const child = execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", `${PRELUDE}\n${script}`], { windowsHide: true, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, BUNNY_COMPUTER_PARAMS: JSON.stringify(params) }, signal }, (error, stdout, stderr) => {
+    const child = trackOwnedChild(execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", `${PRELUDE}\n${script}`], { windowsHide: true, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, BUNNY_COMPUTER_PARAMS: JSON.stringify(params) }, signal }, (error, stdout, stderr) => {
       if (error) { reject(new Error(((stderr || error.message).split(/\r?\n/).filter(Boolean)[0] ?? "UI Automation failed.").replace(/\s+At line:\d+.*$/, "").slice(0, 600))); return; }
       try { resolveRun(JSON.parse(stdout.trim().split(/\r?\n/).at(-1) ?? "null")); } catch { reject(new Error(`Unreadable automation result: ${stdout.slice(0, 200)}`)); }
-    });
+    }));
     child.stdin?.end();
   });
 }

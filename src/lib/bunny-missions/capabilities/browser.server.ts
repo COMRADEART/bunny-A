@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { ActionManifest, CapabilityResult } from "../types.ts";
 import type { CapabilityAdapter, ExecutionContext } from "./bus.server.ts";
 import { blockedHost, checkingProxy, safeUrl, type NetworkOptions } from "./browser-network.server.ts";
+import { HostContainment, type SafeError } from "../../bunny-host/failure.server.ts";
 export { blockedHost, safeUrl } from "./browser-network.server.ts";
 
 type PwPage = {
@@ -27,8 +28,11 @@ export class BrowserCapability implements CapabilityAdapter {
   dataDirectory: string; headless: boolean; allowLoopback: boolean;
   context: PwContext | null = null; starting: Promise<PwContext> | null = null; channel: string | null = null;
   tabs = new Map<string, PwPage>(); current: string | null = null; idle: ReturnType<typeof setTimeout> | null = null;
+  containment:HostContainment;
+  asyncFailure:SafeError|null=null;
   network: NetworkOptions; proxy: Awaited<ReturnType<typeof checkingProxy>> | null = null;
-  constructor(dataDirectory: string, options: { headless?: boolean; allowLoopback?: boolean; network?: NetworkOptions } = {}) {
+  constructor(dataDirectory: string, options: { headless?: boolean; allowLoopback?: boolean; network?: NetworkOptions; containment?:HostContainment } = {}) {
+    this.containment=options.containment ?? new HostContainment();
     this.dataDirectory = dataDirectory; this.headless = options.headless ?? true; this.allowLoopback = options.allowLoopback ?? false;
     this.network = { ...options.network, allowLoopback: this.allowLoopback };
   }
@@ -67,8 +71,10 @@ export class BrowserCapability implements CapabilityAdapter {
           this.channel = channel ?? "bundled chromium";
           // Every request — subresources and redirects included — is checked, not just the first URL.
           await context.route("**/*", async (route) => {
-            let host = ""; try { const url = new URL(route.request().url()); host = url.hostname; if (url.protocol === "data:" || url.protocol === "blob:") return route.continue(); } catch { return route.abort("blockedbyclient"); }
-            return blockedHost(host, this.allowLoopback) ? route.abort("blockedbyclient") : route.continue();
+            try {
+            let host = ""; try { const url = new URL(route.request().url()); host = url.hostname; if (url.protocol === "data:" || url.protocol === "blob:") return await route.continue(); } catch { return await route.abort("blockedbyclient"); }
+            await (blockedHost(host, this.allowLoopback) ? route.abort("blockedbyclient") : route.continue());
+            } catch(error) {await this.containment.contain(error,"boundary",{owner:{subsystem:"browser"},failureClass:"SUBSYSTEM_FAILURE",fail:failure=>{this.asyncFailure=failure;}});}
           });
           for (const page of context.pages()) await page.close().catch(() => {});
           this.context = context; return context;
@@ -79,7 +85,7 @@ export class BrowserCapability implements CapabilityAdapter {
     })().finally(() => { this.starting = null; });
     return this.starting;
   }
-  keepAlive() { if (this.idle) clearTimeout(this.idle); this.idle = setTimeout(() => void this.close(), 5 * 60_000); this.idle.unref?.(); }
+  keepAlive() { if (this.idle) clearTimeout(this.idle); this.idle = setTimeout(() => this.containment.background({subsystem:"browser"},()=>this.close(),undefined,"SUBSYSTEM_FAILURE"), 5 * 60_000); this.idle.unref?.(); }
   async page(tabId?: unknown): Promise<{ id: string; page: PwPage }> {
     const context = await this.ensure();
     const id = typeof tabId === "string" && tabId ? tabId : this.current;
@@ -98,6 +104,12 @@ export class BrowserCapability implements CapabilityAdapter {
     throw new Error("Provide role(+name), label, placeholder, text or selector.");
   }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
+    this.containment.assertAccepting("browser");
+    const result=await this.perform(action,params,context);
+    if(this.asyncFailure) return {ok:false,status:"failed",summary:"Browser asynchronous handler failed; dependent execution is unavailable.",output:null,evidence:[],errorCategory:"capability_failed"};
+    return result;
+  }
+  async perform(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     this.keepAlive();
     const timeout = Math.min(context.timeoutMs, 60_000);
     const evidenceOf = async (page: PwPage) => ({ url: page.url(), title: await page.title().catch(() => ""), retrievedAt: new Date().toISOString() });

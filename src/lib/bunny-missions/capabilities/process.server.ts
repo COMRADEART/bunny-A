@@ -1,6 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { delimiter, dirname, extname, join, resolve } from "node:path";
+import { trackOwnedChild } from "../../bunny-host/owned-processes.server.ts";
 
 /** How a command is actually launched: always a real executable plus argv, never a shell string. */
 export type Resolved = { file: string; prefix: string[]; display: string };
@@ -58,7 +59,7 @@ export function runProcess(resolved: Resolved, args: string[], options: { cwd: s
   const max = options.maxOutput ?? 200_000; const started = Date.now();
   return new Promise((resolveRun, reject) => {
     if (options.signal.aborted) { reject(new Error("Aborted before start.")); return; }
-    const child = spawn(resolved.file, [...resolved.prefix, ...args], { cwd: options.cwd, shell: false, windowsHide: true, env: options.env ?? process.env, stdio: ["ignore", "pipe", "pipe"] });
+    const child = trackOwnedChild(spawn(resolved.file, [...resolved.prefix, ...args], { cwd: options.cwd, shell: false, windowsHide: true, env: options.env ?? process.env, stdio: ["ignore", "pipe", "pipe"] }));
     let stdout = ""; let stderr = ""; let timedOut = false; let aborted = false;
     const append = (current: string, chunk: Buffer) => current.length >= max ? current : (current + chunk.toString("utf8")).slice(0, max);
     child.stdout.on("data", (chunk: Buffer) => { stdout = append(stdout, chunk); });

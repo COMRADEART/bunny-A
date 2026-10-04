@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { commandBunnyHost, readBunnyHost } from "@/lib/orch/host";
 import type { HostEvent, HostSnapshot, PerformanceProfile } from "@/lib/bunny-host/contracts";
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
+import type { OperationalHealth } from "@/lib/bunny-host/failure.server";
 import type {
   HostPresence,
   HostSample,
@@ -82,6 +83,7 @@ type Island = Preferences & {
   override: ProviderId | "auto";
   projectId: string | null;
   host: HostPresence;
+  hostHealth: OperationalHealth | null;
   samples: HostSample[];
   ollamaUp: boolean;
   ollamaModels: string[];
@@ -237,6 +239,7 @@ export const useIsland = create<Island>((set, get) => {
       ? snapshot.events.filter((event) => event.sequence > previous)
       : [];
     set({
+      hostHealth:snapshot.health ?? null,
       remoteUrl: snapshot.remoteUrl ?? null,
       devices: snapshot.devices ?? [],
       events: snapshot.events,
@@ -342,6 +345,7 @@ export const useIsland = create<Island>((set, get) => {
     remoteUrl: null,
     devices: [],
     missions: null,
+    hostHealth:null,
     composeKind: "task",
     missionFocus: null,
     setComposeKind: (composeKind) => set({ composeKind }),

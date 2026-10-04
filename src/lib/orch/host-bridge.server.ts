@@ -3,6 +3,7 @@ import { resolve, join } from "node:path";
 import { getRequest, getRequestIP } from "@tanstack/react-start/server";
 import type { HostSnapshot } from "../bunny-host/contracts.ts";
 import type { OrchTask } from "./types.ts";
+import { developmentStateDirectory } from "../bunny-host/state-paths.server.ts";
 
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const LOOPBACK_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
@@ -49,7 +50,7 @@ export function clientKey(request: Request, remoteAddress: string | undefined = 
 
 export async function hostRequest(path: string, data?: unknown): Promise<HostSnapshot | { snapshot: HostSnapshot; task?: OrchTask; pairCode?: string }> {
   const access = authorizeBridge(getRequest());
-  const directory = resolve(process.env.BUNNY_HOST_DATA_DIRECTORY ?? ".bunny-a");
+  const directory = resolve(process.env.BUNNY_HOST_DATA_DIRECTORY ?? developmentStateDirectory());
   let credentials: { token: string; port: number };
   const credentialPath = process.env.BUNNY_HOST_CREDENTIALS_FILE ?? join(directory, process.env.BUNNY_STATE_LAYOUT === "2" ? "credentials/credentials.json" : "credentials.json");
   try { credentials = JSON.parse(readFileSync(credentialPath, "utf8")); } catch { throw new Error("Bunny-A Host is offline or not installed."); }

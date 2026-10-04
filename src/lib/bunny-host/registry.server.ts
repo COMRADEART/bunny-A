@@ -2,6 +2,7 @@ import type { ProviderId, ProviderLive } from "../orch/types.ts";
 import { FEATURES, providerBase } from "./adapters.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
 import type { HostDatabase } from "./persistence.server.ts";
+import { safeError } from "./failure.server.ts";
 
 export type RegistryTiming = {
   /** Full probes spawn CLIs (version, sign-in, catalogue); run them rarely. */
@@ -84,11 +85,11 @@ export class ProviderRegistry {
           this.usageAt.set(adapter.id, now);
           next = applyUsage({ ...next }, usage);
         }
+        next.features = adapter.capabilities?.() ?? next.features ?? FEATURES[adapter.id];
       } catch (error) {
-        next = { ...providerBase(adapter.id), availability: "unknown", detail: `Discovery failed: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`, probedAt: now };
+        next = { ...providerBase(adapter.id), availability: "unknown", detail: `Discovery failed: ${safeError(error).message.split("\n")[0]}`, probedAt: now };
         this.fullAt.set(adapter.id, now);
       }
-      next.features = adapter.capabilities?.() ?? next.features ?? FEATURES[adapter.id];
       // Usage that only arrives inside sessions (Claude Code) survives re-probes, keeping its report time.
       if (!adapter.usage && !next.usageWindows?.length && previous?.usageWindows?.length && previous.usage_note === SESSION_USAGE) next = applyUsage(next, { windows: previous.usageWindows, observedAt: previous.usageObservedAt ?? now }, SESSION_USAGE);
       next = this.withLimit(next, now);

@@ -10,6 +10,8 @@ import { CODEX_READ_DISABLED_FEATURES, CodexCompatibilityGate, emptyCodexCompati
 export { CODEX_READ_DISABLED_FEATURES } from "./codex-compatibility.server.ts";
 import { hasTool, locate, systemContext, type DiscoveryContext, type Launchable } from "./discovery.server.ts";
 import { ClaudeNormalizer, CodexNormalizer, normalizedTool as toolType } from "./events.ts";
+import { safeError } from "./failure.server.ts";
+import { trackOwnedChild } from "./owned-processes.server.ts";
 
 const exec = promisify(execFile);
 export const normalizedTool = toolType;
@@ -82,14 +84,14 @@ type ProbeResult = { code: number | null; stdout: string; stderr: string; timedO
 /** Runs a provider CLI directly (no shell) with a hard timeout and closed stdin. */
 export function probe(launch: Launchable, args: string[], timeout = 15000): Promise<ProbeResult> {
   return new Promise((resolve) => {
-    const child = execFile(launch.command, [...launch.args, ...args], { timeout, windowsHide: true, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    const child = trackOwnedChild(execFile(launch.command, [...launch.args, ...args], { timeout, windowsHide: true, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       const failure = error as (NodeJS.ErrnoException & { killed?: boolean; code?: number | string }) | null;
       resolve({
         code: failure ? (typeof failure.code === "number" ? failure.code : null) : 0,
         stdout: String(stdout), stderr: String(stderr), timedOut: !!failure?.killed,
         error: failure && typeof failure.code !== "number" ? failure.message.split("\n")[0] : undefined,
       });
-    });
+    }));
     child.stdin?.end();
   });
 }
@@ -188,22 +190,33 @@ export function parseAgentEvent(provider: ProviderId, event: Record<string, unkn
   }
 }
 
-function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string): RunningSession {
+export function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer:CodexNormalizer|ClaudeNormalizer=id === "codex" ? new CodexNormalizer() : new ClaudeNormalizer(), spawnChild:typeof spawn=spawn): RunningSession {
   let child: ChildProcess | null = null; let stopped = false; let output = ""; let stderr = ""; let buffer = ""; let providerError: string | null = null;
-  const normalizer = id === "codex" ? new CodexNormalizer() : new ClaudeNormalizer();
+  const terminate = async (userStop=false) => {
+    if(userStop) stopped=true;
+    if (!child || child.exitCode !== null || child.signalCode !== null || !child.pid) return;
+    if (process.platform === "win32") await exec("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, timeout: 2000 }).catch(() => { child?.kill(); });
+    else child.kill("SIGTERM");
+  };
+  const fail=(error:unknown)=>{
+    providerError ??= safeError(error).message;
+    terminate().catch(()=>{try {child?.kill();} catch { /* Owned child already gone. */ }});
+  };
+  const boundary=(work:()=>void)=>{try {work();} catch(error) {fail(error);}};
   const done = new Promise<AdapterResult>((resolve) => {
     const env = { ...process.env }; delete env.CLAUDECODE;
-    child = spawn(launch.command, [...launch.args, ...args], { cwd: task.cwd, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"], env });
+    child = trackOwnedChild(spawnChild(launch.command, [...launch.args, ...args], { cwd: task.cwd, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"], env }));
     const capture: AdapterHooks = {
       ...hooks,
       output: (text) => { output = (output + text + "\n").slice(-2_000_000); hooks.output(text + "\n"); },
       event: (type, detail) => { if (type === "agent.error") providerError = detail; hooks.event(type, detail); },
     };
-    child.once("spawn", () => {
+    child.once("spawn", () => boundary(() => {
       hooks.session(id === "claude" ? sessionId : null, child!.pid ?? null);
       hooks.event("agent.started", `${NAMES[id]} process started (PID ${child!.pid}).`);
-    });
-    child.stdout!.on("data", (chunk) => {
+    }));
+    child.stdout!.on("data", (chunk) => boundary(() => {
+      if(providerError) return;
       buffer += chunk.toString(); let index: number;
       while ((index = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, index).replace(/\r$/, ""); buffer = buffer.slice(index + 1);
@@ -213,21 +226,16 @@ function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[]
         try { parsed = JSON.parse(line) as Record<string, unknown>; } catch { parsed = null; }
         if (parsed) parseAgentEvent(id, parsed, capture, normalizer); else capture.output(line.slice(0, 4000));
       }
-      if (buffer.length > 2_000_000) { hooks.event("agent.error", "Provider event exceeds the log limit."); void stop(); buffer = ""; }
-    });
-    child.stderr!.on("data", (chunk) => { const text = chunk.toString(); stderr = (stderr + text).slice(-16000); hooks.raw?.("stderr", text); });
-    child.once("error", (error) => resolve({ ok: false, output, error: error.message }));
-    child.once("close", (code) => resolve({ ok: code === 0 && !stopped && !providerError, output, error: stopped ? "Stopped." : providerError ?? (code === 0 ? undefined : firstLine(stderr) || `Process exited ${code}`), stopped, exitCode: code }));
-    child.stdin!.on("error", () => {});
+      if (buffer.length > 2_000_000) { fail(new Error("Provider event exceeds the log limit.")); buffer = ""; }
+    }));
+    child.stderr!.on("data", (chunk) => boundary(() => { const text = chunk.toString(); stderr = (stderr + text).slice(-16000); hooks.raw?.("stderr", text); }));
+    child.stdout!.on("error",fail);child.stderr!.on("error",fail);
+    child.once("error", (error) => resolve({ ok: false, output, error: safeError(error).message }));
+    child.once("close", (code) => resolve({ ok: code === 0 && !stopped && !providerError, output, error: stopped ? "Stopped." : providerError ?? (code === 0 ? undefined : safeError(firstLine(stderr) || `Process exited ${code}`).message), stopped, exitCode: code }));
+    child.stdin!.on("error", fail);
     child.stdin!.end(task.prompt);
   });
-  const stop = async () => {
-    stopped = true;
-    if (!child || child.exitCode !== null || child.signalCode !== null || !child.pid) return;
-    // The live ChildProcess handle proves ownership; never use persisted PIDs here.
-    if (process.platform === "win32") await exec("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, timeout: 5000 }).catch(() => { child?.kill(); });
-    else child.kill("SIGTERM");
-  };
+  const stop = () => terminate(true);
   return { done, stop, pid: () => child?.pid ?? null };
 }
 

@@ -1,8 +1,7 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { execOwnedFile } from "./owned-processes.server.ts";
 import type { ProcessInfo } from "../orch/types.ts";
 
-const exec = promisify(execFile);
+const exec = execOwnedFile;
 
 /** One snapshot of the OS process table: PID, parent PID, image name and creation time. */
 export async function processTable(): Promise<ProcessInfo[]> {

@@ -27,6 +27,7 @@ import {
   ProviderStatus,
   TaskBadge,
   TaskActivity,
+  HostHealthWarning,
 } from "./ui";
 import { elapsed, isActive, todayCount, verifiedFile } from "./ui-model";
 import { FloatingIsland } from "./floating";
@@ -133,6 +134,7 @@ export function Island() {
               </button>
             </div>
           </header>
+          <HostHealthWarning />
           <main id="bunny-content" className="phone-content" tabIndex={-1} key={page}>
             {store.submitting ? (
               <div className="glass phone-surface">
@@ -228,10 +230,10 @@ export function Island() {
                     : store.pairingRequired
                       ? "Not paired"
                       : store.host === "online"
-                        ? "Host online"
+                        ? store.hostHealth && store.hostHealth.operationalState!=="healthy" ? `Host ${store.hostHealth.operationalState}` : "Host online"
                         : store.host === "sleeping"
                           ? "Sleeping"
-                          : "Host offline"}
+                          : "Connection unavailable"}
                 </span>
                 <button
                   className="icon-button"
@@ -257,6 +259,7 @@ export function Island() {
                 </button>
               </div>
             </header>
+            <HostHealthWarning />
             <main id="bunny-content" className="desktop-content" tabIndex={-1}>
               <div className="page-enter" key={page}>
                 {page === "today" ? (

@@ -1,4 +1,5 @@
 import type { MissionSnapshot } from "../bunny-missions/types.ts";
+import type { OperationalHealth } from "./failure.server.ts";
 import type { Mode, OrchTask, Project, ProviderId, ProviderLive, HostSample, TaskConstraints, ProviderFeatures, TaskProgress, TokenUsage, UsageWindow, VerifySpec, ProcessInfo, TaskState, ProviderExecutionScope } from "../orch/types.ts";
 
 /** missionId is null for direct-task and system events (and for every event written before schema v3). */
@@ -12,6 +13,7 @@ export type PerformanceProfile = {
 export type HostSnapshot = {
   app: "Bunny-A";
   instanceId: string;
+  health?: OperationalHealth;
   tasks: OrchTask[];
   projects: Project[];
   providers: ProviderLive[];

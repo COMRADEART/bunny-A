@@ -28,6 +28,7 @@ import type {
   PermissionRequest, StepState, Trigger,
 } from "./types.ts";
 import { WorkspaceCoordinator } from "./workspace.server.ts";
+import { CommandRefusedError, safeError, supervisedLoop, type SafeError } from "../bunny-host/failure.server.ts";
 
 const TASK_END = /^task\.(completed|failed|stopped)$/;
 const STEP_LIVE: StepState[] = ["running", "verifying"];
@@ -53,7 +54,12 @@ export class MissionManager {
   cached: MissionConfig; recovered = false; ticking = new Set<string>(); again = new Set<string>(); pending = new Map<string, ReturnType<typeof setImmediate>>();
   watchdog: ReturnType<typeof setInterval> | null = null; healthTimer: ReturnType<typeof setInterval> | null = null; closed = false;
   stopping = new Set<string>();
-  listener = (event: HostEvent) => this.onHostEvent(event);
+  containing = new Set<string>();
+  loops: { stop: () => void }[] = [];
+  listener = (event: HostEvent) => {
+    try { this.onHostEvent(event); }
+    catch(error) { this.tasks.containment.background({subsystem:"missions",...(event.missionId ? {missionId:event.missionId} : {})},()=>{throw error;},event.missionId ? error=>this.containMission(event.missionId!,error) : undefined,event.missionId ? "OPERATION_FAILURE" : "SUBSYSTEM_FAILURE"); }
+  };
 
   constructor(tasks: TaskManager, options: MissionManagerOptions) {
     this.tasks = tasks; this.dataDirectory = options.dataDirectory;
@@ -69,19 +75,21 @@ export class MissionManager {
     this.artifacts = new ArtifactStore(this.store, options.dataDirectory);
     this.memory = new MissionMemory(this.store);
     this.inbox = new Inbox(this.store);
-    this.bus = new CapabilityBus(this.store, this.artifacts, options.dataDirectory, (type, detail, missionId) => this.emit(type, detail, missionId));
+    this.bus = new CapabilityBus(this.store, this.artifacts, options.dataDirectory, (type, detail, missionId) => this.emit(type, detail, missionId),tasks.containment);
     const adapters = options.adapters ?? [
       new FilesystemCapability(), new TerminalCapability(), new GitCapability(options.dataDirectory),
       new NotificationsCapability((title, detail, missionId) => this.emit("notification.sent", `${title}${detail ? `\n${detail}` : ""}`, missionId)),
-      new BrowserCapability(options.dataDirectory, { headless: this.cached.browserHeadless, allowLoopback: options.browser?.allowLoopback }),
+      new BrowserCapability(options.dataDirectory, { headless: this.cached.browserHeadless, allowLoopback: options.browser?.allowLoopback,containment:tasks.containment }),
       new ComputerCapability(options.dataDirectory), new GitHubCapability(), ...communicationConnectors(),
     ];
     for (const adapter of adapters) this.bus.register(adapter);
     this.skills = new SkillLibrary(this.store, this.bus, (type, detail, missionId) => this.emit(type, detail, missionId));
     this.workspace = new WorkspaceCoordinator(this.store);
-    this.triggers = new TriggerEngine(this.store, (type, detail) => this.emit(type, detail, null), (trigger, cause) => this.act(trigger, cause));
+    this.triggers = new TriggerEngine(this.store, (type, detail) => this.emit(type, detail, null), (trigger, cause) => this.act(trigger, cause),tasks.containment);
     tasks.workspaceRoots.push(join(options.dataDirectory, "worktrees"));
     tasks.bus.on("event", this.listener);
+    // Recovery reconciles persisted execution even while the feature flag is off.
+    this.recover(); this.recovered=true;
     if (this.cached.enabled) this.activate();
   }
 
@@ -101,15 +109,17 @@ export class MissionManager {
   /** Starts the background parts. Called at construction when enabled, or when the workstation enables missions. */
   activate() {
     if (!this.recovered) { this.recovered = true; this.recover(); }
-    void this.bus.refreshHealth();
-    this.healthTimer ??= setInterval(() => void this.bus.refreshHealth(), 5 * 60_000);
-    this.watchdog ??= setInterval(() => { for (const mission of this.store.missionsIn(["running"])) this.schedule(mission.id); }, 15_000);
-    this.healthTimer.unref?.(); this.watchdog.unref?.();
+    this.tasks.containment.background({subsystem:"capability-health"},()=>this.bus.refreshHealth(),undefined,"SUBSYSTEM_FAILURE");
+    if(!this.loops.length) {
+      this.loops.push(supervisedLoop(this.tasks.containment,{subsystem:"capability-health"},()=>this.bus.refreshHealth(),5*60_000,undefined,"SUBSYSTEM_FAILURE"));
+      this.loops.push(supervisedLoop(this.tasks.containment,{subsystem:"missions"},()=>{for(const mission of this.store.missionsIn(["running"])) this.schedule(mission.id);},15_000,undefined,"SUBSYSTEM_FAILURE"));
+    }
     this.triggers.start(() => this.cached.enabled && this.cached.triggersEnabled);
   }
   deactivate() {
     if (this.healthTimer) clearInterval(this.healthTimer); if (this.watchdog) clearInterval(this.watchdog);
     this.healthTimer = null; this.watchdog = null; this.triggers.stop();
+    for(const loop of this.loops) loop.stop(); this.loops=[];
   }
   configure(patch: Record<string, unknown>, by: string): MissionConfig {
     const next: MissionConfig = { ...this.cached, limits: { ...this.cached.limits } };
@@ -131,37 +141,43 @@ export class MissionManager {
     this.emit("mission.configured", `Missions ${next.enabled ? "enabled" : "disabled"}, triggers ${next.triggersEnabled ? "enabled" : "disabled"} by ${by}. Limits: ${JSON.stringify(next.limits)}.`, null);
     return next;
   }
-  requireEnabled() { if (!this.cached.enabled) throw new Error("Missions are disabled on this Host. Direct tasks are unaffected; enable missions in Settings to use them."); }
+  requireEnabled() { this.tasks.containment.assertAccepting("missions"); if (!this.cached.enabled) throw new CommandRefusedError("Missions are disabled on this Host. Direct tasks are unaffected; enable missions in Settings to use them."); }
 
   // ── events ────────────────────────────────────────────────────────────────
   emit(type: string, detail: string, missionId: string | null) {
     if (this.closed) return;
-    try { this.tasks.emit(this.tasks.db.event(type, null, detail, missionId)); } catch { /* Database closed during shutdown. */ }
+    try { this.tasks.emit(this.tasks.db.event(type, null, detail, missionId)); } catch(error) { this.tasks.containment.fatal(error,{subsystem:"persistence",...(missionId ? {missionId} : {})});throw error; }
   }
   onHostEvent(event: HostEvent) {
     if (!this.cached.enabled || this.closed) return;
-    try { this.inbox.ingest(event); if (event.taskId && (TASK_END.test(event.type) || event.type === "approval.accepted")) this.inbox.resolveTask(event.taskId); } catch { /* Inbox is advisory. */ }
+    try { this.inbox.ingest(event); if (event.taskId && (TASK_END.test(event.type) || event.type === "approval.accepted")) this.inbox.resolveTask(event.taskId); } catch(error) { this.tasks.containment.background({subsystem:"inbox"},()=>{throw error;},undefined,"SUBSYSTEM_FAILURE"); }
     if (event.taskId && (TASK_END.test(event.type) || event.type === "approval.accepted")) {
       const step = this.store.stepForTask(event.taskId);
-      if (step) setImmediate(() => { try { if (this.stopping.has(step.missionId)) return; if (event.type === "approval.accepted") this.childApprovedDirectly(step.id, event.taskId!); else void this.finishModelStep(step.id, event.taskId!); } catch (error) { this.emit("mission.error", `Step ${step.id}: ${error instanceof Error ? error.message : String(error)}`, step.missionId); } });
+      if (step) setImmediate(() => this.tasks.containment.background({subsystem:"missions",missionId:step.missionId,stepId:step.id,taskId:event.taskId!},async()=>{if(this.closed || this.stopping.has(step.missionId) || this.containing.has(step.missionId)) return; if(event.type==="approval.accepted") this.childApprovedDirectly(step.id,event.taskId!); else await this.finishModelStep(step.id,event.taskId!);},error=>this.containMission(step.missionId,error)));
     }
-    if (this.cached.triggersEnabled) void this.triggers.onEvent(event, true);
+    if (this.cached.triggersEnabled && !event.type.startsWith("host.")) this.tasks.containment.background({subsystem:"triggers"},()=>this.triggers.onEvent(event,true),undefined,"SUBSYSTEM_FAILURE");
   }
 
   // ── records ───────────────────────────────────────────────────────────────
   mission(id: string) { return this.store.mission(id); }
   setMission(mission: Mission, patch: Partial<Mission>, type?: string, detail?: string): Mission {
+    const owned=this.store.mission(mission.id);
+    if(patch.state && ["completed","stopped"].includes(owned.state)) return owned;
+    mission=owned;
     if (patch.state) assertMissionTransition(mission.state, patch.state);
     const next = { ...mission, ...patch, updatedAt: Date.now() };
-    this.store.saveMission(next);
-    if (type) this.emit(type, detail ?? "", mission.id);
+    const event=this.tasks.db.transaction(()=>{this.store.saveMission(next);return type ? this.tasks.db.event(type,null,detail ?? "",mission.id) : null;});
+    if(event) this.tasks.emit(event);
     return next;
   }
   setStep(step: MissionStep, patch: Partial<MissionStep>, type?: string, detail?: string): MissionStep {
+    const owned=this.store.step(step.id);
+    if(patch.state && ["completed","stopped","skipped"].includes(owned.state)) return owned;
+    step=owned;
     if (patch.state) assertStepTransition(step.state, patch.state);
     const next = { ...step, ...patch };
-    this.store.saveStep(next);
-    if (type) this.emit(type, `${detail ?? ""} (step ${step.id})`, step.missionId);
+    const event=this.tasks.db.transaction(()=>{this.store.saveStep(next);return type ? this.tasks.db.event(type,null,`${detail ?? ""} (step ${step.id})`,step.missionId) : null;});
+    if(event) this.tasks.emit(event);
     return next;
   }
   view(mission: Mission): MissionView {
@@ -262,6 +278,7 @@ export class MissionManager {
     return this.view(mission);
   }
   start(mission: Mission): Mission {
+    this.tasks.containment.assertAccepting("missions");
     this.bus.clearCancellation(mission.id);
     const next = this.setMission(mission, { state: "running", startedAt: mission.startedAt ?? Date.now() }, "mission.started", `Mission "${mission.title}" started.`);
     this.schedule(next.id);
@@ -270,19 +287,19 @@ export class MissionManager {
 
   // ── scheduling ────────────────────────────────────────────────────────────
   schedule(id: string) {
-    if (this.closed || this.pending.has(id)) return;
-    this.pending.set(id, setImmediate(() => { this.pending.delete(id); void this.tick(id); }));
+    if (this.closed || this.pending.has(id) || this.containing.has(id) || !this.tasks.containment.allows("missions")) return;
+    this.pending.set(id, setImmediate(() => { this.pending.delete(id); this.tasks.containment.background({subsystem:"missions",missionId:id},()=>this.tick(id),error=>this.containMission(id,error)); }));
   }
   async tick(id: string) {
     if (this.ticking.has(id)) { this.again.add(id); return; }
     this.ticking.add(id);
     try { await this.tickOnce(id); }
-    catch (error) { this.emit("mission.error", `Scheduler: ${error instanceof Error ? error.message : String(error)}`, id); }
+    catch (error) { await this.tasks.containment.contain(error,"boundary",{owner:{subsystem:"missions",missionId:id},fail:error=>this.containMission(id,error)}); }
     finally { this.ticking.delete(id); if (this.again.delete(id)) this.schedule(id); }
   }
   async tickOnce(id: string) {
     let mission = this.store.mission(id);
-    if (mission.state !== "running" || !this.cached.enabled || this.stopping.has(id)) return;
+    if (mission.state !== "running" || !this.cached.enabled || this.stopping.has(id) || this.containing.has(id) || !this.tasks.containment.allows("missions")) return;
     const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
     if (!envelope) { await this.failMission(mission, "permission_required", "Mission has no authorization.", null); return; }
     const limit = Math.min(envelope.budget.maxRuntimeMs, this.cached.limits.maxMissionRuntimeMs);
@@ -310,7 +327,7 @@ export class MissionManager {
     if (progressing) return;
     if (waiting.length) { this.setMission(mission, { state: "waiting_for_user" }, "mission.waiting_for_user", `Mission ${mission.id} is waiting for ${waiting.length} permission decision(s).`); return; }
     const failed = steps.find((step) => step.state === "failed");
-    void this.failMission(mission, failed?.failure?.category ?? "dependency_failed", failed ? `${failed.role} failed: ${failed.failure?.detail ?? "unknown"}` : "No step can run.", failed?.id ?? null);
+    this.tasks.containment.background({subsystem:"missions",missionId:mission.id},()=>this.failMission(mission, failed?.failure?.category ?? "dependency_failed", failed ? `${failed.role} failed: ${failed.failure?.detail ?? "unknown"}` : "No step can run.", failed?.id ?? null),error=>this.containMission(mission.id,error));
   }
   completeMission(mission: Mission, steps: MissionStep[]) {
     let current = this.setMission(mission, { state: "verifying" }, "mission.verifying", "All steps finished; checking mission-level evidence.");
@@ -329,6 +346,23 @@ export class MissionManager {
     this.setMission(fresh, { state: "failed", finishedAt: Date.now(), failure: { category, detail, stepId }, accounting: this.accounting(fresh.id) }, "mission.failed", `Mission "${fresh.title}" failed (${category}): ${detail}`);
     this.workspace.releaseMission(fresh.id);
   }
+  /** A failed scheduler/boundary has no automatic retry policy. Latch scheduling before any await. */
+  async containMission(id:string,error:SafeError) {
+    if(this.closed || this.containing.has(id) || this.stopping.has(id)) return;
+    const mission=this.store.mission(id);
+    if(!["running","verifying","waiting_for_user","ready"].includes(mission.state)) return;
+    this.containing.add(id); this.again.delete(id);
+    const pending=this.pending.get(id); if(pending) clearImmediate(pending); this.pending.delete(id);
+    try {
+      for(const step of this.store.steps(id)) if(STEP_LIVE.includes(step.state)) this.setStep(step,{state:"failed",finishedAt:Date.now(),failure:{category:"host_failure",detail:error.message},attempts:step.attempts.map((attempt,index)=>index===step.attempts.length-1 ? {...attempt,finishedAt:Date.now(),outcome:"failed",category:"host_failure",detail:error.message} : attempt)},"mission.step.failed","Unexpected async boundary failure; automatic retry is refused.");
+      await this.cancelChildren(id,"Unexpected Mission failure; children cancelled without retry.");
+      if(!this.stopping.has(id)) {
+        let fresh=this.store.mission(id); if(fresh.state==="ready") fresh=this.setMission(fresh,{state:"running"});
+        if(["running","verifying","waiting_for_user"].includes(fresh.state)) this.setMission(fresh,{state:"failed",finishedAt:Date.now(),failure:{category:"host_failure",detail:error.message,stepId:null}},"mission.failed","Unexpected Mission boundary failure; scheduling stopped.");
+      }
+      this.workspace.releaseMission(id);
+    } finally {this.containing.delete(id);}
+  }
   accounting(missionId: string): Mission["accounting"] {
     const steps = this.store.steps(missionId); const mission = this.store.mission(missionId);
     const tokens = steps.filter((step) => step.accounting.inputTokens !== null || step.accounting.outputTokens !== null);
@@ -344,6 +378,7 @@ export class MissionManager {
   // ── launching steps ───────────────────────────────────────────────────────
   /** Returns true when the step now occupies an agent slot. */
   async launch(mission: Mission, step: MissionStep, envelope: AuthorizationEnvelope): Promise<boolean> {
+    this.tasks.containment.assertAccepting("missions");
     let workspace = step.workspace ?? mission.root;
     if (step.scope.isolation === "worktree" && !step.workspace && step.scope.access === "write") {
       if (!existsSync(join(mission.root, ".git"))) workspace = mission.root;
@@ -363,7 +398,7 @@ export class MissionManager {
     }
     if (step.executor.kind === "model") return this.launchModel(mission, step, envelope, workspace);
     const running = this.markRunning(step, null, null, workspace);
-    void this.runDeterministic(mission.id, running.id, envelope, workspace);
+    this.tasks.containment.background({subsystem:"missions",missionId:mission.id,stepId:running.id},()=>this.runDeterministic(mission.id,running.id,envelope,workspace),error=>this.containMission(mission.id,error));
     return true;
   }
   markRunning(step: MissionStep, taskId: string | null, provider: ProviderId | null, workspace?: string): MissionStep {
@@ -415,7 +450,7 @@ export class MissionManager {
       } else { this.stepFailed(mission, this.markRunning(step, null, null, workspace), budgetLocal ? "budget_exceeded" : "provider_unavailable", budgetLocal ? `External model budget exhausted and no local provider can do this step: ${message}` : message); return false; }
     }
     if (step.modelConstraint && task.model !== step.modelConstraint) {
-      void this.tasks.stop(task.id, "Mission step requires a specific model that routing did not select.").catch(() => {});
+      this.tasks.stopInBackground(task.id, "Mission step requires a specific model that routing did not select.");
       this.stepFailed(mission, this.markRunning(step, task.id, task.provider, workspace), "provider_unavailable", `Step requires model ${step.modelConstraint}; routing selected ${task.model}.`);
       return false;
     }
@@ -471,7 +506,7 @@ export class MissionManager {
         };
       } else return;
       step = this.store.step(stepId);
-      if (step.state !== "running" || this.stopping.has(missionId)) return; // stopped meanwhile
+      if (this.closed || step.state !== "running" || this.stopping.has(missionId) || this.containing.has(missionId)) return; // stopped meanwhile
       const runtimeMs = Date.now() - started;
       step = this.setStep(step, { capabilityRunId: result.runId, accounting: { ...step.accounting, runtimeMs: step.accounting.runtimeMs + runtimeMs, deterministic: true, local: true }, attempts: step.attempts.map((attempt, index) => index === step.attempts.length - 1 ? { ...attempt, capabilityRunId: result.runId } : attempt) });
       if (result.permission) { this.workspace.release(stepId); this.askPermission(this.store.mission(missionId), step, result.permission.action, result.permission.risk as PermissionRequest["risk"], result.permission.reason, "execute"); return; }
@@ -479,7 +514,7 @@ export class MissionManager {
       await this.verifyAndComplete(this.store.mission(missionId), step, { summary: result.summary, artifactIds: result.artifactIds, output: result.output, task: null });
     } catch (error) {
       const current = this.store.step(stepId);
-      if (current.state === "running") this.stepFailed(this.store.mission(missionId), current, "capability_failed", error instanceof Error ? error.message : String(error));
+      if (!this.closed && current.state === "running" && !this.stopping.has(missionId) && !this.containing.has(missionId)) this.stepFailed(this.store.mission(missionId), current, "capability_failed", safeError(error).message);
     }
   }
   capabilityCategory(result: CapabilityResult | null, status: string | undefined): FailureCategory {
@@ -534,6 +569,8 @@ export class MissionManager {
   }
   /** Bunny's own checks after a step reports success. Provider prose is never a check. */
   async verifyAndComplete(mission: Mission, step: MissionStep, result: { summary: string; artifactIds: string[]; output: unknown; task: OrchTask | null }) {
+    const interrupted=()=>this.closed || this.stopping.has(mission.id) || this.containing.has(mission.id) || !this.tasks.containment.allows("missions");
+    if(interrupted()) return;
     const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
     if (!envelope) { this.stepFailed(mission, step, "permission_required", "Authorization missing."); return; }
     const checks: string[] = []; let passed = true;
@@ -552,6 +589,7 @@ export class MissionManager {
         const action = check.kind === "command" ? "terminal.exec" : "git.diff";
         const params = check.kind === "command" ? { command: check.command, args: check.args, timeoutMs: check.timeoutMs } : {};
         const outcome = await this.bus.request({ ...this.capabilityRequest(mission, step, envelope, action, params, cwd), timeoutMs: check.kind === "command" ? check.timeoutMs ?? 15 * 60_000 : 60_000 });
+        if(interrupted()) return;
         if (outcome.decision.decision === "ask") { this.askPermission(mission, this.store.step(step.id), action, outcome.decision.risk, `Verification: ${outcome.decision.reason}`, "verify"); return; }
         const ok = check.kind === "command" ? (outcome.result?.output as { exitCode?: number } | null)?.exitCode === check.expectExit : outcome.run?.status === "succeeded" && (outcome.result?.output as { empty?: boolean } | null)?.empty === false;
         passed &&= ok; result.artifactIds.push(...outcome.artifactIds);
@@ -562,7 +600,7 @@ export class MissionManager {
       }
     }
     step = this.store.step(step.id);
-    if (!["running", "verifying"].includes(step.state)) return;
+    if (interrupted() || !["running", "verifying"].includes(step.state)) return;
     if (!passed) {
       for (const id of result.artifactIds) { try { this.artifacts.mark(id, "failed"); } catch { /* pruned */ } }
       this.stepFailed(mission, step, "verification_failed", checks.filter((line) => !/passed|present|changes present/.test(line) || /failed|missing/.test(line)).join("; ") || checks.join("; "));
@@ -579,6 +617,9 @@ export class MissionManager {
     this.schedule(mission.id);
   }
   stepFailed(mission: Mission, step: MissionStep, category: FailureCategory, detail: string) {
+    const owned=this.store.step(step.id);
+    if(this.closed || this.stopping.has(mission.id) || this.containing.has(mission.id) || ["completed","stopped","skipped","failed","blocked"].includes(owned.state)) return;
+    step=owned;
     this.workspace.release(step.id);
     const attempts = step.attempts.length ? step.attempts.map((attempt, index) => index === step.attempts.length - 1 ? { ...attempt, finishedAt: Date.now(), outcome: (category === "user_stopped" ? "stopped" : category === "host_restart" ? "interrupted" : "failed") as "failed", category, detail: detail.slice(0, 1500) } : attempt) : step.attempts;
     const verdict = retryVerdict(category, attempts.length, step.maxRetries, this.accounting(mission.id).retries, mission.budget.maxRetries);
@@ -649,7 +690,7 @@ export class MissionManager {
       const running = this.setStep(step, { state: "running", approvedOnce: { requestId, action: request.action }, pendingRequestId: null, pendingPhase: null });
       const task = running.taskId ? this.tasks.db.get(running.taskId) : null;
       const previous = running.result;
-      void this.verifyAndComplete(mission, running, { summary: previous?.summary ?? running.evidence.at(-1) ?? "", artifactIds: previous?.artifactIds ?? this.store.artifacts(mission.id).filter((a) => a.stepId === running.id).map((a) => a.id), output: null, task });
+      this.tasks.containment.background({subsystem:"missions",missionId:mission.id,stepId:running.id},()=>this.verifyAndComplete(mission, running, { summary: previous?.summary ?? running.evidence.at(-1) ?? "", artifactIds: previous?.artifactIds ?? this.store.artifacts(mission.id).filter((a) => a.stepId === running.id).map((a) => a.id), output: null, task }),error=>this.containMission(mission.id,error));
       return this.view(this.store.mission(mission.id));
     }
     this.setStep(step, { state: "ready", approvedOnce: { requestId, action: request.action }, pendingRequestId: null, pendingPhase: null });
@@ -740,6 +781,11 @@ export class MissionManager {
         interrupted.push(step.id);
       }
       if (!interrupted.length) {
+        if(!this.cached.enabled || this.tasks.containment.health.lastFatal) {
+          const current = ["ready","verifying"].includes(mission.state) ? this.setMission(mission,{state:"running"}) : mission;
+          if(current.state==="running") this.setMission(current,{state:"waiting_for_user",recovery:{at:now,detail:"Host restart paused scheduling. No old execution was resumed; review and replan or stop this Mission.",interruptedSteps:[]}},"mission.recovered","Host restart paused scheduling; user review is required.");
+          continue;
+        }
         if (mission.state === "ready") { this.start(mission); continue; }
         if (mission.state === "running") this.emit("mission.recovered", `Mission ${mission.id} restored after a Host restart; no step was executing, scheduling continues.`, mission.id);
         if (mission.state === "running" || mission.state === "verifying") this.schedule(mission.id);

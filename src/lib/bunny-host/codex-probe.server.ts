@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import type { UsageWindow } from "../orch/types.ts";
+import { trackOwnedChild } from "./owned-processes.server.ts";
 
 type Window={usedPercent?:number;windowDurationMins?:number|null;resetsAt?:number|null};
 type Bucket={primary?:Window|null;secondary?:Window|null};
@@ -21,12 +22,13 @@ export function quotaWindows(bucket:Bucket|undefined):{label:string;usedPercent:
 // Official stdio app-server methods, verified against this installed CLI's
 // generated schema. No account secrets or raw authentication payloads escape.
 export async function probeCodexCatalog(command:string,prefix:string[]=[]):Promise<{model:string|null;models:string[];usageWindows:UsageWindow[];limited:boolean;usageRead:boolean}> {
-  const child=spawn(command,[...prefix,"app-server","--stdio"],{windowsHide:true,shell:false,stdio:["pipe","pipe","pipe"]});
+  const child=trackOwnedChild(spawn(command,[...prefix,"app-server","--stdio"],{windowsHide:true,shell:false,stdio:["pipe","pipe","pipe"]}));
   const pending=new Map<number,{resolve:(value:unknown)=>void;reject:(error:Error)=>void}>();let sequence=0,buffer="";
   const fail=(error:Error)=>{for(const row of pending.values()) row.reject(error);pending.clear();};
   child.once("error",fail);child.once("exit",()=>fail(new Error("Codex app-server exited during discovery.")));
   child.stderr.on("data",()=>{});child.stdin.on("error",()=>{});
-  child.stdout.on("data",chunk=>{buffer+=String(chunk);let at:number;while((at=buffer.indexOf("\n"))>=0) {
+  child.stdout.on("error",fail);child.stderr.on("error",fail);
+  child.stdout.on("data",chunk=>{buffer+=String(chunk);if(buffer.length>2_000_000) {fail(new Error("Codex discovery output exceeded its bound."));child.kill();return;}let at:number;while((at=buffer.indexOf("\n"))>=0) {
     const line=buffer.slice(0,at);buffer=buffer.slice(at+1);
     try {const message=JSON.parse(line);const row=pending.get(message.id);if(row){pending.delete(message.id);if(message.error) row.reject(new Error("Codex catalog/usage method unavailable."));else row.resolve(message.result);}} catch { /* Diagnostics are not protocol events. */ }
   }});

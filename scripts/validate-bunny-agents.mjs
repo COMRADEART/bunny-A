@@ -1,14 +1,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { developmentStateDirectory } from "../src/lib/bunny-host/state-paths.server.ts";
 
-const credentials=JSON.parse(readFileSync(process.env.BUNNY_VALIDATION_CREDENTIALS ?? ".bunny-a/credentials.json","utf8"));
+if(!process.env.BUNNY_VALIDATION_CREDENTIALS) throw new Error("Validation requires an explicit disposable Host credential path.");
+const credentials=JSON.parse(readFileSync(process.env.BUNNY_VALIDATION_CREDENTIALS,"utf8"));
 const base=`http://127.0.0.1:${credentials.port}`;
 const headers={authorization:`Bearer ${credentials.token}`,"content-type":"application/json"};
 async function state() {return (await fetch(`${base}/state`,{headers})).json();}
 async function command(action,data) {const response=await fetch(`${base}/command`,{method:"POST",headers,body:JSON.stringify({action,data})});const result=await response.json();if(!response.ok) throw new Error(result.error);return result;}
 const providerId=process.env.BUNNY_VALIDATION_PROVIDER ?? "claude";
-const directory=resolve(".bunny-a/validation",providerId,String(Date.now()));mkdirSync(directory,{recursive:true});
+const directory=resolve(developmentStateDirectory(),"validation",providerId,String(Date.now()));mkdirSync(directory,{recursive:true});
 await command("project.add",{name:`Bunny-A ${providerId} deterministic validation`,path:directory});
 const project=(await state()).projects.find(p=>p.path===directory);
 const provider=(await state()).providers.find(p=>p.id===providerId && p.availability==="ready");

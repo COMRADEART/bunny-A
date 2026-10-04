@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, join } from "node:path";
+import { HostContainment } from "./src/lib/bunny-host/failure.server.ts";
+import { assertApplicationDirectory } from "./src/lib/bunny-host/state-paths.server.ts";
 if(process.env.BUNNY_STATE_LAYOUT!=="2" || !process.env.BUNNY_HOST_CREDENTIALS_FILE || !process.env.BUNNY_REMOTE_CONFIG) throw new Error("Start the installed gateway through Start-Bunny-Release.ps1. Installed state must be configured explicitly.");
 import { desktopManifest, allowedOrigins, requestAllowed } from "./manifest.mjs";
 
@@ -12,14 +14,23 @@ function remoteOrigins() {
   else delete process.env.BUNNY_REMOTE_ORIGIN;
   return origins;
 }
-process.env.BUNNY_HOST_DATA_DIRECTORY=resolve(process.env.BUNNY_HOST_DATA_DIRECTORY ?? ".bunny-a");
+if(!process.env.BUNNY_HOST_DATA_DIRECTORY) throw new Error("Installed gateway requires an explicit application-data state directory.");
+process.env.BUNNY_HOST_DATA_DIRECTORY=resolve(process.env.BUNNY_HOST_DATA_DIRECTORY);
+const gatewayState=assertApplicationDirectory(process.cwd());
+const containment=new HostContainment({diagnosticDirectory:assertApplicationDirectory(join(gatewayState,"logs/gateway")),runtimeDirectory:assertApplicationDirectory(join(gatewayState,"runtime/gateway")),exit:()=>process.exit(71),shutdown:async()=>{server.closeAllConnections();await new Promise(done=>server.close(done));}});
+containment.installProcessHandlers();
 const {middleware}=await import("./.output/server/index.mjs");
-const server=createServer(async(req,res)=>{
+const handler=async(req,res)=>{
   const origins=remoteOrigins();
   if(!requestAllowed(req.headers,req.method ?? "GET",origins)) {res.writeHead(403);res.end("Bunny-A origin refused.");return;}
   const path=(req.url ?? "/").split("?")[0];
-  if(path === "/bunny-health" && req.method === "GET") {const local=["127.0.0.1:8084","localhost:8084"].includes(req.headers.host);res.writeHead(200,{"content-type":"application/json","cache-control":"no-store"});res.end(JSON.stringify(local ? {app:"Bunny-A",pid:process.pid,root:process.cwd()} : {app:"Bunny-A"}));return;}
+  if(path === "/bunny-health" && req.method === "GET") {const local=["127.0.0.1:8084","localhost:8084"].includes(req.headers.host);res.writeHead(200,{"content-type":"application/json","cache-control":"no-store"});res.end(JSON.stringify(local ? {app:"Bunny-A",pid:process.pid,root:process.cwd(),gatewayOperationalState:containment.health.operationalState} : {app:"Bunny-A"}));return;}
   if(["/__grok/manifest.webmanifest","/__grok/manifest.json"].includes(path)) {res.writeHead(200,{"content-type":"application/manifest+json"});res.end(JSON.stringify(desktopManifest));return;}
-  try {await middleware(req,res);} catch(error) {console.error(error);if(!res.headersSent) res.writeHead(500);res.end("Bunny-A dashboard request failed.");}
+  await middleware(req,res);
+};
+const server=createServer((req,res)=>{
+  res.on("error",()=>res.destroy());
+  containment.background({subsystem:"gateway-request"},()=>handler(req,res),()=>{if(!res.headersSent) res.writeHead(500);res.end("Bunny-A gateway request failed; Host health must be checked independently.");});
 });
+server.on("error",error=>containment.fatal(error,{subsystem:"gateway"}));
 server.listen(8084,"127.0.0.1",()=>console.log("Bunny-A dashboard ready."));

@@ -10,6 +10,11 @@ import type { AgentSession, HostSnapshot } from "./contracts.ts";
 import { MissionManager, type MissionManagerOptions } from "../bunny-missions/manager.server.ts";
 import { MISSION_ACTIONS, missionCommand } from "../bunny-missions/commands.server.ts";
 import { hostStatePaths } from "./state-paths.server.ts";
+import { CommandRefusedError, HostContainment, HostUnavailableError, registerDiagnosticSecret, safeError, supervisedLoop } from "./failure.server.ts";
+import type { ProviderAdapter, HostEvent } from "./contracts.ts";
+import type { HostSample } from "../orch/types.ts";
+import type { EventEmitter } from "node:events";
+import { stopOwnedChildren } from "./owned-processes.server.ts";
 
 const PROVIDERS: ProviderId[]=["codex","claude","ollama","opencode","cline","cursor"];
 function record(value: unknown): Record<string,unknown> {if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("Expected an object.");return value as Record<string,unknown>;}
@@ -51,18 +56,38 @@ function hash(value: string) {return createHash("sha256").update(value).digest("
 function equal(a: string,b: string) {const aa=Buffer.from(a),bb=Buffer.from(b);return aa.length===bb.length && timingSafeEqual(aa,bb);}
 async function body(request: IncomingMessage) {let data="";for await(const chunk of request) {data+=String(chunk);if(Buffer.byteLength(data)>4_000_000) throw new Error("Request too large.");}return record(JSON.parse(data));}
 // charset is explicit: Windows PowerShell 5.1 (the native Island) otherwise decodes JSON as Latin-1.
-function json(response: ServerResponse,value: unknown,status=200) {response.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"});response.end(JSON.stringify(value));}
+function json(response: ServerResponse,value: unknown,status=200) {const encoded=JSON.stringify(value);if(response.destroyed || response.writableEnded) return;response.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"});response.end(encoded);}
 
-export async function startHost(options: { dataDirectory?: string; root?: string; port?: number; missions?: Omit<MissionManagerOptions,"dataDirectory"> }={}) {
+/** One SSE client owns its reads, serializer and writes; failure removes every listener and timer. */
+export function streamSse(response: ServerResponse, bus: EventEmitter, read:(cursor:number)=>HostEvent[], after:number, containment:HostContainment) {
+  let cursor=after,closed=false;
+  const close=()=>{if(closed) return;closed=true;clearInterval(heartbeat);bus.off("event",drain);response.off("close",close);response.off("error",failed);try {response.destroy();} catch { /* Broken client already gone. */ }};
+  const failed=(error:unknown)=>{close();containment.background({subsystem:"sse"},()=>{throw error;});};
+  const write=(value:string)=>{if(response.destroyed || response.writableEnded) {close();return false;} if(!response.write(value)) {close();return false;} return true;};
+  const drain=()=>{if(closed) return;try {let events:HostEvent[];let batches=0;do {events=read(cursor);for(const event of events) {if(!write(`id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`)) return;cursor=event.sequence;}} while(events.length===500 && ++batches<40);} catch(error) {failed(error);}};
+  const heartbeat=setInterval(()=>{if(closed) return;try {write(": heartbeat\n\n");} catch(error) {failed(error);}},15000);
+  response.on("close",close);response.on("error",failed);bus.on("event",drain);drain();
+  return close;
+}
+
+export async function startHost(options: { dataDirectory?: string; root?: string; port?: number; missions?: Omit<MissionManagerOptions,"dataDirectory">; containment?:HostContainment; removeProcessHandlers?:()=>void; adapters?:ProviderAdapter[]; sample?:()=>Promise<HostSample> }={}) {
   const paths=hostStatePaths(options.dataDirectory);
   const dataDirectory=paths.data;
   if(!paths.installed) mkdirSync(dataDirectory,{recursive:true});
   const credentialPath=paths.credentials;
   const saved=existsSync(credentialPath) ? JSON.parse(readFileSync(credentialPath,"utf8")) as { token: string } : null;
   const token=saved?.token ?? randomBytes(32).toString("base64url");
+  const containment=options.containment ?? new HostContainment({diagnosticDirectory:paths.diagnostics,runtimeDirectory:paths.runtime});
+  containment.options.secrets=[...(containment.options.secrets ?? []),token];
+  registerDiagnosticSecret(token);
   const port=options.port ?? Number(process.env.BUNNY_HOST_PORT ?? 43119);
   const db=new HostDatabase(paths.database);
-  const manager=new TaskManager(db,options.root ?? process.cwd(),undefined,{sessionDirectory:paths.sessions});
+  containment.options.persist=(type,detail,owner)=>{db.event(type,owner.taskId ?? null,detail,owner.missionId ?? null);};
+  db.onFailure=(error,rollbackFailed)=>{if(rollbackFailed) containment.fatal(error,{subsystem:"persistence"});else containment.degrade("*","A persistence boundary failed; new execution requires Host recovery.");};
+  containment.recoverMarker(false);
+  const manager=new TaskManager(db,options.root ?? process.cwd(),options.adapters,{sessionDirectory:paths.sessions,containment});
+  containment.options.persist=(type,detail,owner)=>manager.emit(db.event(type,owner.taskId ?? null,detail,owner.missionId ?? null));
+  db.onFailure=(error,rollbackFailed)=>{if(rollbackFailed) containment.fatal(error,{subsystem:"persistence"});else containment.degrade("*","A persistence boundary failed; new execution requires Host recovery.");};
   // M-A-0 mission layer: additive tables are created, but nothing runs unless missions are enabled.
   const missions=new MissionManager(manager,{dataDirectory,...options.missions});
   const snapshot=(after:number):HostSnapshot=>({...manager.snapshot(after),missions:missions.snapshot()});
@@ -73,16 +98,18 @@ export async function startHost(options: { dataDirectory?: string; root?: string
   // Pairing codes carry 96 bits of entropy, so both limits are defence in depth.
   const clientAttempts=new FailureLimiter(5,600000);
   const globalAttempts=new FailureLimiter(100,600000,1);
-  const server=createServer(async(req,res)=>{
+  const handler=async(req:IncomingMessage,res:ServerResponse)=>{
     const host=req.headers.host ?? "";
     if(![`127.0.0.1:${port}`,`localhost:${port}`].includes(host)) return json(res,{error:"Host header rejected."},403);
     if(req.headers.origin || req.headers["sec-fetch-site"] === "cross-site") return json(res,{error:"Use the authenticated same-origin application bridge."},403);
     const path=new URL(req.url ?? "/",`http://${host}`);
-    if(path.pathname === "/health" && req.method === "GET") return json(res,{app:"Bunny-A",instanceId:manager.instanceId,pid:process.pid});
+    if(path.pathname === "/health" && req.method === "GET") return json(res,{app:"Bunny-A",instanceId:manager.instanceId,pid:process.pid,...containment.snapshot()});
     const bearer=(req.headers.authorization ?? "").replace(/^Bearer /,"");
     const local=equal(bearer,token);
     const device=local ? null : db.db.prepare("SELECT id FROM devices WHERE token_hash=? AND revoked_at IS NULL").get(hash(bearer)) as { id:string } | undefined;
+    if(device) registerDiagnosticSecret(bearer);
     if(path.pathname === "/pair" && req.method === "POST") {
+      if(!containment.allows("http")) return json(res,{error:new HostUnavailableError().message},503);
       const key=String(req.headers["x-bunny-pair-client"] ?? "bridge").slice(0,80);const now=Date.now();
       if(clientAttempts.blocked(key,now) || globalAttempts.blocked("*",now)) return json(res,{error:"Pairing attempts limited. Try again later."},429);
       const reject=(status:number,error:string)=>{clientAttempts.fail(key,now);globalAttempts.fail("*",now);return json(res,{error},status);};
@@ -90,10 +117,11 @@ export async function startHost(options: { dataDirectory?: string; root?: string
         const input=await body(req);
         if(!pairing || pairing.expiresAt<now || !equal(hash(text(input.code,100)),pairing.codeHash)) return reject(403,"Invalid or expired pairing code.");
         const deviceToken=randomBytes(32).toString("base64url");const id=randomUUID();
+        registerDiagnosticSecret(deviceToken);
         db.db.prepare("INSERT INTO devices VALUES(?,?,?,?,NULL)").run(id,text(input.name,100),hash(deviceToken),now);
         pairing=null;clientAttempts.succeed(key);manager.emit(db.event("device.paired",null,`Paired device ${id}`));
         return json(res,{token:deviceToken,deviceId:id});
-      } catch(error) {return reject(400,String(error));}
+      } catch {return reject(400,"Pairing request failed.");}
     }
     if(!local && !device) return json(res,{error:"Authentication required."},401);
     try {
@@ -101,15 +129,15 @@ export async function startHost(options: { dataDirectory?: string; root?: string
       if(req.method === "GET" && path.pathname === "/state") return json(res,snapshot(after));
       if(req.method === "GET" && path.pathname === "/events") {
         res.writeHead(200,{"content-type":"text/event-stream; charset=utf-8","cache-control":"no-cache","connection":"keep-alive"});
-        let cursor=after;const taskId=path.searchParams.get("task");
+        const taskId=path.searchParams.get("task");
         // ?task=<id> streams one task's normalized events (the Host-side streamEvents for that session).
         const read=(from:number)=>taskId ? db.taskEvents(taskId,from) : db.events(from);
-        const drain=()=>{let events;do {events=read(cursor);for(const event of events) {res.write(`id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`);cursor=event.sequence;}} while(events.length===500);};
-        drain();manager.bus.on("event",drain);const heartbeat=setInterval(()=>res.write(": heartbeat\n\n"),15000);
-        req.on("close",()=>{clearInterval(heartbeat);manager.bus.off("event",drain);});return;
+        streamSse(res,manager.bus,read,after,containment);return;
       }
       if(req.method!=="POST" || path.pathname!=="/command") return json(res,{error:"Not found"},404);
       const input=await body(req);const data=record(input.data ?? {});let task:OrchTask | undefined;let pairCode:string | undefined;let session:AgentSession | undefined;let extra:{mission?:unknown;data?:unknown}={};
+      const safeActions=new Set(["stop","mission.stop","session.get","mission.get","capability.list","skill.list","inbox.list","trigger.list"]);
+      if(!safeActions.has(String(input.action))) containment.assertAccepting("http");
       if(typeof input.action==="string" && MISSION_ACTIONS.has(input.action)) extra=await missionCommand(missions,input.action,data,{local,actor:local ? "workstation" : `device:${device!.id}`});
       else switch(input.action) {
         case "submit": task=manager.submit(validateSubmit(data));break;
@@ -180,17 +208,44 @@ export async function startHost(options: { dataDirectory?: string; root?: string
       }
       manager.emit(db.event("audit.command",task?.id ?? null,`${local ? "workstation" : `device ${device!.id}`}: ${String(input.action)}`));
       json(res,{snapshot:snapshot(after),task,pairCode,session,...extra});
-    } catch(error) {json(res,{error:error instanceof Error ? error.message : String(error)},400);}
+    } catch(error) {const requestId=containment.context.getStore()?.owner.requestId;if(!(error instanceof CommandRefusedError) && !(error instanceof HostUnavailableError)) await containment.contain(error,"boundary",{owner:{subsystem:"http-command",requestId}});json(res,{requestId,error:error instanceof HostUnavailableError ? error.message : error instanceof CommandRefusedError ? safeError(error,[token]).message : "Host command failed. Inspect operation state before retrying."},error instanceof HostUnavailableError ? 503 : 400);}
+  };
+  const server=createServer((req,res)=>{
+    const requestId=randomUUID();
+    res.on("error",()=>{try {res.destroy();} catch { /* Disconnected client. */ }});
+    containment.background({subsystem:"http",requestId},()=>handler(req,res),()=>{try {if(!res.headersSent) json(res,{error:"Host request failed. Inspect operation state before retrying.",requestId},500);else res.destroy();} catch {res.destroy();}});
   });
   await new Promise<void>((resolveListen,reject)=>{server.once("error",reject);server.listen(port,"127.0.0.1",resolveListen);});
   writeFileSync(credentialPath,JSON.stringify({token,port,pid:process.pid,instanceId:manager.instanceId}),{mode:0o600});
-  await manager.discover();
   let closing=false;
-  const poll=async()=>{if(closing) return;try {manager.sample(await sampleHost());} catch { /* Sensor failure leaves last known samples and timestamps. */ }};
+  let closed:Promise<void>|null=null;
+  const loops:{stop:()=>void}[]=[];
+  const close=()=>{
+    if(closed) return closed;
+    closing=true;for(const loop of loops) loop.stop();missions.deactivate();
+    closed=(async()=>{
+      const ownedCleanup=stopOwnedChildren();
+      try {
+        await Promise.allSettled([...manager.sessions.keys()].map(id=>containment.health.operationalState==="draining" ? manager.failOperation(id,{name:"HostFatal",message:"Host fatal shutdown interrupted this owned task; no session was resumed."}) : manager.stop(id,"Host shutdown stopped this owned task.")));
+        await missions.close();
+      } finally {await ownedCleanup;}
+      await new Promise<void>(r=>{server.closeAllConnections();server.close(()=>r());});db.close();
+      process.off("SIGTERM",signalClose);process.off("SIGINT",signalClose);if(containment.health.operationalState!=="draining") options.removeProcessHandlers?.();
+    })();
+    return closed;
+  };
+  containment.options.shutdown=close;
+  const signalClose=()=>containment.background({subsystem:"shutdown"},async()=>{await close();process.exit(0);},undefined,"HOST_FATAL");
+  process.once("SIGTERM",signalClose);process.once("SIGINT",signalClose);
+  server.on("error",error=>containment.background({subsystem:"http"},()=>{throw error;},undefined,"SUBSYSTEM_FAILURE"));
+  containment.finishRecovery();
+  await manager.discover();
+  const poll=async()=>{if(closing) return;manager.sample(await (options.sample ?? sampleHost)());};
+  const unavailable=()=>{manager.samples=manager.samples.map(sample=>({...sample,cpu:{...sample.cpu,utilization:null,temperatureC:null,clockMhz:null},gpus:sample.gpus.map(gpu=>({...gpu,utilization:null,temperatureC:null,note:"Sensor unavailable."}))}));};
   // Every 30 s: cheap health checks; full CLI probes only when their interval is due (the registry decides).
-  await poll();const telemetry=setInterval(()=>void poll(),3000);const discovery=setInterval(()=>void manager.refreshProviders().catch(()=>{}),30000);
-  const close=async()=>{closing=true;clearInterval(telemetry);clearInterval(discovery);for(const id of manager.sessions.keys()) await manager.stop(id,"Host shutdown stopped this owned task.").catch(()=>{});await missions.close().catch(()=>{});await new Promise<void>(r=>{server.closeAllConnections();server.close(()=>r());});db.close();};
-  process.once("SIGTERM",()=>void close().then(()=>process.exit(0)));process.once("SIGINT",()=>void close().then(()=>process.exit(0)));
+  try {await poll();} catch(error) {unavailable();await containment.contain(error,"boundary",{owner:{subsystem:"telemetry"}});}
+  loops.push(supervisedLoop(containment,{subsystem:"telemetry"},poll,3000,unavailable));
+  loops.push(supervisedLoop(containment,{subsystem:"provider-discovery"},()=>manager.refreshProviders(),30000,undefined,"SUBSYSTEM_FAILURE"));
   console.log(`Bunny-A Host ready on loopback (${manager.instanceId}).`);
-  return {server,manager,missions,close,token,port};
+  return {server,manager,missions,close,token,port,containment};
 }

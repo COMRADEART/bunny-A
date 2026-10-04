@@ -1,10 +1,9 @@
-import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { promisify } from "node:util";
+import { execOwnedFile } from "../bunny-host/owned-processes.server.ts";
 import { cpus, freemem, totalmem } from "node:os";
 import type { GpuSample, HostSample } from "./types";
 
-const execFileAsync = promisify(execFile);
+const execFileAsync = execOwnedFile;
 
 type CpuTick = { idle: number; total: number };
 let previous: CpuTick | null = null;

@@ -43,6 +43,7 @@ export type FailureCategory =
   | "timeout"
   | "workspace_conflict"
   | "host_restart"
+  | "host_failure"
   | "user_stopped"
   | "budget_exceeded"
   | "invalid_plan";

@@ -1,9 +1,8 @@
 import { readFileSync, realpathSync } from "node:fs";
 import { join, relative, isAbsolute } from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { execOwnedFile } from "./owned-processes.server.ts";
 import type { OrchTask, VerifySpec } from "../orch/types.ts";
-const exec=promisify(execFile);
+const exec=execOwnedFile;
 function safeFile(root:string,name:string) {const path=realpathSync(join(root,name));const rel=relative(realpathSync(root),path);if(rel.startsWith("..") || isAbsolute(rel)) throw new Error("Verification file escapes execution root.");return path;}
 export async function verifyTask(task:OrchTask,kind:string):Promise<{passed:boolean;detail:string}> {
   if(task.state!=="completed" || !task.cwd) throw new Error("Only completed tasks with a known execution root can be verified.");

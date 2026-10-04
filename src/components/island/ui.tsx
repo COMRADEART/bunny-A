@@ -28,6 +28,11 @@ export const NAMES: Record<ProviderId, string> = {
   cline: "Cline",
   cursor: "Cursor",
 };
+export function HostHealthWarning() {
+  const health=useIsland(state=>state.hostHealth);
+  if(!health || health.operationalState==="healthy") return null;
+  return <p className="host-health-warning" role="status">{health.operationalState==="degraded" ? health.unavailableSubsystems.includes("*") ? "Host degraded. New execution is unavailable until recovery." : "Host degraded. Dependent execution is unavailable; independent work may continue." : "Host is shutting down after a failure. New execution is refused."}</p>;
+}
 export const STATUS: Record<Availability, string> = {
   ready: "Ready",
   busy: "Busy",

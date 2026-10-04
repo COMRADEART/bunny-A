@@ -85,16 +85,14 @@ export class MissionStore {
   }
   /** Replaces a mission's graph atomically (planning / replanning only). */
   replaceSteps(missionId: string, steps: MissionStep[]) {
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
+    this.host.transaction(()=>{
       this.db.prepare("DELETE FROM mission_steps WHERE mission_id=?").run(missionId);
       this.db.prepare("DELETE FROM mission_dependencies WHERE mission_id=?").run(missionId);
       for (const step of steps) {
         this.saveStep(step);
         for (const dep of step.dependsOn) this.db.prepare("INSERT INTO mission_dependencies VALUES(?,?,?)").run(missionId, step.id, dep);
       }
-      this.db.exec("COMMIT");
-    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+    });
   }
   steps(missionId: string): MissionStep[] { return (this.db.prepare("SELECT record FROM mission_steps WHERE mission_id=? ORDER BY idx").all(missionId) as { record: string }[]).map((row) => JSON.parse(row.record) as MissionStep); }
   step(id: string): MissionStep {

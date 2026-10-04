@@ -11,10 +11,10 @@
   [scriptblock]$TestHook
 )
 $ErrorActionPreference = 'Stop'
-if((Test-Path -LiteralPath (Join-Path $PSScriptRoot 'release-manifest.json')) -and -not $CredentialPath) {throw 'Start the installed Island through Start-Bunny-Release.ps1. Installed state must be configured explicitly.'}
+if(-not $CredentialPath -or -not $DeploymentPath -or -not $PreferencePath) {throw 'Start the Island through Start-Bunny-Release.ps1. Application-data paths must be configured explicitly.'}
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
-$bunnyCredentialPath = if($CredentialPath) {$CredentialPath} else {Join-Path $Root '.bunny-a/credentials.json'}
-$bunnyDeploymentPath = if($DeploymentPath) {$DeploymentPath} else {Join-Path $Root '.bunny-a/deployment.json'}
+$bunnyCredentialPath = $CredentialPath
+$bunnyDeploymentPath = $DeploymentPath
 function Open-BunnyDashboard([string]$Query='') {
   if(Test-Path -LiteralPath $bunnyDeploymentPath) {Start-Process ('http://127.0.0.1:8084/'+$Query)}
   elseif($CredentialPath) {throw 'The installed dashboard configuration is missing.'}
@@ -614,6 +614,10 @@ function Update-Bunny {
       Show-BunnyTask
     }
     Update-BunnyChrome
+    if($bunnySnapshot.health -and $bunnySnapshot.health.operationalState -ne 'healthy') {
+      $bunnyControls.Presence.Text='Host '+$bunnySnapshot.health.operationalState+' - new dependent execution unavailable'
+      Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyMuted'
+    }
   } catch {
     $script:bunnyLastError = $_.Exception.Message
     $bunnyControls.Presence.Text = 'Host unreachable ' + $bunnyDot + ' workstation may be offline or sleeping'

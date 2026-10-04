@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve, relative } from "node:path";
+import { developmentStateDirectory } from "../src/lib/bunny-host/state-paths.server.ts";
 
-export function tunnelPaths(env = process.env, cwd = process.cwd()) {
+export function tunnelPaths(env = process.env, _cwd = process.cwd()) {
   const installed = env.BUNNY_STATE_LAYOUT === "2";
   if (installed && (!env.BUNNY_HOST_DATA_DIRECTORY || !isAbsolute(env.BUNNY_HOST_DATA_DIRECTORY))) throw new Error("Installed tunnel needs an explicit state directory.");
-  const root = resolve(installed ? env.BUNNY_HOST_DATA_DIRECTORY : (env.BUNNY_ROOT ?? cwd));
-  const data = installed ? root : join(root, ".bunny-a");
+  const root = resolve(env.BUNNY_HOST_DATA_DIRECTORY ?? developmentStateDirectory(env));
+  const data = root;
   if (!installed && existsSync(join(data, "state-retired.json"))) throw new Error("Retired production state cannot start a development tunnel.");
   const paths = {
     root, data, installed,
@@ -16,6 +17,7 @@ export function tunnelPaths(env = process.env, cwd = process.cwd()) {
     process: join(data, installed ? "runtime/tunnel-process.json" : "tunnel-process.json"),
     remote: join(data, installed ? "settings/remote.json" : "remote.json"),
   };
+  assertOutsideGit(data);
   if (installed) {
     for (const path of [paths.binary, paths.credentials, paths.config, paths.process, paths.remote]) {
       if (relative(data, path).startsWith("..")) throw new Error("Tunnel path escaped installed state.");

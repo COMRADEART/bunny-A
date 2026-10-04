@@ -1,7 +1,8 @@
 import { startHost } from "../src/lib/bunny-host/http.server.ts";
 import { spawn } from "node:child_process";
 import { resolve, join } from "node:path";
-const dataDirectory=resolve(".bunny-a/real-provider-validation",process.env.BUNNY_VALIDATION_PROVIDER ?? "claude");
+import { developmentStateDirectory } from "../src/lib/bunny-host/state-paths.server.ts";
+const dataDirectory=resolve(developmentStateDirectory(),"real-provider-validation",process.env.BUNNY_VALIDATION_PROVIDER ?? "claude");
 const host=await startHost({dataDirectory,port:43139,root:process.cwd()});
 try {
   const code=await new Promise((resolveExit,reject)=>{

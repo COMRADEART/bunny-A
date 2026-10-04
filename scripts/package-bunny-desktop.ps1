@@ -65,7 +65,7 @@ try {
   if(-not $SkipDashboardBuild) {Copy-Item -LiteralPath (Join-Path $bunnyBuild '.output') -Destination (Join-Path $bunnyPackage '.output') -Recurse}
   foreach($name in @('Bunny-Host.mjs','Bunny-Server.mjs','Bunny-Island.ps1','Bunny-Island.Visual.ps1','Bunny-Island.Motion.ps1','Launch-Bunny-A.ps1','Launch-Bunny-A.cmd','manifest.mjs')) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}
   # The tunnel worker runs from the release too, so remote access never starts code from a checkout.
-  foreach($name in @('bunny-tunnel.mjs','bunny-tunnel-state.mjs','bunny-tunnel-paths.mjs')) {if(Test-Path -LiteralPath (Join-Path $bunnyBuild ('scripts/'+$name))) {Add-PackageFile (Join-Path $bunnyBuild ('scripts/'+$name)) ('scripts/'+$name) 'source' ('scripts/'+$name)}}
+  foreach($name in @('bunny-tunnel.mjs','bunny-tunnel-state.mjs','bunny-tunnel-paths.mjs','bunny-tunnel-worker.mjs')) {if(Test-Path -LiteralPath (Join-Path $bunnyBuild ('scripts/'+$name))) {Add-PackageFile (Join-Path $bunnyBuild ('scripts/'+$name)) ('scripts/'+$name) 'source' ('scripts/'+$name)}}
   foreach($relative in $toolingFiles) {$destination=if($relative.StartsWith('install/')) {Split-Path -Leaf $relative} else {$relative};Add-PackageFile (Join-Path $bunnyTooling $relative) $destination 'tooling' $relative}
   # Every folder the Host's import graph reaches (desktop-install.test.mjs checks this list), with subfolders.
   foreach($directory in @('bunny-host','orch','bunny-missions')) {
@@ -95,7 +95,7 @@ try {
     dashboardDependencies='node_modules of the build machine workspace (not reinstalled); the native Host imports no npm packages'
   }
   $layoutVersion=if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'src/lib/bunny-host/state-paths.server.ts')) {2} else {1}
-  $record=[ordered]@{release=$PackageName;version=$pin.version;sourceCommit=$sourceSha;toolingCommit=$toolingSha;builtAt=$build.builtAt;build=$build;compatibility=[ordered]@{hostEntry='Bunny-Host.mjs';launcher='Start-Bunny-Release.ps1';hostPortDefault=43119;stateLayoutVersion=$layoutVersion};origins=$origins}
+  $record=[ordered]@{release=$PackageName;version=$pin.version;sourceCommit=$sourceSha;toolingCommit=$toolingSha;builtAt=$build.builtAt;build=$build;compatibility=[ordered]@{hostEntry='Bunny-Host.mjs';launcher='Start-Bunny-Release.ps1';hostPortDefault=43119;stateLayoutVersion=$layoutVersion;databaseSchemaVersion=3;codexCompatibilityPolicyVersion=1;hostFailurePolicyVersion=1};origins=$origins}
   [IO.File]::WriteAllText((Join-Path $bunnyPackage '.release-build.json'),($record | ConvertTo-Json -Depth 6))
   $helper=Join-Path $PSScriptRoot 'bunny-release.mjs'
   & $nodePath $helper manifest $bunnyPackage | Out-Null; if($LASTEXITCODE -ne 0) {throw 'Release manifest failed.'}

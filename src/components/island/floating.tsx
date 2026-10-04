@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { activeTasks, liveProviders, useIsland } from "@/store/use-island";
 import { Approval, Composer, openTask, Routing } from "./task";
-import { NAMES, ProviderMark, TaskActivity, TaskBadge } from "./ui";
+import { HostHealthWarning, NAMES, ProviderMark, TaskActivity, TaskBadge } from "./ui";
 import { elapsed, isActive, verifiedFile, TERMINAL } from "./ui-model";
 import { Sparkline, Telemetry, thermalReading, ThermalWarning } from "./telemetry";
 import {
@@ -216,6 +216,7 @@ export function FloatingIsland({ now }: { now: number }) {
       }}
     >
       <div className="island-measure" ref={measured}>
+        <HostHealthWarning />
         <header className="island-header">
           <button
             type="button"
