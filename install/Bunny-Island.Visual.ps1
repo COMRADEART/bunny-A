@@ -49,7 +49,8 @@ $bunnyAnimate = -not $SmokeTest -and [Windows.SystemParameters]::ClientAreaAnima
     <StackPanel x:Name="Providers" Orientation="Horizontal" VerticalAlignment="Center"/>
    </DockPanel>
    <Button x:Name="CompactTask" Visibility="Collapsed" Padding="8,8" HorizontalContentAlignment="Stretch" Margin="0,8,0,0" AutomationProperties.Name="Expand active task"><DockPanel><TextBlock x:Name="CompactTime" DockPanel.Dock="Right" Foreground="{DynamicResource BunnyMuted}" VerticalAlignment="Center"/><StackPanel><TextBlock x:Name="CompactTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="CompactActivity" FontSize="12" Foreground="{DynamicResource BunnyAccent}" TextTrimming="CharacterEllipsis"/></StackPanel></DockPanel></Button>
-   <Button x:Name="CompactMission" Visibility="Collapsed" Padding="8,8" HorizontalContentAlignment="Stretch" Margin="0,8,0,0" AutomationProperties.Name="Open Mission Control"><StackPanel><TextBlock x:Name="MissionTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="MissionWorkers" FontSize="12" Foreground="{DynamicResource BunnyAccent}" TextTrimming="CharacterEllipsis"/></StackPanel></Button>
+   <TextBlock x:Name="CompactHealth" Visibility="Collapsed" Margin="8,8,8,0" Foreground="{DynamicResource BunnyWarning}" FontSize="12" TextWrapping="Wrap"/>
+   <Button x:Name="CompactMission" Visibility="Collapsed" Padding="8,8" HorizontalContentAlignment="Stretch" Margin="0,8,0,0" AutomationProperties.Name="Open Mission Control"><StackPanel><TextBlock x:Name="MissionTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="MissionWorkers" FontSize="12" Foreground="{DynamicResource BunnyAccent}" TextWrapping="Wrap"/></StackPanel></Button>
    <ScrollViewer x:Name="DetailsScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="Details" Visibility="Collapsed" Margin="8,12,8,4">
     <StackPanel Orientation="Horizontal" Margin="0,0,0,16"><Ellipse x:Name="PresenceDot" Width="5" Height="5" Margin="0,0,8,0" VerticalAlignment="Center" Fill="{DynamicResource BunnyPositive}"/><TextBlock x:Name="Presence" Foreground="{DynamicResource BunnyMuted}" FontSize="12"/></StackPanel>
     <StackPanel x:Name="ComposerPanel" Visibility="Collapsed">
@@ -168,6 +169,7 @@ function Resize-Bunny {
  $bunnyControls.DetailsScroll.Height=$detailHeight
  $compactHeight=0;if(-not$expanded-and$bunnyControls.CompactTask.Visibility-eq'Visible'){$bunnyControls.CompactTask.Measure([Windows.Size]::new($width-46,[double]::PositiveInfinity));$compactHeight=$bunnyControls.CompactTask.DesiredSize.Height}
  if(-not$expanded-and$bunnyControls.CompactMission.Visibility-eq'Visible'){$bunnyControls.CompactMission.Measure([Windows.Size]::new($width-46,[double]::PositiveInfinity));$compactHeight+=$bunnyControls.CompactMission.DesiredSize.Height}
+ if(-not$expanded-and$bunnyControls.CompactHealth.Visibility-eq'Visible'){$bunnyControls.CompactHealth.Measure([Windows.Size]::new($width-46,[double]::PositiveInfinity));$compactHeight+=$bunnyControls.CompactHealth.DesiredSize.Height}
  $height=[Math]::Min(86+$detailHeight+$compactHeight,[Windows.SystemParameters]::WorkArea.Height-12)
  Set-BunnyHeight $height
 }

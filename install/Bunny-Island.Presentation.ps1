@@ -6,7 +6,10 @@ function Get-BunnyTaskPresentation($Task) {
   return @{label=(Get-BunnyStateInfo $Task.state).Label;activity=(Get-BunnyStateInfo $Task.state).Label;verification='Not independently verified';detail='Activity details unavailable from this Host.'}
 }
 function Update-BunnyPresentation {
+  $bunnyControls.CompactHealth.Visibility='Collapsed'
   if($bunnySnapshot.health -and $bunnySnapshot.health.operationalState -ne 'healthy') {
+    $bunnyControls.CompactHealth.Visibility='Visible'
+    $bunnyControls.CompactHealth.Text=if($bunnySnapshot.health.operationalState -eq 'degraded') {'Host degraded - '+$(if($bunnySnapshot.health.unavailableSubsystems -contains 'browser') {'Browser unavailable'}else{'Recovery required'})}else {'Host shutting down - recovery required'}
     $bunnyControls.Presence.Text='Host '+$bunnySnapshot.health.operationalState+' - dependent execution unavailable'
     $bunnyControls.Presence.ToolTip='Recovery required. See Host operational status in the application.'
     Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyWarning'
