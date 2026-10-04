@@ -311,13 +311,30 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
     <section className="approval-view">
       <p className="eyebrow">{phone ? "Recommended" : "Your approval"}</p>
       <h2>{phone ? NAMES[task.provider] : `Use ${NAMES[task.provider]}?`}</h2>
-      <p><strong>{task.title}</strong></p>
+      <p>
+        <strong>{task.title}</strong>
+      </p>
       <dl className="fact-list">
-        <div><dt>Workspace</dt><dd>{store.projects.find(project=>project.id===task.projectId)?.name ?? "Default workspace"}</dd></div>
-        <div><dt>Folder</dt><dd>{task.cwd || "Unavailable"}</dd></div>
-        <div><dt>Authority</dt><dd>Direct task · provider permissions</dd></div>
+        <div>
+          <dt>Workspace</dt>
+          <dd>
+            {store.projects.find((project) => project.id === task.projectId)?.name ??
+              "Default workspace"}
+          </dd>
+        </div>
+        <div>
+          <dt>Folder</dt>
+          <dd>{task.cwd || "Unavailable"}</dd>
+        </div>
+        <div>
+          <dt>Authority</dt>
+          <dd>Direct task · provider permissions</dd>
+        </div>
       </dl>
-      <p className="caption">The provider may use files and commands within its existing permissions. External effects follow provider policy; Bunny capability approvals remain separate.</p>
+      <p className="caption">
+        The provider may use files and commands within its existing permissions. External effects
+        follow provider policy; Bunny capability approvals remain separate.
+      </p>
       {cloud ? (
         <p className="caption">{task.model} · runs through Ollama’s cloud service.</p>
       ) : null}
@@ -457,7 +474,11 @@ export function TaskDetail({ now }: { now: number }) {
   const file = verifiedFile(task);
   const progress = finitePlan(task.progress);
   const provider = liveProviders(store).find((p) => p.id === task.provider)!;
-  const role=task.mission ? store.missions?.missions.find(mission=>mission.id===task.mission?.missionId)?.steps.find(step=>step.id===task.mission?.stepId)?.role : null;
+  const role = task.mission
+    ? store.missions?.missions
+        .find((mission) => mission.id === task.mission?.missionId)
+        ?.steps.find((step) => step.id === task.mission?.stepId)?.role
+    : null;
   return (
     <article className="task-detail glass">
       <header className="task-detail-header">
@@ -465,7 +486,8 @@ export function TaskDetail({ now }: { now: number }) {
           <ProviderIcon id={task.provider} />
           <div>
             <p className="eyebrow">
-              {role ? `${role} · ` : ""}{NAMES[task.provider]} · {elapsed(task, now)}
+              {role ? `${role} · ` : ""}
+              {NAMES[task.provider]} · {elapsed(task, now)}
             </p>
             <h2>{task.title}</h2>
           </div>
@@ -473,22 +495,34 @@ export function TaskDetail({ now }: { now: number }) {
         <TaskBadge state={task.state} task={task} />
       </header>
       <TaskJourney task={task} />
-      <div className="verification-card" data-passed={task.verification?.passed ?? "unknown"} role="status">
-        <ShieldCheck size={16} aria-hidden="true" /><div><strong>{taskStatus(task).verification}</strong><p className="caption">Provider turns, task completion and independent verification are separate.</p></div>
+      <div
+        className="verification-card"
+        data-passed={task.verification?.passed ?? "unknown"}
+        role="status"
+      >
+        <ShieldCheck size={16} aria-hidden="true" />
+        <div>
+          <strong>{taskStatus(task).verification}</strong>
+          <p className="caption">
+            Provider turns, task completion and independent verification are separate.
+          </p>
+        </div>
       </div>
-      <ActivityRibbon
-        task={task}
-        onOpen={() =>
-          document.getElementById("task-activity")?.scrollIntoView({
-            behavior:
-              store.appearance.motion === "full" &&
-              !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-                ? "smooth"
-                : "instant",
-            block: "nearest",
-          })
-        }
-      />
+      {isActive(task) ? (
+        <ActivityRibbon
+          task={task}
+          onOpen={() =>
+            document.getElementById("task-activity")?.scrollIntoView({
+              behavior:
+                store.appearance.motion === "full" &&
+                !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+                  ? "smooth"
+                  : "instant",
+              block: "nearest",
+            })
+          }
+        />
+      ) : null}
       {isActive(task) ? <TaskActivity task={task} expanded /> : null}
       {task.error ? (
         <div className="error-card" role="alert">
@@ -572,7 +606,12 @@ export function TaskDetail({ now }: { now: number }) {
           ) : null}
         </section>
       ) : null}
-      {!isActive(task) && !task.output ? <p className="caption">Provider transcripts remain on the Host. Files and independent verification are shown above.</p> : null}
+      {!isActive(task) && !task.output ? (
+        <p className="caption">
+          Provider transcripts remain on the Host. Files and independent verification are shown
+          above.
+        </p>
+      ) : null}
       <details className="raw-logs">
         <summary>Technical details & logs</summary>
         <dl className="fact-list">
