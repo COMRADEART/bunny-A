@@ -127,3 +127,17 @@ None for the T2 implementation and local acceptance checkpoint.
 T3–T10 remain open. Production keeps the v17-T1 startup pin and v10 dashboard.
 Candidate identity and staging evidence are in `MA2_IMPLEMENTATION_REPORT.md`.
 Independent final M-A-2 review remains required.
+
+## T2 installed candidate check
+
+`Bunny-A-Windows-v17-T2` is staged outside Git and has not been activated.
+Source: `e483f95dd329322d7846b73483fae7aa015d3bce`.
+Tooling: `c39d3b76734b6c8a466bfbece1cdb0c0f5152719`.
+Its separate Host used copied state and fresh native provider discovery.
+The current Codex binary was `VALIDATED` under policy 1 for both Mission access modes.
+All 54 tasks and 13 projects were present. No model session ran.
+The installed inventory, exact Git blobs and import closure passed.
+The staged dashboard passed desktop and mobile checks.
+The final production preservation check passed after staging and test-process cleanup.
+Read `test-results/ma2-gate2/package-evidence.json` and `preservation-final.json`.
+Production startup remains v17-T1; T3–T10 and independent review remain open.

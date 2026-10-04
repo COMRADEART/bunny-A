@@ -305,8 +305,49 @@ Full M-A-2 approval and independent final review remain pending.
 
 ## T2 evidence entry points
 
-Read `test-results/ma2-gate2/baseline.json`, `native-profile.json`, `preservation.json`,
-`ui-future-runtime.json`, `full-tests.log`, `focused-final.log`, `ui-tests.log`,
+Read `test-results/ma2-gate2/baseline.json`, `native-profile.json`, `preservation-final.json`,
+`ui-future-runtime.json`, `full-tests-final.log`, `focused-final.log`, `ui-tests.log`,
 `typecheck.log`, `lint.log`, `build.log`, `build-desktop.log`, `browser-dev.log` and `browser-built.log`.
 Rendered screenshots are under `screenshots/ma2-gate2-*`.
-Release identity and staging facts follow after the exact source is packaged.
+
+## T2 candidate identity and final acceptance
+
+| Candidate fact | Exact value |
+|---|---|
+| Release | `Bunny-A-Windows-v17-T2` |
+| Source commit | `e483f95dd329322d7846b73483fae7aa015d3bce` |
+| Tooling and candidate pin commit | `c39d3b76734b6c8a466bfbece1cdb0c0f5152719` |
+| Installed folder | `C:\Users\allam\AppData\Local\Bunny-A\releases\Bunny-A-Windows-v17-T2` |
+| ZIP SHA-256 | `08baef54a765663b0fa5ca107c0e7d7e890403ad755a5a299647b66607d93e7e` |
+| Manifest SHA-256 | `5cb4d701ccfc9668114438a1a2420970e2bed5a07bf39eaf205655fe3f1f391e` |
+| Inventory | 142 files; no missing, extra or changed files |
+| Exact Git blobs | 58 source + 7 tooling = 65; all matched |
+| Host and tunnel import closure | complete; no required npm package or path outside the release |
+| State layout / database schema | 2 / 3 |
+| Installation mode | `StageOnly`; `activated: false` |
+
+The installed candidate passed a separate Host check with a disposable database copy.
+It used the packaged Node runtime and Host entry point outside Git.
+Fresh provider discovery validated the real native Codex under policy 1.
+All 54 tasks and 13 projects were present. Missions and triggers stayed off.
+No model session ran. The owned candidate Host stopped after the check.
+This is a simulated state test with real installed code and a real native provider.
+
+The staged dashboard used its own packaged middleware and manifest on the test server.
+Desktop and mobile rendered with no console errors, page errors or horizontal overflow.
+Both screenshots were inspected. Body lengths matched the dev baseline.
+Live temperature changed the text prefix, so the automated baseline flag remained true.
+The staged Codex detail view also showed direct readiness, Mission restriction and the reason
+for the harmless future-version fixture. Its browser warning/error log was empty.
+
+The final T1 audit ran after staging and test-process cleanup.
+Host PID 2200 and gateway PID 42156 retained their original identities.
+M3 QA PID 11020 remained running. All eight protected hash checks passed.
+The database comparison had no mismatches. Production still has 54 tasks and schema 3.
+Production state, workspace, startup pin and v10 dashboard remain unchanged.
+The candidate has not been activated in production.
+
+Read `test-results/ma2-gate2/package-evidence.json`, `stage.json`, `candidate-host.json`,
+`candidate-ui.json`, `browser-candidate.log`, `process-cleanup.json` and `preservation-final.json`.
+The final full regression record is `full-tests-final.log` plus `ui-tests.log`: 482/482.
+The package binds the source and tooling commits above. The final report update is a later docs-only commit.

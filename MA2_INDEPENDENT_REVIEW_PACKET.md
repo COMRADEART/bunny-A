@@ -98,7 +98,7 @@ The registry path is relative to the current user's home and binds this exact re
 Read `test-results/ma2-gate2/native-profile.json` for actual implemented-gate facts.
 The trusted Windows setting parsed. An invalid enum was rejected.
 No model session was needed. User config was not changed.
-Read `preservation.json` for the T1 production checks.
+Read `preservation-final.json` for the T1 production checks after staging.
 
 ## SIMULATED
 
@@ -136,3 +136,34 @@ T3–T10, physical device tests, sign-in/reboot and final operational review rem
 Do not infer full M-A-2 operational approval from T2.
 Production stays v17-T1 with the v10 dashboard.
 Check the exact candidate identity and staging record below before any future promotion.
+
+## T2 candidate and evidence handoff
+
+Candidate: `Bunny-A-Windows-v17-T2`, staged with `activated: false`.
+Installed folder: `C:\Users\allam\AppData\Local\Bunny-A\releases\Bunny-A-Windows-v17-T2`.
+Source: `e483f95dd329322d7846b73483fae7aa015d3bce`.
+Tooling: `c39d3b76734b6c8a466bfbece1cdb0c0f5152719`.
+ZIP SHA-256: `08baef54a765663b0fa5ca107c0e7d7e890403ad755a5a299647b66607d93e7e`.
+Manifest SHA-256: `5cb4d701ccfc9668114438a1a2420970e2bed5a07bf39eaf205655fe3f1f391e`.
+Inventory: 142 exact files. Git source check: 65 matching blobs, 58 source and 7 tooling.
+Host and tunnel import closure passed.
+
+Read `test-results/ma2-gate2/package-evidence.json` and `stage.json`.
+Check the manifest against the installed files and both exact Git commits.
+The separate installed Host used copied state. `candidate-host.json` records fresh native
+Codex validation under policy 1, 54 tasks, 13 projects, Missions off, triggers off and no model session.
+Do not classify this disposable state check as production T2 activation.
+
+The staged dashboard passed desktop and mobile render checks.
+Read `browser-candidate.log` and `screenshots/ma2-gate2-candidate.json`.
+Both screenshots were inspected. The baseline text flag is true because live temperature changed.
+The staged diagnostics showed the future fixture as direct-ready and Mission restricted.
+The three owned T2 test servers were stopped. Read `process-cleanup.json`.
+
+The final audit in `preservation-final.json` passed after cleanup.
+Production Host 2200, gateway 42156 and unrelated M3 QA 11020 were preserved.
+Protected hashes matched; database comparison had no mismatches.
+Production stays v17-T1. No new model Mission was run.
+Read `full-tests-final.log` and `ui-tests.log` for 482/482 passing tests.
+The final handoff report is newer than the candidate's fixed source and tooling commits.
+Independent review remains pending.

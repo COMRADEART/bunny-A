@@ -27,7 +27,7 @@
 | Actual reboot | NOT TESTED | no reboot |
 
 The final full M-A-2 verdict is NOT ISSUED.
-All 439 regression tests passed. Typecheck and build passed.
+At the T1 baseline, all 439 regression tests passed. Typecheck and build passed.
 Lint had 0 errors and 10 existing warnings.
 The evidence applies to source `898c52cbb439cbaa738f6a44e89ca4c526591cc9` and tooling `e7f82de8f82fb427bc00fdb19a715b58df32fadf`.
 
@@ -51,7 +51,7 @@ The evidence applies to source `898c52cbb439cbaa738f6a44e89ca4c526591cc9` and to
 | Codex 0.153.4 exact binary | VALIDATED for read and write | `native-profile.json` |
 | Trusted Windows enum | accepted; invalid enum rejected | parser probes and implemented gate |
 | All 12 MA1 tool defaults | reported disabled | `features list` parser check |
-| T1 and user config preservation | PASS | `preservation.json`; equal protected hashes |
+| T1 and user config preservation after staging | PASS | `preservation-final.json`; equal protected hashes |
 
 Canonical binary: `C:\Users\allam\.codex\packages\standalone\releases\0.153.4-x86_64-pc-windows-msvc\bin\codex.exe`.
 SHA-256: `444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b`.
@@ -76,6 +76,7 @@ SHA-256: `444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b`.
 | Restart with saved validated facts | PASS: unknown until this Host probes |
 | Legacy direct launch and retarget | PASS: deliberate old policy |
 | Restricted UI on desktop and mobile | PASS: direct readiness and Mission restriction are separate |
+| Installed T2 Host with copied state | PASS: fresh native policy 1 validation; 54 tasks; 13 projects; no model |
 
 ## STATIC VERIFIED
 
@@ -83,6 +84,13 @@ SHA-256: `444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b`.
 Typecheck, lint and builds passed. Lint has 10 existing warnings and no errors.
 Dev and desktop middleware browser checks have visible content, no console/page errors and no overflow.
 Live temperature caused baseline text drift; both built screenshots were inspected.
+The staged candidate also passed desktop and mobile checks with no errors or overflow.
+Its baseline flag is true because live temperature changed; body lengths match.
+Candidate inventory: 142 exact files. Git check: 65 exact source/tooling blobs.
+Host and tunnel import closure passed. The candidate is staged and has not been activated.
+Source: `e483f95dd329322d7846b73483fae7aa015d3bce`.
+Tooling: `c39d3b76734b6c8a466bfbece1cdb0c0f5152719`.
+Read `test-results/ma2-gate2/package-evidence.json` for package identities and final checks.
 
 ## NOT TESTED
 
