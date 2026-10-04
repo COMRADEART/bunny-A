@@ -7,6 +7,8 @@
     "nf3": "0.3.17"
   },
   "scripts": {
+    "build:ownership": "node scripts/build-owned-process.mjs",
+    "pretest": "npm run build:ownership",
     "dev": "node scripts/with-app-env.mjs node node_modules/vite/bin/vite.js dev --host 0.0.0.0 --port 8080",
     "build": "node scripts/with-app-env.mjs node node_modules/vite/bin/vite.js build && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",

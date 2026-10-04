@@ -3,6 +3,7 @@ import { decide } from "../authorization.server.ts";
 import { redact, type MissionStore } from "../store.server.ts";
 import { resolveCommand, type Resolved } from "./process.server.ts";
 import { HostContainment, safeError } from "../../bunny-host/failure.server.ts";
+import type { OwnedProcessRecord } from "../../bunny-host/owned-process-group.server.ts";
 import type {
   ActionManifest, AuthorizationEnvelope, CapabilityAvailability, CapabilityManifest, CapabilityResult, CapabilityRun, CapabilityStatus,
   PermissionDecision, RiskClass,
@@ -11,6 +12,8 @@ import type {
 export type ExecutionContext = {
   missionId: string | null;
   stepId: string | null;
+  capabilityRunId?: string;
+  processOwnership?: OwnedProcessRecord[];
   /** Folder relative paths resolve against. */
   cwd: string;
   /** Every folder this execution may touch (approved project roots plus Host-owned workspaces). */
@@ -173,8 +176,10 @@ export class CapabilityBus {
     const timer = setTimeout(() => controller.abort(new Error(`Timed out after ${timeoutMs} ms.`)), timeoutMs);
     try {
     let result: CapabilityResult;
+    const processOwnership: OwnedProcessRecord[]=[];
     try {
-      result = await found.adapter.execute(request.action, request.params, { missionId: request.missionId, stepId: request.stepId, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable });
+      result = await found.adapter.execute(request.action, request.params, { missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable });
+      if(processOwnership.length) result={...result,output:{...(result.output && typeof result.output === "object" ? result.output : {value:result.output}),processOwnership}};
     } catch (error) {
       const message = safeError(error).message;
       const timedOut = controller.signal.aborted && /timed out/i.test(String(controller.signal.reason));
@@ -182,12 +187,14 @@ export class CapabilityBus {
       await this.containment.contain(error,"boundary",{owner:{subsystem:base.capability,capabilityRunId:base.id,...(request.missionId ? {missionId:request.missionId} : {}),...(request.stepId ? {stepId:request.stepId} : {})}});
     }
     if(controller.signal.aborted && result.ok) result={ok:false,status:"failed",summary:"Execution was cancelled; late success was discarded.",output:null,evidence:[],errorCategory:"user_stopped",cleanup:result.cleanup};
+    if(controller.signal.aborted && /timed out/i.test(String(controller.signal.reason))) result={...result,ok:false,status:"timeout",summary:`Execution timed out after ${timeoutMs} ms. ${result.cleanup?.detail??"Owned process group terminated."}`,errorCategory:"timeout"};
     const artifactIds: string[] = [];
     if (request.missionId) for (const item of result.artifacts ?? []) {
       try { artifactIds.push((await this.artifacts.create({ missionId: request.missionId, stepId: request.stepId, type: item.type, title: item.title, inline: item.inline, path: item.path, mediaType: item.mediaType, provenance: `bunny:capability:${base.id}`, verification: "unverified" })).id); }
       catch (error) { result.evidence.push(`Artifact not stored: ${safeError(error).message}`); }
     }
-    return finish(result.status, result.summary, result, artifactIds);
+    const stopped=processOwnership.length>0 && controller.signal.aborted && !/timed out/i.test(String(controller.signal.reason));
+    return finish(stopped ? "stopped" : result.status, result.summary, result, artifactIds);
     } catch(error) {
       if(terminal) return terminal;
       const message=safeError(error).message;

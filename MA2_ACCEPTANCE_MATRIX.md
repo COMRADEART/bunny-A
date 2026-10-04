@@ -254,3 +254,59 @@ the later laptop activation and final package evidence record the authorized pro
 | T2 provider policy | LIVE metadata + regression PASS | native 0.153.4 VALIDATED; unknown/swap refusal tests retained |
 | Full gates / exact package | PASS | 521 tests; builds; 146 files; 69 Git blobs |
 | Independent T3 review / full M-A-2 verdict | PENDING / NOT ISSUED | review packet; T4–T10 open |
+
+
+# M-A-2 Gate T4
+
+## IMPLEMENTED
+
+Windows Git operations and terminal wrappers use independent creation-time Job Objects.
+The Host owns the sole non-inheritable handle; kill-on-close is set and breakaway disabled.
+The minimal x64 Node-API module is compiled from pinned C source, packaged and hashed.
+Ownership records are history; restart never trusts saved PIDs/handles. Stop/timeout kill
+only the live operation job. Merge markers/cleanup, workspace locks, T1/T2/T3 and provider
+policy remain intact. See [process ownership](MA2_PROCESS_OWNERSHIP.md) and
+[native architecture](native/README.md) for the API, OS boundary and build proof.
+
+## LIVE VERIFIED
+
+Disposable source Hosts/repositories prove cmd/bin/worker launchers, hooks/nested/detached
+children, breakaway refusal, isolated Stop, timeout, merge cleanup, hard commit/merge crashes,
+no delayed writes, honest restart and T3 fatal integration. Local SSH/credential/GPG stand-ins
+are contained; editors fail noninteractively. Production identities/hashes/rows/settings remain
+unchanged. See `test-results/ma2-gate4/source/gates.json` and preservation records.
+
+All 546 local tests pass (240 scripts, 285 application, 21 UI): the 521 T3 floor plus 25 added
+T4 tests, with none removed/skipped on this workstation. Typecheck/normal build pass; lint has
+zero errors and ten preexisting warnings. Desktop/mobile renders are clean. Staged v17-T4
+Windows build and packaged-runtime proof are PENDING at this source checkpoint; the final
+candidate identity/result will be appended after its actual gates pass. No activation occurs.
+
+## SIMULATED
+
+PID reuse uses a historical record with an old creation identity and a currently live unrelated
+PID. Recovery changes history only; that process survives. No forced OS PID-reuse cycle is claimed.
+
+## STATIC VERIFIED
+
+Only native live external objects authorize close. JOB_LIST assigns the root before its first
+instruction; stdio-only inheritance prevents descendants retaining the job handle. Jobs are
+per operation and unnamed. Canonical installed Git paths/hashes and absent usr/bin launcher
+are recorded. Package closure checks include native resources; reproducibility passes.
+The explicit Windows service-broker exception and unchanged provider authority boundary are
+documented in the ownership/native documents; independently brokered processes are not captured.
+
+## NOT TESTED
+
+Other Windows architectures/older Windows, absent usr/bin Git, real credential/GPG/elevated
+service/remote helpers, physical power loss/reboot, forced OS PID reuse or live Linux/macOS.
+No production Git operation or production Host crash was performed.
+
+## BLOCKED
+
+Packaged acceptance and independent review are pending at this source checkpoint. No known
+unresolved BLOCKER/HIGH is present in the completed local T4 gates. No final gate verdict yet.
+
+## DEFERRED
+
+T5-T10, production activation and final independent operational review. No full M-A-2 verdict.

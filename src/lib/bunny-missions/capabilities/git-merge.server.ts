@@ -5,14 +5,14 @@ import type { ExecutionContext } from "./bus.server.ts";
 import { runCommand, runProcess, resolveCommand, tail, type RunResult } from "./process.server.ts";
 
 export type GitRunner = (args: string[], cwd: string, signal: AbortSignal, timeoutMs: number) => Promise<RunResult>;
-const runGit: GitRunner = (args, cwd, signal, timeoutMs) => runCommand("git", args, { cwd, signal, timeoutMs });
 type Cleanup = { attempted: boolean; ok: boolean; detail: string };
 
 /** One Git transaction. Starts only on a clean tracked tree and without another Git transaction;
  * a unique MERGE_MSG marker + original/target HEAD identify our unfinished merge. Cancellation
  * cleanup uses a fresh bounded signal and never resets or aborts an unrelated merge.
  */
-export async function mergeTransaction(branch: string, cwd: string, context: ExecutionContext, run: GitRunner = runGit): Promise<CapabilityResult> {
+export async function mergeTransaction(branch: string, cwd: string, context: ExecutionContext, suppliedRun?: GitRunner): Promise<CapabilityResult> {
+  const run: GitRunner=suppliedRun??((args,cwd,signal,timeoutMs)=>runCommand("git",args,{cwd,signal,timeoutMs,owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:`git.${args[0]}`}}));
   const cleanupContext = new AbortController();
   const inspect = (args: string[]) => run(args, cwd, cleanupContext.signal, 15_000);
   const required = async (args: string[]) => { const result = await inspect(args); if (result.exitCode !== 0) throw new Error(`Git inspection failed: ${tail(result.stderr || result.stdout, 400)}`); return result.stdout.trim(); };

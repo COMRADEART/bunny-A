@@ -62,6 +62,14 @@ try {
     finally {$env:JEV_DESKTOP_BUILD=$previousPreset}
   }
   New-Item -ItemType Directory -Path $bunnyPackage -Force | Out-Null
+  # T4 native ownership is built only from the pinned archive's auditable C source.
+  # No working-tree binary or downloaded prebuilt module can enter this release.
+  if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'native/bunny-owned-process.c')) {
+    & node (Join-Path $bunnyBuild 'scripts/build-owned-process.mjs') $bunnyBuild | Out-Null
+    if($LASTEXITCODE -ne 0) {throw 'Windows ownership native build failed.'}
+    foreach($name in @('native/bunny-owned-process.c','native/README.md','scripts/build-owned-process.mjs')) {Add-PackageFile (Join-Path $bunnyBuild $name) $name 'source' $name}
+    foreach($name in @('native/bunny-owned-process.node','native/bunny-owned-process.node.json')) {Add-PackageFile (Join-Path $bunnyBuild $name) $name 'generated' $null}
+  }
   if(-not $SkipDashboardBuild) {Copy-Item -LiteralPath (Join-Path $bunnyBuild '.output') -Destination (Join-Path $bunnyPackage '.output') -Recurse}
   foreach($name in @('Bunny-Host.mjs','Bunny-Server.mjs','Bunny-Island.ps1','Bunny-Island.Visual.ps1','Bunny-Island.Motion.ps1','Launch-Bunny-A.ps1','Launch-Bunny-A.cmd','manifest.mjs')) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}
   # The tunnel worker runs from the release too, so remote access never starts code from a checkout.
@@ -95,7 +103,9 @@ try {
     dashboardDependencies='node_modules of the build machine workspace (not reinstalled); the native Host imports no npm packages'
   }
   $layoutVersion=if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'src/lib/bunny-host/state-paths.server.ts')) {2} else {1}
-  $record=[ordered]@{release=$PackageName;version=$pin.version;sourceCommit=$sourceSha;toolingCommit=$toolingSha;builtAt=$build.builtAt;build=$build;compatibility=[ordered]@{hostEntry='Bunny-Host.mjs';launcher='Start-Bunny-Release.ps1';hostPortDefault=43119;stateLayoutVersion=$layoutVersion;databaseSchemaVersion=3;codexCompatibilityPolicyVersion=1;hostFailurePolicyVersion=1};origins=$origins}
+  $compatibility=[ordered]@{hostEntry='Bunny-Host.mjs';launcher='Start-Bunny-Release.ps1';hostPortDefault=43119;stateLayoutVersion=$layoutVersion;databaseSchemaVersion=3;codexCompatibilityPolicyVersion=1;hostFailurePolicyVersion=1}
+  if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'native/bunny-owned-process.c')) {$compatibility.gitProcessOwnershipPolicyVersion=1}
+  $record=[ordered]@{release=$PackageName;version=$pin.version;sourceCommit=$sourceSha;toolingCommit=$toolingSha;builtAt=$build.builtAt;build=$build;compatibility=$compatibility;origins=$origins}
   [IO.File]::WriteAllText((Join-Path $bunnyPackage '.release-build.json'),($record | ConvertTo-Json -Depth 6))
   $helper=Join-Path $PSScriptRoot 'bunny-release.mjs'
   & $nodePath $helper manifest $bunnyPackage | Out-Null; if($LASTEXITCODE -ne 0) {throw 'Release manifest failed.'}

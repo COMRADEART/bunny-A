@@ -104,6 +104,13 @@ export function importClosure(release) {
     }
   }
   const files = [...seen].map((f) => relative(root, f).split(sep).join("/")).sort();
+  // Native resources are loaded with createRequire rather than an ESM import.
+  // Check them only for T4 releases; accepted older release closures stay valid.
+  if(files.includes("src/lib/bunny-host/owned-process-group.server.ts")) {
+    for(const path of ["native/bunny-owned-process.c","native/bunny-owned-process.node","native/bunny-owned-process.node.json","scripts/build-owned-process.mjs"]) {
+      if(!existsSync(join(root,path))) missing.push(path);else files.push(path);
+    }
+  }
   return { ok: !missing.length && !outside.length && !packages.size, files, missing, outside, packages: [...packages], optionalPackages: [...optional] };
 }
 

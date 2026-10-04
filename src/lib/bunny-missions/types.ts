@@ -369,7 +369,7 @@ export type CapabilityManifest = {
 
 export type CapabilityStatus = CapabilityManifest & { availability: CapabilityAvailability; detail: string; checkedAt: number | null };
 
-export type CapabilityRunStatus = "succeeded" | "failed" | "denied" | "unavailable" | "unconfigured" | "unsupported" | "timeout" | "interrupted" | "running";
+export type CapabilityRunStatus = "succeeded" | "failed" | "denied" | "unavailable" | "unconfigured" | "unsupported" | "timeout" | "interrupted" | "running" | "stopped";
 
 export type CapabilityResult = {
   ok: boolean;

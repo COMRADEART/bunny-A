@@ -2,6 +2,12 @@ import { execFile, type ChildProcess, type ExecFileOptions } from "node:child_pr
 
 /** Live handles created by Bunny only. Persisted PIDs and executable names confer no authority. */
 const owned = new Set<ChildProcess>();
+const groups = new Set<() => void>();
+/** Only live per-operation ownership objects register; no durable PID authority. */
+export function trackOwnedGroup(stop: () => void) {
+  groups.add(stop);
+  return () => { groups.delete(stop); };
+}
 export function trackOwnedChild<T extends ChildProcess>(child: T): T {
   owned.add(child);
   const release = () => owned.delete(child);
@@ -26,6 +32,7 @@ export function execOwnedFile(
   });
 }
 export async function stopOwnedChildren() {
+  for (const stop of [...groups]) stop();
   await Promise.all(
     [...owned].map(async (child) => {
       if (!child.pid || child.exitCode !== null || child.signalCode !== null || !owned.has(child))

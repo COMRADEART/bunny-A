@@ -113,7 +113,7 @@ export class TerminalCapability implements CapabilityAdapter {
     const timeoutMs = Math.min(typeof params.timeoutMs === "number" && params.timeoutMs > 0 ? params.timeoutMs : context.timeoutMs, context.timeoutMs);
     const identity = context.executable === undefined ? resolveCommand(command, cwd) : context.executable;
     if (!identity) throw new Error(`Command "${command}" is not an executable Bunny-A can launch without a shell.`);
-    const result = await runProcess(identity, args, { cwd, signal: context.signal, timeoutMs });
+    const result = await runProcess(identity, args, { cwd, signal: context.signal, timeoutMs, owned:true, owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:"terminal.exec"} });
     const line = `${command} ${args.join(" ")}`.trim();
     const output = { command, args, cwd, exitCode: result.exitCode, stdout: tail(result.stdout, 20_000), stderr: tail(result.stderr, 8_000), durationMs: result.durationMs, timedOut: result.timedOut };
     const evidence = [`${line} in ${cwd} → exit ${result.exitCode ?? "none"} after ${result.durationMs} ms`];
@@ -146,7 +146,7 @@ export class GitCapability implements CapabilityAdapter {
     return git ? { availability: "available" as const, detail: `git at ${git.file}.` } : { availability: "unavailable" as const, detail: "git executable not found on PATH." };
   }
   async git(args: string[], cwd: string, context: ExecutionContext, timeoutMs = 60_000) {
-    return runCommand("git", args, { cwd, signal: context.signal, timeoutMs: Math.min(timeoutMs, context.timeoutMs) });
+    return runCommand("git", args, { cwd, signal: context.signal, timeoutMs: Math.min(timeoutMs, context.timeoutMs),owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:`git.${args[0]}`} });
   }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     const cwd = cwdOf(params, context);
