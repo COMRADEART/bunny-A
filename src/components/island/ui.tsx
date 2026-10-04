@@ -310,7 +310,7 @@ export function ProviderFacts({
         ) : null}
       </dl>
       {provider.id === "codex" && !compact ? (
-        <p className="caption">{provider.securityCompatibility?.compatibilityClass === "VALIDATED" && codexMissionStatus(provider) === "Validated" ? `Mission security policy ${provider.securityCompatibility.policyVersion} validated for read and write access.` : codexMissionExclusion(provider, "read") ?? codexMissionExclusion(provider, "write")}</p>
+        <p className="caption">{provider.securityCompatibility?.compatibilityClass === "VALIDATED" && codexMissionStatus(provider) === "Validated" ? `Profile ${provider.securityCompatibility.registryEntry ?? "Validated runtime"} · Mission security policy ${provider.securityCompatibility.policyVersion} validated for read and write access.` : codexMissionExclusion(provider, "read") ?? codexMissionExclusion(provider, "write")}</p>
       ) : null}
       {provider.usageObservedAt && provider.id !== "ollama" ? (
         <p className="caption">
