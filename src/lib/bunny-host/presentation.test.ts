@@ -176,6 +176,7 @@ for (const secret of secrets)
       decisionReason: secret,
     });
     const snapshot = {
+      health:{operationalState:"degraded",reason:secret,unavailableSubsystems:["browser"],lastFatal:{at:1,instanceId:"old",reason:secret}},
       instanceId: "host",
       cursor: 3,
       tasks: [t],

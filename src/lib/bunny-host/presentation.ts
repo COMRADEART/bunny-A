@@ -388,6 +388,7 @@ export function projectHostActivity(
 export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
   return {
     ...snapshot,
+    health:snapshot.health ? {...snapshot.health,reason:hostHealthMessage(snapshot.health),lastFatal:snapshot.health.lastFatal ? {...snapshot.health.lastFatal,reason:"Previous Host failure. Old execution was not resumed."} : null} : undefined,
     events: snapshot.events.map((event) => ({
       ...event,
       detail: publicEventDetail(
