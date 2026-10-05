@@ -437,3 +437,31 @@ recorded rather than treated as unchanged runtime identities or configuration.
 
 Full categories, OD-1 exclusions, backup/rollback, immutable hashes and limitations:
 [MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md).
+
+# M-A-2 Gate T6
+
+**BUNNY_MA2_T6_FAIL.** Acceptance against the actual installed T5 runtime remains
+blocked by repeated real public Cloudflare HTTP 530 / Error 1033. Physical Android
+installation/pairing and the remaining public checks are incomplete. Full report:
+[MA2_T6_REMOTE_ACCEPTANCE.md](MA2_T6_REMOTE_ACCEPTANCE.md).
+
+| T6 criterion | Result and evidence under `test-results/ma2-gate6/` |
+| --- | --- |
+| Installed worker/tool provenance, public DNS/TLS | LIVE VERIFIED — `tunnel-start.json`, `cloudflared-identity.json`, `public-endpoint.json`; expected 2026.9.3 hash, valid HTTPS and public Cloudflare edge |
+| Unpaired/second-client denial, Origin/forwarded header resistance | LIVE VERIFIED — `unpaired-auth-boundary.json`, `header-security.json`, `second-client-isolation.json`; no workstation authority shortcut or unsafe server error |
+| New supported pairing and authorized state | LIVE VERIFIED — `pairing.json`, `paired-state.json`, actual public mobile browser pairing; master credential remains server-side |
+| Remote direct Task and approval | LIVE VERIFIED — `remote-task.json`, `remote-approval.json`; local model completion, real mobile approval, no paid provider or false verification badge |
+| Remote deterministic Mission | LIVE VERIFIED — `remote-mission.json`; disposable Git snapshot Mission submitted, approved and completed through existing authority |
+| Remote Stop and independent execution | LIVE VERIFIED — `remote-stop.json`; A's hook/child killed, B retains original birth times, separate Stop ends B, no delayed marker |
+| Event cursor/reconnect and interruption | LIVE VERIFIED / SIMULATED INTERRUPTION — `network-loss.json`, `sse-reconnect.json`; actual authenticated polling, canonical resync, no duplicate activity; physical Wi-Fi loss not controlled |
+| Tunnel failure/restart and local independence | LIVE VERIFIED — `tunnel-failure.json`, `tunnel-restart.json`; scoped child failure, normal installed supervisor restart/new ephemeral hostname, original healthy Host/gateway/Island identities preserved |
+| Sustained public phone transport | BLOCKED — `tunnel-live-diagnostic.json`, `revocation.log`, `screenshots/cloudflare-1033.png`; repeated real 530/1033 after restart; cause/repair not proven |
+| Revocation and stale-session authority | PARTIAL — `revocation.json`, `stale-session.json`: canonical Host 401 after revocation, test devices revoked, no restart; immediate latency not established after retries. Public stale-session requests blocked by transport cannot count as auth denials |
+| Public projection/master credential audit | LIVE / STATIC VERIFIED — `token-leak-audit.json`, 585 regression tests; actual HTML/assets/projection/APK inspected. Direct browser cookie/storage surfaces are NOT TESTED because computer-use scope does not expose them |
+| Phone rendering and actual Android | PARTIAL — inspected real public dark/light 390×844, approval/Stop/Codex detail; Mission reload blocked by 1033. User reports external-Wi-Fi Android; APK installation/physical pairing unverified |
+| Installable Android artifact | BUILT / STATIC VERIFIED — `android-apk.json`, `android-build-unrestricted.log`; existing v2 companion rebuilt, signatures v2/v3 and 21 policy checks pass; no runtime test claimed |
+| T1–T5 and original production records | PASS — `production-preservation.json`: original 54 Tasks/3 Missions/13 projects/9 historic device rows intact, all 156 release entries/protected hashes/config/identities unchanged; flags OFF, temporary clients revoked and project registrations removed |
+| Regression and builds | PASS — 585/585, typecheck, lint (0 errors/10 existing warnings), normal and exact-pinned T5 desktop rebuild; no new Windows release activated |
+
+T6 failure is not a reversal of accepted T1–T5. This gate does not establish a reliable
+physical phone path and does not issue the full M-A-2 operational verdict. T7–T10 remain open.

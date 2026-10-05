@@ -560,3 +560,51 @@ acceptance is claimed. The normal Nitro adapter lacks trusted-peer data and rend
 the accepted installed Windows gateway remains authenticated and online. OD-1 was limited
 to presentation lessons; excluded AgentWorkspace, takeover, revocation/publication runtime,
 Slack/calls and AG-UI/core framework imports are listed in the detailed report.
+
+# M-A-2 Gate T6
+
+Builder verdict: **BUNNY_MA2_T6_FAIL**. This is acceptance-only work against installed
+T5 source `eb96c053c238ec0bd385187e0f4dad6777a0a4bc` and tooling
+`ec81f9b9dbab4236b735f917a89cf3e8393024f4`. No T6 Windows runtime patch/release
+was activated. The user's additional installable APK request was fulfilled from the existing
+Android source. Physical phone installation/pairing is not claimed.
+
+Review [MA2_T6_REMOTE_ACCEPTANCE.md](MA2_T6_REMOTE_ACCEPTANCE.md) and
+`test-results/ma2-gate6/` in this order:
+
+1. `baseline.json`, `backup.json`, `cloudflared-identity.json`, `tunnel-start.json`:
+   real installed identities, exact 2026.9.3 expected hash, safe backup, original flags/history.
+2. `public-endpoint.json`, `unpaired-auth-boundary.json`, `header-security.json`,
+   `pairing.json`, `paired-state.json`: actual Internet/TLS path and explicit pairing,
+   unauthorized/invalid/cross-site/forwarded-header denial, no master credential on the phone.
+3. `remote-task.json`, `remote-task-first-attempt.json`, `remote-task-timeout.json`,
+   `remote-approval.json`, `remote-mission.json`: separate honest bounded cold-model Stop,
+   successful local Task, actual mobile UI approval and deterministic Mission; correlate
+   sequence IDs and device identities. No paid model or fabricated independent verification.
+4. `remote-stop-active.json`, `remote-stop.json`, `network-loss.json`,
+   `sse-reconnect.json`: T4-owned tree Stop, concurrent B's creation times preserved,
+   no delayed marker, authenticated cursor polling/reconnect. Public SSE and physical
+   radio interruption are explicitly not being claimed.
+5. `tunnel-failure.json`, `tunnel-restart.json`, `tunnel-live-diagnostic.json`,
+   `screenshots/cloudflare-1033.png`: exact owned child killed and supervisor restarted,
+   but repeated real Cloudflare 530/1033 persists. Cause and sustained repair are unproven.
+6. `revocation.json`, `stale-session.json`, `revocation.log`: canonical 401 after revocation
+   and revoked records are proven; public transport errors are NOT auth-denial evidence.
+   Retries did not retain valid immediate latency evidence. Remaining public checks are
+   BLOCKED, preventing a T6 PASS.
+7. `token-leak-audit.json`, `browser-storage-audit.json`, `phone-render.json`,
+   inspected phone/approval/provider screenshots: actual safe public content and observable
+   credential absence, with direct browser storage and physical Android limitations explicit.
+8. `android-apk.json`, `android-build-unrestricted.log`: signed v2 APK source/tool hashes,
+   certificate, 21 policy checks and no embedded address/master credential. Signature success
+   cannot substitute for Android runtime installation and pairing.
+9. `production-preservation.json`, `full-tests-windows.log`, `ui-tests.log`,
+   `typecheck.log`, `lint.log`, `normal-build.log`, `windows-desktop-build.log`:
+   original rows and reviewed authority/skill definitions intact, flags restored OFF,
+   original healthy process identities/configuration and all 156 installed hashes retained,
+   temp devices revoked/projects unregistered, 585 regression and builds pass.
+
+Reject acceptance while the real installed public path is unreliable or the remaining
+public/phone proof is absent. Preserved T1–T5 and a working APK build do not resolve that
+blocker. Named/custom-domain migration, new control-plane frameworks and T7–T10 are outside
+this work. No full M-A-2 operational verdict is issued.

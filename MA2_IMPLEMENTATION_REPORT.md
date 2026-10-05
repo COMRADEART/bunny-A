@@ -707,3 +707,46 @@ renders Offline; the installed Windows gateway is online without weakening authe
 Full required report categories, OD-1 traceability, rollback and immutable hashes:
 [MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md). Evidence is in
 `test-results/ma2-gate5/`. T6–T10 remain open; no full operational verdict is issued.
+
+# M-A-2 Gate T6
+
+**BUNNY_MA2_T6_FAIL.** The installed `Bunny-A-Windows-v17-T5` was tested through a
+real Cloudflare quick tunnel using its normal installed launcher, application-owned
+cloudflared 2026.9.3 and existing gateway/pairing boundary. Live pairing, authorized state,
+local direct Task completion, device-correlated mobile approval, deterministic Git Mission,
+isolated remote Stop and canonical reconnect worked. Unexpected tunnel child termination
+was contained; the installed supervisor restarted its own child with a new temporary URL
+while local Host/gateway/Island retained their original identities and health.
+
+Real public transport subsequently returned repeated HTTP 530 / Cloudflare Error 1033,
+including an actual browser reload after restart. This prevents acceptance of remaining
+public stale-session/revocation checks and final Mission rendering. Canonical supported
+revocation returned Host 401 without restart; immediate enforcement latency was not retained
+across harness retries and is not claimed. All three temporary test devices
+are revoked. External-Wi-Fi Android availability is user-reported, but physical installation,
+pairing and traffic remain unverified. Direct browser storage inspection was unavailable
+in the computer-use read-only scope and is documented as NOT TESTED.
+
+The requested signed Android APK was rebuilt from the unchanged existing companion source:
+`releases/Bunny-A-Android-v2.apk`, SHA-256
+`c2345d32af1b157fdad137bd64a038ac93ea0616b6695b9060cfa3717fb8c168`, API 26+
+and target 35. V2/V3 signatures and 21 connection policy checks passed. The app uses existing
+HTTPS/pairing, embeds no server address/master credential and adds no remote authority layer.
+Signing/desktop rendering are not represented as physical Android runtime acceptance.
+
+Full 585/585 regression, typecheck, lint (0 errors/10 existing warnings), normal build and
+exact-pinned T5 Windows desktop rebuild pass. All original 54 Tasks, 3 Missions, 13 projects
+and 9 historical device rows remain intact. Final database totals include only the two test
+Tasks and three test Missions; temporary project registrations were removed and devices
+revoked, retaining truthful history. Git snapshot reliability observations changed only by
+the expected test runs; reviewed skill definitions/authority remain unchanged. Production
+Missions/triggers are OFF. Database integrity/schema, external state/workspace, protected
+T1 hashes, consent, all 156 installed files, Host identity and install configuration pass.
+
+No Host/dashboard/process ownership/authorization runtime source was changed, so T6 did
+not manufacture or activate a new Windows release. Public HTML/assets/API projections and
+decompressed APK entries were inspected without exposing master credentials. The current
+blocker remains the unreliable actual public connector route, rather than an accepted repair.
+
+Detailed categories, endpoint/credential boundaries, test attempts/limits, identities and
+evidence: [MA2_T6_REMOTE_ACCEPTANCE.md](MA2_T6_REMOTE_ACCEPTANCE.md). T7–T10 remain open.
