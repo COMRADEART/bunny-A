@@ -665,8 +665,45 @@ Builder gate result: **BUNNY_MA2_T4_PASS**.
 
 # M-A-2 Gate T5
 
-Read-only Host projection, current dashboard/phone/native Island presentation and exact
-package provenance are implemented. Authoritative runtime policy is preserved. Untyped
-provider transcripts stay local to the Host; public activity uses fixed summaries.
-Full report categories and acceptance evidence are maintained in
-[MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md).
+**BUNNY_MA2_T5_PASS.** The proper Windows application was promoted to
+`Bunny-A-Windows-v17-T5` after all candidate checks, a verified rollback backup and explicit
+user authorization. The measured prior installation was v17-T3, rather than v10. Both
+older release directories remain preserved. Host and current dashboard share immutable
+source `eb96c053c238ec0bd385187e0f4dad6777a0a4bc`; tooling is
+`ec81f9b9dbab4236b735f917a89cf3e8393024f4`.
+
+Read-only Host projection now distinguishes provider turns, Tasks, capability runs,
+Mission steps and independent verification. Stable activity IDs group existing records;
+sequence/revision checks and canonical reconnect refresh prevent duplicate or stale UI
+state. Public projection excludes secret-bearing payloads, transcripts and private
+reasoning. Dashboard/phone/native Island show honest interrupted, degraded, restricted
+provider, Produced/Verified and unknown-progress states. Task/Mission modes and existing
+authenticated approval/Stop commands remain available. TaskManager, MissionManager,
+provider authority, T3 failure containment and T4 process ownership are unchanged.
+
+585 tests passed, above the actual T4 floor of 547 with 38 added. Typecheck, lint
+(0 errors, 10 existing warnings), normal build and Windows desktop build passed.
+The exact packaged runtime passed all 18 live T4 ownership gates and T3 fatal/recovery
+containment. Harmless local execution proved an independently verified direct Task,
+approved six-step Mission and phone UI Stop. Four candidate and four production
+desktop/mobile dark/light views were rendered and visually inspected. Packaged WPF state
+renders and the installed EXE readiness verify native Island functionality.
+
+`production-smoke.json` verifies coherent Host/dashboard provenance, all installed files,
+source blobs, 10 live JS/CSS hashes, preserved history and T1 hashes. Production retains
+54 Tasks, 13 projects and 9 historical devices, Missions/triggers OFF and external state
+root/workspace. No paid model call or public tunnel was started. Windows later restarted
+independently; fresh live executable/creation-time identities were verified without using
+saved PIDs as authority. Personal Codex config changed later and was left as found;
+unchanged Mission isolation ignores user config and actual CLI 0.153.4 remains validated.
+
+Rollback has a 67-file verified backup, consistent schema-3 database, old install/startup
+configuration, two native EXE shortcuts and retained v10/T3 releases. The prepared script
+requires fresh scoped identity checks and never automatically replaces the live database.
+Physical remote transport, paid provider turns, production crash testing and executing
+production rollback are not claimed. The normal Nitro adapter's missing trusted peer
+renders Offline; the installed Windows gateway is online without weakening authentication.
+
+Full required report categories, OD-1 traceability, rollback and immutable hashes:
+[MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md). Evidence is in
+`test-results/ma2-gate5/`. T6–T10 remain open; no full operational verdict is issued.

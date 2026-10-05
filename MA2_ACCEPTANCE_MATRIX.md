@@ -408,8 +408,32 @@ Builder gate result: **BUNNY_MA2_T4_PASS**.
 
 # M-A-2 Gate T5
 
-The T4 floor is 547 tests. T5 adds public projection, correlation, resync and provenance
-regressions. Candidate rendering, native Island and production promotion must also pass.
-The detailed categories, boundaries, OD-1 traceability, rollback and immutable identities
-are in [MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md).
-T5 is not accepted merely because a candidate is staged. T6–T10 remain open.
+**BUNNY_MA2_T5_PASS.** Current dashboard promotion is complete under the user's explicit
+authorization. The installed Host and dashboard share source
+`eb96c053c238ec0bd385187e0f4dad6777a0a4bc`, release `Bunny-A-Windows-v17-T5`.
+T6–T10 remain open; this is only the T5 verdict.
+
+| T5 criterion | Result and evidence under `test-results/ma2-gate5/` |
+| --- | --- |
+| Current dashboard promoted, no legacy asset dependency | PASS — `laptop-activation.json`, `production-smoke.json`, `production-ui-identity.json`; Host/dashboard source and manifest match, 10 live JS/CSS hashes match |
+| Task and Mission modes | PASS — `ui-live-proof.json`: real independently verified direct Task, approved deterministic Mission, UI Stop; `ui-accessibility-motion.json`: keyboard switch |
+| Provider turn / Task / verification distinction | PASS — projection/correlation tests, `ui-task-terminal-proof.json`, `ui-privacy-health.json`; provider completion cannot produce a verification badge |
+| Capability grouping, replay, late events and resync | PASS — full application/UI tests, existing journal/capability records; stable identity and canonical refresh |
+| Secret/reasoning privacy | PASS — actual public projection fixtures and packaged render checks in `ui-live-proof.json` and `ui-privacy-health.json` |
+| Provider compatibility and degraded Host | PASS — `ui-provider-compatibility.json`, `ui-privacy-health.json`; actual Codex 0.153.4 validated, simulated unknown version Mission restricted |
+| Desktop/mobile dark/light | PASS — four packaged candidate and four production screenshots plus render JSON; implementing-agent visual review, zero console/page errors and horizontal overflow |
+| Native Island | PASS — packaged WPF state renders and `native-installed.json`; proper installed EXE loaded, visible and responding |
+| Rollback | PASS — v10 and T3 preserved; verified 67-file backup, consistent database and two EXE shortcuts; prepared `rollback-laptop.ps1` statically verified, not executed |
+| T1–T4 preservation | PASS — protected source/hash and database checks, exact-package T3 fatal containment, all 18 exact-package T4 live Windows gates |
+| Regression/build floor | PASS — 585 = 240 script + 311 application + 34 UI versus T4 floor 547; 38 added, none removed; typecheck, lint, normal and Windows builds passed |
+| Production history/settings | PASS — 54 Tasks, 13 projects, 9 historical devices preserved; Missions/triggers OFF, state outside Git, no public tunnel or paid model request |
+
+There is no unresolved BLOCKER/HIGH in the completed Windows T5 scope. Physical phone
+transport, the non-Windows native UI, paid model turns, production crash testing and live
+rollback are not claimed. The normal Nitro adapter renders Offline because it lacks a
+trusted peer; installed Windows gateway authentication remains intact and online.
+The later independent Windows restart and personal Codex config checksum change are
+recorded rather than treated as unchanged runtime identities or configuration.
+
+Full categories, OD-1 exclusions, backup/rollback, immutable hashes and limitations:
+[MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md).

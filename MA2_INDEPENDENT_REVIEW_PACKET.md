@@ -499,10 +499,64 @@ Builder gate result: **BUNNY_MA2_T4_PASS**.
 
 # M-A-2 Gate T5
 
-Review the additive snapshot/gateway projection and correlation logic, safe native Island
-presentation and dashboard provenance. Confirm secret fixtures exercise actual exported
-objects, not only key-name redaction. Inspect packaged desktop/mobile dark/light evidence,
-Task/Mission authorization and T1–T4 preservation. Compare live gateway assets with the
-exact release manifest. Staging cannot satisfy production promotion.
-See [MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md) and
-`test-results/ma2-gate5/` for report categories, exclusions, rollback and candidate identities.
+The implementing gate verdict is **BUNNY_MA2_T5_PASS**. This packet is review input;
+it does not claim that an independent reviewer has accepted T5 or the full M-A-2 system.
+T6–T10 remain open. No new authority system, scheduler or activity database was introduced.
+
+| Identity | Exact reviewed/build value |
+| --- | --- |
+| Starting HEAD | `53120f3f81bf762f45f242f05838ff8262087988` |
+| Host/dashboard source | `eb96c053c238ec0bd385187e0f4dad6777a0a4bc` |
+| Tooling | `ec81f9b9dbab4236b735f917a89cf3e8393024f4` |
+| Release/version | `Bunny-A-Windows-v17-T5` / `17.0.0-T5` |
+| Package SHA-256 | `fe07fd6f8c3415d38e202a73b3c2ebbed8022f1e48cc1c813c92ab15c83cadb1` |
+| Manifest SHA-256 | `f0531f8d2a02ed3302c3b4ade5e28859e39ec1dba380cf3f8596866ac4a18a4e` |
+| Asset inventory SHA-256 | `c78fc00a559726ed8f2c513319f28df541f260883b41959fcda055210312656d` |
+
+Review `src/lib/bunny-host/presentation.ts` and its tests for default-deny public fields,
+actual secret-bearing projection output and provider turn/Task/verification distinctions.
+Review the additive HTTP/gateway snapshot projection, `src/components/island/activity-model.ts`
+and tests for sequence deduplication, stale snapshot rejection and canonical gap/reconnect
+refresh. Inspect task/Mission/phone presentation, logical role stability, finite progress,
+approval/Stop authority and artifact Produced/Verified distinction. Native presentation is
+in `install/Bunny-Island.Presentation.ps1`; private provider reasoning is never a public
+activity summary. Compare package provenance with live gateway assets and Settings.
+
+Evidence under `test-results/ma2-gate5/` is classified in
+[MA2_T5_DASHBOARD_PROMOTION.md](MA2_T5_DASHBOARD_PROMOTION.md):
+
+- `candidate-acceptance.json`, `candidate-identity.json`: immutable input, 585 passing
+  tests against floor 547, build and source/manifest closure checks, prerequisite acceptance.
+- `ui-live-proof.json`, `ui-stop-action.json`: actual harmless local direct Task, independent
+  file verification, approved deterministic six-step Mission and phone UI Stop; no paid
+  provider turn. The Mission's lack of independent verification is shown truthfully.
+- `ui-privacy-health.json`, `ui-provider-compatibility.json`, `ui-task-terminal-proof.json`,
+  `ui-accessibility-motion.json`: privacy, actual disposable Host degradation, simulated
+  future Codex restriction, truthful terminal Task, focus and motion preferences.
+- `screenshots/promotion-*.png`, `screenshots/production-*.png` and render JSON: real
+  packaged candidate and production desktop/mobile dark/light, zero console/page errors
+  and horizontal overflow. Visual review was by the implementing agent.
+- `native-*-promotion.json`, `native-installed.json`: packaged WPF state renders and
+  proper installed EXE loaded/visible/responding; installed-script render against real Host.
+- `candidate-fatal.json`, `t4-preservation/packaged/result.json`: exact-package T3
+  fatal/interruption recovery and all 18 live Windows T4 ownership gates; disposable Hosts
+  and repositories only. Preserved authority/ownership source hashes are in candidate acceptance.
+- `laptop-backup.json`, `laptop-activation.json`, `production-smoke.json`,
+  `production-ui-identity.json`: actual authorized promotion, 67-file backup, coherent
+  installed source/manifest, 10 live asset hashes and unchanged protected history/settings.
+- `post-activation-restart.json`, `post-activation-identities.json`,
+  `codex-config-observation.json`: later independent Windows boot and fresh process
+  identities; personal config changed later, left as found, no T5 write. Actual 0.153.4
+  remains validated and Mission isolation still ignores user configuration.
+
+Rollback preserves v10 and the measured pre-T5 v17-T3 release, native EXE/startup
+configuration, two existing shortcuts and consistent database snapshot. Inspect
+`rollback-laptop.ps1`: exact manifest/backup guards, idle-work requirement, fresh live
+process identity, scoped termination, no automatic live DB overwrite and no Git checkout.
+Its preparation is verified; executing production rollback is not claimed.
+
+No physical remote transport, paid model turn, production Git/crash test or full independent
+acceptance is claimed. The normal Nitro adapter lacks trusted-peer data and renders Offline;
+the accepted installed Windows gateway remains authenticated and online. OD-1 was limited
+to presentation lessons; excluded AgentWorkspace, takeover, revocation/publication runtime,
+Slack/calls and AG-UI/core framework imports are listed in the detailed report.
