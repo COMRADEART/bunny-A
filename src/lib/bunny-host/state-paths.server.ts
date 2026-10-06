@@ -1,5 +1,5 @@
 // Installed state has an explicit layout. Development and test Hosts retain their local data directory.
-import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
@@ -58,5 +58,38 @@ export function hostStatePaths(directory?: string, env: NodeJS.ProcessEnv = proc
     diagnostics: assertApplicationDirectory(join(data, "logs")), runtime: assertApplicationDirectory(join(data, "runtime")),
     credentials: join(data, installed ? "credentials/credentials.json" : "credentials.json"),
     remote: join(data, installed ? "settings/remote.json" : "remote.json"),
+    marker: join(data, "state-layout.json"),
   };
+}
+
+/**
+ * M-A-2 T9: an installed Host applies its own additive schema at boot (CREATE TABLE IF NOT
+ * EXISTS), but boot validation compares the database against the marker's schema fingerprint,
+ * which still describes the previous schema. Without reconciliation, the second boot after any
+ * additive migration refuses a healthy database. Keep the marker describing exactly the applied
+ * schema — additive reconciliation only; a damaged database is never repaired or booted.
+ * This never claims anything was activated or installed; it only updates two marker fields.
+ */
+export function refreshStateMarker(paths: { installed: boolean; data: string; database: string }): { healed: boolean; schemaSha256: string; userVersion: number } {
+  if (!paths.installed) return { healed: false, schemaSha256: "", userVersion: 0 };
+  const markerPath = join(paths.data, "state-layout.json");
+  const record = JSON.parse(readFileSync(markerPath, "utf8")) as Record<string, unknown>;
+  if (record.schema !== "bunny-state/2") return { healed: false, schemaSha256: "", userVersion: 0 };
+  const database = new DatabaseSync(paths.database, { readOnly: true });
+  try {
+    const version = database.prepare("PRAGMA user_version").get()?.user_version;
+    const integrity = database.prepare("PRAGMA quick_check").all();
+    if (version !== 3) throw new Error("Installed Bunny database user_version must be 3.");
+    if (integrity.length !== 1 || Object.values(integrity[0])[0] !== "ok") {
+      throw new Error("Installed Bunny database did not pass quick_check; the state marker was left unchanged.");
+    }
+    const schema = database.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name").all();
+    const schemaHash = createHash("sha256").update(JSON.stringify(schema)).digest("hex");
+    const healed = record.databaseSchemaSha256 !== schemaHash || record.databaseUserVersion !== version;
+    if (healed) {
+      const next = { ...record, databaseUserVersion: version, databaseSchemaSha256: schemaHash };
+      writeFileSync(markerPath, JSON.stringify(next, null, 2));
+    }
+    return { healed, schemaSha256: schemaHash, userVersion: version };
+  } finally { database.close(); }
 }

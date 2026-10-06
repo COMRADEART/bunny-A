@@ -9,7 +9,7 @@ import type { Mode, OrchTask, Project, ProviderId, TaskConstraints } from "../or
 import type { AgentSession, HostSnapshot } from "./contracts.ts";
 import { MissionManager, type MissionManagerOptions } from "../bunny-missions/manager.server.ts";
 import { MISSION_ACTIONS, missionCommand } from "../bunny-missions/commands.server.ts";
-import { hostStatePaths } from "./state-paths.server.ts";
+import { hostStatePaths, refreshStateMarker } from "./state-paths.server.ts";
 import { CommandRefusedError, HostContainment, HostUnavailableError, registerDiagnosticSecret, safeError, supervisedLoop } from "./failure.server.ts";
 import type { ProviderAdapter, HostEvent } from "./contracts.ts";
 import type { HostSample } from "../orch/types.ts";
@@ -92,6 +92,9 @@ export async function startHost(options: { dataDirectory?: string; root?: string
   db.onFailure=(error,rollbackFailed)=>{if(rollbackFailed) containment.fatal(error,{subsystem:"persistence"});else containment.degrade("*","A persistence boundary failed; new execution requires Host recovery.");};
   // M-A-0 mission layer: additive tables are created, but nothing runs unless missions are enabled.
   const missions=new MissionManager(manager,{dataDirectory,...options.missions});
+  // M-A-2 T9: this Host just applied its own additive schema; reconcile the installed-state marker
+  // with the applied schema so the next boot validates a healthy database instead of refusing it.
+  refreshStateMarker({ installed: paths.installed, data: paths.data, database: paths.database });
   let presentationRevision=0;
   const installedIdentity=releaseIdentity();
   const snapshot=(after:number):HostSnapshot=>{
