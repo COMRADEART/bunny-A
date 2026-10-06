@@ -818,3 +818,67 @@ device untouched). Final verdict **BUNNY_MA2_T6_PASS** (§50). Full report:
 No authentication was weakened and no test was weakened, skipped or
 reclassified (§1). No OCT-1/OD-1 features and no T7 work (§26/§27/§51).
 T7–T10 remain open.
+
+# M-A-2 Gate T7 (final: BUNNY_MA2_T7_PASS)
+
+Gate T7 was an acceptance-only gate: **no product code was changed**, no release was
+manufactured or activated (the "do NOT manufacture v17-T7" rule is fully honored), and the
+regression floor therefore stands unchanged at 592 (§48). The gate exercised the T6R
+installed runtime against a real Windows session boundary and recorded LIVE evidence that
+the existing implementation's installed startup chain does exactly what it claims.
+
+What T7 verified of the implementation (all LIVE VERIFIED, evidence
+`test-results/ma2-gate7/`, report
+[MA2_T7_WINDOWS_SIGNIN_ACCEPTANCE.md](MA2_T7_WINDOWS_SIGNIN_ACCEPTANCE.md)):
+
+- **Real sign-out then natural restart**: explicit user authorization recorded
+  (`signin-authorization.json`, digest `d037f76a78ce9892`), `logoff.exe` at
+  2026-10-06T04:11:32.800Z ended the session (and, as expected, every Bunny process and the
+  gate harness shell). After the user's normal sign-back-in (new session id 2, Explorer
+  36072 at 04:11:54.312Z), the per-user `Bunny-A.lnk` → install-root bootstrap
+  `Bunny-A.exe` (pid 34004) chain started the application completely on its own — Host
+  17956 at T0+3.65 s, gateway 5348 at T0+6.31 s, readiness record at T0+9.86 s
+  (`startup-performance.json`, Windows actual timestamps per §36). No manual start (§12),
+  no repo/dev parentage anywhere (§53), zero repo path references in any process.
+- **Startup authority held**: the same shortcut (unchanged SHA-256), the same bootstrap exe
+  (unchanged SHA-256), the same `install.json` currentRelease → `deployment.json` package
+  pin → release-manifest SHA-256 `f5bf648c…` verification ran post-signin and booted
+  release `17.0.0-T6` / source `cb005ef7…` (§57 mismatch condition absent).
+- **Duplicate startup refused twice LIVE (§19)**: two deliberate competitor launches of the
+  same shortcut target each walked the pinned launcher's refusal chain
+  (`host.already-running` → `gateway.already-running` → `island.already-running`) and
+  exited within ~160 ms with zero new persistent processes, zero disappeared processes and
+  zero log-archive moves; nothing was ever killed by name (§55/§28).
+- **State preserved exactly (§21–§23, §56)**: canonical `bunny-state/2` state, no empty
+  database; order-independent normalized preservation sweep of all user tables vs the
+  pre-signin `VACUUM INTO` backup found 0 problems; events sequences continuous
+  (2303 → present) with only fresh-probe telemetry deltas on the 6 provider rows; missions
+  OFF and triggers OFF preserved, never enabled by startup.
+- **Providers recovered freshly (§24/§25)**: the restarted Host re-probed all six providers
+  at 04:12:22Z on its own; fresh direct tasks with fresh post-restart approvals completed
+  for codex (real file write + Bunny independent on-disk verify `Exact match`) and ollama
+  (exact `T7_LOCAL_OK` marker). One honest failure-ledger entry: the first ollama probe
+  sent a verify spec that adds a filesystem hard constraint a text-only model executor
+  cannot satisfy; the Host **refused rather than falling back to a wrong executor**
+  (correct hard-constraint enforcement) and the corrected retry completed — the probe
+  defect is retained in evidence (`provider-recovery-ollama-retry.json`); the same file
+  records the §26 external claude CLI upgrade (`2.1.290 → 2.1.291`) as a reported external
+  change, never overwritten.
+- **Security preservation (§31–§35, §38–§40, §58)**: unpaired public `/state` still 404,
+  token-leak scan clean, hostname changed (expected; stale hostname withdrawn from the
+  edge — 530) after the user-initiated pinned-launcher remote start, cloudflared binary
+  byte-identical, production "Phone companion" untouched and active, T6R test devices still
+  revoked with unchanged DB timestamps, missions/triggers never enabled at startup, no
+  Windows Service/SYSTEM/scheduled-task elevation, children hidden. One residual mechanism
+  question is recorded honestly in the gate report: bootstrap-invoked launcher runs
+  (03:14Z, 04:12Z, both 04:23Z race competitors) log no `remote.*` line even with a live
+  worker, while direct pinned-launcher runs do (03:04Z, 04:17Z); the sign-in startup leaves
+  the remote path OFF either way and a live worker is never duplicated — the mechanism
+  (likely a `-NoRemote` flag from the bootstrap; partial binary string dumps) stays
+  unresolved and is tracked in the T7 failure ledger, not silently explained away.
+- **Error surface clean (§37)**: all runtime logs scanned post-signin; the single finding
+  is the labeled harness-probe refusal above; host/gateway/tunnel error logs are empty and
+  there is no unresolved BLOCKER/HIGH.
+
+Final verdict **BUNNY_MA2_T7_PASS** (§61); the full M-A-2 operational verdict is still NOT
+claimed (§62) and **NEXT = T8 pinned rollback, not begun** (§63).

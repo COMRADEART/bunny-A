@@ -494,3 +494,37 @@ against the installed remediated runtime.
 | Final verdict | **BUNNY_MA2_T6_PASS** — all required §22 A–Q and §38–§41 properties LIVE; physical-phone rows honestly NOT TESTED; watchdog rules SIMULATED with live restraint evidence; no auth weakening, no test removals, no OCT-1/OD-1, no T7 |
 
 No authentication weakening, no test removal or reclassification, no T7/OCT-1/OD-1 work.
+
+# M-A-2 Gate T7
+
+**BUNNY_MA2_T7_PASS.** A REAL Windows sign-out (`logoff.exe`, 2026-10-06T04:11:32.800Z,
+explicit user authorization recorded) followed by the user's normal sign-back-in: the
+installed v17-T6 chain — Startup shortcut → installed bootstrap → pinned launcher →
+release identity check → Host/gateway/island — started by itself, with no manual start
+(§12), no repo/dev dependency (§53), exactly one of every runtime process (§18), the
+canonical state fully preserved (§21–§23), providers and Codex freshly recovered (§24/§25)
+and every security boundary intact (§33–§35, §58). Acceptance-only gate: no product code
+changed, factory idle, floor 592 unchanged. Full report:
+[MA2_T7_WINDOWS_SIGNIN_ACCEPTANCE.md](MA2_T7_WINDOWS_SIGNIN_ACCEPTANCE.md). Evidence:
+`test-results/ma2-gate7/`.
+
+| T7 criterion | Result and evidence under `test-results/ma2-gate7/` |
+| --- | --- |
+| Real sign-out/sign-in (§1/§2/§12) | LIVE VERIFIED — `signin-authorization.json` (explicit authorization, digest `d037f76a78ce9892`), `HANDOFF.md`; `logoff.exe` 04:11:32.800Z; user signed back in; harness resumed via HANDOFF without manual Bunny start |
+| Session boundary + process parentage (§52/§53) | LIVE VERIFIED — `session-evidence.json` (session 1 → 2; Explorer 36072 born 04:11:54.312Z), `post-signin-processes.json` (all Bunny in session 2, `repoParented: []`). Winlogon/4624 log reads NOT TESTED (non-elevated) — labeled |
+| Measured startup (§36) | LIVE VERIFIED — `startup-performance.json`: bootstrap born 04:12:19.208Z; Host +3.65 s; gateway +6.31 s; readiness +9.86 s (Windows actual timestamps) |
+| Fresh instance, no duplicate (§14/§18/§19) | LIVE VERIFIED — `fresh-instance.json` (instance `e2eed181…` → `15a6a576…`), `single-instance.json` (1 bootstrap, 1 Host 17956, 1 gateway 5348, ≤1 tunnel), `startup-race.json` (two deliberate competitor launches each refused host/gateway/island with the same pids, 0 new/0 disappeared processes, nothing killed, no log-archive moves) |
+| Startup authority, no repo fallback (§4/§10) | LIVE VERIFIED — `post-signin-release-identity.json`, `canonical-state-check.json` (`devPathReferences: false`); installed chain only (shortcut sha unchanged, bootstrap exe sha unchanged) |
+| Release identity (§15/§57) | LIVE VERIFIED — install currentRelease = gateway = readiness = `17.0.0-T6` / `cb005ef7…` / manifest `f5bf648c…`, identical to pre-signin — no release mismatch |
+| Canonical state + preservation (§21/§22) | LIVE VERIFIED — `canonical-state-check.json` (no empty DB), `state-preservation.json` (0 problems; order-independent normalized compare; events continuity 2303→ present; 6 externalProviderDeltas = expected fresh-probe telemetry; harness acceptance tasks separately recorded, never merged) |
+| Autonomy preserved (§23) | LIVE VERIFIED — `autonomy-switches.json`: missions OFF, triggers OFF, unchanged, never enabled during startup |
+| Provider recovery (§24) | LIVE VERIFIED — `provider-recovery.json`: all 6 providers fresh-probed by the restarted Host at 04:12:22Z; discovery 200; fresh direct tasks with fresh approvals only: codex task COMPLETED (file written + Bunny independent verify Exact match), ollama task COMPLETED with exact `T7_LOCAL_OK` marker. First ollama submit 400 = harness probe defect (verify spec on a text-only provider), corrected retry recorded, retained honestly in `provider-recovery-ollama-retry.json` |
+| Codex fresh evaluation (§25) | LIVE VERIFIED — `codex-compatibility.json`: no stale approval trust (all approvals post-restart); byte-identical runtime identity revalidated 04:12:22Z; policy version 1; unknown binary stays Mission-restricted (STATIC VERIFIED from installed source) |
+| Remote startup + hostname (§30/§32) | LIVE VERIFIED — `remote-startup.json`: sign-in startup itself started NO tunnel (consent-first; residual launcher-path question recorded honestly in the gate report); user-initiated pinned launcher then started the worker (fresh hostname, public `/bunny-health` 200, stale hostname withdrawn 530, cloudflared binary unchanged) |
+| Remote auth smoke (§33) | LIVE VERIFIED — `remote-auth-smoke.json`: unpaired `/state` 404 (no data), `/` + `/bunny-health` 200, `tokenLeak: false` |
+| Devices (§34/§35) | LIVE VERIFIED — `device-preservation.json`: production "Phone companion" untouched/active; T6R devices still revoked with unchanged timestamps (DB-verified); no re-pairing/unrevoking/substitution |
+| Watchdog (§31) | LIVE surfaces (restarted runtime) + carried SIMULATED rules — `watchdog-surfaces.json` |
+| Security boundaries (§38–§40, §58) | LIVE VERIFIED — no auth bypass, no Mission enablement, no device authority reset, no Codex bypass, no secret exposure, no repo fallback, no broad kill, no silent elevation (T7 report Security preservation section); console-window/focus rules hold (hidden children; island window only) |
+| Error surface (§37) | LIVE VERIFIED — `startup-errors.json`: all runtime logs scanned; 1 post-signin finding = the labeled harness-probe refusal (expected; Host correctly enforced hard constraints); host/gateway/tunnel error logs empty; no unresolved BLOCKER/HIGH |
+| Legacy audit refresh (§20) | LIVE VERIFIED — `legacy-startup-paths-refresh.json`: Startup folder + HKCU Run unchanged and reviewed (Bunny has no HKCU Run entry; unrelated apps only); nothing auto-deleted |
+| T7 verdict | **BUNNY_MA2_T7_PASS** — acceptance-only; no code changes (floor 592 stands, §48); no test removals; no v17-T7 manufactured; **NEXT = T8 pinned rollback, not begun (§63)**; BUNNY_MA2_OPERATIONAL_PASS NOT claimed (§62) |

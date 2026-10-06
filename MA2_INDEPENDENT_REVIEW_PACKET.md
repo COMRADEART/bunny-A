@@ -677,3 +677,56 @@ Review, in this order:
    install/pairing (F8) — no user participation this session; the mobile-
    browser layout equivalence is live evidence instead; watchdog rules remain
    SIMULATED with live restraint observed on the natural window.
+
+# M-A-2 Gate T7 — REVIEW PACKET (final: BUNNY_MA2_T7_PASS)
+
+Gate T7 is an acceptance-only gate: **no product code changed** (regression floor 592
+stands), no release was manufactured or activated, and the T6R production runtime
+(`Bunny-A-Windows-v17-T6`) is unchanged. An independent reviewer should focus on the one
+hard-to-fake claim — a **real Windows session boundary** — and on the honesty of the two
+negative-looking records (the first ollama probe 400 and the sign-in remote-suppression
+residual), both of which are failure-ledger entries rather than hidden defects.
+
+## What an independent reviewer should re-derive (all evidence under `test-results/ma2-gate7/`)
+
+| T7 claim | Pointer and how to verify | Label |
+| --- | --- | --- |
+| Real sign-out happened, then a real sign-back-in | `pre-signin/signin-authorization.json` (explicit owner authorization, digest `d037f76a78ce9892`); `HANDOFF.md`; post-signin `session-evidence.json` — Explorer process 36072 in **session 2** created 04:11:54.312Z while the pre-signin session was 1; the pre-signin gate shell died at 04:11:32.800Z (logoff) by design (a simulation would not kill the harness) | LIVE VERIFIED |
+| Startup was natural, not manual (§12) | `post-signin-processes.json`: bootstrap `Bunny-A.exe` pid 34004 with parent 36072 (the NEW Explorer), session 2, born 04:12:19.208Z; zero repo/dev parents (`repoParented: []`) | LIVE VERIFIED |
+| Windows actual timings (§36) | `startup-performance.json` — CIM process creation times + launch log: Host 36800→born 04:12:22.211Z (recorded 04:12:22.863Z), gateway 5348 born 04:12:24.999Z, readiness `bunny-windows-application/1` record 04:12:29.071Z = **T0+9.86 s** | LIVE VERIFIED |
+| Release identity, no mismatch (§15/§57) | `post-signin-release-identity.json` — install.json currentRelease + gateway health release + readiness record all `17.0.0-T6` / `cb005ef7…` / manifest `f5bf648c…`, identical to the pre-signin record; bootstrap exe SHA-256 unchanged | LIVE VERIFIED |
+| Exactly one of each process (§18) | `single-instance.json` — 1 bootstrap-root (= island), 1 host-node, 1 gateway-node, ≤1 tunnel worker; nothing killed by name ever (§55) | LIVE VERIFIED |
+| Duplicate startup refused (§19) | `startup-race.json` + `raw-race-run1/startup-race.json` + `release-launch.log`: two deliberate competitor launches of the same shortcut target; BOTH walked `host.already-running` (04:23:06.610Z, 04:23:43.745Z, host pid 17956 unchanged) → `gateway.already-running` (gateway 5348 unchanged) → `island.already-running` (island 34004 unchanged) with 0 new persistent processes / 0 disappeared / 0 `logs/archive` moves; competitors exited in ~160 ms and thus only appear in the launch log, not the 2 s inventory sampling — read the log lines to confirm | LIVE VERIFIED |
+| Canonical state + preservation (§21/§22/§56) | `canonical-state-check.json` (no empty DB), `state-preservation.json` (0 problems across all user tables vs the pre-signin VACUUM INTO backup; events continuity through seq 2303; 6 provider rows classified as expected fresh-probe telemetry; 3 later T7 harness tasks recorded separately, never merged into user content) | LIVE VERIFIED |
+| Autonomy stays OFF (§23) | `autonomy-switches.json` — missions OFF, triggers OFF, `enabledDuringStartup: false` | LIVE VERIFIED |
+| Providers recovered (§24/§25) | `provider-recovery.json` — all 6 providers freshly probed by the restarted Host at 04:12:22Z; codex task COMPLETED with a real file write and Bunny's own on-disk verify (`Exact match`, events 2308–2326); ollama task COMPLETED with exact `T7_LOCAL_OK` (`provider-recovery-ollama-retry.json`, task 44c18b8a, events 2328–2339); all approvals created post-restart (no stale approval trust). NOTE the honest probe-defect record: the first ollama submit 400'd because the harness added a filesystem verify constraint to a text-only provider — the Host's refusal (no fallback executor) is correct behavior, retained in evidence | LIVE VERIFIED |
+| Remote startup + auth (§30–§33) | `remote-startup.json` (sign-in startup started NO tunnel — truthfully recorded; user-initiated pinned launcher then created the worker: fresh hostname, public health 200, stale hostname withdrawn 530, cloudflared byte-identical); `remote-auth-smoke.json` (unpaired /state 404, no token leak) | LIVE VERIFIED |
+| Devices untouched (§34/§35) | `device-preservation.json` (DB-verified): Phone companion active/untouched; T6R devices still revoked with unchanged timestamps; no re-pairing/unrevoking/substitution | LIVE VERIFIED |
+| Error surface (§37/§20) | `startup-errors.json` (all runtime logs scanned; 1 labeled harness-refusal finding; error logs empty), `legacy-startup-paths-refresh.json` (Bunny-A.lnk unchanged; HKCU Run has no Bunny entry; nothing auto-deleted) | LIVE VERIFIED |
+| Bootstrap authority (§4/§10) | `pre-signin/root-exe-strings.json` (".git" refusals + readiness-record schema strings embedded in the .NET bootstrap); installed launcher control flow (already-running identity checks; island mutex `Local\Bunny-A-Island`); zero repo/dev references in any process | STATIC VERIFIED + LIVE |
+| Reboot (§41) / second sign-in cycle (§42) / winlogon-4624 reads / physical phone re-join | Not claimed in T7 (winlogon/4624: non-elevated event-log reads returned empty — session boundary proven via CIM session ids instead, labeled NOT TESTED rather than simulated) | NOT TESTED |
+| Watchdog rules (§31) | Carried from T6R (SIMULATED rules, live restraint); T7 records the restarted runtime's watchdog surfaces (`watchdog-surfaces.json`) | SIMULATED (rules) + LIVE (surfaces) |
+
+## Residual questions an independent reviewer should press on (failure ledger)
+
+1. **Sign-in remote suppression mechanism unresolved (L-T7-2).** Bootstrap-invoked launcher
+   runs (03:14Z, 04:12Z, both 04:23Z competitors) log NO `remote.*` line even with a live
+   worker, while direct pinned-launcher runs do (03:04Z, 04:17Z, `-NoIsland` run). The
+   launcher source has no silent skip branch; whether the bootstrap passes `-NoRemote` is
+   unproven (both binary string dumps are partial). Product impact: the remote path stays
+   OFF until the user launches the pinned launcher — consent-first behavior preserved and a
+   live worker is never duplicated; the T7 report records this as an unresolved mechanism
+   question instead of inventing an explanation.
+2. **Harness probe defect (L-T7-1).** The 400 on the first ollama probe is retained
+   verbatim; the corrected retry and the Host's correct hard-constraint enforcement are the
+   pass evidence.
+3. **fresh-instance.json pid labeling.** The first evidence file labeled gateway pids as
+   "hostPid"; the correction (gateway 22508→5348; launch-log Host pids 36800→17956) is
+   recorded inside the file itself — reviewer should cite the corrected fields.
+
+## Verdict
+
+**BUNNY_MA2_T7_PASS** (§61) — real session boundary, natural installed startup, exactly one
+of each process, canonical state intact, fresh provider/Codex recovery, security
+boundaries intact, zero code changes. BUNNY_MA2_OPERATIONAL_PASS is NOT claimed (§62);
+**T8 pinned rollback is NEXT and must not be begun from T7's close** (§63).
