@@ -1,0 +1,58 @@
+{
+  "ok": true,
+  "missionH": "1f0a717c-dd86-497e-bdd3-9f7e65a9c107",
+  "missionH2": "92440298-27d1-40f5-9cdc-80417d62539e",
+  "checks": [
+    {
+      "check": "batch granted on mission H",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "H's batch is live",
+      "actual": true,
+      "pass": true
+    },
+    {
+      "check": "H2's own desktop ask is a REAL ask — a concurrent mission's batch never rescues it",
+      "actual": null,
+      "pass": true
+    },
+    {
+      "check": "allow_once accepted on H2",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "H2 completed under explicit approvals only",
+      "actual": "completed",
+      "pass": true
+    },
+    {
+      "check": "no batch grant ever existed on H2",
+      "actual": true,
+      "pass": true
+    },
+    {
+      "check": "H2 has NO batch row in the store at all",
+      "actual": null,
+      "pass": true
+    },
+    {
+      "check": "H2's journal contains zero batch events",
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "check": "H completed under its own batch",
+      "actual": "completed",
+      "pass": true
+    },
+    {
+      "check": "H's batch events are all H's own mission",
+      "actual": true,
+      "pass": true
+    }
+  ],
+  "note": "two concurrent missions on the SAME app and SAME actions: H2 asked on its own while H's batch ran; batch consult is strictly mission-scoped and H2 never even gained a batch row (§37/§71)"
+}

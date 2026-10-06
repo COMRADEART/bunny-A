@@ -1,0 +1,36 @@
+{
+  "gate": "M-A-2 T9",
+  "stagedAt": "2026-10-06T15:22:28.634Z",
+  "source": {
+    "installRoot": "C:/Users/allam/AppData/Local/Bunny-A",
+    "stateRoot": "C:/Users/allam/AppData/Local/Bunny-A/state",
+    "productionHostRunning": true
+  },
+  "method": "snapshotDatabase (read-only VACUUM INTO) from scripts/bunny-state-migration.mjs — the repository's own verified state snapshotter; production Host live and untouched; no production write, checkpoint or process change",
+  "stage": {
+    "installRoot": "C:/Users/allam/AppData/Local/Bunny-A-T9-stage",
+    "stateRoot": "C:/Users/allam/AppData/Local/Bunny-A-T9-stage/state",
+    "plannedHostPort": 44119
+  },
+  "snapshot": {
+    "integrity": "ok",
+    "userVersion": 3,
+    "preT9SchemaSha256": "f92b3e1076a4e6884378426e21e53db39d04ffa88c865b58f8c7274bcb1aaa89",
+    "appliedT9SchemaSha256": "7904d40adbb3942820f76d8c59be06f71f41949ca28e90f4c7cfe057fce9515c",
+    "marker": "state-layout.json (schema bunny-state/2, stateRoot patched to the staging path)"
+  },
+  "credentials": "rotated: fresh 32-byte token (length 43); production token not shared",
+  "excluded": [
+    "settings/remote.json",
+    "settings/remote-consent.json",
+    "settings/tunnel.json",
+    "settings/deployment.json (staging ships no gateway)",
+    "runtime/* (no tunnel-process.json)",
+    "cloudflared.exe (empty cloudflared/ folder)",
+    "backups contents, provider-observations, real-provider-validation, logs, sessions, tools, validation",
+    "runtime/git-operations",
+    "runtime/windows-application.json (launcher status telemetry)"
+  ],
+  "productionPreserved": "test-results/ma2-gate9/production-preservation.json",
+  "remoteSurface": "never configured on staging (-NoRemote; no remote settings files copied)"
+}

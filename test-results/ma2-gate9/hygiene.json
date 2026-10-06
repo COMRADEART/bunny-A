@@ -1,0 +1,58 @@
+{
+  "ok": false,
+  "events": [
+    {
+      "phase": "C",
+      "closed": [
+        34640
+      ],
+      "at": 1791311436083,
+      "notes": [
+        "WM_CLOSE posted to 1 \"Calculator\" window handle(s) on pid 34640 (method: per-handle PostMessage, never a pid kill)"
+      ]
+    },
+    {
+      "phase": "C#retry-2",
+      "closed": [
+        34640
+      ],
+      "at": 1791311572241,
+      "notes": [
+        "WM_CLOSE posted to 1 \"Calculator\" window handle(s) on pid 34640 (method: per-handle PostMessage, never a pid kill)"
+      ]
+    },
+    {
+      "phase": "C#retry-3",
+      "closed": [
+        34640
+      ],
+      "at": 1791311753394,
+      "notes": [
+        "WM_CLOSE posted to 1 \"Calculator\" window handle(s) on pid 34640 (method: per-handle PostMessage, never a pid kill)"
+      ]
+    }
+  ],
+  "phaseAttempts": [
+    {
+      "phase": "C",
+      "attempt": 1,
+      "failedAt": 1791311435130,
+      "error": "Timed out waiting: an open permission request for 2d04eef1-f8e4-44cb-9456-cb20e19d6e88"
+    },
+    {
+      "phase": "C",
+      "attempt": 2,
+      "failedAt": 1791311571316,
+      "error": "Timed out waiting: an open permission request for 7956905d-6464-42eb-9725-ef0d5e481597"
+    },
+    {
+      "phase": "C",
+      "attempt": 3,
+      "failedAt": 1791311752518,
+      "error": "Timed out waiting: an open permission request for 0b1df549-cb66-4b41-912a-a23fb717d29a"
+    }
+  ],
+  "model": "(pid|title)-scoped per-phase baseline; closure by title-matched per-handle WM_CLOSE — never a pid kill (one ApplicationFrameHost process hosts unrelated UWP windows)",
+  "strayGuard": "every phase (and every phase attempt) first stops non-terminal missions from interrupted runs (the M-A-1 concurrent-mission limit is 3)",
+  "note": "only matrix-created calculator/notepad windows and matrix-created strays were ever touched"
+}

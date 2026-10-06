@@ -1,0 +1,111 @@
+{
+  "ok": true,
+  "missionId": "2edf1f1d-71b1-4421-8889-7dd27a403395",
+  "batchAtStop": {
+    "usedCount": 2,
+    "maxActions": 12,
+    "status": "active"
+  },
+  "batchEvents": [
+    {
+      "sequence": 3438,
+      "at": 1791305130239,
+      "type": "approval.batch_started",
+      "taskId": null,
+      "detail": "Small approval batch granted by workstation for Calculator: at most 12 mutating actions within 2 min; covers Bring its window forward, Press one of its buttons, Open its app. It ends at the limit, at expiry, on Stop, on a target mismatch, or with the mission.",
+      "missionId": "2edf1f1d-71b1-4421-8889-7dd27a403395"
+    },
+    {
+      "sequence": 3442,
+      "at": 1791305130275,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.open_app admitted under the small approval batch: 1 / 12 mutating actions used.",
+      "missionId": "2edf1f1d-71b1-4421-8889-7dd27a403395"
+    },
+    {
+      "sequence": 3450,
+      "at": 1791305131916,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.focus_window admitted under the small approval batch: 2 / 12 mutating actions used.",
+      "missionId": "2edf1f1d-71b1-4421-8889-7dd27a403395"
+    },
+    {
+      "sequence": 3455,
+      "at": 1791305132087,
+      "type": "approval.batch_ended",
+      "taskId": null,
+      "detail": "Small approval batch ended because the mission stopped by workstation (2 / 12 actions used); no further covered action will run.",
+      "missionId": "2edf1f1d-71b1-4421-8889-7dd27a403395"
+    }
+  ],
+  "batchRow": {
+    "id": "b25b0028-c747-4ac5-a21a-2743c0bc2932",
+    "usedCount": 2,
+    "maxActions": 12,
+    "status": "ended",
+    "endReason": "mission_ended",
+    "createdBy": "workstation",
+    "endBy": "workstation",
+    "createdAt": 1791305130236,
+    "expiresAt": 1791305250236
+  },
+  "checks": [
+    {
+      "check": "batch granted (10 mutations → maxActions 12)",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "the batch was live at Stop time",
+      "actual": "active",
+      "pass": true
+    },
+    {
+      "check": "mission.stop accepted",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "mission is stopped",
+      "actual": "stopped",
+      "pass": true
+    },
+    {
+      "check": "journal: batch_ended present (Stop ends the batch)",
+      "actual": true,
+      "pass": true
+    },
+    {
+      "check": "canonical store row — ended with the stop at the used count seen live",
+      "actual": [
+        "ended",
+        "mission_ended",
+        true
+      ],
+      "pass": true
+    },
+    {
+      "check": "no run still running after Stop",
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "check": "no open request remains (Stop resolves them)",
+      "actual": 0,
+      "pass": true
+    },
+    {
+      "check": "no run exists after the mission's finishedAt (nothing ran afterwards)",
+      "actual": true,
+      "pass": true
+    },
+    {
+      "check": "no batch block remains in the mission view",
+      "actual": null,
+      "pass": true
+    }
+  ],
+  "note": "Stop prevents future actions live: the batch ended with the mission (store row mission_ended), open asks were resolved with deny, and every run predates the mission's finishedAt (§43/§44)"
+}

@@ -1,0 +1,35 @@
+T9 v18 phase R starting
+node:internal/child_process:1143
+    result.error = new ErrnoException(result.error, 'spawnSync ' + options.file);
+                   ^
+
+<ref *1> Error: spawnSync powershell.exe ETIMEDOUT
+    at Object.spawnSync (node:internal/child_process:1143:20)
+    at spawnSync (node:child_process:911:24)
+    at execFileSync (node:child_process:954:15)
+    at Object.R (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma2-gate9/staging/v18-live.ts:110:5)
+    at async file:///C:/Users/allam/Documents/new/bun-router/test-results/ma2-gate9/staging/v18-live.ts:150:22 {
+  errno: -4039,
+  code: 'ETIMEDOUT',
+  syscall: 'spawnSync powershell.exe',
+  path: 'powershell.exe',
+  spawnargs: [
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    'C:/Users/allam/AppData/Local/Bunny-A-T9-stage/releases/Bunny-A-Windows-v19-T9/Start-Bunny-Release.ps1',
+    '-NoIsland',
+    '-NoGateway',
+    '-NoRemote'
+  ],
+  error: [Circular *1],
+  status: 0,
+  signal: null,
+  output: [ null, Buffer(0) [Uint8Array] [], Buffer(0) [Uint8Array] [] ],
+  pid: 35020,
+  stdout: Buffer(0) [Uint8Array] [],
+  stderr: Buffer(0) [Uint8Array] []
+}
+
+Node.js v24.18.0

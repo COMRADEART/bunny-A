@@ -1,0 +1,54 @@
+{
+  "gate": "M-A-2 T9",
+  "recordedAt": "2026-10-06T17:40:00Z",
+  "method": "scripts/install-bunny-release.ps1 (the production installer's full path) with staging parameters; logs at test-results/ma2-gate9/staging-install.log (run 1, pinned source df02410), staging-install2.log (run 2, truthful-TTL follow-up source 73d9382) and staging-install3.log (run 3, window-owner scope source e9604fe)",
+  "installerReturned": {
+    "release": "Bunny-A-Windows-v17-T9",
+    "folder": "C:\\Users\\allam\\AppData\\Local\\Bunny-A-T9-stage\\releases\\Bunny-A-Windows-v17-T9",
+    "sourceCommit": "e9604fefe3b8ab23f8fe6072ff302db3e63a8d15 (matches install/release-pin.json at e550ed0 — verified by the installer's own Test-Release; the installer echoed this exact id)",
+    "manifestSha256": "cd4015f011e280921434185d6b01c3d395160f0224bc7d0b1ac5cbf659d4d6e7",
+    "packageSha256": "7f5fd629143ad4b2f21122a8beebc91e7f0a8b2e09418b9b880a85c8860eddfc (matches the recomputed zip hash and the .sha256 sidecar; independently re-read from the repo releases/ copy before install)",
+    "shortcut": "C:\\Users\\allam\\AppData\\Local\\Bunny-A-T9-stage\\startup\\Bunny-A.lnk (sandboxable staging startup dir; the production logon startup folder was not touched)",
+    "launcher": "C:\\Users\\allam\\AppData\\Local\\Bunny-A-T9-stage\\releases\\Bunny-A-Windows-v17-T9\\Start-Bunny-Release.ps1",
+    "stateRoot": "C:\\Users\\allam\\AppData\\Local\\Bunny-A-T9-stage\\state",
+    "dataDirectory": "C:\\Users\\allam\\AppData\\Local\\Bunny-A-T9-stage\\state",
+    "workspace": "C:\\Users\\allam\\Bunny-Workspace-T9-stage",
+    "gateway": null,
+    "rollbackDirectory": "C:\\Users\\allam\\AppData\\Local\\Bunny-A-T9-stage\\rollback\\20261006-123726-706f55b1"
+  },
+  "reinstallHistory": [
+    {
+      "run": 1,
+      "at": "2026-10-06T11:34:16Z",
+      "sourceCommit": "df024106189292ed5c9a52bb89b95b2b743b66a7",
+      "manifestSha256": "ba988bab5a7a480b743573888641e51c232505788e4c246f2f0c90ce4f4bcf40",
+      "packageSha256": "871f496b46c9744c1004d2ced772370669aea4450ad182165d8595079b7fc276",
+      "rollbackDirectory": "20261006-113416-2a87fef7",
+      "note": "the first staged install; binaries were removed when run 2 replaced the candidate (the exact pinned-source zip and unzipped folder remain archived in the workspace as -pin-df02410)"
+    },
+    {
+      "run": 2,
+      "at": "2026-10-06T16:17:12Z",
+      "sourceCommit": "73d9382511e361a1c03eec072a4a834341dcbb66",
+      "manifestSha256": "4ba1b57854f08bda4c4101df74d63af84ea925367e71318efd56f54e39756994",
+      "packageSha256": "335b40b48d9a3a7fd9d59e5511a8f045c7be66f28170a56f5571b687f5025b0f",
+      "rollbackDirectory": "20261006-121712-27e050ce",
+      "note": "the live-matrix install; completed after one attempt died on a transient Remove-Item NullReferenceException with the release already moved in (staging residue cleared, re-run finished all steps); booted for matrix runs 1-3 — run 3's phase B root-caused the UWP window-owner pid divergence and forced run 4's repackage"
+    },
+    {
+      "run": 3,
+      "at": "2026-10-06T17:37:00Z",
+      "sourceCommit": "e9604fefe3b8ab23f8fe6072ff302db3e63a8d15",
+      "manifestSha256": "cd4015f011e280921434185d6b01c3d395160f0224bc7d0b1ac5cbf659d4d6e7",
+      "packageSha256": "7f5fd629143ad4b2f21122a8beebc91e7f0a8b2e09418b9b880a85c8860eddfc",
+      "rollbackDirectory": "20261006-123726-706f55b1",
+      "note": "the live-matrix install of the window-owner scope candidate; preceded by a controlled staged-host stop (pid 19376, port 44119 verified closed) and the removal of run 2's release binaries (state never touched), so the installer's same-name refusal did not need to fire; this boot runs matrix phases B-J"
+    }
+  ],
+  "notes": [
+    "All three installs validated the disposable state copy in place: state-layout.json present (schema bunny-state/2, staged stateRoot), host.sqlite present, -DataDirectory equal to InstallRoot\\state, Assert-BunnyTree passed; the staged state was never modified by the installer.",
+    "install.json schema bunny-install/2 with stateLayoutVersion 2 and hostPort 44119 written inside the staging install root.",
+    "The same-name different-manifest refusal (installer line 134) fired against run 2's binaries during the run-3 chain as a pre-verified guard: run 1's binaries had to be explicitly removed before run 2 for the same reason — an in-place same-name candidate replacement is never silent."
+  ],
+  "productionIsolation": "install root %LOCALAPPDATA%\\Bunny-A-T9-stage, workspace Bunny-Workspace-T9-stage, port 44119, rotated token, no remote/gateway/island surfaces"
+}

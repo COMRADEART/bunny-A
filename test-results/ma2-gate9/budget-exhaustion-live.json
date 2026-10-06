@@ -1,0 +1,133 @@
+{
+  "ok": true,
+  "missionId": "78704c53-e32b-42d8-a647-99e00fdd2117",
+  "grantedMaxActions": 3,
+  "batchShots": [
+    {
+      "at": 1791304713470,
+      "usedCount": 1,
+      "maxActions": 3,
+      "status": "active"
+    },
+    {
+      "at": 1791304714929,
+      "usedCount": 2,
+      "maxActions": 3,
+      "status": "active"
+    }
+  ],
+  "batchEvents": [
+    {
+      "sequence": 3131,
+      "at": 1791304713414,
+      "type": "approval.batch_started",
+      "taskId": null,
+      "detail": "Small approval batch granted by workstation for Calculator: at most 3 mutating actions within 2 min; covers Bring its window forward, Press one of its buttons, Open its app. It ends at the limit, at expiry, on Stop, on a target mismatch, or with the mission.",
+      "missionId": "78704c53-e32b-42d8-a647-99e00fdd2117"
+    },
+    {
+      "sequence": 3135,
+      "at": 1791304713446,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.open_app admitted under the small approval batch: 1 / 3 mutating actions used.",
+      "missionId": "78704c53-e32b-42d8-a647-99e00fdd2117"
+    },
+    {
+      "sequence": 3143,
+      "at": 1791304714867,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.focus_window admitted under the small approval batch: 2 / 3 mutating actions used.",
+      "missionId": "78704c53-e32b-42d8-a647-99e00fdd2117"
+    },
+    {
+      "sequence": 3151,
+      "at": 1791304715750,
+      "type": "approval.batch_exhausted",
+      "taskId": null,
+      "detail": "Small approval batch reached its 3-action limit; further computer.* actions ask again.",
+      "missionId": "78704c53-e32b-42d8-a647-99e00fdd2117"
+    },
+    {
+      "sequence": 3152,
+      "at": 1791304715753,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.invoke_control admitted under the small approval batch: 3 / 3 mutating actions used.",
+      "missionId": "78704c53-e32b-42d8-a647-99e00fdd2117"
+    }
+  ],
+  "batchRow": {
+    "id": "3d28f7b9-6a4f-4c8a-a423-cfa038e85b34",
+    "usedCount": 3,
+    "maxActions": 3,
+    "status": "ended",
+    "endReason": "exhausted",
+    "createdBy": "workstation",
+    "endBy": "bunny-capability-bus",
+    "createdAt": 1791304713411,
+    "expiresAt": 1791304833411
+  },
+  "checks": [
+    {
+      "check": "offer present (6 mutating executions → maxActions 12)",
+      "actual": [
+        true,
+        12
+      ],
+      "pass": true
+    },
+    {
+      "check": "allow_batch shrunk to maxActions 3 accepted (only-shrink)",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "the live count climbed to 3 admissions (the 3rd ends the batch, so the last visible count is the 3rd or the poll caught 2)",
+      "actual": true,
+      "pass": true
+    },
+    {
+      "check": "the 4th covered mutation asked for FRESH approval (no off-by-one: nothing admitted past the budget)",
+      "actual": null,
+      "pass": true
+    },
+    {
+      "check": "canonical store row — ended exhausted at exactly 3/3",
+      "actual": [
+        3,
+        3,
+        "ended",
+        "exhausted"
+      ],
+      "pass": true
+    },
+    {
+      "check": "journal: batch_exhausted present",
+      "actual": true,
+      "pass": true
+    },
+    {
+      "check": "the ended batch is gone from the mission view",
+      "actual": null,
+      "pass": true
+    },
+    {
+      "check": "at most 3 desktop actions ran (nothing slipped past the budget)",
+      "actual": 3,
+      "pass": true
+    },
+    {
+      "check": "deny accepted on the post-exhaustion ask",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "mission failed after the user denied the fresh ask",
+      "actual": "failed",
+      "pass": true
+    }
+  ],
+  "note": "the budget is real: 3 admissions then the batch ended exhausted (store row 3/3); the 4th desktop action asked fresh and the deny failed the mission — nothing admitted past the budget"
+}

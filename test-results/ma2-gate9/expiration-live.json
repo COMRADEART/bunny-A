@@ -1,0 +1,63 @@
+{
+  "ok": true,
+  "missionId": "f50011bf-d017-4976-b592-ffc48f2f2070",
+  "ttlMsGranted": 1000,
+  "grantedAt": 1791304774898,
+  "admissionsBeforeExpiry": [
+    1
+  ],
+  "lateRequestId": "5bb8d133-428a-4a5e-8a92-dc48c9410271",
+  "checks": [
+    {
+      "check": "allow_batch with the 1-second ttl accepted",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "the lapsed batch displays truthfully (ended / expired — never active)",
+      "actual": [
+        "ended",
+        "expired"
+      ],
+      "pass": true
+    },
+    {
+      "check": "the store row keeps the lazy-flip shape (status active, no end event — consult/admission gates refuse it)",
+      "actual": [
+        "active",
+        null,
+        true
+      ],
+      "pass": true
+    },
+    {
+      "check": "a later covered action asked for explicit approval after expiry",
+      "actual": null,
+      "pass": true
+    },
+    {
+      "check": "the fresh ask happened after the 1-second life (Host clock, not wall luck)",
+      "actual": 1678,
+      "pass": true
+    },
+    {
+      "check": "no batch_ended event exists for an expiry (expiry is refused lazily, never 'ended')",
+      "actual": false,
+      "pass": true
+    },
+    {
+      "check": "whatever the batch covered before expiry, the live shots show it (≤ the max)",
+      "actual": [
+        true,
+        true
+      ],
+      "pass": true
+    },
+    {
+      "check": "remaining actions finished under explicit approvals",
+      "actual": "completed",
+      "pass": true
+    }
+  ],
+  "note": "the Host clock is the authority: the shrunk ttl lapsed mid-mission; the display flipped to ended/expired, the store row keeps the lazy-flip shape, and every later action asked and was answered explicitly (§13)"
+}

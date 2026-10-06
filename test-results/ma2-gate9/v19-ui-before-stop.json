@@ -1,0 +1,433 @@
+{
+  "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6",
+  "state": "waiting_for_user",
+  "batch": {
+    "id": "a361d7ec-95a6-4a45-b7df-8b2ec9ae947c",
+    "maxActions": 6,
+    "usedCount": 2,
+    "targetLabel": "Calculator",
+    "createdAt": 1791314411452,
+    "expiresAt": 1791314531452,
+    "status": "active",
+    "endReason": null
+  },
+  "requests": [
+    {
+      "id": "786659c2-f001-4399-9b06-31f345afdceb",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6",
+      "stepId": "1dc06a2c-82d1-440e-8cd4-041466c25e5c",
+      "action": "computer.type",
+      "risk": "EXECUTE",
+      "reason": "EXECUTE actions were not approved for this mission.",
+      "createdAt": 1791314415290,
+      "resolvedAt": null,
+      "resolution": null,
+      "resolvedBy": null,
+      "batchOffer": null
+    },
+    {
+      "id": "bf5dabb2-1dbb-47a6-af21-b9a4064ad5a4",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6",
+      "stepId": "d31462af-63fd-4e61-ba22-2583e613247c",
+      "action": "computer.open_app",
+      "risk": "EXECUTE",
+      "reason": "EXECUTE actions were not approved for this mission.",
+      "createdAt": 1791314356953,
+      "resolvedAt": 1791314411458,
+      "resolution": "allow_batch",
+      "resolvedBy": "workstation",
+      "batchOffer": {
+        "actions": [
+          "computer.focus_window",
+          "computer.invoke_control",
+          "computer.open_app"
+        ],
+        "counts": {
+          "computer.open_app": 1,
+          "computer.focus_window": 1,
+          "computer.invoke_control": 1
+        },
+        "maxActions": 6,
+        "ttlMs": 120000,
+        "riskCeiling": "EXECUTE",
+        "targetLabel": "Calculator",
+        "target": {
+          "app": "calculator",
+          "processId": null,
+          "title": null
+        },
+        "targetTier": "app",
+        "family": "computer",
+        "readOnly": [],
+        "operations": [
+          {
+            "stepId": "d31462af-63fd-4e61-ba22-2583e613247c",
+            "digest": "21b4097ddb481ec1b386a8ce2bb09177751aae5a96eb50737468da484cd08613"
+          },
+          {
+            "stepId": "b18fdb7b-50ab-4339-9457-09107d9acb75",
+            "digest": "6b668cb0a6a448fc7ecc2b9f87fa419b7bff751ffa947da6757e2ce2eb5b7d4f"
+          },
+          {
+            "stepId": "0b003193-4e36-47dc-bb22-3036082076a0",
+            "digest": "8354d52b662e30aa2d58003071455076a64a38945504ef8236cd8f9096f377ba"
+          }
+        ]
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": "c5b4c8a8-a110-47f9-ba34-b8b5cfc30113",
+      "action": "computer.focus_window",
+      "capability": "computer",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6",
+      "stepId": "b18fdb7b-50ab-4339-9457-09107d9acb75",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Allowed by the small approval batch for Calculator: 2 of 6 mutating actions used.",
+      "params": {
+        "title": "Calculator"
+      },
+      "status": "succeeded",
+      "summary": "Focused \"Calculator\".",
+      "evidence": [
+        "computer.focus_window via UI Automation at 2026-10-06T19:20:15.240Z"
+      ],
+      "artifactIds": [],
+      "startedAt": 1791314413877,
+      "finishedAt": 1791314415241,
+      "durationMs": 1364,
+      "origin": "mission:f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "id": "d8c0a23e-287f-46ac-962b-ecb182bfa1b6",
+      "action": "computer.open_app",
+      "capability": "computer",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6",
+      "stepId": "d31462af-63fd-4e61-ba22-2583e613247c",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Allowed by the small approval batch for Calculator: 1 of 6 mutating actions used.",
+      "params": {
+        "app": "calculator"
+      },
+      "status": "succeeded",
+      "summary": "Started C:\\WINDOWS\\System32\\calc.exe (pid 8228).",
+      "evidence": [
+        "computer.open_app via UI Automation at 2026-10-06T19:20:12.945Z"
+      ],
+      "artifactIds": [],
+      "startedAt": 1791314411505,
+      "finishedAt": 1791314412946,
+      "durationMs": 1441,
+      "origin": "mission:f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    }
+  ],
+  "events": [
+    {
+      "sequence": 13259,
+      "at": 1791314356841,
+      "type": "mission.created",
+      "taskId": null,
+      "detail": "Mission \"T9 v18 UI scope\" created by workstation (fast).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13260,
+      "at": 1791314356844,
+      "type": "mission.planning",
+      "taskId": null,
+      "detail": "Planning with bunny-planner-deterministic-v1.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13261,
+      "at": 1791314356852,
+      "type": "mission.planned",
+      "taskId": null,
+      "detail": "4 step(s): Launcher → Window → Sensitive → Arithmetic. User-supplied plan; validated and bounded by Bunny.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13262,
+      "at": 1791314356856,
+      "type": "mission.approval_required",
+      "taskId": null,
+      "detail": "Mission f2d4e157-3e7e-42bc-807b-74751dec8ce6 \"T9 v18 UI scope\" needs approval: READ; capabilities computer.focus_window, computer.invoke_control, computer.open_app, computer.type, filesystem.exists, filesystem.list, filesystem.read, notifications.send; no model calls.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13264,
+      "at": 1791314356899,
+      "type": "approval.mission_envelope",
+      "taskId": null,
+      "detail": "Mission envelope d3513bde-d2bf-4d50-b0a2-29690f65d002 by workstation; provider sessions {\"steps\":[],\"maxSessions\":0,\"writeIncludesShell\":true}.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13265,
+      "at": 1791314356903,
+      "type": "authorization.granted",
+      "taskId": null,
+      "detail": "Mission authorization d3513bde-d2bf-4d50-b0a2-29690f65d002 granted by workstation: roots C:\\Users\\allam\\Bunny-Workspace-T9-stage; READ; terminal []; git []; browser off; computer on; expires 2026-10-06T19:49:16.892Z.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13266,
+      "at": 1791314356911,
+      "type": "mission.started",
+      "taskId": null,
+      "detail": "Mission \"T9 v18 UI scope\" started.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13268,
+      "at": 1791314356927,
+      "type": "mission.step.ready",
+      "taskId": null,
+      "detail": "Launcher is ready. (step d31462af-63fd-4e61-ba22-2583e613247c)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13269,
+      "at": 1791314356935,
+      "type": "mission.step.started",
+      "taskId": null,
+      "detail": "Launcher started (attempt 1, deterministic). (step d31462af-63fd-4e61-ba22-2583e613247c)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13270,
+      "at": 1791314356939,
+      "type": "capability.requested",
+      "taskId": null,
+      "detail": "computer.open_app requested by mission:f2d4e157-3e7e-42bc-807b-74751dec8ce6 (step d31462af-63fd-4e61-ba22-2583e613247c).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13271,
+      "at": 1791314356942,
+      "type": "authorization.required",
+      "taskId": null,
+      "detail": "computer.open_app: EXECUTE actions were not approved for this mission.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13272,
+      "at": 1791314356956,
+      "type": "mission.permission_required",
+      "taskId": null,
+      "detail": "Mission f2d4e157-3e7e-42bc-807b-74751dec8ce6 request bf5dabb2-1dbb-47a6-af21-b9a4064ad5a4: Launcher needs permission for computer.open_app (EXECUTE): EXECUTE actions were not approved for this mission. (step d31462af-63fd-4e61-ba22-2583e613247c)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13273,
+      "at": 1791314356964,
+      "type": "mission.waiting_for_user",
+      "taskId": null,
+      "detail": "Mission f2d4e157-3e7e-42bc-807b-74751dec8ce6 is waiting for 1 permission decision(s).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13275,
+      "at": 1791314411455,
+      "type": "approval.batch_started",
+      "taskId": null,
+      "detail": "Small approval batch granted by workstation for Calculator: at most 6 mutating actions within 2 min; covers Bring its window forward, Press one of its buttons, Open its app. It ends at the limit, at expiry, on Stop, on a target mismatch, or with the mission.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13276,
+      "at": 1791314411472,
+      "type": "approval.additional_capability",
+      "taskId": null,
+      "detail": "computer.open_app allow_batch by workstation; request bf5dabb2-1dbb-47a6-af21-b9a4064ad5a4; scope one small bounded batch (6 actions, target Calculator).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13277,
+      "at": 1791314411475,
+      "type": "mission.resumed",
+      "taskId": null,
+      "detail": "workstation answered request bf5dabb2-1dbb-47a6-af21-b9a4064ad5a4.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13278,
+      "at": 1791314411478,
+      "type": "authorization.granted",
+      "taskId": null,
+      "detail": "computer.open_app for step d31462af-63fd-4e61-ba22-2583e613247c: allow_batch by workstation (request bf5dabb2-1dbb-47a6-af21-b9a4064ad5a4).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13280,
+      "at": 1791314411499,
+      "type": "mission.step.started",
+      "taskId": null,
+      "detail": "Launcher started (attempt 2, deterministic). (step d31462af-63fd-4e61-ba22-2583e613247c)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13281,
+      "at": 1791314411502,
+      "type": "capability.requested",
+      "taskId": null,
+      "detail": "computer.open_app requested by mission:f2d4e157-3e7e-42bc-807b-74751dec8ce6 (step d31462af-63fd-4e61-ba22-2583e613247c).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13282,
+      "at": 1791314411509,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.open_app admitted under the small approval batch: 1 / 6 mutating actions used.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13283,
+      "at": 1791314411512,
+      "type": "authorization.granted",
+      "taskId": null,
+      "detail": "computer.open_app: Allowed by the small approval batch for Calculator: 1 of 6 mutating actions used.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13284,
+      "at": 1791314411515,
+      "type": "capability.started",
+      "taskId": null,
+      "detail": "computer.open_app started.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13285,
+      "at": 1791314412946,
+      "type": "capability.completed",
+      "taskId": null,
+      "detail": "computer.open_app succeeded: Started C:\\WINDOWS\\System32\\calc.exe (pid 8228).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13286,
+      "at": 1791314412954,
+      "type": "mission.step.completed",
+      "taskId": null,
+      "detail": "Launcher completed (no independent check requested). (step d31462af-63fd-4e61-ba22-2583e613247c)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13287,
+      "at": 1791314412961,
+      "type": "mission.step.ready",
+      "taskId": null,
+      "detail": "Window is ready. (step b18fdb7b-50ab-4339-9457-09107d9acb75)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13288,
+      "at": 1791314412968,
+      "type": "mission.step.started",
+      "taskId": null,
+      "detail": "Window started (attempt 1, deterministic). (step b18fdb7b-50ab-4339-9457-09107d9acb75)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13289,
+      "at": 1791314413874,
+      "type": "capability.requested",
+      "taskId": null,
+      "detail": "computer.focus_window requested by mission:f2d4e157-3e7e-42bc-807b-74751dec8ce6 (step b18fdb7b-50ab-4339-9457-09107d9acb75).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13290,
+      "at": 1791314413880,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.focus_window admitted under the small approval batch: 2 / 6 mutating actions used.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13291,
+      "at": 1791314413884,
+      "type": "authorization.granted",
+      "taskId": null,
+      "detail": "computer.focus_window: Allowed by the small approval batch for Calculator: 2 of 6 mutating actions used.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13292,
+      "at": 1791314413887,
+      "type": "capability.started",
+      "taskId": null,
+      "detail": "computer.focus_window started.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13293,
+      "at": 1791314415241,
+      "type": "capability.completed",
+      "taskId": null,
+      "detail": "computer.focus_window succeeded: Focused \"Calculator\".",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13294,
+      "at": 1791314415257,
+      "type": "mission.step.completed",
+      "taskId": null,
+      "detail": "Window completed (no independent check requested). (step b18fdb7b-50ab-4339-9457-09107d9acb75)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13295,
+      "at": 1791314415265,
+      "type": "mission.step.ready",
+      "taskId": null,
+      "detail": "Sensitive is ready. (step 1dc06a2c-82d1-440e-8cd4-041466c25e5c)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13296,
+      "at": 1791314415272,
+      "type": "mission.step.started",
+      "taskId": null,
+      "detail": "Sensitive started (attempt 1, deterministic). (step 1dc06a2c-82d1-440e-8cd4-041466c25e5c)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13297,
+      "at": 1791314415276,
+      "type": "capability.requested",
+      "taskId": null,
+      "detail": "computer.type requested by mission:f2d4e157-3e7e-42bc-807b-74751dec8ce6 (step 1dc06a2c-82d1-440e-8cd4-041466c25e5c).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13298,
+      "at": 1791314415279,
+      "type": "authorization.required",
+      "taskId": null,
+      "detail": "computer.type: EXECUTE actions were not approved for this mission.",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13299,
+      "at": 1791314415293,
+      "type": "mission.permission_required",
+      "taskId": null,
+      "detail": "Mission f2d4e157-3e7e-42bc-807b-74751dec8ce6 request 786659c2-f001-4399-9b06-31f345afdceb: Sensitive needs permission for computer.type (EXECUTE): EXECUTE actions were not approved for this mission. (step 1dc06a2c-82d1-440e-8cd4-041466c25e5c)",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    },
+    {
+      "sequence": 13300,
+      "at": 1791314415301,
+      "type": "mission.waiting_for_user",
+      "taskId": null,
+      "detail": "Mission f2d4e157-3e7e-42bc-807b-74751dec8ce6 is waiting for 1 permission decision(s).",
+      "missionId": "f2d4e157-3e7e-42bc-807b-74751dec8ce6"
+    }
+  ]
+}

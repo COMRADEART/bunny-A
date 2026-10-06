@@ -1,0 +1,15 @@
+
+> typecheck
+> tsc --noEmit
+
+src/lib/bunny-missions/manager.server.ts(199,26): error TS2322: Type '(MissionStep | { executor: { params: Record<string, unknown>; kind: "capability"; action: string; } | { params: Record<string, unknown>; kind: "skill"; skillId: string; }; ... 30 more ...; finishedAt: number | null; })[]' is not assignable to type 'MissionStep[]'.
+  Type 'MissionStep | { executor: { params: Record<string, unknown>; kind: "capability"; action: string; } | { params: Record<string, unknown>; kind: "skill"; skillId: string; }; ... 30 more ...; finishedAt: number | null; }' is not assignable to type 'MissionStep'.
+    Type '{ executor: { params: Record<string, unknown>; kind: "capability"; action: string; } | { params: Record<string, unknown>; kind: "skill"; skillId: string; }; id: string; missionId: string; ... 28 more ...; finishedAt: number | null; }' is not assignable to type 'MissionStep'.
+      Types of property 'executor' are incompatible.
+        Type '{ params: Record<string, unknown>; kind: "capability"; action: string; } | { params: Record<string, unknown>; kind: "skill"; skillId: string; }' is not assignable to type 'StepExecutor'.
+          Type '{ params: Record<string, unknown>; kind: "capability"; action: string; }' is not assignable to type 'StepExecutor'.
+            Type '{ params: Record<string, unknown>; kind: "capability"; action: string; }' is not assignable to type '{ kind: "capability"; action: string; params: Record<string, JsonValue>; }'.
+              Types of property 'params' are incompatible.
+                Type 'Record<string, unknown>' is not assignable to type 'Record<string, JsonValue>'.
+                  'string' index signatures are incompatible.
+                    Type 'unknown' is not assignable to type 'JsonValue'.

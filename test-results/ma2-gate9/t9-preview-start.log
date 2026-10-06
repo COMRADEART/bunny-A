@@ -1,0 +1,64 @@
+
+> preview:restart
+> node scripts/preview-platform.mjs restart
+
+Get-CimInstance : Access denied 
+At line:1 char:35
++ ...  = 'Stop'; (Get-CimInstance Win32_Process -Filter 'ProcessId = 41932' ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (:) [Get-CimInstance], CimException
+    + FullyQualifiedErrorId : HRESULT 0x80041003,Microsoft.Management.Infrastructure.CimCmdlets.GetCimInstanceCommand
+ 
+node:internal/errors:985
+  const err = new Error(message);
+              ^
+
+Error: Command failed: powershell.exe -NoProfile -Command $ErrorActionPreference = 'Stop'; (Get-CimInstance Win32_Process -Filter 'ProcessId = 41932').CommandLine
+Get-CimInstance : Access denied 
+
+At line:1 char:35
+
++ ...  = 'Stop'; (Get-CimInstance Win32_Process -Filter 'ProcessId = 41932' ...
+
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    + CategoryInfo          : PermissionDenied: (:) [Get-CimInstance], CimException
+
+    + FullyQualifiedErrorId : HRESULT 0x80041003,Microsoft.Management.Infrastructure.CimCmdlets.GetCimInstanceCommand
+
+ 
+
+
+    at genericNodeError (node:internal/errors:985:15)
+    at wrappedFn (node:internal/errors:539:14)
+    at checkExecSyncError (node:child_process:925:11)
+    at execFileSync (node:child_process:961:15)
+    at file:///C:/Users/allam/Documents/new/bun-router/scripts/preview-platform.mjs:32:23
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  status: 1,
+  signal: null,
+  output: [
+    null,
+    '',
+    'Get-CimInstance : Access denied \r\n' +
+      'At line:1 char:35\r\n' +
+      "+ ...  = 'Stop'; (Get-CimInstance Win32_Process -Filter 'ProcessId = 41932' ...\r\n" +
+      '+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n' +
+      '    + CategoryInfo          : PermissionDenied: (:) [Get-CimInstance], CimException\r\n' +
+      '    + FullyQualifiedErrorId : HRESULT 0x80041003,Microsoft.Management.Infrastructure.CimCmdlets.GetCimInstanceCommand\r\n' +
+      ' \r\n'
+  ],
+  pid: 35268,
+  stdout: '',
+  stderr: 'Get-CimInstance : Access denied \r\n' +
+    'At line:1 char:35\r\n' +
+    "+ ...  = 'Stop'; (Get-CimInstance Win32_Process -Filter 'ProcessId = 41932' ...\r\n" +
+    '+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n' +
+    '    + CategoryInfo          : PermissionDenied: (:) [Get-CimInstance], CimException\r\n' +
+    '    + FullyQualifiedErrorId : HRESULT 0x80041003,Microsoft.Management.Infrastructure.CimCmdlets.GetCimInstanceCommand\r\n' +
+    ' \r\n'
+}
+
+Node.js v24.18.0

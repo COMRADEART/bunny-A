@@ -1,0 +1,127 @@
+{
+  "missionId": "99901ae8-eb45-48e6-a54f-f986bb479ff4",
+  "state": "waiting_for_user",
+  "batch": {
+    "id": "17554078-7e30-4538-b6e5-25ac982f7cd3",
+    "maxActions": 6,
+    "usedCount": 2,
+    "targetLabel": "Calculator",
+    "createdAt": 1791315149730,
+    "expiresAt": 1791315269730,
+    "status": "active",
+    "endReason": null
+  },
+  "requests": [
+    {
+      "id": "a5e27726-4c4f-4e3d-9354-9305cb9025d7",
+      "missionId": "99901ae8-eb45-48e6-a54f-f986bb479ff4",
+      "stepId": "072fdb36-410c-416a-a93d-63b4dcea7eea",
+      "action": "computer.type",
+      "risk": "EXECUTE",
+      "reason": "EXECUTE actions were not approved for this mission.",
+      "createdAt": 1791315153729,
+      "resolvedAt": null,
+      "resolution": null,
+      "resolvedBy": null,
+      "batchOffer": null
+    },
+    {
+      "id": "a6eef215-cdfb-4074-89b8-956801346823",
+      "missionId": "99901ae8-eb45-48e6-a54f-f986bb479ff4",
+      "stepId": "6bb1909a-1abe-4c8e-af2d-adcacc06d6af",
+      "action": "computer.open_app",
+      "risk": "EXECUTE",
+      "reason": "EXECUTE actions were not approved for this mission.",
+      "createdAt": 1791314945513,
+      "resolvedAt": 1791315149738,
+      "resolution": "allow_batch",
+      "resolvedBy": "workstation",
+      "batchOffer": {
+        "actions": [
+          "computer.focus_window",
+          "computer.invoke_control",
+          "computer.open_app"
+        ],
+        "counts": {
+          "computer.open_app": 1,
+          "computer.focus_window": 1,
+          "computer.invoke_control": 1
+        },
+        "maxActions": 6,
+        "ttlMs": 120000,
+        "riskCeiling": "EXECUTE",
+        "targetLabel": "Calculator",
+        "target": {
+          "app": "calculator",
+          "processId": null,
+          "title": null
+        },
+        "targetTier": "app",
+        "family": "computer",
+        "readOnly": [],
+        "operations": [
+          {
+            "stepId": "6bb1909a-1abe-4c8e-af2d-adcacc06d6af",
+            "digest": "21b4097ddb481ec1b386a8ce2bb09177751aae5a96eb50737468da484cd08613"
+          },
+          {
+            "stepId": "bb8053de-1b77-4689-ab49-a883d429ad63",
+            "digest": "6b668cb0a6a448fc7ecc2b9f87fa419b7bff751ffa947da6757e2ce2eb5b7d4f"
+          },
+          {
+            "stepId": "42d4bac4-7e89-4c7f-a5c6-081b532a1daf",
+            "digest": "8354d52b662e30aa2d58003071455076a64a38945504ef8236cd8f9096f377ba"
+          }
+        ]
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": "31fccd86-b4bc-4a80-a7ef-db98cc16f38a",
+      "action": "computer.focus_window",
+      "capability": "computer",
+      "missionId": "99901ae8-eb45-48e6-a54f-f986bb479ff4",
+      "stepId": "bb8053de-1b77-4689-ab49-a883d429ad63",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Allowed by the small approval batch for Calculator: 2 of 6 mutating actions used.",
+      "params": {
+        "title": "Calculator"
+      },
+      "status": "succeeded",
+      "summary": "Focused \"Calculator\".",
+      "evidence": [
+        "computer.focus_window via UI Automation at 2026-10-06T19:32:33.676Z"
+      ],
+      "artifactIds": [],
+      "startedAt": 1791315152262,
+      "finishedAt": 1791315153676,
+      "durationMs": 1414,
+      "origin": "mission:99901ae8-eb45-48e6-a54f-f986bb479ff4"
+    },
+    {
+      "id": "47076370-d4ac-46a0-b5b7-1db9f0914e8c",
+      "action": "computer.open_app",
+      "capability": "computer",
+      "missionId": "99901ae8-eb45-48e6-a54f-f986bb479ff4",
+      "stepId": "6bb1909a-1abe-4c8e-af2d-adcacc06d6af",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Allowed by the small approval batch for Calculator: 1 of 6 mutating actions used.",
+      "params": {
+        "app": "calculator"
+      },
+      "status": "succeeded",
+      "summary": "Started C:\\WINDOWS\\System32\\calc.exe (pid 49268).",
+      "evidence": [
+        "computer.open_app via UI Automation at 2026-10-06T19:32:31.309Z"
+      ],
+      "artifactIds": [],
+      "startedAt": 1791315149805,
+      "finishedAt": 1791315151309,
+      "durationMs": 1504,
+      "origin": "mission:99901ae8-eb45-48e6-a54f-f986bb479ff4"
+    }
+  ]
+}

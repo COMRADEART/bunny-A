@@ -1,0 +1,23 @@
+{
+  "gate": "M-A-2 T9",
+  "recordedAt": "2026-10-06T18:20:00Z",
+  "phase": "pre-resume cleanup (between matrix run 4's phase G and the resume from G)",
+  "leftover": {
+    "windowsBefore": [
+      "7 visible top-level windows titled 'Calculator' enumerated machine-wide (the UWP app's shell cluster; its frame host ApplicationFrameHost pid 34640 also carries the user's own windows, which is why a pid kill is forbidden)"
+    ],
+    "hostViewBefore": "WINDOW pid=34640 proc=ApplicationFrameHost title=Calculator (the Host's list_windows probe after matrix run 4's phase G)"
+  },
+  "method": "per-window WM_CLOSE: EnumWindows → visible windows with title containing 'Calculator' → PostMessage(WM_CLOSE) to each handle; NEVER a pid kill and never taskkill /T on a shared frame host",
+  "result": {
+    "handlesPosted": 7,
+    "afterCountMachineWide": 0,
+    "hostViewAfter": {
+      "probe": "computer.list_windows via the staged Host (pid 16220, instanceId 574141cd-f78b-4e6d-b9e6-cb0d9f4b8fc5, healthy)",
+      "calculatorNotepadRows": 0,
+      "totalWindows": 7
+    }
+  },
+  "driverModel": "live-matrix.ts hygiene was rewritten in the same step: freshness is keyed on (pid|title) — one ApplicationFrameHost pid hosts windows of several apps over time, so a bare-pid baseline would skip the matrix's own windows on a shared pid or sweep a user window that inherited the pid later; closure is the same title-matched per-handle WM_CLOSE, and TRACK.sweep never acts without a baseline",
+  "honestyNote": "matrix run 4's phase G hygiene sweep had skipped this window (its frame-host pid was already in the pre-change baseline), so the window stayed open until this explicit closure; the resumed run's own phases record their hygiene in the run's hygiene.json"
+}
