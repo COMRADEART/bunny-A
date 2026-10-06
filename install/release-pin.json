@@ -1,9 +1,9 @@
 {
-  "release": "Bunny-A-Windows-v19-T9",
-  "version": "19.0.0-T9",
-  "sourceCommit": "8d49b7d0d3ab63914d728f7f4872aaf51c141d88",
+  "release": "Bunny-A-Windows-v20-T9",
+  "version": "20.0.0-T9",
+  "sourceCommit": "445beebf8c9d951066dd0bddb1b066820762a912",
   "baselineCommit": "f1934bda6b0d33f27bef198e8967a69f6eb329ff",
   "gate9ImplementationCommit": "3f5375d5a81c86d01bfea75e85b5a44bee962483",
-  "gate9ImplementationFollowUp": "8d49b7d0d3ab63914d728f7f4872aaf51c141d88",
-  "note": "Gate T9 bounded desktop approval batching on top of the T6 production line (production remains Bunny-A-Windows-v17-T6 until a fully tested live candidate is accepted; section 64: activation requires explicit user authorization). Stage and validate with a disposable copy of the production database, separate workspace/token/ports first. Batching is mission-scoped, offer-only, count/TTL/risk bounded, fails closed on every escape, and never outlives its mission envelope or the Host boot epoch. The candidate source includes the installed-state marker reconciliation (df02410), the truthful batch TTL journal wording (73d9382) and the window-owner scope binding (e9604f - the live UWP finding: the Runtime declares the matched top-level window's owning process on control-bearing outputs and the batch review binds to it), so a staged activation can restart and the journal never mislabels seconds as minutes. T10 remains open. Tooling identity is recorded separately."
+  "gate9ImplementationFollowUp": "445beebf8c9d951066dd0bddb1b066820762a912",
+  "note": "T9 staged candidate only. Production remains Bunny-A-Windows-v17-T6; activation requires separate explicit authorization. Exact Host-computed Calculator operations, short TTL, finite budget, risk ceiling, mission and step digests, verified Microsoft Calculator package plus native window/process lifetime before admission and mutation. Arbitrary typing and unrelated capability families require separate approval. Host execution input is preserved; renderer snapshots redact typed input and secret-key fields. Batch authority expires on Stop/replan/restart and does not affect verification. All earlier candidate identities remain immutable. T10 remains open; tooling identity is recorded separately."
 }
