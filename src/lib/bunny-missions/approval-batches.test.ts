@@ -186,8 +186,9 @@ test("T9 positive example: one approval finishes a whole bounded Calculator sequ
     const types = eventTypes(env, view.id);
     assert.equal(types.filter((type) => type === "approval.batch_started").length, 1);
     assert.equal(types.filter((type) => type === "approval.batch_consumed").length, 5);
-    const started = events(env, view.id).find((event) => event.type === "approval.batch_started")!.at as number;
-    assert.ok(events(env, view.id).find((event) => event.type === "approval.batch_ended")!.at >= started, "no consumption happens after the batch ends");
+    const started = events(env, view.id).find((event) => event.type === "approval.batch_started")!;
+    assert.match(started.detail, /within 2 min/, "the journal states the truthful 2-minute ttl (seconds never mislabeled as minutes)");
+    assert.ok(events(env, view.id).find((event) => event.type === "approval.batch_ended")!.at >= started.at, "no consumption happens after the batch ends");
     assert.ok(!types.includes("approval.batch_exhausted"), "the sequence fit inside the budget");
   } finally { await env.cleanup(); }
 });

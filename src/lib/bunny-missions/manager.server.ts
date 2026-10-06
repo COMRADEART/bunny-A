@@ -725,7 +725,9 @@ export class MissionManager {
       status: "active", endAt: null, endReason: null, endBy: null, originStepId: step.id,
     };
     this.store.saveBatch(batch);
-    this.emit("approval.batch_started", `Small approval batch granted by ${by} for ${offer.targetLabel}: at most ${maxActions} mutating actions within ${Math.round(ttlMs / 1000)} min; covers ${offer.actions.map(batchActionLabel).join(", ")}${offer.readOnly.length ? `; read-only also covers ${offer.readOnly.map(batchActionLabel).join(", ")}` : ""}. It ends at the limit, at expiry, on Stop, on a target mismatch, or with the mission.`, mission.id);
+    // Truthful duration: seconds in, seconds out (the ttl is clamped to 1 s … 2 min by createBatchFromOffer).
+    const ttlWords = ttlMs >= 60_000 ? `${ttlMs / 60_000} min` : `${Math.round(ttlMs / 1000)} s`;
+    this.emit("approval.batch_started", `Small approval batch granted by ${by} for ${offer.targetLabel}: at most ${maxActions} mutating actions within ${ttlWords}; covers ${offer.actions.map(batchActionLabel).join(", ")}${offer.readOnly.length ? `; read-only also covers ${offer.readOnly.map(batchActionLabel).join(", ")}` : ""}. It ends at the limit, at expiry, on Stop, on a target mismatch, or with the mission.`, mission.id);
     return batch;
   }
   /** Gate T9: the user revokes the active batch; future covered actions ask for fresh approval. */

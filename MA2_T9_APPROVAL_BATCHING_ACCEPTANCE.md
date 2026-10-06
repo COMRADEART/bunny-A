@@ -117,15 +117,14 @@ preserved; the consult gate runs after the base decision and only for ordinary a
 | Decision consult + post-run review | `src/lib/bunny-missions/capabilities/bus.server.ts` | consult gate after `decide()` (never converts deny; `ask_every_time` respected), admission gate before execution, `approval.batch_*` events, `reviewBatchObserved` (launcher-pid no-pin rule; first window-bearing execution pins; drift ⇒ `scope_mismatch`) |
 | Remote surface | `src/lib/bunny-missions/commands.server.ts` | `allow_batch` decision validation; only-shrink knobs; `mission.revoke_batch` (workstation + paired device) |
 | Truthful display | `src/lib/bunny-missions/batch-labels.ts` (NEW) + `src/components/island/mission-model.ts` + `mission.tsx` + `mission.css` + `src/store/use-island.ts` | offer lines/button/status labels (one import surface), batch offer block, batch block in the mission panel with Revoke; no raw policy |
-
-| Journal + state marker | `src/lib/bunny-host/state-paths.server.ts` + `http.server.ts` | `refreshStateMarker`: after a Host applies its own additive schema, the installed-state marker reconciles (schema fingerprint + user_version) so the second boot validates a healthy database; quick_check must pass or nothing changes; damaged/wrong-version databases stay refused (defect caught while preparing the staged runtime — see defects 4) |
+| Journal + state marker | `src/lib/bunny-host/state-paths.server.ts` + `http.server.ts` | `refreshStateMarker`: after a Host applies its own additive schema, the installed-state marker reconciles (schema fingerprint + user_version) so the second boot validates a healthy database; quick_check must pass or nothing changes; damaged/wrong-version databases stay refused (defect 4) |
 
 # STATIC VERIFIED
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Focused T9 suite (15 tests, areas of §66) | 15 pass, 0 fail | `focused-tests.log` — areas: single-action unchanged; explicit batch (offer shape/counts/ordering); batch denied; app binding; Task binding (delegated child steps); Mission binding; count exhaustion (boundary 2/2, no off-by-one); expiration (lazy flip + guarded denial + UI truth); risk escalation (`riskAtMost` lattice + requestBatchable); unexpected target (foreign pid, lookalike window, capture/sensitive probes, shell, browser, files, git); sensitive input; shell exclusion; Browser exclusion; Stop; Host restart (epoch + recover sweep); UI reconnect (`view()` canonical + stale-response refusals); remote approval (paired phone grant/revoke, clamped knobs, canonical counts); ask_every_time non-batching; secret redaction (automated privacy scan); journal events (ordering + truth); verification independence (area unchanged — zero diff); provider reroute (structural: consult input carries no provider identity; existing retarget suite unchanged) |
-| Full suite | **610 total** = 247 script + 326 application + 37 UI, 0 fail (floor 592, +18 additive, none deleted) | `full-tests.log`, `ui-tests.log` |
+| Focused T9 suite (18 tests, areas of §66) | 18 pass, 0 fail | `focused-tests.log` — approval-batches.test.ts (15) + state-marker.test.ts (3). Areas: single-action unchanged; explicit batch (offer shape/counts/ordering); batch denied; app binding; Task binding (delegated child steps); Mission binding; count exhaustion (boundary 2/2, no off-by-one); expiration (lazy flip + guarded denial + UI truth); risk escalation (`riskAtMost` lattice + requestBatchable); unexpected target (foreign pid, lookalike window, capture/sensitive probes, shell, browser, files, git); sensitive input; shell exclusion; Browser exclusion; Stop; Host restart (epoch + recover sweep); UI reconnect (`view()` canonical + stale-response refusals); remote approval (paired phone grant/revoke, clamped knobs, canonical counts); ask_every_time non-batching; secret redaction (automated privacy scan); journal events (ordering + truth); verification independence (area unchanged — zero diff); provider reroute (structural: consult input carries no provider identity; existing retarget suite unchanged) |
+| Full suite | **613 total** = 247 script + 329 application + 37 UI, 0 fail (floor 592, +21 additive, none deleted) | `full-tests.log`, `ui-tests.log` |
 | Typecheck | exit 0 | `typecheck.log` |
 | Lint | exit 0 (0 errors; 13 pre-existing warnings, unchanged) | `lint.log` |
 | Build | exit 0 (normal Vite/Nitro build) | `build.log` |
@@ -148,6 +147,13 @@ preserved; the consult gate runs after the base decision and only for ordinary a
    preparation; `state-marker.test.ts` reproduces the refusal first, then proves the heal + the
    second-boot validation pass). Fixed with `refreshStateMarker` — additive reconciliation only;
    `quick_check` must pass, damaged databases stay refused.
+5. The `approval.batch_started` journal copy printed the TTL as `Math.round(ttlMs/1000)` labelled
+   "min" — the 120-second default rendered "within 120 min" (seconds mislabeled as minutes, a
+   60× overstatement inside a security-relevant record). Caught re-reading the source before the
+   live matrix; fixed to share the truthful duration wording (`within 2 min` / `within 5 s`),
+   pinned by a new assertion in the canonical-count focused test. The offer card and `BatchView`
+   always carried the truth (batch-labels' `ttlPhrase` was already correct); only the event copy
+   was wrong.
 
 # LIVE VERIFIED
 
