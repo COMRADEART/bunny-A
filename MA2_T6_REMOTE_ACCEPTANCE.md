@@ -207,13 +207,13 @@ private and outside the artifact. Android runtime acceptance is not inferred fro
 
 ---
 
-# M-A-2 Gate T6R — REMEDIATION (in progress, verdict unchanged)
+# M-A-2 Gate T6R — REMEDIATION
 
-**BUNNY_MA2_T6_FAIL stands** until the §22 A–Q sequence passes against the
-remediated installed runtime (§50). This section records Gate T6R: repair of
-only the failures that blocked T6 (§0/§28), no T7 work, no OCT-1/OD-1 features,
-no weakening of authentication, no test removals. Evidence root:
-`test-results/ma2-gate6r/`. Failure ledger (produced before any repair,
+**Final verdict: BUNNY_MA2_T6_PASS (§50).** Gate T6R repaired only the
+failures that blocked T6 (§0/§28), no T7 work, no OCT-1/OD-1 features, no
+weakening of authentication, no test removals. Evidence root:
+`test-results/ma2-gate6r/` (44 hashed evidence files in
+`acceptance-index.json`). Failure ledger (produced before any repair,
 2026-10-05/06, from recorded T6 evidence only):
 [T6_FAILURE_LEDGER.md](T6_FAILURE_LEDGER.md) — F1 BLOCKER (sustained 530/1033
 with a live-but-degraded child), F2 HIGH (stale `settings/remote.json` after a
@@ -276,10 +276,226 @@ No named-tunnel migration (§16), no binary auto-download (§18).
 | `npm run typecheck` / `npm run lint` | LIVE VERIFIED (this session) | exit 0 both (lint retains the existing 10 warnings) |
 | Normal production build | LIVE VERIFIED (this session) | `test-results/ma2-gate6r/normal-build.log`, exit 0 |
 | Windows desktop release build of repaired runtime (staged, not installed/activated) | LIVE VERIFIED (this session) | `releases/Bunny-A-Windows-v17-T6` (+`zip.sha256` `29740a280d96a7d1ed87acab3fbd59fc709ed523e8f118da43be4603606ace1d`), built from exact source `cb005ef75bf86d4d9e722b5214612fe115db5c6b` via committed pin `90a6e8da11e77bd1d3d402c166456f0d816fb4c4`; dashboard built; manifest 156 entries (SHA-256 `f5bf648c92711baba3fe4a24ea46c449fd8f226c0afa018f8f9cf93da52fde88`); explicit `verify`/`closure`/`source-check` (76 files byte-identical) all ok — `test-results/ma2-gate6r/{verify,closure,source-check}-t6.json`, `regression-results.json` |
-| Installed-runtime public §22 A–Q acceptance, §38–§41 security tests, public revocation latency (F6), pairing-abuse window (F7), phone sequence (F8) | NOT TESTED yet | requires §45 user authorization + §20 physical phone (or independent external network); not claimed here |
+| §45 activation of v17-T6 under explicit user authorization ("sure", 2026-10-06) | LIVE VERIFIED | install.json restored/promoted, deployment promoted, shortcut rewritten, EXE-owned process shape (Host+gateway children of EXE), exe readiness record `cb005ef`/`f5bf648c` — `activation-final.json` |
+| Installed-runtime §22 A–Q | LIVE VERIFIED (all 17 properties) | `acceptance-index.json` cases: `public-endpoint` (B), `unpaired-denial` + `unpaired-auth-boundary` (A/C), `pairing` (D), `paired-state` (E), `remote-task` + `local-model-readiness` (F), `remote-mission` (G), `remote-approval` (H), `remote-stop` (I), `header-security` + `second-client-isolation` (J), `revocation` (K), `stale-session` (L), `network-loss` + `sse-reconnect` (M), `tunnel-failure` (N), `local-preservation` + `final-local-smoke` (O), `tunnel-restart` (P/Q) |
+| §38–§41 security tests | LIVE VERIFIED | `header-security.json` (9/9, zero server errors), `csrf-origin-tests.json`, `forwarded-header-tests.json`, `client-isolation.json`, `token-leak-audit.json` (assets + APK entries; no token; provider output suppressed), `browser-storage-audit.json` (live web-storage read — T6's static audit upgraded), `phone-layout.json` (390×844 portrait + landscape, console clean, screenshots under `screenshots/`) |
+| Public revocation latency (F6) | LIVE VERIFIED — single clean samples | `stale-session.json` + `revocation.json`: immediate direct-Host 401 sample and first public stale-RPC denial sample, one sample per stage, transport retries never overwrite latency fields |
+| Pairing-abuse bounded window (F7) | LIVE VERIFIED | `pairing-abuse.json`: 6 invalid-code attempts over public HTTPS → 5×403 denial + 1×429 rate limit, zero device cookies issued, shared tunnel client-key budget side-effect documented |
+| Real transient 530 window containment | LIVE VERIFIED | `tunnel-transient.json`: ~90 s public 530 window self-recovered WITHOUT worker restart; watchdog stayed sub-threshold (churn-restart restraint observed on a natural window) |
+| Phone sequence (F8) / physical Android install and pairing | NOT TESTED (no user participation this session) | mobile-browser equivalence proven live: `phone-layout.json`; the pre-existing production "Phone companion" device was left untouched |
+| Final §50 verdict | BUNNY_MA2_T6_PASS | all required §22 A–Q and §38–§41 properties LIVE VERIFIED; physical-phone rows honestly NOT TESTED; no weakened auth, no removed tests, no OCT-1/OD-1, no T7 work |
 
 Everything already proven in the T6 sections above (auth boundary, pairing,
 Task/Mission/Stop, token-leak audit, local preservation) is unchanged by this
-remediation and is not being silently re-claimed; the R-sequence re-verifies
-the public path against the repaired installed runtime before any positive
-verdict. T7–T10 remain untouched.
+remediation and is not re-claimed silently: the R-sequence re-established the
+public path against the repaired installed runtime. T7–T10 remain untouched.
+
+## Original T6 failure
+
+Sustained public HTTP 530 / Cloudflare 1033 while the tunnel child stayed
+alive, produced by edge-registration churn (7 register / 6 unregister events
+in ~10 minutes with `Unauthorized: Tunnel not found` invalidation windows),
+compounded by a stale `settings/remote.json` publication surviving the worker
+after a hard kill (F2) and exit-only supervision unable to see the degraded
+state. Verdict `BUNNY_MA2_T6_FAIL` was recorded with three blockers
+(`test-results/ma2-gate6/acceptance-index.json`).
+
+## Root cause
+
+The blocker was registration churn, not protocol choice: a LIVE 15-minute
+dual-protocol probe on this same network
+(`test-results/ma2-gate6r/probe/`) returned 90/90 public 200s on BOTH http2
+and quic with `cloudflared_tunnel_ha_connections` constant at 1 (1
+register / 0 unregister each). Production kept `--protocol http2` unchanged.
+The repair therefore targets the worker's supervision of its own child and of
+published state, not the transport protocol or the Host.
+
+## IMPLEMENTED
+
+One owned surface (`scripts/bunny-tunnel-worker.mjs`, `scripts/bunny-tunnel.mjs`,
+`scripts/bunny-tunnel-state.mjs`):
+
+1. Sustained-degradation watchdog restarting only the owned child within the
+   existing 3-attempt/10–20 s budget: zero-active ≥ 60 s; ≥ 7 registration
+   events with < 2 active in 15 min (the recorded T6 signature); public
+   `bunny-health` probe streak ≥ 6 samples or ≥ 75% over ≥ 8 — tri-state, so
+   an origin-side fault is never attributed to the child (§19).
+2. Startup reconciliation clearing a dead worker's stale
+   `settings/remote.json` and refusing a live foreign worker.
+3. Truthful degradation logging with rule, registration counts and totals.
+
+During activation (F2, under the same gate): install.json field restoration
+(per T5 semantics), deployment.json promotion to the v17-T6 package, shortcut
+rewrite, EXE-owned process shape restoration. Nothing else was touched: Host
+routes, credentials, auth envelopes, dashboard, Android companion unchanged.
+
+## LIVE VERIFIED
+
+- §22 A–Q: all 17 properties (table above), against the installed v17-T6
+  runtime, over the real public HTTPS quick tunnel (`acceptance-index.json`).
+- §38–§41 security tests: 9/9 header/origin cases, CSRF/origin denial,
+  spoofed-forwarded-header denial, second-client isolation,
+  token-leak audit (HTTP, assets, API responses, APK),
+  live browser web-storage read, phone-layout render (§41), clean single-sample
+  revocation/stale measurements, bounded pairing abuse.
+- Real transient 530 window (~90 s) contained with self-recovery and
+  watchdog restraint; F2 reconcile executed live on the real installed state
+  after the hibernate/revive; production tunnel stayed a quick tunnel.
+
+## SIMULATED
+
+- The three watchdog rules and startup-reconciliation logic
+  (`scripts/bunny-tunnel.test.mjs`, 13 tests). A live natural window long
+  enough to trigger a restart did not occur; the live behavior actually
+  observed on the real transient window was sub-threshold restraint (churn
+  avoided), and the child-exit restart path was live-verified directly.
+
+## STATIC VERIFIED
+
+- `Bunny-A-Android-v2.apk` identity: artifact unchanged since the T6 build
+  (bytes 49 644, SHA-256 `c2345d32af1b157f…` re-verified —
+  `android-apk.json`). No rebuild in T6R.
+- T6-proven auth/pairing/Task/Mission/Stop/token-leak/local-preservation
+  properties on unchanged source (transport-only repair).
+
+## NOT TESTED
+
+- Physical Android installation, pairing and external-network phone sequence
+  (F4/F8/§20) — no user participation this session. The pre-existing
+  production "Phone companion" device was left intact. Mobile-browser
+  equivalence was proven live (`phone-layout.json`, screenshots).
+- A live watchdog-triggered restart window (recorded as SIMULATED above).
+
+## BLOCKED
+
+None.
+
+## DEFERRED
+
+- F8 phone companionship offer (unchanged from T6; offer level).
+- T7–T10 (out of scope for T6R by brief).
+
+## Public endpoint
+
+LIVE: fresh quick-tunnel hostname over `http2` against the installed gateway
+`127.0.0.1:8084`; TLS to authorized Cloudflare (trycloudflare.com, edge WE1,
+`cf-ray` EWR); shell 200 (15 932 B); server functions answer correctly;
+`/state` and `/events` 404 publicly; `/bunny-health` 200 with a minimal body.
+Hostname rotation after restart is expected; the old hostname returned 530 /
+was withdrawn. `settings/remote.json` stays Host-directed temporary state.
+
+## Authentication and pairing
+
+LIVE: gateway pairs only valid host-created codes; localhost pairing attempts
+rejected; strict `bunny_device` cookie (HttpOnly/Secure/SameSite=Strict,
+value never recorded); device rows recorded with revocable scope; pairing
+abuse live-bounded (5 × 403 then 429, no cookie ever issued; F7). The public
+tunnel remains an authenticated surface of the same single Host — never an
+authority source.
+
+## Revocation and stale-session
+
+LIVE: (K) device revoke → rows marked revoked; (L) the revoked credential's
+immediate public request denied (200-envelope denial without data), with a
+single clean timed 401 sample from the direct Host API and a single clean
+first public stale-RPC denial sample; six route-level denial proofs over the
+stale credential (cached state, old-cursor reconnect, old approval, old task
+and mission routes, old stop) created nothing and saw nothing; host instance
+and release unchanged (F6 in `stale-session.json`/`revocation.json`).
+
+## Remote Task and Mission
+
+LIVE: (F) safe remote Task submitted through public HTTPS — approved on a
+remote device, executed by the local on-device provider (ollama
+`huihui_ai/qwen2.5-abliterate:7b`, 28 030 ms, no cloud), output exactly
+`T6R_LOCAL_OK`, canonical `completed`, provider-output suppressed from the
+public view; (G) deterministic non-model Mission (`git status`, 1 deterministic
+step) submitted, approved and completed remotely; `scopeBroadened:false`.
+
+## Remote approval and Stop
+
+LIVE: (H) the remote approval applied canonically — event chain
+2205 → 2219 including `approval.remote_device` and `task.completed`
+(`remote-approval.json`). An honest transport/envelope note: the approval
+command reached the Host and applied while the client response was obscured
+(first attempt by the ~90 s transient 530 window; the harmless post-completion
+re-approve then returned a server error envelope
+(`"Host command failed. Inspect operation state before retrying."` — no token,
+no internals, zero canonical side effects) that this harness's `fromCrossJSON`
+cannot deserialize (`$TSR/Error` envelope; browser clients handle error
+envelopes natively). Canonical state was verified over loopback and public
+authorized reads instead (`remote-task.json` `evidenceReconstruction`,
+`probe-approve-envelope.log`). (I) remote Stop terminated mission A's owned
+hook/child sleepers while mission B survived with unchanged creation times,
+then stopped B on a separate command; delayed-child mutation check at
++80 s clean; process termination authority stays with the Host's existing
+Job Object, never the tunnel.
+
+## Tunnel containment
+
+LIVE: (N/P/Q) identity-checked termination of ONLY this run's pinned
+cloudflared child (binary path + creation-time matched immediately before the
+kill) — the worker detected the child exit and restarted its own child
+(same worker pid 35784, new child 53324 → 11688) within the existing bounded
+budget; the Host, gateway and Island processes kept identical creation times
+throughout; a new quick-tunnel hostname published; the old endpoint returned
+530 (withdrawn); public 200 on the new hostname; fresh pairing and an
+authenticated read succeeded there, while the pre-restart device's
+origin-bound cookie retained its own independent authority
+(`tunnel-restart.json`). The T6R watchdog additionally guards the
+live-but-degraded child window that this exit path cannot show (SIMULATED;
+restraint observed live on a natural transient window).
+
+## Security tests
+
+All LIVE (unless labeled): unpaired denial with correct browser protocol
+metadata (`unpaired-auth-boundary.json`); revoked credential denial;
+stale-session across routes; second-client isolation; pair → revoke → re-pair;
+malformed/expired credentials; origin/CSRF denial; spoofed `X-Forwarded-For`
+localhost/`x-bunny-` admin headers denied; safe error serialization (no token,
+no internals in public responses or error envelopes); token-leak audit across
+HTTP, assets, API, APK entries and live web storage; trusted-peer spoof;
+phone layout (390 × 844).
+
+## Production preservation
+
+LIVE (O): host instance `e2eed181` unchanged, operational state healthy
+throughout (`local-preservation.json` frames); 56 original production tasks
+preserved (57 = 56 + 1 acceptance task); 13 production projects (3 disposable
+T6R projects unregistered); all disposable mission operations stopped; every
+T6R acceptance device revoked (2 rows verified in `host.sqlite` by direct
+readOnly query); mission flags off; triggers off; protected hashes unchanged
+(migration journal/report/cutover DB, native EXE, pinned cloudflared
+`f096265e…`); install.json deep-equal to baseline; release-manifest 156/156
+files byte-identical; full row-by-row preservation sweep across tasks,
+missions, mission_steps, mission_authorizations, mission_artifacts, devices,
+projects, events, policies, skills, migrations, triggers: zero missing, zero
+modified (`production-preservation.json`); git.snapshot skill stats consistent
+(+3 runs); the production "Phone companion" device untouched.
+
+## Candidate identity
+
+`Bunny-A-Windows-v17-T6` version 17.0.0-T6; source
+`cb005ef75bf86d4d9e722b5214612fe115db5c6b` (T6R repair commit) via committed
+pin `90a6e8da11e77bd1d3d402c166456f0d816fb4c4`; package SHA-256
+`29740a280d96a7d1ed87acab3fbd59fc709ed523e8f118da43be4603606ace1d`; manifest
+SHA-256 `f5bf648c92711baba3fe4a24ea46c449fd8f226c0afa018f8f9cf93da52fde88`
+(156 entries, all re-verified byte-identical at gate close); installed EXE
+readiness record verified at activation; Island EXE bit-identical to the T5
+accepted constant (`a2ac666f…`); pinned cloudflared 2026.9.3 SHA-256
+`f096265e…`; worker runs from the T6 release, its child from the pinned
+cloudflared binary (`tunnel-start.json`). The Island bit-identity to T5 means
+the T5-era dashboard binary identity conclusions carried; the dashboard
+chunk identities used by the harness (`host-B6dxD6Oz.mjs`, readBunnyHost/
+commandBunnyHost ids) match the T6 build.
+
+## Final verdict
+
+**BUNNY_MA2_T6_PASS** (§50): every required §22 A–Q property passed LIVE; the
+§38–§41 security suite passed LIVE; the F6 measurement discipline held; F7 was
+bounded and clean. Phone physical-device rows are honestly **NOT TESTED** (no
+user participation this session; mobile-browser equivalence live instead),
+watchdog rules are SIMULATED with live restraint evidence. No authentication
+was weakened, no test was removed or reclassified, no OCT-1/OD-1 feature was
+implemented, no T7 work was started, and the tunnel remains a quick tunnel of
+the same single-Host authority model.

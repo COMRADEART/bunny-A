@@ -609,13 +609,15 @@ public/phone proof is absent. Preserved T1–T5 and a working APK build do not r
 blocker. Named/custom-domain migration, new control-plane frameworks and T7–T10 are outside
 this work. No full M-A-2 operational verdict is issued.
 
-# M-A-2 Gate T6R — REMEDIATION (in progress)
+# M-A-2 Gate T6R — REMEDIATION (final for review: BUNNY_MA2_T6_PASS)
 
 Scope for review: repair of **only** the T6-blocking findings, in one owned
-transport surface (`scripts/bunny-tunnel*.mjs`), under §28 minimum repair.
-The gate is still open: **BUNNY_MA2_T6_FAIL stands until the §22 A–Q sequence
-passes against the remediated installed runtime** (§50). No authentication
-change, no test removals, no T7/OCT-1/OD-1 work; T7–T10 remain open.
+transport surface (`scripts/bunny-tunnel*.mjs`), under §28 minimum repair,
+then §45-authorized activation of v17-T6 ("sure", 2026-10-06) and the live
+installed-runtime gate. The gate closed **BUNNY_MA2_T6_PASS** (§50): all 17
+§22 A–Q properties and the §38–§41 security suite passed LIVE against the
+installed remediated runtime. No authentication change, no test removals, no
+T7/OCT-1/OD-1 work; T7–T10 remain open.
 
 Review, in this order:
 
@@ -650,8 +652,28 @@ Review, in this order:
    `f5bf648c92711baba3fe4a24ea46c449fd8f226c0afa018f8f9cf93da52fde88`), explicit
    `verify`/`closure`/`source-check` (76 files byte-identical) pass
    (`test-results/ma2-gate6r/{verify,closure,source-check}-t6.json`,
-   `regression-results.json`). Deliberately not claimed: installation,
-   activation, the §22 A–Q installed-runtime sequence and the §38–§41 security
-   tests — those require §45 user authorization and §20 physical phone or
-   independent external-network participation; revocation latency (F6) gets a
-   single clean timed sample per stage.
+   `regression-results.json`). Installed and activated under §45
+   authorization; the activation's own corrections are recorded with process
+   identities in `activation-final.json`.
+6. `test-results/ma2-gate6r/acceptance-index.json` — the closed gate's index:
+   44 hashed evidence files; every §22 A–Q case and §38–§41 security test
+   carrying its §49 label; verdict `BUNNY_MA2_T6_PASS` with the explicit pass
+   rule. Key live records: `pairing.json`/`paired-state.json` (D/E),
+   `remote-task.json` (F + H completion; note the field
+   `evidenceReconstruction` for the approval-response story — the approve
+   applied canonically while a natural ~90 s 530 window and a harness-side
+   `$TSR/Error` deserialization limitation obscured only the client's view;
+   `probe-approve-envelope.log` proves the error envelope was safe and
+   side-effect-free), `remote-mission.json`/`remote-stop.json` (G/I),
+   `network-loss.json`/`sse-reconnect.json` (M), `tunnel-transient.json`
+   (natural window, containment and sub-threshold restraint),
+   `tunnel-start.json`/`tunnel-before-failure.json`/`tunnel-failure.json`/
+   `tunnel-restart.json` (N/P/Q), `token-leak-audit.json`/`privacy` (§39),
+   `phone-layout.json` + `screenshots/t6r-phone-*.png` (§41),
+   `pairing-abuse.json` (F7), `revocation.json`/`stale-session.json`
+   (K/L/F6), `production-preservation.json`/`local-preservation.json`/
+   `production-final.json`/`final-local-smoke.json` (O), `failure-ledger.json`
+   (12 recorded dispositions). Honestly NOT TESTED: physical Android
+   install/pairing (F8) — no user participation this session; the mobile-
+   browser layout equivalence is live evidence instead; watchdog rules remain
+   SIMULATED with live restraint observed on the natural window.

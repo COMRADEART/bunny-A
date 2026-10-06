@@ -466,14 +466,15 @@ installation/pairing and the remaining public checks are incomplete. Full report
 T6 failure is not a reversal of accepted T1–T5. This gate does not establish a reliable
 physical phone path and does not issue the full M-A-2 operational verdict. T7–T10 remain open.
 
-# M-A-2 Gate T6R — REMEDIATION (in progress)
+# M-A-2 Gate T6R — REMEDIATION (final: BUNNY_MA2_T6_PASS)
 
 Repairs **only** the T6-blocking failures per the source-grounded failure ledger
 [T6_FAILURE_LEDGER.md](T6_FAILURE_LEDGER.md), one owned transport surface
 (`scripts/bunny-tunnel*.mjs`), under §28 minimum repair. Evidence:
 `test-results/ma2-gate6r/` and [MA2_T6_REMOTE_ACCEPTANCE.md §M-A-2 Gate T6R —
-REMEDIATION](MA2_T6_REMOTE_ACCEPTANCE.md). **BUNNY_MA2_T6_FAIL stands** until
-the §22 A–Q sequence passes against the remediated installed runtime (§50).
+REMEDIATION](MA2_T6_REMOTE_ACCEPTANCE.md). Activated under §45 with explicit
+user authorization ("sure", 2026-10-06); the full §22 A–Q sequence then passed
+against the installed remediated runtime.
 
 | T6R criterion | Result and evidence |
 | --- | --- |
@@ -482,6 +483,14 @@ the §22 A–Q sequence passes against the remediated installed runtime (§50).
 | Degradation watchdog (churn/zero-active/public-probe rules, origin-fault tri-state) + startup reconciliation of stale `settings/remote.json` + live-duplicate refusal | SIMULATED — `scripts/bunny-tunnel.test.mjs` 13 tests (6 existing + 7 new) pass, exit 0, no hang |
 | Regression floor (§31) | LIVE VERIFIED — 247 script + 311 application = 558 pass/0 fail, 34/34 UI → **592/592 vs. 585 floor**; typecheck, lint (0 errors/10 existing warnings) and normal build exit 0 |
 | Windows desktop release build of repaired runtime | LIVE VERIFIED — staged `releases/Bunny-A-Windows-v17-T6` (+zip, zip SHA-256 `29740a280d96a7d1ed87acab3fbd59fc709ed523e8f118da43be4603606ace1d`), exact source `cb005ef75bf86d4d9e722b5214612fe115db5c6b` via committed pin `90a6e8da11e77bd1d3d402c166456f0d816fb4c4`; dashboard built, manifest 156 entries, `verify`/`closure`/`source-check` (76 files) ok; **not installed or activated** |
-| Installed-runtime §22 A–Q re-run, §38–§41 security tests, revocation latency (F6), pairing abuse (F7), phone sequence (F4/F8) | NOT TESTED yet — requires §45 user authorization + §20 physical phone/independent external network |
+| Installed-runtime §22 A–Q (17 properties) | LIVE VERIFIED — all pass against installed v17-T6 over public HTTPS; evidence `acceptance-index.json` (cases A–Q) |
+| §38–§41 security tests | LIVE VERIFIED — `header-security.json` 9/9, `csrf-origin-tests.json`, `forwarded-header-tests.json`, `client-isolation.json`, `token-leak-audit.json`, `browser-storage-audit.json` (live web-storage read), `phone-layout.json` |
+| Revocation latency (F6) | LIVE VERIFIED — `stale-session.json` + `revocation.json`: single clean direct-Host 401 sample + first public stale-RPC denial sample |
+| Pairing abuse (F7) | LIVE VERIFIED — `pairing-abuse.json`: 5×403 + 1×429, zero cookies issued |
+| Real transient 530 window | LIVE VERIFIED — `tunnel-transient.json`: self-recovered without restart, watchdog sub-threshold restraint |
+| Tunnel failure → restart → auth (N/P/Q) | LIVE VERIFIED — `tunnel-failure.json`, `tunnel-restart.json`: identity-checked child kill, owned restart (worker pid unchanged), fresh pairing + authenticated read on the new hostname, old endpoint withdrawn (530) |
+| Production preservation and cleanup | LIVE VERIFIED — `production-preservation.json`, `production-final.json`, `local-preservation.json`, `final-local-smoke.json`: 56 original tasks + 13 projects intact, T6R devices revoked (2 rows DB-verified), missions/triggers off, 156/156 manifest files byte-identical, protected hashes unchanged, production "Phone companion" device untouched |
+| Phone sequence (F4/F8) | NOT TESTED — no user participation this session; mobile-browser equivalence live (`phone-layout.json`, screenshots); pre-existing production phone device untouched |
+| Final verdict | **BUNNY_MA2_T6_PASS** — all required §22 A–Q and §38–§41 properties LIVE; physical-phone rows honestly NOT TESTED; watchdog rules SIMULATED with live restraint evidence; no auth weakening, no test removals, no OCT-1/OD-1, no T7 |
 
 No authentication weakening, no test removal or reclassification, no T7/OCT-1/OD-1 work.

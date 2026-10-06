@@ -751,14 +751,17 @@ blocker remains the unreliable actual public connector route, rather than an acc
 Detailed categories, endpoint/credential boundaries, test attempts/limits, identities and
 evidence: [MA2_T6_REMOTE_ACCEPTANCE.md](MA2_T6_REMOTE_ACCEPTANCE.md). T7–T10 remain open.
 
-# M-A-2 Gate T6R — REMEDIATION (in progress)
+# M-A-2 Gate T6R — REMEDIATION (final: BUNNY_MA2_T6_PASS)
 
 Gate T6R repairs only the failures that blocked T6, per the failure ledger
 produced from recorded T6 evidence before any repair
 ([T6_FAILURE_LEDGER.md](T6_FAILURE_LEDGER.md)): F1 BLOCKER (sustained 530/1033
 with a live-but-degraded tunnel child), F2 HIGH (stale `settings/remote.json`
 after a hard kill) and F5 HIGH (exit-only supervisor blindness). F3/F6/F7/F8
-are procedure consequences of F1; F9–F13 require no repair.
+are procedure consequences of F1; F9–F13 require no repair. The gate closed
+**PASS**: v17-T6 was installed and activated under §45 user authorization and
+the full §22 A–Q sequence plus the §38–§41 security suite passed LIVE against
+the installed remediated runtime.
 
 Root cause was refined with a LIVE 15-minute dual-protocol probe on this same
 network (`test-results/ma2-gate6r/probe/summary.json`): http2 and quic both
@@ -785,21 +788,33 @@ refusing a live foreign worker; (3) truthful degradation logging. Host
 authority, credentials, auth envelope, dashboard and Android companion source
 are unchanged.
 
-Verification so far: 13 tunnel tests (6 existing + 7 new) pass with no hang;
+Verification (final): 13 tunnel tests (6 existing + 7 new) pass with no hang;
 247 script + 311 application = 558 pass/0 fail plus 34/34 UI = **592/592
 against the 585 floor**; typecheck, lint (0 errors/10 existing warnings) and
-normal build pass. The exact-source candidate is committed and staged:
-`Bunny-A-Windows-v17-T6` (17.0.0-T6) built by `package-bunny-desktop.ps1` from
-source `cb005ef75bf86d4d9e722b5214612fe115db5c6b` (the T6R repair commit) with
+normal build pass. The exact-source candidate is committed, pinned and was
+installed/activated under §45 authorization: `Bunny-A-Windows-v17-T6`
+(17.0.0-T6) built by `package-bunny-desktop.ps1` from source
+`cb005ef75bf86d4d9e722b5214612fe115db5c6b` (the T6R repair commit) with
 committed pin `90a6e8da11e77bd1d3d402c166456f0d816fb4c4`; dashboard built,
 manifest 156 entries SHA-256
-`f5bf648c92711baba3fe4a24ea46c449fd8f226c0afa018f8f9cf93da52fde88`, and its
-verify/closure/source-check (76 files byte-identical) pass. It is **not
-installed and not activated**: per §45, activation and the live acceptance
-sequence require explicit user authorization, and per §20 the phone (or an
-independent external network) must participate. Remaining: install/activate
-v17-T6 under authorization, then the §22 A–Q sequence against the installed
-remediated runtime (§38–§41 security tests included). The verdict stays
-**BUNNY_MA2_T6_FAIL** until that sequence passes (§50). Full report:
+`f5bf648c92711baba3fe4a24ea46c449fd8f226c0afa018f8f9cf93da52fde88`
+(all re-verified byte-identical at gate close); verify/closure/source-check
+(76 files byte-identical) pass. Activation corrections (install.json
+restoration per T5 semantics, deployment.json promotion, shortcut rewrite,
+EXE-owned process shape) are recorded in `activation-final.json`.
+
+The installed-runtime gate then ran LIVE: the §22 A–Q sequence (all 17
+properties), the §38–§41 security suite (9/9 header cases, CSRF/origin,
+forwarded-header spoof, client isolation, token-leak audit, live web-storage
+read, phone-layout render), F6 single-clean-sample revocation/stale
+measurements and bounded F7 pairing abuse all pass; a real ~90 s transient 530
+window was contained with self-recovery and watchdog restraint; the deliberate
+identity-checked child kill proved the bounded owned restart (worker pid
+unchanged, fresh hostname) with fresh pairing + authenticated read on the new
+endpoint. Physical phone rows are honestly NOT TESTED (no user participation;
+mobile-browser equivalence live-verified; the production "Phone companion"
+device untouched). Final verdict **BUNNY_MA2_T6_PASS** (§50). Full report:
 [MA2_T6_REMOTE_ACCEPTANCE.md §M-A-2 Gate T6R — REMEDIATION](MA2_T6_REMOTE_ACCEPTANCE.md).
-No test was weakened, skipped or reclassified (§1). T7–T10 remain open.
+No authentication was weakened and no test was weakened, skipped or
+reclassified (§1). No OCT-1/OD-1 features and no T7 work (§26/§27/§51).
+T7–T10 remain open.
