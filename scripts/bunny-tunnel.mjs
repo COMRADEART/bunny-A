@@ -6,7 +6,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { readyTunnelAddress, loopbackTunnelOrigin } from "./bunny-tunnel-state.mjs";
+import { readyTunnelAddress, loopbackTunnelOrigin, startupTunnelDecision } from "./bunny-tunnel-state.mjs";
 import { tunnelPaths, assertOutsideGit } from "./bunny-tunnel-paths.mjs";
 import { execFileSync } from "node:child_process";
 import { HostContainment } from "../src/lib/bunny-host/failure.server.ts";
@@ -63,7 +63,45 @@ async function unavailable(exit) {
   if(existsSync(remotePath) && JSON.parse(readFileSync(remotePath,"utf8")).tunnelPid===process.pid) unlinkSync(remotePath);
   console.log(`Tunnel exited (${exit}).`);
 }
+function pidAlive(pid) {
+  try{process.kill(pid,0);return true;}catch(error){return error.code!=="ESRCH";}
+}
+function parseStateFile(path) {
+  if(!existsSync(path)) return null;
+  try{return JSON.parse(readFileSync(path,"utf8"));}catch{return null;}
+}
+// remote.json is owned by exactly one worker; a residue proves the recording
+// worker died without running its cleanup (hard kill) and must not keep the
+// Host pointing at a dead public address. A live foreign worker refuses us.
+await (async function reconcileRecordedRemote() {
+  const remote=parseStateFile(paths.remote),recorded=parseStateFile(paths.process);
+  const decision=startupTunnelDecision({remote,recorded,pid:process.pid,pidAlive});
+  if(decision.action==="refuse") throw new Error(`Remote transport is already managed by a live tunnel worker (pid ${decision.recordedPid}).`);
+  if(decision.action!=="reconcile") return;
+  if(existsSync(paths.remote)) unlinkSync(paths.remote);
+  console.log(`Reconciled stale remote state (${decision.reason ?? "publication-without-record"}).`);
+  try{await configure(false);}catch{console.log("Host remote reconfiguration deferred; the stale publication is cleared locally.");}
+})();
+const publishedUrl=()=>{
+  const remote=parseStateFile(paths.remote);
+  return remote?.tunnelPid===process.pid ? remote.url ?? null : null;
+};
+async function probeHealth(origin) {
+  try{const response=await fetch(`${origin}/bunny-health`,{signal:AbortSignal.timeout(8000)});return response.status;}catch{return 0;}
+}
+const health={
+  async probe() {
+    const url=publishedUrl();
+    if(!url) return null;
+    const direct=await probeHealth(target);
+    if(direct!==200) return {outcome:"origin"};
+    const served=await probeHealth(url);
+    return served===200 ? {outcome:"ok"} : {outcome:"public"};
+  },
+  onDegraded:(event)=>console.log(`Tunnel degraded (${event.reason}; ${event.activeCount} active edge connections, ${event.registeredTotal} registrations). Restarting the owned child; the Host stays independent.`),
+};
 for(const signal of ["SIGINT","SIGTERM"]) process.once(signal,()=>controller.abort());
-const result=await superviseTunnel({start,output:chunk=>receive(chunk),unavailable,signal:controller.signal,containment});
+const result=await superviseTunnel({start,output:chunk=>receive(chunk),unavailable,signal:controller.signal,containment,health});
 removeHandlers();
+if(result.degradations?.length) console.log(`Tunnel health: ${result.degradations.length} degradation(s) across ${result.attempts} attempt(s).`);
 if(result.recoveryRequired) {console.error("Remote transport unavailable after three bounded attempts; local Host remains independent. Explicit relaunch required.");process.exitCode=2;}
