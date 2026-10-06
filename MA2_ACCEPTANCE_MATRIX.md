@@ -528,3 +528,43 @@ changed, factory idle, floor 592 unchanged. Full report:
 | Error surface (§37) | LIVE VERIFIED — `startup-errors.json`: all runtime logs scanned; 1 post-signin finding = the labeled harness-probe refusal (expected; Host correctly enforced hard constraints); host/gateway/tunnel error logs empty; no unresolved BLOCKER/HIGH |
 | Legacy audit refresh (§20) | LIVE VERIFIED — `legacy-startup-paths-refresh.json`: Startup folder + HKCU Run unchanged and reviewed (Bunny has no HKCU Run entry; unrelated apps only); nothing auto-deleted |
 | T7 verdict | **BUNNY_MA2_T7_PASS** — acceptance-only; no code changes (floor 592 stands, §48); no test removals; no v17-T7 manufactured; **NEXT = T8 pinned rollback, not begun (§63)**; BUNNY_MA2_OPERATIONAL_PASS NOT claimed (§62) |
+
+# M-A-2 Gate T8
+
+**BUNNY_MA2_T8_PASS.** A REAL production rollback from `Bunny-A-Windows-v17-T6` to the
+nearest previously accepted ACTIVATED release `Bunny-A-Windows-v17-T5` (switch material =
+the immutable T5 pin bundle created at T6R activation; `install.json` LAST = commit point),
+then a REAL forward recovery back to `Bunny-A-Windows-v17-T6` whose config bytes finished
+**byte-identical** to the pre-rollback production bytes — with ZERO git
+checkout/switch/reset/restore, zero database rollback (§49 never invoked), zero stale-PID
+authority (fresh CIM identity corroboration on every stop; kill never by name), zero
+privilege expansion, zero silent state rollback (protected-row ledgers PRESERVED in both
+directions B0→B1 and B0→B2; every appended row enumerated as T8's own acceptance records).
+The §48 emergency path was also exercised live and byte-verified. The remote surface was
+reconciled to the accepted pre-rollback shape under durable consent (public health 200,
+unpaired denial 403), and Windows sign-in was NOT left pinned to the rollback target (§46).
+Acceptance-only gate: no product code changed, factory idle, floor 592 unchanged. Full
+report: [MA2_T8_ROLLBACK_RECOVERY_ACCEPTANCE.md](MA2_T8_ROLLBACK_RECOVERY_ACCEPTANCE.md).
+Evidence: `test-results/ma2-gate8/`.
+
+| T8 criterion | Result and evidence under `test-results/ma2-gate8/` |
+| --- | --- |
+| Rollback-target selection (§5) | LIVE VERIFIED — `rollback-target.json`: T5 = nearest accepted ACTIVATED production; v16 ineligible (pre- layout-2), T2/T4 staged-only (never production), T3 older than T5; selection cross-checks against `accepted-release-ledger.json` |
+| Target validation (§15–§18) | LIVE VERIFIED — `validateTarget` on BOTH targets before any mutation: live manifest SHA match, identity match, outside-git ancestor walk, no reparse points; idle-check shape-aware on `/state`; B0 ledger over 23 tables (`db/protected-row-ledger-b0-prod.json`) |
+| Owned stop of production (§20/§29) | LIVE VERIFIED — `rollback/stops-t6.json`: gateway 55108 → host 11772 → bootstrap 17344, child-first, role+entry corroborated on fresh CIM pids, never by name; sentinel 6924 preserved through every stop/switch/boot of the gate (§22/§23) |
+| Atomic switch to T5 (§25) | LIVE VERIFIED — `rollback/switch-t5.json`: lnk → deployment.json → install.json LAST; after-bytes = exact T5 pin-bundle bytes (`ba356261…`/`81435cc4…`/`ca7f5616…`) |
+| Real restart into T5 + identity (§27) | LIVE VERIFIED — `rollback/boot-t5.json`: bootstrap 38084, Host 19540, gateway 53952; T5 identity `17.0.0-T5`/`eb96c053…`/manifest `f0531f8d…` in the gateway `/bunny-health` release block; host process entry `Bunny-Host.mjs` on the T5 runtime node |
+| State preservation while rolled back (§21/§22/§28) | LIVE VERIFIED — `rollback/state-checks-t5.json` + `db/b0-to-b1-diff.json` (**PRESERVED**, 2 appended / 0 unexpected / 0 modified / 0 missing); devices 15/14 revoked/1 active; token accepted; no re-onboarding; instanceId minted per boot (roundtrip legs 1–4 on one install) |
+| Launcher restart while rolled back (§30) | LIVE VERIFIED — `rollback/restart-t5.json`: same pinned T5 target, no repo dependency, Host 19540→26552 / bootstrap 38084→36092, exactly one of each process, T5 config unchanged, sentinel alive |
+| Local deterministic task while rolled back (§34) | LIVE VERIFIED — `rollback/smoke-t5.json`: ollama `huihui_ai/qwen2.5-abliterate:7b`, fresh approval, COMPLETED with exact marker `T8_T5_LOCAL_OK` (task `0b4964b5-…`); no cloud provider contacted |
+| Remote while rolled back (§33) | LIVE VERIFIED — `rollback/remote-during-rollback.json`: truthfully NO tunnel while unattended (consent-first bootstrap chain); pre-stop worker record stale/dead; no authentication weakened |
+| §48 emergency path exercise | LIVE VERIFIED — `rollback/boot-t6-pre70.json` (runTrail runs 4–6b): restore current accepted config from the immutable T6 recovery bundle (install.json LAST) + boot v17-T6 + health verified, byte-verified, recorded with its own trail |
+| Forward precheck (§36) | LIVE VERIFIED — `rollback/forward-precheck.json`: `Bunny-Release-Info.ps1` integrity `ok` (156 files, 0 missing/changed/extra) — T6 files NOT assumed unchanged; `validateTarget` re-run |
+| Forward owned stop + switch (§37) | LIVE VERIFIED — `rollback/stops-t5.json` + `rollback/switch-t6.json`: gateway 22480 → host 26552 → bootstrap 36092 corroborated; switch back to T6 with **byte parity** (`byteParity: true`) to the pre-rollback production bytes |
+| Forward restart + identity (§37c/§38) | LIVE VERIFIED — `rollback/boot-t6.json` + `forward-live-summary.json`: bootstrap 40712, Host 35792, gateway 17040; identity = accepted T6 record exactly incl. dashboard asset manifest `c78fc00a…` |
+| Published URL reconciliation + public health + unpaired denial (§45/§47) | LIVE VERIFIED — `rollback/tunnel-revalidation-t6.json`: release's own consented launcher invocation → `remote.started` fresh worker 45724 (+ cloudflared 49052) under the T6 folder; NO duplicate host/gateway/island spawned (already-running chain recorded); fresh hostname served by the fresh worker; public `/bunny-health` 200 (reduced identity shape by design); unpaired fetch 403; `tokenLeaked: false`; hostname trail recorded; stale record reconciled |
+| Protected rows (§39/§40) | LIVE VERIFIED — `db/b0-to-b2-diff.json` (**PRESERVED**, 22 appended / 0 unexpected / 0 modified / 0 missing) + `db/appended-rows-b1-b2.json`: 1 task (the §34 smoke task) + 1 outcome + 20 events (task stream + §41 discovery probes) — only T8's own acceptance records |
+| Focused revalidations (§41–§47) | LIVE VERIFIED — `rollback/revalidations.json`: T2 discover (codex ready/VALIDATED, no secret recorded), T3 boundary (recovered boot), T4 ownership (both corroborated production stops + §55/§56 suite), T5 dashboard assets, T6 remote surfaces (gateway 200, live origin), T7 startup (lnk = pre-rollback T6 bytes `a7a3e942…` — sign-in NOT pinned to T5, §46); final census exactly 1+1+1+1(+1) |
+| Security / §54–§58 attack tests | LIVE VERIFIED — `security/attack-tests.json` (`okAll`): target refusals t54a–t54f incl. a REAL inside-git refusal; saved-pid refusals t55a–t55e (dead pid, executable-changed, role mismatch, entry mismatch, sentinel role); tampered content/manifest boot refusals t56a/b by the installed launcher itself; sentinel preserved then owned-ended; `security/rollback-controller-audit.json`: installed `install-bunny-release.ps1 -Rollback` executed VERBATIM against disposable roots REFUSED at its guard (restoredNothing, production untouched) |
+| §52 floor | ACCEPTANCE-ONLY — no product/released/test-suite change (floor 592 stands from T7 evidence; no full-suite re-run required by the §52 rule); in-gate acceptance-tooling repairs are all recorded in the T8 failure ledger; no v17-T8 manufactured |
+| T8 verdict | **BUNNY_MA2_T8_PASS** — evidence root `test-results/ma2-gate8/`, hashed index `evidence/index.json` (92 files, `tokenLeaked: false`); **NEXT = T9 (desktop approval policy), not begun (§68)**; BUNNY_MA2_OPERATIONAL_PASS NOT claimed (§67) |

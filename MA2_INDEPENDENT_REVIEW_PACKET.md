@@ -730,3 +730,68 @@ residual), both of which are failure-ledger entries rather than hidden defects.
 of each process, canonical state intact, fresh provider/Codex recovery, security
 boundaries intact, zero code changes. BUNNY_MA2_OPERATIONAL_PASS is NOT claimed (§62);
 **T8 pinned rollback is NEXT and must not be begun from T7's close** (§63).
+
+# M-A-2 Gate T8 — REVIEW PACKET (final: BUNNY_MA2_T8_PASS)
+
+Gate T8 is acceptance-only: **no product code, release or test file changed** (floor 592
+stands), no v17-T8 was manufactured, and the final production release is still the accepted
+`Bunny-A-Windows-v17-T6`. The hard-to-fake claims an independent reviewer should press:
+the config switches really happened against the installed runtime (not simulated),
+`install.json` was really the LAST-committed file in both directions, and the final config
+bytes are byte-identical to the pre-rollback production bytes. All evidence under
+`test-results/ma2-gate8/` with a hashed index (`evidence/index.json`, 92 files).
+
+## What an independent reviewer should re-derive
+
+| T8 claim | Pointer and how to verify | Label |
+| --- | --- | --- |
+| Rollback target = nearest accepted ACTIVATED release (§5) | `rollback-target.json` + `accepted-release-ledger.json`: T5 activation history (2026-10-04T22:28:52Z → superseded by T6R 03:14:32Z), T2/T4 staged-only, v16 pre-layout-2, T3 non-nearest | LIVE VERIFIED |
+| Switch material immutability (§13/§36) | `rollback/recovery-bundle-t6/` (pre-rollback T6 bytes, SHA-asserted at every use) and the T5 pin bundle `C:\Users\allam\AppData\Local\Bunny-A\rollback\20261005-230352-b2e4e5f1` (created at T6R activation, never mutated; SHAs in `rollback/switch-t5.json`) | LIVE VERIFIED |
+| Real owned stops, never by name (§20/§29) | `rollback/stops-t6.json` + `stops-t5.json`: gateway → host → bootstrap child-first; EVERY stop's fresh-CIM identity shows role + exact entry path corroboration before `taskkill /PID /F /T` by explicit pid; sentinel pid recorded alive across every step (`restart-t5.json`, `sentinel-end.json`) | LIVE VERIFIED |
+| `install.json` LAST = commit point (§25/§37b) | `rollback/switch-t5.json` + `switch-t6.json` (`order` arrays record lnk → deployment.json → install.json LAST, with after-SHA sets equal to the bundle bytes). To falsify the claim, re-compute the after-SHA values from disk against the bundles | LIVE VERIFIED |
+| Boot identity in BOTH directions (§27/§37c/§38) | `rollback/boot-t5.json` (T5 identity `eb96c053…`/manifest `f0531f8d…`) and `rollback/boot-t6.json` (T6 identity `cb005ef7…`/manifest `f5bf648c…` + dashboard `c78fc00a…`), both verified via the gateway `/bunny-health` release block + the host process entry; cross-checked with `rollback-target.json`/`forward-target.json`/accepted-release ledger | LIVE VERIFIED |
+| Byte parity of the forward switch | `rollback/switch-t6.json` `byteParity: true` (after-SHAs vs the pre-rollback preflight/recovery-bundle values in `rollback/recovery-prep.json`) | LIVE VERIFIED |
+| NO database rollback, protected rows preserved (§9/§10/§39/§40) | `db/b0-to-b1-diff.json` + `b0-to-b2-diff.json` (verdicts PRESERVED) + `appended-rows-b1-b2.json` (22 rows = 1 smoke task + 1 outcome + 20 events, each identified; append-only tables); §49 DB restore never invoked | LIVE VERIFIED |
+| Zero git in recovery (§14) | `security/attack-tests.json` `t54f` (real inside-git target REFUSED by ancestor walk); no git-mutation command exists in any gate tooling; reviewer can diff `git log` across the gate-window — only gate-close doc commits appear | LIVE VERIFIED |
+| Rollback-leg runtime facts (§28/§30/§34/§33) | `rollback/state-checks-t5.json` (devices 15/14/1, no re-onboarding), `restart-t5.json` (restart on T5 with no repo dependency, pids fresh, T5 config unchanged), `smoke-t5.json` (local ollama task COMPLETED with exact marker + fresh approval), `remote-during-rollback.json` (NO tunnel while unattended; stale/dead pre-stop record recorded truthfully) | LIVE VERIFIED |
+| §48 emergency path exercised | `rollback/boot-t6-pre70.json` + its `runTrail`: mid-gate crash → emergency restore from the immutable recovery bundle → byte-verified T6 config + healthy boot, BEFORE the authorized forward run resumed | LIVE VERIFIED (unplanned, recorded honestly) |
+| Remote reconciliation (§45/§47) | `rollback/tunnel-revalidation-t6.json` + `state/logs/release-launch.log` (13:53:25Z `remote.started` pid 45724; already-running chain for host/gateway/island = NO duplicates); public health 200 (reduced identity payload — by-design shape, cf. T6R A–Q), unpaired denial 403; hostname trail `christina-…` → null → `redeem-yeah-…` | LIVE VERIFIED |
+| Sign-in pin (§46) | `rollback/revalidations.json` `T7startup`: lnk SHA-256 = pre-rollback T6 value `a7a3e942…` (WScript facts recorded) | LIVE VERIFIED |
+| Refusal suite + installed-tooling fail-safe (§54–§58, §15/§51) | `security/attack-tests.json` (t54a–f, t55a–e, t56a/b, sentinel control), `security/rollback-controller-audit.json` (installed `-Rollback` executed verbatim, refused at guard, `restoredNothing`) | LIVE VERIFIED |
+| Floor / no-manufacture (§52/§50/§59/§61) | `security/rollback-controller-audit.json` `productOrToolingCodeChanged: false`, `testFloor: 592`; no `releases/Bunny-A-Windows-v17-T8` exists; verify with `ls` of the releases root | STATIC VERIFIED + LIVE |
+| instanceId story (§21/§14) | `roundtrip/` legs 1–4: four per-boot instanceIds on one install — durable fidelity is the devices/tasks/settings rows + token acceptance, recorded as `instNote` in `boot-t5.json`/`boot-t6.json` | LIVE VERIFIED |
+
+## Residual questions an independent reviewer should press on (T8 failure ledger — harness-only)
+
+1. **L-T8-2 (the §45 crash).** Forward run 2 crashed while the reconciliation had already
+   succeeded: `state/runtime/tunnel-process.json` is `{pid,childPid,startedAt,exists}` with
+   the hostname in `remote.json`, and the completion loop keyed on the wrong shape. The gate
+   completed via a resume script that re-asserted every §36–§38 precondition live before
+   recording §45 from the live state + launch log. Reviewer guidance: the launch log
+   (13:53:25Z, launcherPid 51444) is the primary reconciliation evidence; the crash did not
+   affect any product state.
+2. **L-T8-1 / L-T8-5 (resume crashes/guards).** Controller return-key and guard-inversion
+   defects in harness scripts; in both cases the live identity asserts had passed, the live
+   state was re-read and preconditions were re-asserted; the final recorded evidence
+   consumes the corrected contracts.
+3. **L-T8-3 (instanceId misconception)** — resolved by the §21 roundtrip legs (per-boot
+   semantics by design); not a product concern.
+4. **L-T8-4 (§48 exercise outside the planned sequence)** — the emergency restore ran after
+   a crash trail; it is an honest unplanned exercise of the §48 machinery with its own
+   byte-verified trail, not a hidden manual fix.
+5. **L-T8-6 (PowerShell empty-args boot defect, pass 1)** — `Start-Process -ArgumentList`
+   rejects the empty-arguments Startup lnk (PS 5.1); the stop/switch had already completed,
+   the recovery booted through the fixed start path, and the defect is visible verbatim in
+   `tools/70-run.log`. Classification: harness-only.
+6. **Public health payload shows `release:null`** for the remote origin — by design: the
+   remote-origin health payload is the reduced `{app:"Bunny-A"}` shape (T6R A–Q record); the
+   full release block is only served to the local loopback Host header. The recovered
+   release identity is proven on the loopback endpoints + live processes at §38.
+
+## Verdict
+
+**BUNNY_MA2_T8_PASS** (§66) — real pinned rollback and real forward recovery outside git,
+byte-parity switches, both protected-row diffs PRESERVED, refusal suite live, final
+production restored to the accepted v17-T6 with the remote surface reconciled and Windows
+sign-in pinned to T6. BUNNY_MA2_OPERATIONAL_PASS is NOT claimed (§67); **NEXT = T9 (desktop
+approval policy), not begun** (§68).

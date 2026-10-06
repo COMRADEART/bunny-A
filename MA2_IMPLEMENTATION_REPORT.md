@@ -882,3 +882,67 @@ What T7 verified of the implementation (all LIVE VERIFIED, evidence
 
 Final verdict **BUNNY_MA2_T7_PASS** (§61); the full M-A-2 operational verdict is still NOT
 claimed (§62) and **NEXT = T8 pinned rollback, not begun** (§63).
+
+# Gate T8 — pinned rollback / real recovery (2026-10-06, BUNNY_MA2_T8_PASS)
+
+T8 was acceptance-only again: **no product code, release, or test-suite file changed** (the
+regression floor therefore stands unchanged at 592, §52 — no full-suite re-run was required
+and none was needed), no release was manufactured ("do NOT manufacture v17-T8" honored), and
+the gate exercised the existing installed rollback/recovery machinery for real in both
+directions (report:
+[MA2_T8_ROLLBACK_RECOVERY_ACCEPTANCE.md](MA2_T8_ROLLBACK_RECOVERY_ACCEPTANCE.md), evidence
+`test-results/ma2-gate8/`).
+
+What T8 verified of the implementation (all LIVE VERIFIED; full-run authorization by the
+workspace owner recorded before §22):
+
+- **Real rollback to the pinned prior release (§22–§33)**: the nearest previously accepted
+  ACTIVATED release was T5 (its T5-pin bundle — the `install.json`/`deployment.json`/Startup
+  shortcut bytes the installer saved at T6R activation — carried the entire switch). The
+  controller validated both targets against live config + the accepted-release ledger
+  (manifest SHA + identity + outside-git ancestor walk + reparse-point check), idle-checked
+  the live instance, spawned a protected sentinel that survived every stop/switch/boot of
+  the whole gate, owned-stopped the production chain child-first (gateway → host →
+  bootstrap, fresh CIM identities, never by name), and committed the T5 switch atomically
+  (shortcut → deployment.json → install.json LAST). T5 booted with its accepted identity
+  proven in the gateway release block, the same canonical state (devices 15/14 revoked/1
+  active, tasks 59, token accepted, no re-onboarding), one launcher restart while rolled
+  back, a passed local §34 smoke task (`T8_T5_LOCAL_OK` on ollama, fresh approval), and the
+  remote truth recorded (no tunnel while unattended — consent-first chain).
+- **Protected state PRESERVED in both directions (§9/§10/§11/§39/§40)**: B0→B1 and B0→B2
+  diffs over the 23-table protected-row ledger are verdict **PRESERVED** (only T8's own
+  acceptance records appended — 1 task + 1 outcome + 20 events, enumerated per row; 0
+  unexpected/modified/missing). NO database rollback was performed in either direction; the
+  §49 emergency DB restore was never invoked.
+- **§48 emergency machinery exercised for real**: a mid-gate crash trail left the config on
+  T5 with the chain stopped; the emergency restoration (immutable recovery bundle →
+  `install.json` LAST → boot v17-T6 → health) was live-executed and byte-verified
+  (`rollback/boot-t6-pre70.json`) before the authorized forward run resumed.
+- **Real forward recovery (§36–§38)**: T6 integrity was re-proven on the installed folder
+  (156 files, 0 missing/changed/extra — not assumed unchanged), the T5 chain was
+  owned-stopped again, and the T6 switch completed with **byte parity** — final config
+  bytes identical to the pre-rollback production bytes. T6 re-booted with the full accepted
+  identity (release/source/manifest + dashboard asset manifest) verified on the live
+  endpoints.
+- **Remote surface reconciled (§45/§47)**: the release's own consented launcher invocation
+  produced `remote.started` for a fresh worker (executable inside the T6 release folder)
+  with NO duplicate host/gateway/island spawned, a fresh public hostname serving 200 on
+  `/bunny-health`, unpaired denial 403, and a recorded hostname trail
+  (preRollback → null-while-rolled-back → postRecovery). Windows sign-in was NOT left
+  pinned to the rollback target — the Startup shortcut finished on the exact pre-rollback
+  T6 bytes (§46).
+- **T7 residual L-T7-2 resolved**: T8's every bootstrap-chain boot (T5 and T6) emitted no
+  remote event while both direct launcher invocations produced `remote.started` — the
+  bootstrap chain runs the launcher remote-disabled (`-NoRemote`); unattended boots publish
+  no public URL by installed design; consent-first behavior preserved, nothing weakened,
+  no product change needed.
+- **Security refusal suite live (§54–§58, §15/§51)**: target validations refused
+  not-in-config / SHA-mismatch / missing-folder / inside-git targets; saved-pid authority
+  refused dead/reused/role-mismatched/entry-mismatched identities; the installed launcher
+  itself refused tampered content and manifests; and the installed
+  `install-bunny-release.ps1 -Rollback` fail-safe refused at its guard when executed
+  verbatim against disposable roots (restoredNothing). Zero git
+  checkout/switch/reset/restore anywhere; zero by-name kills; zero privilege expansion.
+
+Final verdict **BUNNY_MA2_T8_PASS** (§66); BUNNY_MA2_OPERATIONAL_PASS still NOT claimed
+(§67); **NEXT = T9 (desktop approval policy), not begun** (§68).
