@@ -61,12 +61,12 @@ async function body(request: IncomingMessage) {let data="";for await(const chunk
 function json(response: ServerResponse,value: unknown,status=200) {const encoded=JSON.stringify(value);if(response.destroyed || response.writableEnded) return;response.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"});response.end(encoded);}
 
 /** One SSE client owns its reads, serializer and writes; failure removes every listener and timer. */
-export function streamSse(response: ServerResponse, bus: EventEmitter, read:(cursor:number)=>HostEvent[], after:number, containment:HostContainment) {
+export function streamSse(response: ServerResponse, bus: EventEmitter, read:(cursor:number)=>HostEvent[], after:number, containment:HostContainment, authorized:()=>boolean=()=>true) {
   let cursor=after,closed=false;
   const close=()=>{if(closed) return;closed=true;clearInterval(heartbeat);bus.off("event",drain);response.off("close",close);response.off("error",failed);try {response.destroy();} catch { /* Broken client already gone. */ }};
   const failed=(error:unknown)=>{close();containment.background({subsystem:"sse"},()=>{throw error;});};
-  const write=(value:string)=>{if(response.destroyed || response.writableEnded) {close();return false;} if(!response.write(value)) {close();return false;} return true;};
-  const drain=()=>{if(closed) return;try {let events:HostEvent[];let batches=0;do {events=read(cursor);for(const event of events) {if(!write(`id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`)) return;cursor=event.sequence;}} while(events.length===500 && ++batches<40);} catch(error) {failed(error);}};
+  const write=(value:string)=>{if(!authorized() || response.destroyed || response.writableEnded) {close();return false;} if(!response.write(value)) {close();return false;} return true;};
+  const drain=()=>{if(closed) return;try {if(!authorized()) {close();return;} let events:HostEvent[];let batches=0;do {events=read(cursor);for(const event of events) {if(!write(`id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`)) return;cursor=event.sequence;}} while(events.length===500 && ++batches<40);} catch(error) {failed(error);}};
   const heartbeat=setInterval(()=>{if(closed) return;try {write(": heartbeat\n\n");} catch(error) {failed(error);}},15000);
   response.on("close",close);response.on("error",failed);bus.on("event",drain);drain();
   return close;
@@ -143,7 +143,10 @@ export async function startHost(options: { dataDirectory?: string; root?: string
         const taskId=path.searchParams.get("task");
         // ?task=<id> streams one task's normalized events (the Host-side streamEvents for that session).
         const read=(from:number)=>taskId ? db.taskEvents(taskId,from) : db.events(from);
-        streamSse(res,manager.bus,read,after,containment);return;
+        // Device identity is checked for every delivery, including an already-open stream.
+        // Revocation does not cancel an independently granted Host capability batch.
+        const stillAuthorized=()=>local || !!db.db.prepare("SELECT id FROM devices WHERE id=? AND token_hash=? AND revoked_at IS NULL").get(device!.id,hash(bearer));
+        streamSse(res,manager.bus,read,after,containment,stillAuthorized);return;
       }
       if(req.method!=="POST" || path.pathname!=="/command") return json(res,{error:"Not found"},404);
       const input=await body(req);const data=record(input.data ?? {});let task:OrchTask | undefined;let pairCode:string | undefined;let session:AgentSession | undefined;let extra:{mission?:unknown;data?:unknown}={};

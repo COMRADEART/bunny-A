@@ -56,7 +56,7 @@ test("T2: an exact explicitly registered stand-in validates read and write with 
   } finally { env.cleanup(); }
 });
 
-for (const version of ["codex-cli 0.999.0", "codex-cli 0.1.0", "codex-cli 0.153.5"]) test(`T2: ${version} cannot inherit an exact-version entry`, async () => {
+for (const version of ["codex-cli 0.999.0", "codex-cli 0.1.0", "codex-cli 0.153.5", "codex-cli 99.0.0"]) test(`T2: ${version} cannot inherit an exact-version entry`, async () => {
   const env = await fixture({ version });
   try {
     assert.equal(env.profile.compatibilityClass, "UNVALIDATED");
