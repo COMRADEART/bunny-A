@@ -54,7 +54,7 @@ export type RiskClass = "READ" | "WRITE" | "EXECUTE" | "EXTERNAL_SIDE_EFFECT" | 
 /** Persistent permission choices. The data model supports all of them; M-A-0 enforces them in decisions. */
 export type GrantPolicy = "always_allow" | "allow_for_mission" | "ask_every_time" | "read_only" | "never_allow";
 
-export type PermissionDecision = { decision: "allow" | "ask" | "deny"; reason: string; risk: RiskClass };
+export type PermissionDecision = { decision: "allow" | "ask" | "deny"; reason: string; risk: RiskClass; /** Set when an approval batch rescued the ask; admission consumes from it. */ batch?: { id: string } };
 
 export type Budget = {
   /** Child tasks routed to a cloud provider. */
@@ -201,8 +201,68 @@ export type PermissionRequest = {
   reason: string;
   createdAt: number;
   resolvedAt: number | null;
-  resolution: "allow_once" | "deny" | null;
+  resolution: "allow_once" | "allow_batch" | "deny" | null;
   resolvedBy: string | null;
+  /** Host-computed offer of one small bounded batch covering this ask; absent = no batch button. */
+  batchOffer: PermissionBatchOffer | null;
+};
+
+/**
+ * One ephemeral, mission-scoped bounded desktop batch (Gate T9). Created only from a Host-computed
+ * offer attached to a real permission request; it never outlives its envelope, never carries more
+ * authority than the offer stated, and ends on stop, replan, expiry, exhaustion, scope mismatch or
+ * Host restart (`batchEpoch` marks the Host boot it belongs to).
+ */
+export type ApprovalBatch = {
+  id: string;
+  missionId: string;
+  authorizationId: string;
+  family: string;
+  actions: string[];
+  riskCeiling: RiskClass;
+  target: { app: string | null; processId: number | null; title: string | null };
+  targetTier: "process" | "app";
+  maxActions: number;
+  usedCount: number;
+  observedPid: number | null;
+  observedPidFrom: "params" | "post-run" | null;
+  batchEpoch: string;
+  createdAt: number;
+  createdBy: string;
+  expiresAt: number;
+  status: "active" | "ended";
+  endAt: number | null;
+  endReason: "exhausted" | "expired" | "revoked" | "scope_mismatch" | "mission_ended" | "host_restart" | null;
+  endBy: string | null;
+  originStepId: string;
+};
+
+/** What the Host proposes when a permission request comes from a small, predictable desktop sequence. */
+export type PermissionBatchOffer = {
+  family: "computer";
+  actions: string[];
+  /** Expected executions per covered action in one pass; sum ≤ maxActions. Read-only entries count 0. */
+  counts: Record<string, number>;
+  maxActions: number;
+  ttlMs: number;
+  riskCeiling: "EXECUTE";
+  targetLabel: string;
+  /** The bound target the batch will live inside (strictest identity available at grant time). */
+  target: { app: string | null; processId: number | null; title: string | null };
+  targetTier: "process" | "app";
+  /** Read-only covered actions (never consume the budget). */
+  readOnly: string[];
+};
+
+export type BatchView = {
+  id: string;
+  maxActions: number;
+  usedCount: number;
+  targetLabel: string;
+  createdAt: number;
+  expiresAt: number;
+  status: "active" | "ended";
+  endReason: ApprovalBatch["endReason"];
 };
 
 export type MissionProgress =
@@ -248,7 +308,7 @@ export type Mission = {
   accounting: MissionAccounting;
 };
 
-export type MissionView = Mission & { steps: MissionStep[]; progress: MissionProgress; requests: PermissionRequest[]; artifacts: ArtifactSummary[] };
+export type MissionView = Mission & { steps: MissionStep[]; progress: MissionProgress; requests: PermissionRequest[]; artifacts: ArtifactSummary[]; batch: BatchView | null };
 
 export type ArtifactType =
   | "source_file"

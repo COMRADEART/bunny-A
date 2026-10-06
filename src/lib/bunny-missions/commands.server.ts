@@ -13,13 +13,13 @@ function id(value: unknown): string { const out = text(value, 200); if (!/^[A-Za
 function object(value: unknown): Record<string, unknown> { if (value === undefined) return {}; if (!value || typeof value !== "object" || Array.isArray(value)) throw new CommandRefusedError("Expected an object."); return value as Record<string, unknown>; }
 
 export const MISSION_ACTIONS = new Set([
-  "mission.create", "mission.plan", "mission.replan", "mission.approve", "mission.start", "mission.stop", "mission.retry", "mission.respond", "mission.get", "mission.configure",
+  "mission.create", "mission.plan", "mission.replan", "mission.approve", "mission.start", "mission.stop", "mission.retry", "mission.respond", "mission.get", "mission.configure", "mission.revoke_batch",
   "inbox.ack", "capability.run", "capability.grant", "capability.revoke_grant", "capability.refresh",
   "skill.run", "skill.versions", "skill.repair", "skill.verify", "skill.record",
   "trigger.create", "trigger.enable", "trigger.disable", "trigger.delete",
 ]);
-/** What a paired phone may do: create, inspect, answer approvals and stop. Everything else needs the workstation. */
-const REMOTE = new Set(["mission.create", "mission.approve", "mission.start", "mission.stop", "mission.respond", "mission.get", "inbox.ack"]);
+/** What a paired phone may do: create, inspect, answer approvals (once or small batch) and stop. Everything else needs the workstation. */
+const REMOTE = new Set(["mission.create", "mission.approve", "mission.start", "mission.stop", "mission.respond", "mission.get", "mission.revoke_batch", "inbox.ack"]);
 
 export async function missionCommand(missions: MissionManager, action: string, data: Record<string, unknown>, access: { local: boolean; actor: string }): Promise<{ mission?: unknown; data?: unknown }> {
   if (!access.local && !REMOTE.has(action)) throw new CommandRefusedError(`${action} requires workstation access.`);
@@ -54,10 +54,20 @@ export async function missionCommand(missions: MissionManager, action: string, d
     case "mission.stop": return { mission: await missions.stop(id(data.id), access.actor) };
     case "mission.retry": return { mission: missions.retry(id(data.id), access.actor) };
     case "mission.respond": {
-      if (data.decision !== "allow_once" && data.decision !== "deny") throw new CommandRefusedError("Decision must be allow_once or deny.");
-      return { mission: await missions.respond(id(data.requestId), data.decision, access.actor) };
+      if (data.decision !== "allow_once" && data.decision !== "allow_batch" && data.decision !== "deny") throw new CommandRefusedError("Decision must be allow_once, allow_batch or deny.");
+      // Only-shrink knobs on the batch button; the manager clamps both to what the offer stated.
+      const options: { maxActions?: number; ttlMs?: number } = {};
+      for (const [key, min] of [["maxActions", 1] as const, ["ttlMs", 1000] as const]) {
+        const value = data[key];
+        if (value === undefined) continue;
+        const n = Number(value);
+        if (!Number.isInteger(n) || n < min) throw new CommandRefusedError(`${key} must be an integer of at least ${min}.`);
+        options[key] = n;
+      }
+      return { mission: await missions.respond(id(data.requestId), data.decision, access.actor, options) };
     }
     case "mission.get": return { data: missions.get(id(data.id)) };
+    case "mission.revoke_batch": return { mission: missions.revokeBatch(id(data.missionId), id(data.batchId), access.actor) };
     case "mission.configure": return { data: missions.configure(object(data), access.actor) };
     case "inbox.ack": return { data: missions.inbox.acknowledge(id(data.id)) };
     case "capability.refresh": await missions.bus.refreshHealth(); return { data: missions.bus.list() };

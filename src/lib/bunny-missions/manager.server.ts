@@ -6,6 +6,8 @@ import type { Mode, OrchTask, ProviderId, TaskConstraints, VerifySpec } from "..
 import { codexMissionExclusion } from "../orch/compatibility.ts";
 import { ArtifactStore } from "./artifacts.server.ts";
 import { envelopeFrom, MODE_BUDGET, providerScopeViolation, scopeFor, taskViolation } from "./authorization.server.ts";
+import { batchActionLabel, batchOffer, batchView, currentBatchEpoch, type BatchPlanEntry } from "./batches.server.ts";
+import type { ApprovalBatch, PermissionBatchOffer } from "./types.ts";
 import { CapabilityBus, type CapabilityAdapter, type CapabilityRequest } from "./capabilities/bus.server.ts";
 import { BrowserCapability } from "./capabilities/browser.server.ts";
 import { ComputerCapability } from "./capabilities/computer.server.ts";
@@ -20,7 +22,7 @@ import { MissionMemory } from "./memory.server.ts";
 import { scopedPath } from "./paths.server.ts";
 import { runsLocally } from "../bunny-host/router.ts";
 import { planMission, PLANNER_ID } from "./planner.server.ts";
-import { SkillLibrary } from "./skills.server.ts";
+import { SkillLibrary, fill } from "./skills.server.ts";
 import { MissionStore } from "./store.server.ts";
 import { TriggerEngine } from "./triggers.server.ts";
 import type {
@@ -184,7 +186,8 @@ export class MissionManager {
     const steps = this.store.steps(mission.id);
     const requests = this.store.requests(mission.id).sort((a, b) => b.createdAt - a.createdAt).slice(0, 20);
     const artifacts = this.store.artifacts(mission.id).slice(-30);
-    return { ...mission, steps, progress: missionProgress(steps), requests, artifacts };
+    const active = this.store.batches(mission.id).find((batch) => batch.status === "active");
+    return { ...mission, steps, progress: missionProgress(steps), requests, artifacts, batch: active ? batchView(active, Date.now()) : null };
   }
   get(id: string) {
     const mission = this.store.mission(id);
@@ -337,6 +340,8 @@ export class MissionManager {
     const summary = `${steps.length}/${steps.length} steps completed. ${verified} independently verified by Bunny${unverified ? `; ${unverified} completed without independent verification (provider or capability output only)` : ""}.`;
     current = this.setMission(current, { state: "completed", finishedAt: Date.now(), result: { summary, verifiedSteps: verified, unverifiedSteps: unverified, artifactIds }, accounting: this.accounting(current.id) }, "mission.completed", `Mission "${current.title}": ${summary}`);
     this.workspace.releaseMission(current.id);
+    for (const batch of this.store.endMissionBatches(current.id, "mission_ended", "bunny-mission"))
+      this.emit("approval.batch_ended", `Small approval batch ended with the mission (${batch.usedCount} / ${batch.maxActions} actions used).`, current.id);
     this.memory.record(current.id, "mission_state", "Mission completed", summary, "bunny:mission", true);
   }
   async failMission(mission: Mission, category: FailureCategory, detail: string, stepId: string | null) {
@@ -345,6 +350,8 @@ export class MissionManager {
     if (!["running", "waiting_for_user", "verifying"].includes(fresh.state)) return;
     this.setMission(fresh, { state: "failed", finishedAt: Date.now(), failure: { category, detail, stepId }, accounting: this.accounting(fresh.id) }, "mission.failed", `Mission "${fresh.title}" failed (${category}): ${detail}`);
     this.workspace.releaseMission(fresh.id);
+    for (const batch of this.store.endMissionBatches(fresh.id, "mission_ended", "bunny-mission"))
+      this.emit("approval.batch_ended", `Small approval batch ended with the mission (${batch.usedCount} / ${batch.maxActions} actions used).`, fresh.id);
   }
   /** A failed scheduler/boundary has no automatic retry policy. Latch scheduling before any await. */
   async containMission(id:string,error:SafeError) {
@@ -359,6 +366,8 @@ export class MissionManager {
       if(!this.stopping.has(id)) {
         let fresh=this.store.mission(id); if(fresh.state==="ready") fresh=this.setMission(fresh,{state:"running"});
         if(["running","verifying","waiting_for_user"].includes(fresh.state)) this.setMission(fresh,{state:"failed",finishedAt:Date.now(),failure:{category:"host_failure",detail:error.message,stepId:null}},"mission.failed","Unexpected Mission boundary failure; scheduling stopped.");
+        for (const batch of this.store.endMissionBatches(id, "mission_ended", "bunny-mission"))
+          this.emit("approval.batch_ended", `Small approval batch ended with the mission failure (${batch.usedCount} / ${batch.maxActions} actions used).`, id);
       }
       this.workspace.releaseMission(id);
     } finally {this.containing.delete(id);}
@@ -648,28 +657,110 @@ export class MissionManager {
   }
 
   // ── permission requests ───────────────────────────────────────────────────
+  /** Gate T9: the Host-computed bounded-batch offer for an execute-phase desktop ask (never verify, never provider steps). */
+  batchOfferFor(mission: Mission, step: MissionStep, action: string): PermissionBatchOffer | null {
+    const plan: BatchPlanEntry[] = [];
+    for (const item of this.store.steps(mission.id)) {
+      if (item.executor.kind === "capability") {
+        // The ask itself covers this step's execution once; counting it again would double the budget.
+        if (item.id === step.id) continue;
+        plan.push({ action: item.executor.action, params: item.executor.params as Record<string, unknown> });
+      }
+      else if (item.executor.kind === "skill") {
+        try {
+          const skill = this.skills.get(item.executor.skillId);
+          const inputs = this.skills.params(skill, item.executor.params as Record<string, unknown>);
+          for (const skillStep of skill.steps) plan.push({ action: skillStep.action, params: fill(skillStep.params, inputs) as Record<string, unknown> });
+        } catch { /* invalid skill params fail on their own in the run; the offer is only for healthy plans */ }
+      }
+    }
+    // The ask's concrete target: the capability step's own params, or the first plan instance of
+    // the asking action inside a skill step (skill input params are not concrete actions).
+    if (step.executor.kind === "skill" && !plan.some((entry) => entry.action === action)) return null;
+    const askParams = step.executor.kind === "capability" ? step.executor.params as Record<string, unknown> : plan.find((entry) => entry.action === action)?.params ?? {};
+    if (step.executor.kind === "skill") {
+      // For a skill ask, the ask and the matching plan entry are the same execution — cover it once.
+      const matched = plan.findIndex((entry) => entry.action === action && JSON.stringify(entry.params) === JSON.stringify(askParams));
+      if (matched >= 0) plan.splice(matched, 1);
+    }
+    return batchOffer({
+      askAction: action, askParams, plan,
+      find: (candidate) => this.bus.find(candidate)?.manifest ?? null,
+      riskOf: (candidate, params) => this.bus.riskOf(candidate, params),
+    });
+  }
   askPermission(mission: Mission, step: MissionStep, action: string, risk: PermissionRequest["risk"], reason: string, phase: "execute" | "verify") {
-    const request: PermissionRequest = { id: crypto.randomUUID(), missionId: mission.id, stepId: step.id, action, risk, reason, createdAt: Date.now(), resolvedAt: null, resolution: null, resolvedBy: null };
+    let batchOffer: PermissionBatchOffer | null = null;
+    // The user's standing "ask every time" rule outranks batching: asking for permission is the
+    // point of that rule, so a batch button would only produce asks it can never rescue.
+    if (phase === "execute" && !/ask every time/.test(reason)) { try { batchOffer = this.batchOfferFor(mission, step, action); } catch { batchOffer = null; } }
+    const request: PermissionRequest = { id: crypto.randomUUID(), missionId: mission.id, stepId: step.id, action, risk, reason, createdAt: Date.now(), resolvedAt: null, resolution: null, resolvedBy: null, batchOffer };
     this.store.saveRequest(request);
     this.workspace.release(step.id);
     this.setStep(step, { state: "waiting_for_approval", pendingRequestId: request.id, pendingPhase: phase }, "mission.permission_required", `Mission ${mission.id} request ${request.id}: ${step.role} needs permission for ${action} (${risk}): ${reason}`);
     this.schedule(mission.id);
   }
-  async respond(requestId: string, decision: "allow_once" | "deny", by: string) {
+  /** Gate T9: create the batch strictly from the stored Host-computed offer; client data may only shrink it. */
+  createBatchFromOffer(missionId: string, stepId: string, requestId: string, by: string, options: { maxActions?: number; ttlMs?: number } = {}): ApprovalBatch {
+    const mission = this.store.mission(missionId);
+    const request = this.store.request(requestId);
+    const step = this.store.step(stepId);
+    if (!request.batchOffer) throw new Error("This request has no approval batch offer.");
+    // No resolvedAt check here: respond() is the sole caller — it verified the request was open
+    // before resolving it with allow_batch (that entry check is the double-answer protection).
+    const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
+    if (!envelope) throw new Error("The mission has no live authorization to grant a batch inside.");
+    if (envelope.revokedAt) throw new Error("The mission authorization was revoked.");
+    if (envelope.expiresAt <= Date.now()) throw new Error("The mission authorization expired; approve the mission again to grant a fresh batch.");
+    if (mission.state === "completed" || mission.state === "stopped") throw new Error("The mission has already ended.");
+    const offer = request.batchOffer;
+    const maxActions = Math.max(1, Math.min(Number.isInteger(options.maxActions) ? options.maxActions! : offer.maxActions, offer.maxActions));
+    const ttlMs = Math.max(1000, Math.min(Number.isInteger(options.ttlMs) ? options.ttlMs! : offer.ttlMs, offer.ttlMs));
+    const batch: ApprovalBatch = {
+      id: crypto.randomUUID(), missionId: mission.id, authorizationId: envelope.id,
+      family: offer.family, actions: [...offer.actions], riskCeiling: offer.riskCeiling,
+      target: offer.target, targetTier: offer.targetTier, maxActions, usedCount: 0,
+      observedPid: null, observedPidFrom: null, batchEpoch: currentBatchEpoch(),
+      createdAt: Date.now(), createdBy: by, expiresAt: Date.now() + ttlMs,
+      status: "active", endAt: null, endReason: null, endBy: null, originStepId: step.id,
+    };
+    this.store.saveBatch(batch);
+    this.emit("approval.batch_started", `Small approval batch granted by ${by} for ${offer.targetLabel}: at most ${maxActions} mutating actions within ${Math.round(ttlMs / 1000)} min; covers ${offer.actions.map(batchActionLabel).join(", ")}${offer.readOnly.length ? `; read-only also covers ${offer.readOnly.map(batchActionLabel).join(", ")}` : ""}. It ends at the limit, at expiry, on Stop, on a target mismatch, or with the mission.`, mission.id);
+    return batch;
+  }
+  /** Gate T9: the user revokes the active batch; future covered actions ask for fresh approval. */
+  revokeBatch(id: string, batchId: string, by: string): MissionView {
+    this.requireEnabled();
+    const batch = this.store.batch(batchId);
+    if (!batch || batch.missionId !== id) throw new Error("Unknown approval batch for this mission.");
+    if (batch.status === "ended") throw new Error("The approval batch has already ended.");
+    this.store.endBatch(batchId, "revoked", by);
+    this.emit("approval.batch_ended", `Small approval batch revoked by ${by} (${batch.usedCount} / ${batch.maxActions} actions used); subsequent desktop actions ask for fresh approval.`, id);
+    return this.view(this.store.mission(id));
+  }
+  async respond(requestId: string, decision: "allow_once" | "allow_batch" | "deny", by: string, options: { maxActions?: number; ttlMs?: number } = {}) {
     this.requireEnabled();
     const request = this.store.request(requestId);
     if (request.resolvedAt) throw new Error("This request was already answered.");
     const step = this.store.step(request.stepId);
     if (step.state !== "waiting_for_approval" || step.pendingRequestId !== requestId) throw new Error("The step is no longer waiting for this request.");
+    if (decision === "allow_batch" && !request.batchOffer) throw new Error("This request does not offer a small approval batch; answer allow_once or deny.");
     this.store.saveRequest({ ...request, resolvedAt: Date.now(), resolution: decision, resolvedBy: by });
     this.inbox.resolve(request.missionId, { requestId });
     this.inbox.resolve(request.missionId, { kinds: ["requires_attention"] });
-    this.memory.record(request.missionId, "user_decision", `${request.action} ${decision === "allow_once" ? (step.executor.kind === "skill" ? "allowed for this skill run" : "allowed once") : "denied"}`, `${by}: ${request.reason}`, `user:${by}`, true);
-    this.emit("approval.additional_capability", `${request.action} ${decision} by ${by}; request ${requestId}; scope ${step.executor.kind === "skill" ? "this skill run, matching action within approved roots" : "this action"}.`, request.missionId);
+    this.memory.record(request.missionId, "user_decision", `${request.action} ${decision === "allow_once" ? (step.executor.kind === "skill" ? "allowed for this skill run" : "allowed once") : decision === "allow_batch" ? `allowed as a small batch (${request.batchOffer?.maxActions} actions for ${request.batchOffer?.targetLabel})` : "denied"}`, `${by}: ${request.reason}`, `user:${by}`, true);
+    this.emit("approval.additional_capability", `${request.action} ${decision} by ${by}; request ${requestId}; scope ${decision === "allow_batch" ? `one small bounded batch (${request.batchOffer?.maxActions} actions, target ${request.batchOffer?.targetLabel})` : step.executor.kind === "skill" ? "this skill run, matching action within approved roots" : "this action"}.`, request.missionId);
     if (by.startsWith("device:")) this.emit("approval.remote_device", `Additional request ${requestId} answered by paired ${by}: ${decision}.`, request.missionId);
     let mission = this.store.mission(request.missionId);
     if (mission.state === "waiting_for_user") mission = this.setMission(mission, { state: "running" }, "mission.resumed", `${by} answered request ${requestId}.`);
-    this.emit(decision === "allow_once" ? "authorization.granted" : "authorization.denied", `${request.action} for step ${step.id}: ${decision} by ${by} (request ${requestId}).`, request.missionId);
+    this.emit(decision === "deny" ? "authorization.denied" : "authorization.granted", `${request.action} for step ${step.id}: ${decision} by ${by} (request ${requestId}).`, request.missionId);
+    if (decision === "allow_batch") {
+      // The batch must exist before the step resumes so the resumed execution is covered (and counted).
+      this.createBatchFromOffer(mission.id, step.id, requestId, by, options);
+      this.setStep(step, { state: "ready", pendingRequestId: null, pendingPhase: null });
+      this.schedule(mission.id);
+      return this.view(this.store.mission(mission.id));
+    }
     if (decision === "deny") {
       // The step is failed first, so the child's own stop event finds nothing left to finalize.
       this.stepFailed(mission, this.setStep(step, { state: "running" }), "permission_denied", `${by} denied ${request.action}.`);
@@ -717,6 +808,8 @@ export class MissionManager {
     const activeRuns = new Set(this.store.runs({ missionId: id, status: "running", limit: 500 }).map((run) => run.id));
     try {
     await this.cancelChildren(id, `Mission stopped by ${by}.`);
+    for (const batch of this.store.endMissionBatches(id, "mission_ended", by))
+      this.emit("approval.batch_ended", `Small approval batch ended because the mission stopped by ${by} (${batch.usedCount} / ${batch.maxActions} actions used); no further covered action will run.`, id);
     for (const step of this.store.steps(id)) if (!["completed", "skipped", "stopped", "failed"].includes(step.state)) {
       const attempts = step.attempts.map((attempt, index) => index === step.attempts.length - 1 && attempt.outcome === "running" ? { ...attempt, finishedAt: Date.now(), outcome: "stopped" as const, category: "user_stopped" as const, detail: `Stopped by ${by}` } : attempt);
       this.setStep(step, { state: "stopped", finishedAt: Date.now(), attempts, failure: { category: "user_stopped", detail: `Stopped by ${by}.` } });
@@ -759,6 +852,8 @@ export class MissionManager {
     await this.cancelChildren(id, "Mission is being replanned.");
     if (mission.authorizationId) { const envelope = this.store.authorization(mission.authorizationId); if (envelope && !envelope.revokedAt) this.store.saveAuthorization({ ...envelope, revokedAt: Date.now() }); }
     for (const request of this.store.requests(id)) if (!request.resolvedAt) this.store.saveRequest({ ...request, resolvedAt: Date.now(), resolution: "deny", resolvedBy: `${by} (replanned)` });
+    for (const batch of this.store.endMissionBatches(id, "revoked", by))
+      this.emit("approval.batch_ended", `Small approval batch revoked with the replanned mission (${batch.usedCount} / ${batch.maxActions} actions used).`, id);
     this.workspace.releaseMission(id);
     const base = this.setMission(mission, { objective: objective?.trim() || mission.objective, authorizationId: null, failure: null, finishedAt: null, planning: { ...mission.planning, replans: mission.planning.replans + 1 } }, "mission.replanning", `${by} replanned the mission; the previous authorization was revoked and a new approval is required.`);
     return this.view(this.plan(base, explicit));
@@ -767,6 +862,8 @@ export class MissionManager {
   // ── recovery after a Host restart ─────────────────────────────────────────
   recover() {
     const now = Date.now();
+    for (const batch of this.store.endAllActiveBatches("host_restart", "bunny-host-restart", now))
+      this.emit("approval.batch_ended", `Small approval batch ended because the Host restarted; no desktop action from the previous run is resumed (${batch.usedCount} / ${batch.maxActions} actions used).`, batch.missionId);
     for (const run of this.store.runs({ status: "running", limit: 500 })) this.store.saveRun({ ...run, status: "interrupted", summary: "Host restarted while this capability ran; it was not resumed.", finishedAt: now });
     for (const mission of this.store.missionsIn(["running", "verifying", "waiting_for_user", "ready", "planning"])) {
       this.workspace.releaseMission(mission.id);

@@ -1,5 +1,6 @@
 import type { ArtifactStore } from "../artifacts.server.ts";
-import { decide } from "../authorization.server.ts";
+import { decide, matches } from "../authorization.server.ts";
+import { consultBatch, currentBatchEpoch, extractObservedPid, targetLabelOf } from "../batches.server.ts";
 import { redact, type MissionStore } from "../store.server.ts";
 import { resolveCommand, type Resolved } from "./process.server.ts";
 import { HostContainment, safeError } from "../../bunny-host/failure.server.ts";
@@ -114,7 +115,23 @@ export class CapabilityBus {
     const found = this.find(request.action);
     if (!found) return { decision: "deny", reason: `Unknown capability action ${request.action}.`, risk: "READ" };
     const risk = this.riskOf(request.action, request.params) ?? found.manifest.risk;
-    return decide({ ...found.manifest, risk }, request.params, { envelope: request.envelope, missionId: request.missionId, grants: this.store.grants(), oneTime: request.oneTime || (!!request.oneTimeAction && request.oneTimeAction === request.action), direct: request.direct, base: request.cwd, executable });
+    const base = decide({ ...found.manifest, risk }, request.params, { envelope: request.envelope, missionId: request.missionId, grants: this.store.grants(), oneTime: request.oneTime || (!!request.oneTimeAction && request.oneTimeAction === request.action), direct: request.direct, base: request.cwd, executable });
+    // Gate T9: an approval batch may rescue an ORDINARY ask — same mission, its own planned step,
+    // alive envelope, exact covered action, bound target, risk at/below the ceiling. Never a deny,
+    // never a user's standing "ask every time" rule, never another mission or a delegated child step.
+    if (base.decision !== "ask" || !request.missionId || !request.envelope || request.envelope.revokedAt || request.envelope.expiresAt <= Date.now()) return base;
+    if (!request.envelope.computer.enabled || !request.envelope.capabilities.includes(request.action)) return base;
+    if (this.store.grants().some((grant) => grant.policy === "ask_every_time" && matches([grant.action], request.action) && (grant.scope === "global" || grant.scope === `mission:${request.missionId}`))) return base;
+    const stepIds = new Set(this.store.steps(request.missionId).map((step) => step.id));
+    const now = Date.now();
+    for (const batch of this.store.batchesActive(request.missionId, currentBatchEpoch(), now)) {
+      const consult = consultBatch(batch, { action: request.action, params: request.params, manifest: found.manifest, risk, envelope: request.envelope, now, stepIds, stepId: request.stepId, epoch: currentBatchEpoch() });
+      if (consult?.match) {
+        const consume = consult.consume ? `${batch.usedCount + 1} of ${batch.maxActions} mutating actions used` : "read-only";
+        return { decision: "allow", reason: `Allowed by the small approval batch for ${targetLabelOf(batch.target)}: ${consume}.`, risk, batch: { id: batch.id } };
+      }
+    }
+    return base;
   }
   async cancel(filter: { missionId?: string; stepId?: string }) {
     if (filter.missionId) this.cancelledMissions.add(filter.missionId);
@@ -167,6 +184,17 @@ export class CapabilityBus {
     if (availability !== "available" && availability !== "degraded") {
       return finish(STATUS_FOR[availability], this.health.get(found.adapter.manifest.id)?.detail ?? `${found.adapter.manifest.id} is ${availability}.`, { ok: false, status: STATUS_FOR[availability], summary: `${found.adapter.manifest.id} is ${availability}.`, output: null, evidence: [], errorCategory: "capability_unavailable" });
     }
+    // Gate T9 admission gate: re-validate status, epoch, expiry and budget atomically immediately
+    // before execution. A failed guard executes nothing; no run is created; the ask path follows.
+    if (decision.batch) {
+      const consumed = this.store.consumeBatch(decision.batch.id, currentBatchEpoch(), Date.now());
+      if (!consumed.ok) { this.emit("authorization.denied", `${request.action}: ${consumed.reason}`, request.missionId); return finish("denied", consumed.reason, null); }
+      if (consumed.usedCount === consumed.maxActions) {
+        this.store.endBatch(decision.batch.id, "exhausted", "bunny-capability-bus");
+        this.emit("approval.batch_exhausted", `Small approval batch reached its ${consumed.maxActions}-action limit; further ${request.action.split(".")[0]}.* actions ask again.`, request.missionId);
+      }
+      this.emit("approval.batch_consumed", `${request.action} admitted under the small approval batch: ${consumed.usedCount} / ${consumed.maxActions} mutating actions used.`, request.missionId);
+    }
     this.emit("authorization.granted", `${request.action}: ${decision.reason}`, request.missionId);
     this.store.host.transaction(()=>{this.store.saveRun(base);this.emit("capability.started", `${request.action} started.`, request.missionId);});
     const controller = new AbortController(); this.inFlight.set(base.id, controller);
@@ -194,6 +222,7 @@ export class CapabilityBus {
       catch (error) { result.evidence.push(`Artifact not stored: ${safeError(error).message}`); }
     }
     const stopped=processOwnership.length>0 && controller.signal.aborted && !/timed out/i.test(String(controller.signal.reason));
+    if (decision.batch && result?.output) this.reviewBatchObserved(request, decision.batch.id, result);
     return finish(stopped ? "stopped" : result.status, result.summary, result, artifactIds);
     } catch(error) {
       if(terminal) return terminal;
@@ -202,6 +231,32 @@ export class CapabilityBus {
       catch(persistenceError) {this.containment.fatal(persistenceError,{subsystem:"persistence",capabilityRunId:base.id});throw persistenceError;}
     } finally { clearTimeout(timer); this.inFlight.delete(base.id); this.settling.delete(base.id); settled(); }
   }
+  /**
+   * Gate T9 post-run target review: the Computer Runtime's structured output carries the window's
+   * real owning process. First pinning binds the batch to it; any later coverable run that touches
+   * a different process ends the batch immediately (fail closed forward) — a completed run is not
+   * reversible, but nothing further runs without a fresh approval.
+   */
+  reviewBatchObserved(request: CapabilityRequest, batchId: string, result: CapabilityResult) {
+    const batch = this.store.batch(batchId);
+    if (!batch || batch.status === "ended") return;
+    // open_app's pid is the launcher process, not the window owner (Store-app launchers spawn a
+    // separate window process), so it is not window identity and never binds the batch. The first
+    // window-bearing execution (focus/type/invoke/read_controls) is what proves the owning process.
+    if (request.action === "computer.open_app") return;
+    const observed = extractObservedPid(result.output);
+    if (observed == null) return;
+    const pinned = batch.observedPid ?? batch.target.processId;
+    if (pinned == null) {
+      this.store.saveBatch({ ...batch, observedPid: observed, observedPidFrom: "post-run", target: { ...batch.target, processId: observed } });
+      return;
+    }
+    if (observed !== pinned) {
+      this.store.endBatch(batch.id, "scope_mismatch", "bunny-computer-runtime");
+      this.emit("approval.batch_scope_mismatch", `The covered action reached window owner pid ${observed}, but the approval batch is bound to pid ${pinned}; the batch ended; further actions ask for fresh approval.`, batch.missionId);
+    }
+  }
+
   async close() {
     for (const controller of this.inFlight.values()) controller.abort(new Error("Bunny Capability Bus closed."));
     await Promise.all(this.settling.values());

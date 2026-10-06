@@ -1,11 +1,12 @@
 import type { HostDatabase } from "../bunny-host/persistence.server.ts";
 import type { HostEvent } from "../bunny-host/contracts.ts";
 import type {
-  Artifact, AuthorizationEnvelope, CapabilityRun, GrantPolicy, InboxEvent, MemoryEntry, Mission, MissionConfig, MissionStep,
+  ApprovalBatch, Artifact, AuthorizationEnvelope, CapabilityRun, GrantPolicy, InboxEvent, MemoryEntry, Mission, MissionConfig, MissionStep,
   PermissionRequest, Skill, Trigger,
 } from "./types.ts";
 
 export const MISSION_SCHEMA = "ma0.missions.v1";
+export const APPROVAL_BATCHES_SCHEMA = "ma2.approval-batches.v1";
 export const DEFAULT_CONFIG: MissionConfig = {
   enabled: false,
   limits: { maxConcurrentAgents: 3, maxSteps: 12, maxRetriesPerStep: 2, maxReplans: 2, maxMissionRuntimeMs: 2 * 60 * 60_000, maxActiveMissions: 3 },
@@ -46,12 +47,20 @@ export class MissionStore {
       CREATE TABLE IF NOT EXISTS inbox_events(id TEXT PRIMARY KEY, at INTEGER NOT NULL, kind TEXT NOT NULL, mission_id TEXT, acknowledged_at INTEGER, record TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS mission_memory(id TEXT PRIMARY KEY, mission_id TEXT, kind TEXT NOT NULL, verified INTEGER NOT NULL, created_at INTEGER NOT NULL, record TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS workspace_locks(id TEXT PRIMARY KEY, root TEXT NOT NULL, mode TEXT NOT NULL, mission_id TEXT NOT NULL, step_id TEXT NOT NULL, acquired_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS approval_batches(
+        id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, authorization_id TEXT NOT NULL, family TEXT NOT NULL,
+        actions TEXT NOT NULL, risk_ceiling TEXT NOT NULL, target_json TEXT NOT NULL, target_tier TEXT NOT NULL,
+        max_actions INTEGER NOT NULL, used_count INTEGER NOT NULL, observed_pid INTEGER, observed_pid_from TEXT,
+        batch_epoch TEXT NOT NULL, created_at INTEGER NOT NULL, created_by TEXT NOT NULL, expires_at INTEGER NOT NULL,
+        status TEXT NOT NULL, end_at INTEGER, end_reason TEXT, end_by TEXT, origin_step_id TEXT NOT NULL, record TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS idx_approval_batches_mission ON approval_batches(mission_id);
       CREATE INDEX IF NOT EXISTS mission_steps_mission ON mission_steps(mission_id, idx);
       CREATE INDEX IF NOT EXISTS mission_artifacts_mission ON mission_artifacts(mission_id, created_at);
       CREATE INDEX IF NOT EXISTS capability_runs_mission ON capability_runs(mission_id, started_at);
       CREATE INDEX IF NOT EXISTS inbox_at ON inbox_events(at);
       CREATE INDEX IF NOT EXISTS memory_mission ON mission_memory(mission_id, created_at);
-      INSERT OR IGNORE INTO migrations(key) VALUES('${MISSION_SCHEMA}');`);
+      INSERT OR IGNORE INTO migrations(key) VALUES('${MISSION_SCHEMA}');
+      INSERT OR IGNORE INTO migrations(key) VALUES('${APPROVAL_BATCHES_SCHEMA}');`);
   }
   get db() { return this.host.db; }
 
@@ -132,6 +141,62 @@ export class MissionStore {
   clearGrant(action: string, scope: string) { this.db.prepare("DELETE FROM capability_grants WHERE action=? AND scope=?").run(action, scope); }
   grants(): { action: string; scope: string; policy: GrantPolicy; createdAt: number; createdBy: string }[] {
     return this.db.prepare("SELECT action,scope,policy,created_at AS createdAt,created_by AS createdBy FROM capability_grants").all() as { action: string; scope: string; policy: GrantPolicy; createdAt: number; createdBy: string }[];
+  }
+
+  saveBatch(batch: ApprovalBatch) {
+    this.db.prepare(`INSERT INTO approval_batches(id,mission_id,authorization_id,family,actions,risk_ceiling,target_json,target_tier,max_actions,used_count,observed_pid,observed_pid_from,batch_epoch,created_at,created_by,expires_at,status,end_at,end_reason,end_by,origin_step_id,record)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET used_count=excluded.used_count,observed_pid=excluded.observed_pid,observed_pid_from=excluded.observed_pid_from,status=excluded.status,end_at=excluded.end_at,end_reason=excluded.end_reason,end_by=excluded.end_by,record=excluded.record`)
+      .run(batch.id, batch.missionId, batch.authorizationId, batch.family, JSON.stringify(batch.actions), batch.riskCeiling, JSON.stringify(batch.target), batch.targetTier, batch.maxActions, batch.usedCount, batch.observedPid, batch.observedPidFrom, batch.batchEpoch, batch.createdAt, batch.createdBy, batch.expiresAt, batch.status, batch.endAt, batch.endReason, batch.endBy, batch.originStepId, JSON.stringify(batch));
+  }
+  batch(id: string): ApprovalBatch | null {
+    const row = this.db.prepare("SELECT record FROM approval_batches WHERE id=?").get(id) as { record: string } | undefined;
+    return row ? JSON.parse(row.record) as ApprovalBatch : null;
+  }
+  batches(missionId: string): ApprovalBatch[] {
+    return (this.db.prepare("SELECT record FROM approval_batches WHERE mission_id=? ORDER BY created_at DESC").all(missionId) as { record: string }[]).map((row) => JSON.parse(row.record) as ApprovalBatch);
+  }
+  batchesActive(missionId: string, epoch: string, now: number): ApprovalBatch[] {
+    return (this.db.prepare("SELECT record FROM approval_batches WHERE mission_id=? AND status='active' AND batch_epoch=? AND expires_at>?").all(missionId, epoch, now) as { record: string }[]).map((row) => JSON.parse(row.record) as ApprovalBatch);
+  }
+  /** The one atomic admission gate: status, epoch, expiry and budget re-checked inside the UPDATE itself. */
+  consumeBatch(id: string, epoch: string, now: number): { ok: true; usedCount: number; maxActions: number } | { ok: false; reason: string } {
+    const row = this.db.prepare("SELECT status,expires_at AS expiresAt,used_count AS usedCount,max_actions AS maxActions,batch_epoch AS epoch,record FROM approval_batches WHERE id=?").get(id) as { status: string; expiresAt: number; usedCount: number; maxActions: number; epoch: string; record: string } | undefined;
+    if (!row) return { ok: false, reason: "Approval batch not found." };
+    if (row.status === "ended") return { ok: false, reason: "The approval batch has ended; this action asks again." };
+    if (row.epoch !== epoch) return { ok: false, reason: "The approval batch is from a previous Host run; this action asks again." };
+    if (row.expiresAt <= now) return { ok: false, reason: "The approval batch expired; this action asks again." };
+    if (row.usedCount >= row.maxActions) return { ok: false, reason: `The approval batch reached its ${row.maxActions}-action limit; this action asks again.` };
+    // Optimistic guarded increment: the WHERE re-checks used_count, so two racing admissions can
+    // never take one budget slot. The record JSON is updated with the column — every read
+    // (`batch`/`batches`/`view`) must see the same canonical count.
+    const flipped = this.db.prepare("UPDATE approval_batches SET used_count=used_count+1,record=? WHERE id=? AND status='active' AND batch_epoch=? AND expires_at>? AND used_count=?")
+      .run(JSON.stringify({ ...JSON.parse(row.record) as ApprovalBatch, usedCount: row.usedCount + 1 }), id, epoch, now, row.usedCount);
+    if (flipped.changes === 1) return { ok: true, usedCount: row.usedCount + 1, maxActions: row.maxActions };
+    return { ok: false, reason: "The approval batch is unavailable; this action asks again." };
+  }
+  endBatch(id: string, reason: ApprovalBatch["endReason"], by: string, now = Date.now()): ApprovalBatch | null {
+    const current = this.batch(id);
+    if (!current || current.status === "ended") return current;
+    const ended: ApprovalBatch = { ...current, status: "ended", endAt: now, endReason: reason, endBy: by };
+    this.db.prepare("UPDATE approval_batches SET status='ended',end_at=?,end_reason=?,end_by=?,record=? WHERE id=?").run(now, reason, by, JSON.stringify(ended), id);
+    return ended;
+  }
+  endMissionBatches(missionId: string, reason: ApprovalBatch["endReason"], by: string, now = Date.now()): ApprovalBatch[] {
+    const ended: ApprovalBatch[] = [];
+    for (const row of this.db.prepare("SELECT id,record FROM approval_batches WHERE mission_id=? AND status='active'").all(missionId) as { id: string; record: string }[]) {
+      const flipped = this.endBatch(row.id, reason, by, now);
+      if (flipped) ended.push(flipped);
+    }
+    return ended;
+  }
+  /** Host restart: every active batch from any epoch/mission ends; nothing is revived. */
+  endAllActiveBatches(reason: ApprovalBatch["endReason"], by: string, now = Date.now()): ApprovalBatch[] {
+    const ended: ApprovalBatch[] = [];
+    for (const row of this.db.prepare("SELECT id,record FROM approval_batches WHERE status='active'").all() as { id: string; record: string }[]) {
+      const flipped = this.endBatch(row.id, reason, by, now);
+      if (flipped) ended.push(flipped);
+    }
+    return ended;
   }
 
   saveRun(run: CapabilityRun) {

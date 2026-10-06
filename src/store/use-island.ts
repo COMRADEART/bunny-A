@@ -117,7 +117,8 @@ type Island = Preferences & {
   approveMission: (id: string) => Promise<void>;
   stopMission: (id: string) => Promise<void>;
   retryMission: (id: string) => Promise<void>;
-  respondMission: (requestId: string, decision: "allow_once" | "deny") => Promise<void>;
+  respondMission: (requestId: string, decision: "allow_once" | "allow_batch" | "deny") => Promise<void>;
+  revokeBatch: (missionId: string, batchId: string) => Promise<void>;
   ackInbox: (id: string) => void;
   configureMissions: (patch: { enabled?: boolean; triggersEnabled?: boolean }) => void;
   hydrate: () => void;
@@ -383,6 +384,9 @@ export const useIsland = create<Island>((set, get) => {
     },
     respondMission: async (requestId, decision) => {
       await command("mission.respond", { requestId, decision });
+    },
+    revokeBatch: async (missionId, batchId) => {
+      await command("mission.revoke_batch", { missionId, batchId });
     },
     ackInbox: (id) => {
       void command("inbox.ack", { id });

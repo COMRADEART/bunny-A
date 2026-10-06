@@ -1,5 +1,6 @@
 import type { OrchTask } from "../../lib/orch/types.ts";
 import type { MissionProgress, MissionSnapshot, MissionState, MissionStep, MissionView, StepState } from "../../lib/bunny-missions/types.ts";
+import { batchButtonLabel, batchOfferLines, batchStatusLabel, targetLabelOf } from "../../lib/bunny-missions/batch-labels.ts";
 import { finitePlan } from "./ui-model.ts";
 import { publicEventLabel } from "../../lib/bunny-host/presentation.ts";
 
@@ -116,3 +117,6 @@ export function scopeSummary(mission: MissionView): string[] {
 export function permissionLabel(mission: MissionView, stepId: string): string {
   return mission.steps.find((step) => step.id === stepId)?.executor.kind === "skill" ? "Allow this skill run" : "Allow once";
 }
+
+/** Re-exports so the components keep one import surface for batch display truth. */
+export { batchButtonLabel, batchOfferLines, batchStatusLabel, targetLabelOf };

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronLeft, ChevronRight, ExternalLink, RotateCcw, ShieldCheck, Square, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ExternalLink, MousePointerClick, RotateCcw, ShieldCheck, Square, X } from "lucide-react";
 import { useIsland } from "@/store/use-island";
 import type { MissionView } from "@/lib/bunny-missions/types";
 import { NAMES } from "./ui";
@@ -7,6 +7,9 @@ import { openTask } from "./task";
 import {
   agentDetail,
   agentRows,
+  batchButtonLabel,
+  batchOfferLines,
+  batchStatusLabel,
   duration,
   focusMission,
   MISSION_LABEL,
@@ -131,24 +134,41 @@ function Requests({ mission }: { mission: MissionView }) {
   if (!open.length) return null;
   return (
     <div className="mission-requests">
-      {open.map((request) => (
-        <div className="mission-request" key={request.id}>
-          <p>
-            <strong>{mission.steps.find((step) => step.id === request.stepId)?.role ?? "Step"}</strong> wants{" "}
-            <code>{request.action}</code> ({request.risk.toLowerCase().replaceAll("_", " ")})
-          </p>
-          <p className="caption">{request.reason}</p>
-          {mission.steps.find((step) => step.id === request.stepId)?.executor.kind === "skill" ? <p className="caption">Allows matching actions throughout this skill run inside the approved folders. Other actions still require their own approval.</p> : null}
-          <div className="actions">
-            <button className="btn primary" onClick={() => void store.respondMission(request.id, "allow_once")}>
-              {permissionLabel(mission, request.stepId)}
-            </button>
-            <button className="btn quiet" onClick={() => void store.respondMission(request.id, "deny")}>
-              Deny
-            </button>
+      {open.map((request) => {
+        const offer = request.batchOffer;
+        return (
+          <div className="mission-request" key={request.id}>
+            <p>
+              <strong>{mission.steps.find((step) => step.id === request.stepId)?.role ?? "Step"}</strong> wants{" "}
+              <code>{request.action}</code> ({request.risk.toLowerCase().replaceAll("_", " ")})
+            </p>
+            <p className="caption">{request.reason}</p>
+            {mission.steps.find((step) => step.id === request.stepId)?.executor.kind === "skill" ? <p className="caption">Allows matching actions throughout this skill run inside the approved folders. Other actions still require their own approval.</p> : null}
+            {offer ? (
+              <div className="mission-batch-offer">
+                <ul className="mission-scope" data-testid="batch-offer">
+                  {batchOfferLines(offer).map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <div className="actions">
+              <button className="btn primary" onClick={() => void store.respondMission(request.id, "allow_once")}>
+                {permissionLabel(mission, request.stepId)}
+              </button>
+              {offer ? (
+                <button className="btn secondary" data-testid="allow-batch" onClick={() => void store.respondMission(request.id, "allow_batch")}>
+                  {batchButtonLabel(offer)}
+                </button>
+              ) : null}
+              <button className="btn quiet" onClick={() => void store.respondMission(request.id, "deny")}>
+                Deny
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -224,6 +244,19 @@ export function MissionPanel({ mission, now }: { mission: MissionView; now: numb
       <ProgressMeter mission={mission} />
       {mission.state === "waiting_for_approval" ? <ApprovalCard mission={mission} /> : null}
       <Requests mission={mission} />
+      {mission.batch ? (
+        <div className="mission-batch" data-state={mission.batch.status} data-testid="batch-block">
+          <p className="eyebrow">
+            <MousePointerClick size={13} /> Small approval batch
+          </p>
+          <p className="caption">{batchStatusLabel(mission.batch, now)}</p>
+          {mission.batch.status === "active" ? (
+            <button className="btn quiet" onClick={() => void store.revokeBatch(mission.id, mission.batch!.id)}>
+              Revoke batch
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {mission.recovery ? <p className="mission-failure">{mission.recovery.detail}</p> : null}
       {mission.state !== "waiting_for_approval" ? (
         <ul className="mission-agent-list">

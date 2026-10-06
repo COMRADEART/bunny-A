@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { agentDetail, agentRows, focusMission, justFinished, permissionLabel, progressFraction, progressLabel, scopeSummary } from "./mission-model.ts";
-import type { MissionSnapshot, MissionStep, MissionView } from "../../lib/bunny-missions/types.ts";
+import { agentDetail, agentRows, batchButtonLabel, batchOfferLines, batchStatusLabel, focusMission, justFinished, permissionLabel, progressFraction, progressLabel, scopeSummary } from "./mission-model.ts";
+import type { BatchView, MissionSnapshot, MissionStep, MissionView } from "../../lib/bunny-missions/types.ts";
 import type { OrchTask } from "../../lib/orch/types.ts";
 
 const step = (id: string, role: string, state: MissionStep["state"], extra: Partial<MissionStep> = {}): MissionStep => ({
@@ -15,7 +15,7 @@ const mission = (id: string, state: MissionView["state"], steps: MissionStep[], 
   planning: { planner: "p", complexity: "medium", rationale: [], replans: 0, plannedAt: 1 }, requestedScope: null, authorizationId: null, capabilityRequirements: [], providerConstraints: {},
   budget: { maxExternalModelCalls: 6, maxRuntimeMs: 3_600_000, maxRetries: 4, maxTokens: null }, retryPolicy: { maxRetriesPerStep: 2 }, verificationRequired: false, result: null, failure: null, recovery: null,
   accounting: { runtimeMs: 0, externalModelCalls: 0, localModelCalls: 0, deterministicSteps: 0, retries: 0, inputTokens: 0, outputTokens: 0, tokensReported: false },
-  steps, progress: { kind: "steps", completed: steps.filter((s) => s.state === "completed").length, total: steps.length, failed: 0, running: steps.filter((s) => s.state === "running").length }, requests: [], artifacts: [], ...extra,
+  steps, progress: { kind: "steps", completed: steps.filter((s) => s.state === "completed").length, total: steps.length, failed: 0, running: steps.filter((s) => s.state === "running").length }, requests: [], artifacts: [], batch: null, ...extra,
 });
 const snapshot = (missions: MissionView[], enabled = true): MissionSnapshot => ({ enabled, config: { enabled, triggersEnabled: false, browserHeadless: true, limits: { maxConcurrentAgents: 3, maxSteps: 12, maxRetriesPerStep: 2, maxReplans: 2, maxMissionRuntimeMs: 1, maxActiveMissions: 3 } }, missions, inbox: [], capabilities: [], skills: [], triggers: [] });
 
@@ -97,4 +97,32 @@ test("MA1: a stopped or skipped step never reads as running", () => {
   const task = { id: "t1", provider: "codex", latestEvent: { type: "agent.editing", detail: "x", at: 1, label: "Editing" } } as unknown as OrchTask;
   assert.deepEqual(agentRows(stopped, [task], 4).rows.map((r) => r.activity), ["Stopped", "Stopped", "Stopped", "Skipped"]);
   assert.equal(agentDetail(stopped, "1", [task])!.activity, "Stopped");
+});
+
+// Gate T9: the batch display is product language only — the shape, the count and the clock are the
+// Host's truth; no selectors, no capability JSON, no raw policy.
+test("T9: the batch button states what it allows, how many, where and how long", () => {
+  assert.equal(batchButtonLabel({ maxActions: 8, targetLabel: "Calculator", ttlMs: 120_000 }), "Allow this small batch · 8 actions · Calculator only · 2 min");
+  assert.equal(batchButtonLabel({ maxActions: 1, targetLabel: "Calculator", ttlMs: 120_000 }), "Allow this small batch · 1 action · Calculator only · 2 min");
+});
+test("T9: the offer lines name covered actions with truthful counts and what is never covered", () => {
+  const lines = batchOfferLines({ actions: ["computer.open_app", "computer.type", "computer.list_windows"], counts: { "computer.open_app": 1, "computer.type": 3 }, readOnly: ["computer.list_windows"], maxActions: 8, targetLabel: "Calculator", ttlMs: 120_000 });
+  assert.equal(lines.length, 3);
+  assert.match(lines[0], /Open its app, Enter text into a field ×3, List windows \(read-only, never counted\)/);
+  assert.doesNotMatch(lines[0], /\(read-only\) \(read-only/, "no doubled read-only wording");
+  assert.match(lines[1], /At most 8 desktop actions within 2 min/);
+  assert.match(lines[2], /never covers shell commands, files, installs, payments, secrets or anything destructive/);
+});
+test("T9: the batch status line reports the canonical count and each ended reason truthfully", () => {
+  const active: Pick<BatchView, "status" | "endReason" | "usedCount" | "maxActions" | "expiresAt" | "targetLabel"> = { status: "active", endReason: null, usedCount: 3, maxActions: 8, expiresAt: 180_000, targetLabel: "Calculator" };
+  assert.equal(batchStatusLabel(active, 120_000), "Small approval batch for Calculator: 3 of 8 actions used · 1:00 left.");
+  const ended = (reason: typeof active.endReason, phrase: RegExp) => {
+    assert.match(batchStatusLabel({ ...active, status: "ended", endReason: reason }, 999_999), phrase);
+  };
+  ended("exhausted", /all its actions were used after 3 of 8/);
+  ended("expired", /it expired after 3 of 8/);
+  ended("revoked", /it was revoked after 3 of 8/);
+  ended("scope_mismatch", /it reached a window outside its approval after 3 of 8/);
+  ended("mission_ended", /the mission ended after 3 of 8/);
+  ended("host_restart", /the Host restarted after 3 of 8/);
 });
