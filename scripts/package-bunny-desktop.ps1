@@ -43,6 +43,8 @@ $bunnyTooling=$bunnyBuild+'-tooling'
 $bunnyPackage=Join-Path $OutputDirectory $PackageName
 if(Test-Path -LiteralPath $bunnyPackage) {throw 'Package exists. Use a new name to preserve it.'}
 $toolingFiles=@('install/Start-Bunny-Release.ps1','install/Bunny-Release-Info.ps1','install/Bunny-State.ps1','install/release-pin.json','scripts/migrate-bunny-state.ps1','scripts/bunny-state-migration.mjs','scripts/install-bunny-release.ps1')
+& git -C $Repository cat-file -e ($toolingSha+':scripts/bunny-rollback-preflight.mjs') 2>$null
+if($LASTEXITCODE -eq 0) {$toolingFiles+=@('scripts/bunny-rollback-preflight.mjs')}
 $origins=New-Object System.Collections.ArrayList
 function Add-PackageFile([string]$From,[string]$PackagePath,[string]$Origin,[string]$RepoPath) {
   $target=Join-Path $bunnyPackage $PackagePath

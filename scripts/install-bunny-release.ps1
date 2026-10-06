@@ -62,6 +62,13 @@ function Save-Shortcut([string]$Destination) {
 }
 
 if($Rollback) {
+  # T10: a paused Mission or ephemeral desktop grant is active authority too. The read-only
+  # preflight scans canonical SQLite, rather than a limited dashboard page, before any switch.
+  $currentConfig=Get-Content -LiteralPath $installConfig -Raw | ConvertFrom-Json
+  $preflight=Join-Path $PSScriptRoot 'bunny-rollback-preflight.mjs'
+  if(-not(Test-Path -LiteralPath $preflight)) {throw 'Rollback preflight is unavailable. Nothing was switched.'}
+  & (Join-Path $currentConfig.currentRelease.folder 'runtime\node.exe') $preflight $installConfig
+  if($LASTEXITCODE -ne 0) {throw 'Rollback requires quiescent canonical work and disabled Missions/Triggers. Nothing was switched.'}
   if(-not $RollbackDirectory) {$RollbackDirectory=@(Get-ChildItem -LiteralPath (Join-Path $InstallRoot 'rollback') -Directory | Sort-Object Name)[-1].FullName}
   if(-not(Test-Path -LiteralPath (Join-Path $RollbackDirectory 'install.json'))) {throw 'Legacy rollback was refused: no pinned prior install configuration exists.'}
   $priorConfig=Get-Content -LiteralPath (Join-Path $RollbackDirectory 'install.json') -Raw | ConvertFrom-Json
