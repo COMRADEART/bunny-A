@@ -750,3 +750,56 @@ blocker remains the unreliable actual public connector route, rather than an acc
 
 Detailed categories, endpoint/credential boundaries, test attempts/limits, identities and
 evidence: [MA2_T6_REMOTE_ACCEPTANCE.md](MA2_T6_REMOTE_ACCEPTANCE.md). T7–T10 remain open.
+
+# M-A-2 Gate T6R — REMEDIATION (in progress)
+
+Gate T6R repairs only the failures that blocked T6, per the failure ledger
+produced from recorded T6 evidence before any repair
+([T6_FAILURE_LEDGER.md](T6_FAILURE_LEDGER.md)): F1 BLOCKER (sustained 530/1033
+with a live-but-degraded tunnel child), F2 HIGH (stale `settings/remote.json`
+after a hard kill) and F5 HIGH (exit-only supervisor blindness). F3/F6/F7/F8
+are procedure consequences of F1; F9–F13 require no repair.
+
+Root cause was refined with a LIVE 15-minute dual-protocol probe on this same
+network (`test-results/ma2-gate6r/probe/summary.json`): http2 and quic both
+sustained 90/90 public 200s with `cloudflared_tunnel_ha_connections` constant
+at 1 and exactly 1 register/0 unregister events each. A single registered
+edge connection is this network's normal steady state; the T6 BLOCKER was
+edge-registration churn (7 register/6 unregister in ~10 minutes with
+`Unauthorized: Tunnel not found` invalidation windows, archived tunnel log)
+leaving intermittent 530/1033 while the child stayed alive. Protocols are
+statistically equivalent, so production keeps `--protocol http2` (§28 minimum
+repair; §16 no named-tunnel migration; §18 no auto-download).
+
+The repair is confined to the installed release's tunnel transport surface
+(`scripts/bunny-tunnel-worker.mjs`, `scripts/bunny-tunnel.mjs`,
+`scripts/bunny-tunnel-state.mjs`), explicitly permitted by §28, and adds:
+(1) a supervised sustained-degradation watchdog — zero active registered
+connections ≥ 60 s, ≥ 7 registration events with < 2 active in 15 min (the
+recorded T6 signature), or a public `bunny-health` probe failure streak
+≥ 6 samples / ≥ 75% over ≥ 8 — restarting only the owned child inside the
+existing 3-attempt/10–20 s backoff budget, with an origin-fault outcome that is
+never attributed to the child (§19 local independence); (2) startup
+reconciliation clearing a dead worker's stale `settings/remote.json` and
+refusing a live foreign worker; (3) truthful degradation logging. Host
+authority, credentials, auth envelope, dashboard and Android companion source
+are unchanged.
+
+Verification so far: 13 tunnel tests (6 existing + 7 new) pass with no hang;
+247 script + 311 application = 558 pass/0 fail plus 34/34 UI = **592/592
+against the 585 floor**; typecheck, lint (0 errors/10 existing warnings) and
+normal build pass. The exact-source candidate is committed and staged:
+`Bunny-A-Windows-v17-T6` (17.0.0-T6) built by `package-bunny-desktop.ps1` from
+source `cb005ef75bf86d4d9e722b5214612fe115db5c6b` (the T6R repair commit) with
+committed pin `90a6e8da11e77bd1d3d402c166456f0d816fb4c4`; dashboard built,
+manifest 156 entries SHA-256
+`f5bf648c92711baba3fe4a24ea46c449fd8f226c0afa018f8f9cf93da52fde88`, and its
+verify/closure/source-check (76 files byte-identical) pass. It is **not
+installed and not activated**: per §45, activation and the live acceptance
+sequence require explicit user authorization, and per §20 the phone (or an
+independent external network) must participate. Remaining: install/activate
+v17-T6 under authorization, then the §22 A–Q sequence against the installed
+remediated runtime (§38–§41 security tests included). The verdict stays
+**BUNNY_MA2_T6_FAIL** until that sequence passes (§50). Full report:
+[MA2_T6_REMOTE_ACCEPTANCE.md §M-A-2 Gate T6R — REMEDIATION](MA2_T6_REMOTE_ACCEPTANCE.md).
+No test was weakened, skipped or reclassified (§1). T7–T10 remain open.

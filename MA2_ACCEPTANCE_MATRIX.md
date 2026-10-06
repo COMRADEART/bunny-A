@@ -465,3 +465,23 @@ installation/pairing and the remaining public checks are incomplete. Full report
 
 T6 failure is not a reversal of accepted T1–T5. This gate does not establish a reliable
 physical phone path and does not issue the full M-A-2 operational verdict. T7–T10 remain open.
+
+# M-A-2 Gate T6R — REMEDIATION (in progress)
+
+Repairs **only** the T6-blocking failures per the source-grounded failure ledger
+[T6_FAILURE_LEDGER.md](T6_FAILURE_LEDGER.md), one owned transport surface
+(`scripts/bunny-tunnel*.mjs`), under §28 minimum repair. Evidence:
+`test-results/ma2-gate6r/` and [MA2_T6_REMOTE_ACCEPTANCE.md §M-A-2 Gate T6R —
+REMEDIATION](MA2_T6_REMOTE_ACCEPTANCE.md). **BUNNY_MA2_T6_FAIL stands** until
+the §22 A–Q sequence passes against the remediated installed runtime (§50).
+
+| T6R criterion | Result and evidence |
+| --- | --- |
+| Failure ledger before repair | LIVE VERIFIED — `T6_FAILURE_LEDGER.md` from recorded T6 evidence only (F1 BLOCKER, F2/F5 HIGH, F3/F6–F8 procedure consequences, F9–F13 notes) |
+| Root-cause refinement | LIVE VERIFIED — 15-minute dual-protocol probe (`test-results/ma2-gate6r/probe/`): both http2 and quic sustained 90/90 public 200s with constant `ha_connections 1` and 1 register/0 unregister events on this same network; `ha=1` is normal steady state, the T6 blocker was registration churn + `Unauthorized: Tunnel not found` invalidation windows; `--protocol http2` kept unchanged |
+| Degradation watchdog (churn/zero-active/public-probe rules, origin-fault tri-state) + startup reconciliation of stale `settings/remote.json` + live-duplicate refusal | SIMULATED — `scripts/bunny-tunnel.test.mjs` 13 tests (6 existing + 7 new) pass, exit 0, no hang |
+| Regression floor (§31) | LIVE VERIFIED — 247 script + 311 application = 558 pass/0 fail, 34/34 UI → **592/592 vs. 585 floor**; typecheck, lint (0 errors/10 existing warnings) and normal build exit 0 |
+| Windows desktop release build of repaired runtime | LIVE VERIFIED — staged `releases/Bunny-A-Windows-v17-T6` (+zip, zip SHA-256 `29740a280d96a7d1ed87acab3fbd59fc709ed523e8f118da43be4603606ace1d`), exact source `cb005ef75bf86d4d9e722b5214612fe115db5c6b` via committed pin `90a6e8da11e77bd1d3d402c166456f0d816fb4c4`; dashboard built, manifest 156 entries, `verify`/`closure`/`source-check` (76 files) ok; **not installed or activated** |
+| Installed-runtime §22 A–Q re-run, §38–§41 security tests, revocation latency (F6), pairing abuse (F7), phone sequence (F4/F8) | NOT TESTED yet — requires §45 user authorization + §20 physical phone/independent external network |
+
+No authentication weakening, no test removal or reclassification, no T7/OCT-1/OD-1 work.

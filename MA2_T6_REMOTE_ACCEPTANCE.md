@@ -204,3 +204,82 @@ Signer certificate SHA-256
 `51b965f39ad64cc2b593c5d5a90fe307f368e19511338a163f90bf4310152dd7`.
 `android-apk.json` records per-source/tool hashes and build identity; the signing key stays
 private and outside the artifact. Android runtime acceptance is not inferred from signing.
+
+---
+
+# M-A-2 Gate T6R — REMEDIATION (in progress, verdict unchanged)
+
+**BUNNY_MA2_T6_FAIL stands** until the §22 A–Q sequence passes against the
+remediated installed runtime (§50). This section records Gate T6R: repair of
+only the failures that blocked T6 (§0/§28), no T7 work, no OCT-1/OD-1 features,
+no weakening of authentication, no test removals. Evidence root:
+`test-results/ma2-gate6r/`. Failure ledger (produced before any repair,
+2026-10-05/06, from recorded T6 evidence only):
+[T6_FAILURE_LEDGER.md](T6_FAILURE_LEDGER.md) — F1 BLOCKER (sustained 530/1033
+with a live-but-degraded child), F2 HIGH (stale `settings/remote.json` after a
+hard kill), F5 HIGH (exit-only supervisor blindness); F3/F6/F7/F8 are
+acceptance-procedure consequences of F1, F9–F13 are passing/none-needed notes.
+
+## Root cause, refined by live evidence
+
+A 15-minute disposable protocol A/B probe (`test-results/ma2-gate6r/probe/`,
+harness `protocol-ab.mjs`, 2026-10-06T02:36:36Z–02:51:50Z, LIVE VERIFIED) ran
+two quick tunnels from this same network against a dummy loopback origin, one
+`--protocol http2` and one `--protocol quic`: both returned **90/90 public
+200s with zero consecutive failures**, `cloudflared_tunnel_ha_connections`
+constant at **1**, and exactly **1 register / 0 unregister** edge events each.
+Consequences: `ha_connections 1` is this network's normal steady state (the
+earlier "1-of-4 HA connections" reading is partially wrong); the T6 BLOCKER
+was edge-registration **churn** (7 register/6 unregister in ~10 minutes with
+`Unauthorized: Tunnel not found` invalidation windows per the archived tunnel
+log `state/logs/archive/20261004-223629-2a7f7581-tunnel.log`) leaving
+intermittent 530/1033 while the child stayed alive; neither protocol is a
+contributor, so production keeps `--protocol http2` unchanged (§28 minimum
+repair).
+
+## Repaired implementation (one owned surface, transport path only)
+
+`scripts/bunny-tunnel-worker.mjs` and `scripts/bunny-tunnel.mjs` plus the
+shared decision/parsing helpers in `scripts/bunny-tunnel-state.mjs`:
+
+1. **Sustained-degradation watchdog** inside the supervisor (previously
+   exit-only). Three evidence-faithful rules, each restarting the owned child
+   within the existing 3-attempt/10–20 s backoff budget and never touching the
+   Host: (a) zero active registered connections ≥ 60 s; (b) ≥ 7 register+unregister
+   events with < 2 active within 15 min — the exact T6 diagnostic signature;
+   (c) end-to-end public health probe to `https://<host>/bunny-health` with a
+   ≥ 6-sample failure streak (~2 min) or ≥ 75% failure over ≥ 8 samples. The
+   probe is tri-state: an origin-side (gateway down) result is **never**
+   attributed to the child, preserving §19 local independence from the public
+   path.
+2. **Startup reconciliation** of stale published state: a surviving
+   `settings/remote.json` owned by a dead worker (the F2 residue) is cleared
+   and `remote.configure {enabled:false}` is attempted without Host restart;
+   a recorded live foreign worker is refused with an explicit error (no
+   duplicate tunnel takeover). `remote.json` remains Host-directed state,
+   never a constant.
+3. **Truthful degraded logging** on every degradation with the rule, active
+   registration count and totals; a final `Tunnel health:` line and the
+   existing exit-code 2 recovery-required contract.
+
+`--protocol http2`, loopback origin `127.0.0.1:8084`, credentials, pairing,
+auth envelopes, Host routes, dashboard and Android companion are all unchanged.
+No named-tunnel migration (§16), no binary auto-download (§18).
+
+## T6R verification so far (labels per the T6 section convention)
+
+| Property | Label | Evidence |
+| --- | --- | --- |
+| Root-cause A/B probe (15 min × 2 protocols, same network) | LIVE VERIFIED | `test-results/ma2-gate6r/probe/summary.json`, `samples.jsonl`, `proto-http2.log`, `proto-quic.log` |
+| Watchdog rules + startup reconciliation logic | SIMULATED (regression, simulated child/state) | `scripts/bunny-tunnel.test.mjs` — 13 tests (6 existing + 7 new); suite 247 script tests pass, exit 0, no hang |
+| Full regression floor | LIVE VERIFIED (this session) | 247 script + 311 application = **558 pass / 0 fail** (exit 0); UI **34/34** (`test:ui`, exit 0) → **592/592 against the 585 floor** |
+| `npm run typecheck` / `npm run lint` | LIVE VERIFIED (this session) | exit 0 both (lint retains the existing 10 warnings) |
+| Normal production build | LIVE VERIFIED (this session) | `test-results/ma2-gate6r/normal-build.log`, exit 0 |
+| Windows desktop release build of repaired runtime (staged, not installed/activated) | LIVE VERIFIED (this session) | `releases/Bunny-A-Windows-v17-T6` (+`zip.sha256` `29740a280d96a7d1ed87acab3fbd59fc709ed523e8f118da43be4603606ace1d`), built from exact source `cb005ef75bf86d4d9e722b5214612fe115db5c6b` via committed pin `90a6e8da11e77bd1d3d402c166456f0d816fb4c4`; dashboard built; manifest 156 entries (SHA-256 `f5bf648c92711baba3fe4a24ea46c449fd8f226c0afa018f8f9cf93da52fde88`); explicit `verify`/`closure`/`source-check` (76 files byte-identical) all ok — `test-results/ma2-gate6r/{verify,closure,source-check}-t6.json`, `regression-results.json` |
+| Installed-runtime public §22 A–Q acceptance, §38–§41 security tests, public revocation latency (F6), pairing-abuse window (F7), phone sequence (F8) | NOT TESTED yet | requires §45 user authorization + §20 physical phone (or independent external network); not claimed here |
+
+Everything already proven in the T6 sections above (auth boundary, pairing,
+Task/Mission/Stop, token-leak audit, local preservation) is unchanged by this
+remediation and is not being silently re-claimed; the R-sequence re-verifies
+the public path against the repaired installed runtime before any positive
+verdict. T7–T10 remain untouched.

@@ -608,3 +608,50 @@ Reject acceptance while the real installed public path is unreliable or the rema
 public/phone proof is absent. Preserved T1–T5 and a working APK build do not resolve that
 blocker. Named/custom-domain migration, new control-plane frameworks and T7–T10 are outside
 this work. No full M-A-2 operational verdict is issued.
+
+# M-A-2 Gate T6R — REMEDIATION (in progress)
+
+Scope for review: repair of **only** the T6-blocking findings, in one owned
+transport surface (`scripts/bunny-tunnel*.mjs`), under §28 minimum repair.
+The gate is still open: **BUNNY_MA2_T6_FAIL stands until the §22 A–Q sequence
+passes against the remediated installed runtime** (§50). No authentication
+change, no test removals, no T7/OCT-1/OD-1 work; T7–T10 remain open.
+
+Review, in this order:
+
+1. [T6_FAILURE_LEDGER.md](T6_FAILURE_LEDGER.md) — the source-grounded ledger
+   produced **before** any repair: F1 BLOCKER (sustained 530/1033 with a
+   live-but-degraded child), F2 HIGH (stale `settings/remote.json` after hard
+   kill), F5 HIGH (exit-only supervisor); procedure consequences F3/F6/F7/F8;
+   passing/none-needed notes F9–F13, plus an explicit "what did NOT fail" list.
+2. `test-results/ma2-gate6r/probe/` (`protocol-ab.mjs`, `summary.json`,
+   `samples.jsonl`, `proto-*.log`) — LIVE 15-minute dual-protocol probe on the
+   same network: both http2 and quic sustained 90/90 public 200s, constant
+   `ha_connections 1`, 1 register/0 unregister events each. This refines F1:
+   `ha=1` is the network's normal steady state; the T6 blocker was registration
+   churn (7/6 in ~10 min) with `Unauthorized: Tunnel not found` invalidation
+   windows (archived tunnel log). `--protocol http2` is retained unchanged.
+3. `scripts/bunny-tunnel-worker.mjs` / `scripts/bunny-tunnel.mjs` /
+   `scripts/bunny-tunnel-state.mjs` — the repair: sustained-degradation
+   watchdog (zero-active ≥ 60 s; ≥ 7 registration events with < 2 active in
+   15 min — the recorded T6 signature; public `bunny-health` probe streak
+   ≥ 6 / rate ≥ 75%), tri-state probe where an origin fault is never blamed on
+   the child (§19), startup reconciliation of a dead worker's stale
+   `settings/remote.json` with live-duplicate refusal, truthful degradation
+   logging — restarts confined to the owned child within the existing
+   3-attempt/10–20 s backoff budget; Host authority untouched.
+4. `scripts/bunny-tunnel.test.mjs` — 13 tests (6 existing + 7 new; SIMULATED,
+   simulated child/state) pass exit 0 with no hang; full floor re-proven:
+   247 script + 311 application = 558, plus 34/34 UI = **592/592 vs. the 585
+   floor**; typecheck/lint/normal-build exit 0 (`test-results/ma2-gate6r/normal-build.log`).
+5. `releases/Bunny-A-Windows-v17-T6` — the staged, exact-source-pinned
+   candidate (version 17.0.0-T6, source `cb005ef`, committed pin `90a6e8d`):
+   dashboard built, manifest 156 entries (SHA-256
+   `f5bf648c92711baba3fe4a24ea46c449fd8f226c0afa018f8f9cf93da52fde88`), explicit
+   `verify`/`closure`/`source-check` (76 files byte-identical) pass
+   (`test-results/ma2-gate6r/{verify,closure,source-check}-t6.json`,
+   `regression-results.json`). Deliberately not claimed: installation,
+   activation, the §22 A–Q installed-runtime sequence and the §38–§41 security
+   tests — those require §45 user authorization and §20 physical phone or
+   independent external-network participation; revocation latency (F6) gets a
+   single clean timed sample per stage.
