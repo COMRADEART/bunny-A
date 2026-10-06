@@ -567,7 +567,7 @@ test("T9 ask_every_time refuses batching: ask again forever, no rescue, no batch
   } finally { await env.cleanup(); }
 });
 
-test("T9 privacy: typed values exist only in the in-memory adapter call — never in requests, runs, events or the batch records", async () => {
+test("T9 privacy: canonical execution input never reaches renderer snapshots, requests, runs, events or batch records", async () => {
   const env = await setup();
   try {
     const secret = "hunter2-typed-value";
@@ -575,6 +575,9 @@ test("T9 privacy: typed values exist only in the in-memory adapter call — neve
       desktopStep("Launcher", "computer.open_app", { app: "calculator" }),
       desktopStep("Type", "computer.type", { title: "Calculator", name: "num1Button", text: secret }, [0]),
     ] });
+    assert.ok(!JSON.stringify(view).includes(secret), "the initial renderer response redacts typed input before approval");
+    const inputStep = env.missions.store.steps(view.id)[1];
+    assert.equal(inputStep.executor.kind === "capability" && inputStep.executor.params.text, secret, "Host input stays intact for the authorized execution");
     env.missions.approve(view.id, "workstation");
     await until(() => env.missions.store.requests(view.id).length === 1, "launch ask");
     await env.missions.respond(unresolved(env, view.id).id, "allow_once", "workstation");
@@ -591,7 +594,8 @@ test("T9 privacy: typed values exist only in the in-memory adapter call — neve
     for (const event of events(env, view.id)) assert.ok(!event.detail.includes(secret), "journal events carry actions, never content");
     assert.equal(env.missions.store.batches(view.id).length, 0, "secret input created no batch authority");
     const snapshot = env.missions.snapshot().missions.find((mission) => mission.id === view.id)!;
-    assert.ok(!JSON.stringify(snapshot.batch).includes(secret), "the batch block the UI renders carries no typed values");
+    assert.ok(!JSON.stringify(snapshot).includes(secret), "the entire renderer mission snapshot carries no typed values");
+    assert.ok(!JSON.stringify(env.missions.get(view.id)).includes(secret), "the mission detail response also redacts typed input");
   } finally { await env.cleanup(); }
 });
 

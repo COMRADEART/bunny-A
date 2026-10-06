@@ -23,7 +23,7 @@ import { scopedPath } from "./paths.server.ts";
 import { runsLocally } from "../bunny-host/router.ts";
 import { planMission, PLANNER_ID } from "./planner.server.ts";
 import { SkillLibrary, fill } from "./skills.server.ts";
-import { MissionStore } from "./store.server.ts";
+import { MissionStore, redact } from "./store.server.ts";
 import { TriggerEngine } from "./triggers.server.ts";
 import type {
   AuthorizationEnvelope, CapabilityResult, FailureCategory, Mission, MissionConfig, MissionSnapshot, MissionStep, MissionView,
@@ -183,7 +183,16 @@ export class MissionManager {
     return next;
   }
   view(mission: Mission): MissionView {
-    const steps = this.store.steps(mission.id);
+    // Execution inputs remain canonical on the Host. Renderer snapshots do not
+    // need typed values, even while an operation is awaiting approval.
+    const steps = this.store.steps(mission.id).map((step) => step.executor.kind === "model" ? step : {
+      ...step,
+      executor: { ...step.executor, params: redact({
+        ...step.executor.params,
+        ...(step.executor.kind === "capability" && step.executor.action === "computer.type" && typeof step.executor.params.text === "string"
+          ? { text: `[${step.executor.params.text.length} characters]` } : {}),
+      }) as typeof step.executor.params },
+    });
     const requests = this.store.requests(mission.id).sort((a, b) => b.createdAt - a.createdAt).slice(0, 20);
     const artifacts = this.store.artifacts(mission.id).slice(-30);
     const active = this.store.batches(mission.id).find((batch) => batch.status === "active");
