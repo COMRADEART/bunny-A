@@ -886,6 +886,17 @@ export class MissionManager {
       if (mission.state === "planning") { this.setMission(mission, { state: "failed", finishedAt: now, failure: { category: "host_restart", detail: "Host restarted during planning.", stepId: null } }, "mission.failed", "Host restarted during planning; replan to continue."); continue; }
       const interrupted: string[] = [];
       for (const step of this.store.steps(mission.id)) {
+        // A renderer may retain an old request ID across a Host restart. Neither that ID nor
+        // a one-time decision waiting to execute may create authority in the new process.
+        if (step.pendingRequestId || (step.approvedOnce && ["ready", "running", "verifying"].includes(step.state))) {
+          if (step.pendingRequestId) {
+            const request = this.store.request(step.pendingRequestId);
+            if (!request.resolvedAt) this.store.saveRequest({ ...request, resolvedAt: now, resolution: "deny", resolvedBy: "bunny-host-restart" });
+          }
+          this.setStep(step, { state: step.state === "ready" ? "blocked" : "failed", finishedAt: now, pendingRequestId: null, pendingPhase: null, approvedOnce: null, failure: { category: "host_restart", detail: "Previous approval request was invalidated by Host restart; retry requires a fresh decision." } }, "mission.permission_invalidated", `${step.role} needs a fresh permission request after Host restart.`);
+          interrupted.push(step.id);
+          continue;
+        }
         if (!STEP_LIVE.includes(step.state)) continue;
         const task = step.taskId ? (() => { try { return this.tasks.db.get(step.taskId!); } catch { return null; } })() : null;
         const detail = task ? `Child task ${task.id} (${task.provider}) was ${task.state} after the Host restart; its non-interactive provider stream cannot be reattached and was not resumed. Previous PID ${task.pid ?? "none"} retained.` : "A deterministic capability was running when the Host restarted; it was not resumed.";

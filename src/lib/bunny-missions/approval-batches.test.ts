@@ -517,6 +517,46 @@ test("T9 restart: every batch fails closed twice — the boot epoch refuses imme
   } finally { await env.cleanup(); }
 });
 
+test("T10-XG-13: Host restart invalidates a pending request; explicit retry creates a fresh decision", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "Pending approval across restart");
+    await grantBatch(env, view.id);
+    await until(() => env.missions.store.requests(view.id).length === 2, "separate pending request");
+    const old = unresolved(env, view.id), before = env.world.executed.length;
+    env.missions.recover();
+    assert.equal(env.missions.store.request(old.id).resolvedBy, "bunny-host-restart");
+    assert.equal(env.missions.store.request(old.id).resolution, "deny");
+    await assert.rejects(env.missions.respond(old.id, "allow_once", "workstation"), /already answered/);
+    assert.equal(env.world.executed.length, before);
+    assert.equal(env.missions.mission(view.id).state, "waiting_for_user");
+    env.missions.retry(view.id, "workstation");
+    await until(() => env.missions.store.requests(view.id).some(request => !request.resolvedAt), "fresh request after explicit retry");
+    assert.notEqual(unresolved(env, view.id).id, old.id);
+    assert.equal(env.world.executed.length, before, "retry never reuses the old permission");
+  } finally { await env.cleanup(); }
+});
+
+test("T10-XG-05: restart discards a one-time decision that has not begun GUI execution", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "Unstarted approval across restart");
+    await grantBatch(env, view.id);
+    await until(() => env.missions.store.requests(view.id).length === 2, "separate pending request");
+    const request = unresolved(env, view.id), step = env.missions.store.step(request.stepId);
+    // Reproduce the narrow persisted boundary after allow_once commits and before scheduling.
+    env.missions.store.saveRequest({ ...request, resolvedAt: Date.now(), resolution: "allow_once", resolvedBy: "workstation" });
+    env.missions.store.saveStep({ ...step, state: "ready", pendingRequestId: null, pendingPhase: null, approvedOnce: { requestId: request.id, action: request.action } });
+    const before = env.world.executed.length;
+    env.missions.recover();
+    const recovered = env.missions.store.step(step.id);
+    assert.equal(recovered.approvedOnce, null);
+    assert.equal(recovered.failure?.category, "host_restart");
+    assert.equal(env.world.executed.length, before);
+    assert.equal(env.missions.mission(view.id).state, "waiting_for_user");
+  } finally { await env.cleanup(); }
+});
+
 test("T9 remote: a paired phone may grant only the offered batch, revoke its own, and the counts stay canonical", async () => {
   const env = await setup();
   try {
