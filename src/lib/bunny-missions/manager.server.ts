@@ -82,7 +82,7 @@ export class MissionManager {
       new FilesystemCapability(), new TerminalCapability(), new GitCapability(options.dataDirectory),
       new NotificationsCapability((title, detail, missionId) => this.emit("notification.sent", `${title}${detail ? `\n${detail}` : ""}`, missionId)),
       new BrowserCapability(options.dataDirectory, { headless: this.cached.browserHeadless, allowLoopback: options.browser?.allowLoopback,containment:tasks.containment }),
-      new ComputerCapability(options.dataDirectory), new GitHubCapability(), ...communicationConnectors(),
+      new ComputerCapability(options.dataDirectory, { load: owner => this.store.calculatorTarget(owner), save: (owner, target) => this.store.saveCalculatorTarget(owner, target) }), new GitHubCapability(), ...communicationConnectors(),
     ];
     for (const adapter of adapters) this.bus.register(adapter);
     this.skills = new SkillLibrary(this.store, this.bus, (type, detail, missionId) => this.emit(type, detail, missionId));

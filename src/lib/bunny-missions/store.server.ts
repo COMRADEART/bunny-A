@@ -1,5 +1,6 @@
 import type { HostDatabase } from "../bunny-host/persistence.server.ts";
 import type { HostEvent } from "../bunny-host/contracts.ts";
+import type { CalculatorTarget } from "./capabilities/calculator-targets.server.ts";
 import type {
   ApprovalBatch, Artifact, AuthorizationEnvelope, CapabilityRun, GrantPolicy, InboxEvent, MemoryEntry, Mission, MissionConfig, MissionStep,
   PermissionRequest, Skill, Trigger,
@@ -73,6 +74,16 @@ export class MissionStore {
     return { ...DEFAULT_CONFIG, ...saved, enabled, limits: { ...DEFAULT_CONFIG.limits, ...saved.limits } };
   }
   saveConfig(config: MissionConfig) { this.db.prepare("INSERT INTO settings VALUES('missions_config',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(config)); }
+
+  /** Execution identity only, kept in the existing Host settings table. Never a grant. */
+  calculatorTarget(owner: string): CalculatorTarget | null {
+    const row = this.db.prepare("SELECT value FROM settings WHERE key=?").get(`computer.target:${owner}`) as { value: string } | undefined;
+    return row ? JSON.parse(row.value) as CalculatorTarget : null;
+  }
+  saveCalculatorTarget(owner: string, target: CalculatorTarget) {
+    this.db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run(`computer.target:${owner}`, JSON.stringify(target));
+  }
 
   saveMission(mission: Mission) {
     this.db.prepare("INSERT INTO missions(id,state,created_at,updated_at,record) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at,record=excluded.record")

@@ -279,7 +279,16 @@ export class CapabilityBus {
     // open_app's pid is the launcher process, not the window owner (Store-app launchers spawn a
     // separate window process), so it is not window identity and never binds the batch. The first
     // window-bearing execution (focus/type/invoke/read_controls) is what proves the owning process.
-    if (request.action === "computer.open_app") return;
+    if (request.action === "computer.open_app") {
+      const identity = (result.output as { windowIdentity?: ApprovalBatch["windowIdentity"] })?.windowIdentity;
+      if (identity) {
+        if (batch.windowIdentity && JSON.stringify(batch.windowIdentity) !== JSON.stringify(identity)) {
+          this.store.endBatch(batch.id, "scope_mismatch", "bunny-computer-runtime");
+          this.emit("approval.batch_scope_mismatch", "Acquired Calculator target differs from the approved native identity; further actions require fresh approval.", batch.missionId);
+        } else this.store.saveBatch({ ...batch, windowIdentity: identity, observedPid: identity.processId, observedPidFrom: "post-run" });
+      }
+      return;
+    }
     const observed = extractObservedPid(result.output);
     if (observed == null) return;
     const pinned = batch.observedPid ?? batch.target.processId;

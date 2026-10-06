@@ -238,7 +238,7 @@ export type ApprovalBatch = {
   /** Digests of concrete Host-planned operations, keyed by their owning step. No input values. */
   operations?: { stepId: string; digest: string }[];
   /** Exact native window + process lifetime observed before any covered window mutation. */
-  windowIdentity?: { handle: string; processId: number; processStartedAt: string };
+  windowIdentity?: { handle: string; processId: number; processStartedAt: string; contentProcessId?: number; contentStartedAt?: string };
 };
 
 /** What the Host proposes when a permission request comes from a small, predictable desktop sequence. */
