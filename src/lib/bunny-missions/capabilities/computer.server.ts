@@ -87,7 +87,14 @@ function Assert-BatchWindow($w) {
   if (-not $trusted) { throw 'The target is outside the verified Calculator application.' }
   $elements = $w.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
   foreach ($e in $elements) {
-    if ($e.Current.IsPassword -or $e.Current.ControlType -eq [System.Windows.Automation.ControlType]::Window) { throw 'A dialog or sensitive input requires a fresh decision.' }
+    if ($e.Current.IsPassword) { throw 'A dialog or sensitive input requires a fresh decision.' }
+    if ($e.Current.ControlType -eq [System.Windows.Automation.ControlType]::Window) {
+      $wp = $null
+      if ($e.TryGetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern, [ref]$wp) -and $wp.Current.IsModal) { throw 'A modal dialog requires a fresh decision.' }
+      $knownFrame = $e.Current.ProcessId -eq $w.Current.ProcessId -and $e.Current.ClassName -eq 'ApplicationFrameTitleBarWindow'
+      $knownContent = $e.Current.ProcessId -eq $digit.Current.ProcessId -and $e.Current.ClassName -eq 'Windows.UI.Core.CoreWindow'
+      if (-not $knownFrame -and -not $knownContent) { throw 'An unexpected window requires a fresh decision.' }
+    }
   }
 }
 function Assert-BatchControl($w, $e) {
