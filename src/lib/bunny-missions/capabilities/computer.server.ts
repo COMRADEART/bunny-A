@@ -2,7 +2,8 @@ import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 import { scopedPath } from "../paths.server.ts";
-import type { ActionManifest, CapabilityResult } from "../types.ts";
+import type { ActionManifest, ApprovalBatch, CapabilityResult } from "../types.ts";
+import { calculatorOperation } from "../batches.server.ts";
 import type { CapabilityAdapter, ExecutionContext } from "./bus.server.ts";
 import { trackOwnedChild } from "../../bunny-host/owned-processes.server.ts";
 
@@ -14,6 +15,7 @@ const EXECUTABLE = /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|msi|msp|s
 const PRELUDE = String.raw`
 $ErrorActionPreference = 'Stop'
 $p = $env:BUNNY_COMPUTER_PARAMS | ConvertFrom-Json
+$batch = if ($env:BUNNY_COMPUTER_BATCH) { $env:BUNNY_COMPUTER_BATCH | ConvertFrom-Json } else { $null }
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
@@ -27,9 +29,21 @@ public static class BunnyWin {
 }
 "@
 function Find-Window($p) {
+  if ($batch.windowIdentity) {
+    $w = [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr][long]$batch.windowIdentity.handle)
+    Assert-BatchWindow $w
+    return $w
+  }
   $all = [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
   foreach ($w in $all) {
     $c = $w.Current
+    if ($batch) {
+      if ($p.pid -and $c.ProcessId -ne [int]$p.pid) { continue }
+      if ($p.title -and $c.Name -ne [string]$p.title) { continue }
+      if (-not $p.pid -and -not $p.title) { continue }
+      Assert-BatchWindow $w
+      return $w
+    }
     if (($p.pid -and $c.ProcessId -eq [int]$p.pid) -or ($p.title -and $c.Name -like ('*' + $p.title + '*'))) { return $w }
   }
   throw ('No top-level window matches ' + ($(if ($p.pid) { 'pid ' + $p.pid } else { 'title "' + $p.title + '"' })))
@@ -45,6 +59,44 @@ function Find-Control($w, $p) {
   return $e
 }
 function Describe($e) { $c = $e.Current; [ordered]@{ name = $c.Name; controlType = $c.ControlType.ProgrammaticName; automationId = $c.AutomationId; className = $c.ClassName; processId = $c.ProcessId; enabled = $c.IsEnabled } }
+function Assert-BatchClock {
+  if ($batch -and [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -ge [long]$batch.expiresAt) { throw 'Bounded approval expired before the desktop operation.' }
+}
+function Batch-Identity($w) {
+  $proc = Get-Process -Id $w.Current.ProcessId -ErrorAction Stop
+  [ordered]@{ handle = [string]$w.Current.NativeWindowHandle; processId = $w.Current.ProcessId; processStartedAt = [string]$proc.StartTime.ToUniversalTime().Ticks }
+}
+function Assert-BatchWindow($w) {
+  if (-not $batch) { return }
+  Assert-BatchClock
+  if (-not $w -or $w.Current.Name -ne 'Calculator') { throw 'The approved Calculator window is unavailable.' }
+  $identity = Batch-Identity $w
+  if ($batch.windowIdentity -and ($identity.handle -ne $batch.windowIdentity.handle -or $identity.processId -ne $batch.windowIdentity.processId -or $identity.processStartedAt -ne $batch.windowIdentity.processStartedAt)) { throw 'The approved window or process lifetime changed.' }
+  # A UWP frame pid alone can host several apps. Require the arithmetic control to belong to
+  # the installed Microsoft Calculator package, rather than trusting a title or frame process.
+  $digit = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'num0Button')))
+  if (-not $digit) { throw 'No verified Calculator arithmetic surface.' }
+  $content = Get-Process -Id $digit.Current.ProcessId -ErrorAction Stop
+  $packages = @(Get-AppxPackage -Name Microsoft.WindowsCalculator | Where-Object { $_.PublisherId -eq '8wekyb3d8bbwe' -and $_.SignatureKind -in @('Store','System') })
+  $trusted = $false
+  foreach ($package in $packages) {
+    foreach ($exe in @('CalculatorApp.exe','Calculator.exe')) {
+      if ([string]::Equals($content.Path, (Join-Path $package.InstallLocation $exe), [StringComparison]::OrdinalIgnoreCase)) { $trusted = $true }
+    }
+  }
+  if (-not $trusted) { throw 'The target is outside the verified Calculator application.' }
+  $elements = $w.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+  foreach ($e in $elements) {
+    if ($e.Current.IsPassword -or $e.Current.ControlType -eq [System.Windows.Automation.ControlType]::Window) { throw 'A dialog or sensitive input requires a fresh decision.' }
+  }
+}
+function Assert-BatchControl($w, $e) {
+  if (-not $batch) { return }
+  Assert-BatchWindow $w
+  $zero = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'num0Button')))
+  if (-not $e.Current.IsEnabled -or $e.Current.IsPassword -or $e.Current.ProcessId -ne $zero.Current.ProcessId -or $e.Current.ControlType -ne [System.Windows.Automation.ControlType]::Button) { throw 'An unexpected control requires a fresh decision.' }
+  if ([BunnyWin]::GetForegroundWindow() -ne [IntPtr]$w.Current.NativeWindowHandle) { throw 'Foreground drift requires a fresh decision.' }
+}
 `;
 const SCRIPTS: Record<string, string> = {
   "computer.list_windows": String.raw`
@@ -61,6 +113,7 @@ $out = @(); foreach ($e in $items) { if ($out.Count -ge $max) { break }; $d = De
 $before = [BunnyWin]::Title([BunnyWin]::GetForegroundWindow())
 $w = Find-Window $p
 $h = [IntPtr]$w.Current.NativeWindowHandle
+Assert-BatchWindow $w
 if ([BunnyWin]::IsIconic($h)) { [void][BunnyWin]::ShowWindow($h, 9) }
 [void][BunnyWin]::SetForegroundWindow($h)
 Start-Sleep -Milliseconds 250
@@ -69,7 +122,9 @@ $after = [BunnyWin]::Title([BunnyWin]::GetForegroundWindow())
   "computer.invoke_control": String.raw`
 $w = Find-Window $p
 $e = Find-Control $w $p
+Assert-BatchControl $w $e
 $pattern = $null; $kind = ''
+if ($batch -and -not $e.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) { throw 'The approved arithmetic control no longer supports invocation.' }
 if ($e.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) { $pattern.Invoke(); $kind = 'invoke' }
 elseif ($e.TryGetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern, [ref]$pattern)) { $pattern.Toggle(); $kind = 'toggle' }
 elseif ($e.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pattern)) { $pattern.Select(); $kind = 'select' }
@@ -96,16 +151,25 @@ $bmp.Save([string]$p.path, [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose(); $bmp.Dispose()
 @{ path = $p.path; width = $b.Width; height = $b.Height } | ConvertTo-Json -Compress`,
   "computer.open_app": String.raw`
+Assert-BatchClock
 $before = @(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 } | ForEach-Object { $_.Id })
 $proc = if ($p.target) { Start-Process -FilePath ([string]$p.file) -ArgumentList ('"' + [string]$p.target + '"') -PassThru } else { Start-Process -FilePath ([string]$p.file) -PassThru }
 Start-Sleep -Milliseconds 800
 $after = @(Get-Process | Where-Object { $_.MainWindowHandle -ne 0 } | ForEach-Object { $_.Id })
 @{ pid = $proc.Id; file = $p.file; newWindows = @($after | Where-Object { $before -notcontains $_ }).Count } | ConvertTo-Json -Compress`,
+  "computer.read_calculator": String.raw`
+$w = Find-Window $p
+Assert-BatchWindow $w
+$result = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'CalculatorResults')))
+if (-not $result) { throw 'Calculator result unavailable.' }
+$zero = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'num0Button')))
+if ($result.Current.IsPassword -or $result.Current.ProcessId -ne $zero.Current.ProcessId) { throw 'Calculator result identity changed.' }
+@{ windowPid = $w.Current.ProcessId; result = $result.Current.Name } | ConvertTo-Json -Compress`,
 };
 
-function powershell(script: string, params: Record<string, unknown>, signal: AbortSignal, timeoutMs: number): Promise<unknown> {
+function powershell(script: string, params: Record<string, unknown>, signal: AbortSignal, timeoutMs: number, batch?: ExecutionContext["desktopBatch"]): Promise<unknown> {
   return new Promise((resolveRun, reject) => {
-    const child = trackOwnedChild(execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", `${PRELUDE}\n${script}`], { windowsHide: true, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, BUNNY_COMPUTER_PARAMS: JSON.stringify(params) }, signal }, (error, stdout, stderr) => {
+    const child = trackOwnedChild(execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", `${PRELUDE}\n${script}`], { windowsHide: true, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, BUNNY_COMPUTER_PARAMS: JSON.stringify(params), BUNNY_COMPUTER_BATCH: batch ? JSON.stringify(batch) : "" }, signal }, (error, stdout, stderr) => {
       if (error) { reject(new Error(((stderr || error.message).split(/\r?\n/).filter(Boolean)[0] ?? "UI Automation failed.").replace(/\s+At line:\d+.*$/, "").slice(0, 600))); return; }
       try { resolveRun(JSON.parse(stdout.trim().split(/\r?\n/).at(-1) ?? "null")); } catch { reject(new Error(`Unreadable automation result: ${stdout.slice(0, 200)}`)); }
     }));
@@ -132,6 +196,7 @@ export class ComputerCapability implements CapabilityAdapter {
       { id: "computer.type", description: "Set the value of an editable control via the UI Automation ValuePattern (not keystrokes).", risk: "EXECUTE", inputs: [input("title", "string", false, "Window title contains."), input("pid", "number", false, "Process id."), input("name", "string", false, "Control name."), input("automationId", "string", false, "Automation id."), input("text", "string", true, "Value to set.")], outputs: "{ control, windowPid, matches }", evidence: "The matched top-level window's owning pid, value length before/after and whether it matches.", timeoutMs: 30_000, implemented: true },
       { id: "computer.capture", description: "Capture the whole virtual screen to a PNG artifact.", risk: "READ", sensitive: true, inputs: [], outputs: "{ path, width, height }", evidence: "PNG artifact with SHA-256.", timeoutMs: 30_000, implemented: true },
       { id: "computer.open_app", description: `Start an allowlisted application (${Object.keys(APPS).join(", ")}), optionally on a non-executable file inside an approved root.`, risk: "EXECUTE", inputs: [input("app", "string", true, "Allowlisted app name."), input("target", "string", false, "File or folder inside an approved root.")], outputs: "{ pid, newWindows }", evidence: "Started process id and new window count.", timeoutMs: 20_000, implemented: true },
+      { id: "computer.read_calculator", description: "Read only the arithmetic result of the verified Microsoft Calculator application.", risk: "READ", inputs: [input("title", "string", false, "Calculator window."), input("pid", "number", false, "Window owner.")], outputs: "{ windowPid, result }", evidence: "Verified Calculator result, no other controls.", timeoutMs: 30_000, implemented: true },
     ] satisfies ActionManifest[],
   };
   async health() {
@@ -139,6 +204,7 @@ export class ComputerCapability implements CapabilityAdapter {
     return { availability: "available" as const, detail: "Windows UI Automation and user32 via powershell.exe. Raw mouse/keyboard injection is intentionally not offered." };
   }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
+    if (context.desktopBatch && !calculatorOperation(action, params)) throw new Error("Operation outside the Calculator batch policy.");
     const script = SCRIPTS[action];
     if (!script) return { ok: false, status: "unsupported", summary: `${action} is not supported.`, output: null, evidence: [] };
     const args: Record<string, unknown> = {};
@@ -153,7 +219,7 @@ export class ComputerCapability implements CapabilityAdapter {
     if (action === "computer.open_app") {
       const app = String(params.app ?? "").toLowerCase();
       if (!APPS[app]) return { ok: false, status: "failed", summary: `"${app}" is not an allowlisted application (${Object.keys(APPS).join(", ")}).`, output: null, evidence: [], errorCategory: "permission_denied" };
-      args.file = APPS[app];
+      args.file = context.desktopBatch ? join(process.env.WINDIR ?? "C:/Windows", "System32", "calc.exe") : APPS[app];
       if (typeof params.target === "string" && params.target) {
         const target = scopedPath(context.cwd, params.target, context.roots);
         if (!existsSync(target)) throw new Error(`${target} does not exist.`);
@@ -161,7 +227,8 @@ export class ComputerCapability implements CapabilityAdapter {
         args.target = target;
       }
     }
-    const output = await powershell(script, args, context.signal, Math.min(context.timeoutMs, 60_000)) as Record<string, unknown>;
+    const batch = context.desktopBatch ?? (action === "computer.read_calculator" ? { expiresAt: Date.now() + context.timeoutMs } : undefined);
+    const output = await powershell(script, args, context.signal, Math.min(context.timeoutMs, 60_000), batch) as Record<string, unknown>;
     const summaries: Record<string, () => string> = {
       "computer.list_windows": () => `${(output.windows as unknown[] | undefined)?.length ?? 0} windows; foreground "${String(output.foreground ?? "")}".`,
       "computer.read_controls": () => `${(output.controls as unknown[] | undefined)?.length ?? 0} named controls in "${String((output.window as Record<string, unknown>)?.name ?? "")}".`,
@@ -170,10 +237,19 @@ export class ComputerCapability implements CapabilityAdapter {
       "computer.type": () => output.matches ? "Value set and read back." : "Value set but the read-back differs.",
       "computer.capture": () => `Captured ${String(output.width)}×${String(output.height)} screen.`,
       "computer.open_app": () => `Started ${String(output.file)} (pid ${String(output.pid)}).`,
+      "computer.read_calculator": () => `Calculator result: ${String(output.result)}.`,
     };
     const verified = action === "computer.focus_window" ? output.focused === true : action === "computer.type" ? output.matches === true : true;
     const result: CapabilityResult = { ok: verified, status: verified ? "succeeded" : "failed", summary: summaries[action](), output, evidence: [`${action} via UI Automation at ${new Date().toISOString()}`], before: output.before, after: output.after, ...(verified ? {} : { errorCategory: "capability_failed" as const }) };
     if (action === "computer.capture" && typeof output.path === "string") result.artifacts = [{ type: "screenshot", title: "Screen capture", path: output.path, mediaType: "image/png" }];
     return result;
+  }
+  async prepareBatchAction(action: string, params: Record<string, unknown>, batch: ApprovalBatch) {
+    if (!calculatorOperation(action, params)) throw new Error("Operation outside the Calculator batch policy.");
+    if (action === "computer.open_app") return null;
+    const output = await powershell("$w = Find-Window $p; Batch-Identity $w | ConvertTo-Json -Compress", params, new AbortController().signal, 20_000,
+      { expiresAt: batch.expiresAt, windowIdentity: batch.windowIdentity }) as NonNullable<ApprovalBatch["windowIdentity"]>;
+    if (!output || !/^\d+$/.test(output.handle) || output.processId <= 0 || !/^\d+$/.test(output.processStartedAt)) throw new Error("Window identity unavailable.");
+    return output;
   }
 }

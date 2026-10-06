@@ -7,7 +7,7 @@ import { HostContainment, safeError } from "../../bunny-host/failure.server.ts";
 import type { OwnedProcessRecord } from "../../bunny-host/owned-process-group.server.ts";
 import type {
   ActionManifest, AuthorizationEnvelope, CapabilityAvailability, CapabilityManifest, CapabilityResult, CapabilityRun, CapabilityStatus,
-  PermissionDecision, RiskClass,
+  PermissionDecision, RiskClass, ApprovalBatch,
 } from "../types.ts";
 
 export type ExecutionContext = {
@@ -24,6 +24,8 @@ export type ExecutionContext = {
   timeoutMs: number;
   /** Resolved before permission evaluation; terminal must launch this identity without a second PATH lookup. */
   executable?: Resolved | null;
+  /** Host-only batch admission data. Never copied from action parameters. */
+  desktopBatch?: { expiresAt: number; windowIdentity?: NonNullable<ApprovalBatch["windowIdentity"]> };
 };
 
 /** A capability provider. Adapters report unavailable/unconfigured/unsupported truthfully; they never fake success. */
@@ -34,6 +36,7 @@ export interface CapabilityAdapter {
   /** Parameter-dependent escalation (e.g. `git reset --hard` is DESTRUCTIVE even though terminal.exec is EXECUTE). */
   riskFor?(action: string, params: Record<string, unknown>): RiskClass | null;
   close?(): Promise<void>;
+  prepareBatchAction?(action: string, params: Record<string, unknown>, batch: ApprovalBatch): Promise<NonNullable<ApprovalBatch["windowIdentity"]> | null>;
 }
 
 export type CapabilityRequest = {
@@ -156,7 +159,40 @@ export class CapabilityBus {
     const found = this.find(request.action);
     const executable = request.action === "terminal.exec" ? resolveCommand(String(request.params.command ?? ""), request.cwd) : undefined;
     const cancelled = request.missionId && this.cancelledMissions.has(request.missionId) || request.stepId && this.cancelledSteps.has(request.stepId);
-    const decision: PermissionDecision = cancelled ? { decision: "deny", reason: "Execution was cancelled by Bunny-A.", risk: this.riskOf(request.action, request.params) ?? "READ" } : this.decision(request, executable);
+    if (request.missionId) for (const batch of this.store.batches(request.missionId)) {
+      if (batch.status === "active" && batch.expiresAt <= Date.now()) {
+        this.store.endBatch(batch.id, "expired", "bunny-capability-bus");
+        this.emit("approval.batch_expired", "Small approval batch expired; further actions require fresh approval.", request.missionId);
+      }
+    }
+    let decision: PermissionDecision = cancelled ? { decision: "deny", reason: "Execution was cancelled by Bunny-A.", risk: this.riskOf(request.action, request.params) ?? "READ" } : this.decision(request, executable);
+    let desktopBatch: ExecutionContext["desktopBatch"];
+    if (decision.batch && found) {
+      const batch = this.store.batch(decision.batch.id);
+      try {
+        if (!batch || !found.adapter.prepareBatchAction) throw new Error("No trusted target validation.");
+        const identity = await found.adapter.prepareBatchAction(request.action, request.params, batch);
+        // A target probe is asynchronous. Re-read all authority and cancellation after it.
+        const live = this.store.batch(batch.id);
+        const mission = request.missionId ? this.store.mission(request.missionId) : null;
+        const envelope = mission?.authorizationId ? this.store.authorization(mission.authorizationId) : null;
+        if (this.cancelledMissions.has(request.missionId ?? "") || this.cancelledSteps.has(request.stepId ?? "") || !mission || ["stopped", "failed", "completed"].includes(mission.state)) {
+          decision = { decision: "deny", reason: "Execution was cancelled by Bunny-A.", risk: decision.risk };
+        } else {
+          decision = this.decision({ ...request, envelope }, executable);
+          if (decision.batch?.id !== batch.id || !live || live.status !== "active") throw new Error("Authority changed during target validation.");
+          if (identity) {
+            if (live.windowIdentity && JSON.stringify(live.windowIdentity) !== JSON.stringify(identity)) throw new Error("Window identity changed.");
+            this.store.saveBatch({ ...live, windowIdentity: identity, observedPid: identity.processId, observedPidFrom: "params" });
+          } else if (request.action !== "computer.open_app") throw new Error("No window identity.");
+          desktopBatch = { expiresAt: Math.min(live.expiresAt, envelope!.expiresAt), ...(identity ? { windowIdentity: identity } : {}) };
+        }
+      } catch {
+        if (batch?.status === "active") this.store.endBatch(batch.id, "scope_mismatch", "bunny-computer-runtime");
+        this.emit("approval.batch_scope_mismatch", "Desktop target or approval changed before admission; no mutation was admitted and fresh approval is required.", request.missionId);
+        decision = { decision: "ask", reason: "Desktop target or approval changed; review this action again.", risk: decision.risk };
+      }
+    }
     // Typed text and file bodies may be private; records keep their size, not their content.
     const recorded = { ...request.params };
     for (const key of ["text", "content"]) if (typeof recorded[key] === "string") recorded[key] = `[${(recorded[key] as string).length} characters]`;
@@ -186,14 +222,14 @@ export class CapabilityBus {
     }
     // Gate T9 admission gate: re-validate status, epoch, expiry and budget atomically immediately
     // before execution. A failed guard executes nothing; no run is created; the ask path follows.
-    if (decision.batch) {
+    if (decision.batch && decision.risk !== "READ") {
       const consumed = this.store.consumeBatch(decision.batch.id, currentBatchEpoch(), Date.now());
-      if (!consumed.ok) { this.emit("authorization.denied", `${request.action}: ${consumed.reason}`, request.missionId); return finish("denied", consumed.reason, null); }
+      if (!consumed.ok) { this.emit("authorization.required", `${request.action}: ${consumed.reason}`, request.missionId); return { decision: { decision: "ask", risk: decision.risk, reason: consumed.reason }, run: null, result: null, artifactIds: [] }; }
+      this.emit("approval.batch_consumed", `${request.action} admitted under the small approval batch: ${consumed.usedCount} / ${consumed.maxActions} mutating actions used.`, request.missionId);
       if (consumed.usedCount === consumed.maxActions) {
         this.store.endBatch(decision.batch.id, "exhausted", "bunny-capability-bus");
         this.emit("approval.batch_exhausted", `Small approval batch reached its ${consumed.maxActions}-action limit; further ${request.action.split(".")[0]}.* actions ask again.`, request.missionId);
       }
-      this.emit("approval.batch_consumed", `${request.action} admitted under the small approval batch: ${consumed.usedCount} / ${consumed.maxActions} mutating actions used.`, request.missionId);
     }
     this.emit("authorization.granted", `${request.action}: ${decision.reason}`, request.missionId);
     this.store.host.transaction(()=>{this.store.saveRun(base);this.emit("capability.started", `${request.action} started.`, request.missionId);});
@@ -206,7 +242,7 @@ export class CapabilityBus {
     let result: CapabilityResult;
     const processOwnership: OwnedProcessRecord[]=[];
     try {
-      result = await found.adapter.execute(request.action, request.params, { missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable });
+      result = await found.adapter.execute(request.action, request.params, { missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch });
       if(processOwnership.length) result={...result,output:{...(result.output && typeof result.output === "object" ? result.output : {value:result.output}),processOwnership}};
     } catch (error) {
       const message = safeError(error).message;

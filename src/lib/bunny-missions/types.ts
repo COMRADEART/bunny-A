@@ -235,6 +235,10 @@ export type ApprovalBatch = {
   endReason: "exhausted" | "expired" | "revoked" | "scope_mismatch" | "mission_ended" | "host_restart" | null;
   endBy: string | null;
   originStepId: string;
+  /** Digests of concrete Host-planned operations, keyed by their owning step. No input values. */
+  operations?: { stepId: string; digest: string }[];
+  /** Exact native window + process lifetime observed before any covered window mutation. */
+  windowIdentity?: { handle: string; processId: number; processStartedAt: string };
 };
 
 /** What the Host proposes when a permission request comes from a small, predictable desktop sequence. */
@@ -252,6 +256,7 @@ export type PermissionBatchOffer = {
   targetTier: "process" | "app";
   /** Read-only covered actions (never consume the budget). */
   readOnly: string[];
+  operations?: { stepId: string; digest: string }[];
 };
 
 export type BatchView = {

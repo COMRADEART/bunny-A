@@ -15,9 +15,9 @@ import { FilesystemCapability, GitCapability, NotificationsCapability, TerminalC
 import { BrowserCapability } from "./capabilities/browser.server.ts";
 import { communicationConnectors } from "./capabilities/connectors.server.ts";
 import type { CapabilityAdapter } from "./capabilities/bus.server.ts";
-import { consultBatch, extractObservedPid, rotateBatchEpochForTest, riskAtMost } from "./batches.server.ts";
+import { consultBatch, extractObservedPid, rotateBatchEpochForTest, riskAtMost, operationDigest } from "./batches.server.ts";
 import { simulatedCodexProfile } from "../bunny-host/testing/codex.test.ts";
-import type { ActionManifest, ApprovalBatch, AuthorizationEnvelope, CapabilityManifest, MissionView, PermissionBatchOffer, PermissionRequest, RiskClass } from "./types.ts";
+import type { ActionManifest, ApprovalBatch, AuthorizationEnvelope, CapabilityManifest, MissionView, PermissionRequest, RiskClass } from "./types.ts";
 
 // ── the same conventions as missions.test.ts ─────────────────────────────────
 function ready(id: ProviderId): ProviderLive {
@@ -41,6 +41,7 @@ const actionManifest = (id: string, risk: RiskClass, extra: Partial<ActionManife
   ({ id, description: "", risk, inputs: [], outputs: "", evidence: "", timeoutMs: 1000, implemented: true, ...extra });
 const COMPUTER_ACTIONS: ActionManifest[] = [
   actionManifest("computer.list_windows", "READ"),
+  actionManifest("computer.read_calculator", "READ"),
   actionManifest("computer.read_controls", "READ", { sensitive: true }),
   actionManifest("computer.focus_window", "EXECUTE"),
   actionManifest("computer.invoke_control", "EXECUTE"),
@@ -55,6 +56,14 @@ function fakeComputer(world: World): CapabilityAdapter {
   return {
     manifest,
     health: async () => ({ availability: "available", detail: "" }),
+    prepareBatchAction: async (action, params, batch) => {
+      if (action === "computer.open_app") return null;
+      const owner = params.pid !== undefined ? Number(params.pid) : world.owner.get(String(params.title).toLowerCase());
+      if (owner !== 4242) throw new Error("Foreign application");
+      const identity = { handle: "123", processId: owner, processStartedAt: "123456789" };
+      if (batch.windowIdentity && JSON.stringify(batch.windowIdentity) !== JSON.stringify(identity)) throw new Error("Window drift");
+      return identity;
+    },
     execute: async (action, params) => {
       world.executed.push({ action, params });
       const title = String(params.title ?? "");
@@ -68,6 +77,7 @@ function fakeComputer(world: World): CapabilityAdapter {
         // element's own process; on UWP hosts those differ (frame process vs content process).
         case "computer.invoke_control": return result(true, "succeeded", "invoked", { control: { name: params.name, processId: world.contentPid.get(title.toLowerCase()) ?? owner }, pattern: "invoke", windowPid: owner });
         case "computer.type": return result(true, "succeeded", "typed", { control: { name: params.name, processId: world.contentPid.get(title.toLowerCase()) ?? owner }, beforeLength: 0, afterLength: String(params.text ?? "").length, matches: true, windowPid: owner });
+        case "computer.read_calculator": return result(true, "succeeded", "result", { windowPid: owner, result: "Display is 89" });
         case "computer.read_controls": return result(true, "succeeded", "read", { window: { name: title, processId: owner }, controls: [] });
         case "computer.list_windows": return result(true, "succeeded", "listed", { windows: [{ name: title, processId: owner }], foreground: { name: title, processId: owner } });
         case "computer.capture": return result(true, "succeeded", "captured", { path: "x.png", width: 1, height: 1 });
@@ -101,8 +111,8 @@ const desktopStep = (role: string, action: string, params: Record<string, unknow
 const calculatorFlow = () => [
   desktopStep("Launcher", "computer.open_app", { app: "calculator" }),
   desktopStep("Focus", "computer.focus_window", { title: "Calculator" }, [0]),
-  desktopStep("Type 8", "computer.type", { title: "Calculator", name: "num8Button", text: "8" }, [1]),
-  desktopStep("Type 9", "computer.type", { title: "Calculator", name: "num9Button", text: "9" }, [2]),
+  desktopStep("Type 8", "computer.invoke_control", { title: "Calculator", automationId: "num8Button" }, [1]),
+  desktopStep("Type 9", "computer.invoke_control", { title: "Calculator", automationId: "num9Button" }, [2]),
 ];
 type Env = Awaited<ReturnType<typeof setup>>;
 const envelopeOf = (env: Env, missionId: string): AuthorizationEnvelope => env.missions.store.authorization(env.missions.store.mission(missionId).authorizationId!)!;
@@ -125,7 +135,7 @@ const pausedBatchMission = (env: Env, objective: string) => {
   const view = env.missions.create({ objective, mode: "fast", origin: "workstation", steps: [
     desktopStep("Launcher", "computer.open_app", { app: "calculator" }),
     desktopStep("Focus", "computer.focus_window", { title: "Calculator" }, [0]),
-    desktopStep("Type 8", "computer.type", { title: "Calculator", name: "num8Button", text: "8" }, [1]),
+    desktopStep("Type 8", "computer.invoke_control", { title: "Calculator", automationId: "num8Button" }, [1]),
     desktopStep("Foreign", "computer.type", { title: "Calculator", name: "foreign", text: "7", pid: 987 }, [2]),
   ] });
   env.missions.approve(view.id, "workstation");
@@ -154,8 +164,8 @@ test("T9 positive example: one approval finishes a whole bounded Calculator sequ
   try {
     const steps = [
       ...calculatorFlow(),
-      desktopStep("Type 3", "computer.type", { title: "Calculator", name: "num3Button", text: "3" }, [3]),
-      desktopStep("Lister", "computer.list_windows", {}, [4]),
+      desktopStep("Type 3", "computer.invoke_control", { title: "Calculator", automationId: "num3Button" }, [3]),
+      desktopStep("Result", "computer.read_calculator", { title: "Calculator" }, [4]),
     ];
     const view = env.missions.create({ objective: "Bounded Calculator run", mode: "fast", origin: "workstation", steps });
     assert.equal(view.requestedScope?.computer.enabled, true);
@@ -165,9 +175,9 @@ test("T9 positive example: one approval finishes a whole bounded Calculator sequ
     assert.equal(request.action, "computer.open_app");
     const offer = request.batchOffer!;
     assert.ok(offer, "five mutating executions in the plan → a batch is offered");
-    assert.deepEqual(offer.actions, ["computer.focus_window", "computer.list_windows", "computer.open_app", "computer.type"]);
-    assert.deepEqual(offer.readOnly, ["computer.list_windows"], "read-only entries are covered but never counted");
-    assert.equal(offer.counts["computer.type"], 3);
+    assert.deepEqual(offer.actions, ["computer.focus_window", "computer.invoke_control", "computer.open_app", "computer.read_calculator"]);
+    assert.deepEqual(offer.readOnly, ["computer.read_calculator"], "read-only entries are covered but never counted");
+    assert.equal(offer.counts["computer.invoke_control"], 3);
     assert.equal(offer.maxActions, 10, "min(2 × 5 mutating executions, 12)");
     assert.equal(offer.ttlMs, 120_000);
     assert.deepEqual(offer.target, { app: "calculator", processId: null, title: null });
@@ -218,7 +228,6 @@ test("T9 sensitive never covered: read_controls excluded from the offer and asks
     await until(() => env.missions.mission(view.id).state === "failed", "deny ends the mission");
     assert.equal(batchRow(env, view.id).endReason, "mission_ended");
 
-    // A password-shaped control: the offer may cover an ordinary field of the same app, never the secret one.
     const probeView = env.missions.create({ objective: "Secret target", mode: "fast", origin: "workstation", steps: [
       desktopStep("Launcher", "computer.open_app", { app: "notepad" }),
       desktopStep("Type name", "computer.type", { title: "Notepad", name: "Name box", text: "x" }, [0]),
@@ -226,55 +235,39 @@ test("T9 sensitive never covered: read_controls excluded from the offer and asks
     ] });
     env.missions.approve(probeView.id, "workstation");
     await until(() => env.missions.store.requests(probeView.id).length === 1, "the notepad ask");
-    const missionRecord = env.missions.mission(probeView.id);
-    const computed: PermissionBatchOffer | null = env.missions.batchOfferFor(missionRecord, env.missions.store.steps(probeView.id)[0], "computer.open_app");
-    assert.ok(computed);
-    assert.equal(computed.counts["computer.type"], 1, "only the ordinary field is counted in the offer");
-    assert.ok(computed.actions.includes("computer.type"), "ordinary typing stays batch-eligible");
-    const envelope = envelopeOf(env, probeView.id);
-    const stepIds = plannedStepIds(env, probeView.id);
-    const consult = (name: string) => decisionProbe(env, probeView.id, "computer.type", { title: "Notepad", name, text: "x" }, stepIds[1], envelope);
-    assert.equal(consult("Name box").decision, "ask", "no batch yet");
-    assert.equal(consult("Password field").decision, "ask");
-    const { view: liveView } = await grantBatch(env, probeView.id);
-    assert.equal(liveView.batch?.status, "active");
-    await until(() => env.missions.store.requests(probeView.id).length === 2, "the password field asked on its own after the batch ran ahead");
-    assert.equal(consult("Name box").decision, "allow", "the ordinary field rides the batch");
-    assert.equal(consult("Password field").decision, "ask", "the password-typed control never inherits the typing approval");
-    assert.equal(batchRow(env, probeView.id).usedCount, 2, "open + name-type only; probe decisions never consume");
-    assert.equal(env.world.executed.filter((run) => run.params.name === "Password field").length, 0, "the secret field was never typed");
+    assert.equal(unresolved(env, probeView.id).batchOffer, null, "unverified apps and arbitrary typing have no batch offer");
+    await assert.rejects(grantBatch(env, probeView.id), /does not offer/);
+    assert.equal(env.world.executed.length, 2, "no ordinary or secret Notepad input executed");
   } finally { await env.cleanup(); }
 });
 
-test("T9 consult boundary: step binding, verified pids, app/title targets, family and envelope guards (direct)", () => {
+test("T9 consult boundary: exact operations, own steps, pid, risk ceiling and envelope guards", () => {
   const now = Date.now();
-  const envelope = (over: Partial<AuthorizationEnvelope> = {}): AuthorizationEnvelope => ({ id: "e1", missionId: "m1", grantedAt: 1, grantedBy: "test", expiresAt: now + 60_000, projectRoots: [], riskClasses: ["READ"], capabilities: ["computer.open_app", "computer.focus_window", "computer.type", "computer.list_windows"], providers: { execution: false, allow: null, localOnly: false }, filesystem: { read: [], write: [] }, browser: { enabled: false, domains: "public" }, terminal: { enabled: false, commands: [] }, git: { actions: [] }, network: { allowed: false }, computer: { enabled: true }, budget: { maxExternalModelCalls: 0, maxRuntimeMs: 1, maxRetries: 0, maxTokens: null }, alwaysAsk: [], revokedAt: null, ...over });
-  const batchOf = (over: Partial<ApprovalBatch> = {}): ApprovalBatch => ({ id: "b1", missionId: "m1", authorizationId: "e1", family: "computer", actions: ["computer.open_app", "computer.focus_window", "computer.type", "computer.list_windows"], riskCeiling: "EXECUTE", target: { app: "calculator", processId: null, title: null }, targetTier: "app", maxActions: 5, usedCount: 1, observedPid: null, observedPidFrom: null, batchEpoch: "boot-e1", createdAt: 1, createdBy: "test", expiresAt: now + 60_000, status: "active", endAt: null, endReason: null, endBy: null, originStepId: "s1", ...over });
-  const manifestOf = (action: string): ActionManifest => COMPUTER_ACTIONS.find((item) => item.id === action)!;
-  const consult = (batchFixture: ApprovalBatch, env: AuthorizationEnvelope, opts: { action: string; params?: Record<string, unknown>; risk?: RiskClass; stepId?: string; epoch?: string }) =>
-    consultBatch(batchFixture, { action: opts.action, params: opts.params ?? {}, manifest: manifestOf(opts.action), risk: opts.risk ?? "EXECUTE", envelope: env, now, stepIds: new Set(["s1", "s2"]), stepId: opts.stepId ?? "s1", epoch: opts.epoch ?? "boot-e1" });
-  assert.equal(consult(batchOf(), envelope(), { action: "computer.type", params: { title: "Calculator", name: "ok", text: "1" } })?.match, true, "a title-only request matches its app target");
-  assert.equal(consult(batchOf(), envelope(), { action: "computer.type", params: { title: "Calculator", name: "x", text: "1" }, stepId: "delegated-child" })?.match, false, "delegated child steps inherit nothing");
-  assert.equal(consult(batchOf(), envelope(), { action: "computer.open_app", params: { app: "calculator" } })?.match, true, "the app tier matches its own app");
-  assert.equal(consult(batchOf(), envelope(), { action: "computer.open_app", params: { app: "chrome" } })?.match, false, "another application is not covered");
-  assert.equal(consult(batchOf(), envelope(), { action: "computer.type", risk: "DESTRUCTIVE" })?.match, false, "above the risk ceiling asks fresh");
-  assert.equal(consult(batchOf(), envelope(), { action: "computer.capture", risk: "READ" })?.match, false, "sensitive actions are never covered");
-  assert.equal(consult(batchOf(), envelope({ revokedAt: now - 1 }), { action: "computer.type", params: { title: "Calculator", name: "x", text: "1" } })?.match, false, "the envelope being revoked ends coverage");
-  assert.equal(consult(batchOf(), envelope({ expiresAt: now - 1 }), { action: "computer.type", params: { title: "Calculator", name: "x", text: "1" } })?.match, false, "the envelope expiring ends coverage");
-  assert.equal(consult(batchOf(), envelope({ capabilities: ["computer.open_app"], computer: { enabled: false } }), { action: "computer.type", params: { title: "Calculator", name: "x", text: "1" } })?.match, false, "desktop work not in the envelope is never covered");
-  assert.equal(consult(batchOf({ status: "ended", endReason: "revoked" }), envelope(), { action: "computer.type", params: { title: "Calculator", name: "x", text: "1" } }), null, "an ended batch is not consulted at all");
-  assert.equal(consult(batchOf({ expiresAt: now - 1 }), envelope(), { action: "computer.type", params: { title: "Calculator", name: "x", text: "1" } }), null, "an expired batch is not consulted at all");
-  assert.equal(consult(batchOf(), envelope(), { action: "computer.focus_window", params: { pid: 4242 } })?.match, false, "an explicit pid cannot match an unpinned app binding yet");
-  const pinned = consult(batchOf({ observedPid: 4242, observedPidFrom: "post-run" }), envelope(), { action: "computer.focus_window", params: { pid: 4242 } });
-  assert.equal(pinned?.match, true, "the pinned window owner is covered by pid");
+  const action = "computer.focus_window";
+  const params = { title: "Calculator" };
+  const env = { id: "e1", missionId: "m1", expiresAt: now + 60_000, revokedAt: null, computer: { enabled: true }, capabilities: [action] } as AuthorizationEnvelope;
+  const batch = { id: "b1", missionId: "m1", authorizationId: "e1", family: "computer", actions: [action], riskCeiling: "EXECUTE", target: { app: "calculator", processId: null, title: null }, maxActions: 5, usedCount: 1, batchEpoch: "boot", status: "active", expiresAt: now + 60_000, operations: [{ stepId: "s1", digest: operationDigest(action, params) }] } as ApprovalBatch;
+  const consult = (over: Partial<ApprovalBatch> = {}, envelope: AuthorizationEnvelope = env, opts: { params?: Record<string, unknown>; risk?: RiskClass; stepId?: string; epoch?: string } = {}) => consultBatch({ ...batch, ...over }, { action, params: opts.params ?? params, manifest: COMPUTER_ACTIONS.find((m) => m.id === action)!, risk: opts.risk ?? "EXECUTE", envelope, now, stepIds: new Set(["s1", "s2"]), stepId: opts.stepId ?? "s1", epoch: opts.epoch ?? "boot" });
+  assert.equal(consult()?.match, true);
+  assert.equal(consult({}, env, { stepId: "s2" })?.match, false, "even another planned step cannot reuse the operation");
+  assert.equal(consult({}, env, { stepId: "delegated" })?.match, false);
+  assert.equal(consult({}, env, { params: { title: "Calculator help" } })?.match, false);
+  assert.equal(consult({}, env, { params: { pid: 999 } })?.match, false);
+  assert.equal(consult({}, env, { risk: "DESTRUCTIVE" })?.match, false);
+  assert.equal(consult({ riskCeiling: "READ" })?.match, false);
+  assert.equal(consult({ usedCount: 5 })?.match, false);
+  assert.equal(consult({}, { ...env, missionId: "other" })?.match, false);
+  assert.equal(consult({}, { ...env, revokedAt: now })?.match, false);
+  assert.equal(consult({}, { ...env, expiresAt: now - 1 })?.match, false);
+  assert.equal(consult({}, { ...env, capabilities: [], computer: { enabled: false } })?.match, false);
+  assert.equal(consult({ status: "ended" }), null);
+  assert.equal(consult({ expiresAt: now - 1 }), null);
+  assert.equal(consult({}, env, { epoch: "new" }), null);
+  assert.equal(consult({ operations: undefined })?.match, false, "old loose grants fail closed");
+  const pidParams = { pid: 4242 };
+  const pinned = consult({ observedPid: 4242, observedPidFrom: "params", operations: [{ stepId: "s1", digest: operationDigest(action, pidParams) }] }, env, { params: pidParams });
+  assert.equal(pinned?.match, true);
   assert.equal(pinned?.consume, true);
-  assert.equal(consult(batchOf({ observedPid: 4242, observedPidFrom: "post-run" }), envelope(), { action: "computer.focus_window", params: { pid: 999 } })?.match, false, "a different pid is not covered");
-  const readBatch = batchOf({ actions: ["computer.list_windows"] });
-  const readOnly = consult(readBatch, envelope(), { action: "computer.list_windows", risk: "READ" });
-  assert.equal(readOnly?.match, true, "an identity-less read-only covered action is allowed while the batch lives");
-  assert.equal(readOnly?.consume, false, "read-only actions never consume the budget");
-  assert.equal(consult(readBatch, envelope(), { action: "computer.list_windows", params: { title: "Calculator" }, risk: "READ" })?.match, true);
-  assert.equal(consult(readBatch, envelope(), { action: "computer.type", risk: "EXECUTE" })?.match, false, "a mutating action without any identity asks again");
 });
 
 test("T9 admission guards: count boundary, epoch, expiry and end state are all enforced atomically; risk lattice holds", async () => {
@@ -332,7 +325,7 @@ test("T9 expiry: a lapsed batch admits nothing, and the UI shows it ended withou
     const envelope = envelopeOf(env, view.id);
     const stepIds = plannedStepIds(env, view.id);
     const before = batchRow(env, view.id);
-    const probe = () => decisionProbe(env, view.id, "computer.type", { title: "Calculator", name: "num9Button", text: "9" }, stepIds[2], envelope);
+    const probe = () => decisionProbe(env, view.id, "computer.invoke_control", { title: "Calculator", automationId: "num8Button" }, stepIds[2], envelope);
     assert.equal(probe().decision, "allow", "still covered for a planned step while live");
     assert.equal(batchRow(env, view.id).usedCount, 3, "a permission probe alone consumes nothing");
     env.missions.store.saveBatch({ ...before, expiresAt: Date.now() - 1 });
@@ -359,7 +352,7 @@ test("T9 scope escapes fail closed with a live batch: foreign pid, other app, sh
     const envelope = envelopeOf(env, view.id);
     const stepIds = plannedStepIds(env, view.id);
     const decisionFor = (action: string, params: Record<string, unknown>, stepId = stepIds[0]) => decisionProbe(env, view.id, action, params, stepId, envelope).decision;
-    assert.equal(decisionProbe(env, view.id, "computer.type", { title: "Calculator", name: "num9Button", text: "9" }, stepIds[2], envelope).decision, "allow", "a planned step stays covered (positive control)");
+    assert.equal(decisionProbe(env, view.id, "computer.invoke_control", { title: "Calculator", automationId: "num8Button" }, stepIds[2], envelope).decision, "allow", "a planned step stays covered (positive control)");
     assert.equal(decisionFor("computer.focus_window", { title: "Calculator" }, stepIds[1]), "allow");
     assert.equal(decisionFor("computer.focus_window", { pid: 987 }), "ask", "another window's explicit pid asks");
     assert.equal(decisionFor("computer.focus_window", { title: "Chrome" }), "ask", "another application's window asks");
@@ -379,25 +372,25 @@ test("T9 scope escapes fail closed with a live batch: foreign pid, other app, sh
   } finally { await env.cleanup(); }
 });
 
-test("T9 window drift: a title-lookalike window of the same app is admitted per the approved title rule, then its foreign owner ends the batch and the next step asks fresh", async () => {
+test("T9 window drift: a title lookalike asks before any foreign mutation", async () => {
   const env = await setup();
   try {
     const view = env.missions.create({ objective: "Drift probe", mode: "fast", origin: "workstation", steps: [
       desktopStep("Launcher", "computer.open_app", { app: "calculator" }),
       desktopStep("Focus", "computer.focus_window", { title: "Calculator" }, [0]),
-      desktopStep("Type 7", "computer.type", { title: "Calculator", name: "num7Button", text: "7" }, [1]),
+      desktopStep("Type 7", "computer.invoke_control", { title: "Calculator", automationId: "num7Button" }, [1]),
       desktopStep("Lookalike", "computer.type", { title: "Calculator help consent", name: "continue", text: "x" }, [2]),
-      desktopStep("After", "computer.type", { title: "Calculator", name: "num8Button", text: "8" }, [3]),
+      desktopStep("After", "computer.invoke_control", { title: "Calculator", automationId: "num8Button" }, [3]),
     ] });
     env.missions.approve(view.id, "workstation");
     const { request } = await grantBatch(env, view.id);
     assert.equal(request.action, "computer.open_app");
-    await until(() => batchRow(env, view.id).status === "ended", "drift ended the batch", 8000);
+    await until(() => env.missions.store.requests(view.id).length === 2, "drift asks before execution");
     const stored = batchRow(env, view.id);
-    assert.equal(stored.endReason, "scope_mismatch", "the lookalike window's real owner pid ended the batch at once");
-    assert.equal(stored.usedCount, 4, "open + focus + type + the admitted lookalike; nothing after it ran under the batch");
+    assert.equal(stored.endReason, null, "the foreign action asks without touching the window");
+    assert.equal(stored.usedCount, 3, "only open, focus and the approved digit executed");
     assert.equal(stored.observedPid, 4242, "the batch is pinned to Calculator's real window owner");
-    assert.ok(eventTypes(env, view.id).includes("approval.batch_scope_mismatch"));
+    assert.equal(env.world.executed.filter((r) => r.params.title === "Calculator help consent").length, 0, "foreign window never touched");
     await until(() => env.missions.store.requests(view.id).length >= 2, "a fresh ask for the next step");
     const after = unresolved(env, view.id);
     assert.equal(after.action, "computer.type", "the next planned step asks for fresh approval — no silent continuation");
@@ -423,7 +416,7 @@ test("T9 UWP reality: control elements in a content process never end the batch 
     env.world.contentPid.set("calculator", 7788);
     const view = env.missions.create({ objective: "UWP content process", mode: "fast", origin: "workstation", steps: [
       ...calculatorFlow(),
-      desktopStep("Type 3", "computer.type", { title: "Calculator", name: "num3Button", text: "3" }, [3]),
+      desktopStep("Type 3", "computer.invoke_control", { title: "Calculator", automationId: "num3Button" }, [3]),
     ] });
     env.missions.approve(view.id, "workstation");
     await grantBatch(env, view.id);
@@ -438,24 +431,24 @@ test("T9 UWP reality: control elements in a content process never end the batch 
   } finally { await env.cleanup(); }
 });
 
-test("T9 UWP drift: with content pids diverging, a genuinely foreign window owner still ends the batch fail-closed", async () => {
+test("T9 UWP drift: divergent content pids do not authorize a title lookalike", async () => {
   const env = await setup();
   try {
     env.world.contentPid.set("calculator", 7788);
     const view = env.missions.create({ objective: "UWP drift", mode: "fast", origin: "workstation", steps: [
       desktopStep("Launcher", "computer.open_app", { app: "calculator" }),
       desktopStep("Focus", "computer.focus_window", { title: "Calculator" }, [0]),
-      desktopStep("Type 7", "computer.type", { title: "Calculator", name: "num7Button", text: "7" }, [1]),
+      desktopStep("Type 7", "computer.invoke_control", { title: "Calculator", automationId: "num7Button" }, [1]),
       desktopStep("Lookalike", "computer.type", { title: "Calculator help consent", name: "continue", text: "x" }, [2]),
-      desktopStep("After", "computer.type", { title: "Calculator", name: "num8Button", text: "8" }, [3]),
+      desktopStep("After", "computer.invoke_control", { title: "Calculator", automationId: "num8Button" }, [3]),
     ] });
     env.missions.approve(view.id, "workstation");
     await grantBatch(env, view.id);
-    await until(() => batchRow(env, view.id).status === "ended", "drift ended the batch", 8000);
+    await until(() => env.missions.store.requests(view.id).length === 2, "drift asks before execution");
     const stored = batchRow(env, view.id);
-    assert.equal(stored.endReason, "scope_mismatch", "the lookalike window's real owner ended the batch despite divergent control pids");
+    assert.equal(stored.endReason, null, "the foreign action asks without touching the window");
     assert.equal(stored.observedPid, 4242);
-    assert.ok(eventTypes(env, view.id).includes("approval.batch_scope_mismatch"));
+    assert.equal(env.world.executed.filter((r) => r.params.title === "Calculator help consent").length, 0, "foreign window never touched");
     await until(() => env.missions.store.requests(view.id).length >= 2, "the next step asks fresh");
     await env.missions.respond(unresolved(env, view.id).id, "deny", "workstation");
     await until(() => env.missions.mission(view.id).state === "failed", "denied");
@@ -554,13 +547,13 @@ test("T9 remote: a paired phone may grant only the offered batch, revoke its own
 test("T9 ask_every_time refuses batching: ask again forever, no rescue, no batch button; a denied offer creates nothing", async () => {
   const env = await setup();
   try {
-    env.missions.store.setGrant("computer.type", "global", "ask_every_time", "workstation");
+    env.missions.store.setGrant("computer.invoke_control", "global", "ask_every_time", "workstation");
     const view = env.missions.create({ objective: "Always ask", mode: "fast", origin: "workstation", steps: calculatorFlow() });
     env.missions.approve(view.id, "workstation");
     const { request } = await grantBatch(env, view.id);
     assert.equal(request.action, "computer.open_app", "the standing rule covers only its own action; open and focus still batch");
-    await until(() => env.missions.store.requests(view.id).some((candidate) => candidate.action === "computer.type"), "type asked despite the batch");
-    const typeRequest = env.missions.store.requests(view.id).find((candidate) => candidate.action === "computer.type")!;
+    await until(() => env.missions.store.requests(view.id).some((candidate) => candidate.action === "computer.invoke_control"), "type asked despite the batch");
+    const typeRequest = env.missions.store.requests(view.id).find((candidate) => candidate.action === "computer.invoke_control")!;
     assert.equal(typeRequest.batchOffer, null, "the standing rule also suppresses any batch button on its asks");
     await assert.rejects(env.missions.respond(typeRequest.id, "allow_batch", "workstation"), /does not offer/, "the standing rule outranks batching");
     assert.ok(!typeRequest.resolvedAt, "the step stays paused until the user's own rule is honored");
@@ -583,7 +576,11 @@ test("T9 privacy: typed values exist only in the in-memory adapter call — neve
       desktopStep("Type", "computer.type", { title: "Calculator", name: "num1Button", text: secret }, [0]),
     ] });
     env.missions.approve(view.id, "workstation");
-    await grantBatch(env, view.id);
+    await until(() => env.missions.store.requests(view.id).length === 1, "launch ask");
+    await env.missions.respond(unresolved(env, view.id).id, "allow_once", "workstation");
+    await until(() => env.missions.store.requests(view.id).length === 2, "typing asks independently");
+    assert.equal(unresolved(env, view.id).batchOffer, null);
+    await env.missions.respond(unresolved(env, view.id).id, "allow_once", "workstation");
     await until(() => env.missions.mission(view.id).state === "completed", "done", 8000);
     assert.ok(env.world.executed.some((run) => run.params.text === secret), "the fake capability really received the value (execution needs it)");
     assert.ok(!JSON.stringify(env.missions.store.requests(view.id)).includes(secret), "requests hold no typed values");
@@ -592,8 +589,144 @@ test("T9 privacy: typed values exist only in the in-memory adapter call — neve
       if (run.action === "computer.type") assert.equal((run.params as { text: string }).text, `[${secret.length} characters]`, "the value is represented by its length only");
     }
     for (const event of events(env, view.id)) assert.ok(!event.detail.includes(secret), "journal events carry actions, never content");
-    assert.ok(!JSON.stringify(batchRow(env, view.id)).includes(secret), "batch records carry no typed values");
+    assert.equal(env.missions.store.batches(view.id).length, 0, "secret input created no batch authority");
     const snapshot = env.missions.snapshot().missions.find((mission) => mission.id === view.id)!;
     assert.ok(!JSON.stringify(snapshot.batch).includes(secret), "the batch block the UI renders carries no typed values");
+  } finally { await env.cleanup(); }
+});
+
+const pausedRequest = (env: Env, id: string, index = 1) => {
+  const step = env.missions.store.steps(id)[index];
+  if (step.executor.kind !== "capability") throw new Error("Expected capability step");
+  return { action: step.executor.action, params: step.executor.params, missionId: id, stepId: step.id, envelope: envelopeOf(env, id), origin: "test", cwd: env.root, roots: [env.root] };
+};
+
+test("T9 TOCTOU: a foreign window with the exact Calculator title is rejected before mutation or budget consumption", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "TOCTOU"); await grantBatch(env, view.id);
+    await until(() => env.missions.store.requests(view.id).length === 2, "paused");
+    const before = env.world.executed.length;
+    env.world.owner.set("calculator", 5151);
+    const out = await env.missions.bus.request(pausedRequest(env, view.id));
+    assert.equal(out.decision.decision, "ask");
+    assert.equal(out.run, null);
+    assert.equal(env.world.executed.length, before, "no foreign-window mutation");
+    assert.equal(batchRow(env, view.id).usedCount, 3);
+    assert.equal(batchRow(env, view.id).endReason, "scope_mismatch");
+    assert.ok(eventTypes(env, view.id).includes("approval.batch_scope_mismatch"));
+  } finally { await env.cleanup(); }
+});
+
+test("T9 approval replay: changed planned action cannot answer an old offer and the request stays open", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "Changed plan");
+    await until(() => env.missions.store.requests(view.id).length === 1, "ask");
+    const request = unresolved(env, view.id);
+    const step = env.missions.store.steps(view.id)[1];
+    env.missions.store.saveStep({ ...step, executor: { kind: "capability", action: "computer.focus_window", params: { title: "Chrome" } } });
+    await assert.rejects(env.missions.respond(request.id, "allow_batch", "workstation"), /planned batch changed/);
+    assert.equal(env.missions.store.request(request.id).resolvedAt, null);
+    assert.equal(env.missions.store.batches(view.id).length, 0);
+    assert.equal(env.world.executed.length, 0);
+  } finally { await env.cleanup(); }
+});
+
+test("T9 immutable operations: changed selectors, extra fields and spoofed UI claims ask without execution", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "Immutable operations"); await grantBatch(env, view.id);
+    await until(() => env.missions.store.requests(view.id).length === 2, "paused");
+    const request = pausedRequest(env, view.id, 2);
+    const before = env.world.executed.length;
+    for (const params of [{ title: "Calculator", automationId: "equalButton" }, { ...request.params, approved: true }, { title: "Calculator", automationId: "purchaseButton" }, { ...request.params, text: "secret" }, { ...request.params, grantId: batchRow(env, view.id).id }]) {
+      const out = await env.missions.bus.request({ ...request, params });
+      assert.equal(out.decision.decision, "ask"); assert.equal(out.run, null);
+    }
+    assert.equal(env.world.executed.length, before);
+    assert.equal(batchRow(env, view.id).usedCount, 3);
+  } finally { await env.cleanup(); }
+});
+
+test("T9 Stop races preflight: canonical Stop wins before admission and unrelated work survives", async () => {
+  const env = await setup();
+  try {
+    const a = pausedBatchMission(env, "Stop race"); await grantBatch(env, a.id);
+    await until(() => env.missions.store.requests(a.id).length === 2, "paused");
+    const b = pausedBatchMission(env, "B survives"); await grantBatch(env, b.id);
+    await until(() => env.missions.store.requests(b.id).length === 2, "B paused");
+    const adapter = env.missions.bus.adapters.get("computer")!;
+    const original = adapter.prepareBatchAction!;
+    let entered = false; let resume!: () => void;
+    adapter.prepareBatchAction = async (...args) => { entered = true; await new Promise<void>((resolve) => { resume = resolve; }); return original(...args); };
+    const before = env.world.executed.length;
+    const pending = env.missions.bus.request(pausedRequest(env, a.id));
+    await until(() => entered, "probe entered");
+    await env.missions.stop(a.id, "workstation"); resume();
+    const out = await pending;
+    assert.equal(out.decision.decision, "deny");
+    assert.equal(env.world.executed.length, before);
+    assert.equal(batchRow(env, a.id).usedCount, 3);
+    assert.equal(batchRow(env, b.id).status, "active");
+  } finally { await env.cleanup(); }
+});
+
+test("T9 expiration races preflight: time is rechecked after the asynchronous target check", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "Expiry race"); await grantBatch(env, view.id);
+    await until(() => env.missions.store.requests(view.id).length === 2, "paused");
+    const adapter = env.missions.bus.adapters.get("computer")!; const original = adapter.prepareBatchAction!;
+    adapter.prepareBatchAction = async (...args) => { const result = await original(...args); env.missions.store.saveBatch({ ...batchRow(env, view.id), expiresAt: Date.now() - 1 }); return result; };
+    const before = env.world.executed.length;
+    const out = await env.missions.bus.request(pausedRequest(env, view.id));
+    assert.equal(out.decision.decision, "ask");
+    assert.equal(out.run, null);
+    assert.equal(env.world.executed.length, before);
+    assert.equal(batchRow(env, view.id).usedCount, 3);
+  } finally { await env.cleanup(); }
+});
+
+test("T9 retries and provider reroute: each new admission consumes exactly one; provider origin cannot broaden scope", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "Retries"); await grantBatch(env, view.id, { maxActions: 5 });
+    await until(() => env.missions.store.requests(view.id).length === 2, "paused");
+    const request = pausedRequest(env, view.id, 2);
+    for (const origin of ["provider:codex", "provider:claude"]) {
+      const out = await env.missions.bus.request({ ...request, origin }); assert.equal(out.result?.ok, true);
+    }
+    assert.equal(batchRow(env, view.id).usedCount, 5);
+    const out = await env.missions.bus.request(request);
+    assert.equal(out.decision.decision, "ask"); assert.equal(out.run, null);
+    assert.equal(batchRow(env, view.id).usedCount, 5);
+    assert.equal(eventTypes(env, view.id).filter((type) => type === "approval.batch_consumed").length, 5);
+  } finally { await env.cleanup(); }
+});
+
+test("T9 risk escalation: a previously eligible operation asks fresh when adapter risk increases", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "Risk escalation"); await grantBatch(env, view.id);
+    await until(() => env.missions.store.requests(view.id).length === 2, "paused");
+    env.missions.bus.adapters.get("computer")!.riskFor = () => "EXTERNAL_SIDE_EFFECT";
+    const before = env.world.executed.length;
+    const out = await env.missions.bus.request(pausedRequest(env, view.id, 2));
+    assert.equal(out.decision.decision, "ask"); assert.equal(out.decision.risk, "EXTERNAL_SIDE_EFFECT");
+    assert.equal(out.run, null); assert.equal(env.world.executed.length, before);
+  } finally { await env.cleanup(); }
+});
+
+test("T9 rule changes before approval: standing ask-every-time prevents granting an old offer", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "Rule changes");
+    await until(() => env.missions.store.requests(view.id).length === 1, "ask");
+    const request = unresolved(env, view.id);
+    env.missions.store.setGrant("computer.open_app", "global", "ask_every_time", "workstation");
+    await assert.rejects(env.missions.respond(request.id, "allow_batch", "workstation"), /standing ask every time/);
+    assert.equal(env.missions.store.request(request.id).resolvedAt, null);
+    assert.equal(env.missions.store.batches(view.id).length, 0);
   } finally { await env.cleanup(); }
 });

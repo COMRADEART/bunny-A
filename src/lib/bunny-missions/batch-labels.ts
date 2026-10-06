@@ -12,6 +12,7 @@ export const BATCH_ACTION_LABELS: Record<string, string> = {
   "computer.type": "Enter text into a field",
   "computer.invoke_control": "Press one of its buttons",
   "computer.list_windows": "List windows",
+  "computer.read_calculator": "Read the calculation result",
 };
 export const APP_LABELS: Record<string, string> = { notepad: "Notepad", calculator: "Calculator", paint: "Paint", explorer: "File Explorer", terminal: "Terminal" };
 export const batchActionLabel = (action: string) => BATCH_ACTION_LABELS[action] ?? action;
@@ -24,7 +25,7 @@ export function targetLabelOf(target: { app: string | null; processId: number | 
   return "this desktop";
 }
 
-const ttlPhrase = (ttlMs: number): string => (ttlMs >= 60_000 ? `${Math.max(1, Math.round(ttlMs / 60_000))} min` : `${Math.max(1, Math.round(ttlMs / 1000))} s`);
+const ttlPhrase = (ttlMs: number): string => ttlMs % 60_000 === 0 ? `${ttlMs / 60_000} min` : `${Math.floor(ttlMs / 1000)} s`;
 
 /** The batch button's own label carries its shape, per the approval UX: "Allow this small batch · 8 actions · Calculator only · 2 min". */
 export function batchButtonLabel(offer: { maxActions: number; targetLabel: string; ttlMs: number }): string {
@@ -43,7 +44,7 @@ export function batchOfferLines(offer: { actions: string[]; counts: Record<strin
   return [
     `What it covers inside ${offer.targetLabel}: ${[...covered, ...reads].join(", ")}`,
     `At most ${offer.maxActions} desktop action${offer.maxActions === 1 ? "" : "s"} within ${ttlPhrase(offer.ttlMs)}`,
-    "Only ordinary on-screen steps — it never covers shell commands, files, installs, payments, secrets or anything destructive",
+    "Risk ceiling: local Calculator arithmetic. External effects: none. It never covers shell commands, files, installs, payments, secrets or anything destructive",
   ];
 }
 

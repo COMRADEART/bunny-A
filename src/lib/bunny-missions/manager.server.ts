@@ -5,7 +5,7 @@ import type { HostEvent } from "../bunny-host/contracts.ts";
 import type { Mode, OrchTask, ProviderId, TaskConstraints, VerifySpec } from "../orch/types.ts";
 import { codexMissionExclusion } from "../orch/compatibility.ts";
 import { ArtifactStore } from "./artifacts.server.ts";
-import { envelopeFrom, MODE_BUDGET, providerScopeViolation, scopeFor, taskViolation } from "./authorization.server.ts";
+import { envelopeFrom, matches, MODE_BUDGET, providerScopeViolation, scopeFor, taskViolation } from "./authorization.server.ts";
 import { batchActionLabel, batchOffer, batchView, currentBatchEpoch, type BatchPlanEntry } from "./batches.server.ts";
 import type { ApprovalBatch, PermissionBatchOffer } from "./types.ts";
 import { CapabilityBus, type CapabilityAdapter, type CapabilityRequest } from "./capabilities/bus.server.ts";
@@ -664,13 +664,13 @@ export class MissionManager {
       if (item.executor.kind === "capability") {
         // The ask itself covers this step's execution once; counting it again would double the budget.
         if (item.id === step.id) continue;
-        plan.push({ action: item.executor.action, params: item.executor.params as Record<string, unknown> });
+        plan.push({ action: item.executor.action, params: item.executor.params as Record<string, unknown>, stepId: item.id });
       }
       else if (item.executor.kind === "skill") {
         try {
           const skill = this.skills.get(item.executor.skillId);
           const inputs = this.skills.params(skill, item.executor.params as Record<string, unknown>);
-          for (const skillStep of skill.steps) plan.push({ action: skillStep.action, params: fill(skillStep.params, inputs) as Record<string, unknown> });
+          for (const skillStep of skill.steps) plan.push({ action: skillStep.action, params: fill(skillStep.params, inputs) as Record<string, unknown>, stepId: item.id });
         } catch { /* invalid skill params fail on their own in the run; the offer is only for healthy plans */ }
       }
     }
@@ -684,7 +684,7 @@ export class MissionManager {
       if (matched >= 0) plan.splice(matched, 1);
     }
     return batchOffer({
-      askAction: action, askParams, plan,
+      askAction: action, askParams, askStepId: step.id, plan,
       find: (candidate) => this.bus.find(candidate)?.manifest ?? null,
       riskOf: (candidate, params) => this.bus.riskOf(candidate, params),
     });
@@ -712,8 +712,11 @@ export class MissionManager {
     if (!envelope) throw new Error("The mission has no live authorization to grant a batch inside.");
     if (envelope.revokedAt) throw new Error("The mission authorization was revoked.");
     if (envelope.expiresAt <= Date.now()) throw new Error("The mission authorization expired; approve the mission again to grant a fresh batch.");
-    if (mission.state === "completed" || mission.state === "stopped") throw new Error("The mission has already ended.");
+    if (["completed", "failed", "stopped"].includes(mission.state)) throw new Error("The mission has already ended.");
     const offer = request.batchOffer;
+    const currentOffer = this.batchOfferFor(mission, step, request.action);
+    if (!currentOffer || JSON.stringify(currentOffer) !== JSON.stringify(offer)) throw new Error("The planned batch changed; a new approval is required.");
+    if (this.store.grants().some((grant) => grant.policy === "ask_every_time" && matches([grant.action], request.action) && (grant.scope === "global" || grant.scope === `mission:${missionId}`))) throw new Error("A standing ask every time rule prevents batching.");
     const maxActions = Math.max(1, Math.min(Number.isInteger(options.maxActions) ? options.maxActions! : offer.maxActions, offer.maxActions));
     const ttlMs = Math.max(1000, Math.min(Number.isInteger(options.ttlMs) ? options.ttlMs! : offer.ttlMs, offer.ttlMs));
     const batch: ApprovalBatch = {
@@ -723,6 +726,7 @@ export class MissionManager {
       observedPid: null, observedPidFrom: null, batchEpoch: currentBatchEpoch(),
       createdAt: Date.now(), createdBy: by, expiresAt: Date.now() + ttlMs,
       status: "active", endAt: null, endReason: null, endBy: null, originStepId: step.id,
+      operations: offer.operations,
     };
     this.store.saveBatch(batch);
     // Truthful duration: seconds in, seconds out (the ttl is clamped to 1 s … 2 min by createBatchFromOffer).
@@ -747,6 +751,8 @@ export class MissionManager {
     const step = this.store.step(request.stepId);
     if (step.state !== "waiting_for_approval" || step.pendingRequestId !== requestId) throw new Error("The step is no longer waiting for this request.");
     if (decision === "allow_batch" && !request.batchOffer) throw new Error("This request does not offer a small approval batch; answer allow_once or deny.");
+    // Validate and create before answering: a failed validation leaves the request open.
+    if (decision === "allow_batch") this.createBatchFromOffer(request.missionId, step.id, requestId, by, options);
     this.store.saveRequest({ ...request, resolvedAt: Date.now(), resolution: decision, resolvedBy: by });
     this.inbox.resolve(request.missionId, { requestId });
     this.inbox.resolve(request.missionId, { kinds: ["requires_attention"] });
@@ -758,7 +764,6 @@ export class MissionManager {
     this.emit(decision === "deny" ? "authorization.denied" : "authorization.granted", `${request.action} for step ${step.id}: ${decision} by ${by} (request ${requestId}).`, request.missionId);
     if (decision === "allow_batch") {
       // The batch must exist before the step resumes so the resumed execution is covered (and counted).
-      this.createBatchFromOffer(mission.id, step.id, requestId, by, options);
       this.setStep(step, { state: "ready", pendingRequestId: null, pendingPhase: null });
       this.schedule(mission.id);
       return this.view(this.store.mission(mission.id));

@@ -1,11 +1,12 @@
 import type { ActionManifest, ApprovalBatch, AuthorizationEnvelope, BatchView, PermissionBatchOffer, RiskClass } from "./types.ts";
 import { APP_LABELS, BATCH_ACTION_LABELS, batchActionLabel, targetLabelOf } from "./batch-labels.ts";
+import { createHash } from "node:crypto";
 
 export { APP_LABELS, BATCH_ACTION_LABELS, batchActionLabel, targetLabelOf };
 
 /**
  * Gate T9 — Bounded Desktop Approval Batching. Everything batch-shaped lives here: eligibility,
- * the truthfully computed offer shown on the approval card, target binding, post-run drift review
+ * the truthfully computed offer shown on the approval card and exact operation/target binding
  * and the labels the user sees. Consulted only after `decide()` has returned an ordinary "ask";
  * a batch never converts a "deny" and never applies outside its single mission.
  *
@@ -14,9 +15,9 @@ export { APP_LABELS, BATCH_ACTION_LABELS, batchActionLabel, targetLabelOf };
  *   are structurally outside the batch.
  * - `sensitive` and `hardApproval` manifests are never covered (sensitive reads still ask).
  * - Escalation-aware risk above EXECUTE is never covered (risk ceiling).
- * - Target matching is strictest verified identity available: explicit pid first; title-filtered
- *   flows are admitted as a hypothesis verified post-run (observed pid vs pinned pid) and any
- *   mismatch ends the batch immediately.
+ * - Only the Host's Calculator arithmetic policy participates. A title is a lookup hint, never
+ *   authority: Runtime preflight and mutation-time checks verify the package and exact native
+ *   window/process lifetime. Post-run review is additional evidence only.
  */
 
 export const BATCH_FAMILY = "computer";
@@ -37,7 +38,30 @@ export function currentBatchEpoch() { return epoch; }
 /** Test hook: simulates a Host reboot so the epoch boundary can be exercised without a restart. */
 export function rotateBatchEpochForTest() { epoch = crypto.randomUUID(); }
 
-export type BatchPlanEntry = { action: string; params: Record<string, unknown> };
+export type BatchPlanEntry = { action: string; params: Record<string, unknown>; stepId?: string };
+
+/** An application policy, not a claim supplied by an agent. Only Calculator arithmetic is known. */
+export const CALCULATOR_CONTROLS = [
+  ...Array.from({ length: 10 }, (_, i) => `num${i}Button`),
+  "plusButton", "minusButton", "multiplyButton", "divideButton", "equalButton",
+  "clearButton", "clearEntryButton", "decimalSeparatorButton", "negateButton", "backSpaceButton",
+];
+export function operationDigest(action: string, params: Record<string, unknown>): string {
+  const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical)
+    : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)])) : value;
+  return createHash("sha256").update(JSON.stringify(canonical({ action, params }))).digest("hex");
+}
+
+export function calculatorOperation(action: string, params: Record<string, unknown>): boolean {
+  const allowed = action === "computer.open_app" ? ["app"] : action === "computer.invoke_control" ? ["title", "pid", "automationId"] : ["title", "pid"];
+  if (Object.keys(params).some((key) => !allowed.includes(key))) return false;
+  if (action === "computer.open_app") return params.app === "calculator";
+  if (!["computer.focus_window", "computer.invoke_control", "computer.read_calculator"].includes(action)) return false;
+  if (params.title !== undefined && params.title !== "Calculator") return false;
+  if (params.pid !== undefined && (!Number.isInteger(params.pid) || Number(params.pid) <= 0)) return false;
+  if (!params.title && !params.pid) return false;
+  return action !== "computer.invoke_control" || CALCULATOR_CONTROLS.includes(String(params.automationId));
+}
 
 const SENSITIVE_TARGET = /(passw|\bpwd\b|secret|token|credential|\bpin\b|credit|card|\bcvv\b|\bssn\b|api[_-]?key)/i;
 
@@ -70,7 +94,7 @@ export function requestBatchable(manifest: ActionManifest, action: string, param
   if (!manifest.implemented || manifest.sensitive || manifest.hardApproval) return false;
   if (!riskAtMost(risk, RISK_CEILING)) return false;
   if (sensitiveTarget(action, params)) return false;
-  return targetOf(action, params) !== null || action === "computer.list_windows";
+  return calculatorOperation(action, params);
 }
 
 /** The single observed window owner in a structured Computer Runtime output, when there is one. */
@@ -96,6 +120,7 @@ export function extractObservedPid(output: unknown): number | null {
  */
 export function batchOffer(opts: {
   askAction: string; askParams: Record<string, unknown>;
+  askStepId?: string;
   plan: BatchPlanEntry[];
   find: (action: string) => ActionManifest | null;
   riskOf: (action: string, params: Record<string, unknown>) => RiskClass | null;
@@ -132,7 +157,10 @@ export function batchOffer(opts: {
   for (const entry of inPlan) cover(entry);
   if (mutating < 2) return null;
   const actions = Object.keys(counts).sort();
-  const target = targetOf(askAction, askParams)!;
+  const target = { ...targetOf(askAction, askParams)!, app: "calculator" };
+  const operations = [{ action: askAction, params: askParams, stepId: opts.askStepId }, ...inPlan]
+    .filter((entry) => eligible(entry) !== null && !!entry.stepId)
+    .map((entry) => ({ stepId: entry.stepId!, digest: operationDigest(entry.action, entry.params) }));
   return {
     actions, counts,
     maxActions: Math.min(BATCH_HEADROOM * mutating, BATCH_HARD_MAX),
@@ -143,6 +171,7 @@ export function batchOffer(opts: {
     targetTier: target.processId != null ? "process" : "app",
     family: BATCH_FAMILY,
     readOnly: [...readOnly].sort(),
+    operations,
   };
 }
 
@@ -159,10 +188,13 @@ export function consultBatch(batch: ApprovalBatch, opts: {
   if (batch.status !== "active" || batch.batchEpoch !== epoch || batch.expiresAt <= now) return null;
   if (action.split(".")[0] !== batch.family || !batch.actions.includes(action)) return { match: false, reason: null, consume: false };
   if (!stepIds.has(stepId ?? "")) return { match: false, reason: null, consume: false };
+  if (!batch.operations?.some((op) => op.stepId === stepId && op.digest === operationDigest(action, params))) return { match: false, reason: null, consume: false };
   if (!envelope || envelope.id !== batch.authorizationId) return { match: false, reason: null, consume: false };
+  if (envelope.missionId !== batch.missionId) return { match: false, reason: null, consume: false };
   if (envelope.revokedAt || envelope.expiresAt <= now) return { match: false, reason: null, consume: false };
   if (!envelope.computer.enabled || !envelope.capabilities.includes(action)) return { match: false, reason: null, consume: false };
   if (!requestBatchable(manifest, action, params, risk)) return { match: false, reason: null, consume: false };
+  if (!riskAtMost(risk, batch.riskCeiling) || batch.usedCount >= batch.maxActions) return { match: false, reason: null, consume: false };
   const target = targetOf(action, params);
   const pidBound = batch.observedPid ?? batch.target.processId;
   const pidVerified = batch.observedPidFrom != null || batch.target.processId != null;
@@ -178,7 +210,7 @@ export function consultBatch(batch: ApprovalBatch, opts: {
   if (target.processId != null && pidVerified && pidBound == null) return { match: false, reason: null, consume: false };
   if (target.app != null && batch.target.app === target.app) return { match: true, reason: `inside approval batch ${batch.id} for ${targetLabelOf(batch.target)} (${batch.usedCount + 1} of ${batch.maxActions} mutating actions used).`, consume: risk !== "READ" };
   if (target.title != null && batch.target.title != null && batch.target.title === target.title) return { match: true, reason: `inside approval batch ${batch.id} for this window (${batch.usedCount + 1} of ${batch.maxActions} mutating actions used).`, consume: risk !== "READ" };
-  if (target.title != null && batch.target.app != null && target.title.toLowerCase().includes(batch.target.app)) return { match: true, reason: `inside approval batch ${batch.id} for ${targetLabelOf(batch.target)} (${batch.usedCount + 1} of ${batch.maxActions} mutating actions used).`, consume: risk !== "READ" };
+  if (target.title === "Calculator" && batch.target.app === "calculator") return { match: true, reason: `inside approval batch ${batch.id} for ${targetLabelOf(batch.target)} (${batch.usedCount + 1} of ${batch.maxActions} mutating actions used).`, consume: risk !== "READ" };
   if (pidBound == null || !pidVerified) return { match: false, reason: null, consume: false };
   return { match: false, reason: null, consume: false };
 }
