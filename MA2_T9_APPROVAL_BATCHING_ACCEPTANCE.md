@@ -123,10 +123,10 @@ preserved; the consult gate runs after the base decision and only for ordinary a
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Focused T9 suite (18 tests, areas of §66) | 18 pass, 0 fail | `focused-tests.log` — approval-batches.test.ts (15) + state-marker.test.ts (3). Areas: single-action unchanged; explicit batch (offer shape/counts/ordering); batch denied; app binding; Task binding (delegated child steps); Mission binding; count exhaustion (boundary 2/2, no off-by-one); expiration (lazy flip + guarded denial + UI truth); risk escalation (`riskAtMost` lattice + requestBatchable); unexpected target (foreign pid, lookalike window, capture/sensitive probes, shell, browser, files, git); sensitive input; shell exclusion; Browser exclusion; Stop; Host restart (epoch + recover sweep); UI reconnect (`view()` canonical + stale-response refusals); remote approval (paired phone grant/revoke, clamped knobs, canonical counts); ask_every_time non-batching; secret redaction (automated privacy scan); journal events (ordering + truth); verification independence (area unchanged — zero diff); provider reroute (structural: consult input carries no provider identity; existing retarget suite unchanged) |
+| Focused T9 suite (18 tests, areas of §66) | 18 pass, 0 fail | `focused-tests.log` — approval-batches.test.ts (16) + state-marker.test.ts (2). Areas: single-action unchanged; explicit batch (offer shape/counts/ordering); batch denied; app binding; Task binding (delegated child steps); Mission binding; count exhaustion (boundary 2/2, no off-by-one); expiration (lazy flip + guarded denial + UI truth); risk escalation (`riskAtMost` lattice + requestBatchable); unexpected target (foreign pid, lookalike window, capture/sensitive probes, shell, browser, files, git); sensitive input; shell exclusion; Browser exclusion; Stop; Host restart (epoch + recover sweep); UI reconnect (`view()` canonical + stale-response refusals); remote approval (paired phone grant/revoke, clamped knobs, canonical counts); ask_every_time non-batching; secret redaction (automated privacy scan); journal events (ordering + truth, truthful TTL wording); verification independence (area unchanged — zero diff); provider reroute (structural: consult input carries no provider identity; existing retarget suite unchanged) |
 | Full suite | **613 total** = 247 script + 329 application + 37 UI, 0 fail (floor 592, +21 additive, none deleted) | `full-tests.log`, `ui-tests.log` |
 | Typecheck | exit 0 | `typecheck.log` |
-| Lint | exit 0 (0 errors; 13 pre-existing warnings, unchanged) | `lint.log` |
+| Lint | exit 0 (0 errors; 11 warnings at close, all pre-existing and outside the T9 file set — 10 react-refresh island + 1 pre-existing test var + 1 unused disable; the pre-fix tree logged 13 of the same pre-existing kinds) | `lint.log` |
 | Build | exit 0 (normal Vite/Nitro build) | `build.log` |
 | Dev render QA (desktop 1280×800 + mobile 390×844, system Chrome) | real content, zero console/page errors, no horizontal overflow; screenshots visually inspected | `dev-render-verdict.json`, `screenshots/app-builder-preview*.png` |
 
@@ -154,6 +154,17 @@ preserved; the consult gate runs after the base decision and only for ordinary a
    pinned by a new assertion in the canonical-count focused test. The offer card and `BatchView`
    always carried the truth (batch-labels' `ttlPhrase` was already correct); only the event copy
    was wrong.
+
+6. The live Calculator is a UWP app: its top-level window is owned by `ApplicationFrameHost`
+   (pid 34640 in the recon record) while its control elements report a content process (pid
+   51388). The batch review compared the element pid in `computer.invoke_control` outputs to the
+   pinned window owner and ended the batch `scope_mismatch` on the first covered invoke —
+   fail-closed as designed, but wrong: §72 binds the *window owner*, and this was no drift. Fixed
+   in the Runtime's additive surface: `invoke_control`/`type` outputs now declare `windowPid`
+   (the matched top-level window's owning process) and `extractObservedPid` prefers it, keeping
+   the element/target/window fields as fallbacks for focus and window-list outputs. Re-proven by
+   three focused tests (precedence, a batch surviving divergent control pids, drift still ending
+   the batch fail-closed) and by the live matrix resumed on the repackaged candidate.
 
 # LIVE VERIFIED
 

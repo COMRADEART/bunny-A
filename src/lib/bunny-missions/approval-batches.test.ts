@@ -15,7 +15,7 @@ import { FilesystemCapability, GitCapability, NotificationsCapability, TerminalC
 import { BrowserCapability } from "./capabilities/browser.server.ts";
 import { communicationConnectors } from "./capabilities/connectors.server.ts";
 import type { CapabilityAdapter } from "./capabilities/bus.server.ts";
-import { consultBatch, rotateBatchEpochForTest, riskAtMost } from "./batches.server.ts";
+import { consultBatch, extractObservedPid, rotateBatchEpochForTest, riskAtMost } from "./batches.server.ts";
 import { simulatedCodexProfile } from "../bunny-host/testing/codex.test.ts";
 import type { ActionManifest, ApprovalBatch, AuthorizationEnvelope, CapabilityManifest, MissionView, PermissionBatchOffer, PermissionRequest, RiskClass } from "./types.ts";
 
@@ -48,7 +48,7 @@ const COMPUTER_ACTIONS: ActionManifest[] = [
   actionManifest("computer.capture", "READ", { sensitive: true }),
   actionManifest("computer.open_app", "EXECUTE"),
 ];
-type World = { owner: Map<string, number>; launchers: Map<string, number>; unique: number; executed: { action: string; params: Record<string, unknown> }[] };
+type World = { owner: Map<string, number>; contentPid: Map<string, number>; launchers: Map<string, number>; unique: number; executed: { action: string; params: Record<string, unknown> }[] };
 function fakeComputer(world: World): CapabilityAdapter {
   const manifest: CapabilityManifest = { id: "computer", version: "1.0.0", description: "fake desktop", locality: "local", platforms: "any", events: [], cost: { kind: "local_compute", note: "" }, adapter: "fake", actions: COMPUTER_ACTIONS };
   const result = (ok: boolean, status: "succeeded" | "failed" | "unsupported", summary: string, output: unknown) => ({ ok, status, summary, output, evidence: [] });
@@ -64,8 +64,10 @@ function fakeComputer(world: World): CapabilityAdapter {
       switch (action) {
         case "computer.open_app": return result(true, "succeeded", "started", { pid: world.launchers.get(String(params.app)) ?? 1000 + (world.unique += 1), file: `fake-${String(params.app)}.exe`, newWindows: 1 });
         case "computer.focus_window": return result(true, "succeeded", "focused", { before: "old", after: title, target: { name: title, processId: owner }, focused: true });
-        case "computer.invoke_control": return result(true, "succeeded", "invoked", { control: { name: params.name, processId: owner }, pattern: "invoke" });
-        case "computer.type": return result(true, "succeeded", "typed", { control: { name: params.name, processId: owner }, beforeLength: 0, afterLength: String(params.text ?? "").length, matches: true });
+        // The real outputs carry the matched top-level window's owning pid (windowPid) plus the
+        // element's own process; on UWP hosts those differ (frame process vs content process).
+        case "computer.invoke_control": return result(true, "succeeded", "invoked", { control: { name: params.name, processId: world.contentPid.get(title.toLowerCase()) ?? owner }, pattern: "invoke", windowPid: owner });
+        case "computer.type": return result(true, "succeeded", "typed", { control: { name: params.name, processId: world.contentPid.get(title.toLowerCase()) ?? owner }, beforeLength: 0, afterLength: String(params.text ?? "").length, matches: true, windowPid: owner });
         case "computer.read_controls": return result(true, "succeeded", "read", { window: { name: title, processId: owner }, controls: [] });
         case "computer.list_windows": return result(true, "succeeded", "listed", { windows: [{ name: title, processId: owner }], foreground: { name: title, processId: owner } });
         case "computer.capture": return result(true, "succeeded", "captured", { path: "x.png", width: 1, height: 1 });
@@ -75,7 +77,7 @@ function fakeComputer(world: World): CapabilityAdapter {
   };
 }
 function makeWorld(): World {
-  return { owner: new Map([["calculator", 4242], ["notepad", 5151]]), launchers: new Map([["calculator", 1000], ["notepad", 1001]]), unique: 0, executed: [] };
+  return { owner: new Map([["calculator", 4242], ["notepad", 5151]]), contentPid: new Map(), launchers: new Map([["calculator", 1000], ["notepad", 1001]]), unique: 0, executed: [] };
 }
 async function setup(world = makeWorld()) {
   const dir = mkdtempSync(join(tmpdir(), "bunny-batch-"));
@@ -400,6 +402,62 @@ test("T9 window drift: a title-lookalike window of the same app is admitted per 
     const after = unresolved(env, view.id);
     assert.equal(after.action, "computer.type", "the next planned step asks for fresh approval — no silent continuation");
     await env.missions.respond(after.id, "deny", "workstation");
+    await until(() => env.missions.mission(view.id).state === "failed", "denied");
+  } finally { await env.cleanup(); }
+});
+
+test("T9 observed pid: the declared windowPid is the window owner a batch binds to, ahead of control element pids", () => {
+  // The live UWP reality (review packet): Calculator's top-level window is owned by the frame
+  // process (34640) while its buttons report a content process (51388).
+  assert.equal(extractObservedPid({ control: { name: "Five", processId: 51388 }, pattern: "invoke", windowPid: 34640 }), 34640, "the declared window owner outranks the control element's pid");
+  assert.equal(extractObservedPid({ control: { processId: 51388 }, pattern: "invoke" }), 51388, "an output without windowPid falls back to the element's pid");
+  assert.equal(extractObservedPid({ target: { name: "Calculator", processId: 34640 }, focused: true }), 34640, "focus still reports the window owner");
+  assert.equal(extractObservedPid({ windows: [{ processId: 1 }, { name: "Other", processId: 2 }], foreground: "" }), null, "a window list has no single observed owner");
+  assert.equal(extractObservedPid({ windowPid: 0 }), null, "a non-positive pid binds nothing");
+  assert.equal(extractObservedPid(null), null);
+});
+
+test("T9 UWP reality: control elements in a content process never end the batch while the window owner holds", async () => {
+  const env = await setup();
+  try {
+    env.world.contentPid.set("calculator", 7788);
+    const view = env.missions.create({ objective: "UWP content process", mode: "fast", origin: "workstation", steps: [
+      ...calculatorFlow(),
+      desktopStep("Type 3", "computer.type", { title: "Calculator", name: "num3Button", text: "3" }, [3]),
+    ] });
+    env.missions.approve(view.id, "workstation");
+    await grantBatch(env, view.id);
+    await until(() => env.missions.mission(view.id).state === "completed", "the whole sequence under one batch", 8000);
+    const stored = batchRow(env, view.id);
+    assert.equal(stored.status, "ended");
+    assert.equal(stored.endReason, "mission_ended", "divergent control pids alone never end a batch");
+    assert.equal(stored.usedCount, 5);
+    assert.equal(stored.observedPid, 4242, "the batch is pinned to the window owner, not a content process");
+    assert.ok(!eventTypes(env, view.id).includes("approval.batch_scope_mismatch"));
+    assert.equal(env.missions.store.requests(view.id).length, 1, "one approval ran the flow");
+  } finally { await env.cleanup(); }
+});
+
+test("T9 UWP drift: with content pids diverging, a genuinely foreign window owner still ends the batch fail-closed", async () => {
+  const env = await setup();
+  try {
+    env.world.contentPid.set("calculator", 7788);
+    const view = env.missions.create({ objective: "UWP drift", mode: "fast", origin: "workstation", steps: [
+      desktopStep("Launcher", "computer.open_app", { app: "calculator" }),
+      desktopStep("Focus", "computer.focus_window", { title: "Calculator" }, [0]),
+      desktopStep("Type 7", "computer.type", { title: "Calculator", name: "num7Button", text: "7" }, [1]),
+      desktopStep("Lookalike", "computer.type", { title: "Calculator help consent", name: "continue", text: "x" }, [2]),
+      desktopStep("After", "computer.type", { title: "Calculator", name: "num8Button", text: "8" }, [3]),
+    ] });
+    env.missions.approve(view.id, "workstation");
+    await grantBatch(env, view.id);
+    await until(() => batchRow(env, view.id).status === "ended", "drift ended the batch", 8000);
+    const stored = batchRow(env, view.id);
+    assert.equal(stored.endReason, "scope_mismatch", "the lookalike window's real owner ended the batch despite divergent control pids");
+    assert.equal(stored.observedPid, 4242);
+    assert.ok(eventTypes(env, view.id).includes("approval.batch_scope_mismatch"));
+    await until(() => env.missions.store.requests(view.id).length >= 2, "the next step asks fresh");
+    await env.missions.respond(unresolved(env, view.id).id, "deny", "workstation");
     await until(() => env.missions.mission(view.id).state === "failed", "denied");
   } finally { await env.cleanup(); }
 });

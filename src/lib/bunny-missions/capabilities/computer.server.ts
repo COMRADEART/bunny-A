@@ -75,7 +75,7 @@ elseif ($e.TryGetCurrentPattern([System.Windows.Automation.TogglePattern]::Patte
 elseif ($e.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pattern)) { $pattern.Select(); $kind = 'select' }
 elseif ($e.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$pattern)) { $pattern.Expand(); $kind = 'expand' }
 else { throw ('Control supports no invoke/toggle/select/expand pattern: ' + $e.Current.Name) }
-@{ control = (Describe $e); pattern = $kind } | ConvertTo-Json -Depth 4 -Compress`,
+@{ control = (Describe $e); windowPid = $w.Current.ProcessId; pattern = $kind } | ConvertTo-Json -Depth 4 -Compress`,
   "computer.type": String.raw`
 $w = Find-Window $p
 $e = Find-Control $w $p
@@ -85,7 +85,7 @@ if ($pattern.Current.IsReadOnly) { throw 'Control is read-only.' }
 $before = $pattern.Current.Value.Length
 $pattern.SetValue([string]$p.text)
 $after = $pattern.Current.Value
-@{ control = (Describe $e); beforeLength = $before; afterLength = $after.Length; matches = ($after -eq [string]$p.text) } | ConvertTo-Json -Depth 4 -Compress`,
+@{ control = (Describe $e); windowPid = $w.Current.ProcessId; beforeLength = $before; afterLength = $after.Length; matches = ($after -eq [string]$p.text) } | ConvertTo-Json -Depth 4 -Compress`,
   "computer.capture": String.raw`
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
 $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
@@ -128,8 +128,8 @@ export class ComputerCapability implements CapabilityAdapter {
       { id: "computer.list_windows", description: "List top-level windows (pid, process, title, foreground).", risk: "READ", inputs: [], outputs: "{ windows, foreground }", evidence: "Window list at the time of the call.", timeoutMs: 20_000, implemented: true },
       { id: "computer.read_controls", description: "Semantic control tree of one window (name, type, automation id).", risk: "READ", sensitive: true, inputs: [input("title", "string", false, "Window title contains."), input("pid", "number", false, "Process id."), input("limit", "number", false, "Max controls (150).")], outputs: "{ window, controls }", evidence: "Window identity and control count.", timeoutMs: 30_000, implemented: true },
       { id: "computer.focus_window", description: "Bring a window to the foreground.", risk: "EXECUTE", inputs: [input("title", "string", false, "Window title contains."), input("pid", "number", false, "Process id.")], outputs: "{ before, after, focused }", evidence: "Foreground window before and after.", timeoutMs: 20_000, implemented: true },
-      { id: "computer.invoke_control", description: "Invoke/toggle/select/expand a named control via UI Automation.", risk: "EXECUTE", inputs: [input("title", "string", false, "Window title contains."), input("pid", "number", false, "Process id."), input("name", "string", false, "Control name."), input("automationId", "string", false, "Automation id.")], outputs: "{ control, pattern }", evidence: "Control identity and the pattern used.", timeoutMs: 30_000, implemented: true },
-      { id: "computer.type", description: "Set the value of an editable control via the UI Automation ValuePattern (not keystrokes).", risk: "EXECUTE", inputs: [input("title", "string", false, "Window title contains."), input("pid", "number", false, "Process id."), input("name", "string", false, "Control name."), input("automationId", "string", false, "Automation id."), input("text", "string", true, "Value to set.")], outputs: "{ control, matches }", evidence: "Value length before/after and whether it matches.", timeoutMs: 30_000, implemented: true },
+      { id: "computer.invoke_control", description: "Invoke/toggle/select/expand a named control via UI Automation.", risk: "EXECUTE", inputs: [input("title", "string", false, "Window title contains."), input("pid", "number", false, "Process id."), input("name", "string", false, "Control name."), input("automationId", "string", false, "Automation id.")], outputs: "{ control, windowPid, pattern }", evidence: "Control identity, the matched top-level window's owning pid and the pattern used.", timeoutMs: 30_000, implemented: true },
+      { id: "computer.type", description: "Set the value of an editable control via the UI Automation ValuePattern (not keystrokes).", risk: "EXECUTE", inputs: [input("title", "string", false, "Window title contains."), input("pid", "number", false, "Process id."), input("name", "string", false, "Control name."), input("automationId", "string", false, "Automation id."), input("text", "string", true, "Value to set.")], outputs: "{ control, windowPid, matches }", evidence: "The matched top-level window's owning pid, value length before/after and whether it matches.", timeoutMs: 30_000, implemented: true },
       { id: "computer.capture", description: "Capture the whole virtual screen to a PNG artifact.", risk: "READ", sensitive: true, inputs: [], outputs: "{ path, width, height }", evidence: "PNG artifact with SHA-256.", timeoutMs: 30_000, implemented: true },
       { id: "computer.open_app", description: `Start an allowlisted application (${Object.keys(APPS).join(", ")}), optionally on a non-executable file inside an approved root.`, risk: "EXECUTE", inputs: [input("app", "string", true, "Allowlisted app name."), input("target", "string", false, "File or folder inside an approved root.")], outputs: "{ pid, newWindows }", evidence: "Started process id and new window count.", timeoutMs: 20_000, implemented: true },
     ] satisfies ActionManifest[],

@@ -77,8 +77,13 @@ export function requestBatchable(manifest: ActionManifest, action: string, param
 export function extractObservedPid(output: unknown): number | null {
   if (!output || typeof output !== "object") return null;
   const out = output as Record<string, unknown>;
+  // `windowPid` is the Runtime's declaration of the matched top-level window's owning process —
+  // the identity a batch binds to. On UWP hosts the controls live in a separate content process
+  // whose pid differs from the window owner, so the declared windowPid outranks the element
+  // pids; the remaining fields are fallbacks for outputs that carry no windowPid (focus, list_windows).
   const direct = (value: unknown): number | null => typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
-  const from = direct(out.pid) ?? direct((out.target as Record<string, unknown> | null)?.processId)
+  const from = direct(out.windowPid) ?? direct(out.pid)
+    ?? direct((out.target as Record<string, unknown> | null)?.processId)
     ?? direct((out.control as Record<string, unknown> | null)?.processId) ?? direct((out.window as Record<string, unknown> | null)?.processId)
     ?? direct(out.processId);
   return from;
