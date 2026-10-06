@@ -1,3 +1,5 @@
+> Current T9 status (2026-10-06): the duplicate Calculator incident was reopened and remediated in T9R. **BUNNY_MA2_T9R_PASS**, classification **MIXED**. Current staged candidate is v21-T9; production remains v17-T6. See [T9R closure](MA2_T9R_DUPLICATE_CALCULATOR_CLOSURE.md). Earlier T9 results below are historical. T10 was not started.
+
 # Bunny-A M-A-2 implementation report
 
 The earlier sections retain the T1-T3 reports. The final T4 section records the staged candidate and builder evidence. Production remains T3; no full M-A-2 approval is claimed.
@@ -985,3 +987,14 @@ assertions passed. Its unchanged isolated test and the unchanged complete sequen
 pass. No assertion was weakened. This low harness limitation is retained in the failure ledger.
 No unresolved BLOCKER/HIGH. Activation, physical phone, real dialogs/vision/provider reroute
 and broader desktop profiles are not claimed; activation requires separate authorization/backup.
+
+
+# M-A-2 Gate T9R — duplicate Calculator closure
+
+**BUNNY_MA2_T9R_PASS (2026-10-06), classification MIXED.** The original 68 launch calls came from 60 independent Missions and eight direct probes; final historical harness cleanup was omitted. A separate pre-change live reproduction proved two acquisitions under one v20 workflow/grant could create two visible windows. The current Runtime validates and reuses a per-workflow native Calculator target, serializes acquisition and refuses blind spawning after an uncertain launch. Persisted identity carries no permission or cleanup authority.
+
+Live repeated acquisition, postcondition retry, concurrency, fresh second-Task approval, result **402**, stale replacement, focus pause/recovery, Stop, expiry/budget, restart/replan, dashboard reload and pre-existing-window preservation pass. Final inventory is one intentionally retained manually prepared external fixture and zero unexplained windows. Independent Tasks may intentionally share the verified physical application only after separate authorization.
+
+**645 tests pass (251 script + 357 app + 37 UI), focused 47; typecheck/lint/build/Windows package checks pass.** All existing T1–T9 tests remain; eleven existing lint warnings. Candidate **Bunny-A-Windows-v21-T9**, source `b6caa93d0b4d80417c8adb690ce3e85a140909c4`, tooling `97f48e137610e36649624cf63f178dda04db394f`, manifest `f168a7b4f4ca62f546b7aa3410264953dd1776144cbfceb6fd96e257e75e4fcb`; 159/159 installed files and exact archive/import closure verified. Production remains healthy **v17-T6**, 156/156 integrity, protected files/Startup unchanged, no T9 schema or desktop approval writes. No activation or T10 work.
+
+Full scope, limits, ownership rules and evidence: [T9R closure](MA2_T9R_DUPLICATE_CALCULATOR_CLOSURE.md), `test-results/ma2-gate9r/final-verdict.json`, `candidate-package.json` and `evidence/index.json`. Historical exact 10–12 HWND lineage is unavailable and is not invented. This is the implementer's review packet; no new independent-review verdict is claimed.

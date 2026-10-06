@@ -1,0 +1,174 @@
+{
+  "gate": "M-A-2 T9R",
+  "release": "Bunny-A-Windows-v21-T9",
+  "ok": true,
+  "missionId": "9cb5672f-4d63-470e-97a3-be999812bad8",
+  "retryCause": "Read postcondition marker absent on first check, created on observed retry; real unchanged scheduler/Runtime",
+  "readRuns": [
+    {
+      "id": "8f812fce-5e72-47d2-bb6d-ab2e0fe77ee3",
+      "action": "computer.read_calculator",
+      "capability": "computer",
+      "missionId": "9cb5672f-4d63-470e-97a3-be999812bad8",
+      "stepId": "b2b29d25-9bed-4fe7-a23b-d16f155b4c85",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 2efdc60f-9b6a-41e3-a626-5c4180aa35a7.",
+      "params": {
+        "title": "Calculator"
+      },
+      "status": "succeeded",
+      "summary": "Calculator result: Display is 0.",
+      "evidence": [
+        "computer.read_calculator via UI Automation at 2026-10-06T20:35:17.579Z",
+        "Calculator target reused: {\"handle\":\"2426994\",\"processId\":34640,\"processStartedAt\":\"639269006874532721\",\"contentProcessId\":15112,\"contentStartedAt\":\"639269157138542582\"}"
+      ],
+      "artifactIds": [],
+      "startedAt": 1791318916525,
+      "finishedAt": 1791318917579,
+      "durationMs": 1054,
+      "origin": "mission:9cb5672f-4d63-470e-97a3-be999812bad8"
+    },
+    {
+      "id": "b33cc99f-67eb-4c81-86ec-46d11b7c3757",
+      "action": "computer.read_calculator",
+      "capability": "computer",
+      "missionId": "9cb5672f-4d63-470e-97a3-be999812bad8",
+      "stepId": "b2b29d25-9bed-4fe7-a23b-d16f155b4c85",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 2efdc60f-9b6a-41e3-a626-5c4180aa35a7.",
+      "params": {
+        "title": "Calculator"
+      },
+      "status": "succeeded",
+      "summary": "Calculator result: Display is 0.",
+      "evidence": [
+        "computer.read_calculator via UI Automation at 2026-10-06T20:35:16.486Z",
+        "Calculator target reused: {\"handle\":\"2426994\",\"processId\":34640,\"processStartedAt\":\"639269006874532721\",\"contentProcessId\":15112,\"contentStartedAt\":\"639269157138542582\"}"
+      ],
+      "artifactIds": [],
+      "startedAt": 1791318915469,
+      "finishedAt": 1791318916486,
+      "durationMs": 1017,
+      "origin": "mission:9cb5672f-4d63-470e-97a3-be999812bad8"
+    }
+  ],
+  "identities": [
+    {
+      "runId": "ea05e4e0-0cf4-4065-a7d9-328b1b81764e",
+      "action": "computer.open_app",
+      "decision": "reuse_bound",
+      "identity": {
+        "handle": "2426994",
+        "processId": 34640,
+        "processStartedAt": "639269006874532721",
+        "contentProcessId": 15112,
+        "contentStartedAt": "639269157138542582"
+      }
+    },
+    {
+      "runId": "8f812fce-5e72-47d2-bb6d-ab2e0fe77ee3",
+      "action": "computer.read_calculator",
+      "decision": "reused",
+      "identity": {
+        "handle": "2426994",
+        "processId": 34640,
+        "processStartedAt": "639269006874532721",
+        "contentProcessId": 15112,
+        "contentStartedAt": "639269157138542582"
+      }
+    },
+    {
+      "runId": "b33cc99f-67eb-4c81-86ec-46d11b7c3757",
+      "action": "computer.read_calculator",
+      "decision": "reused",
+      "identity": {
+        "handle": "2426994",
+        "processId": 34640,
+        "processStartedAt": "639269006874532721",
+        "contentProcessId": 15112,
+        "contentStartedAt": "639269157138542582"
+      }
+    },
+    {
+      "runId": "47f0d99a-50c3-4b77-8b25-4c7dd2e47c66",
+      "action": "computer.open_app",
+      "decision": "launched",
+      "identity": {
+        "handle": "2426994",
+        "processId": 34640,
+        "processStartedAt": "639269006874532721",
+        "contentProcessId": 15112,
+        "contentStartedAt": "639269157138542582"
+      }
+    }
+  ],
+  "batch": [
+    {
+      "id": "18aca3ef-f61e-4370-8502-c964d0960346",
+      "missionId": "9cb5672f-4d63-470e-97a3-be999812bad8",
+      "authorizationId": "2efdc60f-9b6a-41e3-a626-5c4180aa35a7",
+      "family": "computer",
+      "actions": [
+        "computer.open_app",
+        "computer.read_calculator"
+      ],
+      "riskCeiling": "EXECUTE",
+      "target": {
+        "app": "calculator",
+        "processId": null,
+        "title": null
+      },
+      "targetTier": "app",
+      "maxActions": 4,
+      "usedCount": 2,
+      "observedPid": 34640,
+      "observedPidFrom": "post-run",
+      "batchEpoch": "0fab6fc4-017e-43f9-9858-d0c0bc2ee4c8",
+      "createdAt": 1791318912128,
+      "createdBy": "workstation",
+      "expiresAt": 1791319032128,
+      "status": "ended",
+      "endAt": 1791318919420,
+      "endReason": "mission_ended",
+      "endBy": "bunny-mission",
+      "originStepId": "acf1dacb-521f-4945-9999-cf1b1f1a8a68",
+      "operations": [
+        {
+          "stepId": "acf1dacb-521f-4945-9999-cf1b1f1a8a68",
+          "digest": "21b4097ddb481ec1b386a8ce2bb09177751aae5a96eb50737468da484cd08613"
+        },
+        {
+          "stepId": "b2b29d25-9bed-4fe7-a23b-d16f155b4c85",
+          "digest": "be2173a50aaf2cdbda10549503bc0b002080b5bdb7cb1ffd432276463b8958e2"
+        },
+        {
+          "stepId": "b56b1406-c365-4e19-98fb-2103f68522d1",
+          "digest": "21b4097ddb481ec1b386a8ce2bb09177751aae5a96eb50737468da484cd08613"
+        }
+      ],
+      "windowIdentity": {
+        "handle": "2426994",
+        "processId": 34640,
+        "processStartedAt": "639269006874532721",
+        "contentProcessId": 15112,
+        "contentStartedAt": "639269157138542582"
+      }
+    }
+  ],
+  "target": {
+    "phase": "bound",
+    "identity": {
+      "handle": "2426994",
+      "processId": 34640,
+      "processStartedAt": "639269006874532721",
+      "contentProcessId": 15112,
+      "contentStartedAt": "639269157138542582"
+    },
+    "acquiredAt": 1791318915432,
+    "createdByBunny": true,
+    "runId": "47f0d99a-50c3-4b77-8b25-4c7dd2e47c66"
+  },
+  "launchCount": 1
+}

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
+const root='C:/Users/allam/AppData/Local/Bunny-A-T9R-stage';
+const state=root+'/state', workspace='C:/Users/allam/Bunny-Workspace-T9R-stage';
+assert.ok(!existsSync(state+'/host.sqlite'),'Never overwrite an existing staged database.');
+mkdirSync(state,{recursive:true});mkdirSync(workspace,{recursive:true});
+const production=new DatabaseSync('C:/Users/allam/AppData/Local/Bunny-A/state/host.sqlite',{readOnly:true});
+production.exec("VACUUM INTO '"+state+"/host.sqlite'");production.close();
+writeFileSync('test-results/ma2-gate9r/staging.json',JSON.stringify({gate:'M-A-2 T9R',recordedAt:new Date().toISOString(),root,state,workspace,port:45119,disposableProductionDbCopy:true,copyMethod:'read-only SQLite VACUUM INTO',credentialsCopied:false,startupDirectory:root+'/startup',productionActivated:false},null,2)+'\n');
+console.log('Fresh disposable T9R database copy and separate workspace created; production read only.');
