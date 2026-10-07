@@ -1,7 +1,7 @@
 <!-- R1 approval checkpoint start -->
-## Final remediation R1 — current approval checkpoint
+## Final remediation R1 — authorized attempt result
 
-**BUNNY_MA2_FINAL_REMEDIATION_R1_FAIL pending explicit activation authorization (2026-10-07).** The independent review's FAIL remains unchanged. IR-H1 was reproduced before editing, repaired and tested against the exact installed candidate; production remains v17-T6, so the deployment blocker is still open.
+**BUNNY_MA2_FINAL_REMEDIATION_R1_FAIL — authorized attempt stopped at failed ownership preflight (2026-10-07).** The independent review's FAIL remains unchanged. IR-H1 was reproduced before editing, repaired and tested against the exact installed candidate; production remains v17-T6, so the deployment blocker is still open.
 
 | Acceptance | Evidence / current result | Classification |
 |---|---|---|
@@ -14,9 +14,11 @@
 | Regression / render | 664 = 254 scripts + 373 application + 37 UI; zero failures/skips; typecheck/lint/build/Windows package pass; exact installed desktop/mobile screenshots inspected, clean console | Executed checks |
 | Preparation preservation | Fresh VACUUM INTO backup; zero missing/changed protected historical rows; all production devices/settings/Startup unchanged, Phone unrevoked | LIVE VERIFIED read-only |
 | Cleanup | All stage devices revoked; no test Mission/grant/run active; exact owned fixture closed, zero Calculator windows; stage processes stopped, development/production retained | DISPOSABLE LIVE |
-| Activation / production acceptance | NOT PERFORMED; user section 25 forbids inferring consent from “continue” | NOT TESTED / PENDING HUMAN AUTHORIZATION |
+| Activation / production acceptance | Explicit authorization obtained; ownership preflight refused unmodelled console helpers before Stop/selection | NOT PERFORMED / NOT TESTED AFTER FAILED PREFLIGHT |
 
 Full identities, limitations, known resolved harness failures, authorization scope and evidence index: [R1 report](MA2_FINAL_REMEDIATION_R1.md), `test-results/ma2-final-remediation-r1/activation-plan.json`, `final-verdict.json`, `evidence/index.json`. This is implementer evidence, not a new operational approval. After authorized activation/acceptance, NEXT is a fresh **M-A-2 FINAL INDEPENDENT RE-REVIEW**. Earlier gate records below are historical.
+
+Explicit authorization for the exact pinned v26 candidate is now recorded. Fresh idle and consistent backup checks passed, and immutable code was staged externally without selection. The promotion controller refused four unmodelled Windows console helpers before any Stop. Read-only diagnosis and post-refusal verification show the original healthy v17 Host/gateway, unchanged historical protected rows, all sixteen device rows, Phone, settings and Startup; only two provider status telemetry events were appended. No activation retry followed the failure. Production acceptance is NOT TESTED, and the deployment gap remains open. See `production/preflight-refusal.json`, `refusal-diagnosis.json`, `after-refusal.json` and the retained raw failure logs. No final operational PASS is issued.
 <!-- R1 approval checkpoint end -->
 
 <!-- T10 historical record start -->

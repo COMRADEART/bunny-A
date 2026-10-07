@@ -1,7 +1,7 @@
 <!-- R1 approval checkpoint start -->
 ## Final remediation R1 — current implementation record
 
-**BUNNY_MA2_FINAL_REMEDIATION_R1_FAIL pending explicit production authorization (2026-10-07).** IR-H1 implementer closure and staged acceptance pass; B2 remains open because the actual operating release is v17-T6. The previous independent FAIL review is immutable. No M-A-3, new autonomy, OD-1/OCT-1 or redesign was begun.
+**BUNNY_MA2_FINAL_REMEDIATION_R1_FAIL — authorized attempt stopped at failed ownership preflight (2026-10-07).** IR-H1 implementer closure and staged acceptance pass; B2 remains open because the actual operating release is v17-T6. The previous independent FAIL review is immutable. No M-A-3, new autonomy, OD-1/OCT-1 or redesign was begun.
 
 Runtime commit `8001d51d871f12c15b8de03005a40e9d4c3fd8c2` removes failed-read fallback authority, persists truthful cleanup metadata and adds current creation/image verification with native held-handle termination. Existing T4 Job Object ownership stays canonical. A real before-fix Stop reproduction selected the stale PID under intercepted termination. Ten new tests cover real-manager failure, simulated reuse, native last-hop mismatch, sentinel preservation and real positive cleanup; existing tests are unchanged.
 
@@ -9,7 +9,9 @@ One committed complete candidate, **Bunny-A-Windows-v26-MA2-R1**, tooling `0d3f9
 
 Isolated installed acceptance verifies dedicated-device stream/read/command/reconnect revocation, real active-grant rollback refusal before mutation, hard-crash approval invalidation, finite batch count/expiry/refresh, Stop/isolation, repeated/concurrent target acquisition, actual retry, focus loss and real dashboard reload. One explicitly owned Calculator fixture was launched; follow-up workflows launch zero extras and cleanup leaves zero windows. All stage devices are revoked and stage authority/processes retired. Production state/device/settings/Startup comparisons and private consistent backups pass. Development owner/launcher/state are classified and preserved; exact running cwd/original human intent remain unknown.
 
-Activation and all repaired production acceptance are pending section 25's explicit user authorization. The [R1 report](MA2_FINAL_REMEDIATION_R1.md) and `test-results/ma2-final-remediation-r1/CURRENT_OPERATIONS_R1.md` define the concrete candidate, fresh idle/backup/held-identity procedure, preservation and harmless acceptance scope. No final M-A-2 operational PASS is claimed. Earlier records below are historical.
+Activation and all repaired production acceptance are outstanding after the authorized fail-closed preflight refusal. The [R1 report](MA2_FINAL_REMEDIATION_R1.md) and `test-results/ma2-final-remediation-r1/CURRENT_OPERATIONS_R1.md` define the concrete candidate, fresh idle/backup/held-identity procedure, preservation and harmless acceptance scope. No final M-A-2 operational PASS is claimed. Earlier records below are historical.
+
+Explicit authorization for the exact pinned v26 candidate is now recorded. Fresh idle and consistent backup checks passed, and immutable code was staged externally without selection. The promotion controller refused four unmodelled Windows console helpers before any Stop. Read-only diagnosis and post-refusal verification show the original healthy v17 Host/gateway, unchanged historical protected rows, all sixteen device rows, Phone, settings and Startup; only two provider status telemetry events were appended. No activation retry followed the failure. Production acceptance is NOT TESTED, and the deployment gap remains open. See `production/preflight-refusal.json`, `refusal-diagnosis.json`, `after-refusal.json` and the retained raw failure logs. No final operational PASS is issued.
 <!-- R1 approval checkpoint end -->
 
 <!-- T10 historical record start -->

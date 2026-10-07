@@ -1,10 +1,9 @@
 {
-  "recordedAt": "2026-10-07T15:43:05.610Z",
-  "classification": "NOT TESTED / PENDING HUMAN AUTHORIZATION",
-  "productionActivationAuthorized": false,
-  "policy": "User request section 25",
-  "quote": "Do NOT switch production to the repaired candidate until the user explicitly authorizes production activation. When ready, stop and ask. Do not infer authorization from \"run remediation\", \"fix the bug\", \"continue\".",
-  "latestContinueIsNotActivationAuthorization": true,
+  "recordedAt": "2026-10-07T16:00:12.557Z",
+  "classification": "EXPLICIT HUMAN AUTHORIZATION",
+  "productionActivationAuthorized": true,
+  "source": "Direct human user message in this chat after approval checkpoint; no inference from continue",
+  "quote": "I explicitly authorize production activation of the exact staged candidate: Bunny-A-Windows-v26-MA2-R1 ... Proceed with the authorized production activation and acceptance.",
   "candidate": {
     "release": "Bunny-A-Windows-v26-MA2-R1",
     "version": "26.0.0-MA2-R1",
@@ -13,5 +12,20 @@
     "manifestSha256": "06836b4847824edcbfa4c1628b4e0106c5ccded24a8d9361355003f467339e54",
     "zipSha256": "3e68faed3e1d9ae75d1d3f2140c831e8843fc914ea7dc179e78c81445f7fbac3"
   },
-  "requestedScope": "Activate this exact candidate using fresh idle/backup/held-ownership checks; preserve canonical state and Phone companion; perform harmless dedicated-device SSE and Calculator/approval acceptance, including controlled approval restart acceptance; restore original Mission/Trigger policy; retire unsafe historical promotion guidance; stop before fresh independent re-review."
+  "scope": [
+    "fresh canonical quiescence",
+    "fresh corroborated process identity and held-handle Stop; failed inspection fails closed",
+    "consistent SQLite backup and protected ledgers",
+    "exact pinned candidate activation outside Git",
+    "canonical state, settings, Mission/Trigger and Phone preservation",
+    "installed identity and IR-H1 Stop",
+    "production SSE revocation",
+    "canonical rollback refusal",
+    "controlled approval restart invalidation",
+    "harmless bounded Calculator batch and no-duplicate lifecycle",
+    "temporary device revocation and final process/Calculator cleanup"
+  ],
+  "requiredOnFailure": "Stop safely and do not claim remediation PASS",
+  "finalOperationalPassAuthorized": false,
+  "freshIndependentReReviewRequired": true
 }

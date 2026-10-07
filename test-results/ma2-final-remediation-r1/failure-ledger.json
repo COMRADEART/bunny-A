@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-10-07T15:50:32.474Z",
-  "classification": "STATIC VERIFIED",
+  "recordedAt": "2026-10-07T16:25:45.262Z",
+  "classification": "STATIC VERIFIED failure inventory with LIVE VERIFIED production refusal",
   "unresolvedProductFailures": 0,
   "entries": [
     {
@@ -58,6 +58,22 @@
       "phase": "Evidence Git sealing",
       "kind": "RESOLVED LINE-ENDING CHECK",
       "detail": "Byte-preserving -text exposed retained CRLF log/JSON endings to Git whitespace checks. Scoped cr-at-eol/raw-log attributes preserve original evidence bytes; no log rewriting or normalization performed."
+    },
+    {
+      "phase": "Authorized production ownership inspection",
+      "kind": "UNRESOLVED PROMOTION-CONTROLLER PREFLIGHT FAILURE",
+      "evidence": "production/ownership-inspect.log; production/preflight-refusal.json; production/refusal-diagnosis.json",
+      "detail": "Fresh production ownership preflight refused unexpected descendants before any Stop or selection. Read-only diagnosis identified four Microsoft-signed System32 console hosts; the five-role controller did not model them. The attempt was stopped under the user failure rule.",
+      "productionStopAttempted": false,
+      "productionSelectionChanged": false,
+      "unsafeFallbackAttempted": false
+    },
+    {
+      "phase": "Post-refusal preservation checker",
+      "kind": "RESOLVED HARNESS APPEND ASSUMPTION",
+      "evidence": "production/after-refusal.log; production/after-refusal-ledger-diagnostic.log; production/refusal-ledger-diff.json; production/after-refusal-preservation-pass.log",
+      "detail": "Initial zero-appends assertion rejected two provider.status_changed events from the untouched running Host. Diagnostic preserved exact event IDs/digests. Final checker requires every historical row unchanged and permits only that explicit event type; device/settings/config/Startup checks stay exact. This does not retry activation or relax process ownership."
     }
-  ]
+  ],
+  "unresolvedOperationalFailures": 1
 }

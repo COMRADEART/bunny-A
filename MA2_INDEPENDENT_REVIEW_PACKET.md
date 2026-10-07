@@ -1,7 +1,7 @@
 <!-- R1 approval checkpoint start -->
 ## Final remediation R1 — current review handoff checkpoint
 
-**Not ready for final operational re-review yet: production activation requires explicit human authorization.** Current remediation verdict is **BUNNY_MA2_FINAL_REMEDIATION_R1_FAIL** solely because required promotion/production acceptance are outstanding. Previous `MA2_FINAL_INDEPENDENT_REVIEW.md` returned **BUNNY_MA2_OPERATIONAL_FAIL** and remains byte-identical; its SHA is recorded in the R1 baseline.
+**Not ready for final operational re-review: authorized activation stopped at failed ownership preflight.** Current remediation verdict is **BUNNY_MA2_FINAL_REMEDIATION_R1_FAIL** because the required ownership preflight refused promotion before Stop. Previous `MA2_FINAL_INDEPENDENT_REVIEW.md` returned **BUNNY_MA2_OPERATIONAL_FAIL** and remains byte-identical; its SHA is recorded in the R1 baseline.
 
 Review [MA2_FINAL_REMEDIATION_R1.md](MA2_FINAL_REMEDIATION_R1.md) and `test-results/ma2-final-remediation-r1/evidence/index.json`. B1 evidence reaches old real TaskManager Stop, intercepts stale PID selection before editing, then verifies nine repaired installed-artifact cases plus identity test. The fix fails closed on unavailable fresh inspection, records unresolved cleanup and terminates only a current corroborated held lifetime. Existing Git Job Object isolation tests pass unchanged.
 
@@ -9,7 +9,9 @@ Candidate **v26-MA2-R1** source `8001d51d871f12c15b8de03005a40e9d4c3fd8c2`, tool
 
 Production remains **v17-T6**. Fresh consistent private backup and read-only preservation/idle facts are in `pre-activation/`; Phone companion and revoked devices remain unchanged. Cleanup has zero Calculator windows and no stage authority/runtime. The separate user-owned npm development Host is preserved; unknown launch intent and exact running cwd remain qualified.
 
-After explicit authorization, require actual activation identity, immediate pre/post canonical preservation, production SSE/T9/T9R/IR-H1 acceptance, active repaired rollback tooling, retired unsafe historical operational guidance and final cleanup before handing off to a **new independent reviewer/session**. Staged proof must never be substituted for the operating production bytes. That reviewer alone may issue an M-A-2 operational verdict. Earlier gate records below are historical.
+After correction and an entirely fresh safe preflight, require actual activation identity, immediate pre/post canonical preservation, production SSE/T9/T9R/IR-H1 acceptance, active repaired rollback tooling, retired unsafe historical operational guidance and final cleanup before handing off to a **new independent reviewer/session**. Staged proof must never be substituted for the operating production bytes. That reviewer alone may issue an M-A-2 operational verdict. Earlier gate records below are historical.
+
+Explicit authorization for the exact pinned v26 candidate is now recorded. Fresh idle and consistent backup checks passed, and immutable code was staged externally without selection. The promotion controller refused four unmodelled Windows console helpers before any Stop. Read-only diagnosis and post-refusal verification show the original healthy v17 Host/gateway, unchanged historical protected rows, all sixteen device rows, Phone, settings and Startup; only two provider status telemetry events were appended. No activation retry followed the failure. Production acceptance is NOT TESTED, and the deployment gap remains open. See `production/preflight-refusal.json`, `refusal-diagnosis.json`, `after-refusal.json` and the retained raw failure logs. No final operational PASS is issued.
 <!-- R1 approval checkpoint end -->
 
 <!-- T10 historical record start -->
