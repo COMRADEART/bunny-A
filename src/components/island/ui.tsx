@@ -12,10 +12,12 @@ import {
   Square,
   X,
 } from "lucide-react";
-import type { Availability, ProviderId, ProviderLive, TaskState } from "@/lib/orch/types";
+import type { Availability, ProviderId, ProviderLive, TaskState, UsageWindow } from "@/lib/orch/types";
 import { ringPlacement } from "@/lib/bunny-host/usage";
 import { useIsland } from "@/store/use-island";
 import { finitePlan } from "./ui-model";
+import { checkedLine, modelsDiscovered, resetIn, usageChipLabel, usageFor, usageStateLabel, usageWindowReset, usageWindowLine } from "./usage-model";
+import type { ProviderUsageSnapshot } from "@/lib/bunny-host/provider-usage.server";
 import type { OrchTask } from "@/lib/orch/types";
 import { activityDetail, isPrivateEvent } from "./motion-model";
 import { codexMissionExclusion, codexMissionStatus } from "@/lib/orch/compatibility";
@@ -167,8 +169,26 @@ export function ProviderMark({
   provider: ProviderLive;
   interactive?: boolean;
 }) {
-  const ring = ringPlacement(provider.id === "ollama" ? [] : provider.usageWindows);
-  const title = usageDescription(provider);
+  const providerUsage = useIsland((s) => s.providerUsage);
+  const record = usageFor(providerUsage, provider.id);
+  // Verified rings (M-A-3 T2 §13): only provider-reported data the Host still calls
+  // current/estimated is drawn as an arc. Stale, restart-restored and unknown states
+  // never pretend to be live; a legacy Host without usage truth keeps its old look.
+  const ringVisible = record
+    ? record.status === "current" || record.status === "estimated"
+    : (provider.usageWindows?.length ?? 0) > 0;
+  const ring = ringVisible
+    ? ringPlacement(
+        provider.id === "ollama"
+          ? []
+          : record
+            ? record.windows.map<UsageWindow>((w) => ({ label: w.label, usedPercent: w.percentUsed ?? NaN, resetsAt: w.resetAt, kind: w.kind as UsageWindow["kind"], windowMinutes: null }))
+            : (provider.usageWindows ?? []),
+      )
+    : { inner: null, outer: null };
+  const title = record
+    ? `${NAMES[provider.id]} · usage ${usageChipLabel(record).toLowerCase()}\n${record.windows.length ? record.windows.map((w) => usageWindowLine(w, Date.now())).join("\n") : record.note}\n${checkedLine(record, Date.now())}`
+    : usageDescription(provider);
   const mark = (
     <span
       className="usage-mark"
@@ -239,6 +259,22 @@ export function ProviderFacts({
   provider: ProviderLive;
   compact?: boolean;
 }) {
+  // Usage truth (M-A-3 T2): the Host's normalized record, when this Host knows usage.
+  const providerUsage = useIsland((s) => s.providerUsage);
+  const modelCapabilities = useIsland((s) => s.modelCapabilities);
+  const record = usageFor(providerUsage, provider.id);
+  const models = modelsDiscovered(modelCapabilities, provider.id);
+  const now = Date.now();
+  const chip = record ? (
+    <span
+      className="usage-chip"
+      data-usage-status={
+        record.providerId === "ollama" && record.status === "current" ? "local" : record.status
+      }
+    >
+      {usageChipLabel(record)}
+    </span>
+  ) : null;
   return (
     <>
       <dl className="fact-list">
@@ -281,6 +317,35 @@ export function ProviderFacts({
               <dt>Generation</dt>
               <dd>{provider.active_jobs > 0 ? "Active" : "Idle"}</dd>
             </div>
+            <div>
+              <dt>Usage</dt>
+              <dd>{chip ?? "Unknown"}</dd>
+            </div>
+          </>
+        ) : record ? (
+          <>
+            <div>
+              <dt>Usage</dt>
+              <dd>{chip}</dd>
+            </div>
+            {record.windows.map((w) => {
+              const reset = !compact ? usageWindowReset(w, now) : null;
+              return (
+                <div key={`${w.kind}-${w.label}`}>
+                  <dt>
+                    {w.kind === "short" ? "Short window" : w.kind === "weekly" ? "Weekly" : w.label}
+                    {!compact && reset ? <small>{reset}</small> : null}
+                  </dt>
+                  <dd>{w.percentUsed == null ? "Unknown" : `${Math.round(w.percentUsed)}%`}</dd>
+                </div>
+              );
+            })}
+            {!compact && models != null ? (
+              <div>
+                <dt>Models</dt>
+                <dd>{models} discovered</dd>
+              </div>
+            ) : null}
           </>
         ) : (provider.usageWindows ?? []).length ? (
           (provider.usageWindows ?? []).map((w) => (
@@ -312,7 +377,12 @@ export function ProviderFacts({
       {provider.id === "codex" && !compact ? (
         <p className="caption">{provider.securityCompatibility?.compatibilityClass === "VALIDATED" && codexMissionStatus(provider) === "Validated" ? `Profile ${provider.securityCompatibility.registryEntry ?? "Validated runtime"} · Mission security policy ${provider.securityCompatibility.policyVersion} validated for read and write access.` : codexMissionExclusion(provider, "read") ?? codexMissionExclusion(provider, "write")}</p>
       ) : null}
-      {provider.usageObservedAt && provider.id !== "ollama" ? (
+      {record ? (
+        <p className="caption">
+          {checkedLine(record, now)} ·{" "}
+          {compact ? usageStateLabel(record.status) : record.note}
+        </p>
+      ) : provider.usageObservedAt && provider.id !== "ollama" ? (
         <p className="caption">
           Reported {reportTime(provider.usageObservedAt)} ·{" "}
           {compact

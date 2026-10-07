@@ -10,6 +10,7 @@ import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask } from "./contracts.ts";
 import { PolicyEngine } from "./learning.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
+import { ProviderUsageService } from "./provider-usage.server.ts";
 import { activityLabel } from "./events.ts";
 import { describeTree, descendants, killProcess, processTable, sameProcessIdentity, survivors } from "./process-tree.server.ts";
 import { verifySpec } from "./verification.server.ts";
@@ -35,6 +36,8 @@ export class TaskManager {
   registry: ProviderRegistry;
   /** M-A-3 T1: per-model capability facts. Additive; routing still reads only the provider registry. */
   modelCapabilities: ModelCapabilityRegistry;
+  /** M-A-3 T2: normalized usage truth. Derives from registry state and Bunny's own counters; probes nothing, owns no store. */
+  providerUsage: ProviderUsageService;
   bus = new EventEmitter();
   instanceId: string = crypto.randomUUID();
   sessions=new Map<string,RunningSession>();
@@ -63,6 +66,7 @@ export class TaskManager {
     this.adapters=adapters ?? defaultAdapters(()=>this.providerPaths());
     this.registry=new ProviderRegistry(this.adapters,db,options.timing ?? DEFAULT_TIMING);
     this.modelCapabilities=new ModelCapabilityRegistry(db,{providerPaths:()=>this.providerPaths(),availableProviders:()=>this.adapters.map(adapter=>adapter.id)});
+    this.providerUsage=new ProviderUsageService({providers:()=>this.registry.list(),probed:id=>this.registry.probedThisRun(id),observed:id=>this.db.observed(id),availableProviders:()=>this.adapters.map(adapter=>adapter.id),publish:events=>{for(const event of events) this.emit(this.db.event(event.type,null,event.detail));}});
     this.sessionDirectory=options.sessionDirectory ?? null;
     this.readProcesses=options.processTable ?? processTable;
     const savedThermal=db.db.prepare("SELECT value FROM settings WHERE key='thermal_policy'").get() as {value:string}|undefined;
@@ -107,9 +111,18 @@ export class TaskManager {
   }
   announce(changes: string[]) {if(changes.length) this.emit(this.db.event("provider.status_changed",null,changes.join("; ")));}
   /** User-requested refresh: re-probes every provider and model listing now. */
-  async discover() {this.announce([...await this.registry.refresh({force:true}),...await this.modelCapabilities.refresh({force:true})]);}
+  async discover() {
+    const changes = [...await this.registry.refresh({force:true}),...await this.modelCapabilities.refresh({force:true})];
+    // Usage truth is re-derived from the fresh probes; it never probes on its own.
+    await this.providerUsage.refresh();
+    this.announce(changes);
+  }
   /** Periodic refresh: cheap health checks, full probes only when due. */
-  async refreshProviders() {this.announce([...await this.registry.refresh(),...await this.modelCapabilities.refresh()]);}
+  async refreshProviders() {
+    const changes = [...await this.registry.refresh(),...await this.modelCapabilities.refresh()];
+    await this.providerUsage.refresh();
+    this.announce(changes);
+  }
   async configureProviderPath(id: ProviderId,path: string|null) {
     const paths=this.providerPaths();
     if(path) {const real=realpathSync(resolve(path));if(!statSync(real).isFile()) throw new Error("Executable path must be a file.");paths[id]=real;} else delete paths[id];
@@ -126,7 +139,7 @@ export class TaskManager {
       return {...base,active_jobs:mine.length,activeSessions:mine.map(task=>({taskId:task.id,providerSessionId:task.sessionId ?? null,pid:task.pid ?? null})),availability:mine.length && base.availability === "ready" ? "busy" : base.availability,observed:this.db.observed(provider.id)};
     });
   }
-  snapshot(after=0): HostSnapshot {return {app:"Bunny-A",instanceId:this.instanceId,health:this.containment.snapshot(),tasks:this.db.tasks(),projects:this.db.projects(),providers:this.live(),samples:this.samples,events:after ? this.db.events(after) : this.db.recentEvents(),cursor:this.db.cursor(),performance:this.db.performance(),remoteConfigured:this.remoteConfigured,remoteUrl:this.remoteUrl,devices:this.db.db.prepare("SELECT id,name,created_at AS createdAt FROM devices WHERE revoked_at IS NULL").all() as {id:string;name:string;createdAt:number}[],thermal:this.thermal,modelCapabilities:this.modelCapabilities.snapshot()};}
+  snapshot(after=0): HostSnapshot {return {app:"Bunny-A",instanceId:this.instanceId,health:this.containment.snapshot(),tasks:this.db.tasks(),projects:this.db.projects(),providers:this.live(),samples:this.samples,events:after ? this.db.events(after) : this.db.recentEvents(),cursor:this.db.cursor(),performance:this.db.performance(),remoteConfigured:this.remoteConfigured,remoteUrl:this.remoteUrl,devices:this.db.db.prepare("SELECT id,name,created_at AS createdAt FROM devices WHERE revoked_at IS NULL").all() as {id:string;name:string;createdAt:number}[],thermal:this.thermal,modelCapabilities:this.modelCapabilities.snapshot(),providerUsage:this.providerUsage.snapshot()};}
   configureThermal(cpuWarn:number,gpuWarn:number,autoStop:boolean) {
     if(!Number.isFinite(cpuWarn)||cpuWarn<30||cpuWarn>120||!Number.isFinite(gpuWarn)||gpuWarn<30||gpuWarn>120) throw new Error("Thermal thresholds must be 30–120°C.");
     this.thermal={cpuWarn,gpuWarn,autoStop};this.db.db.prepare("INSERT INTO settings VALUES('thermal_policy',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(this.thermal));
@@ -269,7 +282,11 @@ export class TaskManager {
         output:text=>{pending+=text;if(pending.length>2_000_000) pending=pending.slice(-2_000_000);flushTimer??=setTimeout(this.containment.guard({subsystem:"tasks",taskId:id},flush,error=>this.failOperation(id,error)),300);},
         progress:progress=>{pendingProgress=progress;},
         usage:usage=>{reportedUsage=usage;},
-        rateLimits:(windows,status)=>{this.registry.recordSessionUsage(task.provider,windows,status);},
+        rateLimits:(windows,status)=>{
+          this.registry.recordSessionUsage(task.provider,windows,status);
+          // Session-reported usage is re-derived in the background so the snapshot and events stay in step.
+          this.containment.background({subsystem:"provider-usage",taskId:task.id},()=>this.providerUsage.refresh());
+        },
         raw:(stream,text)=>record?.write(stream,text),
       });
     } catch(error) {this.flushers.delete(id);const message=safeError(error).message;return this.update(launching,{state:"failed",finishedAt:Date.now(),error:message,latestEvent:this.activity(launching,"agent.failed",message)},"task.failed",message);}
@@ -296,7 +313,7 @@ export class TaskManager {
       if(["draining","fatal"].includes(this.containment.health.operationalState)) {await this.failOperation(id,{name:"HostFatal",message:"Host fatal shutdown interrupted verification; no success was recorded."});return;}
       const detail=state === "completed" ? (verification ? `Completed and verified by Bunny-A: ${verification.detail}` : "Provider process completed; no independent verification was requested.") : error ?? `Provider process ${state}.`;
       const finished=this.update(latest,{state,finishedAt:Date.now(),output:result.output || latest.output,error:state === "completed" ? null : error,exitCode:result.exitCode ?? null,activity:activityLabel(`task.${state}`),verification,usage:reportedUsage ?? latest.usage ?? null,latestEvent:this.activity(latest,`agent.${state}`,detail,verification ? "bunny" : "provider")},`task.${state}`,detail);
-      if(finished.provider === "codex") this.containment.background({subsystem:"provider-usage"},()=>this.registry.refreshUsage("codex"));
+      if(finished.provider === "codex") this.containment.background({subsystem:"provider-usage"},async()=>{await this.registry.refreshUsage("codex"); await this.providerUsage.refresh();});
       } catch(error) {await this.containment.contain(error,"boundary",{owner:{subsystem:"tasks",taskId:id,...task.mission},fail:error=>this.failOperation(id,error)});}
       finally {clearTimeout(timer);if(flushTimer) clearTimeout(flushTimer);this.stopTree(id);this.flushers.delete(id);this.sessions.delete(id);}
     });

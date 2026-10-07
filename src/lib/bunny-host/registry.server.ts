@@ -81,9 +81,11 @@ export class ProviderRegistry {
         if (!due && adapter.health) next = await adapter.health(previous!);
         if (!next) { next = await adapter.detect(); this.fullAt.set(adapter.id, now); if (next.usageObservedAt) this.usageAt.set(adapter.id, now); }
         else if (adapter.usage && now - (this.usageAt.get(adapter.id) ?? 0) >= this.timing.usageMs && next.authenticated) {
-          const usage = await adapter.usage().catch(() => null);
+          // T2: a usage read that yields nothing is recorded as a failed attempt on the live record;
+          // previous windows survive untouched, so the usage service can show them as stale rather than current.
+          const attempt = await adapter.usage().then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
           this.usageAt.set(adapter.id, now);
-          next = applyUsage({ ...next }, usage);
+          next = attempt.ok && attempt.value ? applyUsage({ ...next }, attempt.value) : this.markUsageFailure({ ...next }, now, attempt.ok ? null : attempt.error);
         }
         next.features = adapter.capabilities?.() ?? next.features ?? FEATURES[adapter.id];
       } catch (error) {
@@ -104,11 +106,15 @@ export class ProviderRegistry {
     const adapter = this.adapters.find((candidate) => candidate.id === id);
     const current = this.providers.get(id);
     if (!adapter?.usage || !current?.authenticated) return;
-    const usage = await adapter.usage().catch(() => null);
+    const attempt = await adapter.usage().then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
     this.usageAt.set(id, Date.now());
-    const next = applyUsage({ ...current }, usage);
+    const next = attempt.ok && attempt.value ? applyUsage({ ...current }, attempt.value) : this.markUsageFailure({ ...current }, Date.now(), attempt.ok ? null : attempt.error);
     this.providers.set(id, next);
     this.db.db.prepare("UPDATE providers SET record=? WHERE id=?").run(JSON.stringify(next), id);
+  }
+  /** Marks a usage read that produced no data. Previous windows are never erased or overwritten. */
+  private markUsageFailure(live: ProviderLive, now: number, error: unknown): ProviderLive {
+    return { ...live, usage_failed_at: now, ...(error ? { usage_error: safeError(error).message.split("\n")[0] } : {}) };
   }
   /** Usage windows a running session reported itself (Claude Code rate-limit events), with the provider's verdict. */
   recordSessionUsage(id: ProviderId, windows: ProviderLive["usageWindows"], status?: string) {
@@ -133,6 +139,8 @@ export class ProviderRegistry {
 export function applyUsage(live: ProviderLive, usage: { windows: NonNullable<ProviderLive["usageWindows"]>; observedAt: number } | null, note?: string): ProviderLive {
   if (!usage) return live;
   live.usageWindows = usage.windows; live.usageObservedAt = usage.observedAt;
+  // Fresh provider-reported data reasserts itself: a previous failed attempt no longer applies.
+  live.usage_failed_at = null; live.usage_error = null;
   const kinds = new Set(usage.windows.map((window) => window.kind));
   live.usageCapabilities = { ...(live.usageCapabilities ?? { tokenUsage: false, activeJobs: true, source: "provider" }), shortWindow: kinds.has("short"), weekly: kinds.has("weekly"), resetTime: usage.windows.some((window) => window.resetsAt !== null) } as NonNullable<ProviderLive["usageCapabilities"]>;
   live.usage_note = usage.windows.length ? note ?? live.usage_note : "Usage unavailable";

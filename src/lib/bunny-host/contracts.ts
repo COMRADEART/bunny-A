@@ -1,6 +1,7 @@
 import type { MissionSnapshot } from "../bunny-missions/types.ts";
 import type { OperationalHealth } from "./failure.server.ts";
 import type { ModelCapabilitySnapshot } from "./model-capability.server.ts";
+import type { ProviderUsageServiceSnapshot } from "./provider-usage.server.ts";
 import type { HostPresentation } from "./presentation.ts";
 import type { ReleaseIdentity } from "./release-identity.server.ts";
 import type { Mode, OrchTask, Project, ProviderId, ProviderLive, HostSample, TaskConstraints, ProviderFeatures, TaskProgress, TokenUsage, UsageWindow, VerifySpec, ProcessInfo, TaskState, ProviderExecutionScope } from "../orch/types.ts";
@@ -35,6 +36,8 @@ export type HostSnapshot = {
   missions?: MissionSnapshot;
   /** M-A-3 T1 per-model capability facts (probed only). Optional: older clients ignore it. */
   modelCapabilities?: ModelCapabilitySnapshot;
+  /** M-A-3 T2 normalized provider usage truth (derived from registry state and Bunny's own counters). Optional: older clients ignore it. */
+  providerUsage?: ProviderUsageServiceSnapshot;
 };
 /** `routingPrompt` is set in-process by the MissionManager only (never from HTTP input). */
 export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };

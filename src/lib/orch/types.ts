@@ -141,6 +141,10 @@ export type ProviderLive = {
   capabilities?: string[];
   usageWindows?: UsageWindow[];
   usageObservedAt?: number | null;
+  /** When the most recent usage read attempt produced no data; previous windows survive untouched (M-A-3 T2). */
+  usage_failed_at?: number | null;
+  /** First-line reason a usage read attempt produced no data, when the provider threw one. */
+  usage_error?: string | null;
   authenticatedState?: AuthState;
   models?: string[];
   /** Installed models that a local service proxies to a hosted provider (Ollama cloud tags). Never local inference. */

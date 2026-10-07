@@ -74,7 +74,7 @@ export function providerBase(id: ProviderId): ProviderLive {
     local_or_cloud: id === "ollama" ? "local" : "cloud", supported_task_types: ["coding", "debug", "writing", "ops", "research", "general"],
     current_model: null, models: [], usage: null, usage_note: "Usage unavailable", active_jobs: 0, latency_estimate_ms: null,
     extension: ["cline", "cursor", "opencode"].includes(id), detail: "Not detected on this workstation.", vram: null, tokens_per_sec: null,
-    executable: null, version: null, capabilities: [], usageWindows: [], usageObservedAt: null, features: FEATURES[id],
+    executable: null, version: null, capabilities: [], usageWindows: [], usageObservedAt: null, usage_failed_at: null, usage_error: null, features: FEATURES[id],
     usageCapabilities: { shortWindow: false, weekly: false, resetTime: false, tokenUsage: false, activeJobs: true, source: "none" },
     probedAt: null, evidence: [],
   };

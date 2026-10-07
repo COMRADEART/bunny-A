@@ -4,6 +4,8 @@ import type { HostEvent, HostSnapshot, PerformanceProfile } from "@/lib/bunny-ho
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { OperationalHealth } from "@/lib/bunny-host/failure.server";
 import type { PublicActivity } from "@/lib/bunny-host/presentation";
+import type { ModelCapabilitySnapshot } from "@/lib/bunny-host/model-capability.server";
+import type { ProviderUsageServiceSnapshot } from "@/lib/bunny-host/provider-usage.server";
 import { needsCanonicalResync, reconcileSnapshot } from "@/components/island/activity-model";
 import type {
   HostPresence,
@@ -110,6 +112,10 @@ type Island = Preferences & {
   localOnly: boolean;
   /** Host-owned mission state (null until a Host that knows missions answers). */
   missions: MissionSnapshot | null;
+  /** M-A-3 T2 normalized provider usage truth (null until a Host that knows it answers). */
+  providerUsage: ProviderUsageServiceSnapshot | null;
+  /** M-A-3 T1 probed per-model capability facts (null until a Host that knows them answers). */
+  modelCapabilities: ModelCapabilitySnapshot | null;
   composeKind: "task" | "mission";
   missionFocus: string | null;
   setComposeKind: (kind: "task" | "mission") => void;
@@ -273,6 +279,8 @@ export const useIsland = create<Island>((set, get) => {
       performance: snapshot.performance,
       remoteConfigured: snapshot.remoteConfigured,
       missions: snapshot.missions ?? null,
+      providerUsage: snapshot.providerUsage ?? null,
+      modelCapabilities: snapshot.modelCapabilities ?? null,
       cpuWarn: snapshot.thermal?.cpuWarn ?? 90,
       gpuWarn: snapshot.thermal?.gpuWarn ?? 85,
       ollamaUp: ollama?.availability === "ready" || ollama?.availability === "busy",
@@ -367,6 +375,8 @@ export const useIsland = create<Island>((set, get) => {
     remoteUrl: null,
     devices: [],
     missions: null,
+    providerUsage: null,
+    modelCapabilities: null,
     hostHealth:null,
     release:null,
     composeKind: "task",
