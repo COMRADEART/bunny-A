@@ -4,6 +4,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { canTransition } from "../orch/machine.ts";
 import type { OrchTask, Project, ProviderId, ProviderLive, TaskState, HostSample, TaskProgress, TokenUsage, ProcessInfo, ProviderExecutionScope } from "../orch/types.ts";
 import { HostDatabase } from "./persistence.server.ts";
+import { ModelCapabilityRegistry } from "./model-capability.server.ts";
 import { bunnyRoute, eligibility, inferredConstraints, runsLocally } from "./router.ts";
 import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask } from "./contracts.ts";
@@ -32,6 +33,8 @@ export class TaskManager {
   db: HostDatabase;
   adapters: ProviderAdapter[];
   registry: ProviderRegistry;
+  /** M-A-3 T1: per-model capability facts. Additive; routing still reads only the provider registry. */
+  modelCapabilities: ModelCapabilityRegistry;
   bus = new EventEmitter();
   instanceId: string = crypto.randomUUID();
   sessions=new Map<string,RunningSession>();
@@ -59,6 +62,7 @@ export class TaskManager {
     this.policy=new PolicyEngine(db);
     this.adapters=adapters ?? defaultAdapters(()=>this.providerPaths());
     this.registry=new ProviderRegistry(this.adapters,db,options.timing ?? DEFAULT_TIMING);
+    this.modelCapabilities=new ModelCapabilityRegistry(db,{providerPaths:()=>this.providerPaths(),availableProviders:()=>this.adapters.map(adapter=>adapter.id)});
     this.sessionDirectory=options.sessionDirectory ?? null;
     this.readProcesses=options.processTable ?? processTable;
     const savedThermal=db.db.prepare("SELECT value FROM settings WHERE key='thermal_policy'").get() as {value:string}|undefined;
@@ -102,10 +106,10 @@ export class TaskManager {
     try {const row=this.db.db.prepare("SELECT value FROM settings WHERE key='provider_paths'").get() as {value:string}|undefined;return row ? JSON.parse(row.value) : {};} catch {return {};}
   }
   announce(changes: string[]) {if(changes.length) this.emit(this.db.event("provider.status_changed",null,changes.join("; ")));}
-  /** User-requested refresh: re-probes every provider now. */
-  async discover() {this.announce(await this.registry.refresh({force:true}));}
+  /** User-requested refresh: re-probes every provider and model listing now. */
+  async discover() {this.announce([...await this.registry.refresh({force:true}),...await this.modelCapabilities.refresh({force:true})]);}
   /** Periodic refresh: cheap health checks, full probes only when due. */
-  async refreshProviders() {this.announce(await this.registry.refresh());}
+  async refreshProviders() {this.announce([...await this.registry.refresh(),...await this.modelCapabilities.refresh()]);}
   async configureProviderPath(id: ProviderId,path: string|null) {
     const paths=this.providerPaths();
     if(path) {const real=realpathSync(resolve(path));if(!statSync(real).isFile()) throw new Error("Executable path must be a file.");paths[id]=real;} else delete paths[id];
@@ -122,7 +126,7 @@ export class TaskManager {
       return {...base,active_jobs:mine.length,activeSessions:mine.map(task=>({taskId:task.id,providerSessionId:task.sessionId ?? null,pid:task.pid ?? null})),availability:mine.length && base.availability === "ready" ? "busy" : base.availability,observed:this.db.observed(provider.id)};
     });
   }
-  snapshot(after=0): HostSnapshot {return {app:"Bunny-A",instanceId:this.instanceId,health:this.containment.snapshot(),tasks:this.db.tasks(),projects:this.db.projects(),providers:this.live(),samples:this.samples,events:after ? this.db.events(after) : this.db.recentEvents(),cursor:this.db.cursor(),performance:this.db.performance(),remoteConfigured:this.remoteConfigured,remoteUrl:this.remoteUrl,devices:this.db.db.prepare("SELECT id,name,created_at AS createdAt FROM devices WHERE revoked_at IS NULL").all() as {id:string;name:string;createdAt:number}[],thermal:this.thermal};}
+  snapshot(after=0): HostSnapshot {return {app:"Bunny-A",instanceId:this.instanceId,health:this.containment.snapshot(),tasks:this.db.tasks(),projects:this.db.projects(),providers:this.live(),samples:this.samples,events:after ? this.db.events(after) : this.db.recentEvents(),cursor:this.db.cursor(),performance:this.db.performance(),remoteConfigured:this.remoteConfigured,remoteUrl:this.remoteUrl,devices:this.db.db.prepare("SELECT id,name,created_at AS createdAt FROM devices WHERE revoked_at IS NULL").all() as {id:string;name:string;createdAt:number}[],thermal:this.thermal,modelCapabilities:this.modelCapabilities.snapshot()};}
   configureThermal(cpuWarn:number,gpuWarn:number,autoStop:boolean) {
     if(!Number.isFinite(cpuWarn)||cpuWarn<30||cpuWarn>120||!Number.isFinite(gpuWarn)||gpuWarn<30||gpuWarn>120) throw new Error("Thermal thresholds must be 30–120°C.");
     this.thermal={cpuWarn,gpuWarn,autoStop};this.db.db.prepare("INSERT INTO settings VALUES('thermal_policy',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(JSON.stringify(this.thermal));

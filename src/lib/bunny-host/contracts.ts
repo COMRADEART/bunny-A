@@ -1,5 +1,6 @@
 import type { MissionSnapshot } from "../bunny-missions/types.ts";
 import type { OperationalHealth } from "./failure.server.ts";
+import type { ModelCapabilitySnapshot } from "./model-capability.server.ts";
 import type { HostPresentation } from "./presentation.ts";
 import type { ReleaseIdentity } from "./release-identity.server.ts";
 import type { Mode, OrchTask, Project, ProviderId, ProviderLive, HostSample, TaskConstraints, ProviderFeatures, TaskProgress, TokenUsage, UsageWindow, VerifySpec, ProcessInfo, TaskState, ProviderExecutionScope } from "../orch/types.ts";
@@ -32,6 +33,8 @@ export type HostSnapshot = {
   thermal: {cpuWarn:number;gpuWarn:number;autoStop:boolean};
   /** M-A-0 mission layer. Optional: older clients ignore it; when missions are disabled it reports enabled:false. */
   missions?: MissionSnapshot;
+  /** M-A-3 T1 per-model capability facts (probed only). Optional: older clients ignore it. */
+  modelCapabilities?: ModelCapabilitySnapshot;
 };
 /** `routingPrompt` is set in-process by the MissionManager only (never from HTTP input). */
 export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };
