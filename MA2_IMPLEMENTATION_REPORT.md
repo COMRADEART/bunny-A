@@ -1,4 +1,18 @@
-<!-- T10 current record start -->
+<!-- R1 approval checkpoint start -->
+## Final remediation R1 — current implementation record
+
+**BUNNY_MA2_FINAL_REMEDIATION_R1_FAIL pending explicit production authorization (2026-10-07).** IR-H1 implementer closure and staged acceptance pass; B2 remains open because the actual operating release is v17-T6. The previous independent FAIL review is immutable. No M-A-3, new autonomy, OD-1/OCT-1 or redesign was begun.
+
+Runtime commit `8001d51d871f12c15b8de03005a40e9d4c3fd8c2` removes failed-read fallback authority, persists truthful cleanup metadata and adds current creation/image verification with native held-handle termination. Existing T4 Job Object ownership stays canonical. A real before-fix Stop reproduction selected the stale PID under intercepted termination. Ten new tests cover real-manager failure, simulated reuse, native last-hop mismatch, sentinel preservation and real positive cleanup; existing tests are unchanged.
+
+One committed complete candidate, **Bunny-A-Windows-v26-MA2-R1**, tooling `0d3f96db093b2106ebab90e0249ae7b1e711aee9`, includes SSE revocation, canonical rollback guard, restart invalidation, T9, T9R and IR-H1. All 160 covered files, 80 Git blobs, installed bytes, 161 ZIP files and import closure verify. **664 tests pass (254 + 373 + 37), no skips/failures**; typecheck, lint (eleven existing warnings), normal build and Windows package pass.
+
+Isolated installed acceptance verifies dedicated-device stream/read/command/reconnect revocation, real active-grant rollback refusal before mutation, hard-crash approval invalidation, finite batch count/expiry/refresh, Stop/isolation, repeated/concurrent target acquisition, actual retry, focus loss and real dashboard reload. One explicitly owned Calculator fixture was launched; follow-up workflows launch zero extras and cleanup leaves zero windows. All stage devices are revoked and stage authority/processes retired. Production state/device/settings/Startup comparisons and private consistent backups pass. Development owner/launcher/state are classified and preserved; exact running cwd/original human intent remain unknown.
+
+Activation and all repaired production acceptance are pending section 25's explicit user authorization. The [R1 report](MA2_FINAL_REMEDIATION_R1.md) and `test-results/ma2-final-remediation-r1/CURRENT_OPERATIONS_R1.md` define the concrete candidate, fresh idle/backup/held-identity procedure, preservation and harmless acceptance scope. No final M-A-2 operational PASS is claimed. Earlier records below are historical.
+<!-- R1 approval checkpoint end -->
+
+<!-- T10 historical record start -->
 > Current T10 status (2026-10-06/07 UTC): **BUNNY_MA2_T10_PASS**, implementation-side **MIXED** audit. Final staged candidate **v25-T10**; production remains **v17-T6**. Three HIGH defects were repaired in the candidate; production remains older and is not certified by this result. Full regression **654 (254 + 363 + 37), zero failures/skips**. No independent review or operational approval issued.
 
 ## Final T10 candidate and independent-review handoff

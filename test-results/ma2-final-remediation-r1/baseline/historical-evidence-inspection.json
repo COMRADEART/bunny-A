@@ -1,0 +1,2621 @@
+{
+  "recordedAt": "2026-10-07T02:52:22.438Z",
+  "classification": "STATIC VERIFIED",
+  "records": [
+    {
+      "root": "ma2-final-independent",
+      "fileCount": 91,
+      "evidenceBytes": 2399626,
+      "verdicts": [
+        {
+          "path": "test-results\\ma2-final-independent\\final-verdict.json",
+          "size": 1736,
+          "sha256": "87287bdfafaf5e27c5c8feeeb9ce7a11db841ec551839f0a0bfb33fe56435780",
+          "parsed": {
+            "recordedAt": "2026-10-07T02:27:35.782Z",
+            "reviewRun": "test-results/ma2-final-independent/run-20261007T0153Z",
+            "classification": "STATIC VERIFIED",
+            "verdict": "BUNNY_MA2_OPERATIONAL_FAIL",
+            "independenceSatisfied": true,
+            "unresolvedNewHigh": [
+              "IR-H1"
+            ],
+            "blocks": [
+              {
+                "id": "B1",
+                "severity": "HIGH",
+                "required": "Remediate IR-H1 outside this review: failed post-stop process inspection must never turn an old snapshot into kill authority; use fresh identity/held ownership or safe refusal. Add adversarial regression proving no bystander/reused PID kill when inspection fails, then validate the exact replacement artifact.",
+                "evidence": "test-results/ma2-final-independent/run-20261007T0153Z/stop-ownership-finding.json"
+              },
+              {
+                "id": "B2",
+                "severity": "HIGH",
+                "required": "Current production cannot be certified as the complete M-A-2 system. After an acceptable repaired candidate and separate human authorization, ensure the operating release actually contains SSE per-delivery revocation, canonical rollback quiescence, restart approval invalidation, T9 bounded policy and T9R lifecycle closure. Preserve canonical current DB/Phone/settings, use guarded ownership/quiescence procedure, retire unsafe old-controller/manual-copy acceptance shortcuts, and provide exact post-cutover identity/acceptance evidence for fresh independent re-review.",
+                "evidence": "test-results/ma2-final-independent/run-20261007T0153Z/release-integrity.json; test-results/ma2-gate10/failure-ledger.json"
+              }
+            ],
+            "productionRelease": "Bunny-A-Windows-v17-T6",
+            "candidateRelease": "Bunny-A-Windows-v25-T10",
+            "productionChanged": false,
+            "remediationPerformed": false
+          }
+        },
+        {
+          "path": "test-results\\ma2-final-independent\\run-20261007T0153Z\\development-host.json",
+          "size": 1864,
+          "sha256": "2567e1ac299f4e33f87815cbc34c5b75fc6af748483b80c8f16548a5aa04ec04",
+          "parsed": {
+            "recordedAt": "2026-10-07T02:13:54.963Z",
+            "classification": "FRESH LIVE VERIFIED",
+            "health": {
+              "app": "Bunny-A",
+              "instanceId": "86a8abb0-f9c1-40a9-9f2d-90a1289f150a",
+              "pid": 20936,
+              "operationalState": "healthy",
+              "reason": null,
+              "unavailableSubsystems": [],
+              "lastFatal": null
+            },
+            "authenticatedReadStatus": 200,
+            "credentialsPath": "C:\\Users\\allam\\AppData\\Local\\Bunny-A\\development\\credentials.json",
+            "credentialsIdentityMatches": true,
+            "productionStateRootDistinct": true,
+            "developmentStateRoot": "C:\\Users\\allam\\AppData\\Local\\Bunny-A\\development",
+            "snapshotRelease": null,
+            "snapshotSystem": null,
+            "database": {
+              "path": "C:\\Users\\allam\\AppData\\Local\\Bunny-A\\development\\host.sqlite",
+              "integrity": [
+                {
+                  "integrity_check": "ok"
+                }
+              ],
+              "counts": {
+                "approval_batches": 0,
+                "capability_grants": 0,
+                "capability_runs": 0,
+                "devices": 0,
+                "events": 20,
+                "inbox_events": 0,
+                "migrations": 2,
+                "mission_artifacts": 0,
+                "mission_authorizations": 0,
+                "mission_dependencies": 0,
+                "mission_memory": 0,
+                "mission_steps": 0,
+                "missions": 0,
+                "outcomes": 0,
+                "permission_requests": 0,
+                "policies": 1,
+                "projects": 0,
+                "providers": 6,
+                "settings": 1,
+                "skill_versions": 12,
+                "skills": 12,
+                "sqlite_sequence": 1,
+                "tasks": 0,
+                "triggers": 0,
+                "workspace_locks": 0
+              },
+              "missions": null
+            },
+            "authority": "A separate source-entry development Host is live on 43139. It is not the pinned production Host on 43119 and its matching credentials/DB live in the explicit external development root. It predates this review and T10. Who launched it and why it remains running are NOT ESTABLISHED.",
+            "processStopped": false,
+            "tokenRecorded": false
+          }
+        },
+        {
+          "path": "test-results\\ma2-final-independent\\run-20261007T0153Z\\stop-ownership-finding.json",
+          "size": 15036,
+          "sha256": "3f0e962f6ffff78afab34c687ca6a9b146e2cd4ec9cfbec20c9fc957b57fb263",
+          "parsed": {
+            "recordedAt": "2026-10-07T02:05:32.933Z",
+            "classification": "STATIC VERIFIED",
+            "severity": "HIGH",
+            "id": "IR-H1",
+            "snippets": [
+              {
+                "name": "active production",
+                "release": "Bunny-A-Windows-v17-T6",
+                "source": "cb005ef75bf86d4d9e722b5214612fe115db5c6b",
+                "files": [
+                  {
+                    "path": "C:\\Users\\allam\\AppData\\Local\\Bunny-A\\releases\\Bunny-A-Windows-v17-T6\\src\\lib\\bunny-host\\manager.server.ts",
+                    "sha256": "74829051a4c64d6f8f3c11b7b9019dad902a8302de05a7c0a4d9a00c84e7d809",
+                    "snippet": [
+                      {
+                        "line": 319,
+                        "text": "  async stop(id: string,detail=\"User stopped the selected task.\") {"
+                      },
+                      {
+                        "line": 320,
+                        "text": "    const task=this.db.get(id);if(!canTransition(task.state,\"stopped\")) throw new Error(\"Task has already ended.\");"
+                      },
+                      {
+                        "line": 321,
+                        "text": "    if(this.stopping.has(id)) throw new Error(\"Stop already in progress.\");"
+                      },
+                      {
+                        "line": 322,
+                        "text": "    this.stopping.add(id);"
+                      },
+                      {
+                        "line": 323,
+                        "text": "    try {"
+                      },
+                      {
+                        "line": 324,
+                        "text": "      const session=this.sessions.get(id);"
+                      },
+                      {
+                        "line": 325,
+                        "text": "      // Snapshot the owned tree first so the result can be checked: every recorded process must be gone."
+                      },
+                      {
+                        "line": 326,
+                        "text": "      const root=session?.pid?.() ?? null;"
+                      },
+                      {
+                        "line": 327,
+                        "text": "      const before=root ? descendants(await this.readProcesses().catch(()=>[]),root) : [];"
+                      },
+                      {
+                        "line": 328,
+                        "text": "      // Abort request is issued before marking stopped; cancellation errors are honest failures."
+                      },
+                      {
+                        "line": 329,
+                        "text": "      await session?.stop();"
+                      },
+                      {
+                        "line": 330,
+                        "text": "      this.flushers.get(id)?.();this.stopTree(id);"
+                      },
+                      {
+                        "line": 331,
+                        "text": "      let cleanup=\"\";"
+                      },
+                      {
+                        "line": 332,
+                        "text": "      if(before.length) {"
+                      },
+                      {
+                        "line": 333,
+                        "text": "        let alive=survivors(before,await this.readProcesses().catch(()=>before));"
+                      },
+                      {
+                        "line": 334,
+                        "text": "        // Anything that outlived the tree kill was proven ours by the snapshot (same PID and start time)."
+                      },
+                      {
+                        "line": 335,
+                        "text": "        for(const row of alive) await killProcess(row.pid).catch(()=>{});"
+                      },
+                      {
+                        "line": 336,
+                        "text": "        if(alive.length) alive=survivors(alive,await this.readProcesses().catch(()=>alive));"
+                      },
+                      {
+                        "line": 337,
+                        "text": "        cleanup=alive.length ? ` ${alive.length} owned process${alive.length === 1 ? \"\" : \"es\"} could not be ended: ${describeTree(alive)}.` : ` Ended ${before.length} owned process${before.length === 1 ? \"\" : \"es\"} (${describeTree(before)}); none remain.`;"
+                      },
+                      {
+                        "line": 338,
+                        "text": "      } else if(session) cleanup=\" No OS process belonged to this session (in-process request).\";"
+                      },
+                      {
+                        "line": 339,
+                        "text": "      const current=this.db.get(id);if(!canTransition(current.state,\"stopped\")) return current;"
+                      },
+                      {
+                        "line": 340,
+                        "text": "      const stopped=this.update(current,{state:\"stopped\",finishedAt:Date.now(),activity:\"Stopped\",stopReason:detail,latestEvent:this.activity(current,\"agent.stopped\",detail+cleanup,\"bunny\"),...(before.length ? {processTree:before,processTreeAt:Date.now()} : {})},\"task.stopped\",detail+cleanup);"
+                      },
+                      {
+                        "line": 341,
+                        "text": "      return stopped;"
+                      },
+                      {
+                        "line": 342,
+                        "text": "    } finally {this.stopping.delete(id);}"
+                      },
+                      {
+                        "line": 343,
+                        "text": "  }"
+                      }
+                    ],
+                    "unsafePostStopFallback": true,
+                    "integerPidKill": true
+                  },
+                  {
+                    "path": "C:\\Users\\allam\\AppData\\Local\\Bunny-A\\releases\\Bunny-A-Windows-v17-T6\\src\\lib\\bunny-host\\process-tree.server.ts",
+                    "sha256": "0348a58755ef190ee12292f41161e9c12122f7a5f98a30f2648311e191f237d8",
+                    "snippet": [
+                      {
+                        "line": 40,
+                        "text": "export function survivors(before: ProcessInfo[], after: ProcessInfo[]): ProcessInfo[] {"
+                      },
+                      {
+                        "line": 41,
+                        "text": "  return before.filter((old) => after.some((row) => row.pid === old.pid && (old.createdAt === null || row.createdAt === old.createdAt)));"
+                      },
+                      {
+                        "line": 42,
+                        "text": "}"
+                      },
+                      {
+                        "line": 43,
+                        "text": ""
+                      },
+                      {
+                        "line": 44,
+                        "text": "export function describeTree(tree: ProcessInfo[]): string {"
+                      },
+                      {
+                        "line": 45,
+                        "text": "  return tree.map((row) => `${row.name} ${row.pid}`).join(\" → \") || \"no processes\";"
+                      },
+                      {
+                        "line": 46,
+                        "text": "}"
+                      },
+                      {
+                        "line": 47,
+                        "text": ""
+                      },
+                      {
+                        "line": 48,
+                        "text": "/** Ends one specific process that a snapshot proved belongs to an owned session. */"
+                      },
+                      {
+                        "line": 49,
+                        "text": "export async function killProcess(pid: number): Promise<void> {"
+                      },
+                      {
+                        "line": 50,
+                        "text": "  if (process.platform === \"win32\") await exec(\"taskkill.exe\", [\"/PID\", String(pid), \"/F\"], { windowsHide: true, timeout: 5000 });"
+                      },
+                      {
+                        "line": 51,
+                        "text": "  else process.kill(pid, \"SIGKILL\");"
+                      },
+                      {
+                        "line": 52,
+                        "text": "}"
+                      },
+                      {
+                        "line": 53,
+                        "text": ""
+                      }
+                    ],
+                    "unsafePostStopFallback": false,
+                    "integerPidKill": true
+                  }
+                ]
+              },
+              {
+                "name": "final staged candidate",
+                "release": "Bunny-A-Windows-v25-T10",
+                "source": "4f977c8071be17a7807a6c0b6f072f8f17cd4d4d",
+                "files": [
+                  {
+                    "path": "C:\\Users\\allam\\AppData\\Local\\Bunny-A-T10-stage\\releases\\Bunny-A-Windows-v25-T10\\src\\lib\\bunny-host\\manager.server.ts",
+                    "sha256": "74829051a4c64d6f8f3c11b7b9019dad902a8302de05a7c0a4d9a00c84e7d809",
+                    "snippet": [
+                      {
+                        "line": 319,
+                        "text": "  async stop(id: string,detail=\"User stopped the selected task.\") {"
+                      },
+                      {
+                        "line": 320,
+                        "text": "    const task=this.db.get(id);if(!canTransition(task.state,\"stopped\")) throw new Error(\"Task has already ended.\");"
+                      },
+                      {
+                        "line": 321,
+                        "text": "    if(this.stopping.has(id)) throw new Error(\"Stop already in progress.\");"
+                      },
+                      {
+                        "line": 322,
+                        "text": "    this.stopping.add(id);"
+                      },
+                      {
+                        "line": 323,
+                        "text": "    try {"
+                      },
+                      {
+                        "line": 324,
+                        "text": "      const session=this.sessions.get(id);"
+                      },
+                      {
+                        "line": 325,
+                        "text": "      // Snapshot the owned tree first so the result can be checked: every recorded process must be gone."
+                      },
+                      {
+                        "line": 326,
+                        "text": "      const root=session?.pid?.() ?? null;"
+                      },
+                      {
+                        "line": 327,
+                        "text": "      const before=root ? descendants(await this.readProcesses().catch(()=>[]),root) : [];"
+                      },
+                      {
+                        "line": 328,
+                        "text": "      // Abort request is issued before marking stopped; cancellation errors are honest failures."
+                      },
+                      {
+                        "line": 329,
+                        "text": "      await session?.stop();"
+                      },
+                      {
+                        "line": 330,
+                        "text": "      this.flushers.get(id)?.();this.stopTree(id);"
+                      },
+                      {
+                        "line": 331,
+                        "text": "      let cleanup=\"\";"
+                      },
+                      {
+                        "line": 332,
+                        "text": "      if(before.length) {"
+                      },
+                      {
+                        "line": 333,
+                        "text": "        let alive=survivors(before,await this.readProcesses().catch(()=>before));"
+                      },
+                      {
+                        "line": 334,
+                        "text": "        // Anything that outlived the tree kill was proven ours by the snapshot (same PID and start time)."
+                      },
+                      {
+                        "line": 335,
+                        "text": "        for(const row of alive) await killProcess(row.pid).catch(()=>{});"
+                      },
+                      {
+                        "line": 336,
+                        "text": "        if(alive.length) alive=survivors(alive,await this.readProcesses().catch(()=>alive));"
+                      },
+                      {
+                        "line": 337,
+                        "text": "        cleanup=alive.length ? ` ${alive.length} owned process${alive.length === 1 ? \"\" : \"es\"} could not be ended: ${describeTree(alive)}.` : ` Ended ${before.length} owned process${before.length === 1 ? \"\" : \"es\"} (${describeTree(before)}); none remain.`;"
+                      },
+                      {
+                        "line": 338,
+                        "text": "      } else if(session) cleanup=\" No OS process belonged to this session (in-process request).\";"
+                      },
+                      {
+                        "line": 339,
+                        "text": "      const current=this.db.get(id);if(!canTransition(current.state,\"stopped\")) return current;"
+                      },
+                      {
+                        "line": 340,
+                        "text": "      const stopped=this.update(current,{state:\"stopped\",finishedAt:Date.now(),activity:\"Stopped\",stopReason:detail,latestEvent:this.activity(current,\"agent.stopped\",detail+cleanup,\"bunny\"),...(before.length ? {processTree:before,processTreeAt:Date.now()} : {})},\"task.stopped\",detail+cleanup);"
+                      },
+                      {
+                        "line": 341,
+                        "text": "      return stopped;"
+                      },
+                      {
+                        "line": 342,
+                        "text": "    } finally {this.stopping.delete(id);}"
+                      },
+                      {
+                        "line": 343,
+                        "text": "  }"
+                      }
+                    ],
+                    "unsafePostStopFallback": true,
+                    "integerPidKill": true
+                  },
+                  {
+                    "path": "C:\\Users\\allam\\AppData\\Local\\Bunny-A-T10-stage\\releases\\Bunny-A-Windows-v25-T10\\src\\lib\\bunny-host\\process-tree.server.ts",
+                    "sha256": "0348a58755ef190ee12292f41161e9c12122f7a5f98a30f2648311e191f237d8",
+                    "snippet": [
+                      {
+                        "line": 40,
+                        "text": "export function survivors(before: ProcessInfo[], after: ProcessInfo[]): ProcessInfo[] {"
+                      },
+                      {
+                        "line": 41,
+                        "text": "  return before.filter((old) => after.some((row) => row.pid === old.pid && (old.createdAt === null || row.createdAt === old.createdAt)));"
+                      },
+                      {
+                        "line": 42,
+                        "text": "}"
+                      },
+                      {
+                        "line": 43,
+                        "text": ""
+                      },
+                      {
+                        "line": 44,
+                        "text": "export function describeTree(tree: ProcessInfo[]): string {"
+                      },
+                      {
+                        "line": 45,
+                        "text": "  return tree.map((row) => `${row.name} ${row.pid}`).join(\" → \") || \"no processes\";"
+                      },
+                      {
+                        "line": 46,
+                        "text": "}"
+                      },
+                      {
+                        "line": 47,
+                        "text": ""
+                      },
+                      {
+                        "line": 48,
+                        "text": "/** Ends one specific process that a snapshot proved belongs to an owned session. */"
+                      },
+                      {
+                        "line": 49,
+                        "text": "export async function killProcess(pid: number): Promise<void> {"
+                      },
+                      {
+                        "line": 50,
+                        "text": "  if (process.platform === \"win32\") await exec(\"taskkill.exe\", [\"/PID\", String(pid), \"/F\"], { windowsHide: true, timeout: 5000 });"
+                      },
+                      {
+                        "line": 51,
+                        "text": "  else process.kill(pid, \"SIGKILL\");"
+                      },
+                      {
+                        "line": 52,
+                        "text": "}"
+                      },
+                      {
+                        "line": 53,
+                        "text": ""
+                      }
+                    ],
+                    "unsafePostStopFallback": false,
+                    "integerPidKill": true
+                  }
+                ]
+              }
+            ],
+            "acceptedBaselineAlsoAffected": true,
+            "reproduction": {
+              "classification": "SIMULATED",
+              "before": [
+                {
+                  "pid": 2000000101,
+                  "ppid": 2000000100,
+                  "name": "owned-fixture",
+                  "createdAt": 1000
+                }
+              ],
+              "actualFreshTableWouldBe": [
+                {
+                  "pid": 2000000101,
+                  "ppid": 1,
+                  "name": "unrelated-fixture",
+                  "createdAt": 2000
+                }
+              ],
+              "correctFreshSurvivors": [],
+              "failedInspectionFallback": [
+                {
+                  "pid": 2000000101,
+                  "ppid": 2000000100,
+                  "name": "owned-fixture",
+                  "createdAt": 1000
+                }
+              ],
+              "selectedForIntegerPidKill": [
+                {
+                  "pid": 2000000101,
+                  "ppid": 2000000100,
+                  "name": "owned-fixture",
+                  "createdAt": 1000
+                }
+              ],
+              "osProcessQueries": 0,
+              "osKillCalls": 0,
+              "managerStopInvoked": false
+            },
+            "conclusion": "On successful pre-stop observation followed by a failed post-stop observation, old identities are treated as fresh survivors and their PIDs are passed to taskkill. A PID reused after session.stop can address an unrelated process. No current ownership proof is required on this failure branch.",
+            "limits": "The unsafe selection and kill call are independently verified in source/artifacts. No actual PID reuse or unrelated process termination was induced. This is not a claim that production has already killed a bystander."
+          }
+        }
+      ]
+    },
+    {
+      "root": "ma2-gate10",
+      "fileCount": 367,
+      "evidenceBytes": 4713250,
+      "verdicts": [
+        {
+          "path": "test-results\\ma2-gate10\\candidate-package.json",
+          "size": 8616,
+          "sha256": "c53dc173cf743b885b839740061637bdec1661702c1ff9c452580c4b7a0ea293",
+          "parsed": {
+            "recordedAt": "2026-10-07T00:56:23.114Z",
+            "classification": "STATIC VERIFIED",
+            "release": "Bunny-A-Windows-v25-T10",
+            "sourceCommit": "4f977c8071be17a7807a6c0b6f072f8f17cd4d4d",
+            "toolingCommit": "599103cf4409ca1929f9d6109f5f6adec585bbf0",
+            "manifestSha256": "5812926fc685d7f21fc6899df7aaf28583131e5ca0af10b8abb2abf81d9fceff",
+            "packageSha256": "a1ba1b219478f0296b6b8eef2d1b94cee099c48f13794fa5d5b2c7d1862f5580",
+            "packageBytes": 36260857,
+            "assetManifestSha256": "176828598eb38f2b2e0e6dd84316d657d04ebd07362304254a56b59c6ff74d75",
+            "assetInventory": [
+              {
+                "path": ".output/public/__grok/icon-180.png",
+                "sha256": "3cf5d17d294b51c6cca6c86070309b88554b7ad702b0412e8e2709a01990bc8a",
+                "bytes": 2100,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-puzzle.svg",
+                "sha256": "a677c9356c23d1e699559ddbffac97cd135c2782cd893fb34f3738f6d11bee17",
+                "bytes": 1811,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-share.svg",
+                "sha256": "efad1b4b507a68c1f1af4aad2c93e8c24076224aa593da86677697f543d026d6",
+                "bytes": 2388,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/logo-grok.svg",
+                "sha256": "0654e3e59cce69856f38525cbfe4ab3a9ef52d4b64c8532dd0bc1a3f34fcb5b1",
+                "bytes": 1059,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-ipad.png",
+                "sha256": "4c9b09a4660c662b394597d551a04124293b0e37a7a7c72271dd2948c4499a14",
+                "bytes": 101843,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-phone.png",
+                "sha256": "80e0a5ede614d9b920c67d7cb79c80a79134687b1fc9f560384e896a88e302db",
+                "bytes": 103612,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/plus.svg",
+                "sha256": "c2c94be46aa2c3c2fda95d7c6f2fc6d0b656d1f5847828d5d95b5a81a6f4f20d",
+                "bytes": 2401,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/styles.css",
+                "sha256": "7e8e881302f58e54a9c07e7be395692d3de20fdaa27ce358531cc8dcca472cb6",
+                "bytes": 6717,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/index-C0d8k5Em.js",
+                "sha256": "ad7f3c43a9889a3fd41e2993d89b398ca5d570ac1a03aa772bb1f24b7d7cdcb5",
+                "bytes": 430789,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+                "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd",
+                "bytes": 25960,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2",
+                "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075",
+                "bytes": 18748,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2",
+                "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190",
+                "bytes": 11232,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-greek-wght-normal-CkhJZR-_.woff2",
+                "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6",
+                "bytes": 18996,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+                "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956",
+                "bytes": 85068,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-latin-wght-normal-Dx4kXJAl.woff2",
+                "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62",
+                "bytes": 48256,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2",
+                "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2",
+                "bytes": 10252,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/routes-DJtCWK7M.js",
+                "sha256": "508f0a5b849c54beee155d306174d815066991d9cacd3bcf3fd6cf9426991249",
+                "bytes": 590601,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/styles-925lNnPp.css",
+                "sha256": "021171a70ef569251e6987ce660f87c5b337e64e0cb2b252f51d18c590d29dd4",
+                "bytes": 184122,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/bunny-icon-192.png",
+                "sha256": "45e0cd24aeac91f5aa33c2030ab155a38b77a7d39f1cdf5ea9e1a31514b01abf",
+                "bytes": 6926,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/bunny-icon-512.png",
+                "sha256": "bd398f2dc610c432681759c86f4daac5bc0f9e6fef820a4712331d56d0ef612f",
+                "bytes": 19699,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/favicon.svg",
+                "sha256": "c6405c5463adfaf771aa6fc62beb8c4712caa6ce649d1acabd5c014d8fff2930",
+                "bytes": 498,
+                "origin": "build"
+              }
+            ],
+            "files": 160,
+            "integrity": {
+              "ok": true,
+              "checked": 160,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "installedIntegrity": {
+              "ok": true,
+              "checked": 160,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "source": {
+              "ok": true,
+              "checked": 80,
+              "mismatched": [],
+              "sourceCommit": "4f977c8071be17a7807a6c0b6f072f8f17cd4d4d",
+              "toolingCommit": "599103cf4409ca1929f9d6109f5f6adec585bbf0"
+            },
+            "closure": {
+              "ok": true,
+              "files": [
+                "Bunny-Host.mjs",
+                "scripts/bunny-tunnel-paths.mjs",
+                "scripts/bunny-tunnel-state.mjs",
+                "scripts/bunny-tunnel-worker.mjs",
+                "scripts/bunny-tunnel.mjs",
+                "src/lib/bunny-host/adapters.server.ts",
+                "src/lib/bunny-host/codex-compatibility.server.ts",
+                "src/lib/bunny-host/codex-probe.server.ts",
+                "src/lib/bunny-host/discovery.server.ts",
+                "src/lib/bunny-host/entry.server.ts",
+                "src/lib/bunny-host/events.ts",
+                "src/lib/bunny-host/failure.server.ts",
+                "src/lib/bunny-host/http.server.ts",
+                "src/lib/bunny-host/learning.server.ts",
+                "src/lib/bunny-host/manager.server.ts",
+                "src/lib/bunny-host/owned-process-group.server.ts",
+                "src/lib/bunny-host/owned-processes.server.ts",
+                "src/lib/bunny-host/persistence.server.ts",
+                "src/lib/bunny-host/presentation.ts",
+                "src/lib/bunny-host/process-tree.server.ts",
+                "src/lib/bunny-host/registry.server.ts",
+                "src/lib/bunny-host/release-identity.server.ts",
+                "src/lib/bunny-host/router.ts",
+                "src/lib/bunny-host/state-paths.server.ts",
+                "src/lib/bunny-host/verification.server.ts",
+                "src/lib/bunny-missions/artifacts.server.ts",
+                "src/lib/bunny-missions/authorization.server.ts",
+                "src/lib/bunny-missions/batch-labels.ts",
+                "src/lib/bunny-missions/batches.server.ts",
+                "src/lib/bunny-missions/capabilities/browser-network.server.ts",
+                "src/lib/bunny-missions/capabilities/browser.server.ts",
+                "src/lib/bunny-missions/capabilities/bus.server.ts",
+                "src/lib/bunny-missions/capabilities/calculator-targets.server.ts",
+                "src/lib/bunny-missions/capabilities/computer.server.ts",
+                "src/lib/bunny-missions/capabilities/connectors.server.ts",
+                "src/lib/bunny-missions/capabilities/git-merge.server.ts",
+                "src/lib/bunny-missions/capabilities/local.server.ts",
+                "src/lib/bunny-missions/capabilities/process.server.ts",
+                "src/lib/bunny-missions/commands.server.ts",
+                "src/lib/bunny-missions/context.ts",
+                "src/lib/bunny-missions/inbox.server.ts",
+                "src/lib/bunny-missions/machine.ts",
+                "src/lib/bunny-missions/manager.server.ts",
+                "src/lib/bunny-missions/memory.server.ts",
+                "src/lib/bunny-missions/paths.server.ts",
+                "src/lib/bunny-missions/planner.server.ts",
+                "src/lib/bunny-missions/skills.server.ts",
+                "src/lib/bunny-missions/store.server.ts",
+                "src/lib/bunny-missions/triggers.server.ts",
+                "src/lib/bunny-missions/workspace.server.ts",
+                "src/lib/orch/compatibility.ts",
+                "src/lib/orch/exec.server.ts",
+                "src/lib/orch/machine.ts",
+                "src/lib/orch/router.ts",
+                "src/lib/orch/telemetry.server.ts",
+                "native/bunny-owned-process.c",
+                "native/bunny-owned-process.node",
+                "native/bunny-owned-process.node.json",
+                "scripts/build-owned-process.mjs"
+              ],
+              "missing": [],
+              "outside": [],
+              "packages": [],
+              "optionalPackages": [
+                "playwright"
+              ]
+            },
+            "exactCommittedArchive": true,
+            "dirtyInput": false,
+            "productionActivated": false
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate10\\failure-ledger.json",
+          "size": 16901,
+          "sha256": "b8573a5450507c2b6115c402d213b5021336aa6b4bcf1b492424e90bda5dce53",
+          "parsed": {
+            "recordedAt": "2026-10-07T01:25:17.441Z",
+            "gate": "M-A-2 T10",
+            "classification": "STATIC VERIFIED",
+            "entries": [
+              {
+                "id": "T10-F01",
+                "attackId": "T10-T6-04",
+                "expectedBehavior": "Device revocation ends future protected SSE delivery.",
+                "observedBehavior": "Original actual HTTP SSE continued protected delivery after revoked state returned 401.",
+                "severity": "HIGH",
+                "rootCause": "SSE authorized only when connected, not at each future write/drain/heartbeat.",
+                "repair": "738f05b25609f45001ba760ed3f21ba5e92aa571: streamSse rechecks live device hash/id/revocation on delivery.",
+                "retestStatus": "RESOLVED IN v25 CANDIDATE: focused global/task/unrelated streams and installed v25 pass.",
+                "residualLimitation": "Production v17 remains older; candidate repair is not promoted. Existing Host-owned batch revocation semantics are separate.",
+                "evidence": [
+                  "revoke-stream-probe.json",
+                  "revoke-stream-retest.json",
+                  "installed-stream-retest-v25.json",
+                  "t6/affected-retest-pass.log"
+                ]
+              },
+              {
+                "id": "T10-F02",
+                "attackId": "T10-XG-06",
+                "expectedBehavior": "Rollback refuses pending Mission work and live desktop authority before any mutation.",
+                "observedBehavior": "Old T8 acceptance idle check returned idle with a paused Mission/live grant.",
+                "severity": "HIGH",
+                "rootCause": "Historical controller filtered only running-like Mission states and did not actually inspect canonical DB grants.",
+                "repair": "99ffbdd20455d56d64666adf9ad1c427df269ae4: packaged authenticated/read-only canonical preflight, enforced before installer rollback writes.",
+                "retestStatus": "RESOLVED IN v25 CANDIDATE: three focused guard tests plus exact installer active-state refusal and code roundtrip.",
+                "residualLimitation": "Historical controller is retained for evidence and must not be used alone for promotion; production installer remains older.",
+                "evidence": [
+                  "rollback-active-original.json",
+                  "restart-fixture.log",
+                  "installed-active-rollback-v25.json",
+                  "rollback-preflight-focused-final.log"
+                ]
+              },
+              {
+                "id": "T10-F03",
+                "attackId": "T10-XG-13",
+                "expectedBehavior": "Old pending approval ID cannot gain authority after Host restart.",
+                "observedBehavior": "v22 restart invalidated batch, but allow_once on persisted unresolved old ID admitted harmless nonexistent-control action; no arithmetic side effect.",
+                "severity": "HIGH",
+                "rootCause": "Recover swept active steps/batches but left unanswered pending request and one-time authorization fields authoritative.",
+                "repair": "4f977c8071be17a7807a6c0b6f072f8f17cd4d4d: resolve unanswered requests deny/bunny-host-restart; clear pending/approvedOnce and require fresh explicit retry.",
+                "retestStatus": "RESOLVED IN v25 CANDIDATE: two new recovery regressions, 106 focused tests, installed active hard-crash no-replay/old-ID-refusal.",
+                "residualLimitation": "Production Missions are OFF and candidate not promoted; fixture effect is bounded, original authority defect is still HIGH.",
+                "evidence": [
+                  "pending-replay-original.json",
+                  "restart-verify.log",
+                  "restart-verified-v25.json",
+                  "restart-repair-focused-pass.log"
+                ]
+              },
+              {
+                "id": "T10-F04",
+                "attackId": "T10-T8-01",
+                "expectedBehavior": "Legacy/target validation and canonical quiescence guard both precede installer mutation.",
+                "observedBehavior": "First full regression failed one of 254 script tests after adding the guard; application half never ran.",
+                "severity": "LOW",
+                "rootCause": "Old installer regression used fake SQLite/no reachable Host; it could not reach the expected target refusal or valid rollback with the new preflight.",
+                "repair": "2afee0e4ca8d05cae396a6caceecd1b219ecb1fa: read-only target validation first, canonical idle guard immediately before first write; strengthened existing test with real SQLite/authenticated HTTP fixture. Pin 599103cf4409ca1929f9d6109f5f6adec585bbf0.",
+                "retestStatus": "RESOLVED: 7 installer tests and complete final 654 tests pass; no guard weakened.",
+                "residualLimitation": "No added feature or arbitrary rollback fallback.",
+                "evidence": [
+                  "regression-full.log",
+                  "regression-full-exit.json",
+                  "rollback-regression-compatible.log",
+                  "regression-final-full.log"
+                ]
+              },
+              {
+                "id": "T10-F05",
+                "attackId": "T10-XG-08",
+                "expectedBehavior": "Offline request must reach Host connection boundary.",
+                "observedBehavior": "Initial plain-JSON serverFn payload failed wire decoding; generic error was mistakenly treated as Host-down evidence.",
+                "severity": "NOTE",
+                "rootCause": "Missing TanStack Seroval serialization/x-tsr-serverfn header prevented intended boundary.",
+                "repair": "Rebuilt valid-wire probe with healthy positive control and required fetch-failed/unavailable result.",
+                "retestStatus": "CORRECTED: exact installed v25 gateway healthy read then Host-down fetch failure.",
+                "residualLimitation": "Old output retained as harness false positive, never used as final Host-down proof.",
+                "evidence": [
+                  "offline-gateway-v24.json",
+                  "offline-gateway-v24.log",
+                  "offline-gateway-v25-valid-wire.json",
+                  "gateway-wire-positive.json"
+                ]
+              },
+              {
+                "id": "T10-F06",
+                "attackId": "T10-T9R-04",
+                "expectedBehavior": "Pre-existing native target should remain untouched and no extra launches appear.",
+                "observedBehavior": "Original user content/window disappeared across execution interruption; v25 initial comparison to that old identity failed.",
+                "severity": "NOTE",
+                "rootCause": "Cause NOT ESTABLISHED; no T10 cleanup/name kill targeted original HWND. T10 lineage proves exactly one later controlled acquisition of a new target.",
+                "repair": "Preserve failed comparison, capture fresh verified identity, retest repeated/concurrent/native workflows, cleanup only new explicitly T10-owned HWND.",
+                "retestStatus": "BOUNDED: initial/v24 original identity and arithmetic preservation; v25 fresh identity stable; owned content closes naturally and shared frame survives.",
+                "residualLimitation": "Whole-run original-lifetime/value preservation NOT TESTED; disappearance is not assigned to Bunny or user without evidence.",
+                "evidence": [
+                  "native-matrix-v25.log",
+                  "calculator-pre.json",
+                  "calculator-v25-pre.json",
+                  "calculator-launch-lineage.json",
+                  "native-matrix-v25.json",
+                  "calculator-owned-cleanup.json",
+                  "calculator-final.json"
+                ]
+              },
+              {
+                "id": "T10-F07",
+                "attackId": "T10-T6-08",
+                "expectedBehavior": "Canonical active URL must match live worker generation.",
+                "observedBehavior": "Original cloudflared PID absent at final check; original four app processes survived; current child 25956 belongs to unchanged worker 45724 and URL changed.",
+                "severity": "NOTE",
+                "rootCause": "Child replacement observed under supervisor; replacement cause NOT ESTABLISHED. Initial final harness incorrectly required immutable operational remote publication.",
+                "repair": "Record both identities and remote pre/final hashes; verify live worker/child record and Host URL instead of equating volatile transport state with protected install/state metadata.",
+                "retestStatus": "CORRECTED: read-only final comparison passes with unchanged cloudflared bytes and authoritative current generation.",
+                "residualLimitation": "No intentional production transport kill/restart performed; do not claim induced watchdog live recovery.",
+                "evidence": [
+                  "production-native-final.json",
+                  "production-final.json",
+                  "public-denials-valid-wire.json",
+                  "production-final.log"
+                ]
+              },
+              {
+                "id": "T10-F08",
+                "attackId": "T10-T9R-01",
+                "expectedBehavior": "Native focus/reconnect test should reach real intended target safely.",
+                "observedBehavior": "Final forced-focus subcase was refused by Windows foreground policy.",
+                "severity": "NOTE",
+                "rootCause": "Windows focus restriction, not duplicate-target multiplication.",
+                "repair": "Retained earlier full native focus/reconnect proof; final candidate matrix uses safe verified read/reuse without forced foreground.",
+                "retestStatus": "BOUNDED: final rapid/concurrent acquisition, budget/approval-refresh and real postcondition retry pass.",
+                "residualLimitation": "Final v25 forced foreground subcase NOT TESTED; equivalent Computer source unchanged and fixture coverage retained.",
+                "evidence": [
+                  "native-matrix-v24.log",
+                  "native-initial-failure.json",
+                  "native-matrix.json",
+                  "native-matrix-v25.json"
+                ]
+              },
+              {
+                "id": "T10-F09",
+                "attackId": "T10-XG-05",
+                "expectedBehavior": "Hard-kill must occur while grant is still active and use exact candidate helper.",
+                "observedBehavior": "One early grant expired before crash; later v25 wrapper initially called the v24-only helper and refused before crashing.",
+                "severity": "NOTE",
+                "rootCause": "TTL timing and helper-version selection errors in audit harness.",
+                "repair": "Retain expired case and helper refusal; perform immediate pre-expiry actual installed v25 crash with corrected helper.",
+                "retestStatus": "CORRECTED: active-before-v25, held native crash and final no-replay recovery pass.",
+                "residualLimitation": "Expired-before-crash case is not active-grant proof.",
+                "evidence": [
+                  "restart-active-before-v24-expired.json",
+                  "restart-verified-v24-expired.json",
+                  "final-restart-campaign-v25-helper-version-failure.log",
+                  "restart-active-before-v25.json",
+                  "stage-v25-crash.json",
+                  "restart-verified-v25.json"
+                ]
+              },
+              {
+                "id": "T10-F10",
+                "attackId": "T10-XG-10",
+                "expectedBehavior": "Harness diagnostics preserve privacy while reaching the boundary.",
+                "observedBehavior": "Several initial probes failed on wrong import/API/shape/path/encoding/assertion before intended boundary; failed run logs retained.",
+                "severity": "NOTE",
+                "rootCause": "Audit assumptions: array provider shape, status field, empty adapter health fixture, wrong db API/regex, PowerShell path/marker quoting, module path or TLS environment.",
+                "repair": "Correct actual contract/CLI invocation; rerun safe intended boundary with positive control.",
+                "retestStatus": "CORRECTED: final safe task/revoke/public/native/degraded/rollback/focused results pass.",
+                "residualLimitation": "Earlier harness failures are not product success evidence.",
+                "evidence": [
+                  "live-safe.log",
+                  "live-safe-pass.log",
+                  "stage-install.log",
+                  "stage-boot.log",
+                  "t6/affected-retest.log",
+                  "package-record.log",
+                  "native-matrix.log",
+                  "rollback-attacks.log",
+                  "rollback-attacks-retest.log",
+                  "degraded-boundary-v24.log",
+                  "degraded-boundary-v24-pass.log",
+                  "public-probe.log",
+                  "public-probe-system-ca.log",
+                  "restart-repair-focused.log"
+                ]
+              },
+              {
+                "id": "T10-F11",
+                "attackId": "T10-XG-04",
+                "expectedBehavior": "Composed child and desktop batch must both be live before Stop.",
+                "observedBehavior": "First composed fixture consent already covered desktop so no new batch prompt appeared; failure cleanup saw transient EPERM/Node Windows assertion.",
+                "severity": "NOTE",
+                "rootCause": "Test authorization positive control and Windows output/lifetime cleanup ordering.",
+                "repair": "Explicitly narrow simulated fixture capability scope while preserving provider consent; await owned job drain and handle cleanup retries.",
+                "retestStatus": "CORRECTED: real child+native batch Stop/reroute, sentinel preservation and no final leaked process.",
+                "residualLimitation": "Provider policy facts remain SIMULATED; no production mutation.",
+                "evidence": [
+                  "stop-composition.log",
+                  "stop-composition-retest.log",
+                  "stop-composition-final.log",
+                  "stop-composition-harness-failure.json",
+                  "stop-composition.json",
+                  "cleanup-native-inventory.json"
+                ]
+              },
+              {
+                "id": "T10-F12",
+                "attackId": "T10-XG-08",
+                "expectedBehavior": "Audit tool sessions must progress and close owned fixtures.",
+                "observedBehavior": "Execution quota/reviewer capacity and later sandbox-refresh failure interrupted tool work; CUA kernel could not resume. Complex shell inline JS also had a PowerShell parse error before execution.",
+                "severity": "NOTE",
+                "rootCause": "Environment/controller failure, inherited output pipes, PowerShell 5 module search inherited from PowerShell 7, unsafe complexity in inline quoting.",
+                "repair": "Reviewed explicit scripts; file-descriptor logs for launchers; correct PSModulePath; no name kills or browser-driver workaround; required repository render smoke with Edge.",
+                "retestStatus": "BOUNDED: final candidate smoke pass; all own native processes stopped; shared IAB process not killed.",
+                "residualLimitation": "Temporary IAB tab close could not be explicitly confirmed via CUA; default temporary tab lifecycle ends with tool task. No standalone T10 browser exists. Tool exceptions are summarized here because not all platform failures produce local logs.",
+                "evidence": [
+                  "browser-smoke.log",
+                  "browser-smoke-edge.log",
+                  "restart-boot-v24.log",
+                  "final-restart-campaign-harness-failure.log",
+                  "final-restart-campaign.log",
+                  "browser-smoke-v25.log",
+                  "cleanup-native-inventory.json"
+                ]
+              },
+              {
+                "id": "T10-F13",
+                "attackId": "T10-XG-11",
+                "expectedBehavior": "Final preservation comparison uses actual snapshot fields.",
+                "observedBehavior": "First final comparison asserted immutable cloudflared child, then an assumed state.remote.url field threw TypeError/Node UV assertion.",
+                "severity": "NOTE",
+                "rootCause": "Harness treated replaceable transport child as fixed identity and used wrong HostSnapshot shape; canonical field is remoteUrl.",
+                "repair": "Retain failure log; check fixed four native identities, current worker-child-parent/lifetime, unchanged transport binary and Host remoteUrl.",
+                "retestStatus": "CORRECTED: final protected-row/Phone/Startup/install/source comparison passes.",
+                "residualLimitation": "Provider config and rollback content pre-fingerprints were not captured; byte comparisons of those paths remain NOT TESTED.",
+                "evidence": [
+                  "production-final.log",
+                  "production-final-pass.log",
+                  "production-final.json",
+                  "production-native-final.json"
+                ]
+              },
+              {
+                "id": "T10-F14",
+                "attackId": "T10-XG-10",
+                "expectedBehavior": "Audit documentation generator should parse before writing reports.",
+                "observedBehavior": "A missing string concatenation quote caused a SyntaxError before report generation.",
+                "severity": "NOTE",
+                "rootCause": "Documentation helper syntax mistake; no product or production action executed.",
+                "repair": "Correct literal and run node --check before regeneration.",
+                "retestStatus": "CORRECTED: report generation and final evidence audit must pass.",
+                "residualLimitation": "No runtime defect; original parser output retained.",
+                "evidence": [
+                  "report-generator-syntax-failure.log"
+                ]
+              },
+              {
+                "id": "T10-F15",
+                "attackId": "T10-XG-10",
+                "expectedBehavior": "Sealed captured evidence should retain exact bytes while current reports pass whitespace checks.",
+                "observedBehavior": "Git whitespace check flagged native CRLF/trailing-space capture lines and an extra final report blank line. Staged byte equality already passed.",
+                "severity": "NOTE",
+                "rootCause": "Intentional -text evidence capture preserves native output; style checks interpret raw CRLF as trailing whitespace.",
+                "repair": "Preserve raw bytes, disable whitespace style checking only inside T10 evidence; keep current root reports/scoped attributes LF and trim report EOF.",
+                "retestStatus": "CORRECTED: staged bytes and final diff --check must pass.",
+                "residualLimitation": "No raw result was reformatted; historical hashes remain unchanged.",
+                "evidence": [
+                  "git-whitespace-note.json"
+                ]
+              }
+            ],
+            "originalProductHighCount": 3,
+            "resolvedProductHighCount": 3,
+            "unresolvedCandidateHighCount": 0,
+            "unresolvedCandidateBlockerCount": 0,
+            "productionRepairPromotion": "DEFERRED: older v17 unchanged; no operational approval"
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate10\\regression-final.json",
+          "size": 916,
+          "sha256": "f202a1a64dfd9d8a9b54a75eadb796ae6404ff73a7a91ca6953f6762d83959c9",
+          "parsed": {
+            "recordedAt": "2026-10-07T01:25:17.441Z",
+            "classification": "DISPOSABLE LIVE",
+            "scripts": 254,
+            "application": 363,
+            "ui": 37,
+            "total": 654,
+            "baseline": {
+              "scripts": 251,
+              "application": 357,
+              "ui": 37,
+              "total": 645
+            },
+            "newTests": {
+              "scripts": 3,
+              "application": 6,
+              "ui": 0,
+              "total": 9
+            },
+            "retainedBaseline": true,
+            "failures": 0,
+            "skips": 0,
+            "cancelled": 0,
+            "typecheckExit": 0,
+            "lintExit": 0,
+            "lintWarnings": 11,
+            "normalBuildExit": 0,
+            "windowsBuildExit": 0,
+            "windowsBuildEvidence": "windows-build-v25.log",
+            "sourceCommit": "4f977c8071be17a7807a6c0b6f072f8f17cd4d4d",
+            "toolingCommit": "599103cf4409ca1929f9d6109f5f6adec585bbf0",
+            "packageSha256": "a1ba1b219478f0296b6b8eef2d1b94cee099c48f13794fa5d5b2c7d1862f5580",
+            "testsAfterLastRuntimeAttack": true,
+            "initialFailedFullRunRetained": "regression-full.log",
+            "afterFinalPathProbe": true
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate10\\v22-candidate-package.json",
+          "size": 8616,
+          "sha256": "c89fbb811b55b0aa21cde98c08af095995c6a886466eee63c622977823a8a256",
+          "parsed": {
+            "recordedAt": "2026-10-06T21:28:43.188Z",
+            "classification": "STATIC VERIFIED",
+            "release": "Bunny-A-Windows-v22-T10",
+            "sourceCommit": "738f05b25609f45001ba760ed3f21ba5e92aa571",
+            "toolingCommit": "eb7c621bb0ae09c4443bc772727b9b85c1273547",
+            "manifestSha256": "c0572ab52543182551990d98334e7a89df7301c2144057259e7fba5bd48b2801",
+            "packageSha256": "3004dfb1a18436125d61ef86b594f99e7b31efe2c2b9f849803806d03f22aa56",
+            "packageBytes": 36258633,
+            "assetManifestSha256": "176828598eb38f2b2e0e6dd84316d657d04ebd07362304254a56b59c6ff74d75",
+            "assetInventory": [
+              {
+                "path": ".output/public/__grok/icon-180.png",
+                "sha256": "3cf5d17d294b51c6cca6c86070309b88554b7ad702b0412e8e2709a01990bc8a",
+                "bytes": 2100,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-puzzle.svg",
+                "sha256": "a677c9356c23d1e699559ddbffac97cd135c2782cd893fb34f3738f6d11bee17",
+                "bytes": 1811,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-share.svg",
+                "sha256": "efad1b4b507a68c1f1af4aad2c93e8c24076224aa593da86677697f543d026d6",
+                "bytes": 2388,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/logo-grok.svg",
+                "sha256": "0654e3e59cce69856f38525cbfe4ab3a9ef52d4b64c8532dd0bc1a3f34fcb5b1",
+                "bytes": 1059,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-ipad.png",
+                "sha256": "4c9b09a4660c662b394597d551a04124293b0e37a7a7c72271dd2948c4499a14",
+                "bytes": 101843,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-phone.png",
+                "sha256": "80e0a5ede614d9b920c67d7cb79c80a79134687b1fc9f560384e896a88e302db",
+                "bytes": 103612,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/plus.svg",
+                "sha256": "c2c94be46aa2c3c2fda95d7c6f2fc6d0b656d1f5847828d5d95b5a81a6f4f20d",
+                "bytes": 2401,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/styles.css",
+                "sha256": "7e8e881302f58e54a9c07e7be395692d3de20fdaa27ce358531cc8dcca472cb6",
+                "bytes": 6717,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/index-C0d8k5Em.js",
+                "sha256": "ad7f3c43a9889a3fd41e2993d89b398ca5d570ac1a03aa772bb1f24b7d7cdcb5",
+                "bytes": 430789,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+                "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd",
+                "bytes": 25960,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2",
+                "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075",
+                "bytes": 18748,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2",
+                "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190",
+                "bytes": 11232,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-greek-wght-normal-CkhJZR-_.woff2",
+                "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6",
+                "bytes": 18996,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+                "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956",
+                "bytes": 85068,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-latin-wght-normal-Dx4kXJAl.woff2",
+                "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62",
+                "bytes": 48256,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2",
+                "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2",
+                "bytes": 10252,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/routes-DJtCWK7M.js",
+                "sha256": "508f0a5b849c54beee155d306174d815066991d9cacd3bcf3fd6cf9426991249",
+                "bytes": 590601,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/styles-925lNnPp.css",
+                "sha256": "021171a70ef569251e6987ce660f87c5b337e64e0cb2b252f51d18c590d29dd4",
+                "bytes": 184122,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/bunny-icon-192.png",
+                "sha256": "45e0cd24aeac91f5aa33c2030ab155a38b77a7d39f1cdf5ea9e1a31514b01abf",
+                "bytes": 6926,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/bunny-icon-512.png",
+                "sha256": "bd398f2dc610c432681759c86f4daac5bc0f9e6fef820a4712331d56d0ef612f",
+                "bytes": 19699,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/favicon.svg",
+                "sha256": "c6405c5463adfaf771aa6fc62beb8c4712caa6ce649d1acabd5c014d8fff2930",
+                "bytes": 498,
+                "origin": "build"
+              }
+            ],
+            "files": 159,
+            "integrity": {
+              "ok": true,
+              "checked": 159,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "installedIntegrity": {
+              "ok": true,
+              "checked": 159,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "source": {
+              "ok": true,
+              "checked": 79,
+              "mismatched": [],
+              "sourceCommit": "738f05b25609f45001ba760ed3f21ba5e92aa571",
+              "toolingCommit": "eb7c621bb0ae09c4443bc772727b9b85c1273547"
+            },
+            "closure": {
+              "ok": true,
+              "files": [
+                "Bunny-Host.mjs",
+                "scripts/bunny-tunnel-paths.mjs",
+                "scripts/bunny-tunnel-state.mjs",
+                "scripts/bunny-tunnel-worker.mjs",
+                "scripts/bunny-tunnel.mjs",
+                "src/lib/bunny-host/adapters.server.ts",
+                "src/lib/bunny-host/codex-compatibility.server.ts",
+                "src/lib/bunny-host/codex-probe.server.ts",
+                "src/lib/bunny-host/discovery.server.ts",
+                "src/lib/bunny-host/entry.server.ts",
+                "src/lib/bunny-host/events.ts",
+                "src/lib/bunny-host/failure.server.ts",
+                "src/lib/bunny-host/http.server.ts",
+                "src/lib/bunny-host/learning.server.ts",
+                "src/lib/bunny-host/manager.server.ts",
+                "src/lib/bunny-host/owned-process-group.server.ts",
+                "src/lib/bunny-host/owned-processes.server.ts",
+                "src/lib/bunny-host/persistence.server.ts",
+                "src/lib/bunny-host/presentation.ts",
+                "src/lib/bunny-host/process-tree.server.ts",
+                "src/lib/bunny-host/registry.server.ts",
+                "src/lib/bunny-host/release-identity.server.ts",
+                "src/lib/bunny-host/router.ts",
+                "src/lib/bunny-host/state-paths.server.ts",
+                "src/lib/bunny-host/verification.server.ts",
+                "src/lib/bunny-missions/artifacts.server.ts",
+                "src/lib/bunny-missions/authorization.server.ts",
+                "src/lib/bunny-missions/batch-labels.ts",
+                "src/lib/bunny-missions/batches.server.ts",
+                "src/lib/bunny-missions/capabilities/browser-network.server.ts",
+                "src/lib/bunny-missions/capabilities/browser.server.ts",
+                "src/lib/bunny-missions/capabilities/bus.server.ts",
+                "src/lib/bunny-missions/capabilities/calculator-targets.server.ts",
+                "src/lib/bunny-missions/capabilities/computer.server.ts",
+                "src/lib/bunny-missions/capabilities/connectors.server.ts",
+                "src/lib/bunny-missions/capabilities/git-merge.server.ts",
+                "src/lib/bunny-missions/capabilities/local.server.ts",
+                "src/lib/bunny-missions/capabilities/process.server.ts",
+                "src/lib/bunny-missions/commands.server.ts",
+                "src/lib/bunny-missions/context.ts",
+                "src/lib/bunny-missions/inbox.server.ts",
+                "src/lib/bunny-missions/machine.ts",
+                "src/lib/bunny-missions/manager.server.ts",
+                "src/lib/bunny-missions/memory.server.ts",
+                "src/lib/bunny-missions/paths.server.ts",
+                "src/lib/bunny-missions/planner.server.ts",
+                "src/lib/bunny-missions/skills.server.ts",
+                "src/lib/bunny-missions/store.server.ts",
+                "src/lib/bunny-missions/triggers.server.ts",
+                "src/lib/bunny-missions/workspace.server.ts",
+                "src/lib/orch/compatibility.ts",
+                "src/lib/orch/exec.server.ts",
+                "src/lib/orch/machine.ts",
+                "src/lib/orch/router.ts",
+                "src/lib/orch/telemetry.server.ts",
+                "native/bunny-owned-process.c",
+                "native/bunny-owned-process.node",
+                "native/bunny-owned-process.node.json",
+                "scripts/build-owned-process.mjs"
+              ],
+              "missing": [],
+              "outside": [],
+              "packages": [],
+              "optionalPackages": [
+                "playwright"
+              ]
+            },
+            "exactCommittedArchive": true,
+            "dirtyInput": false,
+            "productionActivated": false
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate10\\v24-candidate-package.json",
+          "size": 8616,
+          "sha256": "f9288c9ef9a76f02ecfc029d8ea6b4fe22cd0e64a25823d668b650db58e770cf",
+          "parsed": {
+            "recordedAt": "2026-10-06T21:46:11.233Z",
+            "classification": "STATIC VERIFIED",
+            "release": "Bunny-A-Windows-v24-T10",
+            "sourceCommit": "4f977c8071be17a7807a6c0b6f072f8f17cd4d4d",
+            "toolingCommit": "4e0b9c9f680cfa59584a47af78c60730d4cea82a",
+            "manifestSha256": "fae269c8f345976e15946173ec829952491f3ef8ddc8c14dd18f110e4b67bc8d",
+            "packageSha256": "0d8ddb6309445df6a65556842d90fdde0307d6b0f28f2c92e745fb4bfbe27e7e",
+            "packageBytes": 36260821,
+            "assetManifestSha256": "176828598eb38f2b2e0e6dd84316d657d04ebd07362304254a56b59c6ff74d75",
+            "assetInventory": [
+              {
+                "path": ".output/public/__grok/icon-180.png",
+                "sha256": "3cf5d17d294b51c6cca6c86070309b88554b7ad702b0412e8e2709a01990bc8a",
+                "bytes": 2100,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-puzzle.svg",
+                "sha256": "a677c9356c23d1e699559ddbffac97cd135c2782cd893fb34f3738f6d11bee17",
+                "bytes": 1811,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-share.svg",
+                "sha256": "efad1b4b507a68c1f1af4aad2c93e8c24076224aa593da86677697f543d026d6",
+                "bytes": 2388,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/logo-grok.svg",
+                "sha256": "0654e3e59cce69856f38525cbfe4ab3a9ef52d4b64c8532dd0bc1a3f34fcb5b1",
+                "bytes": 1059,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-ipad.png",
+                "sha256": "4c9b09a4660c662b394597d551a04124293b0e37a7a7c72271dd2948c4499a14",
+                "bytes": 101843,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-phone.png",
+                "sha256": "80e0a5ede614d9b920c67d7cb79c80a79134687b1fc9f560384e896a88e302db",
+                "bytes": 103612,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/plus.svg",
+                "sha256": "c2c94be46aa2c3c2fda95d7c6f2fc6d0b656d1f5847828d5d95b5a81a6f4f20d",
+                "bytes": 2401,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/__grok/install/styles.css",
+                "sha256": "7e8e881302f58e54a9c07e7be395692d3de20fdaa27ce358531cc8dcca472cb6",
+                "bytes": 6717,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/index-C0d8k5Em.js",
+                "sha256": "ad7f3c43a9889a3fd41e2993d89b398ca5d570ac1a03aa772bb1f24b7d7cdcb5",
+                "bytes": 430789,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+                "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd",
+                "bytes": 25960,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2",
+                "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075",
+                "bytes": 18748,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2",
+                "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190",
+                "bytes": 11232,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-greek-wght-normal-CkhJZR-_.woff2",
+                "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6",
+                "bytes": 18996,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+                "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956",
+                "bytes": 85068,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-latin-wght-normal-Dx4kXJAl.woff2",
+                "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62",
+                "bytes": 48256,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2",
+                "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2",
+                "bytes": 10252,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/routes-DJtCWK7M.js",
+                "sha256": "508f0a5b849c54beee155d306174d815066991d9cacd3bcf3fd6cf9426991249",
+                "bytes": 590601,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/assets/styles-925lNnPp.css",
+                "sha256": "021171a70ef569251e6987ce660f87c5b337e64e0cb2b252f51d18c590d29dd4",
+                "bytes": 184122,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/bunny-icon-192.png",
+                "sha256": "45e0cd24aeac91f5aa33c2030ab155a38b77a7d39f1cdf5ea9e1a31514b01abf",
+                "bytes": 6926,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/bunny-icon-512.png",
+                "sha256": "bd398f2dc610c432681759c86f4daac5bc0f9e6fef820a4712331d56d0ef612f",
+                "bytes": 19699,
+                "origin": "build"
+              },
+              {
+                "path": ".output/public/favicon.svg",
+                "sha256": "c6405c5463adfaf771aa6fc62beb8c4712caa6ce649d1acabd5c014d8fff2930",
+                "bytes": 498,
+                "origin": "build"
+              }
+            ],
+            "files": 160,
+            "integrity": {
+              "ok": true,
+              "checked": 160,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "installedIntegrity": {
+              "ok": true,
+              "checked": 160,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "source": {
+              "ok": true,
+              "checked": 80,
+              "mismatched": [],
+              "sourceCommit": "4f977c8071be17a7807a6c0b6f072f8f17cd4d4d",
+              "toolingCommit": "4e0b9c9f680cfa59584a47af78c60730d4cea82a"
+            },
+            "closure": {
+              "ok": true,
+              "files": [
+                "Bunny-Host.mjs",
+                "scripts/bunny-tunnel-paths.mjs",
+                "scripts/bunny-tunnel-state.mjs",
+                "scripts/bunny-tunnel-worker.mjs",
+                "scripts/bunny-tunnel.mjs",
+                "src/lib/bunny-host/adapters.server.ts",
+                "src/lib/bunny-host/codex-compatibility.server.ts",
+                "src/lib/bunny-host/codex-probe.server.ts",
+                "src/lib/bunny-host/discovery.server.ts",
+                "src/lib/bunny-host/entry.server.ts",
+                "src/lib/bunny-host/events.ts",
+                "src/lib/bunny-host/failure.server.ts",
+                "src/lib/bunny-host/http.server.ts",
+                "src/lib/bunny-host/learning.server.ts",
+                "src/lib/bunny-host/manager.server.ts",
+                "src/lib/bunny-host/owned-process-group.server.ts",
+                "src/lib/bunny-host/owned-processes.server.ts",
+                "src/lib/bunny-host/persistence.server.ts",
+                "src/lib/bunny-host/presentation.ts",
+                "src/lib/bunny-host/process-tree.server.ts",
+                "src/lib/bunny-host/registry.server.ts",
+                "src/lib/bunny-host/release-identity.server.ts",
+                "src/lib/bunny-host/router.ts",
+                "src/lib/bunny-host/state-paths.server.ts",
+                "src/lib/bunny-host/verification.server.ts",
+                "src/lib/bunny-missions/artifacts.server.ts",
+                "src/lib/bunny-missions/authorization.server.ts",
+                "src/lib/bunny-missions/batch-labels.ts",
+                "src/lib/bunny-missions/batches.server.ts",
+                "src/lib/bunny-missions/capabilities/browser-network.server.ts",
+                "src/lib/bunny-missions/capabilities/browser.server.ts",
+                "src/lib/bunny-missions/capabilities/bus.server.ts",
+                "src/lib/bunny-missions/capabilities/calculator-targets.server.ts",
+                "src/lib/bunny-missions/capabilities/computer.server.ts",
+                "src/lib/bunny-missions/capabilities/connectors.server.ts",
+                "src/lib/bunny-missions/capabilities/git-merge.server.ts",
+                "src/lib/bunny-missions/capabilities/local.server.ts",
+                "src/lib/bunny-missions/capabilities/process.server.ts",
+                "src/lib/bunny-missions/commands.server.ts",
+                "src/lib/bunny-missions/context.ts",
+                "src/lib/bunny-missions/inbox.server.ts",
+                "src/lib/bunny-missions/machine.ts",
+                "src/lib/bunny-missions/manager.server.ts",
+                "src/lib/bunny-missions/memory.server.ts",
+                "src/lib/bunny-missions/paths.server.ts",
+                "src/lib/bunny-missions/planner.server.ts",
+                "src/lib/bunny-missions/skills.server.ts",
+                "src/lib/bunny-missions/store.server.ts",
+                "src/lib/bunny-missions/triggers.server.ts",
+                "src/lib/bunny-missions/workspace.server.ts",
+                "src/lib/orch/compatibility.ts",
+                "src/lib/orch/exec.server.ts",
+                "src/lib/orch/machine.ts",
+                "src/lib/orch/router.ts",
+                "src/lib/orch/telemetry.server.ts",
+                "native/bunny-owned-process.c",
+                "native/bunny-owned-process.node",
+                "native/bunny-owned-process.node.json",
+                "scripts/build-owned-process.mjs"
+              ],
+              "missing": [],
+              "outside": [],
+              "packages": [],
+              "optionalPackages": [
+                "playwright"
+              ]
+            },
+            "exactCommittedArchive": true,
+            "dirtyInput": false,
+            "productionActivated": false
+          }
+        }
+      ]
+    },
+    {
+      "root": "ma2-gate9",
+      "fileCount": 221,
+      "evidenceBytes": 3030569,
+      "verdicts": [
+        {
+          "path": "test-results\\ma2-gate9\\candidate-package.json",
+          "size": 2672,
+          "sha256": "ce2cb5e93df4e0c69bf182bf48eb10e2e1a1dc81dd06633a048e1853b548880c",
+          "parsed": {
+            "gate": "M-A-2 T9",
+            "recordedAt": "2026-10-06T11:30:00Z",
+            "release": "Bunny-A-Windows-v17-T9",
+            "version": "17.0.0-T9",
+            "pin": {
+              "path": "install/release-pin.json",
+              "gitBlob": "committed as e550ed0 (T9: pin the candidate to the window-owner scope source)",
+              "sourceCommit": "e9604fefe3b8ab23f8fe6072ff302db3e63a8d15",
+              "baselineCommit": "f1934bda6b0d33f27bef198e8967a69f6eb329ff",
+              "gate9ImplementationCommit": "3f5375d5a81c86d01bfea75e85b5a44bee962483",
+              "gate9ImplementationFollowUp": "e9604fefe3b8ab23f8fe6072ff302db3e63a8d15"
+            },
+            "pinMatch": true,
+            "pinMatchBasis": "the packaging script validates the pin against the real git graph and the built manifest; package run 1 failed (PACKAGE_EXIT=1) while the pin carried a hand-mistyped sourceCommit suffix, run 2 passed (PACKAGE_EXIT=0) after the id was corrected from `git rev-parse` and committed (df89b26), run 3 passed (PACKAGE_EXIT=0) after the truthful-TTL journal follow-up was committed (73d9382) and the pin advanced, run 4 passed (PACKAGE_EXIT=0) after the window-owner scope fix (e9604fe) and its pin advance (e550ed0) — exact-source packaging is enforced by the script itself",
+            "package": {
+              "zipPath": "releases/Bunny-A-Windows-v17-T9.zip",
+              "sha256File": "releases/Bunny-A-Windows-v17-T9.zip.sha256",
+              "zipSha256": "7f5fd629143ad4b2f21122a8beebc91e7f0a8b2e09418b9b880a85c8860eddfc",
+              "sha256FileMatchesRecomputed": true,
+              "zipBytes": 36251045,
+              "buildLog": "test-results/ma2-gate9/windows-build2.log",
+              "exitCode": 0
+            },
+            "repackageHistory": [
+              {
+                "run": 1,
+                "result": "PACKAGE_EXIT=1 — packaging refused the pin: sourceCommit id was mistyped (one character invented); no artifacts kept"
+              },
+              {
+                "run": 2,
+                "result": "PACKAGE_EXIT=0 — pin corrected (commit df89b26) and the candidate was rebuilt from the exact pinned source; that zip (871f496b…) and the unzipped folder were archived as -pin-df02410 when run 3 replaced them"
+              },
+              {
+                "run": 3,
+                "result": "PACKAGE_EXIT=0 — truthful-TTL follow-up (73d9382) and the pin advance (a0211eb) repackaged from the exact pinned source; that zip (335b40b4…) and the unzipped folder were archived as -pin-73d9382 when run 4 replaced them"
+              },
+              {
+                "run": 4,
+                "result": "PACKAGE_EXIT=0 — window-owner scope fix (e9604fe, the live UWP finding) and the pin advance (e550ed0) repackaged from the exact pinned source; the packaged manifest's sourceCommit was re-read from the zip and matches the pin; zip + recomputed sha256 sidecar verified above"
+              }
+            ],
+            "installerNext": "scripts/install-bunny-release.ps1 into a staging install root with the disposable state copy; production is not touched"
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate9\\failure-ledger.json",
+          "size": 3482,
+          "sha256": "451c05db230a05a234ef7525852194820a584739725da802cdc5204eadac64ef",
+          "parsed": {
+            "gate": "M-A-2 T9",
+            "recordedAt": "2026-10-06T19:49:13.082Z",
+            "unresolvedBlocker": 0,
+            "unresolvedHigh": 0,
+            "failures": [
+              {
+                "id": "T9-target-admission",
+                "classification": "RESOLVED PRODUCT SECURITY",
+                "finding": "Title-selected operations could touch foreign targets before post-run detection; arbitrary typing/control scope was too broad.",
+                "resolution": "f7d8ccb: exact operation/step digests, verified Calculator profile and preflight before admission; all target/operation escapes fail before mutation."
+              },
+              {
+                "id": "T9-UWP-chrome",
+                "classification": "RESOLVED PRODUCT COMPATIBILITY",
+                "evidence": [
+                  "v18-B-live.json",
+                  "v18-target-probe.log"
+                ],
+                "finding": "Over-strict dialog check refused normal UWP frame/content windows.",
+                "resolution": "8d49b7d recognizes only normal verified nonmodal UWP descendants; v19 and final v20 live positive pass."
+              },
+              {
+                "id": "T9-renderer-input",
+                "classification": "RESOLVED PRODUCT PRIVACY",
+                "finding": "Original typed input remained in mission renderer snapshots despite safe events/visible activity.",
+                "resolution": "445beeb redacts typed input and secret-key params in view/detail without changing Host execution input; whole-response focused/live scan passes."
+              },
+              {
+                "id": "T9-release-name",
+                "classification": "RESOLVED BUILD HARNESS",
+                "evidence": [
+                  "t9-final-full-elevated.log"
+                ],
+                "finding": "Candidate r2 naming failed the existing pin expectation.",
+                "resolution": "Repository-consistent next-version candidates, no release test weakened or package overwritten."
+              },
+              {
+                "id": "T9-restart-harness",
+                "classification": "RESOLVED HARNESS",
+                "evidence": [
+                  "v19-R-harness-failure.json",
+                  "v19-R-harness-timeout.json",
+                  "v19-R1-harness-assertion-failure.json"
+                ],
+                "finding": "PowerShell module/child handle issues, followed by incorrect interrupted-step assertion for an approval pause.",
+                "resolution": "Explicit installed launcher controller; T3 paused-step semantics preserved, v19/v20 recovery/replay verified."
+              },
+              {
+                "id": "T9-plan-limit",
+                "classification": "RESOLVED HARNESS",
+                "evidence": [
+                  "v19-G2-harness-plan-limit.json"
+                ],
+                "finding": "14-step test exceeded the existing 12-step planner limit.",
+                "resolution": "Use 12 steps without increasing limit; actual in-flight Stop passes."
+              },
+              {
+                "id": "T9-Windows-test-cleanup",
+                "classification": "LOW HARNESS LIMITATION",
+                "evidence": [
+                  "t9-v20-full.log",
+                  "t9-v20-full-recheck.log",
+                  "t9-v20-t4-cleanup-isolated.log",
+                  "t9-v20-full-sequential.log"
+                ],
+                "finding": "Default concurrent test files hit EPERM deleting a temporary T4 fixture after ownership assertions.",
+                "resolution": "Unchanged isolated test and complete unchanged sequential inventory pass; no weakened assertion/skip or T4 runtime change."
+              },
+              {
+                "id": "T9-restricted-environment",
+                "classification": "RESOLVED ENVIRONMENT",
+                "evidence": [
+                  "t9-final-full.log",
+                  "t9-final-dev-render.log"
+                ],
+                "finding": "Restricted process/browser environment lacked native access for Windows acceptance.",
+                "resolution": "Authorized normal Windows execution; no automatic approval rejection or product security bypass."
+              }
+            ]
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate9\\regression-final.json",
+          "size": 1168,
+          "sha256": "badcaf9ffcab4f36cda930a0af37f9112c7af63aad16d45ddd7be2db271c07be",
+          "parsed": {
+            "gate": "M-A-2 T9",
+            "recordedAt": "2026-10-06T19:49:13.082Z",
+            "ok": true,
+            "sourceCommit": "445beebf8c9d951066dd0bddb1b066820762a912",
+            "unchangedTestInventory": true,
+            "deletedTests": 0,
+            "fullRegression": {
+              "script": 247,
+              "application": 340,
+              "ui": 37,
+              "passed": 624,
+              "failed": 0,
+              "skipped": 0
+            },
+            "focused": {
+              "passed": 26,
+              "includedInApplicationTotal": true
+            },
+            "fullCommand": "The npm test inventory, with --test-concurrency=1 on both Node test invocations; no cases omitted. npm pretest native ownership build already passed in both default full runs.",
+            "defaultNpmTest": "Two runs: 247 script pass; application 339/340 with one EPERM in fixture cleanup after T4 assertions. Unchanged isolated test and complete sequential run pass. Failed logs retained.",
+            "typecheckExit": 0,
+            "lintExit": 0,
+            "lintErrors": 0,
+            "preexistingLintWarnings": 11,
+            "exactSourceWindowsDashboardBuildExit": 0,
+            "render": {
+              "installedBuild": true,
+              "desktopAndMobile": true,
+              "content": true,
+              "consoleErrors": 0,
+              "pageErrors": 0,
+              "horizontalOverflow": false,
+              "screenshotsVisuallyInspected": true
+            }
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate9\\v20-candidate-package.json",
+          "size": 9808,
+          "sha256": "dc6d3706418db6574f17d0c37c890b42bb01d87e0f207c76c42f8b5e30edf1c6",
+          "parsed": {
+            "gate": "M-A-2 T9",
+            "recordedAt": "2026-10-06T19:49:08.367Z",
+            "release": "Bunny-A-Windows-v20-T9",
+            "sourceCommit": "445beebf8c9d951066dd0bddb1b066820762a912",
+            "toolingCommit": "824a5531ff6c04936f9511ba63c1120e65695d42",
+            "builtAt": "2026-10-06T19:25:50.0564881Z",
+            "pin": {
+              "release": "Bunny-A-Windows-v20-T9",
+              "version": "20.0.0-T9",
+              "sourceCommit": "445beebf8c9d951066dd0bddb1b066820762a912",
+              "baselineCommit": "f1934bda6b0d33f27bef198e8967a69f6eb329ff",
+              "gate9ImplementationCommit": "3f5375d5a81c86d01bfea75e85b5a44bee962483",
+              "gate9ImplementationFollowUp": "445beebf8c9d951066dd0bddb1b066820762a912",
+              "note": "T9 staged candidate only. Production remains Bunny-A-Windows-v17-T6; activation requires separate explicit authorization. Exact Host-computed Calculator operations, short TTL, finite budget, risk ceiling, mission and step digests, verified Microsoft Calculator package plus native window/process lifetime before admission and mutation. Arbitrary typing and unrelated capability families require separate approval. Host execution input is preserved; renderer snapshots redact typed input and secret-key fields. Batch authority expires on Stop/replan/restart and does not affect verification. All earlier candidate identities remain immutable. T10 remains open; tooling identity is recorded separately."
+            },
+            "package": {
+              "path": "releases/Bunny-A-Windows-v20-T9.zip",
+              "size": 36254511,
+              "sha256": "3fdbad67b21ed9bccbabad514756f0d0cb9ca8363c00f38bb61850c29b922a44",
+              "sidecarMatches": true
+            },
+            "manifest": {
+              "path": "releases/Bunny-A-Windows-v20-T9/release-manifest.json",
+              "sha256": "92c60012cca09d95f1c85b7a2373caf52297fc7cc3a50c30a3d49b979e44148a"
+            },
+            "dashboard": {
+              "sourceCommit": "445beebf8c9d951066dd0bddb1b066820762a912",
+              "builtAt": "2026-10-06T19:25:50.0564881Z",
+              "assetManifestSha256": "93183a204a27a0ecec1f4f34444231039d9c1512efc7390f02271ca31ce95171",
+              "assets": 21
+            },
+            "assets": [
+              {
+                "path": ".output/public/__grok/icon-180.png",
+                "sha256": "3cf5d17d294b51c6cca6c86070309b88554b7ad702b0412e8e2709a01990bc8a",
+                "bytes": 2100
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-puzzle.svg",
+                "sha256": "a677c9356c23d1e699559ddbffac97cd135c2782cd893fb34f3738f6d11bee17",
+                "bytes": 1811
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-share.svg",
+                "sha256": "efad1b4b507a68c1f1af4aad2c93e8c24076224aa593da86677697f543d026d6",
+                "bytes": 2388
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/logo-grok.svg",
+                "sha256": "0654e3e59cce69856f38525cbfe4ab3a9ef52d4b64c8532dd0bc1a3f34fcb5b1",
+                "bytes": 1059
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-ipad.png",
+                "sha256": "4c9b09a4660c662b394597d551a04124293b0e37a7a7c72271dd2948c4499a14",
+                "bytes": 101843
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-phone.png",
+                "sha256": "80e0a5ede614d9b920c67d7cb79c80a79134687b1fc9f560384e896a88e302db",
+                "bytes": 103612
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/plus.svg",
+                "sha256": "c2c94be46aa2c3c2fda95d7c6f2fc6d0b656d1f5847828d5d95b5a81a6f4f20d",
+                "bytes": 2401
+              },
+              {
+                "path": ".output/public/__grok/install/styles.css",
+                "sha256": "7e8e881302f58e54a9c07e7be395692d3de20fdaa27ce358531cc8dcca472cb6",
+                "bytes": 6717
+              },
+              {
+                "path": ".output/public/assets/index-CtmVLk4e.js",
+                "sha256": "626f780a809aa3cf362a2f0f37d1c97dc5f87cb4f826fd7f38d991ef4d891447",
+                "bytes": 430789
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+                "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd",
+                "bytes": 25960
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2",
+                "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075",
+                "bytes": 18748
+              },
+              {
+                "path": ".output/public/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2",
+                "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190",
+                "bytes": 11232
+              },
+              {
+                "path": ".output/public/assets/inter-greek-wght-normal-CkhJZR-_.woff2",
+                "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6",
+                "bytes": 18996
+              },
+              {
+                "path": ".output/public/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+                "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956",
+                "bytes": 85068
+              },
+              {
+                "path": ".output/public/assets/inter-latin-wght-normal-Dx4kXJAl.woff2",
+                "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62",
+                "bytes": 48256
+              },
+              {
+                "path": ".output/public/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2",
+                "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2",
+                "bytes": 10252
+              },
+              {
+                "path": ".output/public/assets/routes-B62_NqMs.js",
+                "sha256": "217e774691b8e1373661397e5f2c8c8db55b849544cdf6462e7b1d8bf63d2354",
+                "bytes": 590601
+              },
+              {
+                "path": ".output/public/assets/styles-DpLCBWtK.css",
+                "sha256": "f7f578575957d6ac5a40b79716ee9fb25336737642b701ceaf7157b75e234a26",
+                "bytes": 184090
+              },
+              {
+                "path": ".output/public/bunny-icon-192.png",
+                "sha256": "45e0cd24aeac91f5aa33c2030ab155a38b77a7d39f1cdf5ea9e1a31514b01abf",
+                "bytes": 6926
+              },
+              {
+                "path": ".output/public/bunny-icon-512.png",
+                "sha256": "bd398f2dc610c432681759c86f4daac5bc0f9e6fef820a4712331d56d0ef612f",
+                "bytes": 19699
+              },
+              {
+                "path": ".output/public/favicon.svg",
+                "sha256": "c6405c5463adfaf771aa6fc62beb8c4712caa6ce649d1acabd5c014d8fff2930",
+                "bytes": 498
+              }
+            ],
+            "integrity": {
+              "ok": true,
+              "checked": 158,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "sourceCheck": {
+              "ok": true,
+              "checked": 78,
+              "mismatched": [],
+              "sourceCommit": "445beebf8c9d951066dd0bddb1b066820762a912",
+              "toolingCommit": "824a5531ff6c04936f9511ba63c1120e65695d42"
+            },
+            "importClosure": {
+              "ok": true,
+              "files": [
+                "Bunny-Host.mjs",
+                "scripts/bunny-tunnel-paths.mjs",
+                "scripts/bunny-tunnel-state.mjs",
+                "scripts/bunny-tunnel-worker.mjs",
+                "scripts/bunny-tunnel.mjs",
+                "src/lib/bunny-host/adapters.server.ts",
+                "src/lib/bunny-host/codex-compatibility.server.ts",
+                "src/lib/bunny-host/codex-probe.server.ts",
+                "src/lib/bunny-host/discovery.server.ts",
+                "src/lib/bunny-host/entry.server.ts",
+                "src/lib/bunny-host/events.ts",
+                "src/lib/bunny-host/failure.server.ts",
+                "src/lib/bunny-host/http.server.ts",
+                "src/lib/bunny-host/learning.server.ts",
+                "src/lib/bunny-host/manager.server.ts",
+                "src/lib/bunny-host/owned-process-group.server.ts",
+                "src/lib/bunny-host/owned-processes.server.ts",
+                "src/lib/bunny-host/persistence.server.ts",
+                "src/lib/bunny-host/presentation.ts",
+                "src/lib/bunny-host/process-tree.server.ts",
+                "src/lib/bunny-host/registry.server.ts",
+                "src/lib/bunny-host/release-identity.server.ts",
+                "src/lib/bunny-host/router.ts",
+                "src/lib/bunny-host/state-paths.server.ts",
+                "src/lib/bunny-host/verification.server.ts",
+                "src/lib/bunny-missions/artifacts.server.ts",
+                "src/lib/bunny-missions/authorization.server.ts",
+                "src/lib/bunny-missions/batch-labels.ts",
+                "src/lib/bunny-missions/batches.server.ts",
+                "src/lib/bunny-missions/capabilities/browser-network.server.ts",
+                "src/lib/bunny-missions/capabilities/browser.server.ts",
+                "src/lib/bunny-missions/capabilities/bus.server.ts",
+                "src/lib/bunny-missions/capabilities/computer.server.ts",
+                "src/lib/bunny-missions/capabilities/connectors.server.ts",
+                "src/lib/bunny-missions/capabilities/git-merge.server.ts",
+                "src/lib/bunny-missions/capabilities/local.server.ts",
+                "src/lib/bunny-missions/capabilities/process.server.ts",
+                "src/lib/bunny-missions/commands.server.ts",
+                "src/lib/bunny-missions/context.ts",
+                "src/lib/bunny-missions/inbox.server.ts",
+                "src/lib/bunny-missions/machine.ts",
+                "src/lib/bunny-missions/manager.server.ts",
+                "src/lib/bunny-missions/memory.server.ts",
+                "src/lib/bunny-missions/paths.server.ts",
+                "src/lib/bunny-missions/planner.server.ts",
+                "src/lib/bunny-missions/skills.server.ts",
+                "src/lib/bunny-missions/store.server.ts",
+                "src/lib/bunny-missions/triggers.server.ts",
+                "src/lib/bunny-missions/workspace.server.ts",
+                "src/lib/orch/compatibility.ts",
+                "src/lib/orch/exec.server.ts",
+                "src/lib/orch/machine.ts",
+                "src/lib/orch/router.ts",
+                "src/lib/orch/telemetry.server.ts",
+                "native/bunny-owned-process.c",
+                "native/bunny-owned-process.node",
+                "native/bunny-owned-process.node.json",
+                "scripts/build-owned-process.mjs"
+              ],
+              "missing": [],
+              "outside": [],
+              "packages": [],
+              "optionalPackages": [
+                "playwright"
+              ]
+            },
+            "installedIntegrity": {
+              "ok": true,
+              "checked": 158,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "staging": {
+              "installRoot": "C:/Users/allam/AppData/Local/Bunny-A-T9-stage",
+              "stateRoot": "C:/Users/allam/AppData/Local/Bunny-A-T9-stage/state",
+              "workspace": "C:\\Users\\allam\\Bunny-Workspace-T9-stage",
+              "hostPort": 44119,
+              "startupDirectory": "C:/Users/allam/AppData/Local/Bunny-A-T9-stage/startup",
+              "productionActivated": false
+            },
+            "exactGitBlobs": true,
+            "dirtyWorkingTreeInput": false,
+            "earlierCandidatesPreserved": true
+          }
+        }
+      ]
+    },
+    {
+      "root": "ma2-gate9r",
+      "fileCount": 219,
+      "evidenceBytes": 1316380,
+      "verdicts": [
+        {
+          "path": "test-results\\ma2-gate9r\\candidate-package.json",
+          "size": 9930,
+          "sha256": "1b1bb7476e999c4a0d126ea2fe5e7288bdbf9081e4509a09e961c14116030aea",
+          "parsed": {
+            "gate": "M-A-2 T9R",
+            "recordedAt": "2026-10-06T20:50:39.541Z",
+            "ok": true,
+            "release": "Bunny-A-Windows-v21-T9",
+            "sourceCommit": "b6caa93d0b4d80417c8adb690ce3e85a140909c4",
+            "toolingCommit": "97f48e137610e36649624cf63f178dda04db394f",
+            "builtAt": "2026-10-06T20:19:48.8771110Z",
+            "pin": {
+              "release": "Bunny-A-Windows-v21-T9",
+              "version": "21.0.0-T9",
+              "sourceCommit": "b6caa93d0b4d80417c8adb690ce3e85a140909c4",
+              "baselineCommit": "f1934bda6b0d33f27bef198e8967a69f6eb329ff",
+              "gate9ImplementationCommit": "3f5375d5a81c86d01bfea75e85b5a44bee962483",
+              "gate9ImplementationFollowUp": "445beebf8c9d951066dd0bddb1b066820762a912",
+              "gate9RemediationCommit": "b6caa93d0b4d80417c8adb690ce3e85a140909c4",
+              "note": "T9R staged duplicate-target lifecycle candidate, using the repository's vN-T9 naming contract. Production remains Bunny-A-Windows-v17-T6; activation requires separate authorization. Calculator acquisition reuses a revalidated per-workflow native/frame/content identity, serializes acquisition and guards uncertain launch outcomes. Target identity carries no permission or cleanup authority. Existing exact operations, short TTL, finite count, risk ceiling, application boundaries, Stop/replan/restart, sensitive input, shell/browser exclusions, privacy and verification remain unchanged. All earlier candidates remain immutable. T10 is blocked pending T9R closure and is not started; tooling identity is recorded separately."
+            },
+            "package": {
+              "path": "releases/Bunny-A-Windows-v21-T9.zip",
+              "size": 37355140,
+              "sha256": "b103483d597a70b8cf7593d05acd93940bbe3779552f01dc193f0ea7e2e5c49c",
+              "sidecarMatches": true
+            },
+            "manifest": {
+              "sha256": "f168a7b4f4ca62f546b7aa3410264953dd1776144cbfceb6fd96e257e75e4fcb"
+            },
+            "dashboard": {
+              "sourceCommit": "b6caa93d0b4d80417c8adb690ce3e85a140909c4",
+              "builtAt": "2026-10-06T20:19:48.8771110Z",
+              "assetManifestSha256": "176828598eb38f2b2e0e6dd84316d657d04ebd07362304254a56b59c6ff74d75",
+              "assets": 21
+            },
+            "assets": [
+              {
+                "path": ".output/public/__grok/icon-180.png",
+                "sha256": "3cf5d17d294b51c6cca6c86070309b88554b7ad702b0412e8e2709a01990bc8a",
+                "bytes": 2100
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-puzzle.svg",
+                "sha256": "a677c9356c23d1e699559ddbffac97cd135c2782cd893fb34f3738f6d11bee17",
+                "bytes": 1811
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/glass-share.svg",
+                "sha256": "efad1b4b507a68c1f1af4aad2c93e8c24076224aa593da86677697f543d026d6",
+                "bytes": 2388
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/logo-grok.svg",
+                "sha256": "0654e3e59cce69856f38525cbfe4ab3a9ef52d4b64c8532dd0bc1a3f34fcb5b1",
+                "bytes": 1059
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-ipad.png",
+                "sha256": "4c9b09a4660c662b394597d551a04124293b0e37a7a7c72271dd2948c4499a14",
+                "bytes": 101843
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/ob-phone.png",
+                "sha256": "80e0a5ede614d9b920c67d7cb79c80a79134687b1fc9f560384e896a88e302db",
+                "bytes": 103612
+              },
+              {
+                "path": ".output/public/__grok/install/assets/homescreen/plus.svg",
+                "sha256": "c2c94be46aa2c3c2fda95d7c6f2fc6d0b656d1f5847828d5d95b5a81a6f4f20d",
+                "bytes": 2401
+              },
+              {
+                "path": ".output/public/__grok/install/styles.css",
+                "sha256": "7e8e881302f58e54a9c07e7be395692d3de20fdaa27ce358531cc8dcca472cb6",
+                "bytes": 6717
+              },
+              {
+                "path": ".output/public/assets/index-C0d8k5Em.js",
+                "sha256": "ad7f3c43a9889a3fd41e2993d89b398ca5d570ac1a03aa772bb1f24b7d7cdcb5",
+                "bytes": 430789
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2",
+                "sha256": "ca157063339ac4ad418f214f3abfed119b0798ab4d377386ce5c9e5a7a435ebd",
+                "bytes": 25960
+              },
+              {
+                "path": ".output/public/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2",
+                "sha256": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075",
+                "bytes": 18748
+              },
+              {
+                "path": ".output/public/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2",
+                "sha256": "6e9e020a25f9b56d418f2c085b1d3c09725a4da23fe693a5b463064606732190",
+                "bytes": 11232
+              },
+              {
+                "path": ".output/public/assets/inter-greek-wght-normal-CkhJZR-_.woff2",
+                "sha256": "1be3448e292fbf05ffe176fe1e43f135013d50b1e7d324ad1a558f623d3bb6f6",
+                "bytes": 18996
+              },
+              {
+                "path": ".output/public/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2",
+                "sha256": "34b9c504cab7a73e37b746343a449132e56cf7b5481af2cb81dc74dcff25c956",
+                "bytes": 85068
+              },
+              {
+                "path": ".output/public/assets/inter-latin-wght-normal-Dx4kXJAl.woff2",
+                "sha256": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62",
+                "bytes": 48256
+              },
+              {
+                "path": ".output/public/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2",
+                "sha256": "5c66f9e07e90c6d4ac4922cc68d60de26c17b1858e677fb5e603fce3952b3ff2",
+                "bytes": 10252
+              },
+              {
+                "path": ".output/public/assets/routes-DJtCWK7M.js",
+                "sha256": "508f0a5b849c54beee155d306174d815066991d9cacd3bcf3fd6cf9426991249",
+                "bytes": 590601
+              },
+              {
+                "path": ".output/public/assets/styles-925lNnPp.css",
+                "sha256": "021171a70ef569251e6987ce660f87c5b337e64e0cb2b252f51d18c590d29dd4",
+                "bytes": 184122
+              },
+              {
+                "path": ".output/public/bunny-icon-192.png",
+                "sha256": "45e0cd24aeac91f5aa33c2030ab155a38b77a7d39f1cdf5ea9e1a31514b01abf",
+                "bytes": 6926
+              },
+              {
+                "path": ".output/public/bunny-icon-512.png",
+                "sha256": "bd398f2dc610c432681759c86f4daac5bc0f9e6fef820a4712331d56d0ef612f",
+                "bytes": 19699
+              },
+              {
+                "path": ".output/public/favicon.svg",
+                "sha256": "c6405c5463adfaf771aa6fc62beb8c4712caa6ce649d1acabd5c014d8fff2930",
+                "bytes": 498
+              }
+            ],
+            "integrity": {
+              "ok": true,
+              "checked": 159,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "sourceCheck": {
+              "ok": true,
+              "checked": 79,
+              "mismatched": [],
+              "sourceCommit": "b6caa93d0b4d80417c8adb690ce3e85a140909c4",
+              "toolingCommit": "97f48e137610e36649624cf63f178dda04db394f"
+            },
+            "importClosure": {
+              "ok": true,
+              "files": [
+                "Bunny-Host.mjs",
+                "scripts/bunny-tunnel-paths.mjs",
+                "scripts/bunny-tunnel-state.mjs",
+                "scripts/bunny-tunnel-worker.mjs",
+                "scripts/bunny-tunnel.mjs",
+                "src/lib/bunny-host/adapters.server.ts",
+                "src/lib/bunny-host/codex-compatibility.server.ts",
+                "src/lib/bunny-host/codex-probe.server.ts",
+                "src/lib/bunny-host/discovery.server.ts",
+                "src/lib/bunny-host/entry.server.ts",
+                "src/lib/bunny-host/events.ts",
+                "src/lib/bunny-host/failure.server.ts",
+                "src/lib/bunny-host/http.server.ts",
+                "src/lib/bunny-host/learning.server.ts",
+                "src/lib/bunny-host/manager.server.ts",
+                "src/lib/bunny-host/owned-process-group.server.ts",
+                "src/lib/bunny-host/owned-processes.server.ts",
+                "src/lib/bunny-host/persistence.server.ts",
+                "src/lib/bunny-host/presentation.ts",
+                "src/lib/bunny-host/process-tree.server.ts",
+                "src/lib/bunny-host/registry.server.ts",
+                "src/lib/bunny-host/release-identity.server.ts",
+                "src/lib/bunny-host/router.ts",
+                "src/lib/bunny-host/state-paths.server.ts",
+                "src/lib/bunny-host/verification.server.ts",
+                "src/lib/bunny-missions/artifacts.server.ts",
+                "src/lib/bunny-missions/authorization.server.ts",
+                "src/lib/bunny-missions/batch-labels.ts",
+                "src/lib/bunny-missions/batches.server.ts",
+                "src/lib/bunny-missions/capabilities/browser-network.server.ts",
+                "src/lib/bunny-missions/capabilities/browser.server.ts",
+                "src/lib/bunny-missions/capabilities/bus.server.ts",
+                "src/lib/bunny-missions/capabilities/calculator-targets.server.ts",
+                "src/lib/bunny-missions/capabilities/computer.server.ts",
+                "src/lib/bunny-missions/capabilities/connectors.server.ts",
+                "src/lib/bunny-missions/capabilities/git-merge.server.ts",
+                "src/lib/bunny-missions/capabilities/local.server.ts",
+                "src/lib/bunny-missions/capabilities/process.server.ts",
+                "src/lib/bunny-missions/commands.server.ts",
+                "src/lib/bunny-missions/context.ts",
+                "src/lib/bunny-missions/inbox.server.ts",
+                "src/lib/bunny-missions/machine.ts",
+                "src/lib/bunny-missions/manager.server.ts",
+                "src/lib/bunny-missions/memory.server.ts",
+                "src/lib/bunny-missions/paths.server.ts",
+                "src/lib/bunny-missions/planner.server.ts",
+                "src/lib/bunny-missions/skills.server.ts",
+                "src/lib/bunny-missions/store.server.ts",
+                "src/lib/bunny-missions/triggers.server.ts",
+                "src/lib/bunny-missions/workspace.server.ts",
+                "src/lib/orch/compatibility.ts",
+                "src/lib/orch/exec.server.ts",
+                "src/lib/orch/machine.ts",
+                "src/lib/orch/router.ts",
+                "src/lib/orch/telemetry.server.ts",
+                "native/bunny-owned-process.c",
+                "native/bunny-owned-process.node",
+                "native/bunny-owned-process.node.json",
+                "scripts/build-owned-process.mjs"
+              ],
+              "missing": [],
+              "outside": [],
+              "packages": [],
+              "optionalPackages": [
+                "playwright"
+              ]
+            },
+            "installedIntegrity": {
+              "ok": true,
+              "checked": 159,
+              "extra": [],
+              "missing": [],
+              "changed": []
+            },
+            "staging": {
+              "installRoot": "C:/Users/allam/AppData/Local/Bunny-A-T9R-stage",
+              "stateRoot": "C:/Users/allam/AppData/Local/Bunny-A-T9R-stage/state",
+              "workspace": "C:\\Users\\allam\\Bunny-Workspace-T9R-stage",
+              "hostPort": 45119,
+              "startupDirectory": "C:/Users/allam/AppData/Local/Bunny-A-T9R-stage/startup",
+              "productionActivated": false
+            },
+            "exactGitBlobs": true,
+            "dirtyWorkingTreeInput": false,
+            "earlierCandidatesPreserved": true
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate9r\\classification.json",
+          "size": 572,
+          "sha256": "8c3697add8f80328736234fe53bda7301cc243f55a3cc14ba344bd1551b08198",
+          "parsed": {
+            "gate": "M-A-2 T9R",
+            "primary": "MIXED",
+            "historical": "68 explicit launch runs: 60 independent Missions with one launch each, eight direct probes; final harness omitted cleanup",
+            "product": "Old v20 live reproduction: two explicit acquisitions inside one bounded Mission/grant create two verified visible targets",
+            "evidence": [
+              "launch-lineage.json",
+              "reproduction.json",
+              "repro-cleanup.json",
+              "root-cause.md"
+            ],
+            "historicalObservationExactHwndMappingAvailable": false,
+            "unresolvedPrimaryCause": false,
+            "noProductCodeChangedBeforeReconstruction": true
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate9r\\failure-ledger.json",
+          "size": 3575,
+          "sha256": "57a2f8600bdad27e85c3dc94d5e82a4a73e18a3be4ea208a7b8c162d70b59e6f",
+          "parsed": {
+            "gate": "M-A-2 T9R",
+            "unresolvedBlockerOrHigh": 0,
+            "entries": [
+              {
+                "case": "First old-v20 reproduction",
+                "reason": "Windows refused background foreground focus while ChatGPT was foreground; bounded focus retry did not relaunch.",
+                "resolution": "Stopped and freshly closed the owned target; acquisition-only reproduction proved two visible targets under one grant.",
+                "evidence": [
+                  "reproduction-focus-failure.log",
+                  "failed-repro-cleanup.json",
+                  "reproduction.json"
+                ]
+              },
+              {
+                "case": "Isolated stage preparation",
+                "reason": "Installer correctly refused missing/incorrect state marker and missing dedicated startup directory; PowerShell 7 launcher environment differs from the accepted Windows PowerShell shortcut.",
+                "resolution": "Prepared disposable state with actual Host/Mission migrations and correct layout marker, own startup folder; used Windows PowerShell 5.1. No production switch.",
+                "evidence": [
+                  "prepare-state.ts",
+                  "stage-install.json",
+                  "stage-boot.log"
+                ]
+              },
+              {
+                "case": "Terminal cleanup controller",
+                "reason": "Harness tried mission.stop after completion; Host correctly refused the transition.",
+                "resolution": "Controller checks terminal state before Stop; safely recovered the exact owned target and reran reuse.",
+                "evidence": [
+                  "live-matrix-terminal-cleanup-failure.log",
+                  "reuse-harness-failure.json",
+                  "same-task-reuse-live.json"
+                ]
+              },
+              {
+                "case": "One-second expiry",
+                "reason": "TTL elapsed during native validation of an admitted action; contained step failure needs explicit retry rather than automatic next request.",
+                "resolution": "Retained failure, safely cleaned fixture; tested real explicit retry/fresh approval, one launch and same target.",
+                "evidence": [
+                  "live-matrix-inflight-expiry-harness-failure.log",
+                  "expiry-harness-failure.json",
+                  "expiration-live.json"
+                ]
+              },
+              {
+                "case": "Focus-loss preparation",
+                "reason": "Initial assumption that Calculator was not foreground was false; minimizing hides the UWP arithmetic subtree, causing readiness pause and owned cleanup refusal.",
+                "resolution": "Explicit minimization, observed pause/no new runs; restored only the owned HWND using fresh frame/content/package checks and revalidated UIA. Fresh approval reused the target. Previous failed fixture safely restored then freshly closed; close authority unchanged.",
+                "evidence": [
+                  "live-matrix-final.log",
+                  "focusLoss-harness-failure.json",
+                  "focus-loss-recovery-inventory.json",
+                  "focus-loss-recovery-cleanup.json",
+                  "focus-loss-live.json"
+                ]
+              },
+              {
+                "case": "Other-application assertion",
+                "reason": "Renderer uses null, not undefined, for absent batch offer. Product correctly required separate approval.",
+                "resolution": "Changed harness assertion only, proved fresh acquisition-run ownership for failed fixture cleanup; rerun required separate Notepad approval and executed zero other-app runs.",
+                "evidence": [
+                  "boundary-harness-failure.json",
+                  "boundary-recovery-owned.json",
+                  "boundary-recovery-cleanup.json",
+                  "application-boundary-live.json"
+                ]
+              },
+              {
+                "case": "Browser smoke provider",
+                "reason": "Bundled Playwright Chromium headless shell is absent.",
+                "resolution": "Same repository smoke runner passed with installed Microsoft Edge; both screenshots visually inspected, clean console and no overflow.",
+                "evidence": [
+                  "browser-smoke.log",
+                  "browser-smoke-edge.log",
+                  "built-render.json"
+                ]
+              },
+              {
+                "case": "Evidence parser",
+                "reason": "Smoke verdict stores bodyTextLen and per-viewport checks rather than a top-level ok field.",
+                "resolution": "Aligned evidence parser with actual repository schema; package/journal/privacy/production checks already passed; final seal passed.",
+                "evidence": [
+                  "final-records.log",
+                  "final-records-pass.log"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate9r\\final-verdict.json",
+          "size": 3217,
+          "sha256": "2756135b6c49e049a462ed7ea2aa03784393ef9c43dd928ea7ace2b00c5369e1",
+          "parsed": {
+            "gate": "M-A-2 T9R",
+            "recordedAt": "2026-10-06T20:50:39.541Z",
+            "verdict": "BUNNY_MA2_T9R_PASS",
+            "primaryClassification": "MIXED",
+            "rootCauseEstablished": true,
+            "historicalExactHwndMappingAvailable": false,
+            "productReproduction": "Two old v20 acquisitions in one bounded Mission/grant produced two verified visible windows before source edits.",
+            "remediation": "Verified per-workflow canonical acquisition/reuse, small native acquisition mutex, uncertain launch guard; target identity gives no grant or cleanup authority.",
+            "live": [
+              {
+                "case": "same-task-reuse",
+                "record": "same-task-reuse-live.json",
+                "missionId": "68afb44b-3e54-491d-9b47-3255ab9c486c",
+                "ok": true
+              },
+              {
+                "case": "retry",
+                "record": "retry-live.json",
+                "missionId": "9cb5672f-4d63-470e-97a3-be999812bad8",
+                "ok": true
+              },
+              {
+                "case": "concurrent-acquire",
+                "record": "concurrent-acquire-live.json",
+                "missionId": "dc207bfe-47a7-4e0d-b267-5cd87f64af1c",
+                "ok": true
+              },
+              {
+                "case": "second-task",
+                "record": "second-task-live.json",
+                "missionId": "978f4507-a92a-449a-b867-b7dfb5f2b63b",
+                "ok": true
+              },
+              {
+                "case": "preexisting-user-window",
+                "record": "preexisting-user-window-live.json",
+                "missionId": "958125b2-95b4-4ae3-88dc-0ad6ec9bf46a",
+                "ok": true
+              },
+              {
+                "case": "stop",
+                "record": "stop-live.json",
+                "missionId": "53c19c2c-ea07-4140-9165-0ace608f98e2",
+                "ok": true
+              },
+              {
+                "case": "expiration",
+                "record": "expiration-live.json",
+                "missionId": "257590ef-fec4-4445-ac60-6a638ea2e1eb",
+                "ok": true
+              },
+              {
+                "case": "budget",
+                "record": "budget-live.json",
+                "missionId": "e0e2b87f-0964-4feb-a869-135726862616",
+                "ok": true
+              },
+              {
+                "case": "ui-reconnect",
+                "record": "ui-reconnect-live.json",
+                "missionId": "4ce53333-9b48-4f8f-9c25-e6a56570205c",
+                "ok": true
+              },
+              {
+                "case": "restart",
+                "record": "restart-live.json",
+                "missionId": "164a8b40-958b-4c92-afcc-b3e0f5ebf769",
+                "ok": true
+              },
+              {
+                "case": "stale-target",
+                "record": "stale-target-live.json",
+                "missionId": "08f887e9-38f4-4551-8a3b-facf1ca84e9b",
+                "ok": true
+              },
+              {
+                "case": "positive-calculation",
+                "record": "positive-calculation-live.json",
+                "missionId": "aa49b052-1c13-4b00-bf4f-3fb295cc5a77",
+                "ok": true
+              },
+              {
+                "case": "focus-loss",
+                "record": "focus-loss-live.json",
+                "missionId": "ce04cd9d-d1f6-44f1-a306-426acb097e97",
+                "ok": true
+              },
+              {
+                "case": "application-boundary",
+                "record": "application-boundary-live.json",
+                "missionId": "aa3ef733-eb6e-48e6-9b39-70fdf6b9e704",
+                "ok": true
+              }
+            ],
+            "regressionTotal": 645,
+            "focusedTotal": 47,
+            "unexplainedWindows": 0,
+            "intentionallyRetainedWindows": 1,
+            "unresolvedBlockerOrHigh": 0,
+            "candidate": "Bunny-A-Windows-v21-T9",
+            "sourceCommit": "b6caa93d0b4d80417c8adb690ce3e85a140909c4",
+            "productionActivated": false,
+            "productionRelease": "Bunny-A-Windows-v17-T6",
+            "t10Started": false,
+            "fullMa2OperationalVerdictIssued": false
+          }
+        },
+        {
+          "path": "test-results\\ma2-gate9r\\regression-final.json",
+          "size": 778,
+          "sha256": "42c6d503204b295f01c7526d0f2101c2a1b78104a7ac4e114ba93afc6d330f5b",
+          "parsed": {
+            "gate": "M-A-2 T9R",
+            "recordedAt": "2026-10-06T20:50:39.541Z",
+            "ok": true,
+            "discoveredFloor": {
+              "scripts": 247,
+              "application": 340,
+              "ui": 37,
+              "total": 624,
+              "evidence": "test-results/ma2-gate9/regression-final.json"
+            },
+            "scripts": 251,
+            "application": 357,
+            "ui": 37,
+            "total": 645,
+            "focused": 47,
+            "newTests": 21,
+            "failed": 0,
+            "skipped": 0,
+            "cancelled": 0,
+            "existingTestsRemoved": 0,
+            "existingAssertionsWeakened": 0,
+            "typecheckExit": 0,
+            "lintExit": 0,
+            "lintWarnings": 11,
+            "windowsBuildExit": 0,
+            "build": "Exact committed archive; windows-build.log and candidate-package.json",
+            "fullSuiteFileConcurrency": 1,
+            "reason": "Retains every test; serial file execution avoids the known accepted T4 fixture cleanup race."
+          }
+        }
+      ]
+    },
+    {
+      "root": "ma2-gate8",
+      "fileCount": 93,
+      "evidenceBytes": 1307054,
+      "verdicts": []
+    },
+    {
+      "root": "ma2-gate6r",
+      "fileCount": 103,
+      "evidenceBytes": 391580,
+      "verdicts": [
+        {
+          "path": "test-results\\ma2-gate6r\\failure-ledger.json",
+          "size": 4456,
+          "sha256": "0dbb86fe51a7a743db6f115e2ec48cd1d28177686c9531706d014b3624aa2238",
+          "parsed": {
+            "recordedAt": "2026-10-06T03:37:06.794Z",
+            "gate": "MA2-T6R",
+            "entries": [
+              {
+                "n": "T6 original failure (public HTTP 530 / Cloudflare 1033 loops)",
+                "detected": "T6 gate acceptance",
+                "disposition": "T6R remediation: watchdog (zero-active/registration-storm/public-probe rules) + startup reconcile + identity-audited supervision; tunnel stays a quick tunnel; no named-tunnel migration",
+                "label": "LIVE VERIFIED (containment and restart); watchdog rules SIMULATED (scripts/bunny-tunnel.test.mjs, 13 tests)"
+              },
+              {
+                "n": "install.json dropped stateMigration/tools fields on reactivation",
+                "detected": "F2 activation diff",
+                "disposition": "restored from pre-activation backup with T5 activate-laptop.ps1 field semantics; full record verified",
+                "label": "LIVE VERIFIED"
+              },
+              {
+                "n": "Gateway served cross-release (T5 tree) after activation",
+                "detected": "activation identity checks",
+                "disposition": "deployment.json promoted to v17-T6 package; gateway/Host/launcher stopped identity-checked and restarted from EXE; release identity verified (17.0.0-T6, cb005ef, f5bf648c)",
+                "label": "LIVE VERIFIED"
+              },
+              {
+                "n": "Island held inline by launcher instead of EXE ownership",
+                "detected": "process-tree check",
+                "disposition": "launcher stopped; Bunny-A.exe started directly (T5-faithful process shape); readiness record verified",
+                "label": "LIVE VERIFIED"
+              },
+              {
+                "n": "Transient public 530 window (~90s) during acceptance",
+                "detected": "live phase failure + public probes",
+                "disposition": "contained; self-recovered without worker restart (watchdog sub-threshold restraint, churn avoided); tunnel-transient.json",
+                "label": "LIVE VERIFIED (restraint); watchdog trigger SIMULATED (scripts/bunny-tunnel.test.mjs, 13 tests)"
+              },
+              {
+                "n": "task-approve response not consumable by harness (530 response-kill; then a harmless post-completion re-approve returned a $TSR/Error envelope this harness cannot parse)",
+                "detected": "server-function response parse failure + probe",
+                "disposition": "canonical Host state verified over loopback + public authorized reads; command had applied (event chain 2205-2219); error envelope proven safe and side-effect-free",
+                "label": "LIVE VERIFIED (canonical); harness limitation documented"
+              },
+              {
+                "n": "tunnel-test.mjs crashed on first DNS lookup of the new quick-tunnel hostname (ENOTFOUND race)",
+                "detected": "post-restart publicReady fetch",
+                "disposition": "restart-finish.mjs resumed: DNS-retrying readiness (0 retries needed by resume), old-endpoint status, fresh pairing + authenticated read on the new hostname",
+                "label": "LIVE VERIFIED"
+              },
+              {
+                "n": "delayed-check ran ~12s before its own 80s threshold",
+                "detected": "assertion guard",
+                "disposition": "re-ran after threshold; no delayed child mutation",
+                "label": "LIVE VERIFIED"
+              },
+              {
+                "n": "playwright default browser build absent (headless-shell-1243)",
+                "detected": "launch error",
+                "disposition": "channel:'chrome' (installed Chrome); mobile emulation identical",
+                "label": "LIVE VERIFIED"
+              },
+              {
+                "n": "paired credential files consumed by preserve.mjs before evidence-completions ran",
+                "detected": "ENOENT client.json",
+                "disposition": "browser-storage audit performed unpaired + authorized-session facts carried from pairing.json/phone-layout.json (live at pairing time)",
+                "label": "LIVE VERIFIED"
+              },
+              {
+                "n": "/state recent-events window scrolled past the acceptance task event chain",
+                "detected": "missing events in later snapshot",
+                "disposition": "event timestamps derived from host.sqlite sequences 2211/2218 (canonical in remote-task.json); readOnly snapshot",
+                "label": "LIVE VERIFIED"
+              },
+              {
+                "n": "origin URL rotated when the tunnel restarted (quick-tunnel behavior)",
+                "detected": "tunnel-restart.json",
+                "disposition": "expected; authorization re-proven via fresh pairing on the new hostname; hostname change grants no authority",
+                "label": "LIVE VERIFIED"
+              }
+            ],
+            "t6OriginalBlockersRecorded": [
+              "Repeated real public Cloudflare HTTP 530 / Error 1033",
+              "Public revocation/stale-session responses and final Mission rendering unavailable",
+              "Physical Android installation and pairing unverified"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "reviewSha256": "2ac061dda6f07d86236c1c648ec738d363cb9b701e148b17c7755d5653f57d3a",
+  "priorReviewImmutable": true
+}

@@ -1,0 +1,60 @@
+✔ IR-H1 real TaskManager Stop: inspection-failure (850.8521ms)
+✔ IR-H1 real TaskManager Stop: reuse (867.9984ms)
+✖ IR-H1 real TaskManager Stop: positive (782.359ms)
+✔ IR-H1 real TaskManager Stop: before-failure (831.2348ms)
+✔ IR-H1 real TaskManager Stop: unknown-birth (857.7455ms)
+✔ IR-H1 real TaskManager Stop: image-change (794.7853ms)
+✔ IR-H1 real TaskManager Stop: final-failure (844.7938ms)
+✔ IR-H1 real TaskManager Stop: kill-failure (826.6793ms)
+✔ IR-H1 real TaskManager Stop: native-reuse (822.7932ms)
+✔ IR-H1 birth time and current image are mandatory for PID identity (0.9215ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 9
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7589.6861
+
+✖ failing tests:
+
+test at src\lib\bunny-host\stop-ownership.test.ts:9:3
+✖ IR-H1 real TaskManager Stop: positive (782.359ms)
+  Error: Command failed: c:\Program Files\nodejs\node.exe --experimental-strip-types --experimental-test-module-mocks C:\Users\allam\Documents\new\bun-router\src\lib\bunny-host\fixtures\stop-ownership.mjs positive
+  (node:8048) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+  (Use `node --trace-warnings ...` to show where the warning was created)
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'cleanup_incomplete'
+  - 'complete'
+  
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/fixtures/stop-ownership.mjs:55:128 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'cleanup_incomplete',
+    expected: 'complete',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v24.18.0
+  
+      at genericNodeError (node:internal/errors:985:15)
+      at wrappedFn (node:internal/errors:539:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:509:28)
+      at maybeClose (node:internal/child_process:1124:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:306:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'c:\\Program Files\\nodejs\\node.exe --experimental-strip-types --experimental-test-module-mocks C:\\Users\\allam\\Documents\\new\\bun-router\\src\\lib\\bunny-host\\fixtures\\stop-ownership.mjs positive',
+    stdout: '',
+    stderr: "(node:8048) ExperimentalWarning: Module mocking is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\nnode:internal/modules/run_main:107\r\n    triggerUncaughtException(\r\n    ^\r\n\r\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\r\n+ actual - expected\r\n\r\n+ 'cleanup_incomplete'\r\n- 'complete'\r\n\r\n    at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/fixtures/stop-ownership.mjs:55:128 {\r\n  generatedMessage: true,\r\n  code: 'ERR_ASSERTION',\r\n  actual: 'cleanup_incomplete',\r\n  expected: 'complete',\r\n  operator: 'strictEqual',\r\n  diff: 'simple'\r\n}\r\n\r\nNode.js v24.18.0\r\n"
+  }

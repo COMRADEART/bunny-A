@@ -1,4 +1,18 @@
-<!-- T10 current record start -->
+<!-- R1 approval checkpoint start -->
+## Final remediation R1 — current review handoff checkpoint
+
+**Not ready for final operational re-review yet: production activation requires explicit human authorization.** Current remediation verdict is **BUNNY_MA2_FINAL_REMEDIATION_R1_FAIL** solely because required promotion/production acceptance are outstanding. Previous `MA2_FINAL_INDEPENDENT_REVIEW.md` returned **BUNNY_MA2_OPERATIONAL_FAIL** and remains byte-identical; its SHA is recorded in the R1 baseline.
+
+Review [MA2_FINAL_REMEDIATION_R1.md](MA2_FINAL_REMEDIATION_R1.md) and `test-results/ma2-final-remediation-r1/evidence/index.json`. B1 evidence reaches old real TaskManager Stop, intercepts stale PID selection before editing, then verifies nine repaired installed-artifact cases plus identity test. The fix fails closed on unavailable fresh inspection, records unresolved cleanup and terminates only a current corroborated held lifetime. Existing Git Job Object isolation tests pass unchanged.
+
+Candidate **v26-MA2-R1** source `8001d51d871f12c15b8de03005a40e9d4c3fd8c2`, tooling `0d3f96db093b2106ebab90e0249ae7b1e711aee9`; manifest `06836b4847824edcbfa4c1628b4e0106c5ccded24a8d9361355003f467339e54`, ZIP `3e68faed3e1d9ae75d1d3f2140c831e8843fc914ea7dc179e78c81445f7fbac3`. All six repairs, exact Git/installed/ZIP bytes and import closure verify. Full current regression **664 (254 + 373 + 37)** passes with no security skips/deletions; typecheck/lint/build/package pass. Installed stage SSE, active authority rollback refusal, hard crash, native bounded approval/target lifecycle and real UI reload/render checks pass. Known resolved fixture/tool issues remain in `failure-ledger.json`.
+
+Production remains **v17-T6**. Fresh consistent private backup and read-only preservation/idle facts are in `pre-activation/`; Phone companion and revoked devices remain unchanged. Cleanup has zero Calculator windows and no stage authority/runtime. The separate user-owned npm development Host is preserved; unknown launch intent and exact running cwd remain qualified.
+
+After explicit authorization, require actual activation identity, immediate pre/post canonical preservation, production SSE/T9/T9R/IR-H1 acceptance, active repaired rollback tooling, retired unsafe historical operational guidance and final cleanup before handing off to a **new independent reviewer/session**. Staged proof must never be substituted for the operating production bytes. That reviewer alone may issue an M-A-2 operational verdict. Earlier gate records below are historical.
+<!-- R1 approval checkpoint end -->
+
+<!-- T10 historical record start -->
 > Current T10 status (2026-10-06/07 UTC): **BUNNY_MA2_T10_PASS**, implementation-side **MIXED** audit. Final staged candidate **v25-T10**; production remains **v17-T6**. Three HIGH defects were repaired in the candidate; production remains older and is not certified by this result. Full regression **654 (254 + 363 + 37), zero failures/skips**. No independent review or operational approval issued.
 
 ## Final T10 candidate and independent-review handoff

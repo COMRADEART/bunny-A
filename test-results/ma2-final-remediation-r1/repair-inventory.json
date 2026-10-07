@@ -1,0 +1,179 @@
+{
+  "recordedAt": "2026-10-07T03:01:32.402Z",
+  "classification": "STATIC VERIFIED",
+  "sourceCommit": "8001d51d871f12c15b8de03005a40e9d4c3fd8c2",
+  "toolingCommit": "0d3f96db093b2106ebab90e0249ae7b1e711aee9",
+  "repairs": [
+    {
+      "name": "SSE revocation",
+      "sourceCommit": "738f05b25609f45001ba760ed3f21ba5e92aa571",
+      "files": [
+        "src/lib/bunny-host/http.server.ts"
+      ],
+      "tests": [
+        "src/lib/bunny-host/ma2-t10.test.ts"
+      ],
+      "candidatePresence": true,
+      "productionPresenceBeforeActivation": false,
+      "identities": [
+        {
+          "path": "src/lib/bunny-host/http.server.ts",
+          "candidateSha256": "db5e1d80d9e33812c217d58d4bb6500282df811c14bf864c81b323bd30fc8d6d",
+          "productionBeforeSha256": "a223181f8a69f31324a1b5327cc5637011ed571fbd870744014b927e8d6b0de0",
+          "exactBlobVerified": true
+        }
+      ]
+    },
+    {
+      "name": "rollback quiescence",
+      "sourceCommit": "99ffbdd20455d56d64666adf9ad1c427df269ae4",
+      "files": [
+        "scripts/bunny-rollback-preflight.mjs",
+        "scripts/install-bunny-release.ps1"
+      ],
+      "tests": [
+        "scripts/bunny-rollback-preflight.test.mjs"
+      ],
+      "candidatePresence": true,
+      "productionPresenceBeforeActivation": false,
+      "identities": [
+        {
+          "path": "scripts/bunny-rollback-preflight.mjs",
+          "candidateSha256": "4beaef2595d43451e8c3e7054c690b65473638d88d3ce5b9554c15a4aa584f69",
+          "productionBeforeSha256": null,
+          "exactBlobVerified": true
+        },
+        {
+          "path": "scripts/install-bunny-release.ps1",
+          "candidateSha256": "466a6df19216c5df98ded65dd7d5cdf544a7c6bfa0e60a428abdf6f79e09aedb",
+          "productionBeforeSha256": "033736efa8d0b3e8dbddde1d5e73d589d0c84ee4f0e2d9886df9bf6b8311c516",
+          "exactBlobVerified": true
+        }
+      ]
+    },
+    {
+      "name": "restart approval invalidation",
+      "sourceCommit": "4f977c8071be17a7807a6c0b6f072f8f17cd4d4d",
+      "files": [
+        "src/lib/bunny-missions/manager.server.ts"
+      ],
+      "tests": [
+        "src/lib/bunny-missions/missions.test.ts"
+      ],
+      "candidatePresence": true,
+      "productionPresenceBeforeActivation": false,
+      "identities": [
+        {
+          "path": "src/lib/bunny-missions/manager.server.ts",
+          "candidateSha256": "4d55541fda7fb94cf5429b8aa77814ed69f18b0cb4d0127a6c720bb4d453f2c2",
+          "productionBeforeSha256": "0ceb15e9d9688c22f0b6455fa55392f6a159cf81978f2c5b3bf9b7688bce4539",
+          "exactBlobVerified": true
+        }
+      ]
+    },
+    {
+      "name": "T9 bounded approval",
+      "sourceCommit": "445beebf8c9d951066dd0bddb1b066820762a912",
+      "files": [
+        "src/lib/bunny-missions/batches.server.ts",
+        "src/lib/bunny-missions/authorization.server.ts",
+        "src/lib/bunny-missions/capabilities/bus.server.ts"
+      ],
+      "tests": [
+        "src/lib/bunny-missions/approval-batches.test.ts"
+      ],
+      "candidatePresence": true,
+      "productionPresenceBeforeActivation": false,
+      "identities": [
+        {
+          "path": "src/lib/bunny-missions/batches.server.ts",
+          "candidateSha256": "8769d44cfc56fb4d425192c701750256b35688e64a3de74275f269a69cb68b7b",
+          "productionBeforeSha256": null,
+          "exactBlobVerified": true
+        },
+        {
+          "path": "src/lib/bunny-missions/authorization.server.ts",
+          "candidateSha256": "a3fb006624ad81172efa8066668e7a7a0b7aa38c679d5b3d43b399bb926061ee",
+          "productionBeforeSha256": "a3fb006624ad81172efa8066668e7a7a0b7aa38c679d5b3d43b399bb926061ee",
+          "exactBlobVerified": true
+        },
+        {
+          "path": "src/lib/bunny-missions/capabilities/bus.server.ts",
+          "candidateSha256": "5f7392f995e3519188fb317bc721d94bd2dc5becb4f84f01da99013c7be2ad30",
+          "productionBeforeSha256": "2fc57599158a7d348801718bc0d5aa3fd802349864fb54f282e91ee42fbf9250",
+          "exactBlobVerified": true
+        }
+      ]
+    },
+    {
+      "name": "T9R target lifecycle",
+      "sourceCommit": "b6caa93d0b4d80417c8adb690ce3e85a140909c4",
+      "files": [
+        "src/lib/bunny-missions/capabilities/calculator-targets.server.ts",
+        "src/lib/bunny-missions/capabilities/computer.server.ts"
+      ],
+      "tests": [
+        "src/lib/bunny-missions/calculator-targets.test.ts"
+      ],
+      "candidatePresence": true,
+      "productionPresenceBeforeActivation": false,
+      "identities": [
+        {
+          "path": "src/lib/bunny-missions/capabilities/calculator-targets.server.ts",
+          "candidateSha256": "904b850bc77c44fdf302efc9d77c078e8488a491dc67f8bc82ff4e3c94b07f3f",
+          "productionBeforeSha256": null,
+          "exactBlobVerified": true
+        },
+        {
+          "path": "src/lib/bunny-missions/capabilities/computer.server.ts",
+          "candidateSha256": "69aef91bcde0090437173e5f11a458624fbc1b2639f884032ae2bb2cc3f6cbba",
+          "productionBeforeSha256": "2c3dc76514d30e433a4ac7825d68bd1b7e78e01c803ddac962bd024813331c05",
+          "exactBlobVerified": true
+        }
+      ]
+    },
+    {
+      "name": "IR-H1",
+      "sourceCommit": "8001d51d871f12c15b8de03005a40e9d4c3fd8c2",
+      "files": [
+        "src/lib/bunny-host/manager.server.ts",
+        "src/lib/bunny-host/process-tree.server.ts",
+        "src/lib/bunny-host/owned-process-group.server.ts",
+        "native/bunny-owned-process.c"
+      ],
+      "tests": [
+        "src/lib/bunny-host/stop-ownership.test.ts",
+        "scripts/ir-h1-stop-fixture.mjs"
+      ],
+      "candidatePresence": true,
+      "productionPresenceBeforeActivation": false,
+      "identities": [
+        {
+          "path": "src/lib/bunny-host/manager.server.ts",
+          "candidateSha256": "27d16bc1564ec1a67e609bc10f052d7624910922d2b33559fcd6f6db60224d75",
+          "productionBeforeSha256": "74829051a4c64d6f8f3c11b7b9019dad902a8302de05a7c0a4d9a00c84e7d809",
+          "exactBlobVerified": true
+        },
+        {
+          "path": "src/lib/bunny-host/process-tree.server.ts",
+          "candidateSha256": "a5b1e1c7e8d20ca65941103ca300140fa3e494ae80c8c6cd9aaf3d5b612bc623",
+          "productionBeforeSha256": "0348a58755ef190ee12292f41161e9c12122f7a5f98a30f2648311e191f237d8",
+          "exactBlobVerified": true
+        },
+        {
+          "path": "src/lib/bunny-host/owned-process-group.server.ts",
+          "candidateSha256": "aeac5e35a25f8c169c559c7aec0b22a3206b63305ab4821f4d5c9cccf7a4bd85",
+          "productionBeforeSha256": "9f7d94eadbf874c0364f10912b2a2bec9aa327e5d0cea59ad89ea5fbf8c9b505",
+          "exactBlobVerified": true
+        },
+        {
+          "path": "native/bunny-owned-process.c",
+          "candidateSha256": "48022a425582aac5ce8a2657525152875df8e3143158198fbd92753e0f4b9706",
+          "productionBeforeSha256": "da794168deed12b37a0f0e090f2566e0dc1894037de9a9142a4f48f4430a239c",
+          "exactBlobVerified": true
+        }
+      ]
+    }
+  ],
+  "allRepairsInSingleCandidate": true
+}
