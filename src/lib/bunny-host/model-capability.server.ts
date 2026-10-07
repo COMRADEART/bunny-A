@@ -58,8 +58,8 @@ export type ModelCapabilityProviderSnapshot = {
 };
 export type ModelCapabilitySnapshot = { version: 1; providers: ModelCapabilityProviderSnapshot[] };
 
-/** Providers whose real probe contracts can list models today. Claude Code reports its model only inside sessions; the detect-only providers (OpenCode/Cline/Cursor) are never routed. Absence of rows for those is UNKNOWN, not evidence of emptiness. */
-const MODEL_SOURCE_PROVIDERS: ProviderId[] = ["ollama", "codex"];
+/** Providers whose real probe contracts can list models today. Claude Code reports its model only inside sessions; the detect-only providers (OpenCode/Cline/Cursor) are never routed. Absence of rows for those is UNKNOWN, not evidence of emptiness. (Exported for the T3 router: one source of truth for which providers surface model catalogues.) */
+export const MODEL_SOURCE_PROVIDERS: ProviderId[] = ["ollama", "codex"];
 /** The known provider set, in registry display order. */
 export const MODEL_CAPABILITY_PROVIDERS: ProviderId[] = ["ollama", "codex", "claude", "opencode", "cline", "cursor"];
 

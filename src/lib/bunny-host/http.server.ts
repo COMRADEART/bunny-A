@@ -25,9 +25,12 @@ function provider(value: unknown): ProviderId {if(!PROVIDERS.includes(value as P
 export function validateConstraints(value: unknown): TaskConstraints {
   if(value===undefined) return {};
   const input=record(value);const output:TaskConstraints={};
-  for(const key of ["localOnly","offlineOnly","requiresFilesystem","requiresTerminal","requiresGit","requiresGPU"] as const) if(input[key]!==undefined) {if(typeof input[key]!=="boolean") throw new Error("Invalid constraint.");output[key]=input[key];}
+  for(const key of ["localOnly","offlineOnly","requiresFilesystem","requiresTerminal","requiresGit","requiresGPU","cloudOnly","privacyLocal"] as const) if(input[key]!==undefined) {if(typeof input[key]!=="boolean") throw new Error("Invalid constraint.");output[key]=input[key];}
   if(input.workingDirectory!==undefined) output.workingDirectory=text(input.workingDirectory,2000);
   for(const key of ["providerAllowlist","providerDenylist"] as const) if(input[key]!==undefined) {if(!Array.isArray(input[key]) || input[key].length>6) throw new Error("Invalid provider constraint.");output[key]=input[key].map(provider);}
+  // M-A-3 T3 §27 model-level user constraints; exact pins are honored only where a real model surface exists (§9).
+  if(input.modelExact!==undefined) output.modelExact=text(input.modelExact,200);
+  if(input.modelAllowlist!==undefined) {if(!Array.isArray(input.modelAllowlist) || input.modelAllowlist.length>6 || input.modelAllowlist.some(entry=>typeof entry!=="string" || !entry.trim() || entry.length>200)) throw new Error("Invalid model constraint.");output.modelAllowlist=input.modelAllowlist.map(entry=>String(entry));}
   if(input.maxRuntimeMs!==undefined) {if(!Number.isInteger(input.maxRuntimeMs) || Number(input.maxRuntimeMs)<1000 || Number(input.maxRuntimeMs)>3600000) throw new Error("Runtime must be 1–3600 seconds.");output.maxRuntimeMs=Number(input.maxRuntimeMs);}
   for(const key of Object.keys(input)) if(!(key in output)) throw new Error(`Unsupported constraint: ${key}`);
   return output;
@@ -37,7 +40,8 @@ export function validateSubmit(value: unknown) {
   if(!["fast","balanced","deep"].includes(String(mode))) throw new Error("Unknown routing mode.");
   const projectId=input.projectId==null ? null : text(input.projectId,200);
   const override=input.override===undefined || input.override === "auto" ? "auto" as const : provider(input.override);
-  return {prompt:text(input.prompt),mode:mode as Mode,projectId,override,constraints:validateConstraints(input.constraints),verify:validateVerifySpec(input.verify)};
+  const modelOverride=input.modelOverride==null ? null : text(input.modelOverride,200);
+  return {prompt:text(input.prompt),mode:mode as Mode,projectId,override,modelOverride,constraints:validateConstraints(input.constraints),verify:validateVerifySpec(input.verify)};
 }
 /** Counts failures only, in a fixed window that blocked requests never extend, and clears on success. */
 export class FailureLimiter {
@@ -157,7 +161,7 @@ export async function startHost(options: { dataDirectory?: string; root?: string
         case "submit": task=manager.submit(validateSubmit(data));break;
         case "approve": task=manager.approve(text(data.id,200),local ? "workstation" : `device:${device!.id}`);break;
         case "stop": task=await manager.stop(text(data.id,200));break;
-        case "retarget": task=missions.retargetTask(text(data.id,200),provider(data.provider));break;
+        case "retarget": task=missions.retargetTask(text(data.id,200),provider(data.provider),data.modelOverride==null ? null : text(data.modelOverride,200));break;
         case "discover": await manager.discover();break;
         case "session.get": session=manager.getSession(text(data.id,200));break;
         case "input": case "session.input": await manager.sendInput(text(data.id,200),text(data.input,100000));break;

@@ -10,10 +10,13 @@ import {
   thermalReadingFor,
   verifiedFile,
   conflictsWithLocalOnly,
+  PROVIDER_DEFAULT_MODEL,
+  routingFacts,
 } from "./ui-model.ts";
-import type { HostSample, OrchTask, TaskProgress } from "../../lib/orch/types.ts";
+import type { HostSample, OrchTask, RouteDecision, TaskProgress } from "../../lib/orch/types.ts";
 
 const task = (fields: Partial<OrchTask>) => fields as OrchTask;
+const decision = (fields: object) => fields as unknown as RouteDecision;
 const sample = (at: number, temperatureC: number | null = null): HostSample => ({
   at,
   cpu: { utilization: null, clockMhz: null, temperatureC },
@@ -117,4 +120,48 @@ test("a file claim requires independent Host verification; prose never creates a
     verifiedFile(task({ ...fields, verification: { passed: true, detail: "Disk check" } })),
     { name: "result.txt", folder: "C:\\Projects\\bunny", path: "C:\\Projects\\bunny\\result.txt" },
   );
+});
+test("routing facts show auto/manual, provider defaults and candidate counts without inventing availability", () => {
+  // A T3-engaged AUTO task: exact model Unknown when the pick is the provider default.
+  assert.deepEqual(
+    routingFacts(
+      task({
+        routingMode: "auto",
+        model: "auto",
+        effort: null,
+        routingRerouted: false,
+        decision: decision({
+          policy_version: "routing-policy-v1",
+          routing_mode: "auto",
+          candidate_count: 5,
+          eligible_candidate_count: 2,
+          reroutes: 0,
+        }),
+      }),
+    ),
+    {
+      engaged: true,
+      mode: "Auto",
+      model: PROVIDER_DEFAULT_MODEL,
+      effort: null,
+      candidates: "2 eligible of 5 considered",
+      rerouted: false,
+    },
+  );
+  assert.equal(routingFacts(task({ routingMode: "manual", model: "qwen3:8b", decision: decision({ policy_version: "routing-policy-v1", candidate_count: 5, eligible_candidate_count: 2 }) })).mode, "Manual");
+  // Legacy tasks: no policy_version, no routingMode → not engaged, honest "Model unavailable".
+  const legacy = routingFacts(task({ model: "" }));
+  assert.equal(legacy.engaged, false);
+  assert.equal(legacy.mode, null);
+  assert.equal(legacy.candidates, null);
+  assert.equal(legacy.model, "Model unavailable");
+  // A known exact model wins over the default text on both paths.
+  assert.equal(routingFacts(task({ model: "qwen3:8b" })).model, "qwen3:8b");
+  assert.equal(routingFacts(task({ routingMode: "auto", model: "qwen3:8b", decision: decision({ policy_version: "routing-policy-v1" }) })).model, "qwen3:8b");
+});
+test("rerouted reflects live reroute truth; unknown stays unknown for legacy tasks", () => {
+  assert.equal(routingFacts(task({ routingMode: "auto", routingRerouted: true, decision: decision({ policy_version: "routing-policy-v1" }) })).rerouted, true);
+  assert.equal(routingFacts(task({ routingMode: "auto", decision: decision({ policy_version: "routing-policy-v1", reroutes: 3 }) })).rerouted, true);
+  assert.equal(routingFacts(task({ routingMode: "auto", decision: decision({ policy_version: "routing-policy-v1" }) })).rerouted, false);
+  assert.equal(routingFacts(task({})).rerouted, null);
 });

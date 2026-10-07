@@ -2,13 +2,16 @@ import { EventEmitter } from "node:events";
 import { appendFileSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { canTransition } from "../orch/machine.ts";
-import type { OrchTask, Project, ProviderId, ProviderLive, TaskState, HostSample, TaskProgress, TokenUsage, ProcessInfo, ProviderExecutionScope } from "../orch/types.ts";
+import type { Mode, OrchTask, Project, ProviderId, ProviderLive, TaskState, HostSample, TaskProgress, TokenUsage, ProcessInfo, ProviderExecutionScope, TaskConstraints, RouteDecision } from "../orch/types.ts";
 import { HostDatabase } from "./persistence.server.ts";
-import { ModelCapabilityRegistry } from "./model-capability.server.ts";
+import { MODEL_SOURCE_PROVIDERS, ModelCapabilityRegistry } from "./model-capability.server.ts";
 import { bunnyRoute, eligibility, inferredConstraints, runsLocally } from "./router.ts";
 import { defaultAdapters } from "./adapters.server.ts";
-import type { AgentSession, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask } from "./contracts.ts";
+import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask } from "./contracts.ts";
 import { PolicyEngine } from "./learning.server.ts";
+import { classifyRequirements, effortRequirement, type TaskRequirements } from "../orch/router-requirements.ts";
+import { ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, type RoutingDecisionRecord, type RoutingFailureTaxonomy } from "./routing.server.ts";
+import { RoutingDecisionStore } from "./routing-store.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
 import { ProviderUsageService } from "./provider-usage.server.ts";
 import { activityLabel } from "./events.ts";
@@ -28,6 +31,8 @@ export type ManagerOptions = {
   /** Process-table reader, replaceable in tests. */
   processTable?: () => Promise<ProcessInfo[]>;
   containment?: HostContainment;
+  /** M-A-3 T3: test/fixture injection point for the T1 model registry; production builds the real one. */
+  modelRegistry?: ModelCapabilityRegistry;
 };
 
 export class TaskManager {
@@ -38,6 +43,8 @@ export class TaskManager {
   modelCapabilities: ModelCapabilityRegistry;
   /** M-A-3 T2: normalized usage truth. Derives from registry state and Bunny's own counters; probes nothing, owns no store. */
   providerUsage: ProviderUsageService;
+  /** M-A-3 T3: safe persistence for routing decisions and the bounded attempt trail behind them. */
+  routingStore: RoutingDecisionStore;
   bus = new EventEmitter();
   instanceId: string = crypto.randomUUID();
   sessions=new Map<string,RunningSession>();
@@ -65,8 +72,9 @@ export class TaskManager {
     this.policy=new PolicyEngine(db);
     this.adapters=adapters ?? defaultAdapters(()=>this.providerPaths());
     this.registry=new ProviderRegistry(this.adapters,db,options.timing ?? DEFAULT_TIMING);
-    this.modelCapabilities=new ModelCapabilityRegistry(db,{providerPaths:()=>this.providerPaths(),availableProviders:()=>this.adapters.map(adapter=>adapter.id)});
+    this.modelCapabilities=options.modelRegistry ?? new ModelCapabilityRegistry(db,{providerPaths:()=>this.providerPaths(),availableProviders:()=>this.adapters.map(adapter=>adapter.id)});
     this.providerUsage=new ProviderUsageService({providers:()=>this.registry.list(),probed:id=>this.registry.probedThisRun(id),observed:id=>this.db.observed(id),availableProviders:()=>this.adapters.map(adapter=>adapter.id),publish:events=>{for(const event of events) this.emit(this.db.event(event.type,null,event.detail));}});
+    this.routingStore=new RoutingDecisionStore(db);
     this.sessionDirectory=options.sessionDirectory ?? null;
     this.readProcesses=options.processTable ?? processTable;
     const savedThermal=db.db.prepare("SELECT value FROM settings WHERE key='thermal_policy'").get() as {value:string}|undefined;
@@ -163,6 +171,93 @@ export class TaskManager {
     const project={id:crypto.randomUUID(),name:name.trim(),path:root,preferred:"auto" as const};this.db.project(project);this.emit(this.db.event("project.registered",null,`Approved project root: ${project.name}`));return project;
   }
   /**
+   * M-A-3 T3: one deterministic FILTER-then-SCORE candidate pass (§1/§8/§12). It extends — never
+   * replaces — BunnyRouter: the legacy RouteDecision above stays in the task record, and this pass
+   * chooses the provider+model+effort for THIS Task on the same eligibility. Reads registries; writes nothing.
+   */
+  private routingPipeline(input: {routingText: string; mode: Mode; providers: ProviderLive[]; constraints: TaskConstraints; override?: ProviderId | "auto"; modelOverride?: string | null; taskType?: string}) {
+    const requirements=classifyRequirements({prompt:input.routingText,mode:input.mode,constraints:input.constraints});
+    const modelSnapshot=this.modelCapabilities.snapshot();
+    const usage=this.providerUsage.snapshot();
+    const candidates=buildCandidates({providers:input.providers,modelSnapshot,usage,requirements,constraints:input.constraints,override:input.override??"auto",modelOverride:input.modelOverride,mode:input.mode,empirical:provider=>this.db.learned(provider,input.taskType ?? "general")});
+    const selection=selectRoutingCandidate({candidates,requirements});
+    return {requirements,candidates,selection,modelSnapshot,usage};
+  }
+  /** §11: the Task's effort requirement resolved through the provider's real effort contract; null = PROVIDER_DEFAULT. */
+  private nativeEffort(provider: ProviderId,mode: Mode,requirements: TaskRequirements): string | null {
+    const contract=PROVIDER_EFFORT_CONTRACTS[provider];
+    return contract.supported && contract.native ? contract.native[effortRequirement(requirements,mode)] ?? null : null;
+  }
+  /** §19: the safe candidate subset the island view may show — the same list §18 persists, capped at 24. */
+  private pipelineCandidates(pipeline: ReturnType<TaskManager["routingPipeline"]>): NonNullable<RouteDecision["candidates"]> {
+    return pipeline.candidates.slice(0,24).map(candidate=>({provider_id:candidate.provider_id,model_id:candidate.model_id,candidate_kind:candidate.candidate_kind,effort_mode:candidate.effort_internal,eligible:candidate.eligibility==="eligible",exclusion_reasons:candidate.exclusion_reasons,score:candidate.final_score,components:candidate.score_components?.map(component=>({name:component.name,points:component.points}))??null}));
+  }
+  /** §18: the safe record one pipeline pass persists to the store (id set by the caller). */
+  private recordDecision(input: {id: string; taskId: string; missionId: string | null; routingMode: "auto"|"manual"; pipeline: ReturnType<TaskManager["routingPipeline"]>; reroutes?: number; terminalNote?: string}): RoutingDecisionRecord {
+    return safeDecisionRecord({id:input.id,taskId:input.taskId,missionId:input.missionId,routingMode:input.routingMode,requirements:input.pipeline.requirements,candidates:input.pipeline.candidates,selection:input.pipeline.selection,policyVersion:ROUTING_POLICY_VERSION,createdAt:Date.now(),reroutes:input.reroutes,snapshotProviders:input.pipeline.modelSnapshot.providers,usageStatuses:input.pipeline.usage.providers.map(provider=>({provider:provider.providerId,status:provider.status})),terminalNote:input.terminalNote});
+  }
+  /** §5 clarity: the readable reasons a pipeline pass produced no eligible candidate. */
+  private pipelineFailure(pipeline: ReturnType<TaskManager["routingPipeline"]>): string {
+    const reasons=[...new Set(pipeline.candidates.flatMap(candidate=>candidate.eligibility==="excluded"?candidate.exclusion_reasons:[]))].slice(0,4);
+    return reasons.join(" ") || "No candidate satisfied the Task's hard constraints.";
+  }
+  /** §5 honesty for fact-less environments: a listing provider with zero model facts is UNKNOWN, not routed against. */
+  private modelSnapshotHasFacts(modelSnapshot: ReturnType<ModelCapabilityRegistry["snapshot"]>): boolean {
+    return modelSnapshot.providers.some(entry=>MODEL_SOURCE_PROVIDERS.includes(entry.provider) && entry.models.length>0);
+  }
+  /** T3 §17 launch-gate facts for the persisted selection. Cached facts are age-stamped, never launch authority. */
+  private revalidateCandidate(task: OrchTask): {ok:true}|{ok:false;reason:string} {
+    const live=this.live();
+    const provider=live.find(entry=>entry.id===task.provider);
+    if(!provider) return {ok:false,reason:`Provider ${task.provider} is no longer known.`};
+    const check=preLaunchRevalidate({provider_id:task.provider,model_id:task.model==="auto"?null:task.model,candidate_kind:task.model==="auto"?"PROVIDER_DEFAULT":"DISCOVERED_MODEL"},live,this.modelCapabilities.snapshot(),task.constraints??{},Date.now());
+    if(!check.ok) return check;
+    const fresh=codexCompatibilityFresh(provider,Date.now());
+    return fresh.ok ? {ok:true} : {ok:false,reason:fresh.reason ?? "Codex security compatibility evidence is not fresh."};
+  }
+  /** T3 §28/§22: an AUTO reroute walks the recorded fallback order and revalidates each entry; a MANUAL task never reroutes. `exclude` is every already-attempted candidate; largerContext prefers verified-bigger windows after a CONTEXT_OVERFLOW. */
+  private rerouteFromDecision(task: OrchTask,options?: {exclude?: {provider:ProviderId;model:string|null}[];largerContext?: boolean}): {provider:ProviderId;model:string;effort:string|null} | null {
+    const record=task.routingDecisionId ? this.routingStore.decision(task.routingDecisionId) : null;
+    if(!record) return null;
+    // §22 candidate identity: a provider-default selection routes the provider's legacy-recommended
+    // model string, but the default candidate's identity is (provider, null). A provider yields
+    // either DISCOVERED models or a PROVIDER_DEFAULT candidate, never both, so normalizing every
+    // exclude entry for the default-selected provider to model null is exact, never over-broad.
+    const defaultSelected=!!record.selected && record.selected.provider_id===task.provider && record.selected.model_id===null;
+    const normalizeModel=(provider:ProviderId,model:string|null):string|null=>
+      defaultSelected && provider===task.provider && model!==null ? null : (model ?? null);
+    const exclude=options?.exclude ?? [];
+    const attempted=(provider:ProviderId,model:string|null)=>exclude.some(entry=>entry.provider===provider && normalizeModel(entry.provider,entry.model)===(model ?? null));
+    const isCurrent=(provider:ProviderId,model:string|null)=>provider===task.provider && (model ?? null)===normalizeModel(task.provider,task.model);
+    const order=options?.largerContext
+      ? this.orderedByWindow(record.fallback_order)
+      : record.fallback_order;
+    const live=this.live();
+    for(const next of order) {
+      if(isCurrent(next.provider_id,next.model_id) || attempted(next.provider_id,next.model_id)) continue;
+      const check=preLaunchRevalidate({provider_id:next.provider_id,model_id:next.model_id,candidate_kind:next.model_id?"DISCOVERED_MODEL":"PROVIDER_DEFAULT"},live,this.modelCapabilities.snapshot(),task.constraints ?? {},Date.now());
+      if(check.ok) {
+        const provider=live.find(entry=>entry.id===next.provider_id)!;
+        const fresh=codexCompatibilityFresh(provider,Date.now());
+        if(fresh.ok) return {provider:next.provider_id,model:next.model_id??"auto",effort:this.nativeEffort(next.provider_id,task.mode,record.requirements)};
+      }
+    }
+    return null;
+  }
+  /** §22 CONTEXT_OVERFLOW recovery: verified larger context first; unverified windows rank last, honestly. */
+  private orderedByWindow(order: {provider_id:ProviderId;model_id:string|null;score:number}[]): {provider_id:ProviderId;model_id:string|null;score:number}[] {
+    const snapshot=this.modelCapabilities.snapshot();
+    const windowOf=(entry:{provider_id:ProviderId;model_id:string|null})=>{const record=snapshot.providers.find(provider=>provider.provider===entry.provider_id)?.models.find(model=>model.model===entry.model_id);return record && typeof record.contextWindow==="number" ? record.contextWindow : -1;};
+    return [...order].sort((left,right)=>windowOf(right)-windowOf(left));
+  }
+  /** §18/§28: a reroute mutates THE SAME decision record, once, with its reason. */
+  private bumpReroutes(task: OrchTask,reason: string) {
+    if(!task.routingDecisionId) return;
+    const record=this.routingStore.decision(task.routingDecisionId);
+    if(!record) return;
+    try {this.routingStore.saveDecision({...record,reroutes:(record.reroutes ?? 0)+1,terminal_note:reason.slice(0,300)});} catch { /* Evidence only; the task-side record is authoritative. */ }
+  }
+  /**
    * `delegated` is only passed in-process by the MissionManager (never from HTTP input): it links the
    * child task to its mission step and may place it in a Host-owned mission workspace.
    */
@@ -193,17 +288,69 @@ export class TaskManager {
     }
     const live=this.live();const policy=this.policy.active();
     const decision=bunnyRoute({...input,prompt:routingText,providers:live,constraints,policyId:policy.id,learned:id=>this.policy.adjustment(live.find(p=>p.id===id)!,routingText,input.mode,policy)});
-    const task: OrchTask={id:crypto.randomUUID(),...(delegated ? {mission:{missionId:delegated.missionId,stepId:delegated.stepId}} : {}),title:input.prompt.trim().split("\n")[0].slice(0,80),prompt:input.prompt,mode:input.mode,projectId:project?.id ?? null,cwd,state:"queued",provider:decision.recommended_provider,model:decision.recommended_model,decision,manual:!!input.override && input.override!=="auto",createdAt:Date.now(),startedAt:null,finishedAt:null,output:"",error:null,logs:[],pauseSupported:false,sessionId:null,pid:null,exitCode:null,constraints,maxRuntimeMs:constraints.maxRuntimeMs ?? 120000,verify:input.verify ?? null,latestEvent:null,progress:null,usage:null,processTree:null,retries:0};
+    // M-A-3 T3: the dynamic model router extends this decision for THIS Task (§1/§2: no second
+    // router; same eligibility). Facts are read-only inputs. A MANUAL selection outranks routing
+    // (§5) and impossible manual selections fail clearly (§27) — never a silent substitution.
+    const manual=(!!input.override && input.override!=="auto") || !!input.modelOverride;
+    const routingMode:"auto"|"manual"=manual ? "manual" : "auto";
+    const pipeline=this.routingPipeline({routingText,mode:input.mode,providers:live,constraints,override:input.override,modelOverride:input.modelOverride});
+    const selection=pipeline.selection.selected;
+    const routingDecisionId=crypto.randomUUID();
+    let routed:{provider:ProviderId;model:string;effort:string|null};
+    if(selection) {
+      routed={provider:selection.provider_id,model:selection.model_id ?? (selection.provider_id===decision.recommended_provider ? decision.recommended_model : "auto"),effort:selection.effort_native};
+      // §20: the decision record and the launched configuration are the same facts.
+      decision.recommended_provider=routed.provider;decision.recommended_model=routed.model;
+      decision.policy_version=ROUTING_POLICY_VERSION;decision.routing_mode=routingMode;
+      decision.candidate_count=pipeline.candidates.length;decision.eligible_candidate_count=pipeline.selection.order.length;
+      decision.effort_mode=routed.effort;decision.task_requirements=pipeline.requirements;decision.reroutes=0;
+      decision.selection_reason=pipeline.selection.reason;decision.candidates=this.pipelineCandidates(pipeline);
+    } else {
+      // §27: when model facts exist and none satisfy the Task's hard constraints, fail clearly —
+      // including a manual selection whose exact model can no longer be verified. When NO facts
+      // exist, registry absence is UNKNOWN, not an empty world (§8): the legacy BunnyRouter
+      // provider decision stands byte-for-byte — also for a manual PROVIDER override (pre-T3
+      // parity; MA0R2 reaches launch-time refusal tests through it) — no effort knob (§11).
+      if(this.modelSnapshotHasFacts(pipeline.modelSnapshot)) throw new Error(`No eligible model candidate for this Task. ${this.pipelineFailure(pipeline)}`);
+      // Fact-less Host: no effort knob either — effort engages with routing facts; the saved
+      // record below documents the fallback (§5).
+      routed={provider:decision.recommended_provider,model:decision.recommended_model,effort:null};
+    }
+    const task: OrchTask={id:crypto.randomUUID(),...(delegated ? {mission:{missionId:delegated.missionId,stepId:delegated.stepId}} : {}),title:input.prompt.trim().split("\n")[0].slice(0,80),prompt:input.prompt,mode:input.mode,projectId:project?.id ?? null,cwd,state:"queued",provider:routed.provider,model:routed.model,decision,manual,createdAt:Date.now(),startedAt:null,finishedAt:null,output:"",error:null,logs:[],pauseSupported:false,sessionId:null,pid:null,exitCode:null,constraints,maxRuntimeMs:constraints.maxRuntimeMs ?? 120000,verify:input.verify ?? null,latestEvent:null,progress:null,usage:null,processTree:null,retries:0,effort:routed.effort,routingMode,routingRerouted:false,routingDecisionId};
     if(executionScope) task.executionScope=executionScope;
     if(input.routingPrompt!==undefined) task.routingPrompt=input.routingPrompt;
     this.emit(this.db.write(task,"task.created","Task created on Bunny-A Host."));
+    this.routingStore.saveDecision(this.recordDecision({id:routingDecisionId,taskId:task.id,missionId:delegated?.missionId ?? null,routingMode,pipeline,...(selection ? {} : {terminalNote:"No model facts on this Host; BunnyRouter provider decision stands."})}));
+    if(selection) {
+      this.emit(this.db.event("routing.classified",task.id,`Task class ${pipeline.requirements.task_class}; tools ${pipeline.requirements.needs_tools?"required":"not required"}; privacy ${pipeline.requirements.privacy_requirement}.`,task.mission?.missionId ?? null));
+      this.emit(this.db.event("routing.selected",task.id,`Selected ${routed.provider} · ${selection.model_id ? routed.model : "provider default (exact model unknown)"}${routed.effort ? ` · effort ${routed.effort}` : " · provider default effort"} from ${pipeline.selection.order.length} eligible of ${pipeline.candidates.length} candidates.`,task.mission?.missionId ?? null));
+    }
     const routing=this.update(task,{state:"routing"},"routing.started","Routing with readiness and hard constraints.");
     return this.update(routing,{state:"waiting_for_approval",activity:"Waiting for approval"},"approval.required",decision.reason);
   }
-  retarget(id: string,provider: ProviderId) {
+  /** §5/§27: the user's explicit provider (and exact model) selection outranks routing, then the pipeline resolves model+effort on the same eligibility; impossible selections fail clearly. */
+  retarget(id: string,provider: ProviderId,modelOverride?: string | null) {
     const task=this.db.get(id);if(task.state!=="waiting_for_approval") throw new Error("Only pending tasks can be retargeted.");
     const decision=bunnyRoute({prompt:task.routingPrompt ?? task.prompt,mode:task.mode,providers:this.live(),override:provider,constraints:task.constraints,policyId:this.policy.active().id});
-    return this.update(task,{provider,model:decision.recommended_model,decision,manual:true},"routing.completed",`User selected ${provider}.`);
+    const pipeline=this.routingPipeline({routingText:task.routingPrompt ?? task.prompt,mode:task.mode,providers:this.live(),constraints:task.constraints ?? {},override:provider,modelOverride});
+    const selection=pipeline.selection.selected;
+    const routingDecisionId=task.routingDecisionId ?? crypto.randomUUID();
+    let routed:{model:string;effort:string|null};
+    if(selection) {
+      routed={model:selection.model_id ?? decision.recommended_model,effort:selection.effort_native};
+      decision.recommended_provider=selection.provider_id;decision.recommended_model=routed.model;
+      decision.policy_version=ROUTING_POLICY_VERSION;decision.routing_mode="manual";
+      decision.candidate_count=pipeline.candidates.length;decision.eligible_candidate_count=pipeline.selection.order.length;
+      decision.effort_mode=routed.effort;decision.task_requirements=pipeline.requirements;decision.reroutes=decision.reroutes ?? 0;
+      decision.selection_reason=pipeline.selection.reason;decision.candidates=this.pipelineCandidates(pipeline);
+    } else if(!this.modelSnapshotHasFacts(pipeline.modelSnapshot)) {
+      // Fact-less Host: the explicit provider stands with the legacy model surface (UNKNOWN, not emptiness).
+      routed={model:decision.recommended_model,effort:null};
+    } else {
+      throw new Error(`No eligible model candidate on ${provider}.${modelOverride ? ` The exact model ${modelOverride} could not be honored.` : ""} ${this.pipelineFailure(pipeline)}`);
+    }
+    this.routingStore.saveDecision(this.recordDecision({id:routingDecisionId,taskId:task.id,missionId:task.mission?.missionId ?? null,routingMode:"manual",pipeline,...(selection ? {} : {terminalNote:"No model facts on this Host; BunnyRouter provider decision stands."})}));
+    return this.update(task,{provider,model:routed.model,...(routed.effort ? {effort:routed.effort} : {effort:null}),decision,manual:true,routingMode:"manual",routingDecisionId},"routing.completed",`User selected ${provider}${routed.model && routed.model!=="auto" ? ` · ${routed.model}` : " · provider default (exact model unknown)"}.`);
   }
   /** Appends raw provider output to the Host's private transcript for this task. */
   transcript(id: string) {
@@ -238,10 +385,29 @@ export class TaskManager {
     if(task.mission && !task.executionScope) throw new Error("Legacy mission child has no provider execution authority; replan and approve the mission again.");
     if(task.mission) { const outside=this.missionScopeCheck ? this.missionScopeCheck(task) : "mission scope validator is unavailable"; if(outside) throw new Error(`Outside mission execution scope: ${outside}`); }
     if(task.executionScope && !["read","write"].includes(task.executionScope.access)) throw new Error("Invalid provider execution authority.");
-    const provider=this.live().find(p=>p.id===task.provider);if(!provider) throw new Error("Executor is no longer eligible. Route again.");
-    const blocked=eligibility(provider,task.constraints ?? {});if(blocked) throw new Error(`Executor is no longer eligible: ${blocked} Route again.`);
-    if((task.constraints?.localOnly || task.constraints?.offlineOnly) && !runsLocally(provider,task.model)) throw new Error(`Executor is no longer eligible: ${task.model} is not local inference and this task is local-only. Route again.`);
-    const adapter=this.adapters.find(a=>a.id===task.provider);if(!adapter) throw new Error("Adapter unsupported.");
+    const preProvider=this.live().find(p=>p.id===task.provider);if(!preProvider) throw new Error("Executor is no longer eligible. Route again.");
+    const blocked=eligibility(preProvider,task.constraints ?? {});if(blocked) throw new Error(`Executor is no longer eligible: ${blocked} Route again.`);
+    if((task.constraints?.localOnly || task.constraints?.offlineOnly) && !runsLocally(preProvider,task.model)) throw new Error(`Executor is no longer eligible: ${task.model} is not local inference and this task is local-only. Route again.`);
+    // M-A-3 T3 §17/§20: cached discovery is not launch authority. Only pipeline-engaged tasks
+    // revalidate here; the pre-T3 legacy path (fact-less fallback) keeps its exact behavior.
+    // MANUAL selections fail clearly (§27); AUTO reroutes within the recorded fallback order (§28).
+    const engagedTask=this.db.get(id);
+    if(engagedTask.decision?.policy_version) {
+      const preflight=this.revalidateCandidate(engagedTask);
+      if(!preflight.ok) {
+        this.emit(this.db.event("routing.revalidated",id,`Launch revalidation failed: ${preflight.reason}`));
+        if(engagedTask.routingMode==="manual") throw new Error(`The selected ${engagedTask.provider} ${engagedTask.model==="auto"?"provider default":`model ${engagedTask.model}`} is unavailable: ${preflight.reason} Route again.`);
+        const alternate=this.rerouteFromDecision(engagedTask,{exclude:[{provider:engagedTask.provider,model:engagedTask.model==="auto"?null:engagedTask.model}]});
+        if(!alternate) throw new Error(`No eligible model is available: ${preflight.reason} Route again.`);
+        const label=`${alternate.provider}${alternate.model && alternate.model!=="auto" ? ` · ${alternate.model}` : " · provider default"}`;
+        this.bumpReroutes(engagedTask,`Rerouted to ${label}: ${preflight.reason}`);
+        this.update(engagedTask,{provider:alternate.provider,model:alternate.model,...(alternate.effort ? {effort:alternate.effort} : {effort:null}),routingRerouted:true,decision:{...engagedTask.decision,recommended_provider:alternate.provider,recommended_model:alternate.model,reroutes:(engagedTask.decision.reroutes ?? 0)+1}},"routing.rerouted",`Launch revalidation failed (${preflight.reason}); re-routed to ${label}.`);
+      } else {
+        this.emit(this.db.event("routing.revalidated",id,`Launch revalidation passed for ${engagedTask.provider}${engagedTask.model==="auto" ? " · provider default" : ` · ${engagedTask.model}`}.`));
+      }
+    }
+    const provider=this.live().find(p=>p.id===this.db.get(id).provider);if(!provider) throw new Error("Executor is no longer eligible. Route again.");
+    const adapter=this.adapters.find(a=>a.id===provider.id);if(!adapter) throw new Error("Adapter unsupported.");
     if(!task.cwd || realpathSync(task.cwd)!==task.cwd || !statSync(task.cwd).isDirectory()) throw new Error("Execution root changed or is unavailable.");
     const accepted=this.update(task,{state:"launching",startedAt:Date.now(),activity:"Starting",...(approval.kind==="mission" ? {approval} : {})},approvalEvent,approvalDetail);
     const launching=this.update(accepted,{latestEvent:this.activity(accepted,"agent.starting",`${provider.name} starting in ${task.cwd}.`),progress:{kind:"indeterminate"}},"agent.starting",`${provider.name} starting in ${task.cwd}.`);
@@ -257,6 +423,61 @@ export class TaskManager {
     };
     this.flushers.set(id,flush);
     const record=this.transcript(id);
+    // M-A-3 T3 §22: one hooks object shared by the initial launch and every relaunch; each
+    // handler re-reads the live task record, so provider/model reroutes flow through unrebound.
+    const adapterHooks: AdapterHooks = {
+      event:(type,detail)=>{
+        // Output that arrived first is written first, so the latest activity is really the latest.
+        flush();
+        const current=this.db.get(id);if(TERMINAL.includes(current.state) || this.stopping.has(id)) return;
+        const progress=pendingProgress;pendingProgress=null;
+        const visible=type.startsWith("agent.");
+        this.update(current,{activity:activityLabel(type),...(visible ? {latestEvent:this.activity(current,type,detail)} : {}),...(progress ? {progress} : {})},type,detail);
+      },
+      session:(sessionId,pid)=>{
+        // Providers repeat their session id on every message; only a new id or PID is recorded.
+        const current=this.db.get(id);if((sessionId ?? current.sessionId)===current.sessionId && (pid ?? current.pid)===current.pid) return;
+        this.update(current,{sessionId:sessionId ?? current.sessionId,pid:pid ?? current.pid},"session.recorded",`Provider session ${sessionId ?? current.sessionId ?? "pending"}; PID ${pid ?? current.pid ?? "none"}.`);if(pid) this.watchTree(id);
+      },
+      model:model=>{const current=this.db.get(id);if(current.model!==model) this.update(current,{model},"executor.model",`Provider reported model ${model}.`);},
+      output:text=>{pending+=text;if(pending.length>2_000_000) pending=pending.slice(-2_000_000);flushTimer??=setTimeout(this.containment.guard({subsystem:"tasks",taskId:id},flush,error=>this.failOperation(id,error)),300);},
+      progress:progress=>{pendingProgress=progress;},
+      usage:usage=>{reportedUsage=usage;},
+      rateLimits:(windows,status)=>{
+        this.registry.recordSessionUsage(this.db.get(id).provider,windows,status);
+        // Session-reported usage is re-derived in the background so the snapshot and events stay in step.
+        this.containment.background({subsystem:"provider-usage",taskId:id},()=>this.providerUsage.refresh());
+      },
+      raw:(stream,text)=>record?.write(stream,text),
+    };
+    let runtimeTimer: ReturnType<typeof setTimeout> | null = null;
+    /** T3 §22/§24: one bounded relaunch — fresh authority snapshot, same hooks, per-attempt runtime budget. Returns null when the target cannot honor the same envelope. */
+    const startSession=(target:{provider:ProviderId;model:string;effort:string|null},options:{detail:string;bumpReroutes:boolean}):RunningSession|null => {
+      try {
+        const current=this.db.get(id);
+        if(TERMINAL.includes(current.state) || this.stopping.has(id)) return null;
+        const targetProvider=this.live().find(p=>p.id===target.provider);if(!targetProvider) return null;
+        const targetBlocked=eligibility(targetProvider,current.constraints ?? {});if(targetBlocked) return null;
+        if((current.constraints?.localOnly || current.constraints?.offlineOnly) && !runsLocally(targetProvider,target.model)) return null;
+        const targetAdapter=this.adapters.find(a=>a.id===target.provider);if(!targetAdapter) return null;
+        const rerouting=current.provider!==target.provider || current.model!==target.model;
+        const retried=this.update(current,{...(current.state==="verifying" ? {state:"running"} : {}),provider:target.provider,model:target.model,...(target.effort ? {effort:target.effort} : {effort:null}),...(rerouting ? {routingRerouted:true,decision:{...current.decision,recommended_provider:target.provider,recommended_model:target.model,reroutes:(current.decision?.reroutes ?? 0)+1}} : {}),latestEvent:this.activity(current,"agent.starting",options.detail)},"routing.retrying",options.detail);
+        if(options.bumpReroutes) this.bumpReroutes(retried,options.detail);
+        if(runtimeTimer) clearTimeout(runtimeTimer);
+        runtimeTimer=setTimeout(()=>this.stopInBackground(id,"Runtime limit reached."),retried.maxRuntimeMs ?? 120000);
+        // Adapters receive a detached, immutable authority snapshot, never the persisted task object.
+        const adapterTask=structuredClone(retried);
+        if(adapterTask.executionScope) Object.freeze(adapterTask.executionScope);
+        if(adapterTask.mission) Object.freeze(adapterTask.mission);
+        Object.freeze(adapterTask);
+        const nextSession=targetAdapter.launch(adapterTask,adapterHooks);
+        this.sessions.set(id,nextSession);
+        return nextSession;
+      } catch(error) {
+        this.emit(this.db.event("routing.retrying",id,`Relaunch on ${target.provider} could not start: ${safeError(error).message}`));
+        return null;
+      }
+    };
     let session:RunningSession;
     try {
       // Adapters receive a detached, immutable authority snapshot, never the persisted task object.
@@ -264,58 +485,83 @@ export class TaskManager {
       if(adapterTask.executionScope) Object.freeze(adapterTask.executionScope);
       if(adapterTask.mission) Object.freeze(adapterTask.mission);
       Object.freeze(adapterTask);
-      session=adapter.launch(adapterTask,{
-        event:(type,detail)=>{
-          // Output that arrived first is written first, so the latest activity is really the latest.
-          flush();
-          const current=this.db.get(id);if(TERMINAL.includes(current.state) || this.stopping.has(id)) return;
-          const progress=pendingProgress;pendingProgress=null;
-          const visible=type.startsWith("agent.");
-          this.update(current,{activity:activityLabel(type),...(visible ? {latestEvent:this.activity(current,type,detail)} : {}),...(progress ? {progress} : {})},type,detail);
-        },
-        session:(sessionId,pid)=>{
-          // Providers repeat their session id on every message; only a new id or PID is recorded.
-          const current=this.db.get(id);if((sessionId ?? current.sessionId)===current.sessionId && (pid ?? current.pid)===current.pid) return;
-          this.update(current,{sessionId:sessionId ?? current.sessionId,pid:pid ?? current.pid},"session.recorded",`Provider session ${sessionId ?? current.sessionId ?? "pending"}; PID ${pid ?? current.pid ?? "none"}.`);if(pid) this.watchTree(id);
-        },
-        model:model=>{const current=this.db.get(id);if(current.model!==model) this.update(current,{model},"executor.model",`Provider reported model ${model}.`);},
-        output:text=>{pending+=text;if(pending.length>2_000_000) pending=pending.slice(-2_000_000);flushTimer??=setTimeout(this.containment.guard({subsystem:"tasks",taskId:id},flush,error=>this.failOperation(id,error)),300);},
-        progress:progress=>{pendingProgress=progress;},
-        usage:usage=>{reportedUsage=usage;},
-        rateLimits:(windows,status)=>{
-          this.registry.recordSessionUsage(task.provider,windows,status);
-          // Session-reported usage is re-derived in the background so the snapshot and events stay in step.
-          this.containment.background({subsystem:"provider-usage",taskId:task.id},()=>this.providerUsage.refresh());
-        },
-        raw:(stream,text)=>record?.write(stream,text),
-      });
+      session=adapter.launch(adapterTask,adapterHooks);
     } catch(error) {this.flushers.delete(id);const message=safeError(error).message;return this.update(launching,{state:"failed",finishedAt:Date.now(),error:message,latestEvent:this.activity(launching,"agent.failed",message)},"task.failed",message);}
     this.sessions.set(id,session);
     const running=this.update(this.db.get(id),{state:"running",activity:"Running",...(record ? {logs:[...this.db.get(id).logs,{at:Date.now(),line:`Raw session transcript: ${record.path}`}]} : {})},"executor.starting","Execution active. Progress indeterminate until the provider publishes a plan.");
-    const timer=setTimeout(()=>this.stopInBackground(id,"Runtime limit reached."),task.maxRuntimeMs ?? 120000);
+    runtimeTimer=setTimeout(()=>this.stopInBackground(id,"Runtime limit reached."),task.maxRuntimeMs ?? 120000);
     this.containment.background({subsystem:"tasks",taskId:id,...task.mission},async()=>{
       try {
-      const result=await session.done;
-      flush();this.stopTree(id);
-      if(this.stopping.has(id)) return;
-      const current=this.db.get(id);if(TERMINAL.includes(current.state)) return;
-      if(["draining","fatal"].includes(this.containment.health.operationalState)) {await this.failOperation(id,{name:"HostFatal",message:"Host fatal shutdown interrupted this owned task; no session was resumed."});return;}
-      let state:TaskState=result.stopped ? "stopped" : result.ok ? "completed" : "failed";
-      let verification=current.verification ?? null;let error=result.error ?? null;
-      if(state === "completed" && current.verify) {
-        const spec=current.verify;
-        const verifying=this.update(current,{state:"verifying",activity:"Verifying",latestEvent:this.activity(current,"agent.verifying",`Bunny-A is checking ${spec.name} itself.`,"bunny")},"agent.verifying",`Bunny-A is independently verifying ${spec.name}.`);
-        verification=await verifySpec(verifying,spec);
-        this.update(this.db.get(id),{verification},"verification.completed",verification.detail);
-        if(!verification.passed) {state="failed";error=`Bunny-A verification failed: ${verification.detail}`;}
+      // M-A-3 T3 §22/§23/§24: bounded, taxonomy-driven recovery around the SAME state machine.
+      // Terminal states never recover; MANUAL selections never reroute (§5); every bound is
+      // RECOVERY_BOUNDS. The failed transition stays deferred while an attempt still stands.
+      let attempt=0;let sameRetries=0;let alternates=0;let escalations=0;
+      const attempted:{provider_id:ProviderId;model_id:string|null;taxonomy:RoutingFailureTaxonomy}[]=[];
+      for(;;) {
+        const result=await session.done;
+        flush();this.stopTree(id);
+        if(this.stopping.has(id)) return;
+        const current=this.db.get(id);if(TERMINAL.includes(current.state)) return;
+        if(["draining","fatal"].includes(this.containment.health.operationalState)) {await this.failOperation(id,{name:"HostFatal",message:"Host fatal shutdown interrupted this owned task; no session was resumed."});return;}
+        let state:TaskState=result.stopped ? "stopped" : result.ok ? "completed" : "failed";
+        let verification=current.verification ?? null;let error=result.error ?? null;
+        if(state === "completed" && current.verify) {
+          const spec=current.verify;
+          const verifying=this.update(current,{state:"verifying",activity:"Verifying",latestEvent:this.activity(current,"agent.verifying",`Bunny-A is checking ${spec.name} itself.`,"bunny")},"agent.verifying",`Bunny-A is independently verifying ${spec.name}.`);
+          verification=await verifySpec(verifying,spec);
+          this.update(this.db.get(id),{verification},"verification.completed",verification.detail);
+          if(!verification.passed) {state="failed";error=`Bunny-A verification failed: ${verification.detail}`;}
+        }
+        const latest=this.db.get(id);if(TERMINAL.includes(latest.state) || this.stopping.has(id)) return;
+        if(["draining","fatal"].includes(this.containment.health.operationalState)) {await this.failOperation(id,{name:"HostFatal",message:"Host fatal shutdown interrupted verification; no success was recorded."});return;}
+        let detail=state === "completed" ? (verification ? `Completed and verified by Bunny-A: ${verification.detail}` : "Provider process completed; no independent verification was requested.") : error ?? `Provider process ${state}.`;
+        if(state === "failed") {
+          const verificationFailed=verification!=null && !verification.passed && (error ?? "").startsWith("Bunny-A verification failed:");
+          const taxonomy=classifyFailure({error,stopped:result.stopped,exitCode:result.exitCode,verificationFailed});
+          attempted.push({provider_id:current.provider,model_id:current.model==="auto"?null:current.model,taxonomy});
+          try {this.routingStore.saveAttempt({id:crypto.randomUUID(),decisionId:current.routingDecisionId ?? `direct-${current.id.slice(0,8)}`,taskId:current.id,attemptIndex:attempt,provider:current.provider,model:current.model==="auto"?null:current.model,effort:current.effort ?? null,taxonomy,detail:(error ?? "").slice(0,300),createdAt:Date.now()});} catch { /* Evidence only. */ }
+          const tried=[...attempted.map(entry=>({provider:entry.provider_id,model:entry.model_id})),{provider:current.provider,model:current.model==="auto"?null:current.model}];
+          const exhaustNow=(reason:string)=>{error=`${error ?? "The task failed."} ${exhaustionNote(attempted)} — ${reason}`;detail=error;this.emit(this.db.event("routing.exhausted",id,clip(exhaustionNote(attempted),240),current.mission?.missionId ?? null));};
+          const action=planRecovery({taxonomy,attemptIndex:attempt,sameRetriesUsed:sameRetries,alternatesUsed:alternates,escalationsUsed:escalations,reroutesUsed:alternates,policyAllows:true});
+          if(action.action==="fail") exhaustNow(action.reason);
+          else if(current.routingMode==="manual" && action.action!=="retry-same") exhaustNow(`Manual model selection is fixed; the task failed instead of re-routing. ${action.reason}`);
+          else if(action.action==="retry-same") {
+            sameRetries+=1;
+            const label=`${current.provider}${current.model==="auto" ? " · provider default" : ` · ${current.model}`}`;
+            const retried=startSession({provider:current.provider,model:current.model,effort:current.effort ?? null},{detail:`Re-attempting ${label} after ${taxonomy}: ${action.reason}`,bumpReroutes:false});
+            if(retried) {session=retried;attempt+=1;continue;}
+            exhaustNow("The same candidate could not be relaunched.");
+          } else if(action.action==="escalate-effort") {
+            escalations+=1;
+            const ladder=Object.values(PROVIDER_EFFORT_CONTRACTS[current.provider].native ?? {}) as string[];
+            const raised=current.effort ? ladder[ladder.indexOf(current.effort)+1] ?? null : ladder.length>1 ? ladder[ladder.length-2] : ladder[0] ?? null;
+            const target=raised ? {provider:current.provider,model:current.model,effort:raised} : this.rerouteFromDecision(current,{exclude:tried});
+            if(!target) exhaustNow(`verification failed and no effort ladder or alternate candidate remains (${action.reason})`);
+            else {
+              const label=`${target.provider}${target.model!=="auto" ? ` · ${target.model}` : " · provider default"}`;
+              const retried=startSession(target,{detail:`Re-executing ${label}${raised ? ` at ${raised} effort` : " on an alternate candidate"} after a failed verification; Bunny-A verifies again on completion (§24).`,bumpReroutes:!raised});
+              if(retried) {session=retried;attempt+=1;continue;}
+              exhaustNow("The escalated candidate could not be relaunched.");
+            }
+          } else {
+            alternates+=1;
+            const target=action.action==="reroute-larger-context" ? this.rerouteFromDecision(current,{exclude:tried,largerContext:true}) : this.rerouteFromDecision(current,{exclude:tried});
+            if(!target) exhaustNow(action.reason);
+            else {
+              const label=`${target.provider}${target.model!=="auto" ? ` · ${target.model}` : " · provider default"}`;
+              this.emit(this.db.event("routing.rerouted",id,`Rerouted to ${label} after ${taxonomy} on ${current.provider}${current.model==="auto" ? " · provider default" : ` · ${current.model}`}.`));
+              const retried=startSession(target,{detail:`Routing to ${label} after ${taxonomy}: ${action.reason}`,bumpReroutes:true});
+              if(retried) {session=retried;attempt+=1;continue;}
+              exhaustNow("The alternate candidate could not be relaunched.");
+            }
+          }
+        }
+        const finished=this.update(latest,{state,finishedAt:Date.now(),output:result.output || latest.output,error:state === "completed" ? null : error,exitCode:result.exitCode ?? null,activity:activityLabel(`task.${state}`),verification,usage:reportedUsage ?? latest.usage ?? null,latestEvent:this.activity(latest,`agent.${state}`,detail,verification ? "bunny" : "provider")},`task.${state}`,detail);
+        if(finished.provider === "codex") this.containment.background({subsystem:"provider-usage"},async()=>{await this.registry.refreshUsage("codex"); await this.providerUsage.refresh();});
+        break;
       }
-      const latest=this.db.get(id);if(TERMINAL.includes(latest.state) || this.stopping.has(id)) return;
-      if(["draining","fatal"].includes(this.containment.health.operationalState)) {await this.failOperation(id,{name:"HostFatal",message:"Host fatal shutdown interrupted verification; no success was recorded."});return;}
-      const detail=state === "completed" ? (verification ? `Completed and verified by Bunny-A: ${verification.detail}` : "Provider process completed; no independent verification was requested.") : error ?? `Provider process ${state}.`;
-      const finished=this.update(latest,{state,finishedAt:Date.now(),output:result.output || latest.output,error:state === "completed" ? null : error,exitCode:result.exitCode ?? null,activity:activityLabel(`task.${state}`),verification,usage:reportedUsage ?? latest.usage ?? null,latestEvent:this.activity(latest,`agent.${state}`,detail,verification ? "bunny" : "provider")},`task.${state}`,detail);
-      if(finished.provider === "codex") this.containment.background({subsystem:"provider-usage"},async()=>{await this.registry.refreshUsage("codex"); await this.providerUsage.refresh();});
       } catch(error) {await this.containment.contain(error,"boundary",{owner:{subsystem:"tasks",taskId:id,...task.mission},fail:error=>this.failOperation(id,error)});}
-      finally {clearTimeout(timer);if(flushTimer) clearTimeout(flushTimer);this.stopTree(id);this.flushers.delete(id);this.sessions.delete(id);}
+      finally {if(runtimeTimer) clearTimeout(runtimeTimer);if(flushTimer) clearTimeout(flushTimer);this.stopTree(id);this.flushers.delete(id);this.sessions.delete(id);}
     });
     return running;
   }

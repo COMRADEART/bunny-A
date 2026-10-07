@@ -394,7 +394,10 @@ export function codexLaunchArgs(task: OrchTask, platform = process.platform): st
   // Ignore extensions and execpolicy from user config; restore only trusted native Windows sandbox policy;
   // switch off tool-adding defaults and web search, which do not come from user config.
   const isolation = task.executionScope ? ["--ignore-user-config", "--ignore-rules", ...(platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : []), ...CODEX_READ_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature]), "-c", 'web_search="disabled"'] : [];
-  return ["exec", "--json", "--sandbox", read ? "read-only" : "workspace-write", ...isolation, "--skip-git-repo-check", "--cd", task.cwd!, "--model", task.model, "-"];
+  // M-A-3 T3 §11: the Task's contracted reasoning-effort knob (router-selected). Scoped (mission)
+  // sessions keep their exact verified argv; an effort override there is a documented T3 limitation.
+  const effort = task.executionScope || !task.effort ? [] : ["-c", `model_reasoning_effort="${task.effort}"`];
+  return ["exec", "--json", "--sandbox", read ? "read-only" : "workspace-write", ...isolation, ...effort, "--skip-git-repo-check", "--cd", task.cwd!, "--model", task.model, "-"];
 }
 /** Claude read/write contracts verified with installed Claude Code 2.1.288 help. */
 export function claudeLaunchArgs(task: OrchTask, sessionId: string, platform = process.platform): string[] {

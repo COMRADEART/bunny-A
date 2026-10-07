@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { HostDatabase } from "../bunny-host/persistence.server.ts";
+import { ModelCapabilityRegistry } from "../bunny-host/model-capability.server.ts";
 import { TaskManager } from "../bunny-host/manager.server.ts";
 import { providerBase, codexLaunchArgs, claudeLaunchArgs } from "../bunny-host/adapters.server.ts";
 import { runsLocally } from "../bunny-host/router.ts";
@@ -47,7 +48,10 @@ async function setup(options: { providers?: ProviderId[]; adapters?: (dir: strin
   const root = options.root ?? join(dir, "project"); mkdirSync(root, { recursive: true });
   const db = new HostDatabase(join(dir, "host.sqlite"));
   const launched: Launched[] = [];
-  const tasks = new TaskManager(db, root, (options.providers ?? ["claude"]).map((id) => fakeAdapter(id, launched)));
+  // M-A-3 T3 legacy-parity: these mission fixtures predate model-routing facts; probing nothing
+  // keeps the pre-T3 provider-level behavior byte-identical (T3 paths have their own fixtures).
+  const factLess = new ModelCapabilityRegistry(db, { availableProviders: () => [] });
+  const tasks = new TaskManager(db, root, (options.providers ?? ["claude"]).map((id) => fakeAdapter(id, launched)), { modelRegistry: factLess });
   await tasks.discover();
   const notifications: string[] = [];
   const adapters = options.adapters?.(dir) ?? [new FilesystemCapability(), new TerminalCapability(), new NotificationsCapability((title) => notifications.push(title)), ...communicationConnectors()];
@@ -692,7 +696,9 @@ test("feature flag off: mission commands refused, snapshot reports disabled, dir
     const task = env.tasks.submit({ prompt: "Direct", mode: "fast" }); env.tasks.approve(task.id);
     env.launched[0].finish({ ok: true, output: "done" });
     await until(() => env.db.get(task.id).state === "completed", "direct completion");
-    assert.deepEqual(env.db.events().slice(before).map((e) => e.type).filter((t) => !t.startsWith("agent.") && t !== "session.recorded"), ["task.created", "routing.started", "approval.required", "approval.accepted", "executor.starting", "task.completed"]);
+    // M-A-3 T3 adds routing.classified/selected (submit-time) and routing.revalidated (launch
+    // gate) to the direct-task flow; the approval → executor → completion shape is unchanged.
+    assert.deepEqual(env.db.events().slice(before).map((e) => e.type).filter((t) => !t.startsWith("agent.") && t !== "session.recorded"), ["task.created", "routing.classified", "routing.selected", "routing.started", "approval.required", "routing.revalidated", "approval.accepted", "executor.starting", "task.completed"]);
     assert.equal(env.missions.inbox.recent().length, 0, "no inbox writes while disabled");
   } finally { await env.cleanup(); }
 });
@@ -749,7 +755,7 @@ test("MA1: Ollama locality is per model: local-only missions get a local model; 
   const base = fakeAdapter("ollama", launched);
   // As observed on the M-A-1 workstation: the first installed tag proxies to ollama.com.
   const ollama: ProviderAdapter = { ...base, detect: async () => ({ ...ready("ollama"), current_model: "deepseek-v4.1-flash:cloud", models: ["deepseek-v4.1-flash:cloud", "qwen2.5-coder:7b"], remoteModels: ["deepseek-v4.1-flash:cloud"] }) };
-  const tasks = new TaskManager(db, root, [ollama]);
+  const tasks = new TaskManager(db, root, [ollama], { modelRegistry: new ModelCapabilityRegistry(db, { availableProviders: () => [] }) });
   await tasks.discover();
   const missions = new MissionManager(tasks, { dataDirectory: dir, adapters: [] });
   missions.configure({ enabled: true }, "test");

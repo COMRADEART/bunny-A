@@ -99,13 +99,15 @@ export class MissionManager {
   config(): MissionConfig { return this.cached; }
   enabled() { return this.cached.enabled; }
   /** Includes old persisted Mission children that predate the routing constraint. Direct retarget is unchanged. */
-  retargetTask(id: string, provider: ProviderId) {
+  retargetTask(id: string, provider: ProviderId, modelOverride?: string | null) {
     const task = this.tasks.db.get(id);
     if (task.mission && provider === "codex") {
       if (!task.executionScope) throw new Error("Mission retarget has no approved execution scope.");
       const reason = codexMissionExclusion({ id: "codex", securityCompatibility: this.tasks.live().find(live => live.id === "codex")?.securityCompatibility }, task.executionScope.access);
       if (reason) throw new Error(reason);
     }
+    // M-A-3 T3 §27: an exact-model pin is forwarded with the retarget; honored only where a real model surface exists (§9).
+    if (modelOverride) return this.tasks.retarget(id, provider, modelOverride);
     return this.tasks.retarget(id, provider);
   }
   /** Starts the background parts. Called at construction when enabled, or when the workstation enables missions. */
@@ -448,6 +450,7 @@ export class MissionManager {
       // execution is required do the step's declared capabilities and its objective decide (text-only local models).
       requiresFilesystem: step.scope.access === "write" || step.requiredCapabilities.some((cap) => cap.startsWith("filesystem.")) || !(envelope.providers.localOnly || step.preferences.local || budgetLocal),
       localOnly: envelope.providers.localOnly || !!step.preferences.local || budgetLocal || undefined,
+      ...(step.modelConstraint ? { modelExact: step.modelConstraint } : {}), // M-A-3 T3 §4: the mission pin routes up-front; the post-submit check below stays as defense-in-depth.
       ...(allow?.length ? { providerAllowlist: allow } : {}),
       ...(deny.size ? { providerDenylist: [...deny] } : {}),
       maxRuntimeMs: Math.max(1000, Math.min(step.timeoutMs, 3_600_000)),

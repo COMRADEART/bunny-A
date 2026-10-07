@@ -100,6 +100,27 @@ export type RouteDecision = {
   confidence_kind?: "uncalibrated_score";
   policy_id?: string;
   inputs?: RouteInputs;
+  // M-A-3 T3 additions (additive): model-level routing truth on the same decision record.
+  policy_version?: string;
+  routing_mode?: "auto" | "manual";
+  candidate_count?: number;
+  eligible_candidate_count?: number;
+  effort_mode?: string | null;
+  task_requirements?: import("./router-requirements.ts").TaskRequirements;
+  reroutes?: number;
+  /** M-A-3 T3 §5/§19: the router's own reason for the model selection (distinct from the legacy route reason). */
+  selection_reason?: string;
+  /** M-A-3 T3 §18/§19: the safe candidate subset the island view may show (the shape §18 persists, capped). */
+  candidates?: {
+    provider_id: ProviderId;
+    model_id: string | null;
+    candidate_kind: string;
+    effort_mode: string;
+    eligible: boolean;
+    exclusion_reasons: string[];
+    score: number | null;
+    components: { name: string; points: number }[] | null;
+  }[];
 };
 
 /** What the router actually used, recorded with each decision. */
@@ -222,6 +243,14 @@ export type OrchTask = {
   /** Who launched it: a direct user approval or a mission-delegated approval under an authorization envelope. */
   approval?: { kind: "user" | "mission"; at: number; authorizationId?: string; missionId?: string; stepId?: string } | null;
   executionScope?: ProviderExecutionScope;
+  // M-A-3 T3 additions (additive): per-Task dynamic-model routing facts.
+  /** The provider-native effort/reasoning level selected for THIS Task; null when the provider does not expose one. */
+  effort?: string | null;
+  routingMode?: "auto" | "manual";
+  /** Safe RoutingDecision record id in the routing_decisions store. */
+  routingDecisionId?: string;
+  /** True when Bunny-A re-routed this Task at least once (pre-launch revalidation or recovery). */
+  routingRerouted?: boolean;
 };
 
 /** Determinate only when the provider published a finite plan; otherwise indeterminate. Never time-based. */
@@ -242,6 +271,15 @@ export type TaskConstraints = {
   missionAccess?: ProviderExecutionScope["access"];
   localOnly?: boolean;
   offlineOnly?: boolean;
+  /** M-A-3 T3 user routing constraints (§27). Hard filters, never silent overrides. */
+  /** Run only on this exact model id; no substitution when it is unavailable. */
+  modelExact?: string;
+  /** Run only on one of these model ids (provider-qualified where ambiguous is the caller's duty). */
+  modelAllowlist?: string[];
+  /** Require cloud-hosted execution; local providers are excluded. */
+  cloudOnly?: boolean;
+  /** Require that data does not leave this workstation (local models only). */
+  privacyLocal?: boolean;
   providerAllowlist?: ProviderId[];
   providerDenylist?: ProviderId[];
   requiresFilesystem?: boolean;
@@ -278,6 +316,8 @@ export type ExecRequest = {
   provider: ProviderId;
   model: string;
   prompt: string;
+  /** Provider-native effort/reasoning override Bunny selected; null when the provider does not expose one. */
+  effort?: string | null;
 };
 
 export type ExecResult = {

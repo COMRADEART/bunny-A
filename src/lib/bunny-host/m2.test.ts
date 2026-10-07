@@ -8,6 +8,7 @@ import { locate, parseNpmShim, newestVersionFolder, systemContext, type Discover
 import { ClaudeNormalizer, CodexNormalizer, classifyCommand, displayCommand } from "./events.ts";
 import { bunnyRoute, eligibility, structuredDecision } from "./router.ts";
 import { HostDatabase } from "./persistence.server.ts";
+import { ModelCapabilityRegistry } from "./model-capability.server.ts";
 import { TaskManager } from "./manager.server.ts";
 import { ProviderRegistry, applyUsage } from "./registry.server.ts";
 import { codexUsageWindows } from "./codex-probe.server.ts";
@@ -133,7 +134,8 @@ test("MA1: a stale local-only task whose model is cloud-hosted is refused at lau
   const ollama: ProviderAdapter = { id: "ollama", detect: async () => ready("ollama", { current_model: "deepseek-v4.1-flash:cloud", models: ["deepseek-v4.1-flash:cloud", "qwen2.5-coder:7b"], remoteModels: ["deepseek-v4.1-flash:cloud"] }), launch: (task) => { launched.push(task.model); return { done: new Promise<AdapterResult>(() => {}), stop: async () => {} }; } };
   const db = new HostDatabase(join(dir, "host.sqlite"));
   try {
-    const manager = new TaskManager(db, dir, [ollama]);
+    // M-A-3 T3 legacy-parity: probe nothing, so the model registry stays fact-less and the MA1 route is pre-T3 bytes.
+    const manager = new TaskManager(db, dir, [ollama], { modelRegistry: new ModelCapabilityRegistry(db, { availableProviders: () => [] }) });
     await manager.discover();
     const task = manager.submit({ prompt: "Summarize hello", mode: "fast", constraints: { localOnly: true } });
     assert.equal(task.model, "qwen2.5-coder:7b");

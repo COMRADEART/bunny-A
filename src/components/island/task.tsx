@@ -23,6 +23,7 @@ import {
   verifiedFile,
   usesCloudModel,
   conflictsWithLocalOnly,
+  routingFacts,
 } from "./ui-model";
 import {
   ArtifactPreview,
@@ -289,6 +290,63 @@ export function Routing({ task, pending = true }: { task?: OrchTask; pending?: b
     </div>
   );
 }
+/** M-A-3 T3 §19: the minimal routing summary — provider/model/effort/mode facts, why selected, reroutes; safe candidate details are expandable. */
+export function RoutingSummary({ task }: { task: OrchTask }) {
+  const facts = routingFacts(task);
+  if (!facts.engaged && !task.routingMode) return null; // Legacy tasks keep the existing route facts.
+  return (
+    <div className="routing-facts">
+      <dl className="fact-list">
+        <div>
+          <dt>Routing</dt>
+          <dd>{facts.mode}{facts.candidates ? ` · ${facts.candidates}` : ""}</dd>
+        </div>
+        <div>
+          <dt>Model</dt>
+          <dd>{facts.model}</dd>
+        </div>
+        {facts.engaged || facts.effort ? (
+          <div>
+            <dt>Effort</dt>
+            <dd>{facts.effort ?? "Provider default effort"}</dd>
+          </div>
+        ) : null}
+        {facts.rerouted != null ? (
+          <div>
+            <dt>Rerouted</dt>
+            <dd>{facts.rerouted ? "Yes" : "No"}</dd>
+          </div>
+        ) : null}
+      </dl>
+      {facts.engaged && task.decision.selection_reason ? (
+        <p className="caption">Why selected · {task.decision.selection_reason}</p>
+      ) : null}
+      {facts.engaged && task.decision.candidates?.length ? (
+        <details className="route-candidates">
+          <summary>
+            Model candidates considered <ChevronDown size={12} />
+          </summary>
+          <ul>
+            {task.decision.candidates.map((candidate) => (
+              <li key={`${candidate.provider_id}:${candidate.model_id ?? "provider-default"}`}>
+                <span>{NAMES[candidate.provider_id]}</span>
+                <span className="caption">
+                  {candidate.model_id ?? "Provider default"}
+                  {candidate.eligible
+                    ? ` · eligible${candidate.effort_mode ? ` · effort ${candidate.effort_mode}` : " · provider default effort"}`
+                    : ` · not eligible · ${candidate.exclusion_reasons[0] ?? "hard requirement unsatisfied"}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="caption">
+            Candidate eligibility, not a ranking of success chances.
+          </p>
+        </details>
+      ) : null}
+    </div>
+  );
+}
 export function Approval({ task, phone = false }: { task: OrchTask; phone?: boolean }) {
   const store = useIsland();
   const providers = liveProviders(store);
@@ -361,6 +419,7 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
         </div>
         <ShieldCheck size={18} />
       </div>
+      <RoutingSummary task={task} />
       <details className="route-explanation">
         <summary>Why this agent</summary>
         <p className="route-reason">
@@ -559,6 +618,7 @@ export function TaskDetail({ now }: { now: number }) {
           Selected: {NAMES[task.provider]}
           {task.manual ? " · manual selection" : ""}
         </p>
+        <RoutingSummary task={task} />
         <p className="caption">
           {usesCloudModel(task)
             ? task.decision.reason.replace("Stays on this machine. ", "")
@@ -577,7 +637,7 @@ export function TaskDetail({ now }: { now: number }) {
             <Folder size={14} />
             {task.cwd || "Working folder unavailable"}
           </span>
-          <span>{task.model || "Model unavailable"}</span>
+          <span>{routingFacts(task).model}</span>
         </div>
       </section>
       {task.output ? (

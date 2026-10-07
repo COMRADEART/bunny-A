@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { CodexAdapter, ClaudeAdapter, codexLaunchArgs, providerBase } from "./adapters.server.ts";
 import { systemContext } from "./discovery.server.ts";
 import { fixtureSecurity } from "./testing/codex.test.ts";
+import { ModelCapabilityRegistry } from "./model-capability.server.ts";
 import { HostDatabase } from "./persistence.server.ts";
 import { TaskManager } from "./manager.server.ts";
 import { MissionManager } from "../bunny-missions/manager.server.ts";
@@ -145,7 +146,8 @@ process.stdin.resume(); process.stdin.on('end',()=>{
   } });
   let claudeAvailable = true;
   const claude: ProviderAdapter = { id: "claude", detect: async () => ({ ...live, id: "claude", name: "Claude fixture", availability: claudeAvailable ? "ready" : "offline" }), launch: () => { throw new Error("Claude stand-in must be retargeted before launch"); } };
-  const tasks = new TaskManager(db, root, withClaude ? [codex, claude] : [codex]);
+  // M-A-3 T3 legacy-parity: probe nothing, so MA0R2 asserts the pre-T3 model surface, not this machine's catalogue.
+  const tasks = new TaskManager(db, root, withClaude ? [codex, claude] : [codex], { modelRegistry: new ModelCapabilityRegistry(db, { availableProviders: () => [] }) });
   await tasks.discover();
   const missions = new MissionManager(tasks, { dataDirectory: directory, adapters: [] });
   missions.configure({ enabled: true }, "test");

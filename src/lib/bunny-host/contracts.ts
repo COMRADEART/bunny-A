@@ -39,8 +39,8 @@ export type HostSnapshot = {
   /** M-A-3 T2 normalized provider usage truth (derived from registry state and Bunny's own counters). Optional: older clients ignore it. */
   providerUsage?: ProviderUsageServiceSnapshot;
 };
-/** `routingPrompt` is set in-process by the MissionManager only (never from HTTP input). */
-export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };
+/** `routingPrompt` and `modelOverride` are set in-process by the caller that knows the selection context; HTTP validates both. */
+export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; /** M-A-3 T3 §27: MANUAL exact-model selection; only honored where a real model surface exists. */ modelOverride?: string | null; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };
 export type AdapterResult = { ok: boolean; output: string; error?: string; stopped?: boolean; exitCode?: number | null };
 export type AdapterHooks = {
   event: (type: string, detail: string) => void;

@@ -92,3 +92,44 @@ export function todayCount(tasks: OrchTask[], now: number, provider?: string) {
       task.createdAt <= now,
   ).length;
 }
+
+/** M-A-3 T3 §19: an "auto" model pick means the provider's default — the exact model id stays Unknown. */
+export const PROVIDER_DEFAULT_MODEL = "Provider default · exact model Unknown";
+export type RoutingFacts = {
+  /** T3 model routing produced this Task's selection (policy_version on the decision). */
+  engaged: boolean;
+  mode: "Auto" | "Manual" | null;
+  model: string;
+  /** The Task's native effort knob, or null = the provider's default effort. */
+  effort: string | null;
+  /** "N eligible of M considered" once the Host reports a routing decision. */
+  candidates: string | null;
+  rerouted: boolean | null;
+};
+/** The routing facts a Task/Activity detail may show; provider defaults and legacy tasks stay honest. */
+export function routingFacts(task: OrchTask): RoutingFacts {
+  const decision = task.decision;
+  const engaged = !!decision?.policy_version;
+  const mode = task.routingMode ?? decision?.routing_mode ?? (engaged ? "auto" : null);
+  return {
+    engaged,
+    mode: mode === "manual" ? "Manual" : mode === "auto" ? "Auto" : null,
+    model:
+      task.model && task.model !== "auto"
+        ? task.model
+        : engaged
+          ? PROVIDER_DEFAULT_MODEL
+          : "Model unavailable",
+    effort: task.effort ?? null,
+    candidates:
+      engaged && decision?.candidate_count != null
+        ? `${decision.eligible_candidate_count ?? 0} eligible of ${decision.candidate_count} considered`
+        : null,
+    rerouted:
+      task.routingRerouted === true || (decision?.reroutes ?? 0) > 0
+        ? true
+        : engaged
+          ? false
+          : null,
+  };
+}
