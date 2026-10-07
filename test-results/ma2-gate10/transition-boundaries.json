@@ -1,0 +1,59 @@
+{
+  "recordedAt": "2026-10-07T01:25:17.441Z",
+  "classification": "STATIC VERIFIED",
+  "attackId": "T10-T8-06",
+  "boundaries": [
+    {
+      "point": "before stop",
+      "classification": "DISPOSABLE LIVE",
+      "evidence": [
+        "installed-active-rollback-v25.json"
+      ],
+      "result": "Active grant/paused Mission rejects canonical preflight; exact installed target validation and guard happen before mutation; install and Host unchanged."
+    },
+    {
+      "point": "after stop",
+      "classification": "DISPOSABLE LIVE",
+      "evidence": [
+        "v25-rollback-attacks.json"
+      ],
+      "result": "Missing/tampered targets are rejected before activation; no DB restore or arbitrary fallback. Does not claim a timed live fault inserted immediately after every Stop."
+    },
+    {
+      "point": "before install.json switch",
+      "classification": "DISPOSABLE LIVE",
+      "evidence": [
+        "v25-rollback-attacks.json"
+      ],
+      "result": "Actual dependency-copy ENOENT after private shortcut copy leaves authoritative install.json bytes unchanged; shortcut may be ahead. Explicit manual recovery required, no invented atomic multi-file transaction."
+    },
+    {
+      "point": "after target start",
+      "classification": "DISPOSABLE LIVE",
+      "evidence": [
+        "v25-rollback-attacks.json"
+      ],
+      "result": "Actual wrong-release live collision refuses with old Host still alive; successful code roundtrip requires fresh target identities."
+    },
+    {
+      "point": "before final health",
+      "classification": "STATIC VERIFIED",
+      "evidence": [
+        "source-boundaries.json",
+        "v25-rollback-attacks.json"
+      ],
+      "result": "Inspected boot verifier bounds wait, rejects missing/fresh-identity-mismatched Host/gateway health; actual missing canonical DB refuses start. Not a six-point crash-injection campaign."
+    },
+    {
+      "point": "during forward recovery",
+      "classification": "DISPOSABLE LIVE",
+      "evidence": [
+        "v25-rollback-attacks.json"
+      ],
+      "result": "Actual missing forward target refuses; current user rows retained. Recovery must be explicit and verified."
+    }
+  ],
+  "newAutonomousRollbackOrJournal": false,
+  "commitPoint": "install.json LAST after private shortcut/deployment bytes",
+  "productionSwitchNotAuthorized": true
+}

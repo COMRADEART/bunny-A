@@ -1,3 +1,29 @@
+<!-- T10 current record start -->
+> Current T10 status (2026-10-06/07 UTC): **BUNNY_MA2_T10_PASS**, implementation-side **MIXED** audit. Final staged candidate **v25-T10**; production remains **v17-T6**. Three HIGH defects were repaired in the candidate; production remains older and is not certified by this result. Full regression **654 (254 + 363 + 37), zero failures/skips**. No independent review or operational approval issued.
+
+## Final T10 candidate and independent-review handoff
+
+| Item | Final staged candidate |
+|---|---|
+| Release | Bunny-A-Windows-v25-T10 |
+| Runtime source | `4f977c8071be17a7807a6c0b6f072f8f17cd4d4d` |
+| Tooling pin | `599103cf4409ca1929f9d6109f5f6adec585bbf0` |
+| Manifest SHA-256 | `5812926fc685d7f21fc6899df7aaf28583131e5ca0af10b8abb2abf81d9fceff` |
+| ZIP SHA-256 | `a1ba1b219478f0296b6b8eef2d1b94cee099c48f13794fa5d5b2c7d1862f5580` |
+| ZIP bytes | 36260857 |
+| Asset manifest SHA-256 | `176828598eb38f2b2e0e6dd84316d657d04ebd07362304254a56b59c6ff74d75` |
+| Covered installed files | 160; zero missing/changed/extra |
+
+[Final adversarial audit](MA2_T10_ADVERSARIAL_OPERATIONAL_AUDIT.md), [test-results/ma2-gate10/threat-matrix.md](test-results/ma2-gate10/threat-matrix.md), [test-results/ma2-gate10/failure-ledger.json](test-results/ma2-gate10/failure-ledger.json), [test-results/ma2-gate10/evidence/index.json](test-results/ma2-gate10/evidence/index.json).
+
+Minimal repairs: SSE live device revalidation (`738f05b`), canonical rollback quiescence (`99ffbdd`), restart permission invalidation (`4f977c8`), regression-compatible installer validation order (`2afee0e`, pin `599103c`). 9 new tests; baseline 645 retained. Packages contain exact committed source/tooling; no feature/redesign work. Production was not promoted/restarted.
+
+### Historical checkpoint record
+
+All following checkpoint text is retained as history; current T10 facts above supersede older current-state statements. Older sealed documentation/evidence hashes remain unchanged.
+
+<!-- T10 current record end -->
+
 > Current T9 status (2026-10-06): the duplicate Calculator incident was reopened and remediated in T9R. **BUNNY_MA2_T9R_PASS**, classification **MIXED**. Current staged candidate is v21-T9; production remains v17-T6. See [T9R closure](MA2_T9R_DUPLICATE_CALCULATOR_CLOSURE.md). Earlier T9 results below are historical. T10 was not started.
 
 # Bunny-A M-A-2 implementation report

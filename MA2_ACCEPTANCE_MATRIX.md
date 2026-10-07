@@ -1,3 +1,42 @@
+<!-- T10 current record start -->
+> Current T10 status (2026-10-06/07 UTC): **BUNNY_MA2_T10_PASS**, implementation-side **MIXED** audit. Final staged candidate **v25-T10**; production remains **v17-T6**. Three HIGH defects were repaired in the candidate; production remains older and is not certified by this result. Full regression **654 (254 + 363 + 37), zero failures/skips**. No independent review or operational approval issued.
+
+## Final T10 candidate and independent-review handoff
+
+| Item | Final staged candidate |
+|---|---|
+| Release | Bunny-A-Windows-v25-T10 |
+| Runtime source | `4f977c8071be17a7807a6c0b6f072f8f17cd4d4d` |
+| Tooling pin | `599103cf4409ca1929f9d6109f5f6adec585bbf0` |
+| Manifest SHA-256 | `5812926fc685d7f21fc6899df7aaf28583131e5ca0af10b8abb2abf81d9fceff` |
+| ZIP SHA-256 | `a1ba1b219478f0296b6b8eef2d1b94cee099c48f13794fa5d5b2c7d1862f5580` |
+| ZIP bytes | 36260857 |
+| Asset manifest SHA-256 | `176828598eb38f2b2e0e6dd84316d657d04ebd07362304254a56b59c6ff74d75` |
+| Covered installed files | 160; zero missing/changed/extra |
+
+[Final adversarial audit](MA2_T10_ADVERSARIAL_OPERATIONAL_AUDIT.md), [test-results/ma2-gate10/threat-matrix.md](test-results/ma2-gate10/threat-matrix.md), [test-results/ma2-gate10/failure-ledger.json](test-results/ma2-gate10/failure-ledger.json), [test-results/ma2-gate10/evidence/index.json](test-results/ma2-gate10/evidence/index.json).
+
+| Gate | Original guarantee | New T10 attack | Final candidate result | New evidence |
+|---|---|---|---|---|
+| T1 | External canonical state; no reset/fallback | path spoof, damaged DB, WAL/stale copies | PASS within recorded classifications/limits | t1-path-spoof.json, wal-partial-attack.json, script-attacks-pass.log |
+| T2 | Fresh exact provider compatibility | same-size/mtime byte substitution, future 99.0.0, launch race | PASS within recorded classifications/limits | t6/affected-retest-pass.log, stop-composition.json |
+| T3 | Contained failures and honest recovery | async/serialization/child failures, hard crash/no replay | PASS within recorded classifications/limits | t6/affected-retest-pass.log, restart-verified-v25.json |
+| T4 | Owned processes only | stale claims, real jobs/hooks/breakaway, unrelated sentinels | PASS within recorded classifications/limits | composition-attacks.log, v25-rollback-attacks.json |
+| T5 | Private canonical truthful presentation | secrets/reasoning/stale/duplicate events, verification failure | PASS within recorded classifications/limits | composition-attacks.log, secret-audit/result.json |
+| T6R | Authenticated transport/device authority | public spoof, paired revoke, stale SSE, bounded watchdog fixtures | PASS within recorded classifications/limits | public-denials-valid-wire.json, installed-stream-retest-v25.json, script-attacks-pass.log |
+| T7 | Canonical single startup generation | three installed competitors, registry/Startup audit, wrong-release collision | PASS within recorded classifications/limits | startup-competitors.json, production-native-final.json, v25-rollback-attacks.json |
+| T8 | Verified code-only rollback | tamper/path/stale identity/newer rows/partial commit/active grant | PASS within recorded classifications/limits | v25-rollback-attacks.json, installed-active-rollback-v25.json, transition-boundaries.json |
+| T9 | Bounded task/operation/time/count/Stop authority | scope/replay/expiry/budget/Stop/restart | PASS within recorded classifications/limits | restart-repair-focused-pass.log, native-matrix-v25.json, restart-verified-v25.json |
+| T9R | Native target reuse with explicit ownership | rapid/retry/concurrent acquire, stale content, owned-only cleanup | PASS within recorded classifications/limits | native-matrix-v25.json, composition-attacks.log, calculator-owned-cleanup.json |
+
+Primary coverage: 69 planned/executed/final passed; 0 failed, primary not tested or blocked. Optional/unauthorized subcases are NOT TESTED or DEFERRED as explicitly recorded in the T10 report. Original HIGH failures remain in the ledger.
+
+### Historical checkpoint record
+
+All following checkpoint text is retained as history; current T10 facts above supersede older current-state statements. Older sealed documentation/evidence hashes remain unchanged.
+
+<!-- T10 current record end -->
+
 > Current T9 status (2026-10-06): the duplicate Calculator incident was reopened and remediated in T9R. **BUNNY_MA2_T9R_PASS**, classification **MIXED**. Current staged candidate is v21-T9; production remains v17-T6. See [T9R closure](MA2_T9R_DUPLICATE_CALCULATOR_CLOSURE.md). Earlier T9 results below are historical. T10 was not started.
 
 # Bunny-A M-A-2 acceptance matrix

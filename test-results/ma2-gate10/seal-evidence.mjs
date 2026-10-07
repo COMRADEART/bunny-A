@@ -1,0 +1,24 @@
+import {readFileSync,writeFileSync,readdirSync,mkdirSync,copyFileSync,statSync,utimesSync} from 'node:fs';import {join,relative} from 'node:path';import {createHash} from 'node:crypto';
+const root='test-results/ma2-gate10',read=p=>JSON.parse(readFileSync(p,'utf8').replace(/^\uFEFF/,''));
+const hash=b=>createHash('sha256').update(b).digest('hex'),walk=dir=>readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(join(dir,e.name)):[join(dir,e.name)]);
+mkdirSync(join(root,'evidence/reports'),{recursive:true});mkdirSync(join(root,'evidence/render'),{recursive:true});
+const documentationSources=['MA2_T10_ADVERSARIAL_OPERATIONAL_AUDIT.md','MA2_ACCEPTANCE_MATRIX.md','MA2_IMPLEMENTATION_REPORT.md','MA2_INDEPENDENT_REVIEW_PACKET.md'].map(source=>{const sealedCopy=join(root,'evidence/reports',source);copyFileSync(source,sealedCopy);return{source,sealedCopy,sha256:hash(readFileSync(source))};});
+const attributesSource='.gitattributes',attributesCopy=join(root,'evidence/reports/repository.gitattributes');copyFileSync(attributesSource,attributesCopy);
+const repositorySources=[{source:attributesSource,sealedCopy:attributesCopy,sha256:hash(readFileSync(attributesSource))}];
+const renderSources=readdirSync('screenshots').filter(n=>n.startsWith('t10-')).map(name=>{const source=join('screenshots',name),sealedCopy=join(root,'evidence/render',name);copyFileSync(source,sealedCopy);const s=statSync(source);utimesSync(sealedCopy,s.atime,s.mtime);return{source,sealedCopy,sha256:hash(readFileSync(source))};});
+const plan=read(join(root,'attack-plan.json')),allIds=plan.attacks.map(a=>a.attackId);
+const files=walk(root).filter(p=>relative(root,p).replaceAll('\\','/')!=='evidence/index.json').sort();
+const entries=files.map(path=>{const name=relative(root,path).replaceAll('\\','/'),bytes=readFileSync(path);let data=null;if(name.endsWith('.json'))try{data=read(path);}catch{}
+ const associated=plan.attacks.filter(a=>a.evidence.includes(name)).map(a=>a.attackId);
+ const declared=[...(data?.attackIds??[]),...(data?.attackId?[data.attackId]:[])];
+ const attackIds=[...new Set([...declared,...associated])].filter(id=>allIds.includes(id));
+ let classification=data?.classification;
+ const source=/\.(mjs|ts|ps1|md)$/.test(name)||name==='.gitattributes';
+ if(!classification||source)classification='STATIC VERIFIED';
+ if(/native-matrix.*\.json$|restart-verified.*\.json$|v25-rollback-attacks\.json$/.test(name))classification='DISPOSABLE LIVE';
+ if(name.startsWith('evidence/render/'))classification='DISPOSABLE LIVE';
+ if(name==='regression-final-full.log'||name==='regression-final-ui.log'||name==='windows-build-v25.log')classification='DISPOSABLE LIVE';
+ return{path:name,size:bytes.length,sha256:hash(bytes),classification,timestamp:data?.recordedAt??statSync(path).mtime.toISOString(),timestampOrigin:data?.recordedAt?'artifact recordedAt':'file last write time',attackId:attackIds[0]??'T10-XG-10',attackIds:attackIds.length?attackIds:allIds,association:attackIds.length?'Declared or directly cited by attack matrix':'Audit-wide source/receipt/retained artifact; association is not independent proof of every attack',contentNote:source?'Source/document inspection artifact; executions are proved by separate runtime outputs':'Retained artifact; failed or mixed subcases keep the detailed classifications in the ledger/matrix'};
+});
+writeFileSync(join(root,'evidence/index.json'),JSON.stringify({gate:'M-A-2 T10',recordedAt:new Date().toISOString(),base:root,entryCount:entries.length,entries,documentationSources,repositorySources,renderSources,indexExcludedFromSelfHash:true,privateBackupsExcluded:true,rawSecretsStored:false,classificationPolicy:'Source/documents are STATIC VERIFIED artifacts; actual test/live result classification is explicit in attack matrix. Runtime original failures remain indexed, not treated as successes.'},null,2)+'\n');
+console.log('T10 evidence sealed: '+entries.length+' artifacts.');

@@ -1,3 +1,37 @@
+<!-- T10 current record start -->
+> Current T10 status (2026-10-06/07 UTC): **BUNNY_MA2_T10_PASS**, implementation-side **MIXED** audit. Final staged candidate **v25-T10**; production remains **v17-T6**. Three HIGH defects were repaired in the candidate; production remains older and is not certified by this result. Full regression **654 (254 + 363 + 37), zero failures/skips**. No independent review or operational approval issued.
+
+## Final T10 candidate and independent-review handoff
+
+| Item | Final staged candidate |
+|---|---|
+| Release | Bunny-A-Windows-v25-T10 |
+| Runtime source | `4f977c8071be17a7807a6c0b6f072f8f17cd4d4d` |
+| Tooling pin | `599103cf4409ca1929f9d6109f5f6adec585bbf0` |
+| Manifest SHA-256 | `5812926fc685d7f21fc6899df7aaf28583131e5ca0af10b8abb2abf81d9fceff` |
+| ZIP SHA-256 | `a1ba1b219478f0296b6b8eef2d1b94cee099c48f13794fa5d5b2c7d1862f5580` |
+| ZIP bytes | 36260857 |
+| Asset manifest SHA-256 | `176828598eb38f2b2e0e6dd84316d657d04ebd07362304254a56b59c6ff74d75` |
+| Covered installed files | 160; zero missing/changed/extra |
+
+[Final adversarial audit](MA2_T10_ADVERSARIAL_OPERATIONAL_AUDIT.md), [test-results/ma2-gate10/threat-matrix.md](test-results/ma2-gate10/threat-matrix.md), [test-results/ma2-gate10/failure-ledger.json](test-results/ma2-gate10/failure-ledger.json), [test-results/ma2-gate10/evidence/index.json](test-results/ma2-gate10/evidence/index.json).
+
+### Fresh independent review / promotion audit — prepared, not begun
+
+The reviewer must be someone other than this T10 implementer/auditor. Review v25 exact source/tooling/package pins and all three original HIGH failures, not older intermediate packages. Independently verify the sealed index/69-case matrix/full 654-test regression and production preservation. In particular, verify per-delivery SSE revocation; canonical authenticated + read-only SQLite rollback quiescence before first write; and invalidation of unanswered/one-time approvals at Host restart.
+
+Promotion remains separately authorized and pending. Freshly capture current production identity, consistent backup/protected rows/Phone/flags, provider config hashes and rollback content hashes, then validate target integrity and canonical quiescence. The old T8 acceptance controller idleCheck is unsafe for paused work and cannot be used alone. Use the packaged canonical preflight plus fresh CIM/entry/executable/lifetime evidence and held native handles under the current activation procedure. No stale PID/name kill or automatic state rollback. Candidate state and production state are distinct; restore code only. Re-run appropriate installed acceptance after any authorized promotion.
+
+Reviewer must assess explicit limitations: optional Android/reboot, uninduced Calculator disappearance, production tunnel child replacement cause, edge-only public POST refusal, mixed six-boundary/static snapshot replay coverage, missing baseline provider/rollback content fingerprints and temporary IAB tab explicit-close controller limitation. Do not convert any NOT TESTED item into a runtime claim.
+
+The independent reviewer may later issue the allowed operational verdict after its own audit; this packet issues none and dispatches no reviewer.
+
+### Historical checkpoint record
+
+All following checkpoint text is retained as history; current T10 facts above supersede older current-state statements. Older sealed documentation/evidence hashes remain unchanged.
+
+<!-- T10 current record end -->
+
 > Current T9 status (2026-10-06): the duplicate Calculator incident was reopened and remediated in T9R. **BUNNY_MA2_T9R_PASS**, classification **MIXED**. Current staged candidate is v21-T9; production remains v17-T6. See [T9R closure](MA2_T9R_DUPLICATE_CALCULATOR_CLOSURE.md). Earlier T9 results below are historical. T10 was not started.
 
 # Bunny-A M-A-2 independent review packet

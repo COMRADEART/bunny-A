@@ -1,0 +1,281 @@
+{
+  "recordedAt": "2026-10-07T01:25:17.441Z",
+  "gate": "M-A-2 T10",
+  "classification": "STATIC VERIFIED",
+  "entries": [
+    {
+      "id": "T10-F01",
+      "attackId": "T10-T6-04",
+      "expectedBehavior": "Device revocation ends future protected SSE delivery.",
+      "observedBehavior": "Original actual HTTP SSE continued protected delivery after revoked state returned 401.",
+      "severity": "HIGH",
+      "rootCause": "SSE authorized only when connected, not at each future write/drain/heartbeat.",
+      "repair": "738f05b25609f45001ba760ed3f21ba5e92aa571: streamSse rechecks live device hash/id/revocation on delivery.",
+      "retestStatus": "RESOLVED IN v25 CANDIDATE: focused global/task/unrelated streams and installed v25 pass.",
+      "residualLimitation": "Production v17 remains older; candidate repair is not promoted. Existing Host-owned batch revocation semantics are separate.",
+      "evidence": [
+        "revoke-stream-probe.json",
+        "revoke-stream-retest.json",
+        "installed-stream-retest-v25.json",
+        "t6/affected-retest-pass.log"
+      ]
+    },
+    {
+      "id": "T10-F02",
+      "attackId": "T10-XG-06",
+      "expectedBehavior": "Rollback refuses pending Mission work and live desktop authority before any mutation.",
+      "observedBehavior": "Old T8 acceptance idle check returned idle with a paused Mission/live grant.",
+      "severity": "HIGH",
+      "rootCause": "Historical controller filtered only running-like Mission states and did not actually inspect canonical DB grants.",
+      "repair": "99ffbdd20455d56d64666adf9ad1c427df269ae4: packaged authenticated/read-only canonical preflight, enforced before installer rollback writes.",
+      "retestStatus": "RESOLVED IN v25 CANDIDATE: three focused guard tests plus exact installer active-state refusal and code roundtrip.",
+      "residualLimitation": "Historical controller is retained for evidence and must not be used alone for promotion; production installer remains older.",
+      "evidence": [
+        "rollback-active-original.json",
+        "restart-fixture.log",
+        "installed-active-rollback-v25.json",
+        "rollback-preflight-focused-final.log"
+      ]
+    },
+    {
+      "id": "T10-F03",
+      "attackId": "T10-XG-13",
+      "expectedBehavior": "Old pending approval ID cannot gain authority after Host restart.",
+      "observedBehavior": "v22 restart invalidated batch, but allow_once on persisted unresolved old ID admitted harmless nonexistent-control action; no arithmetic side effect.",
+      "severity": "HIGH",
+      "rootCause": "Recover swept active steps/batches but left unanswered pending request and one-time authorization fields authoritative.",
+      "repair": "4f977c8071be17a7807a6c0b6f072f8f17cd4d4d: resolve unanswered requests deny/bunny-host-restart; clear pending/approvedOnce and require fresh explicit retry.",
+      "retestStatus": "RESOLVED IN v25 CANDIDATE: two new recovery regressions, 106 focused tests, installed active hard-crash no-replay/old-ID-refusal.",
+      "residualLimitation": "Production Missions are OFF and candidate not promoted; fixture effect is bounded, original authority defect is still HIGH.",
+      "evidence": [
+        "pending-replay-original.json",
+        "restart-verify.log",
+        "restart-verified-v25.json",
+        "restart-repair-focused-pass.log"
+      ]
+    },
+    {
+      "id": "T10-F04",
+      "attackId": "T10-T8-01",
+      "expectedBehavior": "Legacy/target validation and canonical quiescence guard both precede installer mutation.",
+      "observedBehavior": "First full regression failed one of 254 script tests after adding the guard; application half never ran.",
+      "severity": "LOW",
+      "rootCause": "Old installer regression used fake SQLite/no reachable Host; it could not reach the expected target refusal or valid rollback with the new preflight.",
+      "repair": "2afee0e4ca8d05cae396a6caceecd1b219ecb1fa: read-only target validation first, canonical idle guard immediately before first write; strengthened existing test with real SQLite/authenticated HTTP fixture. Pin 599103cf4409ca1929f9d6109f5f6adec585bbf0.",
+      "retestStatus": "RESOLVED: 7 installer tests and complete final 654 tests pass; no guard weakened.",
+      "residualLimitation": "No added feature or arbitrary rollback fallback.",
+      "evidence": [
+        "regression-full.log",
+        "regression-full-exit.json",
+        "rollback-regression-compatible.log",
+        "regression-final-full.log"
+      ]
+    },
+    {
+      "id": "T10-F05",
+      "attackId": "T10-XG-08",
+      "expectedBehavior": "Offline request must reach Host connection boundary.",
+      "observedBehavior": "Initial plain-JSON serverFn payload failed wire decoding; generic error was mistakenly treated as Host-down evidence.",
+      "severity": "NOTE",
+      "rootCause": "Missing TanStack Seroval serialization/x-tsr-serverfn header prevented intended boundary.",
+      "repair": "Rebuilt valid-wire probe with healthy positive control and required fetch-failed/unavailable result.",
+      "retestStatus": "CORRECTED: exact installed v25 gateway healthy read then Host-down fetch failure.",
+      "residualLimitation": "Old output retained as harness false positive, never used as final Host-down proof.",
+      "evidence": [
+        "offline-gateway-v24.json",
+        "offline-gateway-v24.log",
+        "offline-gateway-v25-valid-wire.json",
+        "gateway-wire-positive.json"
+      ]
+    },
+    {
+      "id": "T10-F06",
+      "attackId": "T10-T9R-04",
+      "expectedBehavior": "Pre-existing native target should remain untouched and no extra launches appear.",
+      "observedBehavior": "Original user content/window disappeared across execution interruption; v25 initial comparison to that old identity failed.",
+      "severity": "NOTE",
+      "rootCause": "Cause NOT ESTABLISHED; no T10 cleanup/name kill targeted original HWND. T10 lineage proves exactly one later controlled acquisition of a new target.",
+      "repair": "Preserve failed comparison, capture fresh verified identity, retest repeated/concurrent/native workflows, cleanup only new explicitly T10-owned HWND.",
+      "retestStatus": "BOUNDED: initial/v24 original identity and arithmetic preservation; v25 fresh identity stable; owned content closes naturally and shared frame survives.",
+      "residualLimitation": "Whole-run original-lifetime/value preservation NOT TESTED; disappearance is not assigned to Bunny or user without evidence.",
+      "evidence": [
+        "native-matrix-v25.log",
+        "calculator-pre.json",
+        "calculator-v25-pre.json",
+        "calculator-launch-lineage.json",
+        "native-matrix-v25.json",
+        "calculator-owned-cleanup.json",
+        "calculator-final.json"
+      ]
+    },
+    {
+      "id": "T10-F07",
+      "attackId": "T10-T6-08",
+      "expectedBehavior": "Canonical active URL must match live worker generation.",
+      "observedBehavior": "Original cloudflared PID absent at final check; original four app processes survived; current child 25956 belongs to unchanged worker 45724 and URL changed.",
+      "severity": "NOTE",
+      "rootCause": "Child replacement observed under supervisor; replacement cause NOT ESTABLISHED. Initial final harness incorrectly required immutable operational remote publication.",
+      "repair": "Record both identities and remote pre/final hashes; verify live worker/child record and Host URL instead of equating volatile transport state with protected install/state metadata.",
+      "retestStatus": "CORRECTED: read-only final comparison passes with unchanged cloudflared bytes and authoritative current generation.",
+      "residualLimitation": "No intentional production transport kill/restart performed; do not claim induced watchdog live recovery.",
+      "evidence": [
+        "production-native-final.json",
+        "production-final.json",
+        "public-denials-valid-wire.json",
+        "production-final.log"
+      ]
+    },
+    {
+      "id": "T10-F08",
+      "attackId": "T10-T9R-01",
+      "expectedBehavior": "Native focus/reconnect test should reach real intended target safely.",
+      "observedBehavior": "Final forced-focus subcase was refused by Windows foreground policy.",
+      "severity": "NOTE",
+      "rootCause": "Windows focus restriction, not duplicate-target multiplication.",
+      "repair": "Retained earlier full native focus/reconnect proof; final candidate matrix uses safe verified read/reuse without forced foreground.",
+      "retestStatus": "BOUNDED: final rapid/concurrent acquisition, budget/approval-refresh and real postcondition retry pass.",
+      "residualLimitation": "Final v25 forced foreground subcase NOT TESTED; equivalent Computer source unchanged and fixture coverage retained.",
+      "evidence": [
+        "native-matrix-v24.log",
+        "native-initial-failure.json",
+        "native-matrix.json",
+        "native-matrix-v25.json"
+      ]
+    },
+    {
+      "id": "T10-F09",
+      "attackId": "T10-XG-05",
+      "expectedBehavior": "Hard-kill must occur while grant is still active and use exact candidate helper.",
+      "observedBehavior": "One early grant expired before crash; later v25 wrapper initially called the v24-only helper and refused before crashing.",
+      "severity": "NOTE",
+      "rootCause": "TTL timing and helper-version selection errors in audit harness.",
+      "repair": "Retain expired case and helper refusal; perform immediate pre-expiry actual installed v25 crash with corrected helper.",
+      "retestStatus": "CORRECTED: active-before-v25, held native crash and final no-replay recovery pass.",
+      "residualLimitation": "Expired-before-crash case is not active-grant proof.",
+      "evidence": [
+        "restart-active-before-v24-expired.json",
+        "restart-verified-v24-expired.json",
+        "final-restart-campaign-v25-helper-version-failure.log",
+        "restart-active-before-v25.json",
+        "stage-v25-crash.json",
+        "restart-verified-v25.json"
+      ]
+    },
+    {
+      "id": "T10-F10",
+      "attackId": "T10-XG-10",
+      "expectedBehavior": "Harness diagnostics preserve privacy while reaching the boundary.",
+      "observedBehavior": "Several initial probes failed on wrong import/API/shape/path/encoding/assertion before intended boundary; failed run logs retained.",
+      "severity": "NOTE",
+      "rootCause": "Audit assumptions: array provider shape, status field, empty adapter health fixture, wrong db API/regex, PowerShell path/marker quoting, module path or TLS environment.",
+      "repair": "Correct actual contract/CLI invocation; rerun safe intended boundary with positive control.",
+      "retestStatus": "CORRECTED: final safe task/revoke/public/native/degraded/rollback/focused results pass.",
+      "residualLimitation": "Earlier harness failures are not product success evidence.",
+      "evidence": [
+        "live-safe.log",
+        "live-safe-pass.log",
+        "stage-install.log",
+        "stage-boot.log",
+        "t6/affected-retest.log",
+        "package-record.log",
+        "native-matrix.log",
+        "rollback-attacks.log",
+        "rollback-attacks-retest.log",
+        "degraded-boundary-v24.log",
+        "degraded-boundary-v24-pass.log",
+        "public-probe.log",
+        "public-probe-system-ca.log",
+        "restart-repair-focused.log"
+      ]
+    },
+    {
+      "id": "T10-F11",
+      "attackId": "T10-XG-04",
+      "expectedBehavior": "Composed child and desktop batch must both be live before Stop.",
+      "observedBehavior": "First composed fixture consent already covered desktop so no new batch prompt appeared; failure cleanup saw transient EPERM/Node Windows assertion.",
+      "severity": "NOTE",
+      "rootCause": "Test authorization positive control and Windows output/lifetime cleanup ordering.",
+      "repair": "Explicitly narrow simulated fixture capability scope while preserving provider consent; await owned job drain and handle cleanup retries.",
+      "retestStatus": "CORRECTED: real child+native batch Stop/reroute, sentinel preservation and no final leaked process.",
+      "residualLimitation": "Provider policy facts remain SIMULATED; no production mutation.",
+      "evidence": [
+        "stop-composition.log",
+        "stop-composition-retest.log",
+        "stop-composition-final.log",
+        "stop-composition-harness-failure.json",
+        "stop-composition.json",
+        "cleanup-native-inventory.json"
+      ]
+    },
+    {
+      "id": "T10-F12",
+      "attackId": "T10-XG-08",
+      "expectedBehavior": "Audit tool sessions must progress and close owned fixtures.",
+      "observedBehavior": "Execution quota/reviewer capacity and later sandbox-refresh failure interrupted tool work; CUA kernel could not resume. Complex shell inline JS also had a PowerShell parse error before execution.",
+      "severity": "NOTE",
+      "rootCause": "Environment/controller failure, inherited output pipes, PowerShell 5 module search inherited from PowerShell 7, unsafe complexity in inline quoting.",
+      "repair": "Reviewed explicit scripts; file-descriptor logs for launchers; correct PSModulePath; no name kills or browser-driver workaround; required repository render smoke with Edge.",
+      "retestStatus": "BOUNDED: final candidate smoke pass; all own native processes stopped; shared IAB process not killed.",
+      "residualLimitation": "Temporary IAB tab close could not be explicitly confirmed via CUA; default temporary tab lifecycle ends with tool task. No standalone T10 browser exists. Tool exceptions are summarized here because not all platform failures produce local logs.",
+      "evidence": [
+        "browser-smoke.log",
+        "browser-smoke-edge.log",
+        "restart-boot-v24.log",
+        "final-restart-campaign-harness-failure.log",
+        "final-restart-campaign.log",
+        "browser-smoke-v25.log",
+        "cleanup-native-inventory.json"
+      ]
+    },
+    {
+      "id": "T10-F13",
+      "attackId": "T10-XG-11",
+      "expectedBehavior": "Final preservation comparison uses actual snapshot fields.",
+      "observedBehavior": "First final comparison asserted immutable cloudflared child, then an assumed state.remote.url field threw TypeError/Node UV assertion.",
+      "severity": "NOTE",
+      "rootCause": "Harness treated replaceable transport child as fixed identity and used wrong HostSnapshot shape; canonical field is remoteUrl.",
+      "repair": "Retain failure log; check fixed four native identities, current worker-child-parent/lifetime, unchanged transport binary and Host remoteUrl.",
+      "retestStatus": "CORRECTED: final protected-row/Phone/Startup/install/source comparison passes.",
+      "residualLimitation": "Provider config and rollback content pre-fingerprints were not captured; byte comparisons of those paths remain NOT TESTED.",
+      "evidence": [
+        "production-final.log",
+        "production-final-pass.log",
+        "production-final.json",
+        "production-native-final.json"
+      ]
+    },
+    {
+      "id": "T10-F14",
+      "attackId": "T10-XG-10",
+      "expectedBehavior": "Audit documentation generator should parse before writing reports.",
+      "observedBehavior": "A missing string concatenation quote caused a SyntaxError before report generation.",
+      "severity": "NOTE",
+      "rootCause": "Documentation helper syntax mistake; no product or production action executed.",
+      "repair": "Correct literal and run node --check before regeneration.",
+      "retestStatus": "CORRECTED: report generation and final evidence audit must pass.",
+      "residualLimitation": "No runtime defect; original parser output retained.",
+      "evidence": [
+        "report-generator-syntax-failure.log"
+      ]
+    },
+    {
+      "id": "T10-F15",
+      "attackId": "T10-XG-10",
+      "expectedBehavior": "Sealed captured evidence should retain exact bytes while current reports pass whitespace checks.",
+      "observedBehavior": "Git whitespace check flagged native CRLF/trailing-space capture lines and an extra final report blank line. Staged byte equality already passed.",
+      "severity": "NOTE",
+      "rootCause": "Intentional -text evidence capture preserves native output; style checks interpret raw CRLF as trailing whitespace.",
+      "repair": "Preserve raw bytes, disable whitespace style checking only inside T10 evidence; keep current root reports/scoped attributes LF and trim report EOF.",
+      "retestStatus": "CORRECTED: staged bytes and final diff --check must pass.",
+      "residualLimitation": "No raw result was reformatted; historical hashes remain unchanged.",
+      "evidence": [
+        "git-whitespace-note.json"
+      ]
+    }
+  ],
+  "originalProductHighCount": 3,
+  "resolvedProductHighCount": 3,
+  "unresolvedCandidateHighCount": 0,
+  "unresolvedCandidateBlockerCount": 0,
+  "productionRepairPromotion": "DEFERRED: older v17 unchanged; no operational approval"
+}

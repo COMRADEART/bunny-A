@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,copyFileSync,statSync} from 'node:fs';
+import {verifyRelease,fileSha256,sourceCheck,importClosure} from '../../scripts/bunny-release.mjs';
+const pin=JSON.parse(readFileSync('install/release-pin.json','utf8')),folder='releases/'+pin.release,manifest=JSON.parse(readFileSync(folder+'/release-manifest.json','utf8'));
+const installed='C:/Users/allam/AppData/Local/Bunny-A-T10-stage/releases/'+pin.release;
+const integrity=verifyRelease(folder),installedIntegrity=verifyRelease(installed),source=sourceCheck(process.cwd(),folder),closure=importClosure(folder);
+for(const r of [integrity,installedIntegrity,source,closure])assert.equal(r.ok,true);
+const archive=folder+'.zip';const packageSha=fileSha256(archive);assert.equal(readFileSync(archive+'.sha256','utf8').split(/\s/)[0],packageSha);
+copyFileSync(folder+'/release-manifest.json','test-results/ma2-gate10/candidate-manifest.json');
+writeFileSync('test-results/ma2-gate10/candidate-package.json',JSON.stringify({recordedAt:new Date().toISOString(),classification:'STATIC VERIFIED',release:pin.release,sourceCommit:manifest.sourceCommit,toolingCommit:manifest.toolingCommit,manifestSha256:fileSha256(folder+'/release-manifest.json'),packageSha256:packageSha,packageBytes:statSync(archive).size,assetManifestSha256:manifest.dashboard.assetManifestSha256,assetInventory:manifest.files.filter(f=>f.path.startsWith('.output/public/')),files:manifest.files.length,integrity,installedIntegrity,source,closure,exactCommittedArchive:true,dirtyInput:false,productionActivated:false},null,2)+'\n');
