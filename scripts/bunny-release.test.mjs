@@ -1,7 +1,8 @@
 // M-A-1D deployment hardening: the installed Bunny-A Host runs a pinned release, never a development checkout.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync, spawn } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import { appendFileSync, chmodSync, closeSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -151,8 +152,9 @@ test("M-A-1D: the logon launcher starts the release runtime in the separate work
   }
 });
 
-test("M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release", { skip: !windows, timeout: 240_000 }, () => {
+test("M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release", { skip: !windows, timeout: 240_000 }, async () => {
   const temp = mkdtempSync(join(tmpdir(), "bunny-release-install-"));
+  let idleHost = null; let hostPort;
   try {
     const release = sandboxRelease(join(temp, "built"));
     const checkout = join(temp, "checkout"); mkdirSync(join(checkout, "releases", "Gateway-v1"), { recursive: true });
@@ -160,7 +162,17 @@ test("M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, 
     writeFileSync(join(checkout, "releases", "Gateway-v1", "Bunny-Server.mjs"), "// gateway\n");
     const install = join(temp, "install"); const data = join(install, "state");
     for (const folder of ["settings", "credentials", "runtime", "logs", "backups", "cloudflared", "sessions"]) mkdirSync(join(data, folder), { recursive: true });
-    writeFileSync(join(data, "host.sqlite"), "database bytes");
+    const db = new DatabaseSync(join(data, "host.sqlite"));
+    db.exec('CREATE TABLE tasks(record TEXT);CREATE TABLE missions(record TEXT);CREATE TABLE capability_runs(record TEXT);CREATE TABLE approval_batches(record TEXT);CREATE TABLE settings(key TEXT,value TEXT);CREATE TABLE preserved_user_data(value TEXT)');
+    db.prepare('INSERT INTO settings VALUES (?,?)').run('missions_config',JSON.stringify({enabled:false,triggersEnabled:false}));
+    db.prepare('INSERT INTO preserved_user_data VALUES (?)').run('database bytes');db.close();
+    const originalDatabase = readFileSync(join(data, "host.sqlite"));
+    hostPort = await freePort();
+    const idleEntry = join(temp, 'authenticated-idle-host.mjs');
+    writeFileSync(idleEntry, `import {createServer} from 'node:http';const server=createServer((req,res)=>{if(req.headers.authorization!=='Bearer t10-install-fixture'){res.writeHead(401);res.end();return;}res.setHeader('content-type','application/json');res.end(JSON.stringify({missions:{enabled:false,config:{triggersEnabled:false}},tasks:[]}));if(req.url==='/close')server.close();});server.listen(${hostPort},'127.0.0.1');`);
+    idleHost = spawn(process.execPath,[idleEntry],{stdio:'ignore',windowsHide:true});
+    for(let i=0;;i++){try{assert.equal((await fetch(`http://127.0.0.1:${hostPort}/state`,{headers:{authorization:'Bearer t10-install-fixture'}})).status,200);break;}catch(error){if(i>=100)throw error;await new Promise(r=>setTimeout(r,20));}}
+    writeFileSync(join(data,'credentials/credentials.json'),JSON.stringify({token:'t10-install-fixture',port:hostPort}));
     writeFileSync(join(data, "state-layout.json"), JSON.stringify({ schema: "bunny-state/2", stateRoot: data }));
     writeFileSync(join(data, "settings/deployment.json"), JSON.stringify({ packagePath: join(checkout, "releases", "Gateway-v1") }));
     const startup = join(temp, "startup"); mkdirSync(startup);
@@ -169,7 +181,7 @@ test("M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, 
     const before = shortcut(link);
     const workspace = join(temp, "Bunny-Workspace");
     const installer = join(repo, "scripts/install-bunny-release.ps1");
-    const common = ["-InstallRoot", install, "-DataDirectory", data, "-StartupDirectory", startup, "-AllowTestPackage"];
+    const common = ["-InstallRoot", install, "-DataDirectory", data, "-StartupDirectory", startup, "-AllowTestPackage", "-HostPort", String(hostPort)];
     assert.match(powershell(installer, ["-Package", release, ...common, "-Workspace", join(checkout, "work")], temp).stderr, /inside a Git checkout/);
     assert.match(powershell(installer, ["-Package", release, ...common, "-Workspace", join(install, "releases", "work")], temp).stderr, /must be separate/);
     const unsafeState = join(checkout, ".bunny-a"); mkdirSync(unsafeState);
@@ -190,7 +202,7 @@ test("M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, 
     assert.ok(verifyRelease(installed).ok);
     assert.equal(statSync(join(installed, "Bunny-Host.mjs")).mode & 0o200, 0);
     assert.ok(!lstatSync(data).isSymbolicLink() && !existsSync(join(data, ".bunny-a")));
-    assert.equal(readFileSync(join(data, "host.sqlite"), "utf8"), "database bytes");
+    assert.deepEqual(readFileSync(join(data, "host.sqlite")), originalDatabase);
     const config = JSON.parse(readFileSync(join(install, "install.json"), "utf8").replace(/^\uFEFF/, ""));
     assert.equal(config.schema, "bunny-install/2"); assert.equal(config.stateLayoutVersion, 2);
     assert.ok(same(config.workspace, workspace) && existsSync(workspace) && insideGit(workspace) === null);
@@ -213,8 +225,9 @@ test("M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, 
     assert.deepEqual(shortcut(link), after);
     assert.ok(same(JSON.parse(readFileSync(join(data, "settings/deployment.json"), "utf8")).packagePath, deployment.packagePath));
     assert.ok(existsSync(installed) && existsSync(join(install, "releases", "Bunny-A-Windows-v100")));
-    assert.equal(readFileSync(join(data, "host.sqlite"), "utf8"), "database bytes");
+    assert.deepEqual(readFileSync(join(data, "host.sqlite")), originalDatabase);
   } finally {
+    if(idleHost){await fetch(`http://127.0.0.1:${hostPort}/close`,{headers:{authorization:'Bearer t10-install-fixture'}}).catch(()=>{});if(idleHost.exitCode===null)await Promise.race([new Promise(r=>idleHost.once('exit',r)),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Owned idle fixture did not exit')),5000))]);}
     for (const file of walkFiles(temp)) chmodSync(join(temp, file), 0o600);
     rmSync(temp, { recursive: true, force: true, maxRetries: 40, retryDelay: 500 });
   }

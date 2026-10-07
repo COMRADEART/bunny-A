@@ -62,13 +62,6 @@ function Save-Shortcut([string]$Destination) {
 }
 
 if($Rollback) {
-  # T10: a paused Mission or ephemeral desktop grant is active authority too. The read-only
-  # preflight scans canonical SQLite, rather than a limited dashboard page, before any switch.
-  $currentConfig=Get-Content -LiteralPath $installConfig -Raw | ConvertFrom-Json
-  $preflight=Join-Path $PSScriptRoot 'bunny-rollback-preflight.mjs'
-  if(-not(Test-Path -LiteralPath $preflight)) {throw 'Rollback preflight is unavailable. Nothing was switched.'}
-  & (Join-Path $currentConfig.currentRelease.folder 'runtime\node.exe') $preflight $installConfig
-  if($LASTEXITCODE -ne 0) {throw 'Rollback requires quiescent canonical work and disabled Missions/Triggers. Nothing was switched.'}
   if(-not $RollbackDirectory) {$RollbackDirectory=@(Get-ChildItem -LiteralPath (Join-Path $InstallRoot 'rollback') -Directory | Sort-Object Name)[-1].FullName}
   if(-not(Test-Path -LiteralPath (Join-Path $RollbackDirectory 'install.json'))) {throw 'Legacy rollback was refused: no pinned prior install configuration exists.'}
   $priorConfig=Get-Content -LiteralPath (Join-Path $RollbackDirectory 'install.json') -Raw | ConvertFrom-Json
@@ -79,6 +72,13 @@ if($Rollback) {
   if(Test-Path -LiteralPath $priorDeployment) {[void](Assert-BunnyDirectory (Get-Content -LiteralPath $priorDeployment -Raw | ConvertFrom-Json).packagePath)}
   $priorShortcut=Get-Content -LiteralPath (Join-Path $RollbackDirectory 'shortcut.json') -Raw | ConvertFrom-Json
   if(-not $priorShortcut.arguments.Contains((Join-Path $priorConfig.currentRelease.folder 'Start-Bunny-Release.ps1')) -or $priorShortcut.workingDirectory -ne $priorConfig.currentRelease.folder) {throw 'Rollback shortcut does not start the pinned prior release.'}
+  # Read-only target checks precede the final quiescence check. Both must pass before mutation.
+  # A paused Mission or ephemeral desktop grant is active authority; scan canonical SQLite.
+  $currentConfig=Get-Content -LiteralPath $installConfig -Raw | ConvertFrom-Json
+  $preflight=Join-Path $PSScriptRoot 'bunny-rollback-preflight.mjs'
+  if(-not(Test-Path -LiteralPath $preflight)) {throw 'Rollback preflight is unavailable. Nothing was switched.'}
+  & (Join-Path $currentConfig.currentRelease.folder 'runtime\node.exe') $preflight $installConfig
+  if($LASTEXITCODE -ne 0) {throw 'Rollback requires quiescent canonical work and disabled Missions/Triggers. Nothing was switched.'}
   $restored=[ordered]@{rollbackDirectory=$RollbackDirectory}
   $savedLink=Join-Path $RollbackDirectory 'Bunny-A.lnk'
   if(Test-Path -LiteralPath $savedLink) {Copy-Item -LiteralPath $savedLink -Destination $shortcutPath -Force;$restored.shortcut=(Get-Content -LiteralPath (Join-Path $RollbackDirectory 'shortcut.json') -Raw | ConvertFrom-Json)}
