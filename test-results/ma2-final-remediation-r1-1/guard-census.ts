@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {getState,getMission,REC,saveRecord} from './live-client.ts';
+const before=JSON.parse(readFileSync(REC+'/restart-active-before.json','utf8'));
+const state:any=await getState(),detail=await getMission(before.missionId);
+assert.equal(state.missions.enabled,false);
+assert.equal(state.missions.config.triggersEnabled,false);
+assert.equal(detail.mission.state,'waiting_for_user');
+assert.equal(detail.mission.batch.status,'active');
+assert.ok(detail.mission.batch.expiresAt>Date.now());
+saveRecord('rollback-guard-census.json',{recordedAt:new Date().toISOString(),classification:'LIVE VERIFIED',missionsEnabled:false,triggersEnabled:false,activeCanonicalFixture:before.missionId,activeBatchId:detail.mission.batch.id,expiresAt:detail.mission.batch.expiresAt,waitingApproval:true});

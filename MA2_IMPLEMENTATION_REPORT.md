@@ -1,3 +1,17 @@
+<!-- R1.1 current production record start -->
+## Final remediation R1.1 — current implementation and deployment
+
+**BUNNY_MA2_FINAL_REMEDIATION_R1_1_PASS (2026-10-07).** Production now runs exact unchanged **Bunny-A-Windows-v26-MA2-R1**, runtime `8001d51d871f12c15b8de03005a40e9d4c3fd8c2`, packaged tooling `0d3f96db093b2106ebab90e0249ae7b1e711aee9`. Manifest `06836b4847824edcbfa4c1628b4e0106c5ccded24a8d9361355003f467339e54` and ZIP `3e68faed3e1d9ae75d1d3f2140c831e8843fc914ea7dc179e78c81445f7fbac3` remain immutable. All six repairs operate in actual production; no Git runtime deployment or candidate repackaging was used.
+
+External classifier commit `1b5c9c3d6c90e04d09cc0a8dbb3da484d82f0962` adds narrow current Windows support lineage recognition, not runtime authority. Held current parent/child births/images, exact role/path, SID/session, Valid Windows signer and live kernel association are all required. Unknown descendants and changed/unavailable identities refuse; support exits naturally and is never directly killed. Real five-role console fixtures, foreign descendant/sentinel and parent exit race pass, alongside 18 adversarial fact tests and all unchanged IR-H1/T4 safeguards.
+
+Fresh canonical idle/consistent backup/ledger and five held production role lifetimes passed before authorized Stop/atomic selection. Actual native app/Host/gateway/tunnel/cloudflared/Startup identities verify v26. Production SSE, active canonical rollback no-mutation refusal with flags OFF, controlled restart approval invalidation, finite Calculator batch/scope/Stop and no-duplicate repeated/concurrent/retry/focus/approval-refresh/reconnect checks passed. Full regression is 664 (254 + 373 + 37), zero failures/skips; focused IR-H1/T4 35 and exact installed IR-H1 10 are separate reruns. Typecheck/lint/build/package validation pass.
+
+Protected historical rows have zero missing/changed digests; all 16 original devices/settings and Phone remain unchanged. Appended telemetry/acceptance rows, the new batch table and 17 owned Calculator execution-identity settings are enumerated. All QA devices are revoked, original Missions/Triggers OFF restored, and final inventory has zero Calculator/QA authority/process residue. Separate source development Host is preserved. Canonical operations pointer now names verified installed guards and exported external classifier/identity procedure; old unsafe guides/controller remain retained and marked historical invalid. No real rollback, reboot, dangerous OS reuse or physical Phone acceptance is claimed.
+
+See [MA2_FINAL_REMEDIATION_R1_1.md](MA2_FINAL_REMEDIATION_R1_1.md) and `test-results/ma2-final-remediation-r1-1/evidence/index.json`. A fresh independent review of deployed production remains required. Original independent FAIL and R1 failed activation/report/evidence remain unchanged; all dated “current” records below are historical.
+<!-- R1.1 current production record end -->
+
 <!-- R1 approval checkpoint start -->
 ## Final remediation R1 — current implementation record
 

@@ -6,6 +6,8 @@ $cfg=Get-Content -LiteralPath (Join-Path $root 'install.json') -Raw | ConvertFro
 if($cfg.currentRelease.name -ne 'Bunny-A-Windows-v26-MA2-R1') {throw 'Unexpected installed production candidate'}
 $health=Invoke-RestMethod ('http://127.0.0.1:'+$cfg.hostPort+'/health') -TimeoutSec 5
 if($Phase -eq 'guard') {
+ & (Join-Path $cfg.currentRelease.folder 'runtime/node.exe') --experimental-strip-types (Join-Path $PSScriptRoot 'guard-census.ts')
+ if($LASTEXITCODE -ne 0){throw 'Expected OFF flags plus active canonical fixture not verified; no guard invocation'}
  # Private selection fixture points to actual canonical production authority. If a bug
  # bypassed the guard, only private selection/Startup would be eligible for mutation.
  $fixtureRoot=Join-Path $cfg.stateRoot 'backups/ma2-final-remediation-r1-1/rollback-acceptance'

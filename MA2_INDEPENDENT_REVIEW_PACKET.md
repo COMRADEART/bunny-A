@@ -1,3 +1,21 @@
+<!-- R1.1 current production record start -->
+## Final remediation R1.1 — fresh deployed-system re-review handoff
+
+**Ready for a fresh independent re-review of actual production.** Implementer verdict is **BUNNY_MA2_FINAL_REMEDIATION_R1_1_PASS**, not an independent operational approval. Original `MA2_FINAL_INDEPENDENT_REVIEW.md` remains SHA-256 `2ac061dda6f07d86236c1c648ec738d363cb9b701e148b17c7755d5653f57d3a`; original R1 failed-closed attempt/report/evidence remain unchanged. Do not erase or reinterpret those historical failures.
+
+Review [MA2_FINAL_REMEDIATION_R1_1.md](MA2_FINAL_REMEDIATION_R1_1.md), `test-results/ma2-final-remediation-r1-1/final-verdict.json` and hashed `evidence/index.json`. Actual operating release is **Bunny-A-Windows-v26-MA2-R1**, version **26.0.0-MA2-R1**, source `8001d51d871f12c15b8de03005a40e9d4c3fd8c2`, packaged tooling `0d3f96db093b2106ebab90e0249ae7b1e711aee9`, manifest `06836b4847824edcbfa4c1628b4e0106c5ccded24a8d9361355003f467339e54`, ZIP `3e68faed3e1d9ae75d1d3f2140c831e8843fc914ea7dc179e78c81445f7fbac3`. Candidate bytes did not change for the external controller fix.
+
+Verify current canonical state/selection/Startup and actual loaded app/Host/gateway/tunnel/cloudflared against `production-identity.json` and `final-production.json`, resolving all identities freshly. Current canonical operations pointer is `%LOCALAPPDATA%\Bunny-A\state\operations\current.json`; exported corrected classifier/identity controller and exact installed guarded installer/preflight/IR-H1 modules are hash-verified. Saved PID snapshots are audit evidence only. The successful bounded v17→v26 controller is historical and must not be rerun as a generic current deployment tool. All old unsafe rollback guides/controllers are retained and explicitly invalid for current acceptance.
+
+Independently assess console-support lineage (kernel association plus current held parent/child birth/image/SID/session/signer), unknown/refused descendants and natural console teardown; installed IR-H1 ambiguity reduces authority; canonical active authority rollback refusal even with flags OFF; SSE post-revocation delivery/read/command/reconnect denial; restart old-approval invalidation/no GUI replay; bounded T9 scope/Stop; T9R target count through repeated/concurrent/retry/focus/fresh approval/actual UI reload; protected-row/device/Phone/settings preservation and final cleanup. Proof is MIXED: actual production and disposable Windows behavior, exact-byte verification and faithful simulated reuse/name/path/signer negatives. No actual rollback, reboot, dangerous OS PID reuse or physical Phone interaction was performed.
+
+Full regression 664 (254 + 373 + 37), zero failures/skips/cancellations; 18 external facts, focused IR-H1/T4 35 and installed IR-H1 10 are separately classified reruns. Original historical rows/devices/settings are unchanged; appended QA/telemetry records are enumerated, two QA devices revoked, Missions/Triggers OFF restored, zero unexplained Calculator or QA authority/runtime. The separate source development Host remains original healthy instance on 43139; original human intent/cwd are qualified and it was preserved. Resolved harness failures and secret audit are retained in the index. A new reviewer/session must verify the deployed state independently; historical stage results alone do not close the deployment gap.
+
+One extra read-only operational inspection refused a transient unmodelled descendant; no authority/Stop/selection followed. It disappeared before diagnosis and its earlier identity stays unclassified. Later fresh diagnostic and unchanged exported-controller topology checks plus canonical idle passed. Review the retained initial refusal/post-refusal topology and final fresh identity; do not reinterpret that refusal as permission to ignore future unknown children. The final pointer verifier checks actual PowerShell success and a newly timestamped output, not a stale native-command exit variable.
+
+All dated “current” handoff/checkpoint records below are preserved historical context, superseded by this deployed R1.1 handoff.
+<!-- R1.1 current production record end -->
+
 <!-- R1 approval checkpoint start -->
 ## Final remediation R1 — current review handoff checkpoint
 

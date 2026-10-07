@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+const path='scripts/bunny-release.test.mjs',working=readFileSync(path),committed=execFileSync('git',['show','1b5c9c3d6c90e04d09cc0a8dbb3da484d82f0962:'+path]);
+assert.equal(working.toString().replaceAll('\r\n','\n'),committed.toString(),'Unexpected test source change; no overwrite');
+const sha=b=>createHash('sha256').update(b).digest('hex');
+writeFileSync(path,committed);
+writeFileSync('test-results/ma2-final-remediation-r1-1/seal-test-line-ending-refusal.json',JSON.stringify({recordedAt:new Date().toISOString(),classification:'STATIC VERIFIED retained evidence-seal correction',path,initialWorkingSha256:sha(working),committedSha256:sha(committed),onlyCrLfNormalization:true,normalizedSourceExact:true,semanticSourceChange:false,candidateRuntimeChange:false,regressionRerunRequired:false,reason:'Working test mixed Windows line endings differed from its existing committed blob. Proved normalized content exact before restoring the same committed bytes; no runtime deployment or test assertion change.'},null,2)+'\n');
+console.log(JSON.stringify({path,onlyLineEndingsChanged:true,sha256:sha(committed)}));

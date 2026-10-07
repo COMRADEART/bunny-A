@@ -5,7 +5,7 @@ $root=Join-Path $env:LOCALAPPDATA 'Bunny-A'
 $cfg=Get-Content -LiteralPath (Join-Path $root 'install.json') -Raw | ConvertFrom-Json
 $auth=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'authorization.json') -Raw | ConvertFrom-Json
 if($cfg.currentRelease.manifestSha256 -ne $auth.candidate.manifestSha256 -or (Test-Path -LiteralPath (Join-Path $root 'state-migration.lock'))) {throw 'Boot selection or operation lock mismatch'}
-$app=Start-Process -FilePath (Join-Path $root 'Bunny-A.exe') -WorkingDirectory $root -WindowStyle Hidden -PassThru
+$app=Start-Process -FilePath (Join-Path $root 'Bunny-A.exe') -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput (Join-Path $PSScriptRoot 'native-bootstrap-output.log') -RedirectStandardError (Join-Path $PSScriptRoot 'native-bootstrap-error.log') -PassThru
 $applicationPath=Join-Path $cfg.stateRoot 'runtime/windows-application.json'
 $ready=$false
 for($i=0;$i -lt 120;$i++) {

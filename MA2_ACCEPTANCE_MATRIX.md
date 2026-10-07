@@ -1,3 +1,21 @@
+<!-- R1.1 current production record start -->
+## Final remediation R1.1 — deployed production acceptance
+
+**BUNNY_MA2_FINAL_REMEDIATION_R1_1_PASS (2026-10-07).** Exact unchanged v26-MA2-R1 is now the operating production release. External console-lineage classification is repaired with fresh held birth/image, SID/session, signer and kernel console association; support gains no direct kill authority. Unknown/reused/unavailable lineage remains fail-closed. A fresh independent re-review is still required.
+
+| Acceptance | Result / evidence | Classification |
+|---|---|---|
+| Console model / foreign refusal / exit race | Four real support lifetimes accepted in five-role disposable topology; foreign descendant and exited parent refused; sentinel preserved; 18 adversarial facts pass | DISPOSABLE LIVE + SIMULATED facts |
+| Regression | 664 full tests (254 + 373 + 37), zero failures/skips/cancellations; typecheck/lint/build/package validation pass; focused 35 and installed IR-H1 10 pass | Executed + exact installed byte verification |
+| Fresh preflight and activation | Fresh canonical idle/private SQLite backup/ledger; five held roles and four narrow support lifetimes; exact pinned installer/atomic selection; actual loaded v26 identity | LIVE VERIFIED |
+| SSE / rollback / restart | Dedicated revoked stream gets no future protected bytes and all protected access 401; OFF-flags active canonical guard refuses before mutation; fresh Host restart invalidates old grants/requests with no replay | LIVE VERIFIED |
+| T9 / T9R / IR-H1 | Explicit finite Calculator batch, scope/Stop isolation, repeated/concurrent/retry/focus/approval-refresh/real reload with one target; exact installed owned Stop positive and simulated reuse denial | LIVE + STATIC + SIMULATED reuse |
+| Preservation / cleanup | Zero missing/changed historical protected rows; all original 16 devices/settings and Phone unchanged; appended QA rows enumerated; two QA devices revoked; zero Calculator/active QA authority/process leftovers; development Host preserved | LIVE VERIFIED |
+| Current operations | Canonical guarded pointer exported/verified outside Git; historical unsafe guides/controllers retained and marked invalid for current acceptance | LIVE + STATIC VERIFIED |
+
+See [MA2_FINAL_REMEDIATION_R1_1.md](MA2_FINAL_REMEDIATION_R1_1.md), `test-results/ma2-final-remediation-r1-1/final-verdict.json` and `evidence/index.json`. Runtime source remains `8001d51d871f12c15b8de03005a40e9d4c3fd8c2`; packaged tooling remains `0d3f96db093b2106ebab90e0249ae7b1e711aee9`. The original independent review and R1 report/evidence are unchanged. Records below, including their dated “current” labels, are preserved history.
+<!-- R1.1 current production record end -->
+
 <!-- R1 approval checkpoint start -->
 ## Final remediation R1 — authorized attempt result
 
