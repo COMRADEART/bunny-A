@@ -19,7 +19,7 @@ export type OwnedProcessRecord = {
 };
 export type ProcessOwner = { missionId?: string | null; stepId?: string | null; capabilityRunId?: string | null; dataDirectory?: string; action?: string; records?: OwnedProcessRecord[] };
 type Snapshot = { launcherPid: number; launcherCreatedAt: number; exitCode: number | null; limitFlags: number; members: OwnedProcessIdentity[] };
-type Native = { launch(file: string, line: string, cwd: string, env: string, out: string, err: string): object; inspect(group: object): Snapshot; close(group: object): void };
+type Native = { launch(file: string, line: string, cwd: string, env: string, out: string, err: string): object; inspect(group: object): Snapshot; close(group: object): void; terminateVerified(pid: string, createdAt: string, imageName: string): void };
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 let loaded: Native | undefined;
 /** Integrity is checked before loading native code. Packaged authority comes

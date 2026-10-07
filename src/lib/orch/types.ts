@@ -207,6 +207,8 @@ export type OrchTask = {
   processTree?: ProcessInfo[] | null;
   processTreeAt?: number | null;
   stopReason?: string | null;
+  /** Stop ended future task admission; this separately reports OS cleanup verification. */
+  stopCleanup?: { status: "complete" | "ownership_unverified" | "cleanup_incomplete"; inspectedAt: number; unresolvedProcessCount: number | null; terminationFailures: number };
   feedback?: "positive" | "negative" | null;
   retries?: number;
   /** Independent check Bunny-A runs itself after the provider exits successfully. */

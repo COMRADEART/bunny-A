@@ -10,7 +10,7 @@ import type { AgentSession, HostEvent, HostSnapshot, ProviderAdapter, RunningSes
 import { PolicyEngine } from "./learning.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
 import { activityLabel } from "./events.ts";
-import { describeTree, descendants, killProcess, processTable, survivors } from "./process-tree.server.ts";
+import { describeTree, descendants, killProcess, processTable, sameProcessIdentity, survivors } from "./process-tree.server.ts";
 import { verifySpec } from "./verification.server.ts";
 import { HostContainment, safeError, type SafeError } from "./failure.server.ts";
 
@@ -322,22 +322,41 @@ export class TaskManager {
     this.stopping.add(id);
     try {
       const session=this.sessions.get(id);
-      // Snapshot the owned tree first so the result can be checked: every recorded process must be gone.
+      // Pre-stop observations remain evidence only; failed fresh inspection confers no kill authority.
       const root=session?.pid?.() ?? null;
-      const before=root ? descendants(await this.readProcesses().catch(()=>[]),root) : [];
+      const initial=root ? await this.readProcesses().catch(()=>null) : [];
+      const before=root && initial ? descendants(initial,root) : [];
       // Abort request is issued before marking stopped; cancellation errors are honest failures.
       await session?.stop();
       this.flushers.get(id)?.();this.stopTree(id);
       let cleanup="";
-      if(before.length) {
-        let alive=survivors(before,await this.readProcesses().catch(()=>before));
-        // Anything that outlived the tree kill was proven ours by the snapshot (same PID and start time).
-        for(const row of alive) await killProcess(row.pid).catch(()=>{});
-        if(alive.length) alive=survivors(alive,await this.readProcesses().catch(()=>alive));
-        cleanup=alive.length ? ` ${alive.length} owned process${alive.length === 1 ? "" : "es"} could not be ended: ${describeTree(alive)}.` : ` Ended ${before.length} owned process${before.length === 1 ? "" : "es"} (${describeTree(before)}); none remain.`;
+      const stopCleanup: NonNullable<OrchTask["stopCleanup"]>={status:"complete",inspectedAt:Date.now(),unresolvedProcessCount:0,terminationFailures:0};
+      if(root) {
+        const fresh=await this.readProcesses().catch(()=>null);
+        if(!initial || !before.length || !fresh || before.some(row=>!sameProcessIdentity(row,row))) {
+          stopCleanup.status="ownership_unverified";stopCleanup.unresolvedProcessCount=before.length || null;
+          cleanup=" Cleanup ownership unverified: process inspection or lifetime identity is unavailable. Session Stop was requested; no snapshot-based termination was attempted and remaining ownership is unresolved.";
+        } else {
+          let alive=survivors(before,fresh);
+          for(const row of alive) {
+            // Native termination checks lifetime/image on the very handle it terminates.
+            try {await killProcess(row);} catch {stopCleanup.terminationFailures++;}
+          }
+          const verified=alive.length ? await this.readProcesses().catch(()=>null) : fresh;
+          stopCleanup.inspectedAt=Date.now();
+          if(!verified) {
+            stopCleanup.status="ownership_unverified";stopCleanup.unresolvedProcessCount=alive.length;
+            cleanup=" Cleanup ownership unverified: final process inspection failed. Remaining ownership is unresolved; no previous table was reused.";
+          } else {
+            alive=survivors(before,verified);stopCleanup.unresolvedProcessCount=alive.length;
+            stopCleanup.status=alive.length || stopCleanup.terminationFailures ? "cleanup_incomplete" : "complete";
+            cleanup=stopCleanup.status!=="complete" ? ` Cleanup incomplete: ${alive.length} corroborated owned process(es) remain; ${stopCleanup.terminationFailures} identity-checked termination(s) refused or failed.` : ` Verified ${before.length} recorded process lifetime(s) ended; none remain (${describeTree(before)}).`;
+          }
+        }
       } else if(session) cleanup=" No OS process belonged to this session (in-process request).";
+      if(stopCleanup.status!=="complete") this.emit(this.db.event("task.cleanup_incomplete",id,cleanup.trim()));
       const current=this.db.get(id);if(!canTransition(current.state,"stopped")) return current;
-      const stopped=this.update(current,{state:"stopped",finishedAt:Date.now(),activity:"Stopped",stopReason:detail,latestEvent:this.activity(current,"agent.stopped",detail+cleanup,"bunny"),...(before.length ? {processTree:before,processTreeAt:Date.now()} : {})},"task.stopped",detail+cleanup);
+      const stopped=this.update(current,{state:"stopped",finishedAt:Date.now(),activity:stopCleanup.status==="complete" ? "Stopped" : "Stopped; cleanup incomplete",stopReason:detail,stopCleanup,latestEvent:this.activity(current,"agent.stopped",detail+cleanup,"bunny"),...(before.length ? {processTree:before,processTreeAt:Date.now()} : {})},"task.stopped",detail+cleanup);
       return stopped;
     } finally {this.stopping.delete(id);}
   }

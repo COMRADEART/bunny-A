@@ -7,12 +7,19 @@ MinGW-w64 compiler to reproduce a build; no executable/module is downloaded.
 Windows 10+ job-list creation support is required. Unsupported architecture,
 missing module, bad hashes or incompatible enclosing jobs fail before Git runs.
 
-The three exports are `launch`, `inspect` and `close`. `launch` accepts an exact
+The job exports are `launch`, `inspect` and `close`. `launch` accepts an exact
 executable, quoted argv, cwd, Unicode environment block and two local output
 pipe names. It returns a Node external wrapping an owned job and process handle.
 Neither other exports nor restart accept PIDs, integer handles or job names.
 The stable Node-API C declarations are resolved from the running `node.exe`,
 without V8/C++ ABI linkage or a third-party Node dependency.
+
+`terminateVerified` supports supplemental Task Stop after a successful fresh
+process inspection. It requires the observed PID, exact creation time and image
+name, opens one non-inheritable process handle, checks its lifetime/image, and
+terminates that same handle. An integer PID alone is refused. A failed inspection
+never calls it. Historical snapshots remain diagnostic evidence. This path does
+not reconstruct job ownership or change Git's held job handle semantics.
 
 The Host holds the sole non-inheritable handle of an unnamed job. Its only limit
 is `KILL_ON_JOB_CLOSE`. `JOB_LIST` associates the root at kernel creation time;

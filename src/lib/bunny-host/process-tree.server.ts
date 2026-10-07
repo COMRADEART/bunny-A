@@ -1,4 +1,5 @@
 import { execOwnedFile } from "./owned-processes.server.ts";
+import { windowsOwnershipModule } from "./owned-process-group.server.ts";
 import type { ProcessInfo } from "../orch/types.ts";
 
 const exec = execOwnedFile;
@@ -38,15 +39,27 @@ export function descendants(rows: ProcessInfo[], rootPid: number): ProcessInfo[]
 
 /** Processes from an earlier snapshot that are still alive as the same process (same PID and creation time). */
 export function survivors(before: ProcessInfo[], after: ProcessInfo[]): ProcessInfo[] {
-  return before.filter((old) => after.some((row) => row.pid === old.pid && (old.createdAt === null || row.createdAt === old.createdAt)));
+  return before.filter((old) => sameProcessIdentity(old, after.find((row) => row.pid === old.pid)));
+}
+
+/** A missing birth time cannot establish identity for destructive cleanup. */
+export function sameProcessIdentity(expected: ProcessInfo, current: ProcessInfo | undefined): boolean {
+  return !!current && Number.isSafeInteger(expected.pid) && expected.pid > 0 &&
+    expected.createdAt !== null && Number.isFinite(expected.createdAt) && expected.createdAt > 0 &&
+    current.pid === expected.pid && current.createdAt === expected.createdAt &&
+    !!expected.name && current.name.toLowerCase() === expected.name.toLowerCase();
 }
 
 export function describeTree(tree: ProcessInfo[]): string {
   return tree.map((row) => `${row.name} ${row.pid}`).join(" → ") || "no processes";
 }
 
-/** Ends one specific process that a snapshot proved belongs to an owned session. */
-export async function killProcess(pid: number): Promise<void> {
-  if (process.platform === "win32") await exec("taskkill.exe", ["/PID", String(pid), "/F"], { windowsHide: true, timeout: 5000 });
-  else process.kill(pid, "SIGKILL");
+/** Revalidate the expected lifetime/image on one held kernel handle, then terminate that handle.
+ * An enumeration is corroboration, never permission to kill a bare integer PID.
+ * Platforms without this primitive retain the session's owned Stop and refuse supplemental cleanup.
+ */
+export async function killProcess(identity: ProcessInfo): Promise<void> {
+  if (!sameProcessIdentity(identity, identity) || process.platform !== "win32")
+    throw new Error("Supplemental cleanup refused: current process ownership cannot be verified.");
+  windowsOwnershipModule().terminateVerified(String(identity.pid), String(identity.createdAt), identity.name);
 }

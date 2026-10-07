@@ -1,6 +1,6 @@
 /* Windows x64, Node-API v8. No Node/V8 C++ ABI or third-party runtime.
  * Stable C signatures: https://nodejs.org/api/n-api.html . Resolve only the
- * documented exports from node.exe. Never accepts a PID/HANDLE as authority.
+ * documented exports from node.exe. A PID alone never confers authority.
  */
 #define _WIN32_WINNT 0x0A00
 #include <windows.h>
@@ -150,6 +150,37 @@ static napi_value inspect(napi_env env,napi_callback_info info) {
   free(members);napi_set_named_property(env,result,"members",list);return result;
 }
 static napi_value close_owned(napi_env env,napi_callback_info info){Group *g=argument(env,info);if(!g)return fail(env,"live group identity",ERROR_INVALID_HANDLE);close_group(g);napi_value result;napi_get_null(env,&result);return result;}
+/* Supplemental Task Stop: acquire once, verify birth/image on that handle,
+ * and terminate the SAME handle. PID reuse between enumeration and acquisition
+ * is refused; reuse after acquisition cannot retarget an open kernel handle.
+ * This never changes held Git job ownership or reconstructs an old job. */
+static napi_value terminate_verified(napi_env env,napi_callback_info info) {
+  napi_value values[3],result=NULL;size_t count=3,n[3];wchar_t *s[3]={0},*end=NULL;
+  HANDLE handle=NULL;DWORD error=ERROR_INVALID_PARAMETER;const char *stage="process identity arguments";
+  if(napi_get_cb_info(env,info,&count,values,NULL,NULL)!=0||count!=3)return fail(env,stage,error);
+  for(int i=0;i<3;i++){s[i]=string(env,values[i],&n[i]);if(!s[i]||!n[i]||wcslen(s[i])!=n[i])goto done;}
+  unsigned long pid=wcstoul(s[0],&end,10);if(!pid||*end||pid==GetCurrentProcessId())goto done;
+  double birth=wcstod(s[1],&end);if(*end||birth<=0||birth>9007199254740991.0)goto done;
+  if(wcschr(s[2],L'\\')||wcschr(s[2],L'/'))goto done;
+  stage="current process handle";handle=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|PROCESS_TERMINATE|SYNCHRONIZE,FALSE,(DWORD)pid);
+  if(!handle){error=GetLastError();goto done;}
+  stage="current process lifetime/image";
+  wchar_t file[32768];DWORD len=32768;
+  if(created(handle)!=birth||!QueryFullProcessImageNameW(handle,0,file,&len)){error=ERROR_INVALID_DATA;goto done;}
+  wchar_t *name=wcsrchr(file,L'\\');name=name?name+1:file;
+  if(_wcsicmp(name,s[2])){error=ERROR_INVALID_DATA;goto done;}
+  DWORD wait=WaitForSingleObject(handle,0);
+  if(wait==WAIT_OBJECT_0){napi_get_null(env,&result);goto done;}
+  if(wait!=WAIT_TIMEOUT){error=GetLastError();goto done;}
+  stage="identity-verified handle termination";
+  if(!TerminateProcess(handle,1)){error=GetLastError();goto done;}
+  if(WaitForSingleObject(handle,1500)!=WAIT_OBJECT_0){error=ERROR_TIMEOUT;goto done;}
+  napi_get_null(env,&result);
+done:
+  if(handle)CloseHandle(handle);
+  for(int i=0;i<3;i++)free(s[i]);
+  return result?result:fail(env,stage,error);
+}
 __declspec(dllexport) int32_t node_api_module_get_api_version_v1(void){return 8;}
 __declspec(dllexport) napi_value napi_register_module_v1(napi_env env,napi_value exports){
   HMODULE node=GetModuleHandleW(NULL);
@@ -157,7 +188,7 @@ __declspec(dllexport) napi_value napi_register_module_v1(napi_env env,napi_value
   LOAD(napi_get_cb_info);LOAD(napi_get_value_string_utf16);LOAD(napi_get_value_external);LOAD(napi_create_external);
   LOAD(napi_create_function);LOAD(napi_set_named_property);LOAD(napi_create_object);LOAD(napi_create_array);LOAD(napi_set_element);
   LOAD(napi_create_double);LOAD(napi_create_string_utf16);LOAD(napi_get_null);LOAD(napi_throw_error);LOAD(napi_add_env_cleanup_hook);
-  const char *names[]={"launch","inspect","close"};napi_callback callbacks[]={launch,inspect,close_owned};
-  for(int i=0;i<3;i++){napi_value fn;napi_create_function(env,names[i],(size_t)-1,callbacks[i],NULL,&fn);napi_set_named_property(env,exports,names[i],fn);}
+  const char *names[]={"launch","inspect","close","terminateVerified"};napi_callback callbacks[]={launch,inspect,close_owned,terminate_verified};
+  for(int i=0;i<4;i++){napi_value fn;napi_create_function(env,names[i],(size_t)-1,callbacks[i],NULL,&fn);napi_set_named_property(env,exports,names[i],fn);}
   napi_add_env_cleanup_hook(env,cleanup,env);return exports;
 }
