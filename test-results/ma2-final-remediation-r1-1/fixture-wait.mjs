@@ -1,0 +1,1 @@
+﻿import {spawn} from "node:child_process";import {writeFileSync} from "node:fs";if(process.argv.includes("foreign-parent")){const child=spawn(process.execPath,[process.argv[1],"foreign-sentinel"],{stdio:"ignore",windowsHide:true});writeFileSync(process.argv[3],JSON.stringify({pid:child.pid}));}setInterval(()=>{},1000);

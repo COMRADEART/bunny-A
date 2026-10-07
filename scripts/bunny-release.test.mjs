@@ -35,8 +35,8 @@ const freePort = () => new Promise((resolve) => { const server = createServer();
 test("M-A-1D: the production release pin is the reviewed M-A-1 code candidate", () => {
   const pin = JSON.parse(readFileSync(join(repo, "install/release-pin.json"), "utf8"));
   assert.equal(pin.baselineCommit ?? pin.sourceCommit, MA1_CODE_CANDIDATE);
-  assert.match(pin.release, /^Bunny-A-Windows-v\d+(?:-T\d+)?$/);
-  assert.ok(Number(pin.release.match(/v(\d+)(?:-T\d+)?$/)[1]) >= 16, "a new release name; the pre-f1934bd v15 artifact is not reused");
+  assert.match(pin.release, /^Bunny-A-Windows-v\d+(?:-T\d+|-MA2-R1)?$/);
+  assert.ok(Number(pin.release.match(/v(\d+)(?:-T\d+|-MA2-R1)?$/)[1]) >= 16, "a new release name; the pre-f1934bd v15 artifact is not reused");
   assert.equal(git(repo, "rev-parse", `${pin.sourceCommit}^{commit}`), pin.sourceCommit);
   execFileSync("git", ["-C", repo, "merge-base", "--is-ancestor", MA1_CODE_CANDIDATE, pin.sourceCommit]);
 });

@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,mkdirSync,existsSync,statSync} from 'node:fs';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
+import {DatabaseSync} from 'node:sqlite';
+import {fileSha256,verifyRelease,sourceCheck,importClosure} from '../../scripts/bunny-release.mjs';
+import {rowDigest,tableDumps,APPEND_ONLY,VOLATILE_TABLE} from '../ma2-gate8/tools/22-rowdigest.mjs';
+const rec='test-results/ma2-final-remediation-r1-1',out=rec+'/preflight';mkdirSync(out,{recursive:true});
+const read=p=>JSON.parse(readFileSync(p,'utf8').replace(/^\uFEFF/,'')),sha=b=>createHash('sha256').update(b).digest('hex'),save=(p,v)=>writeFileSync(join(out,p),JSON.stringify({recordedAt:new Date().toISOString(),...v},null,2)+'\n');
+const auth=read(rec+'/authorization.json');assert.equal(auth.productionActivationAuthorized,true);
+const prod=join(process.env.LOCALAPPDATA,'Bunny-A'),config=read(join(prod,'install.json')),creds=read(join(config.stateRoot,'credentials/credentials.json')),target=join(prod,'releases',auth.candidate.release);
+assert.equal(config.currentRelease.name,'Bunny-A-Windows-v17-T6');assert.equal(config.currentRelease.manifestSha256,read(rec+'/baseline/production.json').manifestSha256);
+assert.ok(verifyRelease(target).ok&&sourceCheck(process.cwd(),target).ok&&importClosure(target).ok);assert.equal(fileSha256(join(target,'release-manifest.json')),auth.candidate.manifestSha256);
+assert.equal(existsSync(join(prod,'state-migration.lock')),false);
+const {idleCheck}=await import(pathToFileURL(join(target,'scripts/bunny-rollback-preflight.mjs')).href);const idle=await idleCheck(config.hostPort,creds.token,config.stateRoot);
+const health=await fetch('http://127.0.0.1:'+config.hostPort+'/health').then(r=>r.json());assert.equal(health.pid,creds.pid);assert.equal(health.instanceId,creds.instanceId);assert.equal(health.operationalState,'healthy');
+const response=await fetch('http://127.0.0.1:'+config.hostPort+'/state',{headers:{authorization:'Bearer '+creds.token}});assert.equal(response.status,200);const s=await response.json();
+const dir=join(config.stateRoot,'backups','ma2-final-remediation-r1-1');mkdirSync(dir,{recursive:true});const backup=join(dir,'before-activation-'+Date.now()+'.sqlite');const db=new DatabaseSync(join(config.stateRoot,'host.sqlite'),{readOnly:true});db.prepare('VACUUM INTO ?').run(backup);db.close();
+const snap=new DatabaseSync(backup,{readOnly:true});assert.equal(snap.prepare('PRAGMA integrity_check').get().integrity_check,'ok');snap.exec('BEGIN');const tables={};
+for(const {name} of snap.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()){const {pk,rows}=tableDumps(snap,name);tables[name]={pk,count:rows.length,appendOnly:APPEND_ONLY.has(name),volatile:VOLATILE_TABLE.has(name),rows:Object.fromEntries(rows.map(r=>[String(r[pk]),rowDigest(name,r).digest]))};}
+const rowRecords=t=>snap.prepare('SELECT record FROM '+t).all().map(r=>JSON.parse(r.record));const destructive=rowRecords('permission_requests').filter(r=>!r.resolvedAt&&r.risk==='DESTRUCTIVE');assert.equal(destructive.length,0);
+const devices=snap.prepare('SELECT * FROM devices').all().map(d=>({id:d.id,name:d.name,revokedAt:d.revoked_at,tokenHashSha256:sha(d.token_hash),fullRowSha256:sha(JSON.stringify(d))}));const settings=snap.prepare('SELECT * FROM settings').all().map(r=>({key:r.key,valueSha256:sha(r.value)}));const mission=snap.prepare("SELECT value FROM settings WHERE key='missions_config'").get();const missionConfig=JSON.parse(mission.value);snap.exec('ROLLBACK');snap.close();
+const old=read(rec+'/baseline/protected-row-ledger.json').tables;const missing=[],changed=[];for(const [name,t] of Object.entries(old))if(!t.volatile)for(const [id,digest] of Object.entries(t.rows)){if(!tables[name]?.rows[id])missing.push({table:name,id});else if(tables[name].rows[id]!==digest)changed.push({table:name,id});}assert.equal(missing.length,0);assert.equal(changed.length,0);
+save('db-backup.json',{classification:'LIVE VERIFIED',path:backup,sha256:fileSha256(backup),bytes:statSync(backup).size,method:'Read-only SQLite VACUUM INTO; WAL-consistent',integrity:'ok',privateOutsideEvidence:true,afterExplicitAuthorization:true});
+save('protected-row-ledger.json',{classification:'LIVE VERIFIED',tables,devices,settings,missionConfig,exclusions:'Canonical secret/provider probe exclusions; volatile workspace_locks',missingSinceBaseline:missing,changedSinceBaseline:changed});
+save('production.json',{classification:'LIVE VERIFIED',authorizationObtained:true,activationPerformed:false,config,health,canonicalIdle:idle,pendingDestructiveApprovals:0,devices,settings,missionConfig,remote:read(join(config.stateRoot,'settings/remote.json')),providers:Object.values(s.providers??{}).map(p=>({id:p.id??p.provider,version:p.version,availability:p.availability,compatibility:p.securityCompatibility??null})),configSha256:fileSha256(join(prod,'install.json')),credentialFileSha256:fileSha256(join(config.stateRoot,'credentials/credentials.json')),stateMarkerSha256:fileSha256(join(config.stateRoot,'state-layout.json')),consentSha256:fileSha256(join(config.stateRoot,'settings/remote-consent.json')),deploymentSha256:fileSha256(join(config.stateRoot,'settings/deployment.json')),bootstrapSha256:fileSha256(join(prod,'Bunny-A.exe')),toolSha256:fileSha256(join(config.stateRoot,'cloudflared/cloudflared.exe'))});
+console.log('Authorized fresh production quiescence and consistent backup passed; all baseline protected rows remain unchanged.');

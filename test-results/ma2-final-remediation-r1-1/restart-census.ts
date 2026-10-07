@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {DatabaseSync} from 'node:sqlite';
+import {getState,REC,STAGE_STATE,getMission} from './live-client.ts';
+const before=JSON.parse(readFileSync(REC+'/restart-active-before.json','utf8'));
+const state:any=await getState();
+assert.equal((state.tasks??[]).filter((t:any)=>!['completed','failed','stopped','rejected'].includes(t.state)).length,0);
+const active=(state.missions?.missions??[]).filter((m:any)=>!['completed','failed','stopped'].includes(m.state));assert.deepEqual(active.map((m:any)=>m.id),[before.missionId]);
+const detail=await getMission(before.missionId);assert.equal(detail.mission.state,'waiting_for_user');assert.equal(detail.mission.batch?.status,'active');assert.equal(detail.runs.filter((r:any)=>['running','queued'].includes(r.status)).length,0);
+const db=new DatabaseSync(STAGE_STATE+'/host.sqlite',{readOnly:true});
+const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('missions','capability_runs')").all();assert.equal(tables.length,2);db.close();
+writeFileSync(REC+'/restart-census.json',JSON.stringify({recordedAt:new Date().toISOString(),classification:'LIVE VERIFIED',onlyActiveMissionIsExplicitFixture:true,missionId:before.missionId,activeTasks:0,inFlightRuns:0,waitingApprovalOnly:true,activeGrant:true,triggersEnabled:(state.missions as any).config?.triggersEnabled},null,2)+'\n');
