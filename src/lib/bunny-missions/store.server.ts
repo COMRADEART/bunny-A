@@ -84,6 +84,13 @@ export class MissionStore {
     this.db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
       .run(`computer.target:${owner}`, JSON.stringify(target));
   }
+  browserSession(id: string): import("./capabilities/browser.server.ts").BrowserSessionRecord | null {
+    const row = this.db.prepare("SELECT value FROM settings WHERE key=?").get(`browser.session:${id}`) as { value: string } | undefined;
+    return row ? JSON.parse(row.value) : null;
+  }
+  saveBrowserSession(record: import("./capabilities/browser.server.ts").BrowserSessionRecord) {
+    this.db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(`browser.session:${record.missionId}`, JSON.stringify(record));
+  }
 
   saveMission(mission: Mission) {
     this.db.prepare("INSERT INTO missions(id,state,created_at,updated_at,record) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at,record=excluded.record")

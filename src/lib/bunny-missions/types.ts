@@ -119,6 +119,8 @@ export type GitAction = "status" | "diff" | "log" | "commit" | "worktree" | "mer
 export type ScopeRequest = Omit<AuthorizationEnvelope, "id" | "missionId" | "grantedAt" | "grantedBy" | "expiresAt" | "revokedAt" | "agentic">;
 
 export type VerificationCriterion =
+  | { kind: "capability"; action: string; params: Record<string, JsonValue>; expect: { field: string; equals?: JsonValue; contains?: string } }
+  | { kind: "capability_run"; expectExit: number; stdoutIncludes: string }
   | { kind: "task_spec"; spec: VerifySpec }
   | { kind: "file_exists"; path: string; contains?: string }
   | { kind: "command"; command: string; args: string[]; expectExit: number; timeoutMs?: number }
@@ -156,6 +158,7 @@ export type StepAccounting = {
 };
 
 export type MissionStep = {
+  crossApp?: import("./cross-app.ts").CrossAppMetadata;
   id: string;
   missionId: string;
   index: number;
@@ -182,7 +185,7 @@ export type MissionStep = {
   capabilityRunId: string | null;
   workspace: string | null;
   attempts: StepAttempt[];
-  result: { summary: string; artifactIds: string[]; verified: boolean | null; verification: string[] } | null;
+  result: { summary: string; artifactIds: string[]; verified: boolean | null; verification: string[]; outputRef?: string; verificationRunIds?: string[] } | null;
   evidence: string[];
   failure: { category: FailureCategory; detail: string } | null;
   accounting: StepAccounting;
@@ -454,6 +457,7 @@ export type CapabilityResult = {
 };
 
 export type CapabilityRun = {
+  outputRef?: string;
   cleanup?: { attempted: boolean; ok: boolean; detail: string };
   id: string;
   action: string;

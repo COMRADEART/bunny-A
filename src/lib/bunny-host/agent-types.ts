@@ -31,7 +31,7 @@ export const REPLAY_SAFETY = ["SAFE_TO_REPLAY", "VERIFY_BEFORE_REPLAY", "NOT_REP
 export type ReplaySafety = (typeof REPLAY_SAFETY)[number];
 
 /** §8 checkpoint boundaries, in the order they can occur along one step attempt. */
-export const CHECKPOINT_BOUNDARIES = ["before_task_admission", "after_task_completion", "after_verification", "before_waiting_for_user", "after_approval_decision", "before_provider_reroute", "after_artifact_commit", "before_terminal_state"] as const;
+export const CHECKPOINT_BOUNDARIES = ["before_task_admission", "after_task_completion", "after_verification", "before_waiting_for_user", "after_approval_decision", "before_provider_reroute", "after_artifact_commit", "before_terminal_state", "before_capability_admission", "after_capability_completion", "before_application_handoff"] as const;
 export type CheckpointBoundary = (typeof CHECKPOINT_BOUNDARIES)[number];
 
 /**
@@ -111,6 +111,7 @@ export type AgentCheckpoint = {
 export type AgentRecordRow = { id: string; missionId: string | null; state: AgentState; createdAt: number; updatedAt: number; record: AgentProfile };
 export type AgentSnapshot = {
   agents: {
+    activity?: { application: string | null; action: string | null; step: string | null; completed: number; total: number; verification: string; artifacts: { id: string; title: string; verified: boolean }[]; history: { step: string; action: string; state: string }[] };
     authorization?: import("../bunny-missions/agentic-types.ts").AgenticProjection | null;
     authorizationError?: string;
     id: string; name: string; state: AgentState; missionId: string | null; createdAt: number; updatedAt: number;

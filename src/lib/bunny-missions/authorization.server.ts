@@ -7,6 +7,8 @@ import type { AgenticAuthorizationEnvelope } from "./agentic-types.ts";
 import { canonical } from "./paths.server.ts";
 import { digest, fileDigest, rootIdentity } from "./agentic-store.server.ts";
 import { boundedTestResources } from "./capabilities/bounded-terminal.server.ts";
+import { operationDigest, calculatorOperation } from "./batches.server.ts";
+import { operationContract } from "./cross-app.ts";
 
 export const ALWAYS_ASK: RiskClass[] = ["EXTERNAL_SIDE_EFFECT", "DESTRUCTIVE"];
 export const MODE_BUDGET: Record<Mode, Budget> = {
@@ -14,7 +16,7 @@ export const MODE_BUDGET: Record<Mode, Budget> = {
   balanced: { maxExternalModelCalls: 6, maxRuntimeMs: 60 * 60_000, maxRetries: 4, maxTokens: null },
   deep: { maxExternalModelCalls: 12, maxRuntimeMs: 2 * 60 * 60_000, maxRetries: 6, maxTokens: null },
 };
-const GIT_ACTION: Record<string, GitAction> = { "git.status": "status", "git.diff": "diff", "git.log": "log", "git.commit": "commit", "git.worktree_add": "worktree", "git.worktree_remove": "worktree", "git.merge": "merge" };
+const GIT_ACTION: Record<string, GitAction> = { "git.status": "status", "git.diff": "diff", "git.log": "log", "git.tracked_files": "status", "git.branch": "status", "git.commit_info": "log", "git.commit": "commit", "git.worktree_add": "worktree", "git.worktree_remove": "worktree", "git.merge": "merge" };
 
 export function matches(patterns: string[], action: string) {
   return patterns.some((pattern) => pattern === "*" || pattern === action || (pattern.endsWith(".*") && action.startsWith(pattern.slice(0, -1))));
@@ -31,7 +33,7 @@ function domainAllowed(domains: string[] | "public", host: string) {
  * The scope a mission asks for, derived from its planned steps. Nothing is granted until the user
  * approves the mission; approval turns this request into a persisted envelope.
  */
-export function scopeFor(steps: (Pick<MissionStep, "executor" | "requiredCapabilities" | "verification" | "scope" | "providerConstraints"> & { id?: string })[], root: string, mode: Mode, options: { localOnly?: boolean; providers?: ProviderId[] | null; budget?: Budget; skillSteps?: (skillId: string) => { action: string; params: Record<string, unknown> }[] } = {}): ScopeRequest {
+export function scopeFor(steps: (Pick<MissionStep, "executor" | "requiredCapabilities" | "verification" | "scope" | "providerConstraints" | "crossApp"> & { id?: string })[], root: string, mode: Mode, options: { localOnly?: boolean; providers?: ProviderId[] | null; budget?: Budget; skillSteps?: (skillId: string) => { action: string; params: Record<string, unknown> }[] } = {}): ScopeRequest {
   const actions = new Set<string>(["notifications.send", "filesystem.read", "filesystem.list", "filesystem.exists"]);
   const commands = new Set<string>(); const executables = new Map<string, { command: string; file: string; prefix: string[] }>();
   const approveCommand = (command: string) => {
@@ -51,6 +53,7 @@ export function scopeFor(steps: (Pick<MissionStep, "executor" | "requiredCapabil
       if (item.action === "terminal.exec" && typeof item.params.command === "string") approveCommand(item.params.command);
     }
     for (const check of step.verification) if (check.kind === "command") { actions.add("terminal.exec"); approveCommand(check.command); }
+    for (const check of step.verification) if (check.kind === "capability") actions.add(check.action);
     if (step.scope.access === "write") write = true;
     if (step.scope.isolation === "worktree") actions.add("git.worktree_add");
     if (step.verification.some((check) => check.kind === "git_diff_nonempty")) actions.add("git.diff");
@@ -60,6 +63,7 @@ export function scopeFor(steps: (Pick<MissionStep, "executor" | "requiredCapabil
     if (action.startsWith("computer.")) computer = true;
     if (action.startsWith("github.")) network = true;
     if (GIT_ACTION[action]) git.add(GIT_ACTION[action]);
+    if (steps.some(step => step.crossApp) && action.startsWith("computer.") && action !== "computer.read_calculator") risks.add("EXECUTE");
     if (action === "terminal.exec") risks.add("EXECUTE");
     if (action === "filesystem.write" || action === "git.commit" || action === "git.merge" || action.startsWith("git.worktree")) risks.add("WRITE");
     if (action === "filesystem.write" || action === "git.commit" || action === "git.merge") write = true;
@@ -151,6 +155,7 @@ function grantFor(grants: GrantRow[], action: string, missionId: string | null):
 export function decide(manifest: ActionManifest, params: Record<string, unknown>, context: { envelope: AuthorizationEnvelope | null; missionId: string | null; grants: GrantRow[]; oneTime?: boolean; direct?: { confirmed: boolean }; now?: number; base?: string; executable?: Resolved | null; agenticViolation?: string | null }): PermissionDecision {
   const risk = manifest.risk; const now = context.now ?? Date.now();
   const deny = (reason: string): PermissionDecision => ({ decision: "deny", reason, risk });
+  if (context.envelope && context.envelope.missionId !== context.missionId) return deny("Authorization belongs to a different Mission; it cannot authorize this request.");
   const ask = (reason: string): PermissionDecision => ({ decision: "ask", reason, risk });
   const allow = (reason: string): PermissionDecision => ({ decision: "allow", reason, risk });
   if (!["READ", "WRITE", "EXECUTE", "EXTERNAL_SIDE_EFFECT", "DESTRUCTIVE"].includes(risk)) return deny("Unknown action risk fails closed.");
@@ -181,11 +186,12 @@ export function decide(manifest: ActionManifest, params: Record<string, unknown>
 }
 
 /** T5 constraints inside the existing permission engine; this function never grants execution. */
-export function agenticScopeViolation(e: AgenticAuthorizationEnvelope, action: string, params: Record<string, unknown>, risk: RiskClass, cwd: string, executable?: Resolved | null): string | null {
+export function agenticScopeViolation(e: AgenticAuthorizationEnvelope, action: string, params: Record<string, unknown>, risk: RiskClass, cwd: string, executable?: Resolved | null, stepId?: string | null): string | null {
   const rank: RiskClass[] = ["READ", "WRITE", "EXECUTE", "EXTERNAL_SIDE_EFFECT", "DESTRUCTIVE"];
   if (!rank.includes(risk)) return "Unknown action risk; explicit review required.";
   if (!e.permitted_capabilities.includes(action)) return "Action is outside the explicitly approved Agent capability list.";
   if (rank.indexOf(risk) > rank.indexOf(e.risk_ceiling) || ALWAYS_ASK.includes(risk)) return "Sensitive/high-risk actions require a separate specific authorization.";
+  if (e.cross_app && action !== "provider.execute" && (!operationContract(action) || !stepId || !e.cross_app.operations.some(op => op.stepId === stepId && op.action === action && op.digest === agenticOperationDigest(action, params)))) return "Cross-app operation differs from the exact reviewed Mission step or postcondition.";
   try {
     const roots = e.permitted_resource_scopes;
     for (const root of roots) if (canonical(root.root) !== root.root || rootIdentity(root.root) !== root.identity) return "Approved root identity changed; fresh review required.";
@@ -210,15 +216,31 @@ export function agenticScopeViolation(e: AgenticAuthorizationEnvelope, action: s
       return null;
     }
     if (action.startsWith("git.")) {
-      if (!["git.status", "git.diff", "git.log"].includes(action)) return "Git mutation/hooks, push and branch changes require specific review.";
-      if (Object.keys(params).some(k => !["cwd", "limit"].includes(k))) return "Unapproved Git arguments.";
+      if (!["git.status", "git.diff", "git.log", ...(e.cross_app ? ["git.tracked_files", "git.branch", "git.commit_info"] : [])].includes(action)) return "Git mutation/hooks, push and branch changes require specific review.";
+      if (Object.keys(params).some(k => !["cwd", "limit", ...(e.cross_app ? ["against", "ref"] : [])].includes(k))) return "Unapproved Git arguments.";
       const at = typeof params.cwd === "string" ? canonical(resolve(cwd, params.cwd)) : canonical(cwd);
       return roots.some(r => r.kind === "git" && r.root === at && r.operations.includes(action)) ? null : "Different repository or operation is outside consent.";
     }
+    if (e.cross_app && action.startsWith("browser.")) {
+      if (!e.browser_origins.length || !["browser.navigate", "browser.read", "browser.extract", "browser.metadata", "browser.wait", "browser.screenshot"].includes(action)) return "No bounded browser operation was approved; mutation/download requires separate review.";
+      if (typeof params.url === "string") {
+        const url = new URL(params.url);
+        if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || !e.browser_origins.includes(url.origin)) return "Browser origin exceeds exact consent.";
+      }
+      return null;
+    }
+    if (e.cross_app && action.startsWith("computer.")) return calculatorOperation(action, params) ? null : "Only exact reviewed Calculator arithmetic operations are delegated.";
     if (action === "provider.execute") return params.provider === "ollama" && params.access === "read" && params.filesystem === false ? null : "Workspace provider tools cannot enforce this exact Agent resource/terminal scope; separate review required.";
     // Browser/desktop target validation stays with their existing specific approval path.
     return "This operation requires its existing specific resource/target approval boundary.";
   } catch { return "Resource identity could not be revalidated; authority fails closed."; }
+}
+
+/** Referenced file data is not executable identity; all resource/control parameters stay exact. */
+export function agenticOperationDigest(action: string, params: Record<string, unknown>): string {
+  const bound = { ...params };
+  if (action === "filesystem.write") delete bound.content;
+  return operationDigest(action, bound);
 }
 
 export function agenticFingerprint(action: string, params: Record<string, unknown>, cwd: string): string {

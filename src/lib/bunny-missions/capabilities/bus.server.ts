@@ -5,12 +5,17 @@ import { redact, type MissionStore } from "../store.server.ts";
 import { resolveCommand, type Resolved } from "./process.server.ts";
 import { HostContainment, safeError } from "../../bunny-host/failure.server.ts";
 import type { OwnedProcessRecord } from "../../bunny-host/owned-process-group.server.ts";
+import { operationContract, semanticOutput, safeSemanticText } from "../cross-app.ts";
 import type {
   ActionManifest, AuthorizationEnvelope, CapabilityAvailability, CapabilityManifest, CapabilityResult, CapabilityRun, CapabilityStatus,
   PermissionDecision, RiskClass, ApprovalBatch,
 } from "../types.ts";
 
 export type ExecutionContext = {
+  browserOrigins?: string[];
+  crossApp?: boolean;
+  revalidate?: () => string | null;
+  missionActive?: () => boolean;
   /** Host-provided, minimal environment for exact Agentic terminal commands. */
   boundedEnvironment?: NodeJS.ProcessEnv;
   boundedDelegation?: boolean;
@@ -81,6 +86,7 @@ export class CapabilityBus {
   agenticCheck: ((request: CapabilityRequest, risk: RiskClass, executable?: Resolved | null) => string | null) | null = null;
   agenticAdmit: ((request: CapabilityRequest, runId: string, executable?: Resolved | null) => { id?: string; reason?: string; timeoutMs?: number; scriptHash?: string }) | null = null;
   agenticFinish: ((id: string, ok: boolean) => void) | null = null;
+  agenticExecutionContext: ((request: CapabilityRequest, admissionId: string, executable?: Resolved | null) => Partial<ExecutionContext>) | null = null;
   clearCancellation(missionId: string) { this.cancelledMissions.delete(missionId); }
   constructor(store: MissionStore, artifacts: ArtifactStore, dataDirectory: string, emit: (type: string, detail: string, missionId: string | null) => void, containment=new HostContainment()) {
     this.store = store; this.artifacts = artifacts; this.dataDirectory = dataDirectory; this.containment=containment;
@@ -111,6 +117,7 @@ export class CapabilityBus {
       return { ...adapter.manifest, availability: health?.availability ?? "unavailable", detail: health?.detail ?? "Not checked yet.", checkedAt: health?.checkedAt ?? null };
     });
   }
+  catalog() { return this.list().map(capability => ({ ...capability, actions: capability.actions.map(action => ({ ...action, execution: operationContract(action.id) })) })); }
   availability(action: string): CapabilityAvailability {
     const found = this.find(action);
     if (!found) return "unsupported";
@@ -218,10 +225,11 @@ export class CapabilityBus {
     };
     let terminal:CapabilityOutcome|null=null;
     const agenticAdmission: { id?: string } = {};
+    let outputRef: string | undefined;
     const finish = (status: CapabilityRun["status"], summary: string, result: CapabilityResult | null, artifactIds: string[] = []): CapabilityOutcome => {
       if(terminal) return terminal;
       const finishedAt = Date.now();
-      const run = { ...base, ...(result?.cleanup ? { cleanup: result.cleanup } : {}), status, summary: summary.slice(0, 2000), evidence: result?.evidence.slice(0, 40) ?? [], artifactIds, finishedAt, durationMs: finishedAt - startedAt };
+      const run = { ...base, ...(outputRef ? { outputRef } : {}), ...(result?.cleanup ? { cleanup: result.cleanup } : {}), status, summary: safeSemanticText(summary).slice(0, 2000), evidence: result?.evidence.slice(0, 40).map(safeSemanticText) ?? [], artifactIds, finishedAt, durationMs: finishedAt - startedAt };
       this.store.host.transaction(()=>{this.store.saveRun(run);this.emit(status === "succeeded" ? "capability.completed" : "capability.failed", `${request.action} ${status}: ${run.summary}`, request.missionId);});
       if (agenticAdmission.id) this.agenticFinish?.(agenticAdmission.id, status === "succeeded");
       terminal={decision,run,result,artifactIds};
@@ -260,7 +268,10 @@ export class CapabilityBus {
     const processOwnership: OwnedProcessRecord[]=[];
     try {
       const boundedEnvironment = agenticAdmission.id && request.action === "terminal.exec" ? Object.fromEntries(["SystemRoot", "WINDIR", "TEMP", "TMP", "LANG"].flatMap(k => process.env[k] ? [[k, process.env[k]!]] : [])) : undefined;
-      result = await found.adapter.execute(request.action, request.params, { missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch, boundedEnvironment, boundedDelegation: !!agenticAdmission.id, boundedScriptHash: admitted?.scriptHash });
+      const delegated = agenticAdmission.id ? this.agenticExecutionContext?.(request, agenticAdmission.id, executable) ?? {} : {};
+      const currentViolation = delegated.revalidate?.();
+      if (currentViolation) throw new Error(currentViolation);
+      result = await found.adapter.execute(request.action, request.params, { ...delegated, missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch: delegated.desktopBatch ?? desktopBatch, boundedEnvironment, boundedDelegation: !!agenticAdmission.id, boundedScriptHash: admitted?.scriptHash });
       if(processOwnership.length) result={...result,output:{...(result.output && typeof result.output === "object" ? result.output : {value:result.output}),processOwnership}};
     } catch (error) {
       const message = safeError(error).message;
@@ -271,8 +282,12 @@ export class CapabilityBus {
     if(controller.signal.aborted && result.ok) result={ok:false,status:"failed",summary:"Execution was cancelled; late success was discarded.",output:null,evidence:[],errorCategory:"user_stopped",cleanup:result.cleanup};
     if(controller.signal.aborted && /timed out/i.test(String(controller.signal.reason))) result={...result,ok:false,status:"timeout",summary:`Execution timed out after ${timeoutMs} ms. ${result.cleanup?.detail??"Owned process group terminated."}`,errorCategory:"timeout"};
     const artifactIds: string[] = [];
+    if (request.missionId && request.stepId && this.store.step(request.stepId).crossApp && result.ok) {
+      const artifact = await this.artifacts.create({ missionId: request.missionId, stepId: request.stepId, type: "structured_result", title: `${request.action} observation`, inline: JSON.stringify(semanticOutput(request.action, result.output)), mediaType: "application/json", provenance: `bunny:capability:${base.id}`, verification: "unverified" });
+      outputRef = artifact.id; artifactIds.push(artifact.id);
+    }
     if (request.missionId) for (const item of result.artifacts ?? []) {
-      try { artifactIds.push((await this.artifacts.create({ missionId: request.missionId, stepId: request.stepId, type: item.type, title: item.title, inline: item.inline, path: item.path, mediaType: item.mediaType, provenance: `bunny:capability:${base.id}`, verification: "unverified" })).id); }
+      try { artifactIds.push((await this.artifacts.create({ missionId: request.missionId, stepId: request.stepId, type: item.type, title: safeSemanticText(item.title), inline: item.inline === undefined ? undefined : safeSemanticText(item.inline), path: item.path, mediaType: item.mediaType, provenance: `bunny:capability:${base.id}`, verification: "unverified" })).id); }
       catch (error) { result.evidence.push(`Artifact not stored: ${safeError(error).message}`); }
     }
     const stopped=processOwnership.length>0 && controller.signal.aborted && !/timed out/i.test(String(controller.signal.reason));

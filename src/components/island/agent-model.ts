@@ -12,9 +12,11 @@ export const AGENT_STATE_LABEL: Record<AgentSnapshot["agents"][number]["state"],
 const NON_TERMINAL = ["CREATED", "PLANNING", "RUNNING", "WAITING_FOR_USER", "WAITING_FOR_DEPENDENCY", "PAUSED", "VERIFYING", "INTERRUPTED"];
 
 export type AgentPanelRow = {
+  activity?: AgentSnapshot["agents"][number]["activity"];
   authorization?: AgentSnapshot["agents"][number]["authorization"];
   authorizationError?: string;
   id: string;
+  missionId?: string | null;
   name: string;
   state: AgentSnapshot["agents"][number]["state"];
   label: string;
@@ -36,6 +38,7 @@ export function agentPanelRows(snapshot: AgentSnapshot | null | undefined, max =
   const ordered = [...snapshot.agents].sort((a, b) => rank(a.state) - rank(b.state) || b.updatedAt - a.updatedAt);
   const rows = ordered.map((agent) => ({
     id: agent.id,
+    missionId: agent.missionId,
     name: agent.name,
     state: agent.state,
     label: AGENT_STATE_LABEL[agent.state],
@@ -47,11 +50,15 @@ export function agentPanelRows(snapshot: AgentSnapshot | null | undefined, max =
     note: agent.note,
     authorization: agent.authorization,
     authorizationError: agent.authorizationError,
+    activity: agent.activity,
   }));
   return { rows: rows.slice(0, max), more: Math.max(0, rows.length - max) };
 }
 
 export const CHECKPOINT_LABEL: Record<string, string> = {
+  before_capability_admission: "Before a capability was admitted",
+  after_capability_completion: "After capability output was saved",
+  before_application_handoff: "Before changing applications",
   before_task_admission: "Before a step was admitted",
   after_task_completion: "After a task finished",
   after_verification: "After Bunny verified",

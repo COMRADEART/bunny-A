@@ -20,11 +20,16 @@ export type ReplayFacts = {
   checkpoint: { boundary: string | null; valid: boolean };
   attemptsUsed: number;
   maxAttempts: number;
+  capability?: { replay: ReplaySafety; status: string | null; hasOutput: boolean };
 };
 
 export function classifyReplay(facts: ReplayFacts): ReplayDecision {
   // Fail closed on unreadable or structurally invalid checkpoints (A19): recovery never guesses.
   if (!facts.checkpoint.valid) return { safety: "UNKNOWN", action: "ask_user", category: "CHECKPOINT_INVALID", reason: "Checkpoint material is corrupt or unreadable; nothing replays automatically." };
+  if (facts.capability) {
+    if (facts.capability.status === "succeeded" && facts.capability.hasOutput) return { safety: "VERIFY_BEFORE_REPLAY", action: "verify_then_consume", category: null, reason: "Canonical capability output exists; recheck postconditions without repeating the effect." };
+    if (facts.capability.status && facts.capability.replay !== "SAFE_TO_REPLAY") return { safety: facts.capability.replay, action: "ask_user", category: "RECOVERY_AMBIGUOUS", reason: "An admitted cross-app effect lacks verified completion; it cannot replay automatically." };
+  }
   // A still-admitted child means admission already happened; re-submitting would create a duplicate
   // logical task — the step must not be re-queued (A21). The user decides.
   if (facts.task && (["queued", "waiting_for_approval", "running", "verifying"] as readonly string[]).includes(facts.task.state as string)) return { safety: "NOT_REPLAYABLE", action: "ask_user", category: "RECOVERY_AMBIGUOUS", reason: "A child task is still admitted for this step; replay would duplicate it." };

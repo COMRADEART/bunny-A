@@ -5,7 +5,7 @@ import type { HostEvent } from "../bunny-host/contracts.ts";
 import type { Mode, OrchTask, ProviderId, TaskConstraints, VerifySpec } from "../orch/types.ts";
 import { codexMissionExclusion } from "../orch/compatibility.ts";
 import { ArtifactStore } from "./artifacts.server.ts";
-import { agenticFingerprint, agenticScopeViolation, envelopeFrom, matches, MODE_BUDGET, providerScopeViolation, scopeFor, taskViolation } from "./authorization.server.ts";
+import { agenticFingerprint, agenticOperationDigest, agenticScopeViolation, envelopeFrom, matches, MODE_BUDGET, providerScopeViolation, scopeFor, taskViolation } from "./authorization.server.ts";
 import { AgenticStore, digest, fileDigest, rootIdentity } from "./agentic-store.server.ts";
 import { AGENTIC_POLICY_VERSION, type AgenticAdjustment, type AgenticAuthorizationEnvelope, type CommandBinding } from "./agentic-types.ts";
 import { resolveCommand, type Resolved } from "./capabilities/process.server.ts";
@@ -25,6 +25,9 @@ import {
 } from "./machine.ts";
 import { MissionMemory } from "./memory.server.ts";
 import { scopedPath } from "./paths.server.ts";
+import { operationContract, crossAppFailure } from "./cross-app.ts";
+import { sha256 } from "./artifacts.server.ts";
+import { calculatorOperation } from "./batches.server.ts";
 import { runsLocally } from "../bunny-host/router.ts";
 import { planMission, PLANNER_ID } from "./planner.server.ts";
 import { SkillLibrary, fill } from "./skills.server.ts";
@@ -102,6 +105,29 @@ export class MissionManager {
       } catch { return { reason: "Current Agentic authority/revision cannot be validated." }; }
     };
     this.bus.agenticFinish = (id, ok) => this.agentic.finish(id, ok ? "COMPLETED" : "FAILED");
+    this.bus.agenticExecutionContext = (request, admissionId, executable) => {
+      const e = this.agentic.forMission(request.missionId!)!;
+      if (!e.cross_app) return {};
+      const target = this.store.calculatorTarget(`mission:${request.missionId}`);
+      return { crossApp: true, browserOrigins: e.browser_origins,
+        missionActive: () => { try { const live = this.agentic.get(e.id)!; return ["running", "verifying"].includes(this.store.mission(e.mission_id).state) && ["ACTIVE", "EXHAUSTED"].includes(live.current_state) && live.host_generation === this.tasks.instanceId && live.expires_at > Date.now() && !this.stopping.has(e.mission_id); } catch { return false; } },
+        ...(request.action.startsWith("computer.") ? { desktopBatch: { expiresAt: e.expires_at, ...(target?.identity ? { windowIdentity: target.identity } : {}) } } : {}),
+        revalidate: () => {
+          try {
+            const live = this.agentic.get(e.id)!;
+            const admission = this.agentic.rows(e.id).find(row => row.id === admissionId);
+            const mission = this.store.mission(e.mission_id);
+            const agent = this.tasks.db.db.prepare("SELECT stopped FROM agents WHERE id=?").get(e.agent_id) as { stopped: number } | undefined;
+            const envelope = this.currentAgenticCanonical(e.mission_id);
+            if (!admission || admission.outcome !== "ADMITTED" || admission.capability !== request.action || admission.step_id !== request.stepId || admission.host_generation !== this.tasks.instanceId
+              || !agent || agent.stopped || !["ACTIVE", "EXHAUSTED"].includes(live.current_state) || live.revision !== admission.revision || live.host_generation !== this.tasks.instanceId || live.expires_at <= Date.now()
+              || !envelope || envelope.id !== live.user_authorization_id || envelope.revokedAt || envelope.agentic?.revision !== live.revision || envelope.expiresAt <= Date.now()
+              || !["running", "verifying"].includes(mission.state) || this.stopping.has(mission.id) || this.agenticPlanReference(mission.id) !== live.plan_reference) return "Current cross-app admission, target operation or authorization changed; execution paused.";
+            return agenticScopeViolation(live, request.action, request.params, this.bus.riskOf(request.action, request.params) ?? "READ", request.cwd, executable, request.stepId);
+          } catch { return "Current cross-app execution authority cannot be revalidated."; }
+        },
+      };
+    };
     tasks.missionAttemptAdmission = (task, kind) => this.admitAgenticProvider(task, kind);
     tasks.missionAttemptRuntimeLimit = task => {
       if (!task.mission || !this.agentic.exists(task.mission.missionId)) return Infinity;
@@ -118,7 +144,10 @@ export class MissionManager {
       new BrowserCapability(options.dataDirectory, { headless: this.cached.browserHeadless, allowLoopback: options.browser?.allowLoopback,containment:tasks.containment }),
       new ComputerCapability(options.dataDirectory, { load: owner => this.store.calculatorTarget(owner), save: (owner, target) => this.store.saveCalculatorTarget(owner, target) }), new GitHubCapability(), ...communicationConnectors(),
     ];
-    for (const adapter of adapters) this.bus.register(adapter);
+    for (const adapter of adapters) {
+      if (adapter instanceof BrowserCapability) adapter.sessionStorage = { load: id => this.store.browserSession(id), save: record => this.store.saveBrowserSession(record) };
+      this.bus.register(adapter);
+    }
     this.skills = new SkillLibrary(this.store, this.bus, (type, detail, missionId) => this.emit(type, detail, missionId));
     this.workspace = new WorkspaceCoordinator(this.store);
     this.triggers = new TriggerEngine(this.store, (type, detail) => this.emit(type, detail, null), (trigger, cause) => this.act(trigger, cause),tasks.containment);
@@ -276,10 +305,11 @@ export class MissionManager {
       const ids = new Map(plan.steps.map((step) => [step.key, crypto.randomUUID()]));
       const kept = this.store.steps(current.id).filter((step) => step.state === "completed");
       const steps: MissionStep[] = plan.steps.map((draft, index) => ({
+        ...(draft.crossApp ? { crossApp: { ...draft.crossApp, inputs: draft.crossApp.inputs.map(ref => ({ ...ref, stepId: ids.get(ref.stepId)! })) } } : {}),
         id: ids.get(draft.key)!, missionId: current.id, index: kept.length + index, role: draft.role, objective: draft.objective, dependsOn: draft.dependsOn.map((key) => ids.get(key)!),
         requiredCapabilities: draft.requiredCapabilities, reasoning: draft.reasoning, preferences: { ...draft.preferences, independentOf: draft.preferences.independentOf?.map((key) => ids.get(key)!).filter(Boolean) },
         scope: { root: current.root, access: draft.access, isolation: draft.isolation }, providerConstraints: draft.providerConstraints, modelConstraint: draft.modelConstraint, executor: draft.executor,
-        expectedArtifacts: draft.expectedArtifacts, verification: draft.verification, maxRetries: Math.min(draft.maxRetries ?? this.cached.limits.maxRetriesPerStep, this.cached.limits.maxRetriesPerStep), timeoutMs: draft.timeoutMs, weight: draft.weight,
+        expectedArtifacts: draft.expectedArtifacts, verification: draft.verification, maxRetries: draft.crossApp && draft.executor.kind === "capability" && operationContract(draft.executor.action)?.replay !== "SAFE_TO_REPLAY" ? 0 : Math.min(draft.maxRetries ?? this.cached.limits.maxRetriesPerStep, this.cached.limits.maxRetriesPerStep), timeoutMs: draft.timeoutMs, weight: draft.weight,
         state: "pending", taskId: null, capabilityRunId: null, workspace: null, attempts: [], result: null, evidence: [], failure: null,
         accounting: { runtimeMs: 0, local: null, provider: null, model: null, inputTokens: null, outputTokens: null, deterministic: draft.executor.kind !== "model" },
         pendingRequestId: null, pendingPhase: null, approvedOnce: null, startedAt: null, finishedAt: null,
@@ -289,6 +319,10 @@ export class MissionManager {
       for (const step of steps) {
         if (step.executor.kind === "skill") { const skill = this.skills.get(step.executor.skillId); if (skill.status !== "active") throw new Error(`Skill ${skill.id} is an unverified candidate.`); }
         if (step.executor.kind === "capability" && !this.bus.find(step.executor.action)) throw new Error(`Unknown capability action ${step.executor.action}.`);
+        for (const check of step.verification) if (check.kind === "capability") {
+          const manifest = this.bus.find(check.action)?.manifest;
+          if (!manifest || this.bus.riskOf(check.action, check.params) !== "READ" || manifest.sensitive || manifest.hardApproval) throw new Error("Independent verification must be a supported non-sensitive read operation.");
+        }
       }
       this.store.replaceSteps(current.id, [...kept, ...steps]);
       const requestedScope = scopeFor(steps, current.root, current.mode, { localOnly: current.providerConstraints.localOnly, providers: current.providerConstraints.allow ?? null, skillSteps: (id) => this.skills.get(id).steps });
@@ -561,7 +595,11 @@ export class MissionManager {
     try {
       let result: { ok: boolean; summary: string; artifactIds: string[]; runId: string | null; category: FailureCategory | null; output: unknown; permission: { action: string; risk: string; reason: string } | null };
       if (step.executor.kind === "capability") {
-        const outcome = await this.bus.request(this.capabilityRequest(mission, step, envelope, step.executor.action, step.executor.params, workspace));
+        const params = this.crossAppInputs(step);
+        const prior = this.store.steps(missionId).filter(previous => step.dependsOn.includes(previous.id)).at(-1);
+        if (prior?.executor.kind === "capability" && prior.executor.action.split(".")[0] !== step.executor.action.split(".")[0]) this.crossAppEvent("agent.application_handoff", step, { from: prior.executor.action.split(".")[0], to: step.executor.action.split(".")[0] });
+        this.crossAppEvent("agent.capability_selected", step, { action: step.executor.action });
+        const outcome = await this.bus.request(this.capabilityRequest(mission, step, envelope, step.executor.action, params, workspace));
         const status = outcome.run?.status;
         result = {
           ok: status === "succeeded", summary: outcome.run?.summary ?? outcome.decision.reason, artifactIds: outcome.artifactIds, runId: outcome.run?.id ?? null, output: outcome.result?.output ?? null,
@@ -582,7 +620,7 @@ export class MissionManager {
       const runtimeMs = Date.now() - started;
       step = this.setStep(step, { capabilityRunId: result.runId, accounting: { ...step.accounting, runtimeMs: step.accounting.runtimeMs + runtimeMs, deterministic: true, local: true }, attempts: step.attempts.map((attempt, index) => index === step.attempts.length - 1 ? { ...attempt, capabilityRunId: result.runId } : attempt) });
       if (result.permission) { this.workspace.release(stepId); this.askPermission(this.store.mission(missionId), step, result.permission.action, result.permission.risk as PermissionRequest["risk"], result.permission.reason, "execute"); return; }
-      if (!result.ok) { this.stepFailed(this.store.mission(missionId), step, result.category ?? "capability_failed", result.summary); return; }
+      if (!result.ok) { this.crossAppEvent("agent.capability_failed", step, { failure: crossAppFailure(result.category ?? "capability_failed", result.summary) }); this.stepFailed(this.store.mission(missionId), step, step.crossApp && /foreground|focus|target.*changed|window.*changed|uncertain/i.test(result.summary) ? "permission_required" : result.category ?? "capability_failed", result.summary); return; }
       await this.verifyAndComplete(this.store.mission(missionId), step, { summary: result.summary, artifactIds: result.artifactIds, output: result.output, task: null });
     } catch (error) {
       const current = this.store.step(stepId);
@@ -597,9 +635,29 @@ export class MissionManager {
     return "capability_failed";
   }
 
+  crossAppEvent(type: string, step: MissionStep, detail: Record<string, unknown>) {
+    if (!step.crossApp) return;
+    const e = this.agentic.forMission(step.missionId);
+    this.emit(type, JSON.stringify({ kind: "agent-cross-app", agentId: e?.agent_id ?? null, missionId: step.missionId, stepId: step.id, capability: step.executor.kind === "capability" ? step.executor.action.split(".")[0] : "provider", ...detail }), step.missionId);
+  }
+  crossAppInputs(step: MissionStep): Record<string, unknown> {
+    if (step.executor.kind !== "capability") return {};
+    const params: Record<string, unknown> = { ...step.executor.params };
+    for (const ref of step.crossApp?.inputs ?? []) {
+      const dependency = this.store.step(ref.stepId);
+      if (!step.dependsOn.includes(dependency.id) || dependency.missionId !== step.missionId || dependency.state !== "completed" || dependency.result?.verified !== true || !dependency.result.outputRef) throw new Error("Cross-app input has no verified canonical dependency output.");
+      const { artifact, body } = this.artifacts.get(dependency.result.outputRef);
+      if (!body || artifact.missionId !== step.missionId || artifact.stepId !== dependency.id || artifact.verification !== "verified" || artifact.sha256 !== sha256(body) || artifact.provenance !== `bunny:capability:${dependency.capabilityRunId}`) throw new Error("Cross-app artifact hash, ownership or verification changed.");
+      const value = JSON.parse(body)[ref.field];
+      if (typeof value !== "string" || value.length > 16_000) throw new Error("Cross-app data field is missing or exceeds its bounded text contract.");
+      params[ref.parameter] = value; this.artifacts.consume(artifact.id, step.id);
+    }
+    return params;
+  }
+
   // T5: consent and accounting are adjuncts of this Mission authority, never a new executor.
   agenticPlanReference(id: string): string {
-    return digest(this.store.steps(id).map(s => ({ id: s.id, executor: s.executor, scope: s.scope, verification: s.verification, requiredCapabilities: s.requiredCapabilities })));
+    return digest(this.store.steps(id).map(s => ({ id: s.id, executor: s.executor, scope: s.scope, verification: s.verification, requiredCapabilities: s.requiredCapabilities, ...(s.crossApp ? { crossApp: s.crossApp, dependsOn: s.dependsOn } : {}) })));
   }
   currentAgenticCanonical(id: string): AuthorizationEnvelope | null {
     const m = this.store.mission(id); return m.authorizationId ? this.store.authorization(m.authorizationId) : null;
@@ -639,13 +697,36 @@ export class MissionManager {
     }
     const now = Date.now();
     const duration = Math.min(scope.budget.maxRuntimeMs, this.cached.limits.maxMissionRuntimeMs, 7_200_000);
-    const caps = [...scope.capabilities, ...(scope.providers.execution ? ["provider.execute"] : [])].filter(action => action.startsWith("filesystem.") && action !== "filesystem.delete" || ["terminal.exec", "git.status", "git.diff", "git.log", "provider.execute"].includes(action));
+    const crossApp = steps.some(step => step.crossApp);
+    const operations: { stepId: string; action: string; digest: string }[] = [];
+    for (const step of steps.filter(step => step.crossApp)) {
+      const concrete: { action: string; params: Record<string, unknown> }[] = step.executor.kind === "capability" ? [{ action: step.executor.action, params: step.executor.params }] : [];
+      for (const check of step.verification) {
+        if (check.kind === "capability") concrete.push({ action: check.action, params: check.params });
+        else if (check.kind === "command") concrete.push({ action: "terminal.exec", params: { command: check.command, args: check.args, timeoutMs: check.timeoutMs } });
+        else if (check.kind === "file_exists") concrete.push({ action: check.contains ? "filesystem.read" : "filesystem.exists", params: { path: check.path } });
+        else if (check.kind === "git_diff_nonempty") concrete.push({ action: "git.diff", params: {} });
+      }
+      for (const op of concrete) operations.push({ stepId: step.id, action: op.action, digest: agenticOperationDigest(op.action, op.params) });
+    }
+    const origins = new Set<string>();
+    if (crossApp) for (const step of steps) {
+      if (!step.crossApp) throw new Error("A cross-app consent requires explicit bounded metadata/postconditions on every step.");
+      const actions = step.executor.kind === "capability" ? [{ action: step.executor.action, params: step.executor.params }, ...step.verification.flatMap(check => check.kind === "capability" ? [{ action: check.action, params: check.params }] : [])] : [];
+      for (const op of actions) {
+        if (!operationContract(op.action) || op.action.startsWith("computer.") && !calculatorOperation(op.action, op.params)) throw new Error("Unsupported cross-app operation or application; no authority offered.");
+        if (op.action === "browser.navigate") { const url = new URL(String(op.params.url)); if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) throw new Error("Browser needs a concrete credential-free HTTP origin."); origins.add(url.origin); }
+      }
+    }
+    if (crossApp && origins.size) scope.browser.domains = [...origins].map(origin => new URL(origin).hostname);
+    const caps = [...scope.capabilities, ...(scope.providers.execution ? ["provider.execute"] : [])].filter(action => action.startsWith("filesystem.") && action !== "filesystem.delete" || ["terminal.exec", "git.status", "git.diff", "git.log", "provider.execute"].includes(action) || crossApp && !!operationContract(action));
     const e: AgenticAuthorizationEnvelope = {
+      ...(crossApp ? { cross_app: { version: "ma3.cross-app.v1", operations } } : {}),
       id: crypto.randomUUID(), policy_version: AGENTIC_POLICY_VERSION, agent_id: agentId, mission_id: mission.id, project_id: mission.projectId,
       user_authorization_id: null, authorization_provenance: null, proposed_at: now, approved_at: null, expires_at: now + duration,
       permitted_capabilities: [...new Set(caps)], permitted_action_families: [...new Set(caps.map(c => c.split(".")[0]))],
       permitted_resource_scopes: roots.flatMap(root => [{ kind: "filesystem" as const, root, identity: rootIdentity(root), operations: caps.filter(c => c.startsWith("filesystem.")) }, ...(existsSync(join(root, ".git")) ? [{ kind: "git" as const, root, identity: rootIdentity(root), operations: caps.filter(c => c.startsWith("git.")) }] : [])]),
-      commands, browser_origins: [], risk_ceiling: "EXECUTE", maximum_actions: Math.min(1000, Math.max(20, steps.length * 4)), maximum_duration: duration, maximum_concurrency: Math.min(8, this.cached.limits.maxConcurrentAgents),
+      commands, browser_origins: [...origins], risk_ceiling: "EXECUTE", maximum_actions: Math.min(1000, Math.max(20, steps.length * 4)), maximum_duration: duration, maximum_concurrency: crossApp ? 1 : Math.min(8, this.cached.limits.maxConcurrentAgents),
       budget_constraints: { maximum_provider_attempts: scope.providers.sessions?.maxSessions ?? 0, usage_unknown: "finite-action-budget" },
       current_state: "PROPOSED", revoked_at: null, revision: 1, integrity_reference: "", host_generation: null,
       scope, plan_reference: this.agenticPlanReference(mission.id), restart_requires_consent: true,
@@ -674,6 +755,14 @@ export class MissionManager {
     this.agentic.approve(e.id, revision, envelope.id, actor);
     this.store.saveAuthorization(envelope);
     this.setMission(m, { authorizationId: envelope.id, recovery: { at: Date.now(), detail: "Fresh scope consent recorded; interrupted/ambiguous effects still require explicit retry review.", interruptedSteps: m.recovery?.interruptedSteps ?? [] } }, "approval.mission_envelope", "Fresh post-restart scope consent; no old request, batch or side effect was replayed.");
+    if (e.cross_app) {
+      const steps = this.store.steps(missionId);
+      const instructions = steps.filter(step => step.failure?.category === "host_restart" && step.crossApp && step.executor.kind === "capability").flatMap<{ stepId: string; mode: "consume" | "resubmit" }>(step => {
+        const run = step.capabilityRunId ? this.store.run(step.capabilityRunId) : null;
+        return run?.status === "succeeded" && run.outputRef ? [{ stepId: step.id, mode: "consume" as const }] : operationContract(step.executor.kind === "capability" ? step.executor.action : "")?.replay === "SAFE_TO_REPLAY" ? [{ stepId: step.id, mode: "resubmit" as const }] : [];
+      });
+      this.tasks.containment.background({ subsystem: "agent-runtime", missionId }, () => this.reconcileInterrupted(missionId, instructions), undefined, "SUBSYSTEM_FAILURE");
+    }
     return this.agentic.projection(missionId);
   }
   agenticIdentityViolation(e: AgenticAuthorizationEnvelope, missionId: string, stepId: string | null, revision?: number): string | null {
@@ -699,7 +788,7 @@ export class MissionManager {
       if (identity) return identity;
       if (request.envelope?.agentic?.id !== e.id) return "Cross-Agent envelope replay.";
       // A broad project root must never turn Host consent evidence or credentials into tool data.
-      const privateState = (path: string) => ["host.sqlite", "host.sqlite-wal", "host.sqlite-shm", "credentials.json", "remote.json", "state-layout.json", "state-retired.json", "credentials", "settings", "runtime", "sessions", "logs", "agentic-terminal"]
+      const privateState = (path: string) => ["host.sqlite", "host.sqlite-wal", "host.sqlite-shm", "credentials.json", "remote.json", "state-layout.json", "state-retired.json", "credentials", "settings", "runtime", "sessions", "logs", "agentic-terminal", "browser-profile", "browser-sessions"]
         .some(name => within(canonical(join(this.dataDirectory, name)), canonical(path)));
       if (request.action.startsWith("filesystem.") && privateState(resolve(request.cwd, typeof request.params.path === "string" ? request.params.path : "."))) return "Host credentials, consent database and process records cannot be delegated as project files.";
       if (request.action === "terminal.exec" && e.commands.some(command => command.args.join("\0") === ((request.params.args ?? []) as string[]).join("\0") && (privateState(command.script) || command.test_resources.some(privateState)))) return "An approved test cannot copy or inspect private Host authority state.";
@@ -715,7 +804,7 @@ export class MissionManager {
       }
       const fingerprint = agenticFingerprint(request.action, request.params, request.cwd);
       if (this.agentic.denied(request.missionId, fingerprint)) return "This resource/operation was explicitly denied; no provider/tool retry is permitted.";
-      const violation = agenticScopeViolation(e, request.action, request.params, risk, request.cwd, executable);
+      const violation = agenticScopeViolation(e, request.action, request.params, risk, request.cwd, executable, request.stepId);
       if (!violation) return null;
       if (request.action.startsWith("computer.")) {
         const now = Date.now();
@@ -754,6 +843,8 @@ export class MissionManager {
   }
   agenticRequestParams(step: MissionStep, action: string, phase: "execute" | "verify"): Record<string, unknown> {
     if (phase === "verify") {
+      const operation = step.verification.find(check => check.kind === "capability" && check.action === action);
+      if (operation?.kind === "capability") return operation.params;
       const check = step.verification.find(c => c.kind === "command" && action === "terminal.exec");
       if (check?.kind === "command") return { command: check.command, args: check.args, timeoutMs: check.timeoutMs };
     }
@@ -810,11 +901,27 @@ export class MissionManager {
     if(interrupted()) return;
     const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
     if (!envelope) { this.stepFailed(mission, step, "permission_required", "Authorization missing."); return; }
-    const checks: string[] = []; let passed = true;
+    const checks: string[] = []; const verificationRunIds: string[] = []; let passed = true;
+    const executionRun = step.capabilityRunId ? this.store.run(step.capabilityRunId) : null;
     const cwd = step.workspace ?? mission.root;
     if (step.verification.length) step = this.setStep(step, { state: "verifying" }, "mission.step.verifying", `Bunny is checking ${step.role}'s result itself.`);
     for (const check of step.verification) {
-      if (check.kind === "task_spec") {
+      if (check.kind === "capability") {
+        const outcome = await this.bus.request(this.capabilityRequest(mission, step, envelope, check.action, check.params, cwd));
+        if (interrupted()) return;
+        if (outcome.decision.decision === "ask") { this.askPermission(mission, this.store.step(step.id), check.action, outcome.decision.risk, outcome.decision.reason, "verify"); return; }
+        if (outcome.run) verificationRunIds.push(outcome.run.id);
+        const value = outcome.result?.output && typeof outcome.result.output === "object" ? (outcome.result.output as Record<string, unknown>)[check.expect.field] : undefined;
+        const ok = outcome.run?.status === "succeeded" && (Object.hasOwn(check.expect, "equals") ? JSON.stringify(value) === JSON.stringify(check.expect.equals) : typeof value === "string" && value.includes(check.expect.contains!));
+        passed &&= ok; result.artifactIds.push(...outcome.artifactIds);
+        checks.push(`${check.action} ${check.expect.field}: ${ok ? "passed" : "failed"} (independent capability observation)`);
+      } else if (check.kind === "capability_run") {
+        const observation = executionRun?.outputRef ? this.artifacts.get(executionRun.outputRef) : null;
+        const output = observation?.body && observation.artifact.sha256 === sha256(observation.body) ? JSON.parse(observation.body) as { exitCode?: number; stdout?: string; timedOut?: boolean } : null;
+        const ok = !result.task && executionRun?.action === "terminal.exec" && executionRun.status === "succeeded" && executionRun.missionId === mission.id && executionRun.stepId === step.id
+          && observation?.artifact.provenance === `bunny:capability:${executionRun.id}` && output?.timedOut === false && output.exitCode === check.expectExit && typeof output.stdout === "string" && output.stdout.includes(check.stdoutIncludes);
+        passed &&= !!ok; checks.push(`Owned terminal exit/output: ${ok ? "passed" : "failed"}`);
+      } else if (check.kind === "task_spec") {
         const verification = result.task?.verification;
         const ok = !!verification?.passed; passed &&= ok;
         checks.push(`task_spec ${check.spec.name}: ${ok ? "passed" : "failed"} — ${verification?.detail ?? "TaskManager did not verify"}`);
@@ -846,6 +953,7 @@ export class MissionManager {
     step = this.store.step(step.id);
     if (interrupted() || !["running", "verifying"].includes(step.state)) return;
     if (!passed) {
+      this.crossAppEvent("agent.capability_failed", step, { failure: "VERIFICATION_FAILED", verified: false });
       for (const id of result.artifactIds) { try { this.artifacts.mark(id, "failed"); } catch { /* pruned */ } }
       this.stepFailed(mission, step, "verification_failed", checks.filter((line) => !/passed|present|changes present/.test(line) || /failed|missing/.test(line)).join("; ") || checks.join("; "));
       return;
@@ -856,7 +964,9 @@ export class MissionManager {
       this.memory.record(mission.id, "verified_fact", `${step.role} verified`, checks.join("; "), `bunny:verification:${step.id}`, true);
     }
     const attempts = step.attempts.map((attempt, index) => index === step.attempts.length - 1 ? { ...attempt, finishedAt: Date.now(), outcome: "completed" as const, detail: "completed" } : attempt);
-    this.setStep(step, { state: "completed", finishedAt: Date.now(), attempts, result: { summary: result.summary, artifactIds: result.artifactIds, verified, verification: checks }, failure: null, approvedOnce: null }, "mission.step.completed", `${step.role} completed${verified ? " and verified by Bunny" : " (no independent check requested)"}.`);
+    this.setStep(step, { state: "completed", finishedAt: Date.now(), attempts, result: { summary: result.summary, artifactIds: result.artifactIds, verified, verification: checks, ...(executionRun?.outputRef ? { outputRef: executionRun.outputRef, verificationRunIds } : {}) }, failure: null, approvedOnce: null }, "mission.step.completed", `${step.role} completed${verified ? " and verified by Bunny" : " (no independent check requested)"}.`);
+    this.crossAppEvent("agent.capability_verified", step, { verified: verified === true, capabilityRunId: executionRun?.id ?? null });
+    this.crossAppEvent("agent.cross_app_step_completed", step, { verified: verified === true, artifactCount: result.artifactIds.length });
     this.workspace.release(step.id);
     this.schedule(mission.id);
   }
@@ -1149,6 +1259,16 @@ export class MissionManager {
         continue;
       }
       const task = step.taskId ? this.tasks.db.get(step.taskId) : null;
+      const capability = step.crossApp && step.capabilityRunId ? this.store.run(step.capabilityRunId) : null;
+      if (capability?.status === "succeeded" && capability.outputRef && capability.missionId === missionId && capability.stepId === step.id) {
+        const { artifact, body } = this.artifacts.get(capability.outputRef);
+        if (!body || sha256(body) !== artifact.sha256 || artifact.provenance !== `bunny:capability:${capability.id}` || artifact.missionId !== missionId || artifact.stepId !== step.id) throw new Error("Canonical recovery output integrity failed.");
+        this.setStep(step, { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", "Consume a canonical capability result; repeat only independent postconditions.");
+        const running = this.markRunning(this.store.step(step.id), null, null);
+        const mission = this.setMission(this.store.mission(missionId), { state: "running", recovery: null }, "mission.recovered", "Recheck the completed capability without repeating its effect.");
+        await this.verifyAndComplete(mission, running, { summary: capability.summary, artifactIds: capability.artifactIds, output: JSON.parse(body), task: null });
+        results.push({ stepId: step.id, applied: true, replay: "verify_then_consume" }); continue;
+      }
       if (!task || task.state !== "completed") { results.push({ stepId: instruction.stepId, applied: false, reason: "Canonical child truth is not a completed task; nothing is consumed." }); continue; }
       this.setStep(step, { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role} reconciliation: the child task's canonical result is consumed.`);
       const running = this.markRunning(this.store.step(instruction.stepId), step.taskId, task.provider);

@@ -38,9 +38,14 @@ export type NetworkOptions = {
   lookup?: DnsLookup;
   connect?: (address: string, port: number) => Socket;
   allowLoopback?: boolean;
+  allowedOrigins?: string[];
 };
+export function approvedOrigin(url: URL, origins?: string[]): void {
+  if (origins && !origins.includes(url.origin)) throw new Error("Browser origin is outside delegated scope.");
+}
 export async function resolvePublic(url: URL, options: NetworkOptions = {}): Promise<string> {
   safeUrl(url.toString(), options.allowLoopback);
+  approvedOrigin(url, options.allowedOrigins);
   const host = url.hostname.replace(/^\[|\]$/g, "").replace(/\.$/, "");
   const addresses = isIP(host) ? [{ address: host, family: isIP(host) }] : await (options.lookup ?? ((name) => lookup(name, { all: true, verbatim: true })))(host);
   if (!addresses.length) throw new Error(`No DNS addresses for ${host}.`);
@@ -70,6 +75,7 @@ export async function checkingProxy(options: NetworkOptions = {}): Promise<{ url
     res.on("error",()=>res.destroy());req.on("error",()=>req.destroy());
     try {
       const url = safeUrl(req.url ?? "", options.allowLoopback);
+      if (options.allowedOrigins && !["GET", "HEAD"].includes(req.method ?? "")) throw new Error("Delegated browser observation refuses network mutation methods.");
       if (url.protocol !== "http:") throw new Error("HTTPS requires CONNECT.");
       const address = await resolvePublic(url, options);
       if (req.destroyed) return;
@@ -109,6 +115,7 @@ export async function checkingProxy(options: NetworkOptions = {}): Promise<{ url
   // ws:// upgrades use an ordinary HTTP request to the same checked destination.
   server.on("upgrade", async (req, client, head) => {
     try {
+      if (options.allowedOrigins) throw new Error("Delegated browser observation refuses socket upgrades.");
       const url = safeUrl((req.url ?? "").replace(/^ws:/, "http:"), options.allowLoopback);
       if (url.protocol !== "http:") throw new Error("Invalid upgrade.");
       const address = await resolvePublic(url, options);

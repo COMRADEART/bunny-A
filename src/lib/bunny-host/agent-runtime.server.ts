@@ -5,6 +5,7 @@ import type { JsonValue, MissionStep } from "../bunny-missions/types.ts";
 import { CommandRefusedError } from "./failure.server.ts";
 import { AgentStore } from "./agent-store.server.ts";
 import { classifyReplay, type ReplayFacts } from "./agent-replay.ts";
+import { operationContract } from "../bunny-missions/cross-app.ts";
 import { agentCanTransition, deriveAgentState, mapFailure, routingExhausted, type AgentFailure, type AgentProfile, type AgentRun, type AgentSnapshot, type AgentState, type CheckpointBoundary } from "./agent-types.ts";
 
 /**
@@ -42,7 +43,14 @@ export class AgentRuntime {
   snapshot(): AgentSnapshot {
     const snapshot = this.store.snapshot();
     return { ...snapshot, agents: snapshot.agents.map(agent => {
-      try { return { ...agent, authorization: agent.missionId ? this.missions.agentic.projection(agent.missionId) : null }; }
+      try {
+        const mission = agent.missionId ? this.missions.get(agent.missionId).mission : null;
+        const crossApp = mission?.steps.some(step => step.crossApp);
+        const current = mission?.steps.find(step => ["running", "verifying", "waiting_for_approval"].includes(step.state)) ?? mission?.steps.find(step => step.failure) ?? mission?.steps.find(step => step.state !== "completed") ?? mission?.steps.at(-1);
+        const action = current?.executor.kind === "capability" ? current.executor.action : null;
+        return { ...agent, authorization: agent.missionId ? this.missions.agentic.projection(agent.missionId) : null,
+          ...(crossApp && mission ? { activity: { application: action?.startsWith("computer.") ? "Microsoft Calculator" : action?.startsWith("browser.") ? "Mission browser" : action?.split(".")[0] ?? null, action, step: current?.role ?? null, completed: mission.steps.filter(step => step.state === "completed").length, total: mission.steps.length, verification: current?.failure?.category === "verification_failed" ? "Verification failed" : current?.state === "verifying" ? "Checking postconditions" : current?.result?.verified ? "Verified" : "Pending verification", artifacts: this.missions.store.artifacts(mission.id).filter(artifact => artifact.verification === "verified").slice(-6).map(artifact => ({ id: artifact.id, title: artifact.title, verified: true })), history: mission.steps.slice(-12).map(step => ({ step: step.role, action: step.executor.kind === "capability" ? step.executor.action : "provider", state: step.state })) } } : {}) };
+      }
       catch { return { ...agent, authorization: null, authorizationError: "Authorization evidence is invalid; all new work is blocked. Stop remains available." }; }
     }) };
   }
@@ -176,6 +184,14 @@ export class AgentRuntime {
     if (this.store.agentFlags(agent.id).stopped) return;
     const run = this.store.latestRun(agent.id);
     if (!run || run.endedAt !== null) return;
+    if (event.type === "agent.capability_selected" || event.type === "agent.application_handoff") {
+      const detail = JSON.parse(event.detail) as { stepId?: string };
+      const step = this.missions.store.steps(missionId).find(step => step.id === detail.stepId && step.crossApp);
+      if (step) this.checkpoint(agent, run, event.type === "agent.application_handoff" ? "before_application_handoff" : "before_capability_admission", { stepId: step.id }, "Before the next reviewed cross-app capability.");
+    } else if (event.type === "capability.completed") {
+      const capability = this.missions.store.runs({ missionId, limit: 1 })[0];
+      if (capability?.stepId && capability.status === "succeeded" && this.missions.store.step(capability.stepId).crossApp) this.checkpoint(agent, run, "after_capability_completion", { stepId: capability.stepId, capabilityRunId: capability.id, outputRef: capability.outputRef ?? null }, "Canonical capability output committed; postconditions remain independent.");
+    }
     this.captureBoundaries(agent, run, event.type, event.taskId);
     this.deriveTransition(agent);
   }
@@ -349,6 +365,7 @@ export class AgentRuntime {
       let checkpointValid = true;
       try { if (priorRunId) this.store.checkpoints(priorRunId); } catch { checkpointValid = false; }
       const facts: ReplayFacts = {
+        ...(step.crossApp && step.executor.kind === "capability" ? { capability: { replay: operationContract(step.executor.action)?.replay ?? "UNKNOWN", status: step.capabilityRunId ? this.missions.store.run(step.capabilityRunId).status : null, hasOutput: !!(step.capabilityRunId && this.missions.store.run(step.capabilityRunId).outputRef) } } : {}),
         stepId: step.id,
         scope: step.scope.access,
         attempt: { taskId: attempt?.taskId ?? null, outcome: attempt?.outcome ?? null },
@@ -374,6 +391,9 @@ export class AgentRuntime {
 }
 
 const BOUNDARY_REPLAY: Record<CheckpointBoundary, "SAFE_TO_REPLAY" | "VERIFY_BEFORE_REPLAY" | "NOT_REPLAYABLE"> = {
+  before_capability_admission: "SAFE_TO_REPLAY",
+  after_capability_completion: "VERIFY_BEFORE_REPLAY",
+  before_application_handoff: "NOT_REPLAYABLE",
   before_task_admission: "SAFE_TO_REPLAY",
   after_task_completion: "VERIFY_BEFORE_REPLAY",
   after_verification: "VERIFY_BEFORE_REPLAY",

@@ -279,7 +279,25 @@ export class ComputerCapability implements CapabilityAdapter {
     if (process.platform !== "win32") return { availability: "unsupported" as const, detail: "The Computer Runtime is implemented for Windows only." };
     return { availability: "available" as const, detail: "Windows UI Automation and user32 via powershell.exe. Raw mouse/keyboard injection is intentionally not offered." };
   }
+  private desktopTail: Promise<void> = Promise.resolve();
+  private desktopLease: { missionId: string; expiresAt: number; active: () => boolean } | null = null;
+  applicationRegistry() {
+    return [{ id: "calculator", platforms: ["win32"], operations: ["computer.open_app", "computer.focus_window", "computer.invoke_control", "computer.read_calculator"], detection: "Native package/lifetime probe at acquisition", selectors: "Calculator T9R arithmetic AutomationId allowlist", focus: "Foreground required before invoke", recovery: "Revalidate native lifetime; uncertain effects require review", granted: false }, { id: "other", operations: [], detection: "Unsupported by this reviewed integration", granted: false }];
+  }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
+    if (!context.crossApp) return this.perform(action, params, context);
+    const previous = this.desktopTail; let release!: () => void; this.desktopTail = new Promise<void>(resolve => { release = resolve; });
+    await previous;
+    try {
+      context.signal.throwIfAborted(); const denied = context.revalidate?.(); if (denied) throw new Error(denied);
+      if (!context.missionId || !context.revalidate || !context.desktopBatch) throw new Error("Current Mission desktop authority is unavailable.");
+      const lease = this.desktopLease;
+      if (lease && lease.missionId !== context.missionId && lease.expiresAt > Date.now() && lease.active()) throw new Error("Calculator target is busy in another Mission; no competing mutation admitted.");
+      this.desktopLease = { missionId: context.missionId, expiresAt: context.desktopBatch.expiresAt, active: context.missionActive ?? (() => true) };
+      return await this.perform(action, params, context);
+    } finally { release(); }
+  }
+  private async perform(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     if (context.desktopBatch && !calculatorOperation(action, params)) throw new Error("Operation outside the Calculator batch policy.");
     const script = SCRIPTS[action];
     if (!script) return { ok: false, status: "unsupported", summary: `${action} is not supported.`, output: null, evidence: [] };
@@ -328,6 +346,7 @@ export class ComputerCapability implements CapabilityAdapter {
         launch: async () => {
           if (admittedIdentity) throw new Error("A bound batch cannot launch a replacement target; fresh approval required.");
           context.signal.throwIfAborted();
+          const denied = context.revalidate?.(); if (denied) throw new Error(denied);
           if (Date.now() >= scope.expiresAt) throw new Error("Approval expired before Calculator acquisition.");
           return await this.automate(CALCULATOR_SCRIPTS.acquire, args, context.signal, timeout, scope) as CalculatorAcquisition;
         },
@@ -335,6 +354,7 @@ export class ComputerCapability implements CapabilityAdapter {
       if (context.desktopBatch?.windowIdentity && JSON.stringify(context.desktopBatch.windowIdentity) !== JSON.stringify(acquired.identity)) throw new Error("Acquired target differs from the admitted batch identity.");
       output = { ...acquired, file: args.file, pid: acquired.identity.processId, windowPid: acquired.identity.processId, windowIdentity: acquired.identity, newWindows: acquired.decision === "launched" ? 1 : 0 };
     } else {
+      const denied = context.revalidate?.(); if (denied) throw new Error(denied);
       output = await this.automate(script, args, context.signal, timeout, batch) as Record<string, unknown>;
       if (calculator && output.windowIdentity) this.targets.storage.save(owner, { phase: "bound", identity: output.windowIdentity as CalculatorIdentity, acquiredAt: saved?.acquiredAt ?? Date.now(), createdByBunny: saved?.createdByBunny ?? false, runId: saved?.runId ?? context.capabilityRunId ?? null });
     }

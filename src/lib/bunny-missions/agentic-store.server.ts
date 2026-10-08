@@ -156,11 +156,12 @@ export class AgenticStore {
     const rows = this.rows(e.id);
     const mission = this.missions.mission(missionId);
     return { id: e.id, revision: e.revision, state: e.current_state, objective: mission.objective, capabilities: e.permitted_capabilities,
+      ...(e.cross_app ? { browserOrigins: e.browser_origins, applications: e.permitted_capabilities.some(action => action.startsWith("computer.")) ? ["Microsoft Calculator (verified native lifetime)"] : [] } : {}),
       roots: e.permitted_resource_scopes.map(r => r.root), commands: e.commands.map(c => ({ command: c.command, args: c.args, cwd: c.cwd, timeoutMs: c.timeout_ms })),
       riskCeiling: e.risk_ceiling, expiresAt: e.expires_at, durationMs: e.maximum_duration, maximumActions: e.maximum_actions, maximumConcurrency: e.maximum_concurrency,
       admitted: rows.length, completed: rows.filter(r => r.outcome === "COMPLETED").length, failed: rows.filter(r => r.outcome === "FAILED").length, unknown: rows.filter(r => r.outcome === "UNKNOWN").length,
       remainingActions: Math.max(0, e.maximum_actions - rows.length), remainingMs: Math.max(0, Math.min(e.expires_at - Date.now(), e.maximum_duration - (e.approved_at ? Date.now() - e.approved_at : 0))), latestAdmission: rows.at(-1) ?? null,
       pending: this.missions.requests(missionId).filter(r => !r.resolvedAt).map(r => ({ id: r.id, action: r.action, risk: r.risk, reason: r.reason, ...(r.agentic ? { resource: r.agentic.resource } : {}) })),
-      limitations: ["Restart requires fresh reviewed consent.", "Model delegation supports tool-free Ollama inference; workspace CLI tools require separate review.", "Terminal delegation supports pure read/assertion Node checks in a read-only snapshot, with no executable imports, subprocesses or network APIs; script edits require new consent.", "Browser and desktop operations require their existing specific approval boundary."] };
+      limitations: ["Restart requires fresh reviewed consent.", "Model delegation supports tool-free Ollama inference; workspace CLI tools require separate review.", "Terminal delegation supports pure read/assertion Node checks in a read-only snapshot, with no executable imports, subprocesses or network APIs; script edits require new consent.", e.cross_app ? "Browser observation is bound to exact approved origins and a Mission-owned profile. Desktop scope is verified Calculator arithmetic only; ambiguous effects require review." : "Browser and desktop operations require their existing specific approval boundary."] };
   }
 }

@@ -16,6 +16,8 @@ function AuthorizationCard({ id, authorization: a }: { id: string; authorization
     <p className="caption">{a.objective}</p>
     <ul aria-label="Requested access">{a.capabilities.map(capability => <li key={capability}>{capability}</li>)}</ul>
     <p className="caption">Workspace: {a.roots.filter((root, i, roots) => roots.indexOf(root) === i).join(", ")}</p>
+    {a.browserOrigins?.length ? <p className="caption">Browser origins: {a.browserOrigins.join(", ")}</p> : null}
+    {a.applications?.length ? <p className="caption">Applications: {a.applications.join(", ")}</p> : null}
     {a.commands.map((command, i) => <p className="caption" key={i}>Exact test: <code>{command.command} {command.args.join(" ")}</code> · {Math.ceil(command.timeoutMs / 1000)} seconds</p>)}
     <p className="caption">{a.remainingActions} of {a.maximumActions} actions remain · {Math.ceil(a.remainingMs / 60_000)} minutes remain · up to {a.maximumConcurrency} at once · risk ceiling {a.riskCeiling.toLowerCase()}</p>
     <p className="caption">Publishing, messages, system changes, credentials and arbitrary shells require separate review.</p>
@@ -65,6 +67,11 @@ export function AgentsSection() {
               </small>
             </div>
             {row.note ? <p className="caption">{row.note}</p> : null}
+            {row.activity ? <div className="agent-activity">
+              <p className="caption">{row.activity.application} · {row.activity.step} · {row.activity.completed} of {row.activity.total} steps completed</p>
+              <p className="caption">{row.activity.verification}</p>
+              <details><summary>Steps and verified artifacts</summary><ol>{row.activity.history.map((item, index) => <li key={index}>{item.step} · {item.state.replaceAll("_", " ")}</li>)}</ol><ul>{row.activity.artifacts.map(artifact => <li key={artifact.id}><button className="btn quiet" onClick={() => store.openMission(row.missionId ?? null)}>{artifact.title} · verified</button></li>)}</ul></details>
+            </div> : null}
             {row.authorizationError ? <p role="alert" className="caption">{row.authorizationError}</p> : null}
             {row.authorization ? <AuthorizationCard key={`${row.id}-${row.authorization.revision}`} id={row.id} authorization={row.authorization} /> : ["CREATED", "PLANNING"].includes(row.state) ? <button className="btn secondary" onClick={() => void store.agentAuthorization(row.id, "propose")}>Review bounded Mission access</button> : null}
             <div className="actions" data-testid={`agent-actions-${row.id}`}>

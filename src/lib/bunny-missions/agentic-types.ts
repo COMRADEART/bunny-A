@@ -11,6 +11,7 @@ export type CommandBinding = {
 };
 /** Historical consent, subordinate to the MA0 envelope and canonical Host policy. Never a token. */
 export type AgenticAuthorizationEnvelope = {
+  cross_app?: import("./cross-app.ts").CrossAppConsent;
   id: string; policy_version: typeof AGENTIC_POLICY_VERSION;
   agent_id: string; mission_id: string; project_id: string | null;
   user_authorization_id: string | null;
@@ -32,6 +33,8 @@ export type AgenticAdmission = {
   attempt_kind: "action" | "retry" | "reroute";
 };
 export type AgenticProjection = {
+  browserOrigins?: string[];
+  applications?: string[];
   id: string; revision: number; state: AgenticState; objective: string; capabilities: string[];
   roots: string[]; commands: { command: string; args: string[]; cwd: string; timeoutMs: number }[];
   riskCeiling: RiskClass; expiresAt: number; durationMs: number; maximumActions: number;
