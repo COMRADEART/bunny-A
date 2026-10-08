@@ -413,7 +413,7 @@ export function Projects() {
             />
           )}
           <div className="project-pagination">
-            <span>{projectPageRange(offset, 24, page.total)}</span>
+            <span>{loading ? "Loading Projects…" : projectPageRange(offset, 24, page.total)}</span>
             <button
               className="btn quiet"
               disabled={!offset || loading}

@@ -277,7 +277,7 @@ function Update-Bunny {
   Update-BunnyPresentation
   Resize-Bunny
   Update-BunnyMotion
- }catch{$script:bunnyOnline=$false;$script:bunnyLastError=$_.Exception.Message;$bunnyControls.Presence.Text='Host unavailable - retained work may be stale';Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyMuted';$bunnyControls.Temperature.Text='--';$bunnyControls.ApproveButton.IsEnabled=$false;$bunnyControls.StopButton.IsEnabled=$false;Update-BunnyAgentPresentation;Resize-Bunny;Update-BunnyRouteState;Draw-BunnyProviders;Update-BunnyMotion}
+ }catch{$script:bunnyOnline=$false;$script:bunnyLastError=$_.Exception.Message;$bunnyControls.Presence.Text='Host unavailable - retained work may be stale';$bunnyControls.CompactHealth.Text='Host unavailable - retained work may be stale';$bunnyControls.CompactHealth.Visibility='Visible';Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyMuted';$bunnyControls.Temperature.Text='--';$bunnyControls.ApproveButton.IsEnabled=$false;$bunnyControls.StopButton.IsEnabled=$false;Update-BunnyAgentPresentation;Resize-Bunny;Update-BunnyRouteState;Draw-BunnyProviders;Update-BunnyMotion}
 }
 # Async UI commands keep the morph/animation and keyboard responsive; execution stays in the Host.
 function Begin-BunnyCommand([string]$Action,$Data){
