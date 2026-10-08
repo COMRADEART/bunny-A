@@ -20,10 +20,10 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const step = (action: string, params: Record<string, unknown> = { path: "seed.txt" }) => ({ role: "Probe", objective: "Inspect the disposable resource", access: action === "filesystem.write" ? "write" : "read", executor: { kind: "capability", action, params } });
-async function fixture(options: { max?: number; approve?: boolean; steps?: unknown[]; adapters?: ProviderAdapter[]; git?: boolean; durationMs?: number } = {}) {
+async function fixture(options: { max?: number; approve?: boolean; steps?: unknown[]; adapters?: ProviderAdapter[]; git?: boolean; durationMs?: number; rootIsState?: boolean } = {}) {
   const parent = canonical(tmpdir());
   const dir = mkdtempSync(join(parent, "bunny-t5-policy-"));
-  const root = join(dir, "project"); mkdirSync(root); writeFileSync(join(root, "seed.txt"), "seed");
+  const root = options.rootIsState ? dir : join(dir, "project"); mkdirSync(root, { recursive: true }); writeFileSync(join(root, "seed.txt"), "seed");
   writeFileSync(join(root, "check.mjs"), "if (process.env.NODE_OPTIONS || process.env.BUNNY_TEST_SECRET) process.exit(2); console.log('checked');");
   if (options.git) { const initialized = spawnSync("git", ["init", "-q", root], { windowsHide: true }); assert.equal(initialized.status, 0); }
   const db = new HostDatabase(join(dir, "host.sqlite"));
@@ -114,6 +114,24 @@ probe("T5 positive parser grammar rejects executable imports, network, construct
 probe("T5 forged invocation flags cannot defeat a standing ask-every-time rule", async f => { f.missions.store.setGrant("filesystem.read", "global", "ask_every_time", "workstation"); await blocked(f, undefined, undefined, { oneTime: true, direct: { confirmed: true } }); });
 probe("T5 Pause before consent cannot strand the pending review", f => { assert.throws(() => f.agents.pause(f.agentId, "workstation"), /active|consent/); assert.equal(f.agents.snapshot().agents[0].pausedAt, null); assert.equal(f.missions.agentic.forMission(f.missionId)?.current_state, "WAITING_FOR_USER"); }, { approve: false });
 
+probe("T5 broad roots cannot read, overwrite or copy Host authority state", async f => {
+  writeFileSync(join(f.root, "credentials.json"), "disposable-owner-credential");
+  for (const [action, params] of [["filesystem.read", { path: "host.sqlite" }], ["filesystem.read", { path: "credentials.json" }], ["filesystem.write", { path: "credentials.json", content: "replaced", overwrite: true }]] as const) {
+    const out = await blocked(f, action, params); assert.match(out.decision.reason, /Host credentials, consent database/);
+  }
+  assert.equal(readFileSync(join(f.root, "credentials.json"), "utf8"), "disposable-owner-credential");
+  assert.match((await blocked(f, "git.status", {})).decision.reason, /private Host authority state/);
+  const { fileDigest } = await import("./agentic-store.server.ts");
+  const { boundedTestResources } = await import("./capabilities/bounded-terminal.server.ts");
+  const script = join(f.root, "private-check.mjs");
+  writeFileSync(script, "import { readFileSync } from 'node:fs'; console.log(readFileSync('credentials.json', 'utf8'));");
+  // Staged Host-owned test binding challenges admission itself, not offer construction.
+  const command = { ...f.e.commands[0], script, script_hash: fileDigest(script), args: ["private-check.mjs"], test_resources: boundedTestResources(script, f.root, [f.root]) };
+  (f.missions.agentic as unknown as { put: (e: typeof f.e) => void }).put({ ...f.e, commands: [command] });
+  assert.match((await blocked(f, "terminal.exec", { command: "node", args: ["private-check.mjs"] })).decision.reason, /private Host authority state/);
+  assert.equal(f.missions.agentic.rows(f.e.id).length, 0);
+}, { rootIsState: true, git: true });
+
 const modelStep = { role: "Inference", objective: "Summarize two approaches without tools", access: "read", executor: { kind: "model" } };
 function simulatedModels() {
   const launches: { task: OrchTask; finish: (result: AdapterResult) => void }[] = [];
@@ -145,6 +163,29 @@ test("T5 A07/A23/A39/A44: actual retarget and launch cannot enlarge Mission auth
     models.launches[0].finish({ ok: true, output: "fixture" }); await waitFor(() => f.missions.agentic.rows(f.e.id)[0].outcome === "COMPLETED");
     writeFileSync(resolve("test-results/ma3/t5/routing-authority-proof.json"), JSON.stringify({ classification: "SIMULATED", hostPath: "Real TaskManager submit/retarget/approve, MissionManager canonical check and SQLite admission", providerIO: "scripted, no live model service", before: { revision: before!.revision, capabilities: before!.permitted_capabilities, resourceScopes: before!.permitted_resource_scopes }, retargetToClaude: "rejected before launch; cannot enforce tool-free bounds", retargetBackToOllama: "one admission under unchanged consent", scopeEqual: true, projectModelBinding: false }, null, 2));
   } finally { await f.cleanup(); }
+});
+
+test("T5 A22 actual TaskManager retry spends fresh authority and refuses an exhausted budget (provider I/O simulated)", async () => {
+  const evidence = [];
+  for (const max of [1, 2]) {
+    const models = simulatedModels(); const f = await fixture({ max, adapters: models.adapters, steps: [modelStep] });
+    try {
+      const task = f.tasks.submit({ prompt: modelStep.objective, mode: "fast", override: "ollama", constraints: { requiresFilesystem: false } }, { missionId: f.missionId, stepId: f.steps[0].id, cwd: f.root, executionScope: { access: "read" } });
+      f.tasks.approve(task.id); assert.equal(models.launches.length, 1);
+      models.launches[0].finish({ ok: false, output: "", error: "transient network error ECONNRESET", exitCode: 1 });
+      if (max === 1) {
+        await waitFor(() => f.db.get(task.id).state === "failed"); assert.equal(models.launches.length, 1);
+      } else {
+        await waitFor(() => models.launches.length === 2);
+        assert.equal(f.missions.agentic.rows(f.e.id)[1].attempt_kind, "retry");
+        models.launches[1].finish({ ok: true, output: "fixture retry completed" });
+        await waitFor(() => f.db.get(task.id).state === "completed");
+      }
+      const rows = f.missions.agentic.rows(f.e.id); assert.equal(rows.length, max); assert.equal(rows[0].outcome, "FAILED");
+      evidence.push({ maximumActions: max, launches: models.launches.length, attempts: rows.map(row => ({ kind: row.attempt_kind, outcome: row.outcome })), taskState: f.db.get(task.id).state });
+    } finally { await f.cleanup(); }
+  }
+  writeFileSync(resolve("test-results/ma3/t5/retry-accounting-proof.json"), JSON.stringify({ classification: "SIMULATED", hostPath: "Actual TaskManager transient-failure recovery and canonical Mission admission", providerIO: "scripted, no live model service", runs: evidence }, null, 2));
 });
 
 probe("T5 Git read cannot execute repository fsmonitor configuration", async f => {

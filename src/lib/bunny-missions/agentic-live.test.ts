@@ -57,7 +57,8 @@ test("T5 DISPOSABLE LIVE VERIFIED: one HTTP consent, real edit/test/correct/test
     assert.equal(pending.length, 1); assert.equal(pending[0].action, "filesystem.delete");
     assert.equal((await host.api("mission.respond", { requestId: pending[0].id, decision: "deny" })).status, 200);
     assert.equal(readFileSync(join(w.root, "seed.txt"), "utf8"), "seed");
-    const final = (await host.state()).agents.agents.find(a => a.id === agent.id)!;
+    const final = await until(async () => { const a = (await host.state()).agents.agents.find(a => a.id === agent.id); return a?.state === "FAILED" ? a : null; }, "denied required step ends the Mission");
+    assert.equal(final.failure, "AUTHORITY_LOST"); assert.ok(final.checkpoints > 0);
     const db = new DatabaseSync(join(w.dir, "host.sqlite"), { readOnly: true });
     try {
       const rows = db.prepare("SELECT record FROM agentic_admissions").all() as { record: string }[];
@@ -66,7 +67,7 @@ test("T5 DISPOSABLE LIVE VERIFIED: one HTTP consent, real edit/test/correct/test
       const requests = db.prepare("SELECT record FROM permission_requests").all() as { record: string }[];
       assert.equal(approvals.n, 1); assert.equal(requests.length, 1); assert.ok(admissions.length >= 7); assert.equal(admissions.filter(a => a.capability === "terminal.exec").length, 2);
       assert.equal(admissions.filter(a => a.outcome === "FAILED").length, 1);
-      save("disposable-live-acceptance.json", { classification: "DISPOSABLE LIVE VERIFIED", hostPid: host.pid, generation: host.generation, consentCount: approvals.n, admissions, redundantPrompts: 0, scopeRequest: pending[0], denied: true, deniedFilePreserved: true, finalAgent: final, checkpointCount: final.checkpoints });
+      save("disposable-live-acceptance.json", { classification: "DISPOSABLE LIVE VERIFIED", hostPid: host.pid, generation: host.generation, consentCount: approvals.n, admissions, redundantPrompts: 0, scopeRequest: pending[0], waitingBeforeDenial: waiting.state, denied: true, deniedFilePreserved: true, finalAgent: final, checkpointCount: final.checkpoints });
     } finally { db.close(); }
     await host.api("agent.stop", { id: agent.id });
   } finally { await host.stop(); save("disposable-live-host.log.json", { output: host.output() }); w.cleanup(); }

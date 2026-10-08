@@ -9,7 +9,7 @@ import { agenticFingerprint, agenticScopeViolation, envelopeFrom, matches, MODE_
 import { AgenticStore, digest, fileDigest, rootIdentity } from "./agentic-store.server.ts";
 import { AGENTIC_POLICY_VERSION, type AgenticAdjustment, type AgenticAuthorizationEnvelope, type CommandBinding } from "./agentic-types.ts";
 import { resolveCommand, type Resolved } from "./capabilities/process.server.ts";
-import { canonical } from "./paths.server.ts";
+import { canonical, within } from "./paths.server.ts";
 import { boundedTestResources } from "./capabilities/bounded-terminal.server.ts";
 import { batchActionLabel, batchOffer, batchView, consultBatch, currentBatchEpoch, type BatchPlanEntry } from "./batches.server.ts";
 import type { ApprovalBatch, PermissionBatchOffer } from "./types.ts";
@@ -698,6 +698,12 @@ export class MissionManager {
       const identity = this.agenticIdentityViolation(e, request.missionId, request.stepId, request.envelope?.agentic?.revision);
       if (identity) return identity;
       if (request.envelope?.agentic?.id !== e.id) return "Cross-Agent envelope replay.";
+      // A broad project root must never turn Host consent evidence or credentials into tool data.
+      const privateState = (path: string) => ["host.sqlite", "host.sqlite-wal", "host.sqlite-shm", "credentials.json", "remote.json", "state-layout.json", "state-retired.json", "credentials", "settings", "runtime", "sessions", "logs", "agentic-terminal"]
+        .some(name => within(canonical(join(this.dataDirectory, name)), canonical(path)));
+      if (request.action.startsWith("filesystem.") && privateState(resolve(request.cwd, typeof request.params.path === "string" ? request.params.path : "."))) return "Host credentials, consent database and process records cannot be delegated as project files.";
+      if (request.action === "terminal.exec" && e.commands.some(command => command.args.join("\0") === ((request.params.args ?? []) as string[]).join("\0") && (privateState(command.script) || command.test_resources.some(privateState)))) return "An approved test cannot copy or inspect private Host authority state.";
+      if (request.action.startsWith("git.") && within(canonical(request.cwd), canonical(this.dataDirectory))) return "A Git repository containing private Host authority state cannot be delegated.";
       if (request.envelope.id !== e.user_authorization_id || request.envelope.missionId !== request.missionId) return "Request did not use current canonical Mission authority.";
       const plannedStep = this.store.step(request.stepId!);
       if (risk === "WRITE" && plannedStep.scope.access !== "write") return "This read-only Task/step has no mutation authority.";
