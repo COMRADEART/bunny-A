@@ -182,7 +182,7 @@ export function AgenticWorkspace() {
           ["Failed", agents.filter((row) => row.state === "FAILED").length],
         ].map(([label, count]) => (
           <div key={label}>
-            <strong>{count}</strong>
+            <strong>{store.hydratedFromHost ? count : "—"}</strong>
             <span>{label}</span>
           </div>
         ))}
@@ -349,15 +349,17 @@ export function AgenticWorkspace() {
           <Empty
             title={store.connectionChecked ? "No matching Agents." : "Connecting to your Host…"}
             detail={
-              store.missions?.enabled
-                ? "Create an Agent for durable work, or ask a question in regular Bunny chat."
-                : "Agent Missions are disabled on this Host. Review the existing Mission setting to enable them."
+              !store.hydratedFromHost
+                ? "The Host is loading its canonical workspace snapshot."
+                : store.missions?.enabled
+                  ? "Create an Agent for durable work, or ask a question in regular Bunny chat."
+                  : "Agent Missions are disabled on this Host. Review the existing Mission setting to enable them."
             }
           />
         )}
       </div>
       <div className="project-pagination">
-        <span>{matches.length} Agents in this Host snapshot</span>
+        <span>{store.hydratedFromHost ? matches.length : "—"} Agents in this Host snapshot</span>
         <button
           className="btn quiet"
           disabled={!offset}
@@ -399,7 +401,11 @@ export function AgenticWorkspace() {
               <ArrowRight size={16} />
             </button>
           ))}
-          {!missions.length && <p className="t8-empty-copy">No Mission history retained.</p>}
+          {!missions.length && (
+            <p className="t8-empty-copy">
+              {store.hydratedFromHost ? "No Mission history retained." : "Loading Mission history…"}
+            </p>
+          )}
         </div>
       </section>
     </>
