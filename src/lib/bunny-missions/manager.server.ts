@@ -57,6 +57,8 @@ export class MissionManager {
   watchdog: ReturnType<typeof setInterval> | null = null; healthTimer: ReturnType<typeof setInterval> | null = null; closed = false;
   stopping = new Set<string>();
   containing = new Set<string>();
+  /** M-A-3 T4 additive: admission gate the Agent runtime wires in. Undefined → byte-identical behavior. */
+  missionPauseGate: ((missionId: string) => boolean) | null = null;
   loops: { stop: () => void }[] = [];
   listener = (event: HostEvent) => {
     try { this.onHostEvent(event); }
@@ -314,6 +316,8 @@ export class MissionManager {
   async tickOnce(id: string) {
     let mission = this.store.mission(id);
     if (mission.state !== "running" || !this.cached.enabled || this.stopping.has(id) || this.containing.has(id) || !this.tasks.containment.allows("missions")) return;
+    // M-A-3 T4 additive: while the mission's owning agent is paused, no NEW step is admitted; whatever was admitted already finishes.
+    if (this.missionPauseGate?.(id)) return;
     const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
     if (!envelope) { await this.failMission(mission, "permission_required", "Mission has no authorization.", null); return; }
     const limit = Math.min(envelope.budget.maxRuntimeMs, this.cached.limits.maxMissionRuntimeMs);
@@ -876,6 +880,49 @@ export class MissionManager {
     this.workspace.releaseMission(id);
     const base = this.setMission(mission, { objective: objective?.trim() || mission.objective, authorizationId: null, failure: null, finishedAt: null, planning: { ...mission.planning, replans: mission.planning.replans + 1 } }, "mission.replanning", `${by} replanned the mission; the previous authorization was revoked and a new approval is required.`);
     return this.view(this.plan(base, explicit));
+  }
+
+  /**
+   * M-A-3 T4 additive: one canonical, bounded reconciliation pass over an interrupted mission, driven
+   * by the Agent runtime's replay classification. ALL step and mission writes stay inside MissionManager.
+   * "consume" re-runs only Bunny's own verification of an already-completed child task (never the
+   * effect); "resubmit" re-admits once under the existing attempt ceiling and envelope.
+   */
+  async reconcileInterrupted(missionId: string, instructions: { stepId: string; mode: "consume" | "resubmit" }[]): Promise<Record<string, unknown>[]> {
+    const results: Record<string, unknown>[] = [];
+    for (const instruction of instructions) {
+      const step = this.store.steps(missionId).find((item) => item.id === instruction.stepId);
+      if (!step) { results.push({ stepId: instruction.stepId, applied: false, reason: "Unknown step." }); continue; }
+      // Only unreconciled Host-restart interruptions are touched, and never a step that still holds an
+      // approval decision or a one-time approval — old authority never revives (A15).
+      if (!["failed", "blocked"].includes(step.state) || step.failure?.category !== "host_restart" || step.pendingRequestId || step.approvedOnce) {
+        results.push({ stepId: instruction.stepId, applied: false, reason: `Step is ${step.state}; not an unreconciled Host-restart interruption.` });
+        continue;
+      }
+      if (instruction.mode === "resubmit") {
+        if (step.state === "blocked") this.setStep(step, { state: "pending", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role} unblocked for one bounded re-admission after the Host restart (read-only replay).`);
+        const fresh = this.store.step(instruction.stepId);
+        this.setStep(fresh, { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role} re-admitted once after the Host restart (read-only replay within the attempt ceiling).`);
+        results.push({ stepId: instruction.stepId, applied: true, replay: "requeue_once" });
+        continue;
+      }
+      const task = step.taskId ? this.tasks.db.get(step.taskId) : null;
+      if (!task || task.state !== "completed") { results.push({ stepId: instruction.stepId, applied: false, reason: "Canonical child truth is not a completed task; nothing is consumed." }); continue; }
+      this.setStep(step, { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role} reconciliation: the child task's canonical result is consumed.`);
+      const running = this.markRunning(this.store.step(instruction.stepId), step.taskId, task.provider);
+      const mission = this.setMission(this.store.mission(missionId), { state: "running", recovery: null }, "mission.recovered", `Reconciliation re-armed ${step.role} to consume child task ${task.id} without re-executing its effect.`);
+      await this.verifyAndComplete(mission, running, { summary: `Canonical result of child task ${task.id} consumed after a Host restart.`, artifactIds: [], output: task.output, task });
+      results.push({ stepId: instruction.stepId, applied: true, replay: step.verification.length ? "verify_then_consume" : "consume_result" });
+    }
+    // The mission lands running only when nothing else needs the user; missions disabled keeps it parked.
+    const current = this.store.mission(missionId);
+    const pending = this.store.steps(missionId);
+    const needsUser = pending.some((step) => step.state === "waiting_for_approval") || pending.some((step) => ["failed", "blocked"].includes(step.state));
+    if (current.state === "waiting_for_user" && !needsUser && this.cached.enabled && !this.stopping.has(missionId)) {
+      this.setMission(current, { state: "running", recovery: null }, "mission.recovered", "Recovery reconciliation finished; scheduling continues under the same envelope.");
+      this.schedule(missionId);
+    }
+    return results;
   }
 
   // ── recovery after a Host restart ─────────────────────────────────────────

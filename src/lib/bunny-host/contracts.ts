@@ -4,6 +4,7 @@ import type { ModelCapabilitySnapshot } from "./model-capability.server.ts";
 import type { ProviderUsageServiceSnapshot } from "./provider-usage.server.ts";
 import type { HostPresentation } from "./presentation.ts";
 import type { ReleaseIdentity } from "./release-identity.server.ts";
+import type { AgentSnapshot } from "./agent-types.ts";
 import type { Mode, OrchTask, Project, ProviderId, ProviderLive, HostSample, TaskConstraints, ProviderFeatures, TaskProgress, TokenUsage, UsageWindow, VerifySpec, ProcessInfo, TaskState, ProviderExecutionScope } from "../orch/types.ts";
 
 /** missionId is null for direct-task and system events (and for every event written before schema v3). */
@@ -38,6 +39,8 @@ export type HostSnapshot = {
   modelCapabilities?: ModelCapabilitySnapshot;
   /** M-A-3 T2 normalized provider usage truth (derived from registry state and Bunny's own counters). Optional: older clients ignore it. */
   providerUsage?: ProviderUsageServiceSnapshot;
+  /** M-A-3 T4 durable Agent runtime snapshot (agent-level continuity state). Optional: older clients ignore it. */
+  agents?: AgentSnapshot;
 };
 /** `routingPrompt` and `modelOverride` are set in-process by the caller that knows the selection context; HTTP validates both. */
 export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; /** M-A-3 T3 §27: MANUAL exact-model selection; only honored where a real model surface exists. */ modelOverride?: string | null; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };

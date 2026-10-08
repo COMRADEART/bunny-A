@@ -17,6 +17,7 @@ import type { EventEmitter } from "node:events";
 import { stopOwnedChildren } from "./owned-processes.server.ts";
 import { projectHostActivity } from "./presentation.ts";
 import { releaseIdentity } from "./release-identity.server.ts";
+import { AGENT_ACTIONS, AgentRuntime, agentCommand } from "./agent-runtime.server.ts";
 
 const PROVIDERS: ProviderId[]=["codex","claude","ollama","opencode","cline","cursor"];
 function record(value: unknown): Record<string,unknown> {if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("Expected an object.");return value as Record<string,unknown>;}
@@ -64,15 +65,36 @@ async function body(request: IncomingMessage) {let data="";for await(const chunk
 // charset is explicit: Windows PowerShell 5.1 (the native Island) otherwise decodes JSON as Latin-1.
 function json(response: ServerResponse,value: unknown,status=200) {const encoded=JSON.stringify(value);if(response.destroyed || response.writableEnded) return;response.writeHead(status,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"});response.end(encoded);}
 
-/** One SSE client owns its reads, serializer and writes; failure removes every listener and timer. */
+/** One SSE client owns its reads, serializer and writes; failure removes every listener and timer.
+ * Backpressure on a large replay waits for the socket to drain instead of treating a healthy,
+ * slow client as failed — destroying on response.write()===false would RST the connection and a
+ * reconnecting UI could never replay more than the socket buffer (~16KB) of history. */
 export function streamSse(response: ServerResponse, bus: EventEmitter, read:(cursor:number)=>HostEvent[], after:number, containment:HostContainment, authorized:()=>boolean=()=>true) {
-  let cursor=after,closed=false;
-  const close=()=>{if(closed) return;closed=true;clearInterval(heartbeat);bus.off("event",drain);response.off("close",close);response.off("error",failed);try {response.destroy();} catch { /* Broken client already gone. */ }};
+  let cursor=after,closed=false,pumping=false;
+  const close=()=>{if(closed) return;closed=true;clearInterval(heartbeat);bus.off("event",pump);response.off("close",close);response.off("error",failed);try {response.destroy();} catch { /* Broken client already gone. */ }};
   const failed=(error:unknown)=>{close();containment.background({subsystem:"sse"},()=>{throw error;});};
-  const write=(value:string)=>{if(!authorized() || response.destroyed || response.writableEnded) {close();return false;} if(!response.write(value)) {close();return false;} return true;};
-  const drain=()=>{if(closed) return;try {if(!authorized()) {close();return;} let events:HostEvent[];let batches=0;do {events=read(cursor);for(const event of events) {if(!write(`id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`)) return;cursor=event.sequence;}} while(events.length===500 && ++batches<40);} catch(error) {failed(error);}};
-  const heartbeat=setInterval(()=>{if(closed) return;try {write(": heartbeat\n\n");} catch(error) {failed(error);}},15000);
-  response.on("close",close);response.on("error",failed);bus.on("event",drain);drain();
+  const pump=async()=>{
+    if(closed || pumping) return;
+    pumping=true;
+    try {
+      let batches=0;
+      for(;;) {
+        if(!authorized()) {close();return;}
+        const events=read(cursor);
+        for(const event of events) {
+          if(!authorized() || response.destroyed || response.writableEnded) {close();return;}
+          cursor=event.sequence;
+          if(!response.write(`id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`)) {
+            await new Promise<void>((resolve)=>{response.once("drain",resolve);response.once("close",resolve);});
+            if(closed) return;
+          }
+        }
+        if(events.length<500 || ++batches>=40) break;
+      }
+    } catch(error) {failed(error);} finally {pumping=false;}
+  };
+  const heartbeat=setInterval(()=>{if(!closed){try {if(!authorized() || response.destroyed || response.writableEnded) {close();return;} response.write(": heartbeat\n\n");} catch(error) {failed(error);}}},15000);
+  response.on("close",close);response.on("error",failed);bus.on("event",pump);pump();
   return close;
 }
 
@@ -96,13 +118,17 @@ export async function startHost(options: { dataDirectory?: string; root?: string
   db.onFailure=(error,rollbackFailed)=>{if(rollbackFailed) containment.fatal(error,{subsystem:"persistence"});else containment.degrade("*","A persistence boundary failed; new execution requires Host recovery.");};
   // M-A-0 mission layer: additive tables are created, but nothing runs unless missions are enabled.
   const missions=new MissionManager(manager,{dataDirectory,...options.missions});
+  // M-A-3 T4: the durable Agent runtime sits above Missions — it owns continuity only, and construction
+  // runs the recovery walk after MissionManager.recover() has reconciled the mission rows.
+  const agents=new AgentRuntime(db,missions);
+  missions.missionPauseGate=(missionId)=>agents.blockedForMission(missionId);
   // M-A-2 T9: this Host just applied its own additive schema; reconcile the installed-state marker
   // with the applied schema so the next boot validates a healthy database instead of refusing it.
   refreshStateMarker({ installed: paths.installed, data: paths.data, database: paths.database });
   let presentationRevision=0;
   const installedIdentity=releaseIdentity();
   const snapshot=(after:number):HostSnapshot=>{
-    const canonical={...manager.snapshot(after),missions:missions.snapshot()};
+    const canonical={...manager.snapshot(after),missions:missions.snapshot(),agents:agents.snapshot()};
     const retainedFrom=Number((db.db.prepare("SELECT COALESCE(MIN(sequence),0) n FROM events").get() as {n:number}).n);
     return {...canonical,release:installedIdentity,presentation:projectHostActivity(canonical,missions.store.runs({limit:100}),retainedFrom,++presentationRevision)};
   };
@@ -153,10 +179,11 @@ export async function startHost(options: { dataDirectory?: string; root?: string
         streamSse(res,manager.bus,read,after,containment,stillAuthorized);return;
       }
       if(req.method!=="POST" || path.pathname!=="/command") return json(res,{error:"Not found"},404);
-      const input=await body(req);const data=record(input.data ?? {});let task:OrchTask | undefined;let pairCode:string | undefined;let session:AgentSession | undefined;let extra:{mission?:unknown;data?:unknown}={};
-      const safeActions=new Set(["stop","mission.stop","session.get","mission.get","capability.list","skill.list","inbox.list","trigger.list"]);
+      const input=await body(req);const data=record(input.data ?? {});let task:OrchTask | undefined;let pairCode:string | undefined;let session:AgentSession | undefined;let extra:{mission?:unknown;data?:unknown;agents?:unknown;agent?:unknown}={};
+      const safeActions=new Set(["stop","mission.stop","session.get","mission.get","capability.list","skill.list","inbox.list","trigger.list","agent.list","agent.get"]);
       if(!safeActions.has(String(input.action))) containment.assertAccepting("http");
-      if(typeof input.action==="string" && MISSION_ACTIONS.has(input.action)) extra=await missionCommand(missions,input.action,data,{local,actor:local ? "workstation" : `device:${device!.id}`});
+      if(typeof input.action==="string" && AGENT_ACTIONS.has(input.action)) extra=await agentCommand(agents,input.action,data,local ? "workstation" : `device:${device!.id}`);
+      else if(typeof input.action==="string" && MISSION_ACTIONS.has(input.action)) extra=await missionCommand(missions,input.action,data,{local,actor:local ? "workstation" : `device:${device!.id}`});
       else switch(input.action) {
         case "submit": task=manager.submit(validateSubmit(data));break;
         case "approve": task=manager.approve(text(data.id,200),local ? "workstation" : `device:${device!.id}`);break;
@@ -245,6 +272,7 @@ export async function startHost(options: { dataDirectory?: string; root?: string
       const ownedCleanup=stopOwnedChildren();
       try {
         await Promise.allSettled([...manager.sessions.keys()].map(id=>containment.health.operationalState==="draining" ? manager.failOperation(id,{name:"HostFatal",message:"Host fatal shutdown interrupted this owned task; no session was resumed."}) : manager.stop(id,"Host shutdown stopped this owned task.")));
+        agents.close();
         await missions.close();
       } finally {await ownedCleanup;}
       await new Promise<void>(r=>{server.closeAllConnections();server.close(()=>r());});db.close();
@@ -265,5 +293,5 @@ export async function startHost(options: { dataDirectory?: string; root?: string
   loops.push(supervisedLoop(containment,{subsystem:"telemetry"},poll,3000,unavailable));
   loops.push(supervisedLoop(containment,{subsystem:"provider-discovery"},()=>manager.refreshProviders(),30000,undefined,"SUBSYSTEM_FAILURE"));
   console.log(`Bunny-A Host ready on loopback (${manager.instanceId}).`);
-  return {server,manager,missions,close,token,port,containment};
+  return {server,manager,missions,agents,close,token,port,containment};
 }

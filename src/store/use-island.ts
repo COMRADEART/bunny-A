@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { commandBunnyHost, readBunnyHost } from "@/lib/orch/host";
 import type { HostEvent, HostSnapshot, PerformanceProfile } from "@/lib/bunny-host/contracts";
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
+import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
 import type { OperationalHealth } from "@/lib/bunny-host/failure.server";
 import type { PublicActivity } from "@/lib/bunny-host/presentation";
 import type { ModelCapabilitySnapshot } from "@/lib/bunny-host/model-capability.server";
@@ -116,12 +117,17 @@ type Island = Preferences & {
   providerUsage: ProviderUsageServiceSnapshot | null;
   /** M-A-3 T1 probed per-model capability facts (null until a Host that knows them answers). */
   modelCapabilities: ModelCapabilitySnapshot | null;
+  /** M-A-3 T4 durable Agent runtime state (null until a Host that knows agents answers). */
+  agents: AgentSnapshot | null;
   composeKind: "task" | "mission";
   missionFocus: string | null;
   setComposeKind: (kind: "task" | "mission") => void;
   openMission: (id: string | null) => void;
   approveMission: (id: string) => Promise<void>;
   stopMission: (id: string) => Promise<void>;
+  pauseAgent: (id: string) => Promise<void>;
+  resumeAgent: (id: string) => Promise<void>;
+  stopAgent: (id: string) => Promise<void>;
   retryMission: (id: string) => Promise<void>;
   respondMission: (requestId: string, decision: "allow_once" | "allow_batch" | "deny") => Promise<void>;
   revokeBatch: (missionId: string, batchId: string) => Promise<void>;
@@ -279,6 +285,7 @@ export const useIsland = create<Island>((set, get) => {
       performance: snapshot.performance,
       remoteConfigured: snapshot.remoteConfigured,
       missions: snapshot.missions ?? null,
+      agents: snapshot.agents ?? null,
       providerUsage: snapshot.providerUsage ?? null,
       modelCapabilities: snapshot.modelCapabilities ?? null,
       cpuWarn: snapshot.thermal?.cpuWarn ?? 90,
@@ -375,6 +382,7 @@ export const useIsland = create<Island>((set, get) => {
     remoteUrl: null,
     devices: [],
     missions: null,
+    agents: null,
     providerUsage: null,
     modelCapabilities: null,
     hostHealth:null,
@@ -385,6 +393,15 @@ export const useIsland = create<Island>((set, get) => {
     openMission: (missionFocus) => set({ missionFocus }),
     approveMission: async (id) => {
       await command("mission.approve", { id });
+    },
+    pauseAgent: async (id) => {
+      await command("agent.pause", { id });
+    },
+    resumeAgent: async (id) => {
+      await command("agent.resume", { id });
+    },
+    stopAgent: async (id) => {
+      await command("agent.stop", { id });
     },
     stopMission: async (id) => {
       await command("mission.stop", { id });

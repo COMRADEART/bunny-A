@@ -146,6 +146,7 @@ const LABELS: Record<string, string> = {
   "mission.stopped": "Mission stopped",
   "mission.recovered": "Mission interrupted",
   "mission.recovery": "Mission interrupted",
+  "mission.step.recovered": "Step recovered after restart",
   "capability.requested": "Capability requested",
   "capability.started": "Capability running",
   "capability.completed": "Capability succeeded",
@@ -160,6 +161,15 @@ const LABELS: Record<string, string> = {
   "thermal.warning": "Temperature warning",
 };
 export const publicEventLabel = (type: string) => LABELS[type] ?? "Activity recorded";
+/**
+ * M-A-3 T4: agent LIFECYCLE rows (taskId=null + a kind:"agent-lifecycle" detail marker) never project
+ * into the journal feed — the agent panel carries them. Provider ACTIVITY rows with the same agent.*
+ * type names always carry a task stream id, so the two stay distinct here.
+ */
+export function isAgentLifecycle(event: { type: string; taskId: string | null; detail: string }): boolean {
+  if (event.taskId !== null || !event.type.startsWith("agent.")) return false;
+  try { return (JSON.parse(event.detail) as { kind?: string }).kind === "agent-lifecycle"; } catch { return true; }
+}
 export function taskInterrupted(task: Pick<OrchTask, "state" | "stopReason" | "error">) {
   return (
     ["failed", "stopped"].includes(task.state) &&
@@ -260,7 +270,10 @@ export function projectEvents(events: HostEvent[], tasks: OrchTask[]): PublicAct
         !event.type.startsWith("capability.") &&
         !event.type.startsWith("authorization.") &&
         event.type !== "agent.output" &&
-        !/thinking|reasoning/i.test(event.type),
+        !/thinking|reasoning/i.test(event.type) &&
+        // M-A-3 T4 additive: agent LIFECYCLE rows are projected into the agent panel, not the journal;
+        // provider ACTIVITY rows with the same agent.* type names always carry a task stream id.
+        !isAgentLifecycle(event),
     )
     .map((event) => {
       const task = tasks.find((item) => item.id === event.taskId);
@@ -415,7 +428,8 @@ export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
       : undefined,
     events: snapshot.events.map((event) => ({
       ...event,
-      detail: publicEventDetail(
+      // M-A-3 T4: lifecycle rows keep their raw JSON out of the browser; the agent panel carries them.
+      detail: isAgentLifecycle(event) ? "Agent lifecycle event; see the agents panel." : publicEventDetail(
         event.type,
         event.detail,
         snapshot.tasks.find((task) => task.id === event.taskId),
