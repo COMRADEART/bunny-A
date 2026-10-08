@@ -240,6 +240,8 @@ export type OrchTask = {
   verify?: VerifySpec | null;
   /** Set only on child tasks a mission created; direct tasks never carry it. */
   mission?: { missionId: string; stepId: string } | null;
+  /** Bounded Host context reference for this child; never an authorization token. */
+  projectContextRef?: string;
   /** Who launched it: a direct user approval or a mission-delegated approval under an authorization envelope. */
   approval?: { kind: "user" | "mission"; at: number; authorizationId?: string; missionId?: string; stepId?: string } | null;
   executionScope?: ProviderExecutionScope;

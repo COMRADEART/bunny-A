@@ -128,9 +128,12 @@ type Island = Preferences & {
   pauseAgent: (id: string) => Promise<void>;
   resumeAgent: (id: string) => Promise<void>;
   stopAgent: (id: string) => Promise<void>;
-  agentAuthorization: (id: string, action: "propose" | "approve" | "adjust" | "deny" | "revoke", revision?: number, patch?: { maximumActions?: number; durationMs?: number; maximumConcurrency?: number; capabilities?: string[] }) => Promise<void>;
+  agentAuthorization: (id: string, action: "propose" | "approve" | "adjust" | "deny" | "revoke", revision?: number, patch?: { maximumActions?: number; durationMs?: number; maximumConcurrency?: number; capabilities?: string[] ;
+    },
+  ) => Promise<void>;
   retryMission: (id: string) => Promise<void>;
-  respondMission: (requestId: string, decision: "allow_once" | "allow_batch" | "deny") => Promise<void>;
+  respondMission: (requestId: string, decision: "allow_once" | "allow_batch" | "deny",
+  ) => Promise<void>;
   revokeBatch: (missionId: string, batchId: string) => Promise<void>;
   ackInbox: (id: string) => void;
   configureMissions: (patch: { enabled?: boolean; triggersEnabled?: boolean }) => void;
@@ -157,6 +160,7 @@ type Island = Preferences & {
   setGpuWarn: (value: number) => void;
   setExtension: (id: "cline" | "cursor", on: boolean) => void;
   addProject: (name: string, path: string) => void;
+  projectCommand: (action: string, data: Record<string, unknown>) => Promise<unknown | null>;
   removeProject: (id: string) => void;
   dismissNotice: () => void;
   note: (line: string) => void;
@@ -256,7 +260,9 @@ export const useIsland = create<Island>((set, get) => {
   const apply = (snapshot: HostSnapshot, after=0, order=++requestOrder) => {
     const state=get();
     if(order<appliedOrder && snapshot.instanceId!==state.hostInstanceId) return;
-    const reconciled=reconcileSnapshot({instanceId:state.hostInstanceId,revision:state.snapshotRevision,cursor:state.cursor,events:state.events,activities:state.activities},snapshot,after);
+    const reconciled=reconcileSnapshot({instanceId:state.hostInstanceId,revision:state.snapshotRevision,cursor:state.cursor,events:state.events,activities:state.activities,
+      },snapshot,after,
+    );
     if(!reconciled) return;
     appliedOrder=Math.max(appliedOrder,order);
     const ollama = snapshot.providers.find((p) => p.id === "ollama");
@@ -298,11 +304,14 @@ export const useIsland = create<Island>((set, get) => {
         .reverse()
         .map((e) => ({ at: e.at, line: `${e.type}: ${e.detail}` })),
     });
-    disconnected=false;
+    disconnected = false;
     for (const event of fresh)
       if (
         // A mission's child tasks are approved and reported by the mission itself.
-        !(event.missionId && ["approval.required", "task.completed", "task.failed"].includes(event.type)) &&
+        !(
+          event.missionId &&
+          ["approval.required", "task.completed", "task.failed"].includes(event.type)
+        ) &&
         [
           "thermal.warning",
           "task.completed",
@@ -330,9 +339,9 @@ export const useIsland = create<Island>((set, get) => {
   };
   const command = async (action: string, data: Record<string, unknown>) => {
     try {
-      const order=++requestOrder;
+      const order = ++requestOrder;
       const result = await commandBunnyHost({ data: { action, data } });
-      apply(result.snapshot,0,order);
+      apply(result.snapshot, 0, order);
       return result;
     } catch (error) {
       get().note(error instanceof Error ? error.message : "Host command failed.");
@@ -386,8 +395,8 @@ export const useIsland = create<Island>((set, get) => {
     agents: null,
     providerUsage: null,
     modelCapabilities: null,
-    hostHealth:null,
-    release:null,
+    hostHealth: null,
+    release: null,
     composeKind: "task",
     missionFocus: null,
     setComposeKind: (composeKind) => set({ composeKind }),
@@ -405,7 +414,11 @@ export const useIsland = create<Island>((set, get) => {
       await command("agent.stop", { id });
     },
     agentAuthorization: async (id, action, revision, patch) => {
-      await command(`agent.authorization.${action}`, { id, ...(revision === undefined ? {} : { revision }), ...(patch ? { patch } : {}) });
+      await command(`agent.authorization.${action}`, {
+        id,
+        ...(revision === undefined ? {} : { revision }),
+        ...(patch ? { patch } : {}),
+      });
     },
     stopMission: async (id) => {
       await command("mission.stop", { id });
@@ -478,22 +491,22 @@ export const useIsland = create<Island>((set, get) => {
         set({ theme: requestedTheme, appearance: { ...appearance, theme: requestedTheme } });
       const taskId = query.get("task");
       if (taskId) set({ decisionTaskId: taskId, sheet: "task" });
-      const missionId=query.get("mission");
-      if(missionId) set({missionFocus:missionId,sheet:"today"});
+      const missionId = query.get("mission");
+      if (missionId) set({ missionFocus: missionId, sheet: "today" });
       void get().refreshOllama();
     },
     refreshOllama: async () => {
       if (refreshing) return refreshing;
       refreshing = (async () => {
         try {
-          const after=disconnected ? 0 : get().cursor;
-          const order=++requestOrder;
+          const after = disconnected ? 0 : get().cursor;
+          const order = ++requestOrder;
           const snapshot = await readBunnyHost({ data: { after } });
-          const resync=needsCanonicalResync(get().hostInstanceId,snapshot,after);
-          apply(snapshot,after,order);
-          if(resync) {
-            const canonical=await readBunnyHost({data:{after:0}});
-            apply(canonical,0,++requestOrder);
+          const resync = needsCanonicalResync(get().hostInstanceId, snapshot, after);
+          apply(snapshot, after, order);
+          if (resync) {
+            const canonical = await readBunnyHost({ data: { after: 0 } });
+            apply(canonical, 0, ++requestOrder);
           }
           if (!migrationAttempted) {
             migrationAttempted = true;
@@ -505,7 +518,7 @@ export const useIsland = create<Island>((set, get) => {
               });
           }
         } catch (error) {
-          disconnected=true;
+          disconnected = true;
           set({
             host: "offline",
             connectionChecked: true,
@@ -564,6 +577,10 @@ export const useIsland = create<Island>((set, get) => {
     },
     addProject: (name, path) => {
       void command("project.add", { name, path });
+    },
+    projectCommand: async (action, data) => {
+      const result = await command(action, data);
+      return result?.data ?? null;
     },
     removeProject: (id) => {
       void command("project.remove", { id });

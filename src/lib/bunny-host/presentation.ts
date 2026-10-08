@@ -166,9 +166,17 @@ export const publicEventLabel = (type: string) => LABELS[type] ?? "Activity reco
  * into the journal feed — the agent panel carries them. Provider ACTIVITY rows with the same agent.*
  * type names always carry a task stream id, so the two stay distinct here.
  */
-export function isAgentLifecycle(event: { type: string; taskId: string | null; detail: string }): boolean {
+export function isAgentLifecycle(event: {
+  type: string;
+  taskId: string | null;
+  detail: string;
+}): boolean {
   if (event.taskId !== null || !event.type.startsWith("agent.")) return false;
-  try { return (JSON.parse(event.detail) as { kind?: string }).kind === "agent-lifecycle"; } catch { return true; }
+  try {
+    return (JSON.parse(event.detail) as { kind?: string }).kind === "agent-lifecycle";
+  } catch {
+    return true;
+  }
 }
 export function taskInterrupted(task: Pick<OrchTask, "state" | "stopReason" | "error">) {
   return (
@@ -429,11 +437,13 @@ export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
     events: snapshot.events.map((event) => ({
       ...event,
       // M-A-3 T4: lifecycle rows keep their raw JSON out of the browser; the agent panel carries them.
-      detail: isAgentLifecycle(event) ? "Agent lifecycle event; see the agents panel." : publicEventDetail(
-        event.type,
-        event.detail,
-        snapshot.tasks.find((task) => task.id === event.taskId),
-      ),
+      detail: isAgentLifecycle(event)
+        ? "Agent lifecycle event; see the agents panel."
+        : publicEventDetail(
+            event.type,
+            event.detail,
+            snapshot.tasks.find((task) => task.id === event.taskId),
+          ),
     })),
     tasks: snapshot.tasks.map((task) => ({
       ...task,
@@ -569,11 +579,14 @@ export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
 
 /** Only the fields used by the dashboard cross its command boundary. Private session/capability data stays local. */
 export function dashboardCommand<
-  T extends { snapshot: HostSnapshot; task?: OrchTask; mission?: MissionView; pairCode?: string },
->(result: T) {
+  T extends { snapshot: HostSnapshot; task?: OrchTask; mission?: MissionView; pairCode?: string ;
+    data?: import("../bunny-missions/types.ts").JsonValue;
+  },
+>(result: T, projectAction?: string) {
   const snapshot = dashboardSnapshot(result.snapshot);
   return {
     snapshot,
+    ...(result.data === undefined || !["project.list", "project.get", "project.add", "project.create", "project.update", "project.relink", "project.remove", "project.artifact", "project.repository", "project.agent.create"].includes(projectAction ?? "") ? {} : { data: result.data }),
     pairCode: result.pairCode,
     task: result.task ? snapshot.tasks.find((task) => task.id === result.task!.id) : undefined,
     mission: result.mission

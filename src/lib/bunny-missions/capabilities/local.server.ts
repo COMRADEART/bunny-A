@@ -47,7 +47,7 @@ export class FilesystemCapability implements CapabilityAdapter {
       const path = scopedPath(context.cwd, str(params, "path", false) || ".", context.roots);
       if (context.boundedDelegation && privateHostPath(context.dataDirectory, path)) throw new Error("Private Host state is outside project scope.");
       if (!statSync(path).isDirectory()) return fail(`${path} is not a folder.`);
-      const entries = readdirSync(path, { withFileTypes: true }).filter(entry => !context.boundedDelegation || !privateHostPath(context.dataDirectory, join(path, entry.name))).slice(0, 500).map((entry) => {
+      const entries = readdirSync(path, { withFileTypes: true }).filter(entry => !context.resourceValidation?.(join(path,entry.name)) && (!context.boundedDelegation || !privateHostPath(context.dataDirectory, join(path, entry.name)))).slice(0, 500).map((entry) => {
         const full = join(path, entry.name); let bytes: number | null = null;
         try { if (entry.isFile()) bytes = statSync(full).size; } catch { bytes = null; }
         return { name: entry.name, kind: entry.isDirectory() ? "folder" : entry.isFile() ? "file" : "other", bytes };
@@ -79,6 +79,7 @@ export class FilesystemCapability implements CapabilityAdapter {
           if (++inspected > 1000 || matches.length >= 100 || bytes > 8 * READ_LIMIT) { truncated = true; return; }
           if (entry.isSymbolicLink() || entry.name === ".git" || entry.name === "node_modules") continue;
           const child = scopedPath(folder, entry.name, context.roots);
+          if (context.resourceValidation?.(child)) continue;
           if (privateHostPath(context.dataDirectory, child)) continue;
           if (entry.isDirectory()) walk(child, depth + 1);
           else if (entry.isFile()) { const info = statSync(child); if (info.size > READ_LIMIT || bytes + info.size > 8 * READ_LIMIT) continue; bytes += info.size;

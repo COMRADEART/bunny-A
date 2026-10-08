@@ -112,8 +112,11 @@ export class AgentStore {
   releaseClaim(agentId: string, claim: string): void { this.db.prepare("DELETE FROM agent_recovery_claims WHERE agent_id=? AND claim=?").run(agentId, claim); }
   releaseAllClaims(): void { this.db.prepare("DELETE FROM agent_recovery_claims").run(); }
 
-  snapshot(): AgentSnapshot {
-    const rows = this.db.prepare("SELECT state,record FROM agents ORDER BY created_at").all() as { state: string; record: string }[];
+  snapshot(ids?: string[]): AgentSnapshot {
+    if (ids && (!ids.length || ids.length > 100)) return { agents: [], cursor: this.cursor() };
+    const rows = (ids
+      ? this.db.prepare(`SELECT state,record FROM agents WHERE id IN (${ids.map(() => "?").join(",")}) ORDER BY created_at`).all(...ids)
+      : this.db.prepare("SELECT state,record FROM agents ORDER BY created_at").all()) as { state: string; record: string }[];
     const agents = rows.map((row) => {
       const profile = JSON.parse(row.record) as AgentProfile;
       const run = this.latestRun(profile.id);

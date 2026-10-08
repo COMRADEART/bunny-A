@@ -12,6 +12,7 @@ import type {
 } from "../types.ts";
 
 export type ExecutionContext = {
+  resourceValidation?: (path: string) => string | null;
   browserOrigins?: string[];
   crossApp?: boolean;
   revalidate?: () => string | null;
@@ -74,6 +75,7 @@ const STATUS_FOR: Record<Exclude<CapabilityAvailability, "available" | "degraded
  * parameters, and emits normalized capability.* events.
  */
 export class CapabilityBus {
+  resourceValidation: ((request: CapabilityRequest, path: string) => string | null) | null = null;
   adapters = new Map<string, CapabilityAdapter>();
   health = new Map<string, { availability: CapabilityAvailability; detail: string; checkedAt: number }>();
   store: MissionStore; artifacts: ArtifactStore; dataDirectory: string;
@@ -271,7 +273,7 @@ export class CapabilityBus {
       const delegated = agenticAdmission.id ? this.agenticExecutionContext?.(request, agenticAdmission.id, executable) ?? {} : {};
       const currentViolation = delegated.revalidate?.();
       if (currentViolation) throw new Error(currentViolation);
-      result = await found.adapter.execute(request.action, request.params, { ...delegated, missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch: delegated.desktopBatch ?? desktopBatch, boundedEnvironment, boundedDelegation: !!agenticAdmission.id, boundedScriptHash: admitted?.scriptHash });
+      result = await found.adapter.execute(request.action, request.params, { ...delegated, resourceValidation: path => this.resourceValidation?.(request,path) ?? null, missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch: delegated.desktopBatch ?? desktopBatch, boundedEnvironment, boundedDelegation: !!agenticAdmission.id, boundedScriptHash: admitted?.scriptHash });
       if(processOwnership.length) result={...result,output:{...(result.output && typeof result.output === "object" ? result.output : {value:result.output}),processOwnership}};
     } catch (error) {
       const message = safeError(error).message;

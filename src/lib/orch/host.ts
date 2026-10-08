@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { HostSnapshot } from "../bunny-host/contracts.ts";
-import type { MissionView } from "../bunny-missions/types.ts";
+import type { MissionView , JsonValue } from "../bunny-missions/types.ts";
 import type { OrchTask } from "./types";
 import { dashboardCommand, dashboardSnapshot } from "../bunny-host/presentation.ts";
 
@@ -22,6 +22,7 @@ export const commandBunnyHost = createServerFn({ method: "POST" })
       task?: OrchTask;
       pairCode?: string;
       mission?: MissionView;
+      data?: JsonValue;
     }> => {
       const { hostRequest } = await import("./host-bridge.server.ts");
       const result = (await hostRequest("/command", data)) as {
@@ -29,7 +30,8 @@ export const commandBunnyHost = createServerFn({ method: "POST" })
         task?: OrchTask;
         pairCode?: string;
         mission?: MissionView;
+        data?: JsonValue;
       };
-      return dashboardCommand(result);
+      return dashboardCommand(result, data.action);
     },
   );
