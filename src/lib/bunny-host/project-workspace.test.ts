@@ -182,7 +182,7 @@ check("T7 P10/P11/P12 archive and restore retain identities and user files", (f)
   assert.equal(f.host.db.prepare("SELECT state FROM agents WHERE id=?").get(stopped.agentId)?.state,"STOPPED");
   assert.equal(restored.id, p.id);
   assert.equal(readFileSync(join(f.a, "keep.txt"), "utf8"), "keep");
-  assert.equal(f.host.db.prepare("SELECT COUNT(*) n FROM agents").get()?.n, 0);
+  assert.equal(f.host.db.prepare("SELECT COUNT(*) n FROM agents").get()?.n, 1);
 });
 check("T7 P13 favorite persists in canonical record", (f) => {
   const p = f.registry.update(f.project.id, { favorite: true }, 1);
