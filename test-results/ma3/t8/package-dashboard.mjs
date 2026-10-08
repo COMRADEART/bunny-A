@@ -1,0 +1,16 @@
+import { createServer } from 'node:http';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { verifyRelease, importClosure, sourceCheck } from '../../../scripts/bunny-release.mjs';
+const base=resolve('test-results/ma3/t8'), root=join(base,'package/Bunny-A-Windows-v27-MA3-T8-R4-TEST');
+const fixture=JSON.parse(readFileSync(join(base,'ui-fixture.json'),'utf8'));
+process.env.BUNNY_HOST_DATA_DIRECTORY=fixture.data;
+process.env.BUNNY_HOST_CREDENTIALS_FILE=join(fixture.data,'credentials.json');
+delete process.env.BUNNY_STATE_LAYOUT;delete process.env.BUNNY_RELEASE_ROOT;delete process.env.DATABASE_URL;
+const verification=verifyRelease(root);
+writeFileSync(join(base,'package-integrity.json'),JSON.stringify({classification:'STATIC VERIFIED',root,verification,closure:importClosure(root),source:sourceCheck(resolve('.'),root)},null,2));
+if(!verification.ok)throw Error('Package verification failed');
+const {middleware}=await import(pathToFileURL(join(root,'.output/server/index.mjs')));
+const server=createServer((req,res)=>{res.on('error',()=>res.destroy());Promise.resolve(middleware(req,res)).catch(()=>{if(!res.headersSent)res.writeHead(500);res.end('Disposable package adapter error');});});
+server.listen(8082,'127.0.0.1',()=>console.log('Pinned package test middleware ready; production gateway remains untouched.'));

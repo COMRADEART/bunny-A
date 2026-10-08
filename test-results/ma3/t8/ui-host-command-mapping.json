@@ -1,0 +1,21 @@
+{
+  "classification": "STATIC VERIFIED",
+  "existingAuthority": true,
+  "mapping": {
+    "New Agent": "project.agent.create",
+    "Pause": "agent.pause",
+    "Resume": "agent.resume",
+    "Stop future work": "agent.stop",
+    "Authorize Mission": "agent.authorization.approve + current revision",
+    "Reduce scope": "agent.authorization.adjust + current revision + reduction patch",
+    "Deny": "agent.authorization.deny + current revision",
+    "Revoke": "agent.authorization.revoke + current revision",
+    "Open artifact": "project.artifact",
+    "Project list/detail": "project.list/project.get",
+    "Register/favorite/archive/restore/relink": "existing T7 project commands",
+    "Refresh models/usage": "existing refresh command/T2 service",
+    "Stream": "GET /api/bunny-events → existing authenticated Host /events; cursor-only redacted signals",
+    "Talk/Redirect": "unsupported, disabled"
+  },
+  "auth": "Existing authorizeBridge TCP peer/origin/trusted-device checks; credential remains server-side"
+}

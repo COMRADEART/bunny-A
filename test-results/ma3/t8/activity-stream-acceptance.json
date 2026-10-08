@@ -1,0 +1,59 @@
+{
+  "classification": "DISPOSABLE LIVE VERIFIED",
+  "source": "Canonical Host journal; no extra store/scheduler",
+  "browser": "Live Host updates and restart reconciliation observed in pinned desktop middleware",
+  "transport": "Authenticated cursor-only SSE bridge; initial handshake, 5s upstream connect bound, cancel cleanup, backpressure, 262144-char frame bound",
+  "rendering": "30-row pages from bounded 240 public activities; Agent detail at most 60",
+  "filters": [
+    "Project",
+    "Agent",
+    "Mission",
+    "Task",
+    "Status",
+    "Provider",
+    "Date"
+  ],
+  "replayDedupe": {
+    "classification": "SIMULATED",
+    "evidence": "T8 replay/out-of-order/new-epoch focused test plus original Host SSE replay tests"
+  },
+  "privacy": {
+    "classification": "SIMULATED",
+    "evidence": "T8 token/cookie/prompt redaction, chunked multibyte, cancellation, oversized-frame tests"
+  },
+  "offlineAndFreshEpoch": {
+    "classification": "DISPOSABLE LIVE VERIFIED",
+    "evidence": "restart-reconnect.json"
+  },
+  "liveAuthenticatedProbe": {
+    "classification": "DISPOSABLE LIVE VERIFIED",
+    "results": [
+      {
+        "name": "invalid cursor",
+        "status": 400,
+        "body": "{\"error\":\"Invalid event cursor.\"}"
+      },
+      {
+        "name": "untrusted forwarded peer",
+        "status": 503,
+        "body": "{\"error\":\"Authenticated Host activity is unavailable.\"}"
+      },
+      {
+        "name": "cross-site origin",
+        "status": 503,
+        "body": "{\"error\":\"Authenticated Host activity is unavailable.\"}"
+      },
+      {
+        "name": "cross-site metadata",
+        "status": 503,
+        "body": "{\"error\":\"Authenticated Host activity is unavailable.\"}"
+      }
+    ],
+    "authenticatedLocalHandshake": 200,
+    "onlySequenceSignals": true,
+    "replayedSignals": 54,
+    "noDuplicateReplayInObservedChunk": true,
+    "clientCanceled": true,
+    "credentialsExposed": false
+  }
+}

@@ -1,0 +1,5 @@
+# Agentic workspace contract
+
+Canonical Agent state and Agentic authorization state are displayed separately. Waiting consent never implies execution. Planned/last/retained steps are labeled honestly. Current Task requires a current accepted Mission step link and a nonterminal Task. Conversation retains the Mission request and explains unsupported free-form Agent messaging; tool activity and verified results use distinct tabs. Talk and Redirect are disabled with an explicit Host capability explanation.
+
+Pause holds new admissions; Resume invokes Host revalidation; Stop has focus-contained confirmation explaining that existing effects are not undone. Controls wait for command acknowledgment and use canonical returned snapshots. Offline commands are disabled. Exact authorization revisions are sent for approve/adjust/deny/revoke. Artifact opening delegates to project.artifact with Project ID and artifact ID, retaining hash and scope validation. UI closure never issues a runtime stop command.
