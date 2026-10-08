@@ -1,0 +1,152 @@
+{
+  "contract": "workspace-contract.md",
+  "cases": [
+    {
+      "id": "P21",
+      "expected": "Durable Agent workspace",
+      "actual": "Actual Agent acquired owned manifest/scratch outside user root",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P22",
+      "expected": "Workspace identity survives restart",
+      "actual": "Pinned identity unchanged after fresh Host",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "restart-recovery.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P23",
+      "expected": "Distinct scratch for two Agents",
+      "actual": "Unique Agent/Mission bindings yield separate scratch roots",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P24",
+      "expected": "Other Agent scratch inaccessible",
+      "actual": "Other scratch and own private manifest denied",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P25",
+      "expected": "Cross-Project root isolation",
+      "actual": "Project B unchanged, context/root access denied",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P26",
+      "expected": "Explicit cross-Project scope",
+      "actual": "Absent exact current T5 scope denied by resolver; current T5 remains authority",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P27",
+      "expected": "Reject traversal/prefix cousins",
+      "actual": "Relative traversal and AppSecrets prefix cousin rejected",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P28",
+      "expected": "Reject junction/symlink escape",
+      "actual": "Real Windows junction creation then registration refusal",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P29",
+      "expected": "Root substitution needs review",
+      "actual": "Moved original/replacement inode rejected as CONTEXT_CHANGED",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P30",
+      "expected": "Exclude Host state",
+      "actual": "Private SQLite/credentials paths excluded; T5 regression preserved",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P47",
+      "expected": "Unowned cleanup refused",
+      "actual": "Separate reviewed cleanup required; root remains",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P48",
+      "expected": "No active silent cleanup",
+      "actual": "Cleanup always refuses; active scratch still exists",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P54",
+      "expected": "Concurrent safety",
+      "actual": "Revision conflict prevents overwrite; canonical exclusive WorkspaceCoordinator blocks second root mutation",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P55",
+      "expected": "No shared authority",
+      "actual": "Separate B receives no A context, authorization or artifact",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P61",
+      "expected": "Reject hard-link leakage",
+      "actual": "Cross-root hard link denied",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P62",
+      "expected": "Detect manifest tampering",
+      "actual": "Modified manifest prevents admission, CONTEXT_CHANGED",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P63",
+      "expected": "Enforce scratch quota",
+      "actual": "Prospective >64MB write rejected",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P66",
+      "expected": "Windows special paths denied",
+      "actual": "UNC/device/ADS/reserved/trailing-dot aliases rejected",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    }
+  ],
+  "maximumWorkspaceBytes": 67108864,
+  "maximumEntries": 1000,
+  "maximumDepth": 12
+}

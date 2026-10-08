@@ -1,0 +1,15 @@
+
+> typecheck
+> tsc --noEmit
+
+src/lib/orch/host.ts(18,5): error TS2345: Argument of type '({ data, }: ServerFnCtx<Register, "POST", undefined, (data: { action: string; data: Record<string, unknown>; }) => { action: string; data: Record<string, unknown>; }>) => Promise<...>' is not assignable to parameter of type 'ServerFn<Register, "POST", undefined, (data: { action: string; data: Record<string, unknown>; }) => { action: string; data: Record<string, unknown>; }, Promise<{ snapshot: HostSnapshot; task?: OrchTask | undefined; pairCode?: string | undefined; mission?: MissionView | undefined; data?: unknown; }>, true>'.
+  Type 'Promise<{ snapshot: HostSnapshot; task?: OrchTask | undefined; pairCode?: string | undefined; mission?: MissionView | undefined; data?: unknown; }>' is not assignable to type 'Promise<ValidateSerializableMapped<{ snapshot: HostSnapshot; task?: OrchTask | undefined; pairCode?: string | undefined; mission?: MissionView | undefined; data?: unknown; }, RegisteredSerializableInput<Register>>>'.
+    Type '{ snapshot: HostSnapshot; task?: OrchTask | undefined; pairCode?: string | undefined; mission?: MissionView | undefined; data?: unknown; }' is not assignable to type 'ValidateSerializableMapped<{ snapshot: HostSnapshot; task?: OrchTask | undefined; pairCode?: string | undefined; mission?: MissionView | undefined; data?: unknown; }, RegisteredSerializableInput<Register>>'.
+      Types of property 'data' are incompatible.
+        Type 'unknown' is not assignable to type 'SerializationError<"Type may not be serializable"> | undefined'.
+src/store/use-island.ts(336,13): error TS18046: 'result' is of type 'unknown'.
+src/store/use-island.ts(569,103): error TS2339: Property 'data' does not exist on type '{}'.
+src/store/use-island.ts(591,37): error TS2339: Property 'mission' does not exist on type '{}'.
+src/store/use-island.ts(605,23): error TS2339: Property 'task' does not exist on type '{}'.
+src/store/use-island.ts(605,70): error TS2339: Property 'task' does not exist on type '{}'.
+src/store/use-island.ts(689,33): error TS2339: Property 'pairCode' does not exist on type '{}'.

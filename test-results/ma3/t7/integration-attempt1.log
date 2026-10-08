@@ -1,0 +1,13 @@
+✔ A07/A08: pause survives a real Host restart; nothing resumes by itself; resume completes under the same envelope (2444.0023ms)
+✔ A12: restart during a read child requeues it once; one interrupted row, one recovered row, same agent and mission (2512.6096ms)
+✔ A13/A28: verification recorded and crash before the mission heard — consume the canonical result, never re-execute (905.9808ms)
+✔ A30: completed child without recorded verification — re-run the check, never the underlying effect (808.8336ms)
+{"type":"host.degraded","at":1791475958463,"failureClass":"HOST_DEGRADED","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+{"type":"host.subsystem_failed","at":1791475958462,"failureClass":"SUBSYSTEM_FAILURE","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+✔ A19: a corrupt checkpoint stops recovery fail-closed; nothing replays and the mission waits for the user (3798.6555ms)
+✔ A15: a restart-invalidated approval is denied, cleared, and re-asked fresh — never reused (1013.7368ms)
+✔ A16/A17: the removed provider's requeue re-routes to the remaining eligible provider (841.7354ms)
+✔ A20: a foreign recovery claim blocks the walk; once released, a runtime picks the agent up (2480.1538ms)
+✔ A21: reconcile refuses completed/blocked-by-authority steps and non-completed canonical truth (962.926ms)
+✔ A22: a COMPLETED agent stays COMPLETED across a restart; a STOPPED agent never resurrects (2228.7694ms)
+✔ A35: a historical direct task's canonical row is byte-identical across the restart (763.2824ms)

@@ -1,0 +1,43 @@
+{
+  "classification": "SIMULATED",
+  "method": "Real disposable SQLite/filesystem; controlled legacy rows and transaction interruption. Assertions retained in T7 focused suite.",
+  "cases": [
+    {
+      "scenario": "new database",
+      "actual": "Existing Host table extended; bounded indexes installed",
+      "status": "PASS"
+    },
+    {
+      "scenario": "populated legacy",
+      "actual": "Historical ID/path retained; preferred normalized auto; user bytes retained",
+      "status": "PASS"
+    },
+    {
+      "scenario": "repeat migration",
+      "actual": "Same IDs/records, no duplicate Project",
+      "status": "PASS"
+    },
+    {
+      "scenario": "interrupted migration",
+      "actual": "Injected transaction failure rolls back original row bytes; next migration succeeds",
+      "status": "PASS"
+    },
+    {
+      "scenario": "malformed row",
+      "actual": "Original invalid JSON bytes retained, excluded from usable registry",
+      "status": "PASS"
+    },
+    {
+      "scenario": "ambiguous roots",
+      "actual": "Both IDs retained, both NEEDS_RELINK, never silently merged",
+      "status": "PASS"
+    }
+  ],
+  "evidence": [
+    "t7-final.log",
+    "full-regression.log",
+    "src/lib/bunny-host/project-workspace.test.ts"
+  ],
+  "productionMigrationPerformed": false,
+  "rollback": "Separately reviewed consistent SQLite+WAL backup and matching source; no automatic downgrade or destructive down migration."
+}
