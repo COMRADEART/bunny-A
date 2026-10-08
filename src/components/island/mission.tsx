@@ -97,6 +97,8 @@ function ProgressMeter({ mission }: { mission: MissionView }) {
 
 function ApprovalCard({ mission }: { mission: MissionView }) {
   const store = useIsland();
+  const delegatedAgent = store.agents?.agents.find(agent => agent.missionId === mission.id && agent.authorization);
+  if (delegatedAgent) return <div className="mission-approval"><p className="caption">Review and authorize the exact bounded access for {delegatedAgent.name} in Persistent agents below.</p></div>;
   return (
     <div className="mission-approval">
       <p className="eyebrow">

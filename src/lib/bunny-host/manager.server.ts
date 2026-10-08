@@ -64,6 +64,9 @@ export class TaskManager {
   workspaceRoots: string[]=[];
   /** Installed by the mission owner; checked for direct approvals of pending children too. */
   missionScopeCheck: ((task: OrchTask) => string | null) | null=null;
+  missionAttemptAdmission: ((task: OrchTask, kind: "action" | "retry" | "reroute") => string | null) | null=null;
+  missionAttemptSettled: ((task: OrchTask, ok: boolean) => void) | null=null;
+  missionAttemptRuntimeLimit: ((task: OrchTask) => number) | null=null;
   containment: HostContainment;
   constructor(db: HostDatabase,defaultRoot: string,adapters?: ProviderAdapter[],options: ManagerOptions={}) {
     this.db=db;this.defaultRoot=realpathSync(defaultRoot);
@@ -409,6 +412,8 @@ export class TaskManager {
     const provider=this.live().find(p=>p.id===this.db.get(id).provider);if(!provider) throw new Error("Executor is no longer eligible. Route again.");
     const adapter=this.adapters.find(a=>a.id===provider.id);if(!adapter) throw new Error("Adapter unsupported.");
     if(!task.cwd || realpathSync(task.cwd)!==task.cwd || !statSync(task.cwd).isDirectory()) throw new Error("Execution root changed or is unavailable.");
+    const admissionViolation = this.missionAttemptAdmission?.(this.db.get(id), "action");
+    if (admissionViolation) throw new Error(`Outside current Agentic authority: ${admissionViolation}`);
     const accepted=this.update(task,{state:"launching",startedAt:Date.now(),activity:"Starting",...(approval.kind==="mission" ? {approval} : {})},approvalEvent,approvalDetail);
     const launching=this.update(accepted,{latestEvent:this.activity(accepted,"agent.starting",`${provider.name} starting in ${task.cwd}.`),progress:{kind:"indeterminate"}},"agent.starting",`${provider.name} starting in ${task.cwd}.`);
     // Streamed chunks are coalesced: one record write, event and log-free update per flush instead of per token.
@@ -461,10 +466,15 @@ export class TaskManager {
         if((current.constraints?.localOnly || current.constraints?.offlineOnly) && !runsLocally(targetProvider,target.model)) return null;
         const targetAdapter=this.adapters.find(a=>a.id===target.provider);if(!targetAdapter) return null;
         const rerouting=current.provider!==target.provider || current.model!==target.model;
+        const targetTask = { ...current, provider: target.provider, model: target.model };
+        if (targetTask.mission) {
+          const outside = this.missionScopeCheck?.(targetTask) ?? this.missionAttemptAdmission?.(targetTask, rerouting ? "reroute" : "retry");
+          if (outside) { this.emit(this.db.event("agent.action_denied", id, "Retry/reroute rejected by current Host authorization.", targetTask.mission.missionId)); return null; }
+        }
         const retried=this.update(current,{...(current.state==="verifying" ? {state:"running"} : {}),provider:target.provider,model:target.model,...(target.effort ? {effort:target.effort} : {effort:null}),...(rerouting ? {routingRerouted:true,decision:{...current.decision,recommended_provider:target.provider,recommended_model:target.model,reroutes:(current.decision?.reroutes ?? 0)+1}} : {}),latestEvent:this.activity(current,"agent.starting",options.detail)},"routing.retrying",options.detail);
         if(options.bumpReroutes) this.bumpReroutes(retried,options.detail);
         if(runtimeTimer) clearTimeout(runtimeTimer);
-        runtimeTimer=setTimeout(()=>this.stopInBackground(id,"Runtime limit reached."),retried.maxRuntimeMs ?? 120000);
+        runtimeTimer=setTimeout(()=>this.stopInBackground(id,"Runtime limit reached."),Math.min(retried.maxRuntimeMs ?? 120000, this.missionAttemptRuntimeLimit?.(retried) ?? Infinity));
         // Adapters receive a detached, immutable authority snapshot, never the persisted task object.
         const adapterTask=structuredClone(retried);
         if(adapterTask.executionScope) Object.freeze(adapterTask.executionScope);
@@ -474,6 +484,7 @@ export class TaskManager {
         this.sessions.set(id,nextSession);
         return nextSession;
       } catch(error) {
+        this.missionAttemptSettled?.(this.db.get(id), false);
         this.emit(this.db.event("routing.retrying",id,`Relaunch on ${target.provider} could not start: ${safeError(error).message}`));
         return null;
       }
@@ -486,10 +497,10 @@ export class TaskManager {
       if(adapterTask.mission) Object.freeze(adapterTask.mission);
       Object.freeze(adapterTask);
       session=adapter.launch(adapterTask,adapterHooks);
-    } catch(error) {this.flushers.delete(id);const message=safeError(error).message;return this.update(launching,{state:"failed",finishedAt:Date.now(),error:message,latestEvent:this.activity(launching,"agent.failed",message)},"task.failed",message);}
+    } catch(error) {this.missionAttemptSettled?.(this.db.get(id), false);this.flushers.delete(id);const message=safeError(error).message;return this.update(launching,{state:"failed",finishedAt:Date.now(),error:message,latestEvent:this.activity(launching,"agent.failed",message)},"task.failed",message);}
     this.sessions.set(id,session);
     const running=this.update(this.db.get(id),{state:"running",activity:"Running",...(record ? {logs:[...this.db.get(id).logs,{at:Date.now(),line:`Raw session transcript: ${record.path}`}]} : {})},"executor.starting","Execution active. Progress indeterminate until the provider publishes a plan.");
-    runtimeTimer=setTimeout(()=>this.stopInBackground(id,"Runtime limit reached."),task.maxRuntimeMs ?? 120000);
+    runtimeTimer=setTimeout(()=>this.stopInBackground(id,"Runtime limit reached."),Math.min(task.maxRuntimeMs ?? 120000, this.missionAttemptRuntimeLimit?.(task) ?? Infinity));
     this.containment.background({subsystem:"tasks",taskId:id,...task.mission},async()=>{
       try {
       // M-A-3 T3 §22/§23/§24: bounded, taxonomy-driven recovery around the SAME state machine.
@@ -499,6 +510,7 @@ export class TaskManager {
       const attempted:{provider_id:ProviderId;model_id:string|null;taxonomy:RoutingFailureTaxonomy}[]=[];
       for(;;) {
         const result=await session.done;
+        this.missionAttemptSettled?.(this.db.get(id), result.ok);
         flush();this.stopTree(id);
         if(this.stopping.has(id)) return;
         const current=this.db.get(id);if(TERMINAL.includes(current.state)) return;

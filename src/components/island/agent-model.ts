@@ -12,6 +12,8 @@ export const AGENT_STATE_LABEL: Record<AgentSnapshot["agents"][number]["state"],
 const NON_TERMINAL = ["CREATED", "PLANNING", "RUNNING", "WAITING_FOR_USER", "WAITING_FOR_DEPENDENCY", "PAUSED", "VERIFYING", "INTERRUPTED"];
 
 export type AgentPanelRow = {
+  authorization?: AgentSnapshot["agents"][number]["authorization"];
+  authorizationError?: string;
   id: string;
   name: string;
   state: AgentSnapshot["agents"][number]["state"];
@@ -43,6 +45,8 @@ export function agentPanelRows(snapshot: AgentSnapshot | null | undefined, max =
     paused: agent.state === "PAUSED",
     controllable: AGENT_NON_TERMINAL.includes(agent.state),
     note: agent.note,
+    authorization: agent.authorization,
+    authorizationError: agent.authorizationError,
   }));
   return { rows: rows.slice(0, max), more: Math.max(0, rows.length - max) };
 }

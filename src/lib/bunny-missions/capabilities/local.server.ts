@@ -6,6 +6,7 @@ import type { CapabilityAdapter, ExecutionContext } from "./bus.server.ts";
 import { resolveCommand, runCommand, runProcess, tail } from "./process.server.ts";
 import { mergeTransaction } from "./git-merge.server.ts";
 import { commandName } from "../authorization.server.ts";
+import { boundedTestResources, snapshotBoundedTest } from "./bounded-terminal.server.ts";
 
 const READ_LIMIT = 1024 * 1024;
 const input = (name: string, type: ActionManifest["inputs"][number]["type"], required: boolean, description: string) => ({ name, type, required, description });
@@ -110,12 +111,20 @@ export class TerminalCapability implements CapabilityAdapter {
   }
   async execute(_action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     const command = str(params, "command"); const args = argv(params); const cwd = cwdOf(params, context);
-    const timeoutMs = Math.min(typeof params.timeoutMs === "number" && params.timeoutMs > 0 ? params.timeoutMs : context.timeoutMs, context.timeoutMs);
+    const timeoutMs = Math.min(typeof params.timeoutMs === "number" && params.timeoutMs > 0 ? params.timeoutMs : context.timeoutMs, context.timeoutMs, context.boundedEnvironment ? 60_000 : Infinity);
     const identity = context.executable === undefined ? resolveCommand(command, cwd) : context.executable;
     if (!identity) throw new Error(`Command "${command}" is not an executable Bunny-A can launch without a shell.`);
-    const result = await runProcess(identity, args, { cwd, signal: context.signal, timeoutMs, owned:true, owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:"terminal.exec"} });
+    let launchIdentity = identity; let launchCwd = cwd;
+    if (context.boundedEnvironment) {
+      const script = scopedPath(cwd, args[0], context.roots);
+      const resources = boundedTestResources(script, cwd, context.roots);
+      if (!context.boundedScriptHash) throw new Error("No current approved script identity.");
+      launchCwd = snapshotBoundedTest(script, resources, cwd, join(context.dataDirectory, "agentic-terminal", context.capabilityRunId!), context.boundedScriptHash);
+      launchIdentity = { ...identity, prefix: ["--permission", `--allow-fs-read=${launchCwd}`] };
+    }
+    const result = await runProcess(launchIdentity, args, { cwd: launchCwd, signal: context.signal, timeoutMs, env: context.boundedEnvironment, owned:true, owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:"terminal.exec"} });
     const line = `${command} ${args.join(" ")}`.trim();
-    const output = { command, args, cwd, exitCode: result.exitCode, stdout: tail(result.stdout, 20_000), stderr: tail(result.stderr, 8_000), durationMs: result.durationMs, timedOut: result.timedOut };
+    const output = { command, args, cwd, ...(context.boundedEnvironment ? { executionBoundary: "pure-read-check-v1", executionCwd: launchCwd } : {}), exitCode: result.exitCode, stdout: tail(result.stdout, 20_000), stderr: tail(result.stderr, 8_000), durationMs: result.durationMs, timedOut: result.timedOut };
     const evidence = [`${line} in ${cwd} → exit ${result.exitCode ?? "none"} after ${result.durationMs} ms`];
     const report = { type: "test_report" as const, title: `${line} output`, inline: `$ ${line}\n# cwd: ${cwd}\n# exit: ${result.exitCode}\n\n${tail(result.stdout, 30_000)}\n${result.stderr ? `\n# stderr\n${tail(result.stderr, 10_000)}` : ""}`, mediaType: "text/plain" };
     if (result.timedOut) return { ok: false, status: "timeout", summary: `${line} timed out after ${timeoutMs} ms.`, output, evidence, errorCategory: "timeout", artifacts: [report] };
@@ -146,6 +155,12 @@ export class GitCapability implements CapabilityAdapter {
     return git ? { availability: "available" as const, detail: `git at ${git.file}.` } : { availability: "unavailable" as const, detail: "git executable not found on PATH." };
   }
   async git(args: string[], cwd: string, context: ExecutionContext, timeoutMs = 60_000) {
+    if (context.boundedDelegation) {
+      const env: NodeJS.ProcessEnv = Object.fromEntries(["SystemRoot", "WINDIR", "TEMP", "TMP", "PATH"].flatMap(k => process.env[k] ? [[k, process.env[k]!]] : []));
+      Object.assign(env, { GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_ATTR_NOSYSTEM: "1" });
+      const safeArgs = args[0] === "diff" ? [args[0], "--no-ext-diff", "--no-textconv", ...args.slice(1)] : args;
+      return runCommand("git", ["--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", ...safeArgs], { cwd, signal: context.signal, env, timeoutMs: Math.min(timeoutMs, context.timeoutMs), owner: { missionId: context.missionId, stepId: context.stepId, capabilityRunId: context.capabilityRunId, dataDirectory: context.dataDirectory, records: context.processOwnership, action: `git.${args[0]}` } });
+    }
     return runCommand("git", args, { cwd, signal: context.signal, timeoutMs: Math.min(timeoutMs, context.timeoutMs),owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:`git.${args[0]}`} });
   }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {

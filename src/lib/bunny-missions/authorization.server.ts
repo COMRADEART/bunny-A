@@ -3,6 +3,10 @@ import type { Mode, ProviderId, ProviderExecutionScope } from "../orch/types.ts"
 import { withinAny } from "./paths.server.ts";
 import { resolveCommand, type Resolved } from "./capabilities/process.server.ts";
 import type { ActionManifest, AuthorizationEnvelope, Budget, GitAction, GrantPolicy, MissionStep, PermissionDecision, RiskClass, ScopeRequest } from "./types.ts";
+import type { AgenticAuthorizationEnvelope } from "./agentic-types.ts";
+import { canonical } from "./paths.server.ts";
+import { digest, fileDigest, rootIdentity } from "./agentic-store.server.ts";
+import { boundedTestResources } from "./capabilities/bounded-terminal.server.ts";
 
 export const ALWAYS_ASK: RiskClass[] = ["EXTERNAL_SIDE_EFFECT", "DESTRUCTIVE"];
 export const MODE_BUDGET: Record<Mode, Budget> = {
@@ -144,15 +148,17 @@ function grantFor(grants: GrantRow[], action: string, missionId: string | null):
  * - `direct`: a workstation user invoked the action explicitly outside any mission (still asks for
  *   EXTERNAL_SIDE_EFFECT / DESTRUCTIVE / hard-approval actions unless `confirmed`).
  */
-export function decide(manifest: ActionManifest, params: Record<string, unknown>, context: { envelope: AuthorizationEnvelope | null; missionId: string | null; grants: GrantRow[]; oneTime?: boolean; direct?: { confirmed: boolean }; now?: number; base?: string; executable?: Resolved | null }): PermissionDecision {
+export function decide(manifest: ActionManifest, params: Record<string, unknown>, context: { envelope: AuthorizationEnvelope | null; missionId: string | null; grants: GrantRow[]; oneTime?: boolean; direct?: { confirmed: boolean }; now?: number; base?: string; executable?: Resolved | null; agenticViolation?: string | null }): PermissionDecision {
   const risk = manifest.risk; const now = context.now ?? Date.now();
   const deny = (reason: string): PermissionDecision => ({ decision: "deny", reason, risk });
   const ask = (reason: string): PermissionDecision => ({ decision: "ask", reason, risk });
   const allow = (reason: string): PermissionDecision => ({ decision: "allow", reason, risk });
+  if (!["READ", "WRITE", "EXECUTE", "EXTERNAL_SIDE_EFFECT", "DESTRUCTIVE"].includes(risk)) return deny("Unknown action risk fails closed.");
   if (!manifest.implemented) return deny(`${manifest.id} is not implemented on this Host.`);
   const grant = grantFor(context.grants, manifest.id, context.missionId);
   if (grant === "never_allow") return deny(`A persistent "never allow" rule covers ${manifest.id}.`);
   if (grant === "read_only" && risk !== "READ") return deny(`A persistent "read only" rule covers ${manifest.id}.`);
+  if (context.agenticViolation) return ask(context.agenticViolation);
   if (context.oneTime) return allow("The user allowed this invocation or the matching action in this skill run.");
   if (context.direct) {
     if ((manifest.hardApproval || ALWAYS_ASK.includes(risk) || manifest.sensitive) && !context.direct.confirmed) return ask(`${manifest.id} is ${risk.toLowerCase().replaceAll("_", " ")}${manifest.sensitive ? " and privacy-sensitive" : ""}; explicit confirmation required.`);
@@ -172,6 +178,55 @@ export function decide(manifest: ActionManifest, params: Record<string, unknown>
   if (envelope.alwaysAsk.includes(risk) && !(elevated && risk !== "DESTRUCTIVE")) return ask(`${risk.replaceAll("_", " ").toLowerCase()} actions always ask.`);
   if (manifest.sensitive && !elevated) return ask(`${manifest.id} is privacy-sensitive and asks each time.`);
   return allow(`Inside mission authorization ${envelope.id}.`);
+}
+
+/** T5 constraints inside the existing permission engine; this function never grants execution. */
+export function agenticScopeViolation(e: AgenticAuthorizationEnvelope, action: string, params: Record<string, unknown>, risk: RiskClass, cwd: string, executable?: Resolved | null): string | null {
+  const rank: RiskClass[] = ["READ", "WRITE", "EXECUTE", "EXTERNAL_SIDE_EFFECT", "DESTRUCTIVE"];
+  if (!rank.includes(risk)) return "Unknown action risk; explicit review required.";
+  if (!e.permitted_capabilities.includes(action)) return "Action is outside the explicitly approved Agent capability list.";
+  if (rank.indexOf(risk) > rank.indexOf(e.risk_ceiling) || ALWAYS_ASK.includes(risk)) return "Sensitive/high-risk actions require a separate specific authorization.";
+  try {
+    const roots = e.permitted_resource_scopes;
+    for (const root of roots) if (canonical(root.root) !== root.root || rootIdentity(root.root) !== root.identity) return "Approved root identity changed; fresh review required.";
+    if (!withinAny(roots.map(r => r.root), cwd)) return "Agent working directory escaped the approved project.";
+    if (action.startsWith("filesystem.")) {
+      if (typeof params.path !== "string" && action !== "filesystem.list") return "Filesystem action has no concrete resource.";
+      const path = canonical(resolve(cwd, typeof params.path === "string" ? params.path : "."));
+      if (/(^|[\\/])\.git([\\/]|$)/i.test(path) && action !== "filesystem.read" && action !== "filesystem.list" && action !== "filesystem.exists") return "Git metadata requires specific Git authority.";
+      return roots.some(r => r.kind === "filesystem" && r.operations.includes(action) && withinAny([r.root], path)) ? null : "Filesystem resource or operation exceeds approved roots.";
+    }
+    if (action === "terminal.exec") {
+      if (Object.keys(params).some(k => !["command", "args", "cwd", "timeoutMs"].includes(k))) return "Terminal environment or wrapper parameters were not approved.";
+      const args = params.args ?? [];
+      if (!Array.isArray(args) || args.some(a => typeof a !== "string")) return "Invalid terminal argv.";
+      const at = typeof params.cwd === "string" ? canonical(resolve(cwd, params.cwd)) : canonical(cwd);
+      const bound = e.commands.find(c => c.command === params.command && c.cwd === at && JSON.stringify(c.args) === JSON.stringify(args));
+      if (!bound || !executable || executable.file !== bound.executable || JSON.stringify(executable.prefix) !== JSON.stringify(bound.prefix)
+        || fileDigest(bound.executable) !== bound.executable_hash || fileDigest(bound.script) !== bound.script_hash
+        || canonical(bound.script) !== bound.script || !withinAny(roots.map(r => r.root), bound.script)
+        || bound.boundary !== "pure-read-check-v1" || JSON.stringify(boundedTestResources(bound.script, at, roots.map(r => r.root))) !== JSON.stringify(bound.test_resources)
+        || !Number.isSafeInteger(params.timeoutMs ?? bound.timeout_ms) || Number(params.timeoutMs ?? bound.timeout_ms) < 1 || Number(params.timeoutMs ?? bound.timeout_ms) > bound.timeout_ms) return "Terminal executable, exact arguments, script identity, cwd or execution limit exceeds consent.";
+      return null;
+    }
+    if (action.startsWith("git.")) {
+      if (!["git.status", "git.diff", "git.log"].includes(action)) return "Git mutation/hooks, push and branch changes require specific review.";
+      if (Object.keys(params).some(k => !["cwd", "limit"].includes(k))) return "Unapproved Git arguments.";
+      const at = typeof params.cwd === "string" ? canonical(resolve(cwd, params.cwd)) : canonical(cwd);
+      return roots.some(r => r.kind === "git" && r.root === at && r.operations.includes(action)) ? null : "Different repository or operation is outside consent.";
+    }
+    if (action === "provider.execute") return params.provider === "ollama" && params.access === "read" && params.filesystem === false ? null : "Workspace provider tools cannot enforce this exact Agent resource/terminal scope; separate review required.";
+    // Browser/desktop target validation stays with their existing specific approval path.
+    return "This operation requires its existing specific resource/target approval boundary.";
+  } catch { return "Resource identity could not be revalidated; authority fails closed."; }
+}
+
+export function agenticFingerprint(action: string, params: Record<string, unknown>, cwd: string): string {
+  const safe = { ...params };
+  // Contents/model identity are not a new authorization boundary for the same resource/operation.
+  for (const key of ["content", "text", "provider", "model", "prompt"]) delete safe[key];
+  if (typeof safe.path === "string") safe.path = canonical(resolve(cwd, safe.path));
+  return digest({ action, cwd: canonical(cwd), params: Object.fromEntries(Object.entries(safe).sort(([a], [b]) => a.localeCompare(b))) });
 }
 
 /** Extra approval can change provider/budget consent, never the child's declared access. */

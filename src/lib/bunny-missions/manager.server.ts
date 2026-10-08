@@ -5,8 +5,13 @@ import type { HostEvent } from "../bunny-host/contracts.ts";
 import type { Mode, OrchTask, ProviderId, TaskConstraints, VerifySpec } from "../orch/types.ts";
 import { codexMissionExclusion } from "../orch/compatibility.ts";
 import { ArtifactStore } from "./artifacts.server.ts";
-import { envelopeFrom, matches, MODE_BUDGET, providerScopeViolation, scopeFor, taskViolation } from "./authorization.server.ts";
-import { batchActionLabel, batchOffer, batchView, currentBatchEpoch, type BatchPlanEntry } from "./batches.server.ts";
+import { agenticFingerprint, agenticScopeViolation, envelopeFrom, matches, MODE_BUDGET, providerScopeViolation, scopeFor, taskViolation } from "./authorization.server.ts";
+import { AgenticStore, digest, fileDigest, rootIdentity } from "./agentic-store.server.ts";
+import { AGENTIC_POLICY_VERSION, type AgenticAdjustment, type AgenticAuthorizationEnvelope, type CommandBinding } from "./agentic-types.ts";
+import { resolveCommand, type Resolved } from "./capabilities/process.server.ts";
+import { canonical } from "./paths.server.ts";
+import { boundedTestResources } from "./capabilities/bounded-terminal.server.ts";
+import { batchActionLabel, batchOffer, batchView, consultBatch, currentBatchEpoch, type BatchPlanEntry } from "./batches.server.ts";
 import type { ApprovalBatch, PermissionBatchOffer } from "./types.ts";
 import { CapabilityBus, type CapabilityAdapter, type CapabilityRequest } from "./capabilities/bus.server.ts";
 import { BrowserCapability } from "./capabilities/browser.server.ts";
@@ -51,6 +56,7 @@ export type CreateMission = { objective: string; title?: string; mode: Mode; pro
  * a provider adapter itself.
  */
 export class MissionManager {
+  agentic: AgenticStore;
   tasks: TaskManager; store: MissionStore; bus: CapabilityBus; artifacts: ArtifactStore; memory: MissionMemory; inbox: Inbox;
   skills: SkillLibrary; workspace: WorkspaceCoordinator; triggers: TriggerEngine; dataDirectory: string;
   cached: MissionConfig; recovered = false; ticking = new Set<string>(); again = new Set<string>(); pending = new Map<string, ReturnType<typeof setImmediate>>();
@@ -68,11 +74,14 @@ export class MissionManager {
   constructor(tasks: TaskManager, options: MissionManagerOptions) {
     this.tasks = tasks; this.dataDirectory = options.dataDirectory;
     this.store = new MissionStore(tasks.db);
+    this.agentic = new AgenticStore(tasks.db, this.store, tasks.instanceId);
     tasks.missionScopeCheck = (task) => {
       const mission = this.store.mission(task.mission!.missionId);
       const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
       const authority = envelope ? providerScopeViolation(task, envelope, this.store.step(task.mission!.stepId)) : "no approved mission envelope";
       if (authority) return authority;
+      const agentic = this.agenticProviderCheck(task);
+      if (agentic) return agentic;
       return task.provider === "codex" ? codexMissionExclusion({ id: "codex", securityCompatibility: this.tasks.live().find(provider => provider.id === "codex")?.securityCompatibility }, task.executionScope!.access) : null;
     };
     this.cached = this.store.config();
@@ -80,6 +89,29 @@ export class MissionManager {
     this.memory = new MissionMemory(this.store);
     this.inbox = new Inbox(this.store);
     this.bus = new CapabilityBus(this.store, this.artifacts, options.dataDirectory, (type, detail, missionId) => this.emit(type, detail, missionId),tasks.containment);
+    this.bus.agenticCheck = (request, risk, executable) => this.agenticCheck(request, risk, executable);
+    this.bus.agenticAdmit = (request, _runId, executable) => {
+      if (!request.missionId || !this.agentic.exists(request.missionId)) return {};
+      try {
+        const e = this.agentic.forMission(request.missionId)!;
+        const result = this.agentic.admit(e.id, request.envelope?.agentic?.revision ?? -1,
+          { agent_id: e.agent_id, mission_id: request.missionId, task_id: null, step_id: request.stepId ?? "", capability: request.action,
+            resource_reference: agenticFingerprint(request.action, request.params, request.cwd), attempt_kind: (request.stepId && this.store.step(request.stepId).attempts.length > 1) ? "retry" : "action" },
+          () => { const decision = this.bus.decision(request, executable); return decision.decision === "allow" ? null : decision.reason; });
+        return { id: result.admission?.id, reason: result.reason, timeoutMs: Math.max(1, e.expires_at - Date.now()), scriptHash: request.action === "terminal.exec" ? e.commands.find(c => c.args.join("\0") === (request.params.args as string[]).join("\0"))?.script_hash : undefined };
+      } catch { return { reason: "Current Agentic authority/revision cannot be validated." }; }
+    };
+    this.bus.agenticFinish = (id, ok) => this.agentic.finish(id, ok ? "COMPLETED" : "FAILED");
+    tasks.missionAttemptAdmission = (task, kind) => this.admitAgenticProvider(task, kind);
+    tasks.missionAttemptRuntimeLimit = task => {
+      if (!task.mission || !this.agentic.exists(task.mission.missionId)) return Infinity;
+      try { return Math.max(1, this.agentic.forMission(task.mission.missionId)!.expires_at - Date.now()); } catch { return 1; }
+    };
+    tasks.missionAttemptSettled = (task, ok) => {
+      if (!task.mission || !this.agentic.exists(task.mission.missionId)) return;
+      const e = this.agentic.forMission(task.mission.missionId)!;
+      for (const row of this.agentic.rows(e.id).filter(r => r.task_id === task.id && r.outcome === "ADMITTED")) this.agentic.finish(row.id, ok ? "COMPLETED" : "FAILED");
+    };
     const adapters = options.adapters ?? [
       new FilesystemCapability(), new TerminalCapability(), new GitCapability(options.dataDirectory),
       new NotificationsCapability((title, detail, missionId) => this.emit("notification.sent", `${title}${detail ? `\n${detail}` : ""}`, missionId)),
@@ -272,10 +304,16 @@ export class MissionManager {
       return this.setMission(this.store.mission(current.id), { state: "failed", finishedAt: Date.now(), failure: { category: "invalid_plan", detail, stepId: null } }, "mission.failed", `Planning failed: ${detail}`);
     }
   }
-  approve(id: string, by: string, start = true): MissionView {
+  approve(id: string, by: string, start = true, agenticRevision?: number): MissionView {
     this.requireEnabled();
     let mission = this.store.mission(id);
     if (mission.state !== "waiting_for_approval" || !mission.requestedScope) throw new Error("Mission is not waiting for approval.");
+    const agentic = this.agentic.forMission(id);
+    if (agentic) {
+      this.agentic.assertRevision(agentic.id, agenticRevision ?? -1);
+      if (agentic.plan_reference !== this.agenticPlanReference(id)) throw new Error("The offered plan changed; fresh exact scope review required.");
+      if (agentic.current_state !== "WAITING_FOR_USER") throw new Error("Agentic user consent is not pending.");
+    }
     const active = this.store.missionsIn(MISSION_ACTIVE).length;
     if (active >= this.cached.limits.maxActiveMissions) throw new Error(`${active} missions are already active (limit ${this.cached.limits.maxActiveMissions}).`);
     const steps = this.store.steps(id);
@@ -284,6 +322,11 @@ export class MissionManager {
     if (plannedAuthority.length && (!requestedScope.providers.sessions || JSON.stringify(requestedScope.providers.sessions.steps) !== JSON.stringify(plannedAuthority))) throw new Error("Provider execution scope changed or is missing; replan and review the new scope before approval.");
     const extra = steps.some((step) => step.scope.isolation === "worktree") ? [join(this.dataDirectory, "worktrees", id.slice(0, 8))] : [];
     const envelope = envelopeFrom(requestedScope, id, by, this.cached.limits.maxMissionRuntimeMs, extra);
+    if (agentic) {
+      this.agentic.approve(agentic.id, agenticRevision!, envelope.id, by);
+      envelope.agentic = { id: agentic.id, revision: agentic.revision };
+      envelope.expiresAt = Math.min(envelope.expiresAt, agentic.expires_at);
+    }
     this.store.saveAuthorization(envelope);
     this.memory.record(id, "user_decision", "Mission approved", `${by} approved ${envelope.riskClasses.join("/")} in ${envelope.projectRoots.join(", ")} until ${new Date(envelope.expiresAt).toISOString()}.`, `user:${by}`, true);
     this.emit("approval.mission_envelope", `Mission envelope ${envelope.id} by ${by}; provider sessions ${JSON.stringify(envelope.providers.sessions)}.`, id);
@@ -348,6 +391,8 @@ export class MissionManager {
     this.tasks.containment.background({subsystem:"missions",missionId:mission.id},()=>this.failMission(mission, failed?.failure?.category ?? "dependency_failed", failed ? `${failed.role} failed: ${failed.failure?.detail ?? "unknown"}` : "No step can run.", failed?.id ?? null),error=>this.containMission(mission.id,error));
   }
   completeMission(mission: Mission, steps: MissionStep[]) {
+    const delegation = this.agentic.forMission(mission.id);
+    if (delegation && !["REVOKED", "EXPIRED", "COMPLETED"].includes(delegation.current_state)) this.agentic.state(delegation.id, "COMPLETED");
     let current = this.setMission(mission, { state: "verifying" }, "mission.verifying", "All steps finished; checking mission-level evidence.");
     const verified = steps.filter((step) => step.result?.verified === true).length;
     const unverified = steps.filter((step) => step.state === "completed" && step.result?.verified !== true).length;
@@ -482,10 +527,11 @@ export class MissionManager {
     const local = runsLocally(this.tasks.live().find((provider) => provider.id === task.provider), task.model);
     const sessionsUsed = mission.accounting.externalModelCalls + mission.accounting.localModelCalls;
     const violation = taskViolation(task, envelope, local, usedExternal, Date.now(), step, sessionsUsed);
-    if (violation) {
+    const agenticViolation = this.agenticProviderCheck(task);
+    if (violation || agenticViolation) {
       // The child stays waiting_for_approval: the user may approve it directly or through the request.
       this.setStep(step, { taskId: task.id, workspace }, "mission.step.child_created", `${step.role} child task ${task.id} routed to ${task.provider}.`);
-      this.askPermission(mission, this.store.step(step.id), "provider.execute", "EXECUTE", `${task.provider} for ${step.role}: ${violation}`, "execute");
+      this.askPermission(mission, this.store.step(step.id), "provider.execute", "EXECUTE", `${task.provider} for ${step.role}: ${violation ?? agenticViolation}`, "execute");
       return false;
     }
     try {
@@ -503,6 +549,7 @@ export class MissionManager {
     this.setMission(mission, { accounting: { ...mission.accounting, externalModelCalls: mission.accounting.externalModelCalls + (local ? 0 : 1), localModelCalls: mission.accounting.localModelCalls + (local ? 1 : 0) } });
   }
   capabilityRequest(mission: Mission, step: MissionStep, envelope: AuthorizationEnvelope, action: string, params: Record<string, unknown>, cwd: string): CapabilityRequest {
+    if (this.agentic.exists(mission.id)) envelope = this.currentAgenticCanonical(mission.id) ?? envelope;
     // A one-time allowance covers exactly the path the user saw in the request, nothing around it.
     const once = step.approvedOnce?.action === action && typeof params.path === "string";
     const roots = once ? [...envelope.projectRoots, dirname(resolve(cwd, params.path as string))] : envelope.projectRoots;
@@ -548,6 +595,165 @@ export class MissionManager {
     if (status === "timeout") return "timeout";
     if (status === "unavailable" || status === "unconfigured" || status === "unsupported") return "capability_unavailable";
     return "capability_failed";
+  }
+
+  // T5: consent and accounting are adjuncts of this Mission authority, never a new executor.
+  agenticPlanReference(id: string): string {
+    return digest(this.store.steps(id).map(s => ({ id: s.id, executor: s.executor, scope: s.scope, verification: s.verification, requiredCapabilities: s.requiredCapabilities })));
+  }
+  currentAgenticCanonical(id: string): AuthorizationEnvelope | null {
+    const m = this.store.mission(id); return m.authorizationId ? this.store.authorization(m.authorizationId) : null;
+  }
+  syncAgentic(e: AgenticAuthorizationEnvelope): void {
+    const canonical = this.currentAgenticCanonical(e.mission_id);
+    if (canonical) this.store.saveAuthorization({ ...canonical, agentic: { id: e.id, revision: e.revision }, expiresAt: Math.min(canonical.expiresAt, e.expires_at), revokedAt: e.current_state === "REVOKED" ? e.revoked_at : canonical.revokedAt });
+  }
+  proposeAgentAuthorization(agentId: string, options: AgenticAdjustment = {}) {
+    this.requireEnabled();
+    const row = this.tasks.db.db.prepare("SELECT mission_id,stopped FROM agents WHERE id=?").get(agentId) as { mission_id: string; stopped: number } | undefined;
+    if (!row || row.stopped) throw new Error("Unknown or stopped Agent.");
+    const mission = this.store.mission(row.mission_id);
+    if (mission.state !== "waiting_for_approval" || !mission.requestedScope) throw new Error("Review the planned Mission before proposing delegation.");
+    const scope = structuredClone(mission.requestedScope);
+    const roots = scope.projectRoots.map(root => canonical(root));
+    const commands: CommandBinding[] = [];
+    const steps = this.store.steps(mission.id);
+    const bind = (command: string, args: string[], cwd: string, timeout: number) => {
+      // First bounded family: exact Node test scripts. No eval, loader, shells, npm wrappers or installs.
+      if (command !== "node" || !Array.isArray(args) || args.length !== 1 || typeof args[0] !== "string" || args[0].startsWith("-") || !/\.(mjs|cjs|js)$/i.test(args[0])) return;
+      try {
+        const executable = resolveCommand(command, cwd);
+        const script = scopedPath(cwd, args[0], roots);
+        if (!executable || !existsSync(script)) return;
+        if (args[0].startsWith("..") || /^[A-Za-z]:|^[\\/]/.test(args[0])) return;
+        const resources = boundedTestResources(script, cwd, roots);
+        commands.push({ command, executable: executable.file, executable_hash: fileDigest(executable.file), prefix: executable.prefix, args, cwd: canonical(cwd), script, script_hash: fileDigest(script), timeout_ms: Math.min(timeout, 60_000), test_resources: resources, boundary: "pure-read-check-v1" });
+      } catch { /* unsupported commands are offered through the separate explicit scope request */ }
+    };
+    for (const step of steps) {
+      const cwd = step.scope.root ?? mission.root;
+      const concrete = step.executor.kind === "capability" ? [{ action: step.executor.action, params: step.executor.params as Record<string, unknown> }]
+        : step.executor.kind === "skill" ? (() => { const skill = this.skills.get(step.executor.skillId); const inputs = this.skills.params(skill, step.executor.params); return skill.steps.map(s => ({ action: s.action, params: fill(s.params, inputs) as Record<string, unknown> })); })() : [];
+      for (const item of concrete) if (item.action === "terminal.exec") bind(String(item.params.command), (item.params.args ?? []) as string[], typeof item.params.cwd === "string" ? resolve(cwd, item.params.cwd) : cwd, step.timeoutMs);
+      for (const check of step.verification) if (check.kind === "command") bind(check.command, check.args, cwd, check.timeoutMs ?? step.timeoutMs);
+    }
+    const now = Date.now();
+    const duration = Math.min(scope.budget.maxRuntimeMs, this.cached.limits.maxMissionRuntimeMs, 7_200_000);
+    const caps = [...scope.capabilities, ...(scope.providers.execution ? ["provider.execute"] : [])].filter(action => action.startsWith("filesystem.") && action !== "filesystem.delete" || ["terminal.exec", "git.status", "git.diff", "git.log", "provider.execute"].includes(action));
+    const e: AgenticAuthorizationEnvelope = {
+      id: crypto.randomUUID(), policy_version: AGENTIC_POLICY_VERSION, agent_id: agentId, mission_id: mission.id, project_id: mission.projectId,
+      user_authorization_id: null, authorization_provenance: null, proposed_at: now, approved_at: null, expires_at: now + duration,
+      permitted_capabilities: [...new Set(caps)], permitted_action_families: [...new Set(caps.map(c => c.split(".")[0]))],
+      permitted_resource_scopes: roots.flatMap(root => [{ kind: "filesystem" as const, root, identity: rootIdentity(root), operations: caps.filter(c => c.startsWith("filesystem.")) }, ...(existsSync(join(root, ".git")) ? [{ kind: "git" as const, root, identity: rootIdentity(root), operations: caps.filter(c => c.startsWith("git.")) }] : [])]),
+      commands, browser_origins: [], risk_ceiling: "EXECUTE", maximum_actions: Math.min(1000, Math.max(20, steps.length * 4)), maximum_duration: duration, maximum_concurrency: Math.min(8, this.cached.limits.maxConcurrentAgents),
+      budget_constraints: { maximum_provider_attempts: scope.providers.sessions?.maxSessions ?? 0, usage_unknown: "finite-action-budget" },
+      current_state: "PROPOSED", revoked_at: null, revision: 1, integrity_reference: "", host_generation: null,
+      scope, plan_reference: this.agenticPlanReference(mission.id), restart_requires_consent: true,
+    };
+    this.agentic.propose(e);
+    if (Object.keys(options).length) this.agentic.adjust(e.id, 1, options);
+    return this.agentic.projection(mission.id);
+  }
+  adjustAgentAuthorization(missionId: string, revision: number, patch: AgenticAdjustment) {
+    const e = this.agentic.forMission(missionId); if (!e) throw new Error("No Agentic scope to adjust.");
+    const next = this.agentic.adjust(e.id, revision, patch); this.syncAgentic(next);
+    return this.agentic.projection(missionId);
+  }
+  reauthorizeAgent(missionId: string, revision: number, actor: string) {
+    const e = this.agentic.forMission(missionId); if (!e) throw new Error("No historical Agentic authorization.");
+    this.agentic.assertRevision(e.id, revision);
+    const m = this.store.mission(missionId);
+    if (m.state !== "waiting_for_user" || e.current_state !== "WAITING_FOR_USER" || e.expires_at <= Date.now()) throw new Error("Historical consent is not eligible for reviewed reauthorization.");
+    if (e.plan_reference !== this.agenticPlanReference(missionId)) throw new Error("Plan changed; historical scope cannot be reauthorized.");
+    for (const root of e.permitted_resource_scopes) if (canonical(root.root) !== root.root || rootIdentity(root.root) !== root.identity) throw new Error("Approved root changed.");
+    for (const command of e.commands) if (fileDigest(command.script) !== command.script_hash || fileDigest(command.executable) !== command.executable_hash) throw new Error("Approved command changed.");
+    const envelope = envelopeFrom(e.scope, missionId, actor, Math.max(1000, e.expires_at - Date.now()));
+    envelope.expiresAt = Math.min(envelope.expiresAt, e.expires_at);
+    envelope.agentic = { id: e.id, revision };
+    // Reviewed canonical consent creates a NEW MA0 authorization; no old executable grant is revived.
+    this.agentic.approve(e.id, revision, envelope.id, actor);
+    this.store.saveAuthorization(envelope);
+    this.setMission(m, { authorizationId: envelope.id, recovery: { at: Date.now(), detail: "Fresh scope consent recorded; interrupted/ambiguous effects still require explicit retry review.", interruptedSteps: m.recovery?.interruptedSteps ?? [] } }, "approval.mission_envelope", "Fresh post-restart scope consent; no old request, batch or side effect was replayed.");
+    return this.agentic.projection(missionId);
+  }
+  agenticIdentityViolation(e: AgenticAuthorizationEnvelope, missionId: string, stepId: string | null, revision?: number): string | null {
+    if (e.mission_id !== missionId || e.revision !== revision) return "Cross-Mission or stale Agentic authorization revision.";
+    const mission = this.store.mission(missionId);
+    if (mission.projectId !== e.project_id || !["running", "verifying", "waiting_for_user"].includes(mission.state) || this.stopping.has(missionId)) return "Mission/project is no longer eligible for admission.";
+    const agent = this.tasks.db.db.prepare("SELECT mission_id,paused,stopped,state FROM agents WHERE id=?").get(e.agent_id) as { mission_id: string; paused: number; stopped: number; state: string } | undefined;
+    if (!agent || agent.mission_id !== missionId || agent.stopped || agent.paused || ["COMPLETED", "FAILED", "STOPPED"].includes(agent.state)) return "Current Agent identity, Pause or Stop blocks admission.";
+    if (!stepId || this.store.step(stepId).missionId !== missionId || ["completed", "stopped", "skipped", "failed", "blocked"].includes(this.store.step(stepId).state)) return "No current Task/step authority for this Mission.";
+    if (e.current_state !== "ACTIVE" || e.host_generation !== this.tasks.instanceId || !e.user_authorization_id || !e.authorization_provenance || mission.authorizationId !== e.user_authorization_id) return "No current generation of active user-delegated authority.";
+    if (e.expires_at <= Date.now()) return "Agentic delegation expired.";
+    const envelope = this.currentAgenticCanonical(missionId);
+    if (!envelope || envelope.revokedAt || envelope.expiresAt <= Date.now() || envelope.agentic?.id !== e.id || envelope.agentic.revision !== e.revision) return "Canonical Host authority is missing, expired, revoked or stale.";
+    const rows = this.agentic.rows(e.id);
+    if (rows.length >= e.maximum_actions) return "Agentic action budget exhausted.";
+    return null;
+  }
+  agenticCheck(request: CapabilityRequest, risk: PermissionRequest["risk"], executable?: Resolved | null): string | null {
+    if (!request.missionId || !this.agentic.exists(request.missionId)) return null;
+    try {
+      const e = this.agentic.forMission(request.missionId)!;
+      const identity = this.agenticIdentityViolation(e, request.missionId, request.stepId, request.envelope?.agentic?.revision);
+      if (identity) return identity;
+      if (request.envelope?.agentic?.id !== e.id) return "Cross-Agent envelope replay.";
+      if (request.envelope.id !== e.user_authorization_id || request.envelope.missionId !== request.missionId) return "Request did not use current canonical Mission authority.";
+      const plannedStep = this.store.step(request.stepId!);
+      if (risk === "WRITE" && plannedStep.scope.access !== "write") return "This read-only Task/step has no mutation authority.";
+      // Invocation flags are Host-owned conveniences, never self-asserted delegation.
+      if (request.direct || request.oneTime || request.oneTimeAction) {
+        const reviewed = plannedStep.approvedOnce ? this.store.request(plannedStep.approvedOnce.requestId) : null;
+        if (!reviewed || reviewed.resolution !== "allow_once" || reviewed.action !== request.action || reviewed.agentic?.revision !== e.revision || reviewed.agentic.generation !== this.tasks.instanceId
+          || reviewed.agentic.fingerprint !== agenticFingerprint(request.action, request.params, request.cwd)) return "No current Host-reviewed invocation supports these approval flags.";
+      }
+      const fingerprint = agenticFingerprint(request.action, request.params, request.cwd);
+      if (this.agentic.denied(request.missionId, fingerprint)) return "This resource/operation was explicitly denied; no provider/tool retry is permitted.";
+      const violation = agenticScopeViolation(e, request.action, request.params, risk, request.cwd, executable);
+      if (!violation) return null;
+      if (request.action.startsWith("computer.")) {
+        const now = Date.now();
+        const manifest = this.bus.find(request.action)?.manifest;
+        if (manifest && request.envelope) for (const batch of this.store.batchesActive(request.missionId, currentBatchEpoch(), now)) {
+          if (consultBatch(batch, { action: request.action, params: request.params, manifest, risk, envelope: request.envelope, now, stepIds: new Set(this.store.steps(request.missionId).map(s => s.id)), stepId: request.stepId, epoch: currentBatchEpoch() })?.match) return null;
+        }
+      }
+      // One reviewed filesystem action can widen that exact resource, never the ongoing envelope.
+      const step = this.store.step(request.stepId!);
+      const once = step.approvedOnce ? this.store.request(step.approvedOnce.requestId) : null;
+      if (request.action.startsWith("filesystem.") && once?.resolution === "allow_once" && once.action === request.action && once.risk === risk
+        && once.agentic?.fingerprint === fingerprint && once.agentic.revision === e.revision && once.agentic.generation === this.tasks.instanceId) return null;
+      return violation;
+    } catch { return "Agentic authorization integrity, target or identity validation failed closed."; }
+  }
+  private agenticProviderParams(task: OrchTask) { return { provider: task.provider, access: task.executionScope?.access, filesystem: !!task.constraints?.requiresFilesystem }; }
+  agenticProviderCheck(task: OrchTask): string | null {
+    if (!task.mission || !this.agentic.exists(task.mission.missionId)) return null;
+    try {
+      const e = this.agentic.forMission(task.mission.missionId)!;
+      const envelope = this.currentAgenticCanonical(task.mission.missionId);
+      const identity = this.agenticIdentityViolation(e, task.mission.missionId, task.mission.stepId, envelope?.agentic?.revision);
+      return identity ?? agenticScopeViolation(e, "provider.execute", this.agenticProviderParams(task), "EXECUTE", task.cwd!);
+    } catch { return "Agentic model authority cannot be validated."; }
+  }
+  admitAgenticProvider(task: OrchTask, kind: "action" | "retry" | "reroute"): string | null {
+    if (!task.mission || !this.agentic.exists(task.mission.missionId)) return null;
+    try {
+      const e = this.agentic.forMission(task.mission.missionId)!;
+      const result = this.agentic.admit(e.id, this.currentAgenticCanonical(e.mission_id)?.agentic?.revision ?? -1,
+        { agent_id: e.agent_id, mission_id: e.mission_id, task_id: task.id, step_id: task.mission.stepId, capability: "provider.execute", resource_reference: agenticFingerprint("provider.execute", this.agenticProviderParams(task), task.cwd!), attempt_kind: kind },
+        () => this.agenticProviderCheck(task) ?? taskViolation(task, this.currentAgenticCanonical(e.mission_id)!, runsLocally(this.tasks.live().find(p => p.id === task.provider), task.model), this.store.mission(e.mission_id).accounting.externalModelCalls, Date.now(), this.store.step(task.mission!.stepId)));
+      return result.reason ?? null;
+    } catch { return "Agentic admission revision/integrity failed closed."; }
+  }
+  agenticRequestParams(step: MissionStep, action: string, phase: "execute" | "verify"): Record<string, unknown> {
+    if (phase === "verify") {
+      const check = step.verification.find(c => c.kind === "command" && action === "terminal.exec");
+      if (check?.kind === "command") return { command: check.command, args: check.args, timeoutMs: check.timeoutMs };
+    }
+    if (step.executor.kind === "capability") return step.executor.params;
+    if (step.executor.kind === "model" && step.taskId) return this.agenticProviderParams(this.tasks.db.get(step.taskId));
+    return {};
   }
 
   // ── finishing steps ───────────────────────────────────────────────────────
@@ -608,7 +814,14 @@ export class MissionManager {
         checks.push(`task_spec ${check.spec.name}: ${ok ? "passed" : "failed"} — ${verification?.detail ?? "TaskManager did not verify"}`);
       } else if (check.kind === "file_exists") {
         let ok = false; let detail = "";
-        try { const path = scopedPath(cwd, check.path, envelope.projectRoots); ok = existsSync(path) && (!check.contains || readFileSync(path, "utf8").includes(check.contains)); detail = `${path} ${ok ? "present" : "missing or without the expected text"}`; } catch (error) { detail = error instanceof Error ? error.message : String(error); }
+        if (this.agentic.exists(mission.id)) {
+          const action = check.contains ? "filesystem.read" : "filesystem.exists";
+          const outcome = await this.bus.request(this.capabilityRequest(mission, step, envelope, action, { path: check.path }, cwd));
+          if (outcome.decision.decision === "ask") { this.askPermission(mission, this.store.step(step.id), action, outcome.decision.risk, outcome.decision.reason, "verify"); return; }
+          const output = outcome.result?.output as { exists?: boolean; text?: string } | null;
+          ok = outcome.run?.status === "succeeded" && (check.contains ? !!output?.text?.includes(check.contains) : output?.exists === true);
+          detail = `${check.path} ${ok ? "present" : "missing or without the expected text"}`;
+        } else try { const path = scopedPath(cwd, check.path, envelope.projectRoots); ok = existsSync(path) && (!check.contains || readFileSync(path, "utf8").includes(check.contains)); detail = `${path} ${ok ? "present" : "missing or without the expected text"}`; } catch (error) { detail = error instanceof Error ? error.message : String(error); }
         passed &&= ok; checks.push(`file ${check.path}: ${detail}`);
       } else if (check.kind === "command" || check.kind === "git_diff_nonempty") {
         const action = check.kind === "command" ? "terminal.exec" : "git.diff";
@@ -706,11 +919,22 @@ export class MissionManager {
     });
   }
   askPermission(mission: Mission, step: MissionStep, action: string, risk: PermissionRequest["risk"], reason: string, phase: "execute" | "verify") {
+    const delegation = this.agentic.forMission(mission.id);
+    const params = this.agenticRequestParams(step, action, phase);
+    const fingerprint = delegation ? agenticFingerprint(action, params, step.workspace ?? mission.root) : null;
+    if (fingerprint && this.agentic.denied(mission.id, fingerprint)) {
+      this.stepFailed(mission, step, "permission_denied", "This exact resource/operation was denied; another provider cannot retry it."); return;
+    }
     let batchOffer: PermissionBatchOffer | null = null;
     // The user's standing "ask every time" rule outranks batching: asking for permission is the
     // point of that rule, so a batch button would only produce asks it can never rescue.
     if (phase === "execute" && !/ask every time/.test(reason)) { try { batchOffer = this.batchOfferFor(mission, step, action); } catch { batchOffer = null; } }
     const request: PermissionRequest = { id: crypto.randomUUID(), missionId: mission.id, stepId: step.id, action, risk, reason, createdAt: Date.now(), resolvedAt: null, resolution: null, resolvedBy: null, batchOffer };
+    if (delegation && fingerprint) {
+      const resource = typeof params.path === "string" ? params.path : typeof params.command === "string" ? `${params.command} ${Array.isArray(params.args) ? params.args.join(" ") : ""}` : action;
+      request.agentic = { fingerprint, revision: delegation.revision, generation: this.tasks.instanceId, resource: `${resource} in ${step.workspace ?? mission.root}` };
+      this.agentic.audit("agent.scope_expansion_requested", delegation, { requestId: request.id, action, risk, fingerprint });
+    }
     this.store.saveRequest(request);
     this.workspace.release(step.id);
     this.setStep(step, { state: "waiting_for_approval", pendingRequestId: request.id, pendingPhase: phase }, "mission.permission_required", `Mission ${mission.id} request ${request.id}: ${step.role} needs permission for ${action} (${risk}): ${reason}`);
@@ -766,6 +990,13 @@ export class MissionManager {
     if (request.resolvedAt) throw new Error("This request was already answered.");
     const step = this.store.step(request.stepId);
     if (step.state !== "waiting_for_approval" || step.pendingRequestId !== requestId) throw new Error("The step is no longer waiting for this request.");
+    if (this.agentic.exists(request.missionId)) {
+      const e = this.agentic.forMission(request.missionId)!;
+      if (!request.agentic || request.agentic.revision !== e.revision || request.agentic.generation !== this.tasks.instanceId) throw new Error("Agentic scope request is stale; fresh Host review is required.");
+      if (decision === "deny") { this.agentic.deny(request.missionId, request.agentic.fingerprint); this.agentic.audit("agent.action_denied", e, { requestId, action: request.action }); }
+      // T5 never converts broad target/shell approval into general delegation. The explicit one-off
+      // remains subordinate to its exact Host-offered resource fingerprint and the shared budget.
+    }
     if (decision === "allow_batch" && !request.batchOffer) throw new Error("This request does not offer a small approval batch; answer allow_once or deny.");
     // Validate and create before answering: a failed validation leaves the request open.
     if (decision === "allow_batch") this.createBatchFromOffer(request.missionId, step.id, requestId, by, options);
@@ -828,6 +1059,10 @@ export class MissionManager {
     if (["completed", "stopped"].includes(mission.state)) throw new Error("Mission has already ended.");
     if (this.stopping.has(id)) throw new Error("Mission Stop is already in progress.");
     this.stopping.add(id);
+    try {
+      const delegation = this.agentic.forMission(id);
+      if (delegation && !["REVOKED", "EXPIRED", "EXHAUSTED", "COMPLETED"].includes(delegation.current_state)) this.agentic.state(delegation.id, "REVOKED");
+    } catch { this.emit("agent.action_denied", "Corrupt Agentic authority remains blocked; Stop still cancels admitted work.", id); }
     const activeRuns = new Set(this.store.runs({ missionId: id, status: "running", limit: 500 }).map((run) => run.id));
     try {
     await this.cancelChildren(id, `Mission stopped by ${by}.`);
@@ -889,6 +1124,7 @@ export class MissionManager {
    * effect); "resubmit" re-admits once under the existing attempt ceiling and envelope.
    */
   async reconcileInterrupted(missionId: string, instructions: { stepId: string; mode: "consume" | "resubmit" }[]): Promise<Record<string, unknown>[]> {
+    if (this.agentic.exists(missionId) && this.agentic.forMission(missionId)?.current_state !== "ACTIVE") return [];
     const results: Record<string, unknown>[] = [];
     for (const instruction of instructions) {
       const step = this.store.steps(missionId).find((item) => item.id === instruction.stepId);
@@ -955,6 +1191,11 @@ export class MissionManager {
         interrupted.push(step.id);
       }
       if (!interrupted.length) {
+        if (this.agentic.exists(mission.id)) {
+          const current = ["ready", "verifying"].includes(mission.state) ? this.setMission(mission, { state: "running" }) : mission;
+          if (current.state === "running") this.setMission(current, { state: "waiting_for_user", recovery: { at: now, detail: "Agentic intent is historical; fresh reviewed consent is required in this Host generation.", interruptedSteps: [] } }, "mission.recovered", "Agentic restart authority fails closed; no stale executable grant was restored.");
+          continue;
+        }
         if(!this.cached.enabled || this.tasks.containment.health.lastFatal) {
           const current = ["ready","verifying"].includes(mission.state) ? this.setMission(mission,{state:"running"}) : mission;
           if(current.state==="running") this.setMission(current,{state:"waiting_for_user",recovery:{at:now,detail:"Host restart paused scheduling. No old execution was resumed; review and replan or stop this Mission.",interruptedSteps:[]}},"mission.recovered","Host restart paused scheduling; user review is required.");

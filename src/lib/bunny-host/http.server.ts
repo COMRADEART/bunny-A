@@ -182,7 +182,11 @@ export async function startHost(options: { dataDirectory?: string; root?: string
       const input=await body(req);const data=record(input.data ?? {});let task:OrchTask | undefined;let pairCode:string | undefined;let session:AgentSession | undefined;let extra:{mission?:unknown;data?:unknown;agents?:unknown;agent?:unknown}={};
       const safeActions=new Set(["stop","mission.stop","session.get","mission.get","capability.list","skill.list","inbox.list","trigger.list","agent.list","agent.get"]);
       if(!safeActions.has(String(input.action))) containment.assertAccepting("http");
-      if(typeof input.action==="string" && AGENT_ACTIONS.has(input.action)) extra=await agentCommand(agents,input.action,data,local ? "workstation" : `device:${device!.id}`);
+      if(typeof input.action==="string" && AGENT_ACTIONS.has(input.action)) {
+        if (!local && input.action === "agent.create" && data.steps !== undefined) throw new CommandRefusedError("Remote devices cannot supply executable Agent graphs.");
+        if (!local && Object.keys(data).some(k => !["id", "revision"].includes(k)) && input.action.startsWith("agent.authorization.")) throw new CommandRefusedError("Remote approval can only answer the exact Host offer.");
+        extra=await agentCommand(agents,input.action,data,local ? "workstation" : `device:${device!.id}`);
+      }
       else if(typeof input.action==="string" && MISSION_ACTIONS.has(input.action)) extra=await missionCommand(missions,input.action,data,{local,actor:local ? "workstation" : `device:${device!.id}`});
       else switch(input.action) {
         case "submit": task=manager.submit(validateSubmit(data));break;

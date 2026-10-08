@@ -128,6 +128,7 @@ type Island = Preferences & {
   pauseAgent: (id: string) => Promise<void>;
   resumeAgent: (id: string) => Promise<void>;
   stopAgent: (id: string) => Promise<void>;
+  agentAuthorization: (id: string, action: "propose" | "approve" | "adjust" | "deny" | "revoke", revision?: number, patch?: { maximumActions?: number; durationMs?: number; maximumConcurrency?: number; capabilities?: string[] }) => Promise<void>;
   retryMission: (id: string) => Promise<void>;
   respondMission: (requestId: string, decision: "allow_once" | "allow_batch" | "deny") => Promise<void>;
   revokeBatch: (missionId: string, batchId: string) => Promise<void>;
@@ -402,6 +403,9 @@ export const useIsland = create<Island>((set, get) => {
     },
     stopAgent: async (id) => {
       await command("agent.stop", { id });
+    },
+    agentAuthorization: async (id, action, revision, patch) => {
+      await command(`agent.authorization.${action}`, { id, ...(revision === undefined ? {} : { revision }), ...(patch ? { patch } : {}) });
     },
     stopMission: async (id) => {
       await command("mission.stop", { id });

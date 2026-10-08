@@ -11,6 +11,10 @@ import type {
 } from "../types.ts";
 
 export type ExecutionContext = {
+  /** Host-provided, minimal environment for exact Agentic terminal commands. */
+  boundedEnvironment?: NodeJS.ProcessEnv;
+  boundedDelegation?: boolean;
+  boundedScriptHash?: string;
   missionId: string | null;
   stepId: string | null;
   capabilityRunId?: string;
@@ -73,6 +77,10 @@ export class CapabilityBus {
   settling = new Map<string, Promise<void>>();
   cancelledMissions = new Set<string>(); cancelledSteps = new Set<string>();
   containment: HostContainment;
+  /** T5 adjuncts are installed by MissionManager; neither comes from request parameters. */
+  agenticCheck: ((request: CapabilityRequest, risk: RiskClass, executable?: Resolved | null) => string | null) | null = null;
+  agenticAdmit: ((request: CapabilityRequest, runId: string, executable?: Resolved | null) => { id?: string; reason?: string; timeoutMs?: number; scriptHash?: string }) | null = null;
+  agenticFinish: ((id: string, ok: boolean) => void) | null = null;
   clearCancellation(missionId: string) { this.cancelledMissions.delete(missionId); }
   constructor(store: MissionStore, artifacts: ArtifactStore, dataDirectory: string, emit: (type: string, detail: string, missionId: string | null) => void, containment=new HostContainment()) {
     this.store = store; this.artifacts = artifacts; this.dataDirectory = dataDirectory; this.containment=containment;
@@ -111,6 +119,7 @@ export class CapabilityBus {
   riskOf(action: string, params: Record<string, unknown>): RiskClass | null {
     const found = this.find(action); if (!found) return null;
     const escalated = found.adapter.riskFor?.(action, params) ?? null;
+    if (escalated && !RANK.includes(escalated)) return escalated;
     return escalated && RANK.indexOf(escalated) > RANK.indexOf(found.manifest.risk) ? escalated : found.manifest.risk;
   }
   /** Permission decision only; no side effects. */
@@ -118,7 +127,9 @@ export class CapabilityBus {
     const found = this.find(request.action);
     if (!found) return { decision: "deny", reason: `Unknown capability action ${request.action}.`, risk: "READ" };
     const risk = this.riskOf(request.action, request.params) ?? found.manifest.risk;
-    const base = decide({ ...found.manifest, risk }, request.params, { envelope: request.envelope, missionId: request.missionId, grants: this.store.grants(), oneTime: request.oneTime || (!!request.oneTimeAction && request.oneTimeAction === request.action), direct: request.direct, base: request.cwd, executable });
+    const violation = this.agenticCheck?.(request, risk, executable);
+    const base = decide({ ...found.manifest, risk }, request.params, { envelope: request.envelope, missionId: request.missionId, grants: this.store.grants(), oneTime: request.oneTime || (!!request.oneTimeAction && request.oneTimeAction === request.action), direct: request.direct, base: request.cwd, executable, agenticViolation: violation });
+    if (violation) return base; // T9 cannot launder an Agent identity, budget or resource mismatch.
     // Gate T9: an approval batch may rescue an ORDINARY ask — same mission, its own planned step,
     // alive envelope, exact covered action, bound target, risk at/below the ceiling. Never a deny,
     // never a user's standing "ask every time" rule, never another mission or a delegated child step.
@@ -206,11 +217,13 @@ export class CapabilityBus {
       startedAt, finishedAt: null, durationMs: null, origin: request.origin,
     };
     let terminal:CapabilityOutcome|null=null;
+    const agenticAdmission: { id?: string } = {};
     const finish = (status: CapabilityRun["status"], summary: string, result: CapabilityResult | null, artifactIds: string[] = []): CapabilityOutcome => {
       if(terminal) return terminal;
       const finishedAt = Date.now();
       const run = { ...base, ...(result?.cleanup ? { cleanup: result.cleanup } : {}), status, summary: summary.slice(0, 2000), evidence: result?.evidence.slice(0, 40) ?? [], artifactIds, finishedAt, durationMs: finishedAt - startedAt };
       this.store.host.transaction(()=>{this.store.saveRun(run);this.emit(status === "succeeded" ? "capability.completed" : "capability.failed", `${request.action} ${status}: ${run.summary}`, request.missionId);});
+      if (agenticAdmission.id) this.agenticFinish?.(agenticAdmission.id, status === "succeeded");
       terminal={decision,run,result,artifactIds};
       return terminal;
     };
@@ -220,6 +233,10 @@ export class CapabilityBus {
     if (availability !== "available" && availability !== "degraded") {
       return finish(STATUS_FOR[availability], this.health.get(found.adapter.manifest.id)?.detail ?? `${found.adapter.manifest.id} is ${availability}.`, { ok: false, status: STATUS_FOR[availability], summary: `${found.adapter.manifest.id} is ${availability}.`, output: null, evidence: [], errorCategory: "capability_unavailable" });
     }
+    // Canonical policy is re-evaluated inside the shared SQLite admission transaction.
+    const admitted = this.agenticAdmit?.(request, base.id, executable);
+    if (admitted?.reason) return { decision: { decision: "ask", risk: decision.risk, reason: admitted.reason }, run: null, result: null, artifactIds: [] };
+    agenticAdmission.id = admitted?.id;
     // Gate T9 admission gate: re-validate status, epoch, expiry and budget atomically immediately
     // before execution. A failed guard executes nothing; no run is created; the ask path follows.
     if (decision.batch && decision.risk !== "READ") {
@@ -236,13 +253,14 @@ export class CapabilityBus {
     const controller = new AbortController(); this.inFlight.set(base.id, controller);
     let settled!: () => void;
     this.settling.set(base.id, new Promise<void>((done) => { settled = done; }));
-    const timeoutMs = Math.min(request.timeoutMs ?? found.manifest.timeoutMs, 30 * 60_000);
+    const timeoutMs = Math.min(request.timeoutMs ?? found.manifest.timeoutMs, 30 * 60_000, admitted?.timeoutMs ?? Infinity);
     const timer = setTimeout(() => controller.abort(new Error(`Timed out after ${timeoutMs} ms.`)), timeoutMs);
     try {
     let result: CapabilityResult;
     const processOwnership: OwnedProcessRecord[]=[];
     try {
-      result = await found.adapter.execute(request.action, request.params, { missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch });
+      const boundedEnvironment = agenticAdmission.id && request.action === "terminal.exec" ? Object.fromEntries(["SystemRoot", "WINDIR", "TEMP", "TMP", "LANG"].flatMap(k => process.env[k] ? [[k, process.env[k]!]] : [])) : undefined;
+      result = await found.adapter.execute(request.action, request.params, { missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch, boundedEnvironment, boundedDelegation: !!agenticAdmission.id, boundedScriptHash: admitted?.scriptHash });
       if(processOwnership.length) result={...result,output:{...(result.output && typeof result.output === "object" ? result.output : {value:result.output}),processOwnership}};
     } catch (error) {
       const message = safeError(error).message;

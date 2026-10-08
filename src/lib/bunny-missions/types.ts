@@ -86,6 +86,8 @@ export type MissionConfig = {
 
 /** What the user approved for one mission. Child work outside it stops and asks. */
 export type AuthorizationEnvelope = {
+  /** T5 adjunct; canonical policy remains this envelope plus the Host's current revision. */
+  agentic?: { id: string; revision: number };
   id: string;
   missionId: string;
   grantedAt: number;
@@ -114,7 +116,7 @@ export type AuthorizationEnvelope = {
 export type GitAction = "status" | "diff" | "log" | "commit" | "worktree" | "merge";
 
 /** Requested scope shown before approval; becomes the envelope when approved. */
-export type ScopeRequest = Omit<AuthorizationEnvelope, "id" | "missionId" | "grantedAt" | "grantedBy" | "expiresAt" | "revokedAt">;
+export type ScopeRequest = Omit<AuthorizationEnvelope, "id" | "missionId" | "grantedAt" | "grantedBy" | "expiresAt" | "revokedAt" | "agentic">;
 
 export type VerificationCriterion =
   | { kind: "task_spec"; spec: VerifySpec }
@@ -193,6 +195,8 @@ export type MissionStep = {
 };
 
 export type PermissionRequest = {
+  /** Exact Host-offered T5 scope; never accepted from model/client parameters. */
+  agentic?: { fingerprint: string; revision: number; generation: string; resource: string };
   id: string;
   missionId: string;
   stepId: string;

@@ -39,7 +39,13 @@ export class AgentRuntime {
     try { return this.store.agentFlags(agent.id).paused; } catch { return false; }
   }
 
-  snapshot(): AgentSnapshot { return this.store.snapshot(); }
+  snapshot(): AgentSnapshot {
+    const snapshot = this.store.snapshot();
+    return { ...snapshot, agents: snapshot.agents.map(agent => {
+      try { return { ...agent, authorization: agent.missionId ? this.missions.agentic.projection(agent.missionId) : null }; }
+      catch { return { ...agent, authorization: null, authorizationError: "Authorization evidence is invalid; all new work is blocked. Stop remains available." }; }
+    }) };
+  }
 
   // ── commands (§7/§11/§12) ─────────────────────────────────────────────────
   create(input: { objective?: unknown; name?: unknown; title?: unknown; mode?: unknown; projectId?: unknown; steps?: unknown; localOnly?: unknown; providers?: unknown }, actor: string): AgentSnapshot {
@@ -65,17 +71,19 @@ export class AgentRuntime {
     return this.snapshot();
   }
 
-  start(agentId: string, actor: string): AgentSnapshot {
+  start(agentId: string, actor: string, revision?: number): AgentSnapshot {
     this.missions.requireEnabled();
     const agent = this.require(agentId);
     if (agent.stoppedAt) throw new CommandRefusedError("A stopped agent cannot be started again.");
     const view = this.missions.mission(agent.missionId!);
     if (view.state !== "waiting_for_approval") throw new CommandRefusedError(`The agent's mission is ${view.state}, not waiting for plan approval.`);
+    const delegation = this.missions.agentic.forMission(agent.missionId!);
+    if (delegation) this.missions.agentic.assertRevision(delegation.id, revision ?? -1);
     // Run open before approval so the first mission events land under a live run (A09 lineage).
     const run = this.openRun(agent.id, null, null);
     const prior = this.rowState(agent.id);
     if (prior && agentCanTransition(prior, "RUNNING")) this.transition(agent, "RUNNING", run);
-    this.missions.approve(agent.missionId!, actor, true);
+    this.missions.approve(agent.missionId!, actor, true, revision);
     this.emitLifecycle("agent.started", agent, null, run.id);
     return this.snapshot();
   }
@@ -87,9 +95,12 @@ export class AgentRuntime {
     if (agent.stoppedAt || agent.completedAt) throw new CommandRefusedError("A finished agent cannot be paused.");
     const mission = this.mission(agent);
     if (["completed", "failed", "stopped"].includes(mission.state)) throw new CommandRefusedError("A finished agent cannot be paused.");
+    const delegation = this.missions.agentic.forMission(agent.missionId!);
+    if (delegation && delegation.current_state !== "ACTIVE") throw new CommandRefusedError("Pause requires current active Agentic consent; review pending access first.");
     const now = Date.now();
     // Pause persists BEFORE anything else: a crash mid-pause must still leave the pause in place (§11).
     this.saveProfile({ ...agent, pausedAt: now, updatedAt: now }, "PAUSED", { ...flags, paused: true });
+    if (delegation?.current_state === "ACTIVE") this.missions.syncAgentic(this.missions.agentic.state(delegation.id, "PAUSED"));
     this.emitLifecycle("agent.paused", agent, null, this.store.latestRun(agent.id)?.id ?? null);
     const run = this.store.latestRun(agent.id);
     if (run && run.endedAt === null) this.store.closeRun(run.id, "PAUSED", `Paused by ${actor}; new admissions hold, already-admitted steps finish.`, now);
@@ -105,6 +116,11 @@ export class AgentRuntime {
     if (!envelope) throw new CommandRefusedError("The agent's authorization is missing; resume is refused.");
     if (envelope.revokedAt) throw new CommandRefusedError("The agent's authorization was revoked; resume is refused.");
     if (envelope.expiresAt !== null && envelope.expiresAt <= Date.now()) throw new CommandRefusedError("The agent's authorization expired; resume is refused.");
+    const delegation = this.missions.agentic.forMission(agent.missionId!);
+    if (delegation) {
+      if (delegation.current_state !== "PAUSED") throw new CommandRefusedError("Current Agentic consent does not permit Resume.");
+      this.missions.syncAgentic(this.missions.agentic.state(delegation.id, "ACTIVE"));
+    }
     const mission = this.mission(agent);
     if (mission.state === "stopped" || mission.state === "failed") throw new CommandRefusedError(`The agent's mission already ${mission.state}; nothing to resume.`);
     const now = Date.now();
@@ -372,6 +388,7 @@ const BOUNDARY_REPLAY: Record<CheckpointBoundary, "SAFE_TO_REPLAY" | "VERIFY_BEF
 export const AGENT_LIMITS = { maxActiveAgents: 10 } as const;
 
 export const AGENT_ACTIONS = new Set(["agent.create", "agent.start", "agent.pause", "agent.resume", "agent.stop", "agent.list", "agent.get"]);
+for (const action of ["agent.authorization.propose", "agent.authorization.approve", "agent.authorization.adjust", "agent.authorization.deny", "agent.authorization.revoke"]) AGENT_ACTIONS.add(action);
 
 /** Same dispatch boundary as missionCommand: validated actions only, honest refusals otherwise (§26). */
 export async function agentCommand(agents: AgentRuntime, action: string, data: Record<string, unknown>, actor: string): Promise<Record<string, unknown>> {
@@ -379,7 +396,34 @@ export async function agentCommand(agents: AgentRuntime, action: string, data: R
   const agentId = typeof data.id === "string" ? data.id.slice(0, 200) : "";
   switch (action) {
     case "agent.create": return { agents: agents.create(data, actor) };
-    case "agent.start": return { agents: agents.start(agentId, actor) };
+    case "agent.start": return { agents: agents.start(agentId, actor, Number(data.revision)) };
+    case "agent.authorization.propose": {
+      if (actor.startsWith("device:")) throw new CommandRefusedError("A remote device cannot invent Agentic scope.");
+      const profile = agents.store.agent(agentId); if (!profile?.missionId) throw new CommandRefusedError("Unknown Agent.");
+      agents.missions.proposeAgentAuthorization(agentId); return { agents: agents.snapshot() };
+    }
+    case "agent.authorization.approve": {
+      const profile = agents.store.agent(agentId); if (!profile?.missionId) throw new CommandRefusedError("Unknown Agent.");
+      const mission = agents.missions.mission(profile.missionId);
+      if (mission.state === "waiting_for_approval") return { agents: agents.start(agentId, actor, Number(data.revision)) };
+      agents.missions.reauthorizeAgent(profile.missionId, Number(data.revision), actor);
+      return { agents: agents.snapshot() };
+    }
+    case "agent.authorization.adjust": {
+      if (actor.startsWith("device:")) throw new CommandRefusedError("Scope edits require the authenticated workstation owner flow.");
+      const profile = agents.store.agent(agentId); if (!profile?.missionId) throw new CommandRefusedError("Unknown Agent.");
+      const patch = data.patch;
+      if (!patch || typeof patch !== "object" || Array.isArray(patch)) throw new CommandRefusedError("Expected a scope reduction patch.");
+      agents.missions.adjustAgentAuthorization(profile.missionId, Number(data.revision), patch);
+      return { agents: agents.snapshot() };
+    }
+    case "agent.authorization.deny": case "agent.authorization.revoke": {
+      const profile = agents.store.agent(agentId); if (!profile?.missionId) throw new CommandRefusedError("Unknown Agent.");
+      const e = agents.missions.agentic.forMission(profile.missionId); if (!e) throw new CommandRefusedError("No Agentic consent record.");
+      agents.missions.syncAgentic(agents.missions.agentic.state(e.id, "REVOKED", Number(data.revision)));
+      if (!profile.stoppedAt && !profile.completedAt) await agents.stop(agentId, actor);
+      return { agents: agents.snapshot() };
+    }
     case "agent.pause": return { agents: agents.pause(agentId, actor) };
     case "agent.resume": return { agents: agents.resume(agentId, actor) };
     case "agent.stop": return { agents: await agents.stop(agentId, actor) };

@@ -44,7 +44,7 @@ export async function missionCommand(missions: MissionManager, action: string, d
     }
     case "mission.plan": case "mission.replan":
       return { mission: await missions.replan(id(data.id), access.actor, data.steps, data.objective === undefined ? undefined : text(data.objective)) };
-    case "mission.approve": return { mission: missions.approve(id(data.id), access.actor, data.start !== false) };
+    case "mission.approve": return { mission: missions.approve(id(data.id), access.actor, data.start !== false, data.revision === undefined ? undefined : Number(data.revision)) };
     case "mission.start": {
       missions.requireEnabled();
       const mission = missions.mission(id(data.id));

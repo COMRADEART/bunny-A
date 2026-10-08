@@ -111,6 +111,8 @@ export type AgentCheckpoint = {
 export type AgentRecordRow = { id: string; missionId: string | null; state: AgentState; createdAt: number; updatedAt: number; record: AgentProfile };
 export type AgentSnapshot = {
   agents: {
+    authorization?: import("../bunny-missions/agentic-types.ts").AgenticProjection | null;
+    authorizationError?: string;
     id: string; name: string; state: AgentState; missionId: string | null; createdAt: number; updatedAt: number;
     failure: AgentFailure | null;
     run: { id: string; generation: number; state: AgentState; startedAt: number | null; endedAt: number | null } | null;

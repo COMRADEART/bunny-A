@@ -22,6 +22,7 @@ export default tseslint.config(
       "artifacts/branding-before-bunny-a/**",
       "artifacts/checkpoints/**",
       "src/routeTree.gen.ts",
+      "src/lib/bunny-missions/vendor/acorn.ts", // Licensed, unchanged upstream parser.
     ],
   },
   js.configs.recommended,
