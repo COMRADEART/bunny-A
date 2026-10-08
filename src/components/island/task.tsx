@@ -44,7 +44,7 @@ export function openTask(id: string) {
 /** Task / Mission switch; shown only when the Host reports missions enabled. */
 function ComposeKindToggle() {
   const store = useIsland();
-  if (!store.missions?.enabled) return null;
+  if (!store.missions?.enabled || store.sheet === "chat") return null;
   return (
     <div className="mode-selector compose-kind" aria-label="Request kind">
       {(["task", "mission"] as const).map((kind) => (

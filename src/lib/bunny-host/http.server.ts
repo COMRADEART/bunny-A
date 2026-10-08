@@ -358,6 +358,8 @@ export async function startHost(
           "cache-control": "no-cache",
           connection: "keep-alive",
         });
+        // Deliver the authenticated handshake even when the caller is already at the journal head.
+        res.flushHeaders();
         const taskId = path.searchParams.get("task");
         // ?task=<id> streams one task's normalized events (the Host-side streamEvents for that session).
         const read = (from: number) => (taskId ? db.taskEvents(taskId, from) : db.events(from));

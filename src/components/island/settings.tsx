@@ -7,15 +7,15 @@ import { MissionSettings } from "./mission";
 
 const GROUPS = [
   "General",
-  "Agents",
-  "Routing",
-  "Missions",
-  "Projects",
-  "Remote access",
+  "Providers",
+  "Models",
+  "Privacy and permissions",
+  "Workspace",
+  "Devices",
   "Notifications",
-  "System monitoring",
+  "Runtime diagnostics",
   "Appearance",
-  "Advanced",
+  "About Bunny",
 ] as const;
 type Group = (typeof GROUPS)[number];
 function Setting({
@@ -203,7 +203,7 @@ export function Settings() {
                 <span className="caption">{store.drafts.length} saved</span>
               </Setting>
             </>
-          ) : group === "Agents" ? (
+          ) : group === "Providers" ? (
             <>
               {liveProviders(store).map((p) => (
                 <Setting key={p.id} label={NAMES[p.id]} detail={p.detail}>
@@ -211,7 +211,7 @@ export function Settings() {
                 </Setting>
               ))}
             </>
-          ) : group === "Routing" ? (
+          ) : group === "Models" ? (
             <>
               <Setting
                 label="Approval before launch"
@@ -219,7 +219,7 @@ export function Settings() {
               >
                 <span className="caption">Required by Host</span>
               </Setting>
-              <Setting label="Default depth">
+              <Setting label="Next Task depth">
                 <select
                   aria-label="Default task depth"
                   value={store.mode}
@@ -242,23 +242,21 @@ export function Settings() {
                 </button>
               </Setting>
             </>
-          ) : group === "Missions" ? (
+          ) : group === "Privacy and permissions" ? (
             <MissionSettings />
-          ) : group === "Projects" ? (
+          ) : group === "Workspace" ? (
             <>
               <p className="caption">Project folders and preferences come from the Host.</p>
               {store.projects.map((p) => (
                 <Setting key={p.id} label={p.name} detail={p.path}>
-                  <span className="caption">
-                    {p.preferred === "auto" ? "Auto" : NAMES[p.preferred]}
-                  </span>
+                  <span className="caption">Router selects per Task</span>
                 </Setting>
               ))}
               <button className="btn secondary" onClick={() => store.setSheet("project")}>
                 Manage projects <ChevronRight size={14} />
               </button>
             </>
-          ) : group === "Remote access" ? (
+          ) : group === "Devices" ? (
             <Pairing compact />
           ) : group === "Notifications" ? (
             <>
@@ -287,7 +285,7 @@ export function Settings() {
                 View notifications <ChevronRight size={14} />
               </button>
             </>
-          ) : group === "System monitoring" ? (
+          ) : group === "Runtime diagnostics" ? (
             <>
               <Setting
                 label="CPU warning"
@@ -351,8 +349,30 @@ export function Settings() {
               >
                 <ShieldCheck size={18} />
               </Setting>
-              <Setting label="Installed Host" detail={store.release ? `${store.release.release} · ${store.release.sourceCommit.slice(0,12)}` : "Development Host or build identity unavailable"}><span className="caption">{store.release?.version ?? "Unavailable"}</span></Setting>
-              <Setting label="Dashboard build" detail={store.release?.dashboard ? `Source ${store.release.dashboard.sourceCommit.slice(0,12)} · ${store.release.dashboard.assets} packaged assets` : "Dashboard build identity unavailable"}><span className="caption">{store.release?.dashboard?.builtAt ? new Date(store.release.dashboard.builtAt).toLocaleDateString() : "Unavailable"}</span></Setting>
+              <Setting
+                label="Installed Host"
+                detail={
+                  store.release
+                    ? `${store.release.release} · ${store.release.sourceCommit.slice(0, 12)}`
+                    : "Development Host or build identity unavailable"
+                }
+              >
+                <span className="caption">{store.release?.version ?? "Unavailable"}</span>
+              </Setting>
+              <Setting
+                label="Dashboard build"
+                detail={
+                  store.release?.dashboard
+                    ? `Source ${store.release.dashboard.sourceCommit.slice(0, 12)} · ${store.release.dashboard.assets} packaged assets`
+                    : "Dashboard build identity unavailable"
+                }
+              >
+                <span className="caption">
+                  {store.release?.dashboard?.builtAt
+                    ? new Date(store.release.dashboard.builtAt).toLocaleDateString()
+                    : "Unavailable"}
+                </span>
+              </Setting>
             </>
           )}
         </section>

@@ -35,6 +35,10 @@ export type Sheet =
   | "project"
   | "constellation"
   | "missions"
+  | "agentic"
+  | "activity"
+  | "chat"
+  | "devices"
   | null;
 export type TaskFilter = "all" | "running" | "completed" | "failed" | "stopped";
 export type Draft = {
@@ -82,6 +86,9 @@ type Island = Preferences & {
   hostInstanceId: string | null;
   snapshotRevision: number;
   syncStatus: string | null;
+  streamStatus: "connecting" | "live" | "reconnecting";
+  agentFocus: string | null;
+  projectFocus: string | null;
   connectionChecked: boolean;
   sheet: Sheet;
   providerFocus: ProviderId | null;
@@ -128,11 +135,21 @@ type Island = Preferences & {
   pauseAgent: (id: string) => Promise<void>;
   resumeAgent: (id: string) => Promise<void>;
   stopAgent: (id: string) => Promise<void>;
-  agentAuthorization: (id: string, action: "propose" | "approve" | "adjust" | "deny" | "revoke", revision?: number, patch?: { maximumActions?: number; durationMs?: number; maximumConcurrency?: number; capabilities?: string[] ;
+  agentAuthorization: (
+    id: string,
+    action: "propose" | "approve" | "adjust" | "deny" | "revoke",
+    revision?: number,
+    patch?: {
+      maximumActions?: number;
+      durationMs?: number;
+      maximumConcurrency?: number;
+      capabilities?: string[];
     },
   ) => Promise<void>;
   retryMission: (id: string) => Promise<void>;
-  respondMission: (requestId: string, decision: "allow_once" | "allow_batch" | "deny",
+  respondMission: (
+    requestId: string,
+    decision: "allow_once" | "allow_batch" | "deny",
   ) => Promise<void>;
   revokeBatch: (missionId: string, batchId: string) => Promise<void>;
   ackInbox: (id: string) => void;
@@ -254,30 +271,45 @@ export function liveProviders(state: {
   );
 }
 let refreshing: Promise<void> | null = null;
-let migrationAttempted = false;
 export const useIsland = create<Island>((set, get) => {
-  let requestOrder=0, appliedOrder=0, disconnected=false;
-  const apply = (snapshot: HostSnapshot, after=0, order=++requestOrder) => {
-    const state=get();
-    if(order<appliedOrder && snapshot.instanceId!==state.hostInstanceId) return;
-    const reconciled=reconcileSnapshot({instanceId:state.hostInstanceId,revision:state.snapshotRevision,cursor:state.cursor,events:state.events,activities:state.activities,
-      },snapshot,after,
+  let requestOrder = 0,
+    appliedOrder = 0,
+    disconnected = false;
+  const apply = (snapshot: HostSnapshot, after = 0, order = ++requestOrder) => {
+    const state = get();
+    if (order < appliedOrder && snapshot.instanceId !== state.hostInstanceId) return;
+    const reconciled = reconcileSnapshot(
+      {
+        instanceId: state.hostInstanceId,
+        revision: state.snapshotRevision,
+        cursor: state.cursor,
+        events: state.events,
+        activities: state.activities,
+      },
+      snapshot,
+      after,
     );
-    if(!reconciled) return;
-    appliedOrder=Math.max(appliedOrder,order);
+    if (!reconciled) return;
+    appliedOrder = Math.max(appliedOrder, order);
     const ollama = snapshot.providers.find((p) => p.id === "ollama");
     // The first snapshot only seeds the cursor: replaying history would notify about long-finished tasks.
-    const fresh=reconciled.fresh;
+    const fresh = reconciled.fresh;
     set({
-      hostHealth:snapshot.health ?? null,
-      release:snapshot.release ?? null,
+      hostHealth: snapshot.health ?? null,
+      release: snapshot.release ?? null,
       remoteUrl: snapshot.remoteUrl ?? null,
       devices: snapshot.devices ?? [],
       events: reconciled.events,
       activities: reconciled.activities,
       hostInstanceId: reconciled.instanceId,
       snapshotRevision: reconciled.revision,
-      syncStatus: reconciled.gap ? "Activity history gap. Current state refreshed from the Host." : reconciled.restarted ? "Host restarted. Current state refreshed; old sessions were not resumed." : disconnected ? "Reconnected. Current state refreshed from the Host." : state.syncStatus,
+      syncStatus: reconciled.gap
+        ? "Activity history gap. Current state refreshed from the Host."
+        : reconciled.restarted
+          ? "Host restarted. Current state refreshed; old sessions were not resumed."
+          : disconnected
+            ? "Reconnected. Current state refreshed from the Host."
+            : state.syncStatus,
       connectionChecked: true,
     });
     set({
@@ -357,6 +389,9 @@ export const useIsland = create<Island>((set, get) => {
     hostInstanceId: null,
     snapshotRevision: 0,
     syncStatus: null,
+    streamStatus: "connecting",
+    agentFocus: null,
+    projectFocus: null,
     connectionChecked: false,
     drafts: [],
     extensions: { cline: false, cursor: false },
@@ -474,7 +509,12 @@ export const useIsland = create<Island>((set, get) => {
       if (query.get("companion") === "1") set({ sheet: "phone" });
       const views: Record<string, Sheet> = {
         today: "today",
-        agents: "provider",
+        agents: "agentic",
+        agentic: "agentic",
+        models: "provider",
+        activity: "activity",
+        devices: "devices",
+        chat: "chat",
         projects: "project",
         system: "system",
         settings: "settings",
@@ -482,7 +522,7 @@ export const useIsland = create<Island>((set, get) => {
         notifications: "extensions",
         compose: "compose",
         constellation: "constellation",
-        missions: "today",
+        missions: "agentic",
       };
       const requestedView = query.get("view");
       if (requestedView && views[requestedView]) set({ sheet: views[requestedView] });
@@ -492,7 +532,9 @@ export const useIsland = create<Island>((set, get) => {
       const taskId = query.get("task");
       if (taskId) set({ decisionTaskId: taskId, sheet: "task" });
       const missionId = query.get("mission");
-      if (missionId) set({ missionFocus: missionId, sheet: "today" });
+      if (missionId) set({ missionFocus: missionId, sheet: "agentic" });
+      const agentId = query.get("agent");
+      if (agentId) set({ agentFocus: agentId, sheet: "agentic" });
       void get().refreshOllama();
     },
     refreshOllama: async () => {
@@ -507,15 +549,6 @@ export const useIsland = create<Island>((set, get) => {
           if (resync) {
             const canonical = await readBunnyHost({ data: { after: 0 } });
             apply(canonical, 0, ++requestOrder);
-          }
-          if (!migrationAttempted) {
-            migrationAttempted = true;
-            const legacy = load(LEGACY_KEY);
-            if (legacy.tasks?.length || legacy.projects?.length)
-              await command("legacy.import", {
-                tasks: legacy.tasks ?? [],
-                projects: legacy.projects ?? [],
-              });
           }
         } catch (error) {
           disconnected = true;

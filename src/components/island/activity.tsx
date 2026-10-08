@@ -41,7 +41,7 @@ export function ActivityTimeline({
     </section>
   );
 }
-function ActivityRow({ item }: { item: PublicActivity }) {
+export function ActivityRow({ item }: { item: PublicActivity }) {
   const Icon =
     item.state === "Verified"
       ? ShieldCheck

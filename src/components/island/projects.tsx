@@ -33,7 +33,8 @@ export function Projects() {
   const [offset, setOffset] = useState(0);
   const [refresh, setRefresh] = useState(0);
   const [page, setPage] = useState<ProjectPage>({ projects: [], total: 0, offset: 0, limit: 24 });
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedId = store.projectFocus;
+  const setSelectedId = (projectFocus: string | null) => useIsland.setState({ projectFocus });
   const [detail, setDetail] = useState<ProjectDetail | null>(null);
   const [tab, setTab] = useState<Tab>("Overview");
   const [historyOffset, setHistoryOffset] = useState(0);
@@ -49,9 +50,12 @@ export function Projects() {
   const [tagsText, setTagsText] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [repository, setRepository] = useState<Record<string, unknown> | null>(null);
-  const [artifact, setArtifact] = useState<{ title: string; body: string; sha256: string; image?: string } | null>(
-    null,
-  );
+  const [artifact, setArtifact] = useState<{
+    title: string;
+    body: string;
+    sha256: string;
+    image?: string;
+  } | null>(null);
   const command = store.projectCommand;
   useEffect(() => {
     if (!online) return;
@@ -73,7 +77,7 @@ export function Projects() {
       current = false;
       clearTimeout(timer);
     };
-  }, [online, query, filter, sort, offset, refresh, command]);
+  }, [online, store.hostInstanceId, query, filter, sort, offset, refresh, command]);
   useEffect(() => {
     if (!online || !selectedId) return;
     let current = true;
@@ -94,7 +98,7 @@ export function Projects() {
     return () => {
       current = false;
     };
-  }, [online, selectedId, historyOffset, refresh, command]);
+  }, [online, store.hostInstanceId, selectedId, historyOffset, refresh, command]);
   const mutate = async (action: string, data: Record<string, unknown>) => {
     setBusy(true);
     setError(null);
@@ -554,8 +558,16 @@ export function Projects() {
                         </p>
                         <p className="caption">
                           {(() => {
-                            const current = detail.tasks.find((t) => t.mission?.missionId === agent.missionId && ["running", "verifying", "waiting_for_approval", "queued"].includes(t.state));
-                            return current ? `Current Task: ${current.title} · ${current.provider} / ${current.model}` : "No active model Task";
+                            const current = detail.tasks.find(
+                              (t) =>
+                                t.mission?.missionId === agent.missionId &&
+                                ["running", "verifying", "waiting_for_approval", "queued"].includes(
+                                  t.state,
+                                ),
+                            );
+                            return current
+                              ? `Current Task: ${current.title} · ${current.provider} / ${current.model}`
+                              : "No active model Task";
                           })()}
                         </p>
                       </div>
@@ -563,8 +575,11 @@ export function Projects() {
                         <button
                           className="btn secondary"
                           onClick={() => {
-                            store.openMission(agent.missionId);
-                            store.setSheet("today");
+                            useIsland.setState({
+                              agentFocus: agent.id,
+                              missionFocus: agent.missionId,
+                              sheet: "agentic",
+                            });
                           }}
                         >
                           View Mission / Agent
@@ -628,7 +643,12 @@ export function Projects() {
                         className="btn secondary"
                         onClick={() => {
                           store.openMission(mission.id);
-                          store.setSheet("today");
+                          useIsland.setState({
+                            sheet: "agentic",
+                            agentFocus:
+                              store.agents?.agents.find((row) => row.missionId === mission.id)
+                                ?.id ?? null,
+                          });
                         }}
                       >
                         View Tasks and verification
@@ -681,8 +701,21 @@ export function Projects() {
                   >
                     Relink workspace
                   </button>
-                  {project.projectType === "repository" && <button className="btn secondary" disabled={!online || busy} onClick={async () => { const result = await command("project.repository", { id: project.id }); if (result) setRepository(result as Record<string, unknown>); }}>Inspect repository</button>}
-                  {repository && <pre className="project-path">{JSON.stringify(repository, null, 2)}</pre>}
+                  {project.projectType === "repository" && (
+                    <button
+                      className="btn secondary"
+                      disabled={!online || busy}
+                      onClick={async () => {
+                        const result = await command("project.repository", { id: project.id });
+                        if (result) setRepository(result as Record<string, unknown>);
+                      }}
+                    >
+                      Inspect repository
+                    </button>
+                  )}
+                  {repository && (
+                    <pre className="project-path">{JSON.stringify(repository, null, 2)}</pre>
+                  )}
                   <h3>Agent scratch spaces</h3>
                   {!detail.workspaces.length && (
                     <p className="caption">No Agent scratch space allocated.</p>
@@ -734,7 +767,10 @@ export function Projects() {
                               title: a.title,
                               body: result.body,
                               sha256: result.artifact.sha256,
-                              image: result.encoding === "base64" ? `data:${a.location.mediaType};base64,${result.body}` : undefined,
+                              image:
+                                result.encoding === "base64"
+                                  ? `data:${a.location.mediaType};base64,${result.body}`
+                                  : undefined,
                             });
                         }}
                       >
@@ -753,7 +789,11 @@ export function Projects() {
                       <p className="caption project-path">
                         Content checked against SHA-256 {artifact.sha256}
                       </p>
-                      {artifact.image ? <img src={artifact.image} alt={artifact.title} /> : <pre>{artifact.body}</pre>}
+                      {artifact.image ? (
+                        <img src={artifact.image} alt={artifact.title} />
+                      ) : (
+                        <pre>{artifact.body}</pre>
+                      )}
                     </div>
                   )}
                 </>

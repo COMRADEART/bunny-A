@@ -6,6 +6,7 @@ function Get-BunnyTaskPresentation($Task) {
   return @{label=(Get-BunnyStateInfo $Task.state).Label;activity=(Get-BunnyStateInfo $Task.state).Label;verification='Not independently verified';detail='Activity details unavailable from this Host.'}
 }
 function Update-BunnyPresentation {
+  Update-BunnyAgentPresentation
   $bunnyControls.CompactHealth.Visibility='Collapsed'
   if($bunnySnapshot.health -and $bunnySnapshot.health.operationalState -ne 'healthy') {
     $bunnyControls.CompactHealth.Visibility='Visible'
@@ -19,7 +20,7 @@ function Update-BunnyPresentation {
     $now=[DateTimeOffset]::Now.ToUnixTimeMilliseconds()
     $mission=@($bunnySnapshot.missions.missions | Where-Object {$_.state -eq 'completed' -and $_.finishedAt -and $now-$_.finishedAt -ge 0 -and $now-$_.finishedAt -lt 8000}) | Select-Object -First 1
   }
-  $bunnyControls.CompactMission.Visibility=if($mission -and $bunnyView -eq 'idle') {'Visible'} else {'Collapsed'}
+  $bunnyControls.CompactMission.Visibility=if($mission -and $bunnyView -eq 'idle' -and -not $bunnyCurrentAgentId) {'Visible'} else {'Collapsed'}
   if($mission) {
     $bunnyControls.CompactMission.Tag=$mission.id
     $bunnyControls.MissionTitle.Text=$mission.title
@@ -32,3 +33,29 @@ function Update-BunnyPresentation {
   }
 }
 $bunnyControls.CompactMission.Add_Click({Open-BunnyDashboard ('?view=missions&mission='+[Uri]::EscapeDataString([string]$this.Tag))})
+
+# T8: native controls project the same durable Agent authority as the desktop workspace.
+$bunnyCurrentAgentId=$null
+$bunnyStopConfirmation=$null
+function Update-BunnyAgentPresentation {
+  $agent=@($bunnySnapshot.agents.agents | Sort-Object @{Expression={if($_.authorization.state -eq 'WAITING_FOR_USER' -or $_.state -in @('WAITING_FOR_USER','INTERRUPTED')){0}elseif($_.state -notin @('COMPLETED','FAILED','STOPPED')){1}else{2}}},@{Expression='updatedAt';Descending=$true}) | Select-Object -First 1
+  if($bunnyCurrentAgentId -ne $agent.id) {$script:bunnyStopConfirmation=$null}
+  $script:bunnyCurrentAgentId=if($agent){$agent.id}else{$null}
+  $bunnyControls.CompactAgent.Visibility=if($agent -and $bunnyView -eq 'idle'){'Visible'}else{'Collapsed'}
+  if(-not $agent) {return}
+  $bunnyControls.AgentName.Text=$agent.name
+  $label=([string]$agent.state).Replace('_',' ').ToLower()
+  $bunnyControls.AgentState.Text=if(-not $bunnyOnline){'Host disconnected - last known: '+$label}else{$label+' - authorization: '+$(if($agent.authorization){([string]$agent.authorization.state).Replace('_',' ').ToLower()}else{'not granted'})}
+  $bunnyControls.AgentBoundary.Text=if($bunnyStopConfirmation -eq $agent.id){'Stop future admissions? Already admitted effects are not undone. Press Stop now to confirm.'}elseif($agent.activity.verification -eq 'Verified'){'Project result independently verified.'}elseif($agent.authorization.state -eq 'WAITING_FOR_USER'){'Agent waiting for authorization.'}else{'Closing this Bar keeps Host-owned work running.'}
+  $bunnyControls.AgentPause.IsEnabled=$bunnyOnline -and -not $bunnyPending -and (-not $agent.authorization -or $agent.authorization.state -eq 'ACTIVE') -and $agent.state -in @('CREATED','PLANNING','RUNNING','WAITING_FOR_USER','WAITING_FOR_DEPENDENCY','VERIFYING')
+  $bunnyControls.AgentResume.IsEnabled=$bunnyOnline -and -not $bunnyPending -and $agent.state -eq 'PAUSED'
+  $bunnyControls.AgentStop.IsEnabled=$bunnyOnline -and -not $bunnyPending -and $agent.state -notin @('COMPLETED','FAILED','STOPPED')
+  $bunnyControls.AgentStop.Content=if($bunnyStopConfirmation -eq $agent.id){'Stop now'}else{'Stop'}
+  $bunnyControls.AgentReview.Visibility=if($agent.authorization -and ($agent.authorization.state -eq 'WAITING_FOR_USER' -or @($agent.authorization.pending | Where-Object {$_}).Count -gt 0)){'Visible'}else{'Collapsed'}
+  $bunnyControls.AgentReview.IsEnabled=$bunnyOnline
+}
+$bunnyControls.AgentOpen.Add_Click({Open-BunnyDashboard ('?view=agentic&agent='+[Uri]::EscapeDataString([string]$bunnyCurrentAgentId))})
+$bunnyControls.AgentReview.Add_Click({Open-BunnyDashboard ('?view=agentic&agent='+[Uri]::EscapeDataString([string]$bunnyCurrentAgentId))})
+$bunnyControls.AgentPause.Add_Click({Begin-BunnyCommand 'agent.pause' @{id=$bunnyCurrentAgentId};Update-BunnyAgentPresentation})
+$bunnyControls.AgentResume.Add_Click({Begin-BunnyCommand 'agent.resume' @{id=$bunnyCurrentAgentId};Update-BunnyAgentPresentation})
+$bunnyControls.AgentStop.Add_Click({if($bunnyStopConfirmation -eq $bunnyCurrentAgentId){Begin-BunnyCommand 'agent.stop' @{id=$bunnyCurrentAgentId};$script:bunnyStopConfirmation=$null}else{$script:bunnyStopConfirmation=$bunnyCurrentAgentId};Update-BunnyAgentPresentation})
