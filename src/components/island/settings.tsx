@@ -103,45 +103,6 @@ export function Settings() {
               <p className="caption">
                 Preferences for this browser. Native Island preferences are available from its menu.
               </p>
-              <Setting label="Island size">
-                {choice("size", [
-                  { value: "compact", label: "Compact" },
-                  { value: "normal", label: "Normal" },
-                  { value: "detailed", label: "Detailed" },
-                ])}
-              </Setting>
-              <Setting label="Island position">
-                {choice("position", [
-                  { value: "left", label: "Top left" },
-                  { value: "center", label: "Top center" },
-                  { value: "right", label: "Top right" },
-                ])}
-              </Setting>
-              <Setting label="Idle content">
-                {choice("idle", [
-                  { value: "providers", label: "Provider usage" },
-                  { value: "temperatures", label: "Temperatures" },
-                  { value: "tasks", label: "Active tasks" },
-                  { value: "clock", label: "Clock" },
-                  { value: "minimal", label: "Minimal" },
-                  { value: "mixed", label: "Mixed · providers + system" },
-                ])}
-              </Setting>
-              <Setting label="Glass strength">
-                {choice("glass", [
-                  { value: "low", label: "Low" },
-                  { value: "medium", label: "Medium" },
-                  { value: "high", label: "High" },
-                ])}
-              </Setting>
-              <Setting label="Auto-collapse" detail="After a finished task">
-                {choice("collapse", [
-                  { value: 5, label: "5 sec" },
-                  { value: 10, label: "10 sec" },
-                  { value: 30, label: "30 sec" },
-                  { value: 0, label: "Never" },
-                ])}
-              </Setting>
               <Setting label="Motion" detail="OS reduced-motion preferences always take priority.">
                 {choice("motion", [
                   { value: "full", label: "Full" },
@@ -156,31 +117,6 @@ export function Settings() {
                   { value: "light", label: "Light" },
                 ])}
               </Setting>
-              <div className="primary-settings">
-                <strong>Primary providers</strong>
-                <p className="caption">Choose up to three for the idle Island.</p>
-                {liveProviders(store).map((p) => (
-                  <label className="provider-checkbox" key={p.id}>
-                    <input
-                      type="checkbox"
-                      checked={store.appearance.primary.includes(p.id)}
-                      disabled={
-                        !store.appearance.primary.includes(p.id) &&
-                        store.appearance.primary.length >= 3
-                      }
-                      onChange={(e) =>
-                        store.setAppearance({
-                          primary: e.target.checked
-                            ? [...store.appearance.primary, p.id]
-                            : store.appearance.primary.filter((id) => id !== p.id),
-                        })
-                      }
-                    />
-                    <span>{NAMES[p.id]}</span>
-                    <ProviderStatus provider={p} />
-                  </label>
-                ))}
-              </div>
             </>
           ) : group === "General" ? (
             <>
