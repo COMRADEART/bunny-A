@@ -113,6 +113,11 @@ export function importClosure(release) {
       if(!existsSync(join(root,path))) missing.push(path);else files.push(path);
     }
   }
+  // T6 promises an executable bounded browser family, rather than an optional development import.
+  if (existsSync(join(root, "src/lib/bunny-missions/cross-app.ts"))) {
+    for (const path of ["node_modules/playwright/index.mjs", "node_modules/playwright-core/index.mjs", "node_modules/playwright/LICENSE", "node_modules/playwright-core/LICENSE"])
+      if (!existsSync(join(root, path))) missing.push(path); else files.push(path);
+  }
   return { ok: !missing.length && !outside.length && !packages.size, files, missing, outside, packages: [...packages], optionalPackages: [...optional] };
 }
 

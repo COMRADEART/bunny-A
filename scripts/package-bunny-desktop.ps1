@@ -87,7 +87,14 @@ try {
       Add-PackageFile $_.FullName $relative 'source' $relative
     }
   }
-  # Type-stripped Host files are ESM. No npm install is required for the native Host.
+  # T6 includes the actual browser API runtime; never resolve it from a development checkout.
+  $browserRuntime=$null
+  if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'src/lib/bunny-missions/cross-app.ts')) {
+    $browserRuntime=(& node (Join-Path $bunnyBuild 'scripts/package-browser-runtime.mjs') $bunnyBuild $bunnyWorkspace $bunnyPackage) | ConvertFrom-Json
+    if($LASTEXITCODE -ne 0) {throw 'Pinned browser runtime export failed.'}
+    foreach($item in $browserRuntime.origins) {[void]$origins.Add($item)}
+  }
+  # Type-stripped Host files are ESM. Runtime dependencies are shipped; no npm install is required.
   '{"type":"module"}' | Set-Content -LiteralPath (Join-Path $bunnyPackage 'package.json') -Encoding ascii
   New-Item -ItemType Directory -Path (Join-Path $bunnyPackage 'runtime') -Force | Out-Null
   $nodePath=(Get-Command node).Source
@@ -104,7 +111,9 @@ try {
     os=[Environment]::OSVersion.VersionString
     dashboardBuild=(-not $SkipDashboardBuild)
     packageLockSha256=if(Test-Path -LiteralPath $lock) {(Get-FileHash -LiteralPath $lock -Algorithm SHA256).Hash.ToLower()} else {$null}
-    dashboardDependencies='node_modules of the build machine workspace (not reinstalled); the native Host imports no npm packages'
+    dashboardDependencies='node_modules of the build machine workspace (not reinstalled)'
+    browserRuntime=if($browserRuntime) {$browserRuntime.packages} else {$null}
+    browserExecutable=if($browserRuntime) {$browserRuntime.browserExecutable} else {$null}
   }
   $layoutVersion=if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'src/lib/bunny-host/state-paths.server.ts')) {2} else {1}
   $compatibility=[ordered]@{hostEntry='Bunny-Host.mjs';launcher='Start-Bunny-Release.ps1';hostPortDefault=43119;stateLayoutVersion=$layoutVersion;databaseSchemaVersion=3;codexCompatibilityPolicyVersion=1;hostFailurePolicyVersion=1}
