@@ -1,0 +1,93 @@
+{
+  "classification": "DISPOSABLE LIVE VERIFIED",
+  "interaction": "Browser controls: Adjust scope 20→12, Authorize Mission, observe exact deletion boundary, Revoke access",
+  "agent": {
+    "id": "84cdfb04-f100-49d3-aea4-2b17f01ec538",
+    "name": "T5 permission review 1791434381718",
+    "state": "STOPPED",
+    "missionId": "8e096c3f-7d1f-41b0-a82e-62b92e32b7c4",
+    "createdAt": 1791434381723,
+    "updatedAt": 1791434596851,
+    "failure": null,
+    "run": {
+      "id": "8a1f9474-28ef-40f1-9dbc-2884b579b182",
+      "generation": 1,
+      "state": "STOPPED",
+      "startedAt": 1791434484311,
+      "endedAt": 1791434596851
+    },
+    "checkpoints": 13,
+    "lastCheckpoint": {
+      "boundary": "before_waiting_for_user",
+      "at": 1791434485280,
+      "replaySafety": "NOT_REPLAYABLE"
+    },
+    "pausedAt": null,
+    "stoppedAt": 1791434596851,
+    "note": null,
+    "authorization": {
+      "id": "3f70771c-bdb1-4281-9020-78a2cd42c96f",
+      "revision": 3,
+      "state": "REVOKED",
+      "objective": "Inspect, edit and check disposable files; ask before deletion",
+      "capabilities": [
+        "filesystem.exists",
+        "filesystem.list",
+        "filesystem.read",
+        "filesystem.write",
+        "terminal.exec"
+      ],
+      "roots": [
+        "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t5-preview-bun-router\\ui-project"
+      ],
+      "commands": [
+        {
+          "command": "node",
+          "args": [
+            "check.mjs"
+          ],
+          "cwd": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t5-preview-bun-router\\ui-project",
+          "timeoutMs": 60000
+        }
+      ],
+      "riskCeiling": "EXECUTE",
+      "expiresAt": 1791437981933,
+      "durationMs": 3600000,
+      "maximumActions": 12,
+      "maximumConcurrency": 3,
+      "admitted": 3,
+      "completed": 3,
+      "failed": 0,
+      "unknown": 0,
+      "remainingActions": 9,
+      "remainingMs": 3328430,
+      "latestAdmission": {
+        "agent_id": "84cdfb04-f100-49d3-aea4-2b17f01ec538",
+        "mission_id": "8e096c3f-7d1f-41b0-a82e-62b92e32b7c4",
+        "task_id": null,
+        "step_id": "c6a1ddb2-61da-4c4d-864b-f22d3e965611",
+        "capability": "terminal.exec",
+        "resource_reference": "ca098e20614240a84f1c164bd6021228013072b80509a79ea3673a091ae32d3e",
+        "attempt_kind": "action",
+        "id": "d9e4d880-17ba-458a-baf6-779951d57802",
+        "envelope_id": "3f70771c-bdb1-4281-9020-78a2cd42c96f",
+        "revision": 2,
+        "host_generation": "b353d42d-c8a7-409d-8f32-5df536e5cf75",
+        "admitted_at": 1791434484970,
+        "finished_at": 1791434485149,
+        "outcome": "COMPLETED"
+      },
+      "pending": [],
+      "limitations": [
+        "Restart requires fresh reviewed consent.",
+        "Model delegation supports tool-free Ollama inference; workspace CLI tools require separate review.",
+        "Terminal delegation supports pure read/assertion Node checks in a read-only snapshot, with no executable imports, subprocesses or network APIs; script edits require new consent.",
+        "Browser and desktop operations require their existing specific approval boundary."
+      ]
+    }
+  },
+  "completedResultPreserved": true,
+  "unapprovedDeletionNotExecuted": true,
+  "privateCredentialsOmitted": true,
+  "developerConsole": "No uncaught errors observed; final desktop/mobile smoke clean"
+}

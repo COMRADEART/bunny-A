@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ma3.agentic.v1",
+  "type": "object",
+  "required": [
+    "id",
+    "policy_version",
+    "agent_id",
+    "mission_id",
+    "project_id",
+    "user_authorization_id",
+    "authorization_provenance",
+    "proposed_at",
+    "approved_at",
+    "expires_at",
+    "permitted_capabilities",
+    "permitted_resource_scopes",
+    "permitted_action_families",
+    "risk_ceiling",
+    "maximum_actions",
+    "maximum_duration",
+    "maximum_concurrency",
+    "budget_constraints",
+    "current_state",
+    "revoked_at",
+    "revision",
+    "integrity_reference",
+    "host_generation",
+    "scope",
+    "plan_reference",
+    "restart_requires_consent",
+    "commands",
+    "browser_origins"
+  ],
+  "properties": {
+    "policy_version": {
+      "const": "ma3.agentic.v1"
+    },
+    "maximum_actions": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "maximum_duration": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 7200000
+    },
+    "maximum_concurrency": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "current_state": {
+      "enum": [
+        "PROPOSED",
+        "WAITING_FOR_USER",
+        "ACTIVE",
+        "PAUSED",
+        "EXPIRED",
+        "REVOKED",
+        "EXHAUSTED",
+        "COMPLETED"
+      ]
+    },
+    "integrity_reference": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "restart_requires_consent": {
+      "const": true
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "command",
+          "executable",
+          "executable_hash",
+          "prefix",
+          "args",
+          "cwd",
+          "script",
+          "script_hash",
+          "timeout_ms",
+          "test_resources",
+          "boundary"
+        ],
+        "properties": {
+          "boundary": {
+            "const": "pure-read-check-v1"
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60000
+          }
+        }
+      }
+    },
+    "permitted_resource_scopes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "root",
+          "identity",
+          "operations"
+        ]
+      }
+    }
+  },
+  "implementationContract": "src/lib/bunny-missions/agentic-types.ts; runtime schema and HMAC in agentic-store.server.ts. This schema is documentary; the canonical Host validation is authoritative."
+}

@@ -1,0 +1,41 @@
+{
+  "classification": "STATIC VERIFIED",
+  "canonicalRiskClasses": [
+    "READ",
+    "WRITE",
+    "EXECUTE",
+    "EXTERNAL_SIDE_EFFECT",
+    "DESTRUCTIVE"
+  ],
+  "conceptualMapping": [
+    [
+      "READ_ONLY",
+      "READ"
+    ],
+    [
+      "LOW_RISK_MUTATION",
+      "WRITE"
+    ],
+    [
+      "BOUNDED_WORKSPACE_MUTATION",
+      "WRITE"
+    ],
+    [
+      "SENSITIVE",
+      "manifest.sensitive / hardApproval"
+    ],
+    [
+      "HIGH_RISK",
+      "EXTERNAL_SIDE_EFFECT or hardApproval"
+    ],
+    [
+      "IRREVERSIBLE",
+      "DESTRUCTIVE"
+    ]
+  ],
+  "delegationCeiling": "EXECUTE",
+  "standingDenyAndReadOnlyRulesWin": true,
+  "unknownRisk": "deny",
+  "separateApproval": "Exact Host-computed request, current revision/generation/fingerprint. Supported filesystem allow_once never widens ongoing consent.",
+  "unsupportedBroadActions": "Remain blocked rather than accepting an unenforceable broad scope"
+}

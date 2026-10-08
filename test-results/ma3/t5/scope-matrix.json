@@ -1,0 +1,80 @@
+{
+  "classification": "STATIC VERIFIED",
+  "categories": [
+    {
+      "concept": "FILESYSTEM_READ",
+      "actual": "filesystem.read/list/exists",
+      "boundary": "Canonical root, root identity, operation; each invocation checked"
+    },
+    {
+      "concept": "FILESYSTEM_WRITE",
+      "actual": "filesystem.write",
+      "boundary": "Declared write step, canonical root; Git metadata excluded"
+    },
+    {
+      "concept": "GIT_READ",
+      "actual": "git.status/diff/log",
+      "boundary": "Exact repo root; helpers/fsmonitor/external diff/textconv disabled; no optional index locks"
+    },
+    {
+      "concept": "GIT_WORKTREE_WRITE",
+      "actual": "git.commit/worktree_add/merge",
+      "boundary": "Separate review; no automatic T5 delegation"
+    },
+    {
+      "concept": "TERMINAL_BOUNDED",
+      "actual": "terminal.exec",
+      "boundary": "Exact Node binary and script hashes/argv/cwd; pure read/assertion grammar; copied regular-file inputs; minimal env; <=60s"
+    },
+    {
+      "concept": "BROWSER_READ",
+      "actual": "browser.* read",
+      "boundary": "No broad T5 grant; existing isolated Browser and origin/SSRF boundary preserved"
+    },
+    {
+      "concept": "BROWSER_MUTATION",
+      "actual": "browser.* mutation",
+      "boundary": "Separate specific boundary"
+    },
+    {
+      "concept": "COMPUTER_READ",
+      "actual": "computer.* read",
+      "boundary": "Existing exact T9 batch may satisfy scope after native identity revalidation"
+    },
+    {
+      "concept": "COMPUTER_ACTION",
+      "actual": "computer.* action",
+      "boundary": "Existing exact T9 batch, shared T5 count, fresh target identity"
+    },
+    {
+      "concept": "APPLICATION_LAUNCH",
+      "actual": "computer.open_app",
+      "boundary": "Existing T9/T9R lifecycle; no general T5 permission"
+    },
+    {
+      "concept": "APPLICATION_INTERACTION",
+      "actual": "computer.* interaction",
+      "boundary": "Existing exact app/target/operation binding"
+    },
+    {
+      "concept": "NETWORK_ACCESS",
+      "actual": "network.fetch/provider inference",
+      "boundary": "Arbitrary network disabled; tool-free inference is finite canonical provider consent"
+    },
+    {
+      "concept": "EXTERNAL_COMMUNICATION",
+      "actual": "mail/messages/connectors",
+      "boundary": "Separate specific boundary"
+    },
+    {
+      "concept": "PUBLISH_OR_DEPLOY",
+      "actual": "git push/npm publish/deploy",
+      "boundary": "Separate specific boundary"
+    },
+    {
+      "concept": "INSTALL_OR_PRIVILEGE",
+      "actual": "npm install/shell/system operations",
+      "boundary": "No T5 delegation"
+    }
+  ]
+}

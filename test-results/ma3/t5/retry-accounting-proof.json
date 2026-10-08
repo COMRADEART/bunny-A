@@ -1,0 +1,33 @@
+{
+  "classification": "SIMULATED",
+  "hostPath": "Actual TaskManager transient-failure recovery and canonical Mission admission",
+  "providerIO": "scripted, no live model service",
+  "runs": [
+    {
+      "maximumActions": 1,
+      "launches": 1,
+      "attempts": [
+        {
+          "kind": "action",
+          "outcome": "FAILED"
+        }
+      ],
+      "taskState": "failed"
+    },
+    {
+      "maximumActions": 2,
+      "launches": 2,
+      "attempts": [
+        {
+          "kind": "action",
+          "outcome": "FAILED"
+        },
+        {
+          "kind": "retry",
+          "outcome": "COMPLETED"
+        }
+      ],
+      "taskState": "completed"
+    }
+  ]
+}

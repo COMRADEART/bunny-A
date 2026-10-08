@@ -1,0 +1,420 @@
+
+> build
+> node scripts/with-app-env.mjs node node_modules/vite/bin/vite.js build && npm run db:migrate
+
+[nitro:vercel] i Using nodejs24.x runtime.
+[nitro:vercel] i Using web entry format.
+vite v8.3.1 building client environment for production...
+transforming...
+✓ 2523 modules transformed.
+rendering chunks...
+computing gzip size...
+.vercel/output/static/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2     10.25 kB
+.vercel/output/static/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2      11.23 kB
+.vercel/output/static/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2       18.74 kB
+.vercel/output/static/assets/inter-greek-wght-normal-CkhJZR-_.woff2          18.99 kB
+.vercel/output/static/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2   25.96 kB
+.vercel/output/static/assets/inter-latin-wght-normal-Dx4kXJAl.woff2          48.25 kB
+.vercel/output/static/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2      85.06 kB
+.vercel/output/static/assets/styles-B69Gkt76.css                            148.56 kB │ gzip:  27.05 kB
+.vercel/output/static/assets/index-B6JiMwhf.js                              430.78 kB │ gzip: 135.16 kB
+.vercel/output/static/assets/routes-B8mBpfsI.js                             603.47 kB │ gzip: 168.43 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 15.07s
+[PLUGIN_TIMINGS] JavaScript callbacks ran for 7.6s of this 15.1s build (51%).
+The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - plugin @tailwindcss/vite:generate:build transform (43%, 6.5s, 1 call)
+Additional callback time came from the callbacks below and from callbacks under 1s.
+2 callbacks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
+  - plugin tanstack-start-core:import-protection resolveId (7271 calls)
+  - plugin tanstack-start-core::server-fn:client transform (15 calls)
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+
+vite v8.3.1 building ssr environment for production...
+transforming...
+✓ 96 modules transformed.
+rendering chunks...
+computing gzip size...
+node_modules/.nitro/vite/services/ssr/assets/inter-vietnamese-wght-normal-CBcvBZtf.woff2     10.25 kB
+node_modules/.nitro/vite/services/ssr/assets/inter-greek-ext-wght-normal-DlzME5K_.woff2      11.23 kB
+node_modules/.nitro/vite/services/ssr/assets/inter-cyrillic-wght-normal-DqGufNeO.woff2       18.74 kB
+node_modules/.nitro/vite/services/ssr/assets/inter-greek-wght-normal-CkhJZR-_.woff2          18.99 kB
+node_modules/.nitro/vite/services/ssr/assets/inter-cyrillic-ext-wght-normal-BOeWTOD4.woff2   25.96 kB
+node_modules/.nitro/vite/services/ssr/assets/inter-latin-wght-normal-Dx4kXJAl.woff2          48.25 kB
+node_modules/.nitro/vite/services/ssr/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2      85.06 kB
+node_modules/.nitro/vite/services/ssr/assets/styles-B69Gkt76.css                            148.56 kB │ gzip: 27.05 kB
+node_modules/.nitro/vite/services/ssr/assets/start-5Z2QO8AU.js                                0.14 kB │ gzip:  0.13 kB
+node_modules/.nitro/vite/services/ssr/assets/empty-plugin-adapters-D9UWiqvJ.js                0.22 kB │ gzip:  0.16 kB
+node_modules/.nitro/vite/services/ssr/assets/_tanstack-start-manifest_v-CSwLiage.js           0.55 kB │ gzip:  0.32 kB
+node_modules/.nitro/vite/services/ssr/assets/host-9d9Gm2Rk.js                                 1.78 kB │ gzip:  0.74 kB
+node_modules/.nitro/vite/services/ssr/assets/host-bridge.server-L6ygOz7P.js                   5.18 kB │ gzip:  2.20 kB
+node_modules/.nitro/vite/services/ssr/assets/presentation-DA3cNsQj.js                        14.66 kB │ gzip:  4.50 kB
+node_modules/.nitro/vite/services/ssr/assets/router-C8UCCmGj.js                              15.30 kB │ gzip:  5.18 kB
+node_modules/.nitro/vite/services/ssr/index.js                                               74.78 kB │ gzip: 19.03 kB
+node_modules/.nitro/vite/services/ssr/assets/routes-DZBMZ_ZF.js                             235.94 kB │ gzip: 53.41 kB
+
+✓ built in 4.37s
+[PLUGIN_TIMINGS] JavaScript callbacks ran for 4.3s of this 4.4s build (98%).
+The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - plugin @tailwindcss/vite:generate:build transform (95%, 4.1s, 1 call)
+Additional callback time came from the callbacks below and from callbacks under 1s.
+2 callbacks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
+  - plugin tanstack-start-core:import-protection resolveId (273 calls)
+  - plugin tanstack-start-core::server-fn:ssr transform (14 calls)
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+
+
+[nitro] o Building [Nitro] (preset: vercel, compatibility: 2026-10-03)
+[nitro] √ Generated public .vercel/output/static
+vite v8.3.1 building nitro environment for production...
+`output.codeSplitting.groups[0].name` is a function. Set `output.codeSplitting.groups[0].debugName` so the bundler timing report can identify this group.
+transforming...
+✓ 2532 modules transformed.
+i Tracing dependencies:
+- tslib (2.8.1)
+√ Traced 1 dependencies (4 files) in 64ms.
+i Ensure your production environment matches the builder OS and architecture (win32-x64) to avoid native module issues.
+rendering chunks...
+computing gzip size...
+.vercel/output/functions/__server.func/_ssr/start-5Z2QO8AU.mjs                              0.14 kB │ gzip:   0.13 kB
+.vercel/output/functions/__server.func/_ssr/empty-plugin-adapters-D9UWiqvJ.mjs              0.23 kB │ gzip:   0.16 kB
+.vercel/output/functions/__server.func/_libs/clsx.mjs                                       0.55 kB │ gzip:   0.31 kB
+.vercel/output/functions/__server.func/_tanstack-start-manifest_v-CSwLiage.mjs              0.60 kB │ gzip:   0.35 kB
+.vercel/output/functions/__server.func/_chunks/ssr-renderer.mjs                             0.96 kB │ gzip:   0.49 kB
+.vercel/output/functions/__server.func/_libs/@radix-ui/react-id+[...].mjs                   0.99 kB │ gzip:   0.52 kB
+.vercel/output/functions/__server.func/_libs/radix-ui__react-focus-guards.mjs               1.54 kB │ gzip:   0.70 kB
+.vercel/output/functions/__server.func/_runtime.mjs                                         1.58 kB │ gzip:   0.74 kB
+.vercel/output/functions/__server.func/_libs/react-is.mjs                                   1.67 kB │ gzip:   0.65 kB
+.vercel/output/functions/__server.func/_ssr/host-9d9Gm2Rk.mjs                               1.71 kB │ gzip:   0.72 kB
+.vercel/output/functions/__server.func/_libs/radix-ui__primitive.mjs                        1.83 kB │ gzip:   0.72 kB
+.vercel/output/functions/__server.func/_libs/zustand.mjs                                    1.91 kB │ gzip:   0.72 kB
+.vercel/output/functions/__server.func/_libs/prop-types.mjs                                 2.27 kB │ gzip:   0.84 kB
+.vercel/output/functions/__server.func/_libs/d3-path.mjs                                    3.25 kB │ gzip:   1.16 kB
+.vercel/output/functions/__server.func/_libs/radix-ui__react-context.mjs                    4.46 kB │ gzip:   1.20 kB
+.vercel/output/functions/__server.func/_libs/d3-interpolate.mjs                             5.03 kB │ gzip:   1.61 kB
+.vercel/output/functions/__server.func/_ssr/host-bridge.server-L6ygOz7P.mjs                 5.12 kB │ gzip:   2.19 kB
+.vercel/output/functions/__server.func/_libs/d3-array.mjs                                   8.06 kB │ gzip:   2.25 kB
+.vercel/output/functions/__server.func/_libs/eventemitter3.mjs                              8.31 kB │ gzip:   2.05 kB
+.vercel/output/functions/__server.func/_libs/radix-ui__react-focus-scope.mjs                8.40 kB │ gzip:   2.49 kB
+.vercel/output/functions/__server.func/_libs/@radix-ui/react-arrow+[...].mjs               10.01 kB │ gzip:   3.00 kB
+.vercel/output/functions/__server.func/_libs/h3-v2+rou3.mjs                                10.17 kB │ gzip:   3.18 kB
+.vercel/output/functions/__server.func/_libs/d3-color.mjs                                  10.38 kB │ gzip:   3.57 kB
+.vercel/output/functions/__server.func/_libs/d3-format.mjs                                 10.56 kB │ gzip:   3.02 kB
+.vercel/output/functions/__server.func/_libs/tanstack__history.mjs                         12.50 kB │ gzip:   3.70 kB
+.vercel/output/functions/__server.func/_libs/@radix-ui/react-dismissable-layer+[...].mjs   13.09 kB │ gzip:   2.87 kB
+.vercel/output/functions/__server.func/_ssr/presentation-DA3cNsQj.mjs                      14.69 kB │ gzip:   4.53 kB
+.vercel/output/functions/__server.func/_ssr/router-C8UCCmGj.mjs                            15.72 kB │ gzip:   5.30 kB
+.vercel/output/functions/__server.func/_libs/fast-equals.mjs                               15.98 kB │ gzip:   4.14 kB
+.vercel/output/functions/__server.func/_libs/h3+rou3+srvx.mjs                              22.57 kB │ gzip:   6.12 kB
+.vercel/output/functions/__server.func/_libs/decimal.js-light.mjs                          23.31 kB │ gzip:   6.89 kB
+.vercel/output/functions/__server.func/_libs/d3-shape.mjs                                  24.60 kB │ gzip:   5.02 kB
+.vercel/output/functions/__server.func/_libs/lucide-react.mjs                              24.99 kB │ gzip:   5.20 kB
+.vercel/output/functions/__server.func/_libs/@floating-ui/dom+[...].mjs                    25.39 kB │ gzip:   6.57 kB
+.vercel/output/functions/__server.func/_libs/@floating-ui/core+[...].mjs                   25.56 kB │ gzip:   6.32 kB
+.vercel/output/functions/__server.func/_libs/@tanstack/router-core+[...].mjs               29.60 kB │ gzip:   7.98 kB
+.vercel/output/functions/__server.func/index.mjs                                           32.51 kB │ gzip:  10.03 kB
+.vercel/output/functions/__server.func/_libs/@floating-ui/react-dom+[...].mjs              32.62 kB │ gzip:   8.23 kB
+.vercel/output/functions/__server.func/_libs/react-smooth.mjs                              37.85 kB │ gzip:   8.15 kB
+.vercel/output/functions/__server.func/_libs/d3-scale+[...].mjs                            58.23 kB │ gzip:  12.12 kB
+.vercel/output/functions/__server.func/_libs/@radix-ui/react-popover+[...].mjs             61.83 kB │ gzip:  15.36 kB
+.vercel/output/functions/__server.func/_ssr/ssr.mjs                                        73.18 kB │ gzip:  19.01 kB
+.vercel/output/functions/__server.func/_libs/lodash.mjs                                   161.64 kB │ gzip:  29.40 kB
+.vercel/output/functions/__server.func/_libs/zod.mjs                                      167.56 kB │ gzip:  37.36 kB
+.vercel/output/functions/__server.func/_ssr/routes-DZBMZ_ZF.mjs                           269.44 kB │ gzip:  54.52 kB
+.vercel/output/functions/__server.func/_libs/recharts+[...].mjs                           499.46 kB │ gzip:  94.01 kB
+.vercel/output/functions/__server.func/_libs/@tanstack/react-router+[...].mjs             787.10 kB │ gzip: 165.19 kB
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/index.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/index.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/RouterProvider.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/RouterProvider.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/CatchBoundary.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/CatchBoundary.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/utils.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/utils.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/ClientOnly.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/ClientOnly.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/useNavigate.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/useNavigate.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/useRouter.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/useRouter.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/useBlocker.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/useBlocker.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/useLocation.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/useLocation.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/useMatch.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/useMatch.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/useRouterState.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/useRouterState.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/Asset.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/Asset.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/Matches.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/Matches.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/HeadContent.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/HeadContent.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/Match.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/Match.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/routerContext.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/routerContext.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/nonRouteComponentContext.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/nonRouteComponentContext.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/link.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/link.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/matchContext.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/matchContext.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@tanstack/react-router/dist/esm/Transitioner.js" may not be preserved when bundling.
+   ╭─[ node_modules/@tanstack/react-router/dist/esm/Transitioner.js:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@radix-ui/react-popover/dist/index.mjs" may not be preserved when bundling.
+   ╭─[ node_modules/@radix-ui/react-popover/dist/index.mjs:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@radix-ui/react-focus-guards/dist/index.mjs" may not be preserved when bundling.
+   ╭─[ node_modules/@radix-ui/react-focus-guards/dist/index.mjs:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@radix-ui/react-presence/dist/index.mjs" may not be preserved when bundling.
+   ╭─[ node_modules/@radix-ui/react-presence/dist/index.mjs:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@radix-ui/react-portal/dist/index.mjs" may not be preserved when bundling.
+   ╭─[ node_modules/@radix-ui/react-portal/dist/index.mjs:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@radix-ui/react-dismissable-layer/dist/index.mjs" may not be preserved when bundling.
+   ╭─[ node_modules/@radix-ui/react-dismissable-layer/dist/index.mjs:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@radix-ui/react-focus-scope/dist/index.mjs" may not be preserved when bundling.
+   ╭─[ node_modules/@radix-ui/react-focus-scope/dist/index.mjs:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "node_modules/@radix-ui/react-popper/dist/index.mjs" may not be preserved when bundling.
+   ╭─[ node_modules/@radix-ui/react-popper/dist/index.mjs:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────  
+   │       ╰──────── module level directive may not be preserved
+   │ 
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+✓ built in 3.10s
+[PLUGIN_TIMINGS] JavaScript callbacks ran for 2.6s of this 3.1s build (83%).
+The slowest callbacks, timed inside each callback (the wait before a callback starts is excluded, the time it awaits is included):
+  - plugin nitro:externals buildEnd (76%, 2.3s, 1 call)
+Additional callback time came from the callbacks below and from callbacks under 1s.
+2 callbacks are listed without a time. Their calls overlapped, so the time inside one call includes work from other calls. To find their cost, profile the build with `node --cpu-prof`:
+  - plugin nitro:virtual-deps resolveId (29 calls)
+  - plugin nitro:externals resolveId (7 calls)
+See https://rolldown.rs/reference/InputOptions.checks#bundlertimings for more details.
+
+i Generated .vercel/output/nitro.json
+
+[nitro] √ You can preview this build using npx vite preview
+[nitro] √ You can deploy this build using npx nitro deploy --prebuilt
+
+> db:migrate
+> node scripts/migrate.mjs
+
+[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).
