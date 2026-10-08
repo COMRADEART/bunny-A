@@ -1,0 +1,359 @@
+{
+  "classification": "STATIC VERIFIED + DISPOSABLE LIVE VERIFIED",
+  "soleAuthority": "Existing Host authorization / T5 store / atomic Capability Bus admission",
+  "coveredActionList": "Exact per-step and independent verification operation digests",
+  "neverGrantedBy": "Model choice, prompt, browser content, checkpoint, native identity or session reference",
+  "boundaries": [
+    {
+      "id": "X03",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Root escape rejected.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "Cross-app operation differs from the exact reviewed Mission step or postcondition.",
+        "risk": "WRITE"
+      },
+      "evidence": [
+        "security/X03.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X04",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Junction/symlink escape rejected.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "Filesystem resource or operation exceeds approved roots.",
+        "risk": "WRITE"
+      },
+      "evidence": [
+        "security/X04.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X05",
+      "initialState": "Bounded disposable integrated Mission with explicit reviewed T5 consent",
+      "action": "Private Bunny state inaccessible.",
+      "expectedResult": "The stated bounded operation succeeds or the stated forbidden operation is refused before effect",
+      "actualResult": "Fixed Host-private roots include browser state and execution snapshots",
+      "evidence": [
+        "security/X05.json"
+      ],
+      "classification": "STATIC VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X07",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Git worktree/repository scope respected.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "Action is outside the explicitly approved Agent capability list.",
+        "risk": "READ"
+      },
+      "evidence": [
+        "security/X07.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X08",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Git push refused without separate approval.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "deny",
+        "reason": "Unknown capability action git.push.",
+        "risk": "READ"
+      },
+      "evidence": [
+        "security/X08.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X11",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Model-generated arbitrary command rejected.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "Cross-app operation differs from the exact reviewed Mission step or postcondition.",
+        "risk": "EXECUTE"
+      },
+      "evidence": [
+        "security/X11.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X12",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Modified approved script requires revalidation.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "Terminal executable, exact arguments, script identity, cwd or execution limit exceeds consent.",
+        "risk": "EXECUTE"
+      },
+      "evidence": [
+        "security/X12.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X19",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Browser content cannot grant permissions.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "Sensitive/high-risk actions require a separate specific authorization.",
+        "risk": "EXTERNAL_SIDE_EFFECT"
+      },
+      "evidence": [
+        "security/X19.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X20",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Browser mutation without scope rejected.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "This read-only Task/step has no mutation authority.",
+        "risk": "WRITE"
+      },
+      "evidence": [
+        "security/X20.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X23",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Wrong application target rejected.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "Cross-app operation differs from the exact reviewed Mission step or postcondition.",
+        "risk": "EXECUTE"
+      },
+      "evidence": [
+        "security/X23.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X29",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Out-of-scope application requires fresh approval.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "Cross-app operation differs from the exact reviewed Mission step or postcondition.",
+        "risk": "READ"
+      },
+      "evidence": [
+        "security/X29.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X30",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Model reroute preserves exact authorization.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": "Actual TaskManager/retarget preserves the envelope; provider transport is controlled.",
+      "evidence": [
+        "regression-final.log",
+        "T5 A07/A23/A39/A44: actual retarget and launch cannot enlarge Mission authority (provider I/O simulated)",
+        "security/X30.json"
+      ],
+      "classification": "SIMULATED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X31",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Specialized local model cannot expand capability authority.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "Cross-app operation differs from the exact reviewed Mission step or postcondition.",
+        "risk": "WRITE"
+      },
+      "evidence": [
+        "security/X31.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X32",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Stop prevents later cross-app admission.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "deny",
+        "reason": "Execution was cancelled by Bunny-A.",
+        "risk": "READ"
+      },
+      "evidence": [
+        "security/X32.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X33",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Revoke prevents later admission.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "ask",
+        "reason": "No current generation of active user-delegated authority.",
+        "risk": "READ"
+      },
+      "evidence": [
+        "security/X33.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X34",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Concurrent last-budget race admits at most one action.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": [
+        {
+          "decision": "allow",
+          "reason": "Inside mission authorization 9dbf2f02-9b97-41b1-bd33-9af3d5f69491.",
+          "risk": "READ"
+        },
+        {
+          "decision": "ask",
+          "reason": "No current generation of active user-delegated authority.",
+          "risk": "READ"
+        }
+      ],
+      "evidence": [
+        "security/X34.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X36",
+      "initialState": "Bounded disposable integrated Mission with explicit reviewed T5 consent",
+      "action": "Old transient grants remain invalid after restart.",
+      "expectedResult": "The stated bounded operation succeeds or the stated forbidden operation is refused before effect",
+      "actualResult": "Historical envelope is WAITING_FOR_USER in fresh generation; continuation needs revised consent.",
+      "evidence": [
+        "restart-recovery.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X47",
+      "initialState": "Existing disposable regression harness; unchanged test assertions",
+      "action": "Remote/revoked client cannot expand execution scope.",
+      "expectedResult": "The stated bounded operation succeeds or the stated forbidden operation is refused before effect",
+      "actualResult": "Actual HTTP revoked device cannot admit actions; remote proposed/adjusted authority remains Host-owned.",
+      "evidence": [
+        "regression-final.log",
+        "T5 DISPOSABLE LIVE VERIFIED: fresh Host process/SQLite, revoked device, old approval, reviewed restart"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X48",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Two concurrent unrelated Missions retain separate authority.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "deny",
+        "reason": "Authorization belongs to a different Mission; it cannot authorize this request.",
+        "risk": "READ"
+      },
+      "evidence": [
+        "security/X48.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X49",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Unknown capability fails closed.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "deny",
+        "reason": "Unknown capability action unknown.execute.",
+        "risk": "READ"
+      },
+      "evidence": [
+        "security/X49.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    },
+    {
+      "id": "X51",
+      "initialState": "Fresh disposable SQLite Host, active reviewed exact-step consent",
+      "action": "Application capability removal causes clear refusal.",
+      "expectedResult": "Assertions pass at canonical Host boundaries",
+      "actualResult": {
+        "decision": "deny",
+        "reason": "Unknown capability action computer.open_app.",
+        "risk": "READ"
+      },
+      "evidence": [
+        "security/X51.json"
+      ],
+      "classification": "DISPOSABLE LIVE VERIFIED",
+      "status": "PASS",
+      "limitations": null
+    }
+  ]
+}

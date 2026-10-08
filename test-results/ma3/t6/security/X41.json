@@ -1,0 +1,46 @@
+{
+  "classification": "DISPOSABLE LIVE VERIFIED",
+  "initialState": "Two actual fixture processes; only one belongs to the stopped Task",
+  "action": "TaskManager Stop via native ownership",
+  "expectedResult": "Owned process stops; unrelated sentinel survives",
+  "actualResult": {
+    "recordedAt": "2026-10-08T15:26:29.215Z",
+    "mode": "positive",
+    "runtime": "file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/",
+    "classification": "DISPOSABLE LIVE",
+    "trace": [
+      "inspect-1",
+      "session.stop",
+      "inspect-2",
+      "inspect-3"
+    ],
+    "readCount": 3,
+    "before": {
+      "pid": 17296,
+      "ppid": 28472,
+      "name": "node.exe",
+      "createdAt": 1791473188149
+    },
+    "destructiveCalls": [
+      {
+        "pid": 17296,
+        "ppid": 28472,
+        "name": "node.exe",
+        "createdAt": 1791473188149
+      }
+    ],
+    "sentinel": {
+      "pid": 27396,
+      "alive": true
+    },
+    "cleanup": {
+      "status": "complete",
+      "inspectedAt": 1791473189175,
+      "unresolvedProcessCount": 0,
+      "terminationFailures": 0
+    },
+    "detail": "User stopped the selected task. Verified 1 recorded process lifetime(s) ended; none remain (node.exe 17296).",
+    "realTaskManagerStop": true,
+    "actualOsPidReuse": false
+  }
+}

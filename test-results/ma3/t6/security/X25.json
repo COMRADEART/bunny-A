@@ -1,0 +1,28 @@
+{
+  "classification": "SIMULATED",
+  "initialState": "Injected native automation response with a foreign foreground; actual Computer adapter and failure classifier",
+  "action": "Request Calculator focus",
+  "expectedResult": "False foreground cannot report success; no typing/mutation is dispatched",
+  "actualResult": {
+    "result": {
+      "ok": false,
+      "status": "failed",
+      "summary": "Focus requested; foreground is \"Controlled foreign foreground\".",
+      "output": {
+        "focused": false,
+        "after": "Controlled foreign foreground",
+        "target": {
+          "name": "Calculator"
+        }
+      },
+      "evidence": [
+        "computer.focus_window via UI Automation at 2026-10-08T15:26:27.971Z"
+      ],
+      "after": "Controlled foreign foreground",
+      "errorCategory": "capability_failed"
+    },
+    "mutations": 0,
+    "category": "FOCUS_DENIED"
+  },
+  "limitation": "Controlled native failure response; real foreground-denied Windows transition was not forced"
+}

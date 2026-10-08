@@ -1,0 +1,96 @@
+{
+  "classification": "STATIC VERIFIED + DISPOSABLE LIVE VERIFIED + SIMULATED",
+  "contracts": [
+    {
+      "action": "filesystem.read",
+      "authorizationCategory": "filesystem",
+      "resourceScope": "Canonical approved root and current identity",
+      "sideEffect": "READ",
+      "verification": "Independent current disk observation/hash",
+      "cancellation": "Abort before the next bounded operation; retain completed evidence",
+      "replay": "SAFE_TO_REPLAY"
+    },
+    {
+      "action": "filesystem.write",
+      "authorizationCategory": "filesystem",
+      "resourceScope": "Canonical approved root and current identity",
+      "sideEffect": "WRITE",
+      "verification": "Independent file hash/content check with before/after evidence",
+      "cancellation": "Abort before the next bounded operation; retain completed evidence",
+      "replay": "VERIFY_BEFORE_REPLAY"
+    },
+    {
+      "action": "terminal.exec",
+      "authorizationCategory": "terminal",
+      "resourceScope": "Canonical approved root and current identity",
+      "sideEffect": "EXECUTE",
+      "verification": "Genuine owned-process exit and reviewed output assertion",
+      "cancellation": "Owned process group only; bounded timeout; no stale PID cleanup",
+      "replay": "NOT_REPLAYABLE"
+    },
+    {
+      "action": "browser.navigate",
+      "authorizationCategory": "browser",
+      "resourceScope": "Exact approved origin and Mission-owned session",
+      "sideEffect": "READ",
+      "verification": "Independent DOM/navigation observation in the same origin-bound session",
+      "cancellation": "Abort before the next bounded operation; retain completed evidence",
+      "replay": "SAFE_TO_REPLAY"
+    },
+    {
+      "action": "computer.open_app",
+      "authorizationCategory": "computer",
+      "resourceScope": "Verified Calculator package and current native lifetime",
+      "sideEffect": "EXECUTE",
+      "verification": "Fresh native identity and package observation; T9R acquisition/reuse ledger",
+      "cancellation": "Abort before the next bounded operation; retain completed evidence",
+      "replay": "VERIFY_BEFORE_REPLAY"
+    },
+    {
+      "action": "computer.invoke_control",
+      "authorizationCategory": "computer",
+      "resourceScope": "Verified Calculator package and current native lifetime",
+      "sideEffect": "EXECUTE",
+      "verification": "Fresh UIA postcondition; target/focus uncertainty stops execution",
+      "cancellation": "Abort before the next bounded operation; retain completed evidence",
+      "replay": "UNKNOWN"
+    }
+  ],
+  "liveRestart": "restart-recovery.json",
+  "ambiguousEffectProbe": {
+    "classification": "SIMULATED",
+    "initialState": {
+      "stepId": "step",
+      "scope": "read",
+      "attempt": {
+        "taskId": null,
+        "outcome": "interrupted"
+      },
+      "task": null,
+      "verify": {
+        "hasSpec": true,
+        "recorded": false,
+        "passed": null
+      },
+      "checkpoint": {
+        "valid": true,
+        "boundary": "before_capability_admission"
+      },
+      "attemptsUsed": 1,
+      "maxAttempts": 2,
+      "capability": {
+        "replay": "UNKNOWN",
+        "status": "interrupted",
+        "hasOutput": false
+      }
+    },
+    "actualResult": {
+      "safety": "UNKNOWN",
+      "action": "ask_user",
+      "category": "RECOVERY_AMBIGUOUS",
+      "reason": "An admitted cross-app effect lacks verified completion; it cannot replay automatically."
+    }
+  },
+  "targetRevalidationEvidence": "calculator-targets.test.ts (SIMULATED native responses)",
+  "automaticReplayOfUnknownEffects": false
+}

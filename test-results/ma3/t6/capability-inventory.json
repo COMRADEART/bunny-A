@@ -1,0 +1,2270 @@
+{
+  "classification": "STATIC VERIFIED",
+  "stage": "accepted T5 executable source; no T6 implementation yet",
+  "source": "1be6bc0b6e24989fe26b069e7bcc09808079776a",
+  "capabilities": [
+    {
+      "id": "filesystem",
+      "version": "1.0.0",
+      "description": "Read, list and write files inside approved project roots and Host-owned mission workspaces.",
+      "locality": "local",
+      "platforms": "any",
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "local_compute",
+        "note": "Local disk I/O; no model tokens."
+      },
+      "adapter": "node:fs",
+      "actions": [
+        {
+          "id": "filesystem.read",
+          "description": "Read a UTF-8 text file (up to 1 MB).",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "File path, relative to the step's working folder."
+            }
+          ],
+          "outputs": "{ path, bytes, text, sha256 }",
+          "evidence": "Absolute path and byte count read from disk.",
+          "timeoutMs": 10000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.list",
+          "description": "List a folder (up to 500 entries).",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": false,
+              "description": "Folder path; defaults to the working folder."
+            }
+          ],
+          "outputs": "{ path, entries: { name, kind, bytes }[] }",
+          "evidence": "Folder path and entry count.",
+          "timeoutMs": 10000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.exists",
+          "description": "Check whether a path exists.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Path to check."
+            }
+          ],
+          "outputs": "{ path, exists, kind }",
+          "evidence": "Path checked on disk.",
+          "timeoutMs": 5000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.write",
+          "description": "Write a UTF-8 text file atomically (temporary file + rename).",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "File path."
+            },
+            {
+              "name": "content",
+              "type": "string",
+              "required": true,
+              "description": "Full file contents."
+            },
+            {
+              "name": "overwrite",
+              "type": "boolean",
+              "required": false,
+              "description": "Allow replacing an existing file (default false)."
+            }
+          ],
+          "outputs": "{ path, bytes, created }",
+          "evidence": "Path and bytes written, read back from disk.",
+          "timeoutMs": 10000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.delete",
+          "description": "Delete one file (never a folder).",
+          "risk": "DESTRUCTIVE",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "File to delete."
+            }
+          ],
+          "outputs": "{ path, deleted }",
+          "evidence": "Path no longer exists on disk.",
+          "timeoutMs": 5000,
+          "implemented": true
+        }
+      ],
+      "limitations": [
+        "Root/junction and private Host state checks already enforced."
+      ]
+    },
+    {
+      "id": "git",
+      "version": "1.0.0",
+      "description": "Git status, diff, log, commit, isolated worktrees and merge through the local git executable.",
+      "locality": "local",
+      "platforms": "any",
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "local_compute",
+        "note": "Local git; no network (push is not offered)."
+      },
+      "adapter": "git CLI (no shell)",
+      "actions": [
+        {
+          "id": "git.status",
+          "description": "Branch and porcelain status.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            }
+          ],
+          "outputs": "{ branch, changes: string[], clean }",
+          "evidence": "git status --porcelain=v1 -b output.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "git.diff",
+          "description": "Diff stat and patch (working tree vs HEAD, or against a ref).",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "against",
+              "type": "string",
+              "required": false,
+              "description": "Ref to compare with."
+            }
+          ],
+          "outputs": "{ stat, patch, empty }",
+          "evidence": "Patch stored as an artifact with its SHA-256.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "git.log",
+          "description": "Recent commits (one line each).",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "How many (max 100)."
+            }
+          ],
+          "outputs": "{ commits: string[] }",
+          "evidence": "git log --oneline output.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "git.commit",
+          "description": "Stage all changes in the folder and commit with a message.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "required": true,
+              "description": "Commit message."
+            }
+          ],
+          "outputs": "{ commit }",
+          "evidence": "New HEAD commit id.",
+          "timeoutMs": 60000,
+          "implemented": true
+        },
+        {
+          "id": "git.worktree_add",
+          "description": "Create an isolated worktree on a new bunny/* branch under the Host data folder.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "description": "Short worktree name."
+            }
+          ],
+          "outputs": "{ path, branch, base }",
+          "evidence": "Worktree path and branch.",
+          "timeoutMs": 60000,
+          "implemented": true
+        },
+        {
+          "id": "git.worktree_remove",
+          "description": "Remove a clean Bunny-owned worktree (never one outside the Host data folder).",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Main repository folder."
+            },
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Worktree path."
+            }
+          ],
+          "outputs": "{ removed }",
+          "evidence": "Worktree no longer listed.",
+          "timeoutMs": 60000,
+          "implemented": true
+        },
+        {
+          "id": "git.merge",
+          "description": "Merge a bunny/* branch into the current branch (--no-ff; aborts cleanly on conflict).",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "branch",
+              "type": "string",
+              "required": true,
+              "description": "bunny/* branch to merge."
+            }
+          ],
+          "outputs": "{ merged, conflict, head }",
+          "evidence": "Resulting HEAD or conflict files.",
+          "timeoutMs": 120000,
+          "implemented": true
+        }
+      ],
+      "limitations": [
+        "Agent delegation permits status/diff/log; broad project scripts and Git mutations unsupported."
+      ]
+    },
+    {
+      "id": "terminal",
+      "version": "1.0.0",
+      "description": "Run one executable with an argument list (no shell) inside an approved folder.",
+      "locality": "local",
+      "platforms": "any",
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "local_compute",
+        "note": "Local CPU only; no model tokens."
+      },
+      "adapter": "node:child_process (shell: false)",
+      "actions": [
+        {
+          "id": "terminal.exec",
+          "description": "Run `command args…` without a shell. npm/npx run through this Node's npm CLI; .cmd/.bat/.ps1 scripts are refused.",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "command",
+              "type": "string",
+              "required": true,
+              "description": "Executable name (node, npm, git, python, …)."
+            },
+            {
+              "name": "args",
+              "type": "string[]",
+              "required": false,
+              "description": "Argument list."
+            },
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Working folder inside the approved roots."
+            },
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "required": false,
+              "description": "Timeout (ms)."
+            }
+          ],
+          "outputs": "{ command, args, cwd, exitCode, stdout, stderr, durationMs, timedOut }",
+          "evidence": "Exact argv, folder, exit code and output tail.",
+          "timeoutMs": 900000,
+          "implemented": true
+        }
+      ],
+      "limitations": [
+        "Agent delegation permits exact immutable pure-read Node checks only."
+      ]
+    },
+    {
+      "id": "browser",
+      "version": "1.0.0",
+      "description": "Isolated Bunny-owned browser profile for research and web tasks (Playwright over installed Chromium/Chrome/Edge).",
+      "locality": "local",
+      "platforms": "any",
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "network",
+        "note": "Local browser process; network traffic to visited sites; no model tokens."
+      },
+      "adapter": "playwright persistent context (Bunny profile)",
+      "actions": [
+        {
+          "id": "browser.navigate",
+          "description": "Open a public http(s) URL in a Bunny tab.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "url",
+              "type": "string",
+              "required": true,
+              "description": "Public URL."
+            },
+            {
+              "name": "tabId",
+              "type": "string",
+              "required": false,
+              "description": "Existing tab."
+            }
+          ],
+          "outputs": "{ tabId, url, title, status }",
+          "evidence": "Final URL, title and HTTP status.",
+          "timeoutMs": 45000,
+          "implemented": true
+        },
+        {
+          "id": "browser.search",
+          "description": "Search the web (DuckDuckGo HTML) and return result links.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "query",
+              "type": "string",
+              "required": true,
+              "description": "Search query."
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "Max results (10)."
+            }
+          ],
+          "outputs": "{ query, results: { title, url }[] }",
+          "evidence": "Search URL, retrieval time and result list (research note artifact).",
+          "timeoutMs": 45000,
+          "implemented": true
+        },
+        {
+          "id": "browser.read",
+          "description": "Read the current page's visible text (bounded) with URL/title evidence.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "tabId",
+              "type": "string",
+              "required": false,
+              "description": "Tab."
+            },
+            {
+              "name": "maxChars",
+              "type": "number",
+              "required": false,
+              "description": "Text limit (20,000)."
+            }
+          ],
+          "outputs": "{ url, title, retrievedAt, text, headings }",
+          "evidence": "browser_evidence artifact: URL, title, retrieval time, text excerpt.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "browser.extract",
+          "description": "Extract text or an attribute from elements matching a CSS selector.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "selector",
+              "type": "string",
+              "required": true,
+              "description": "CSS selector."
+            },
+            {
+              "name": "attribute",
+              "type": "string",
+              "required": false,
+              "description": "Attribute instead of text."
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "Max items (100)."
+            }
+          ],
+          "outputs": "{ items: string[] }",
+          "evidence": "Selector, URL and item count.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "browser.metadata",
+          "description": "Page title, canonical URL, description and Open Graph metadata.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "tabId",
+              "type": "string",
+              "required": false,
+              "description": "Tab."
+            }
+          ],
+          "outputs": "{ url, title, meta }",
+          "evidence": "URL and metadata.",
+          "timeoutMs": 15000,
+          "implemented": true
+        },
+        {
+          "id": "browser.click",
+          "description": "Click an element found by role+name, label, text or CSS selector.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "role",
+              "type": "string",
+              "required": false,
+              "description": "ARIA role."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false,
+              "description": "Accessible name."
+            },
+            {
+              "name": "text",
+              "type": "string",
+              "required": false,
+              "description": "Visible text."
+            },
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "description": "CSS selector."
+            }
+          ],
+          "outputs": "{ url, title }",
+          "evidence": "Locator used and URL after the click.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "browser.type",
+          "description": "Fill a form field found by label, placeholder or selector; optional Enter.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "label",
+              "type": "string",
+              "required": false,
+              "description": "Field label."
+            },
+            {
+              "name": "placeholder",
+              "type": "string",
+              "required": false,
+              "description": "Placeholder."
+            },
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "description": "CSS selector."
+            },
+            {
+              "name": "text",
+              "type": "string",
+              "required": true,
+              "description": "Text to enter."
+            },
+            {
+              "name": "submit",
+              "type": "boolean",
+              "required": false,
+              "description": "Press Enter afterwards."
+            }
+          ],
+          "outputs": "{ url }",
+          "evidence": "Locator used (typed text is not logged).",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "browser.wait",
+          "description": "Wait for a selector, text or load state.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "description": "CSS selector."
+            },
+            {
+              "name": "text",
+              "type": "string",
+              "required": false,
+              "description": "Visible text."
+            },
+            {
+              "name": "state",
+              "type": "string",
+              "required": false,
+              "description": "load | domcontentloaded | networkidle."
+            }
+          ],
+          "outputs": "{ url }",
+          "evidence": "Condition met before the timeout.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "browser.screenshot",
+          "description": "Screenshot the current tab into the mission's artifacts.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "fullPage",
+              "type": "boolean",
+              "required": false,
+              "description": "Whole page."
+            }
+          ],
+          "outputs": "{ path, url }",
+          "evidence": "PNG artifact with SHA-256.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "browser.download",
+          "description": "Download a public URL (or the file a click starts) into the Host artifacts folder.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "url",
+              "type": "string",
+              "required": false,
+              "description": "File URL."
+            },
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "description": "Element whose click starts the download."
+            }
+          ],
+          "outputs": "{ path, filename, url }",
+          "evidence": "Downloaded file artifact with SHA-256.",
+          "timeoutMs": 120000,
+          "implemented": true
+        },
+        {
+          "id": "browser.tabs",
+          "description": "List, open or close Bunny tabs.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "op",
+              "type": "string",
+              "required": true,
+              "description": "list | new | close."
+            },
+            {
+              "name": "tabId",
+              "type": "string",
+              "required": false,
+              "description": "Tab to close."
+            }
+          ],
+          "outputs": "{ tabs: { id, url, title }[] }",
+          "evidence": "Tab list.",
+          "timeoutMs": 15000,
+          "implemented": true
+        }
+      ],
+      "limitations": [
+        "Shared Bunny-owned profile, no Mission origin/session binding in T5 delegation."
+      ]
+    },
+    {
+      "id": "computer",
+      "version": "1.0.0",
+      "description": "Windows desktop control through UI Automation and user32 (semantic controls, no coordinates).",
+      "locality": "local",
+      "platforms": [
+        "win32"
+      ],
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "local_compute",
+        "note": "Local PowerShell/UI Automation; no model tokens."
+      },
+      "adapter": "powershell.exe + System.Windows.Automation",
+      "actions": [
+        {
+          "id": "computer.list_windows",
+          "description": "List top-level windows (pid, process, title, foreground).",
+          "risk": "READ",
+          "inputs": [],
+          "outputs": "{ windows, foreground }",
+          "evidence": "Window list at the time of the call.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "computer.read_controls",
+          "description": "Semantic control tree of one window (name, type, automation id).",
+          "risk": "READ",
+          "sensitive": true,
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Window title contains."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Process id."
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "Max controls (150)."
+            }
+          ],
+          "outputs": "{ window, controls }",
+          "evidence": "Window identity and control count.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "computer.focus_window",
+          "description": "Bring a window to the foreground.",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Window title contains."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Process id."
+            }
+          ],
+          "outputs": "{ before, after, focused }",
+          "evidence": "Foreground window before and after.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "computer.invoke_control",
+          "description": "Invoke/toggle/select/expand a named control via UI Automation.",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Window title contains."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Process id."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false,
+              "description": "Control name."
+            },
+            {
+              "name": "automationId",
+              "type": "string",
+              "required": false,
+              "description": "Automation id."
+            }
+          ],
+          "outputs": "{ control, windowPid, pattern }",
+          "evidence": "Control identity, the matched top-level window's owning pid and the pattern used.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "computer.type",
+          "description": "Set the value of an editable control via the UI Automation ValuePattern (not keystrokes).",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Window title contains."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Process id."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false,
+              "description": "Control name."
+            },
+            {
+              "name": "automationId",
+              "type": "string",
+              "required": false,
+              "description": "Automation id."
+            },
+            {
+              "name": "text",
+              "type": "string",
+              "required": true,
+              "description": "Value to set."
+            }
+          ],
+          "outputs": "{ control, windowPid, matches }",
+          "evidence": "The matched top-level window's owning pid, value length before/after and whether it matches.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "computer.capture",
+          "description": "Capture the whole virtual screen to a PNG artifact.",
+          "risk": "READ",
+          "sensitive": true,
+          "inputs": [],
+          "outputs": "{ path, width, height }",
+          "evidence": "PNG artifact with SHA-256.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "computer.open_app",
+          "description": "Start an allowlisted application (notepad, calculator, paint, explorer, terminal), optionally on a non-executable file inside an approved root.",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "app",
+              "type": "string",
+              "required": true,
+              "description": "Allowlisted app name."
+            },
+            {
+              "name": "target",
+              "type": "string",
+              "required": false,
+              "description": "File or folder inside an approved root."
+            }
+          ],
+          "outputs": "{ pid, newWindows }",
+          "evidence": "Started process id and new window count.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "computer.read_calculator",
+          "description": "Read only the arithmetic result of the verified Microsoft Calculator application.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Calculator window."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Window owner."
+            }
+          ],
+          "outputs": "{ windowPid, result }",
+          "evidence": "Verified Calculator result, no other controls.",
+          "timeoutMs": 30000,
+          "implemented": true
+        }
+      ],
+      "limitations": [
+        "Specific T9/T9R Calculator approval; broad Agent desktop grant unsupported."
+      ]
+    }
+  ],
+  "missingBoundaries": [
+    "Cross-app exact-operation consent derived from canonical plan",
+    "Per-Mission origin-bound browser state",
+    "Canonical artifact input references and verified postconditions",
+    "Capability replay facts and correlated safe Agent UI activity"
+  ],
+  "finalSource": "b3ae2f52aa5b62cd8bbbcca1c9fd37c45c61bd7f",
+  "finalCapabilities": [
+    {
+      "id": "filesystem",
+      "version": "1.0.0",
+      "description": "Read, list and write files inside approved project roots and Host-owned mission workspaces.",
+      "locality": "local",
+      "platforms": "any",
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "local_compute",
+        "note": "Local disk I/O; no model tokens."
+      },
+      "adapter": "node:fs",
+      "actions": [
+        {
+          "id": "filesystem.read",
+          "description": "Read a UTF-8 text file (up to 1 MB).",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "File path, relative to the step's working folder."
+            }
+          ],
+          "outputs": "{ path, bytes, text, sha256 }",
+          "evidence": "Absolute path and byte count read from disk.",
+          "timeoutMs": 10000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.list",
+          "description": "List a folder (up to 500 entries).",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": false,
+              "description": "Folder path; defaults to the working folder."
+            }
+          ],
+          "outputs": "{ path, entries: { name, kind, bytes }[] }",
+          "evidence": "Folder path and entry count.",
+          "timeoutMs": 10000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.exists",
+          "description": "Check whether a path exists.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Path to check."
+            }
+          ],
+          "outputs": "{ path, exists, kind }",
+          "evidence": "Path checked on disk.",
+          "timeoutMs": 5000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.write",
+          "description": "Write a UTF-8 text file atomically (temporary file + rename).",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "File path."
+            },
+            {
+              "name": "content",
+              "type": "string",
+              "required": true,
+              "description": "Full file contents."
+            },
+            {
+              "name": "overwrite",
+              "type": "boolean",
+              "required": false,
+              "description": "Allow replacing an existing file (default false)."
+            }
+          ],
+          "outputs": "{ path, bytes, created }",
+          "evidence": "Path and bytes written, read back from disk.",
+          "timeoutMs": 10000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.delete",
+          "description": "Delete one file (never a folder).",
+          "risk": "DESTRUCTIVE",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "File to delete."
+            }
+          ],
+          "outputs": "{ path, deleted }",
+          "evidence": "Path no longer exists on disk.",
+          "timeoutMs": 5000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.hash",
+          "description": "Bounded scoped file hash.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Approved file or search folder."
+            },
+            {
+              "name": "expectedSha256",
+              "type": "string",
+              "required": false,
+              "description": "Optional expected SHA-256."
+            }
+          ],
+          "outputs": "Bounded current disk facts.",
+          "evidence": "Current resource identity and disk observation.",
+          "timeoutMs": 10000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.metadata",
+          "description": "Bounded scoped file metadata.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Approved file or search folder."
+            }
+          ],
+          "outputs": "Bounded current disk facts.",
+          "evidence": "Current resource identity and disk observation.",
+          "timeoutMs": 10000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.compare",
+          "description": "Bounded scoped file compare.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Approved file or search folder."
+            },
+            {
+              "name": "content",
+              "type": "string",
+              "required": true,
+              "description": "Expected exact UTF-8 text."
+            }
+          ],
+          "outputs": "Bounded current disk facts.",
+          "evidence": "Current resource identity and disk observation.",
+          "timeoutMs": 10000,
+          "implemented": true
+        },
+        {
+          "id": "filesystem.search",
+          "description": "Bounded scoped file search.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Approved file or search folder."
+            },
+            {
+              "name": "query",
+              "type": "string",
+              "required": true,
+              "description": "Literal text to find."
+            }
+          ],
+          "outputs": "Bounded current disk facts.",
+          "evidence": "Current resource identity and disk observation.",
+          "timeoutMs": 10000,
+          "implemented": true
+        }
+      ]
+    },
+    {
+      "id": "git",
+      "version": "1.0.0",
+      "description": "Git status, diff, log, commit, isolated worktrees and merge through the local git executable.",
+      "locality": "local",
+      "platforms": "any",
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "local_compute",
+        "note": "Local git; no network (push is not offered)."
+      },
+      "adapter": "git CLI (no shell)",
+      "actions": [
+        {
+          "id": "git.status",
+          "description": "Branch and porcelain status.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            }
+          ],
+          "outputs": "{ branch, changes: string[], clean }",
+          "evidence": "git status --porcelain=v1 -b output.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "git.diff",
+          "description": "Diff stat and patch (working tree vs HEAD, or against a ref).",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "against",
+              "type": "string",
+              "required": false,
+              "description": "Ref to compare with."
+            }
+          ],
+          "outputs": "{ stat, patch, empty }",
+          "evidence": "Patch stored as an artifact with its SHA-256.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "git.log",
+          "description": "Recent commits (one line each).",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "How many (max 100)."
+            }
+          ],
+          "outputs": "{ commits: string[] }",
+          "evidence": "git log --oneline output.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "git.tracked_files",
+          "description": "Read repository tracked_files.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Approved repository."
+            }
+          ],
+          "outputs": "Bounded repository facts.",
+          "evidence": "Current Git CLI observation.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "git.branch",
+          "description": "Read repository branch.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Approved repository."
+            }
+          ],
+          "outputs": "Bounded repository facts.",
+          "evidence": "Current Git CLI observation.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "git.commit_info",
+          "description": "Read repository commit_info.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Approved repository."
+            },
+            {
+              "name": "ref",
+              "type": "string",
+              "required": false,
+              "description": "Commit ref, defaults HEAD."
+            }
+          ],
+          "outputs": "Bounded repository facts.",
+          "evidence": "Current Git CLI observation.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "git.commit",
+          "description": "Stage all changes in the folder and commit with a message.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "required": true,
+              "description": "Commit message."
+            }
+          ],
+          "outputs": "{ commit }",
+          "evidence": "New HEAD commit id.",
+          "timeoutMs": 60000,
+          "implemented": true
+        },
+        {
+          "id": "git.worktree_add",
+          "description": "Create an isolated worktree on a new bunny/* branch under the Host data folder.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": true,
+              "description": "Short worktree name."
+            }
+          ],
+          "outputs": "{ path, branch, base }",
+          "evidence": "Worktree path and branch.",
+          "timeoutMs": 60000,
+          "implemented": true
+        },
+        {
+          "id": "git.worktree_remove",
+          "description": "Remove a clean Bunny-owned worktree (never one outside the Host data folder).",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Main repository folder."
+            },
+            {
+              "name": "path",
+              "type": "string",
+              "required": true,
+              "description": "Worktree path."
+            }
+          ],
+          "outputs": "{ removed }",
+          "evidence": "Worktree no longer listed.",
+          "timeoutMs": 60000,
+          "implemented": true
+        },
+        {
+          "id": "git.merge",
+          "description": "Merge a bunny/* branch into the current branch (--no-ff; aborts cleanly on conflict).",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Repository folder."
+            },
+            {
+              "name": "branch",
+              "type": "string",
+              "required": true,
+              "description": "bunny/* branch to merge."
+            }
+          ],
+          "outputs": "{ merged, conflict, head }",
+          "evidence": "Resulting HEAD or conflict files.",
+          "timeoutMs": 120000,
+          "implemented": true
+        }
+      ]
+    },
+    {
+      "id": "terminal",
+      "version": "1.0.0",
+      "description": "Run one executable with an argument list (no shell) inside an approved folder.",
+      "locality": "local",
+      "platforms": "any",
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "local_compute",
+        "note": "Local CPU only; no model tokens."
+      },
+      "adapter": "node:child_process (shell: false)",
+      "actions": [
+        {
+          "id": "terminal.exec",
+          "description": "Run `command args…` without a shell. npm/npx run through this Node's npm CLI; .cmd/.bat/.ps1 scripts are refused.",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "command",
+              "type": "string",
+              "required": true,
+              "description": "Executable name (node, npm, git, python, …)."
+            },
+            {
+              "name": "args",
+              "type": "string[]",
+              "required": false,
+              "description": "Argument list."
+            },
+            {
+              "name": "cwd",
+              "type": "string",
+              "required": false,
+              "description": "Working folder inside the approved roots."
+            },
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "required": false,
+              "description": "Timeout (ms)."
+            }
+          ],
+          "outputs": "{ command, args, cwd, exitCode, stdout, stderr, durationMs, timedOut }",
+          "evidence": "Exact argv, folder, exit code and output tail.",
+          "timeoutMs": 900000,
+          "implemented": true
+        }
+      ]
+    },
+    {
+      "id": "browser",
+      "version": "1.0.0",
+      "description": "Isolated Bunny-owned browser profile for research and web tasks (Playwright over installed Chromium/Chrome/Edge).",
+      "locality": "local",
+      "platforms": "any",
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "network",
+        "note": "Local browser process; network traffic to visited sites; no model tokens."
+      },
+      "adapter": "playwright persistent context (Bunny profile)",
+      "actions": [
+        {
+          "id": "browser.navigate",
+          "description": "Open a public http(s) URL in a Bunny tab.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "url",
+              "type": "string",
+              "required": true,
+              "description": "Public URL."
+            },
+            {
+              "name": "tabId",
+              "type": "string",
+              "required": false,
+              "description": "Existing tab."
+            }
+          ],
+          "outputs": "{ tabId, url, title, status }",
+          "evidence": "Final URL, title and HTTP status.",
+          "timeoutMs": 45000,
+          "implemented": true
+        },
+        {
+          "id": "browser.search",
+          "description": "Search the web (DuckDuckGo HTML) and return result links.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "query",
+              "type": "string",
+              "required": true,
+              "description": "Search query."
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "Max results (10)."
+            }
+          ],
+          "outputs": "{ query, results: { title, url }[] }",
+          "evidence": "Search URL, retrieval time and result list (research note artifact).",
+          "timeoutMs": 45000,
+          "implemented": true
+        },
+        {
+          "id": "browser.read",
+          "description": "Read the current page's visible text (bounded) with URL/title evidence.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "tabId",
+              "type": "string",
+              "required": false,
+              "description": "Tab."
+            },
+            {
+              "name": "maxChars",
+              "type": "number",
+              "required": false,
+              "description": "Text limit (20,000)."
+            }
+          ],
+          "outputs": "{ url, title, retrievedAt, text, headings }",
+          "evidence": "browser_evidence artifact: URL, title, retrieval time, text excerpt.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "browser.extract",
+          "description": "Extract text or an attribute from elements matching a CSS selector.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "selector",
+              "type": "string",
+              "required": true,
+              "description": "CSS selector."
+            },
+            {
+              "name": "attribute",
+              "type": "string",
+              "required": false,
+              "description": "Attribute instead of text."
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "Max items (100)."
+            }
+          ],
+          "outputs": "{ items: string[] }",
+          "evidence": "Selector, URL and item count.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "browser.metadata",
+          "description": "Page title, canonical URL, description and Open Graph metadata.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "tabId",
+              "type": "string",
+              "required": false,
+              "description": "Tab."
+            }
+          ],
+          "outputs": "{ url, title, meta }",
+          "evidence": "URL and metadata.",
+          "timeoutMs": 15000,
+          "implemented": true
+        },
+        {
+          "id": "browser.click",
+          "description": "Click an element found by role+name, label, text or CSS selector.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "role",
+              "type": "string",
+              "required": false,
+              "description": "ARIA role."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false,
+              "description": "Accessible name."
+            },
+            {
+              "name": "text",
+              "type": "string",
+              "required": false,
+              "description": "Visible text."
+            },
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "description": "CSS selector."
+            }
+          ],
+          "outputs": "{ url, title }",
+          "evidence": "Locator used and URL after the click.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "browser.type",
+          "description": "Fill a form field found by label, placeholder or selector; optional Enter.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "label",
+              "type": "string",
+              "required": false,
+              "description": "Field label."
+            },
+            {
+              "name": "placeholder",
+              "type": "string",
+              "required": false,
+              "description": "Placeholder."
+            },
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "description": "CSS selector."
+            },
+            {
+              "name": "text",
+              "type": "string",
+              "required": true,
+              "description": "Text to enter."
+            },
+            {
+              "name": "submit",
+              "type": "boolean",
+              "required": false,
+              "description": "Press Enter afterwards."
+            }
+          ],
+          "outputs": "{ url }",
+          "evidence": "Locator used (typed text is not logged).",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "browser.wait",
+          "description": "Wait for a selector, text or load state.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "description": "CSS selector."
+            },
+            {
+              "name": "text",
+              "type": "string",
+              "required": false,
+              "description": "Visible text."
+            },
+            {
+              "name": "state",
+              "type": "string",
+              "required": false,
+              "description": "load | domcontentloaded | networkidle."
+            }
+          ],
+          "outputs": "{ url }",
+          "evidence": "Condition met before the timeout.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "browser.screenshot",
+          "description": "Screenshot the current tab into the mission's artifacts.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "fullPage",
+              "type": "boolean",
+              "required": false,
+              "description": "Whole page."
+            }
+          ],
+          "outputs": "{ path, url }",
+          "evidence": "PNG artifact with SHA-256.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "browser.download",
+          "description": "Download a public URL (or the file a click starts) into the Host artifacts folder.",
+          "risk": "WRITE",
+          "inputs": [
+            {
+              "name": "url",
+              "type": "string",
+              "required": false,
+              "description": "File URL."
+            },
+            {
+              "name": "selector",
+              "type": "string",
+              "required": false,
+              "description": "Element whose click starts the download."
+            }
+          ],
+          "outputs": "{ path, filename, url }",
+          "evidence": "Downloaded file artifact with SHA-256.",
+          "timeoutMs": 120000,
+          "implemented": true
+        },
+        {
+          "id": "browser.tabs",
+          "description": "List, open or close Bunny tabs.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "op",
+              "type": "string",
+              "required": true,
+              "description": "list | new | close."
+            },
+            {
+              "name": "tabId",
+              "type": "string",
+              "required": false,
+              "description": "Tab to close."
+            }
+          ],
+          "outputs": "{ tabs: { id, url, title }[] }",
+          "evidence": "Tab list.",
+          "timeoutMs": 15000,
+          "implemented": true
+        }
+      ]
+    },
+    {
+      "id": "computer",
+      "version": "1.0.0",
+      "description": "Windows desktop control through UI Automation and user32 (semantic controls, no coordinates).",
+      "locality": "local",
+      "platforms": [
+        "win32"
+      ],
+      "events": [
+        "capability.completed",
+        "capability.failed"
+      ],
+      "cost": {
+        "kind": "local_compute",
+        "note": "Local PowerShell/UI Automation; no model tokens."
+      },
+      "adapter": "powershell.exe + System.Windows.Automation",
+      "actions": [
+        {
+          "id": "computer.list_windows",
+          "description": "List top-level windows (pid, process, title, foreground).",
+          "risk": "READ",
+          "inputs": [],
+          "outputs": "{ windows, foreground }",
+          "evidence": "Window list at the time of the call.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "computer.read_controls",
+          "description": "Semantic control tree of one window (name, type, automation id).",
+          "risk": "READ",
+          "sensitive": true,
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Window title contains."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Process id."
+            },
+            {
+              "name": "limit",
+              "type": "number",
+              "required": false,
+              "description": "Max controls (150)."
+            }
+          ],
+          "outputs": "{ window, controls }",
+          "evidence": "Window identity and control count.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "computer.focus_window",
+          "description": "Bring a window to the foreground.",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Window title contains."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Process id."
+            }
+          ],
+          "outputs": "{ before, after, focused }",
+          "evidence": "Foreground window before and after.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "computer.invoke_control",
+          "description": "Invoke/toggle/select/expand a named control via UI Automation.",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Window title contains."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Process id."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false,
+              "description": "Control name."
+            },
+            {
+              "name": "automationId",
+              "type": "string",
+              "required": false,
+              "description": "Automation id."
+            }
+          ],
+          "outputs": "{ control, windowPid, pattern }",
+          "evidence": "Control identity, the matched top-level window's owning pid and the pattern used.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "computer.type",
+          "description": "Set the value of an editable control via the UI Automation ValuePattern (not keystrokes).",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Window title contains."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Process id."
+            },
+            {
+              "name": "name",
+              "type": "string",
+              "required": false,
+              "description": "Control name."
+            },
+            {
+              "name": "automationId",
+              "type": "string",
+              "required": false,
+              "description": "Automation id."
+            },
+            {
+              "name": "text",
+              "type": "string",
+              "required": true,
+              "description": "Value to set."
+            }
+          ],
+          "outputs": "{ control, windowPid, matches }",
+          "evidence": "The matched top-level window's owning pid, value length before/after and whether it matches.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "computer.capture",
+          "description": "Capture the whole virtual screen to a PNG artifact.",
+          "risk": "READ",
+          "sensitive": true,
+          "inputs": [],
+          "outputs": "{ path, width, height }",
+          "evidence": "PNG artifact with SHA-256.",
+          "timeoutMs": 30000,
+          "implemented": true
+        },
+        {
+          "id": "computer.open_app",
+          "description": "Start an allowlisted application (notepad, calculator, paint, explorer, terminal), optionally on a non-executable file inside an approved root.",
+          "risk": "EXECUTE",
+          "inputs": [
+            {
+              "name": "app",
+              "type": "string",
+              "required": true,
+              "description": "Allowlisted app name."
+            },
+            {
+              "name": "target",
+              "type": "string",
+              "required": false,
+              "description": "File or folder inside an approved root."
+            }
+          ],
+          "outputs": "{ pid, newWindows }",
+          "evidence": "Started process id and new window count.",
+          "timeoutMs": 20000,
+          "implemented": true
+        },
+        {
+          "id": "computer.read_calculator",
+          "description": "Read only the arithmetic result of the verified Microsoft Calculator application.",
+          "risk": "READ",
+          "inputs": [
+            {
+              "name": "title",
+              "type": "string",
+              "required": false,
+              "description": "Calculator window."
+            },
+            {
+              "name": "pid",
+              "type": "number",
+              "required": false,
+              "description": "Window owner."
+            }
+          ],
+          "outputs": "{ windowPid, result }",
+          "evidence": "Verified Calculator result, no other controls.",
+          "timeoutMs": 30000,
+          "implemented": true
+        }
+      ]
+    }
+  ],
+  "finalContract": [
+    {
+      "action": "filesystem.read",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "filesystem",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Independent current disk observation/hash",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "filesystem.list",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "filesystem",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Independent current disk observation/hash",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "filesystem.exists",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "filesystem",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Independent current disk observation/hash",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "filesystem.write",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "filesystem",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "WRITE",
+        "verification": "Independent file hash/content check with before/after evidence",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "VERIFY_BEFORE_REPLAY"
+      }
+    },
+    {
+      "action": "filesystem.delete",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "filesystem.hash",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "filesystem",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Independent current disk observation/hash",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "filesystem.metadata",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "filesystem",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Independent current disk observation/hash",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "filesystem.compare",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "filesystem",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Independent current disk observation/hash",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "filesystem.search",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "filesystem",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Independent current disk observation/hash",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "git.status",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "git",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Fresh bounded Git observation with hooks/config/text conversion disabled",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "git.diff",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "git",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Fresh bounded Git observation with hooks/config/text conversion disabled",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "git.log",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "git",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Fresh bounded Git observation with hooks/config/text conversion disabled",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "git.tracked_files",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "git",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Fresh bounded Git observation with hooks/config/text conversion disabled",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "git.branch",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "git",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Fresh bounded Git observation with hooks/config/text conversion disabled",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "git.commit_info",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "git",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "READ",
+        "verification": "Fresh bounded Git observation with hooks/config/text conversion disabled",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "git.commit",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "git.worktree_add",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "git.worktree_remove",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "git.merge",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "terminal.exec",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "terminal",
+        "resourceScope": "Canonical approved root and current identity",
+        "sideEffect": "EXECUTE",
+        "verification": "Genuine owned-process exit and reviewed output assertion",
+        "cancellation": "Owned process group only; bounded timeout; no stale PID cleanup",
+        "replay": "NOT_REPLAYABLE"
+      }
+    },
+    {
+      "action": "browser.navigate",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "browser",
+        "resourceScope": "Exact approved origin and Mission-owned session",
+        "sideEffect": "READ",
+        "verification": "Independent DOM/navigation observation in the same origin-bound session",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "browser.search",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "browser.read",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "browser",
+        "resourceScope": "Exact approved origin and Mission-owned session",
+        "sideEffect": "READ",
+        "verification": "Independent DOM/navigation observation in the same origin-bound session",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "browser.extract",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "browser",
+        "resourceScope": "Exact approved origin and Mission-owned session",
+        "sideEffect": "READ",
+        "verification": "Independent DOM/navigation observation in the same origin-bound session",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "browser.metadata",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "browser",
+        "resourceScope": "Exact approved origin and Mission-owned session",
+        "sideEffect": "READ",
+        "verification": "Independent DOM/navigation observation in the same origin-bound session",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "browser.click",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "browser.type",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "browser.wait",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "browser",
+        "resourceScope": "Exact approved origin and Mission-owned session",
+        "sideEffect": "READ",
+        "verification": "Independent DOM/navigation observation in the same origin-bound session",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "browser.screenshot",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "browser",
+        "resourceScope": "Exact approved origin and Mission-owned session",
+        "sideEffect": "READ",
+        "verification": "Independent DOM/navigation observation in the same origin-bound session",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    },
+    {
+      "action": "browser.download",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "browser.tabs",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "computer.list_windows",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "computer.read_controls",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "computer.focus_window",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "computer",
+        "resourceScope": "Verified Calculator package and current native lifetime",
+        "sideEffect": "EXECUTE",
+        "verification": "Fresh UIA postcondition; target/focus uncertainty stops execution",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "UNKNOWN"
+      }
+    },
+    {
+      "action": "computer.invoke_control",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "computer",
+        "resourceScope": "Verified Calculator package and current native lifetime",
+        "sideEffect": "EXECUTE",
+        "verification": "Fresh UIA postcondition; target/focus uncertainty stops execution",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "UNKNOWN"
+      }
+    },
+    {
+      "action": "computer.type",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "computer.capture",
+      "implemented": true,
+      "delegation": null
+    },
+    {
+      "action": "computer.open_app",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "computer",
+        "resourceScope": "Verified Calculator package and current native lifetime",
+        "sideEffect": "EXECUTE",
+        "verification": "Fresh native identity and package observation; T9R acquisition/reuse ledger",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "VERIFY_BEFORE_REPLAY"
+      }
+    },
+    {
+      "action": "computer.read_calculator",
+      "implemented": true,
+      "delegation": {
+        "authorizationCategory": "computer",
+        "resourceScope": "Verified Calculator package and current native lifetime",
+        "sideEffect": "READ",
+        "verification": "Fresh UIA arithmetic result with native lifetime/package corroboration",
+        "cancellation": "Abort before the next bounded operation; retain completed evidence",
+        "replay": "SAFE_TO_REPLAY"
+      }
+    }
+  ],
+  "liveProvedFamilies": [
+    "filesystem",
+    "git",
+    "terminal",
+    "browser",
+    "computer"
+  ],
+  "deploymentBoundary": "Separate verified Windows test package; no install or deploy"
+}
