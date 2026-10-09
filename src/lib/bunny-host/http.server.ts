@@ -562,7 +562,7 @@ export async function startHost(
               }
               if (pending.mission)
                 throw new WorkstationRequiredError("Mission work is approved through its Mission request.");
-              if (!deviceMayLaunch(pending))
+              if (!deviceMayLaunch(pending, manager.live().find((provider) => provider.id === pending.provider)?.remoteModels))
                 throw new WorkstationRequiredError(
                   `${APPROVAL_ON_HOST} This route can use workspace tools or a hosted model on the workstation.`,
                 );
@@ -853,7 +853,9 @@ export async function startHost(
         // Revoke first so no further admission or Retry can use it, then stop admitted and pending work canonically.
         missions.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });
         approvals++;
-        if (MISSION_ACTIVE.includes(mission.state)) await missions.stop(mission.id, `workstation (revoked ${deviceActor})`);
+        // Re-read: an earlier awaited stop may have let a concurrent Retry re-arm this Mission.
+        if (MISSION_ACTIVE.includes(missions.store.mission(mission.id).state))
+          await missions.stop(mission.id, `workstation (revoked ${deviceActor})`);
       } catch {
         // The revoked envelope still refuses every further admission; Stop remains available on the workstation.
         unstopped++;

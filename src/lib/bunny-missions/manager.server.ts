@@ -1955,7 +1955,7 @@ export class MissionManager {
       // The Host asked because this route exceeds what it can confine; only local tool-free inference launches remotely.
       const step = this.store.step(request.stepId);
       const task = step.taskId ? this.tasks.db.get(step.taskId) : null;
-      return task && deviceMayLaunch(task) ? null : APPROVAL_ON_HOST;
+      return task && deviceMayLaunch(task, this.tasks.live().find((provider) => provider.id === task.provider)?.remoteModels) ? null : APPROVAL_ON_HOST;
     }
     return deviceApprovalRefusal(request.risk, this.bus.find(request.action)?.manifest);
   }

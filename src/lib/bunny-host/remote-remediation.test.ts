@@ -249,6 +249,7 @@ test("T9R F-02: workstation revocation ends Mission approvals the lost device gr
     assert.equal(revoked.status, 200, revoked.body.error);
     assert.ok(envelope(lost).revokedAt, "the lost device's Mission approval is revoked");
     assert.equal(f.host.missions.store.mission(lost).state, "stopped");
+    assert.equal((await f.api("mission.start", { id: lost })).status, 400, "a revoked approval never starts");
     assert.ok(envelope(failed).revokedAt, "a failed Mission's device approval is revoked too");
     const retry = await f.api("mission.retry", { id: failed });
     assert.equal(retry.status, 400, "Retry cannot revive the lost device's approval");
@@ -257,7 +258,8 @@ test("T9R F-02: workstation revocation ends Mission approvals the lost device gr
     assert.ok(envelope(parked).revokedAt, "a failed Mission's device approval is revoked");
     const parkedRetry = await f.api("mission.retry", { id: parked });
     assert.equal(parkedRetry.status, 400);
-    assert.match(parkedRetry.body.error ?? "", /revoked|Host command failed/);
+    // The HTTP body is the generic failure text, so the reason is asserted at the canonical manager boundary.
+    assert.throws(() => f.host.missions.retry(parked, "workstation"), /authorization expired or was revoked/);
     assert.equal(f.host.missions.store.mission(parked).state, "failed", "Retry could not revive the lost device's approval");
     assert.equal(envelope(owner).revokedAt, null);
     assert.equal(f.host.missions.store.mission(owner).state, "ready");
@@ -265,7 +267,7 @@ test("T9R F-02: workstation revocation ends Mission approvals the lost device gr
     assert.equal(envelope(signedOut).revokedAt, null, "self sign-out keeps the approvals the user gave (documented design)");
     assert.equal(f.host.missions.store.mission(signedOut).state, "ready");
     assert.equal((await f.state(f.device.token)).status, 401);
-    record("f02-revocation-ends-approvals", { classification: "LIVE disposable Host HTTP, SQLite and MissionManager", lostDeviceMission: f.host.missions.store.mission(lost).state, failedMissionStateBefore: failedState, failedMissionStateAfter: f.host.missions.store.mission(failed).state, retryStatus: retry.status, retryCode: retry.body.code, simulatedFailedMission: { state: f.host.missions.store.mission(parked).state, envelopeRevoked: !!envelope(parked).revokedAt, retryStatus: parkedRetry.status }, workstationMission: f.host.missions.store.mission(owner).state, selfSignOutMission: f.host.missions.store.mission(signedOut).state });
+    record("f02-revocation-ends-approvals", { classification: "LIVE disposable Host HTTP, SQLite and MissionManager; SIMULATED failed state for the parked Mission (state write only)", lostDeviceMission: f.host.missions.store.mission(lost).state, failedMissionStateBefore: failedState, failedMissionStateAfter: f.host.missions.store.mission(failed).state, retryStatus: retry.status, retryCode: retry.body.code, simulatedFailedMission: { state: f.host.missions.store.mission(parked).state, envelopeRevoked: !!envelope(parked).revokedAt, retryStatus: parkedRetry.status }, workstationMission: f.host.missions.store.mission(owner).state, selfSignOutMission: f.host.missions.store.mission(signedOut).state });
   } finally { await f.close(); }
 });
 
@@ -387,7 +389,7 @@ test("T9R Host restart: same Host UUID, Agent and Mission; new epoch; pre-restar
     assert.equal(existsSync(join(f.root, "receipt.txt")), false);
     assert.equal((await f.state()).body.tasks.length, tasksBefore, "no duplicate Task");
     assert.equal(f.host.missions.store.runs({ missionId: a.agent.missionId! }).filter(run => run.action === "filesystem.write").length, 0, "no side effect");
-    record("host-restart-continuity", { classification: "LIVE Host shutdown and fresh in-process Host over the same SQLite; OS-process restart is in protocol/host-restart-recovery.json", hostId: after.body.hostIdentity.hostId === before.hostId, epochBefore: before.epoch, epochAfter: after.body.hostIdentity.epoch, agentId: agent.id, missionId: agent.missionId, agentState: agent.state, heldCode: held.body.code, unpinnedCode: unpinned.body.code, unpinnedError: unpinned.body.error });
+    record("host-restart-continuity", { classification: "LIVE Host shutdown and fresh in-process Host over the same SQLite; OS-process restart is in test-results/ma3/t9r/protocol/host-restart-recovery.json", hostId: after.body.hostIdentity.hostId === before.hostId, epochBefore: before.epoch, epochAfter: after.body.hostIdentity.epoch, agentId: agent.id, missionId: agent.missionId, agentState: agent.state, heldCode: held.body.code, unpinnedCode: unpinned.body.code, unpinnedError: unpinned.body.error });
   } finally { await f.close(); }
 });
 
@@ -435,6 +437,8 @@ test("T9R DEV-01: a device-approved local tool-free task is never rerouted to a 
     tasks.approve(submitted.id, by);
     const deadline = Date.now() + 8000;
     while (!launched.length && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    // A refused duplicate workstation approve must not clear the device marker.
+    assert.throws(() => tasks.approve(submitted.id, "workstation"), /not awaiting approval/);
     launched[0].finish({ ok: false, output: "", error: "usage limit reached (429)", exitCode: 1 });
     while (launched.length < 2 && !["failed", "completed"].includes(db.get(submitted.id).state) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
     const result = { by, launches: launched.map((row) => row.id), state: db.get(submitted.id).state, events: db.taskEvents(submitted.id).map((event) => event.type) };
@@ -444,6 +448,10 @@ test("T9R DEV-01: a device-approved local tool-free task is never rerouted to a 
     rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
     return result;
   };
+  const { deviceMayLaunch } = await import("./device-authority.server.ts");
+  assert.equal(deviceMayLaunch({ provider: "ollama", model: "qwen3:8b" }), true);
+  assert.equal(deviceMayLaunch({ provider: "ollama", model: "qwen3:8b" }, ["qwen3:8b"]), false, "a probe-reported hosted tag is not local, whatever its name");
+  assert.equal(deviceMayLaunch({ provider: "ollama", model: "" }), false, "an empty model never launches");
   const workstation = await run("workstation");
   assert.deepEqual(workstation.launches, ["ollama", "claude"], "positive control: the recovery path reroutes a workstation-approved task");
   const device = await run("device:t9r-phone");

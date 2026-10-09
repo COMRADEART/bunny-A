@@ -25,9 +25,14 @@ export const DEVICE_ROLE = "paired-device" as const;
 export const WORKSTATION_ONLY_RISKS: readonly RiskClass[] = ["EXTERNAL_SIDE_EFFECT", "DESTRUCTIVE"];
 /** Provider routes a paired device may launch: text-only local generation with no workspace tools. */
 export const TOOL_FREE_PROVIDERS: ReadonlySet<string> = new Set(["ollama"]);
-/** A task a paired device may launch: local tool-free inference only, never a hosted (cloud) Ollama tag. */
-export function deviceMayLaunch(task: Pick<OrchTask, "provider" | "model">) {
-  return TOOL_FREE_PROVIDERS.has(task.provider) && !isRemoteOllamaTag({ name: task.model ?? "" });
+/**
+ * A task a paired device may launch: local tool-free inference only, never a hosted (cloud) Ollama tag. M-A-3
+ * T9R: a tag Ollama's own probe reported as remote (remote_host/remote_model, kept in `remoteModels`) is hosted
+ * even without a cloud suffix, and an empty model is never launchable.
+ */
+export function deviceMayLaunch(task: Pick<OrchTask, "provider" | "model">, remoteModels: readonly string[] = []) {
+  const model = task.model ?? "";
+  return TOOL_FREE_PROVIDERS.has(task.provider) && !!model && !isRemoteOllamaTag({ name: model }) && !remoteModels.includes(model);
 }
 export const APPROVAL_ON_HOST = "Approval required on Windows Host.";
 

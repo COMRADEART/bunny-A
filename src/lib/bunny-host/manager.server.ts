@@ -585,7 +585,7 @@ export class TaskManager {
       if (isCurrent(next.provider_id, next.model_id) || attempted(next.provider_id, next.model_id))
         continue;
       // A provider default could resolve to a hosted tag, so a device-approved task needs an exact local model.
-      if (deviceApproved && (!next.model_id || !deviceMayLaunch({ provider: next.provider_id, model: next.model_id })))
+      if (deviceApproved && (!next.model_id || !deviceMayLaunch({ provider: next.provider_id, model: next.model_id }, live.find((entry) => entry.id === next.provider_id)?.remoteModels)))
         continue;
       const check = preLaunchRevalidate(
         {
@@ -970,8 +970,11 @@ export class TaskManager {
   /** Direct user approval. Unchanged contract: launches exactly one task that is waiting for approval. */
   approve(id: string, by = "workstation"): OrchTask {
     // M-A-3 T9R (DEV-01): a device approved a tool-free route; no launch-time or recovery reroute may leave it.
-    if (by.startsWith("device:")) this.deviceApproved.add(id);
-    else this.deviceApproved.delete(id);
+    // Only an approval that can still launch changes the marker; a refused duplicate approve leaves it intact.
+    if (this.db.get(id).state === "waiting_for_approval") {
+      if (by.startsWith("device:")) this.deviceApproved.add(id);
+      else this.deviceApproved.delete(id);
+    }
     const launched = this.launch(
       id,
       { kind: "user", at: Date.now() },
