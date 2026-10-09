@@ -20,6 +20,16 @@ $batch = if ($env:BUNNY_COMPUTER_BATCH) { $env:BUNNY_COMPUTER_BATCH | ConvertFro
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 Add-Type @"
 using System; using System.Runtime.InteropServices; using System.Text;
+[StructLayout(LayoutKind.Sequential)] public struct BunnyPropertyKey { public Guid format; public uint id; }
+[StructLayout(LayoutKind.Explicit)] public struct BunnyPropertyVariant {
+  [FieldOffset(0)] public ushort type; [FieldOffset(8)] public IntPtr value; [FieldOffset(16)] public IntPtr extra;
+}
+[ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface BunnyPropertyStore {
+  [PreserveSig] int GetCount(out uint count); [PreserveSig] int GetAt(uint index, out BunnyPropertyKey key);
+  [PreserveSig] int GetValue(ref BunnyPropertyKey key, out BunnyPropertyVariant value);
+  [PreserveSig] int SetValue(ref BunnyPropertyKey key, ref BunnyPropertyVariant value); [PreserveSig] int Commit();
+}
 public static class BunnyWin {
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
@@ -28,7 +38,20 @@ public static class BunnyWin {
   [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+  [DllImport("shell32.dll")] static extern int SHGetPropertyStoreForWindow(IntPtr h, ref Guid iid, out BunnyPropertyStore store);
+  [DllImport("ole32.dll")] static extern int PropVariantClear(ref BunnyPropertyVariant value);
   public static string Title(IntPtr h) { var s = new StringBuilder(512); GetWindowText(h, s, 512); return s.ToString(); }
+  public static string Class(IntPtr h) { var s = new StringBuilder(256); GetClassName(h, s, 256); return s.ToString(); }
+  public static string AppId(IntPtr h) {
+    var iid = new Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"); BunnyPropertyStore store;
+    Marshal.ThrowExceptionForHR(SHGetPropertyStoreForWindow(h, ref iid, out store));
+    try {
+      var key = new BunnyPropertyKey { format = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), id = 5 };
+      BunnyPropertyVariant value; Marshal.ThrowExceptionForHR(store.GetValue(ref key, out value));
+      try { return value.type == 31 ? Marshal.PtrToStringUni(value.value) : null; } finally { PropVariantClear(ref value); }
+    } finally { Marshal.ReleaseComObject(store); }
+  }
 }
 "@
 function Find-Window($p) {
@@ -69,6 +92,95 @@ function Describe($e) { $c = $e.Current; [ordered]@{ name = $c.Name; controlType
 function Assert-BatchClock {
   if ($batch -and [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -ge [long]$batch.expiresAt) { throw 'Bounded approval expired before the desktop operation.' }
 }
+function Calculator-Packages {
+  if (-not $script:BunnyCalculatorPackages) {
+    $script:BunnyCalculatorPackages = @(Get-AppxPackage -Name Microsoft.WindowsCalculator | Where-Object { $_.PublisherId -eq '8wekyb3d8bbwe' -and $_.SignatureKind -in @('Store','System') })
+  }
+  if ($script:BunnyCalculatorPackages.Count -eq 0) { throw 'Verified installed Microsoft Calculator package unavailable.' }
+  return $script:BunnyCalculatorPackages
+}
+function Assert-CalculatorProcess($proc) {
+  if ($proc.SessionId -ne (Get-Process -Id $PID).SessionId) { throw 'Calculator belongs to another Windows session.' }
+  foreach ($package in @(Calculator-Packages)) {
+    foreach ($exe in @('CalculatorApp.exe','Calculator.exe')) {
+      if ([string]::Equals($proc.Path, (Join-Path $package.InstallLocation $exe), [StringComparison]::OrdinalIgnoreCase)) { return }
+    }
+  }
+  throw 'The target is outside the verified Calculator application.'
+}
+# A minimized UWP frame can detach its XAML content and expose no arithmetic UIA elements.
+# This is a native identity probe only, never a claim that a control is ready or permission to invoke it.
+function Native-CalculatorFrame($w) {
+  Assert-BatchClock
+  if (-not [Environment]::UserInteractive -or -not $w -or $w.Current.Name -ne 'Calculator') { throw 'Interactive Calculator window unavailable.' }
+  $h = [IntPtr]$w.Current.NativeWindowHandle
+  if (-not [BunnyWin]::IsWindow($h)) { throw 'Calculator native window unavailable.' }
+  [uint32]$owner = 0; [void][BunnyWin]::GetWindowThreadProcessId($h, [ref]$owner)
+  if ($owner -ne $w.Current.ProcessId) { throw 'Calculator UIA/native owner mismatch.' }
+  $proc = Get-Process -Id $owner -ErrorAction Stop
+  if ($proc.SessionId -ne (Get-Process -Id $PID).SessionId) { throw 'Calculator belongs to another Windows session.' }
+  $frame = [ordered]@{ handle = [string]$h; processId = $proc.Id; processStartedAt = [string]$proc.StartTime.ToUniversalTime().Ticks }
+  if ([string]::Equals($proc.Path, (Join-Path $env:WINDIR 'System32\ApplicationFrameHost.exe'), [StringComparison]::OrdinalIgnoreCase)) {
+    if ([BunnyWin]::Class($h) -ne 'ApplicationFrameWindow') { throw 'Unexpected Calculator native frame class.' }
+    $appId = [BunnyWin]::AppId($h); $trustedFrame = $false
+    foreach ($package in @(Calculator-Packages)) {
+      [xml]$manifest = Get-Content -LiteralPath (Join-Path $package.InstallLocation 'AppxManifest.xml') -Raw
+      foreach ($app in @($manifest.Package.Applications.Application)) {
+        if ($appId -eq ($package.PackageFamilyName + '!' + $app.Id)) { $trustedFrame = $true }
+      }
+    }
+    if (-not $trustedFrame) { throw 'Native frame does not identify the installed Calculator application.' }
+  } else { Assert-CalculatorProcess $proc }
+  if ($batch.windowIdentity) {
+    $expected = $batch.windowIdentity
+    if ($frame.handle -ne $expected.handle -or $frame.processId -ne $expected.processId -or $frame.processStartedAt -ne $expected.processStartedAt) { throw 'The approved window or process lifetime changed.' }
+    if ($expected.contentProcessId) {
+      $content = Get-Process -Id $expected.contentProcessId -ErrorAction Stop
+      Assert-CalculatorProcess $content
+      if ([string]$content.StartTime.ToUniversalTime().Ticks -ne $expected.contentStartedAt) { throw 'The approved Calculator content process lifetime changed.' }
+    }
+  }
+  return $frame
+}
+function Calculator-Frames {
+  $all = [System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
+  foreach ($w in $all) { if ($w.Current.Name -eq 'Calculator') { [void](Native-CalculatorFrame $w); $w } }
+}
+function Ready-CalculatorWindow($w) {
+  $initial = Native-CalculatorFrame $w
+  $h = [IntPtr][long]$initial.handle
+  $started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $deadline = [Math]::Min($started + 8000, [long]$batch.expiresAt)
+  $restored = [BunnyWin]::IsIconic($h); $attempts = 0
+  # Only called in an admitted open/focus operation. Pure target probes never restore a window.
+  if ($restored) { Assert-BatchClock; [void](Native-CalculatorFrame $w); [void][BunnyWin]::ShowWindow($h, 9) }
+  do {
+    Assert-BatchClock; $attempts++
+    $fresh = [System.Windows.Automation.AutomationElement]::FromHandle($h)
+    $current = Native-CalculatorFrame $fresh
+    if ($current.processId -ne $initial.processId -or $current.processStartedAt -ne $initial.processStartedAt) { throw 'Calculator lifetime changed during readiness; no automatic relaunch.' }
+    $ready = $true; $contentPid = $null
+    foreach ($id in @('num0Button','num2Button','clearButton','CalculatorResults')) {
+      $control = $fresh.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, $id)))
+      if (-not $control) { $ready = $false; break }
+      $c = $control.Current
+      if (-not $c.IsEnabled -or $c.IsPassword) { $ready = $false; break }
+      if ($contentPid -and $contentPid -ne $c.ProcessId) { throw 'Calculator readiness controls have different native owners.' }
+      $contentPid = $c.ProcessId
+      if ($id -ne 'CalculatorResults') {
+        $pattern = $null
+        if ($c.ControlType -ne [System.Windows.Automation.ControlType]::Button -or -not $control.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern,[ref]$pattern)) { throw 'Calculator arithmetic control is not a semantic invokable button.' }
+      }
+    }
+    if ($ready) {
+      if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -ge $deadline) { throw 'Calculator arithmetic readiness exceeded the bounded deadline; no automatic relaunch.' }
+      Assert-BatchWindow $fresh
+      return @{ identity = (Batch-Identity $fresh); readiness = @{ restored = $restored; attempts = $attempts; elapsedMs = ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - $started); controls = @('num0Button','num2Button','clearButton','CalculatorResults') } }
+    }
+    if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -lt $deadline) { Start-Sleep -Milliseconds 100 }
+  } while ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -lt $deadline)
+  throw 'Calculator arithmetic readiness unavailable within the bounded deadline; no automatic relaunch.'
+}
 function Batch-Identity($w) {
   $proc = Get-Process -Id $w.Current.ProcessId -ErrorAction Stop
   $zero = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'num0Button')))
@@ -79,6 +191,7 @@ function Batch-Identity($w) {
 function Assert-BatchWindow($w) {
   if (-not $batch) { return }
   Assert-BatchClock
+  [void](Native-CalculatorFrame $w)
   if (-not $w -or $w.Current.Name -ne 'Calculator') { throw 'The approved Calculator window is unavailable.' }
   $identity = Batch-Identity $w
   if ($batch.windowIdentity -and ($identity.handle -ne $batch.windowIdentity.handle -or $identity.processId -ne $batch.windowIdentity.processId -or $identity.processStartedAt -ne $batch.windowIdentity.processStartedAt)) { throw 'The approved window or process lifetime changed.' }
@@ -127,9 +240,14 @@ function Calculator-Windows {
 
 export const CALCULATOR_SCRIPTS = {
   existing: String.raw`
-$windows = @(Calculator-Windows)
+$windows = @(Calculator-Frames)
 if ($windows.Count -gt 1) { throw 'Several verified Calculator windows exist; no arbitrary target or additional launch selected.' }
-@{ identity = $(if ($windows.Count -eq 1) { Batch-Identity $windows[0] } else { $null }) } | ConvertTo-Json -Depth 4 -Compress`,
+$identity = $null
+if ($windows.Count -eq 1 -and -not [BunnyWin]::IsIconic([IntPtr]$windows[0].Current.NativeWindowHandle)) {
+  try { Assert-BatchWindow $windows[0]; $identity = Batch-Identity $windows[0] }
+  catch { if ($_.Exception.Message -ne 'Calculator arithmetic identity unavailable.' -and $_.Exception.Message -ne 'No verified Calculator arithmetic surface.') { throw } }
+}
+@{ identity = $identity; awaitingReadiness = ($windows.Count -eq 1 -and -not $identity) } | ConvertTo-Json -Depth 4 -Compress`,
   valid: String.raw`
 $id = $batch.windowIdentity
 $h = [IntPtr][long]$id.handle
@@ -139,22 +257,30 @@ if ($valid) {
   [void][BunnyWin]::GetWindowThreadProcessId($h, [ref]$owner)
   $proc = Get-Process -Id $owner -ErrorAction Stop
   $valid = $owner -eq $id.processId -and [string]$proc.StartTime.ToUniversalTime().Ticks -eq $id.processStartedAt
-  if ($valid) { $w = [System.Windows.Automation.AutomationElement]::FromHandle($h); Assert-BatchWindow $w }
+  if ($valid) {
+    $w = [System.Windows.Automation.AutomationElement]::FromHandle($h); [void](Native-CalculatorFrame $w)
+    if ($p.prepareReadiness) { $prepared = Ready-CalculatorWindow $w }
+    elseif (-not [BunnyWin]::IsIconic($h)) {
+      try { Assert-BatchWindow $w }
+      catch { if ($_.Exception.Message -ne 'Calculator arithmetic identity unavailable.' -and $_.Exception.Message -ne 'No verified Calculator arithmetic surface.') { throw }; $needsReadiness = $true }
+    }
+  }
 }
-@{ valid = $valid } | ConvertTo-Json -Compress`,
+@{ valid = $valid; needsReadiness = ($valid -and ($needsReadiness -or [BunnyWin]::IsIconic($h))); readiness = $prepared.readiness } | ConvertTo-Json -Depth 4 -Compress`,
   acquire: String.raw`
 Assert-BatchClock
-$windows = @(Calculator-Windows)
+$windows = @(Calculator-Frames)
 if ($windows.Count -gt 1) { throw 'Several verified Calculator windows exist; no additional launch selected.' }
 if ($windows.Count -eq 1) {
-  @{ decision = 'reuse_existing'; identity = (Batch-Identity $windows[0]); newWindows = 0 } | ConvertTo-Json -Depth 4 -Compress
+  $prepared = Ready-CalculatorWindow $windows[0]
+  @{ decision = 'reuse_existing'; identity = $prepared.identity; readiness = $prepared.readiness; newWindows = 0 } | ConvertTo-Json -Depth 5 -Compress
 } else {
   Assert-BatchClock
   $proc = Start-Process -FilePath ([string]$p.file) -PassThru
   $deadline = [Math]::Min([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() + 8000, [long]$batch.expiresAt)
   do {
     Assert-BatchClock
-    try { $windows = @(Calculator-Windows) }
+    try { $windows = @(Calculator-Frames) }
     catch {
       if ($_.Exception.Message -ne 'No verified Calculator arithmetic surface.' -and $_.Exception.Message -ne 'Calculator arithmetic identity unavailable.') { throw }
       $windows = @()
@@ -164,7 +290,8 @@ if ($windows.Count -eq 1) {
     Start-Sleep -Milliseconds 100
   } while ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -lt $deadline)
   if ($windows.Count -ne 1) { throw 'Calculator launch outcome uncertain; no automatic relaunch.' }
-  @{ decision = 'launched'; launcherPid = $proc.Id; identity = (Batch-Identity $windows[0]); newWindows = 1 } | ConvertTo-Json -Depth 4 -Compress
+  $prepared = Ready-CalculatorWindow $windows[0]
+  @{ decision = 'launched'; launcherPid = $proc.Id; identity = $prepared.identity; readiness = $prepared.readiness; newWindows = 1 } | ConvertTo-Json -Depth 5 -Compress
 }`,
 };
 const SCRIPTS: Record<string, string> = {
@@ -330,14 +457,18 @@ export class ComputerCapability implements CapabilityAdapter {
     if (action === "computer.open_app" && String(params.app ?? "").toLowerCase() === "calculator" && !args.target) {
       const scope = { expiresAt: context.desktopBatch?.expiresAt ?? Date.now() + timeout };
       const admittedIdentity = context.desktopBatch?.windowIdentity;
+      let readiness: unknown;
       const acquired = await this.targets.acquire(owner, context.capabilityRunId ?? null, {
         valid: async identity => {
           if (admittedIdentity && JSON.stringify(admittedIdentity) !== JSON.stringify(identity)) throw new Error("Canonical target differs from the admitted batch identity.");
-          return (await this.automate(CALCULATOR_SCRIPTS.valid, {}, context.signal, timeout, { ...scope, windowIdentity: identity }) as { valid: boolean }).valid;
+          const probe = await this.automate(CALCULATOR_SCRIPTS.valid, { prepareReadiness: true }, context.signal, timeout, { ...scope, windowIdentity: identity }) as { valid: boolean; readiness?: unknown };
+          readiness = probe.readiness;
+          return probe.valid;
         },
         existing: async () => {
           if (admittedIdentity) {
-            const probe = await this.automate(CALCULATOR_SCRIPTS.valid, {}, context.signal, timeout, { ...scope, windowIdentity: admittedIdentity }) as { valid: boolean };
+            const probe = await this.automate(CALCULATOR_SCRIPTS.valid, { prepareReadiness: true }, context.signal, timeout, { ...scope, windowIdentity: admittedIdentity }) as { valid: boolean; readiness?: unknown };
+            readiness = probe.readiness;
             if (!probe.valid) throw new Error("Admitted Calculator target changed; fresh approval required before reacquisition.");
             return admittedIdentity;
           }
@@ -352,7 +483,7 @@ export class ComputerCapability implements CapabilityAdapter {
         },
       }, context.signal);
       if (context.desktopBatch?.windowIdentity && JSON.stringify(context.desktopBatch.windowIdentity) !== JSON.stringify(acquired.identity)) throw new Error("Acquired target differs from the admitted batch identity.");
-      output = { ...acquired, file: args.file, pid: acquired.identity.processId, windowPid: acquired.identity.processId, windowIdentity: acquired.identity, newWindows: acquired.decision === "launched" ? 1 : 0 };
+      output = { ...acquired, ...(readiness ? { readiness } : {}), file: args.file, pid: acquired.identity.processId, windowPid: acquired.identity.processId, windowIdentity: acquired.identity, newWindows: acquired.decision === "launched" ? 1 : 0 };
     } else {
       const denied = context.revalidate?.(); if (denied) throw new Error(denied);
       output = await this.automate(script, args, context.signal, timeout, batch) as Record<string, unknown>;
@@ -371,6 +502,7 @@ export class ComputerCapability implements CapabilityAdapter {
     const verified = action === "computer.focus_window" ? output.focused === true : action === "computer.type" ? output.matches === true : true;
     const result: CapabilityResult = { ok: verified, status: verified ? "succeeded" : "failed", summary: summaries[action](), output, evidence: [`${action} via UI Automation at ${new Date().toISOString()}`], before: output.before, after: output.after, ...(verified ? {} : { errorCategory: "capability_failed" as const }) };
     if (output.windowIdentity) result.evidence.push(`Calculator target ${String(output.decision ?? "reused")}: ${JSON.stringify(output.windowIdentity)}`);
+    if (output.readiness) result.evidence.push(`Calculator readiness: ${JSON.stringify(output.readiness)}`);
     if (action === "computer.capture" && typeof output.path === "string") result.artifacts = [{ type: "screenshot", title: "Screen capture", path: output.path, mediaType: "image/png" }];
     return result;
   }

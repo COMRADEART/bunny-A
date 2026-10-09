@@ -61,6 +61,8 @@ export async function missionCommand(missions: MissionManager, action: string, d
     case "mission.stop": return { mission: await missions.stop(id(data.id), access.actor) };
     case "mission.retry": return { mission: missions.retry(id(data.id), access.actor) };
     case "mission.respond": {
+      if (!access.local && Object.keys(data).some(key => !["requestId", "decision", "maxActions", "ttlMs"].includes(key)))
+        throw new CommandRefusedError("Remote approval can only answer the exact Host request; Agent, Mission and Project binding cannot be supplied by a device.");
       if (data.decision !== "allow_once" && data.decision !== "allow_batch" && data.decision !== "deny") throw new CommandRefusedError("Decision must be allow_once, allow_batch or deny.");
       // Only-shrink knobs on the batch button; the manager clamps both to what the offer stated.
       const options: { maxActions?: number; ttlMs?: number } = {};
