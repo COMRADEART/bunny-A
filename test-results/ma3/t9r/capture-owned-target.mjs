@@ -1,0 +1,16 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import {ownedAcquisition,identityOf} from '../../../scripts/t9-calculator-fixture.mjs';
+const dir='test-results/ma3/t9r';
+const before=JSON.parse(readFileSync(dir+'/calculator-before.json','utf8').replace(/^\uFEFF/,''));
+const after=JSON.parse(readFileSync(dir+'/calculator-after-baseline.json','utf8').replace(/^\uFEFF/,''));
+const live=JSON.parse(readFileSync(dir+'/baseline-x53/integrated-acceptance.json'));
+const acquisition=live.runs.find(run=>run.action==='computer.open_app'&&run.status==='succeeded');
+const result=JSON.parse(live.bodies.find(body=>body.artifactId===acquisition?.outputRef)?.body??'null');
+assert.ok(acquisition&&result?.decision==='launched','One canonical test acquisition must prove ownership');
+const target=ownedAcquisition(before,after,{missionId:live.missionId,capabilityRunId:acquisition.id});
+const identityEvidence=acquisition.evidence.find(line=>line.startsWith('Calculator target launched: '));
+assert.ok(identityEvidence,'Canonical acquisition lifetime evidence required');
+assert.deepEqual(identityOf(target),JSON.parse(identityEvidence.slice('Calculator target launched: '.length)),'Fresh diagnostic equals canonical acquired identity');
+writeFileSync(dir+'/owned-calculator-ledger.json',JSON.stringify({preexistingHandles:before.targets.map(t=>t.handle),targets:[target]},null,2)+'\n');
+console.log('Exact test-owned Calculator window recorded; pre-existing targets protected.');

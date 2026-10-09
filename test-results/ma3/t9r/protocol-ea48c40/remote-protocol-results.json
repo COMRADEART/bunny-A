@@ -1,0 +1,199 @@
+{
+  "result": "PASS",
+  "classification": "LIVE canonical Windows Host and built gateway; SIMULATED loopback TLS proxy, browser origin and lost-ack injection",
+  "physicalPhone": "NOT TESTED",
+  "separateNetwork": "NOT TESTED",
+  "rows": [
+    {
+      "id": "F01/F11",
+      "title": "Independent device identity and finite authority",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:48.758Z",
+      "observed": {
+        "viewer": {
+          "kind": "device",
+          "deviceId": "76eebdbf-788e-4291-a761-155a90dfb68b",
+          "name": "T9 independently paired client",
+          "role": "paired-device",
+          "pairedAt": 1791519588688,
+          "expiresAt": 1794111588688,
+          "lastSeenAt": 1791519588764,
+          "rights": [
+            "agent.authorization.approve",
+            "agent.authorization.deny",
+            "agent.authorization.revoke",
+            "agent.get",
+            "agent.list",
+            "agent.pause",
+            "agent.resume",
+            "agent.stop",
+            "approve",
+            "device.revoke",
+            "inbox.ack",
+            "mission.approve",
+            "mission.get",
+            "mission.respond",
+            "mission.revoke_batch",
+            "mission.start",
+            "mission.stop",
+            "operation.status",
+            "project.artifact",
+            "project.get",
+            "project.list",
+            "stop",
+            "submit",
+            "task.feedback"
+          ]
+        },
+        "identity": {
+          "hostId": "27f4a67b-e123-4dc7-9abd-4b52ce16a831",
+          "epoch": "3dec058b-f300-4168-b0ae-bab69fbb0865",
+          "startedAt": 1791519560827
+        },
+        "cookieAttributes": {
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "Strict",
+          "path": "/",
+          "maxAge": 31536000
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F08",
+      "title": "Certificate trust fails closed",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:48.785Z",
+      "observed": {
+        "error": "DEPTH_ZERO_SELF_SIGNED_CERT",
+        "certificateBypass": false,
+        "systemTrustModified": false
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F02/F10/F31",
+      "title": "Authentication and origin failures are enforced",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:48.790Z",
+      "observed": {
+        "unknown": "AUTH_REQUIRED",
+        "crossSiteStatus": 403,
+        "anonymousStreamStatus": 401,
+        "canonicalPause": false
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F06/F35",
+      "title": "Wrong Host and stale generation execute nothing",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:48.828Z",
+      "observed": {
+        "wrong": "HOST_IDENTITY_CHANGED",
+        "stale": "HOST_EPOCH_CHANGED"
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F12/F13/F14/F19",
+      "title": "Workstation delegation and scope expansion remain forbidden",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:48.867Z",
+      "observed": {
+        "localOnly": "WORKSTATION_REQUIRED",
+        "alteredOffer": "REFUSED"
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F39/F40/F61",
+      "title": "Discarded Stop acknowledgment is reconciled without repeating effects",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:48.896Z",
+      "observed": {
+        "fault": "SIMULATED receipt discard after real Host command",
+        "operationId": "5bb6bac5-df57-4d95-93ec-9aa4aaaa4c50",
+        "status": {
+          "operationId": "5bb6bac5-df57-4d95-93ec-9aa4aaaa4c50",
+          "state": "applied",
+          "action": "agent.stop",
+          "at": 1791519588960,
+          "code": null,
+          "error": null,
+          "epoch": "3dec058b-f300-4168-b0ae-bab69fbb0865"
+        },
+        "duplicate": {
+          "id": "5bb6bac5-df57-4d95-93ec-9aa4aaaa4c50",
+          "state": "applied",
+          "replayed": true
+        },
+        "agentState": "STOPPED"
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F20",
+      "title": "Remote denial persists in canonical Host state",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:49.080Z",
+      "observed": {
+        "requestId": "bfb3b74a-4427-4764-ab5f-705dbfc891f9",
+        "resolution": "deny",
+        "actor": "device:76eebdbf-788e-4291-a761-155a90dfb68b",
+        "agentState": "FAILED"
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F30/F43/F56",
+      "title": "Verified artifact access and Project isolation",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:49.312Z",
+      "observed": {
+        "artifactId": "604e64f3-bbe6-4f0c-b39b-57cfcefe69f0",
+        "sha256": "3e9484dc2d67ede3d42dc98a8b6680df86cc41b5537e69babd32990416ecb714",
+        "verified": "verified",
+        "allowed": true,
+        "crossProjectCode": "REFUSED",
+        "receiptVerified": true
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F03/F44/F46/F47",
+      "title": "Self-revocation removes future control and artifact authority",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:49.589Z",
+      "observed": {
+        "signOutStatus": 200,
+        "subsequentRead": "DEVICE_REVOKED",
+        "subsequentCommand": "DEVICE_REVOKED",
+        "automaticRepair": false
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F35/F41/F42/F43",
+      "title": "Fresh Host process preserves identity and artifacts, invalidates grants",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T04:19:49.645Z",
+      "observed": {
+        "oldPid": 27172,
+        "newPid": 9140,
+        "stableHostId": true,
+        "oldEpochRefusal": "HOST_EPOCH_CHANGED",
+        "completedAgent": "f60072c9-efb9-4251-895b-2f69859c5b00",
+        "recoveryStates": [
+          {
+            "id": "c56efd07-836a-46f2-90e7-bfc214108a38",
+            "state": "PLANNING",
+            "authorization": "WAITING_FOR_USER"
+          }
+        ]
+      },
+      "result": "PASS"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {request} from 'node:https';
+import {existsSync,readFileSync,writeFileSync,renameSync} from 'node:fs';
+import {toJSON,fromCrossJSON} from 'seroval';
+import {DatabaseSync} from 'node:sqlite';
+const dir='test-results/ma3/t9r/continuity',f=JSON.parse(readFileSync(dir+'/live-fixture.json')),ca=readFileSync(f.certPath);
+const pause=ms=>new Promise(done=>setTimeout(done,ms));
+const control=async(action)=>{const id=randomUUID();writeFileSync(dir+'/fixture-request.tmp',JSON.stringify({id,action}));renameSync(dir+'/fixture-request.tmp',dir+'/fixture-request.json');const deadline=Date.now()+30000;do{const path=dir+'/fixture-response-'+id+'.json';if(existsSync(path)){const result=JSON.parse(readFileSync(path));assert.ok(!result.error,result.error);return result;}await pause(100);}while(Date.now()<deadline);throw Error('Fixture control timeout');};
+const call=(path,method='GET',headers={},body='')=>new Promise((done,reject)=>{const q=request({hostname:'127.0.0.1',port:f.tlsPort,path,method,ca,headers:{'sec-fetch-site':'same-origin',...headers,...(body?{'content-length':Buffer.byteLength(body)}:{})}},r=>{let text='';r.on('data',b=>text+=b);r.on('end',()=>done({status:r.statusCode,headers:r.headers,text}));});q.on('error',reject);q.end(body);});
+const paired=await call('/__fixture/pair');assert.equal(paired.status,302);const cookie=paired.headers['set-cookie'][0].split(';')[0];
+const wire=async(id,data)=>{const r=await call('/_serverFn/'+id,'POST',{cookie,origin:f.remoteOrigin,'content-type':'application/json','x-tsr-serverFn':'true'},JSON.stringify(toJSON({data})));return fromCrossJSON(JSON.parse(r.text),{refs:new Map()}).result;};
+const before=await wire(f.ids.read,{}),agent=before.snapshot.agents.agents.find(a=>a.id===f.integratedAgent),ask=agent.authorization.pending[0];
+assert.equal(ask.action,'filesystem.write');assert.equal(ask.remote.answerable,true);
+assert.equal((await wire(f.ids.command,{action:'mission.respond',data:{requestId:ask.id,decision:'allow_once'},expect:before.snapshot.hostIdentity})).ok,true);
+let deadline=Date.now()+15000;while(!existsSync(dir+'/held-write.json')&&Date.now()<deadline)await pause(100);
+const held=JSON.parse(readFileSync(dir+'/held-write.json'));assert.equal(held.missionId,agent.missionId);
+const off=await control('client-network-off');let error;
+try{await wire(f.ids.read,{});}catch(failure){error=failure.code;}
+assert.equal(error,'ECONNREFUSED','client-only trusted TLS transport really closes');
+await control('release-held');let after;
+deadline=Date.now()+15000;
+do{after=await control('snapshot');if(after.agents.agents.find(a=>a.id===agent.id)?.state==='COMPLETED')break;await pause(100);}while(Date.now()<deadline);
+const completed=after.agents.agents.find(a=>a.id===agent.id);assert.equal(completed.state,'COMPLETED');assert.equal(completed.missionId,agent.missionId);
+assert.deepEqual(after.hostIdentity,before.snapshot.hostIdentity,'Host is not restarted to simulate phone disconnection');
+// Canonical effect count comes from the disposable Host SQLite, opened read-only (the client snapshot has no capability runs).
+const db=new DatabaseSync(f.data+'/host.sqlite',{readOnly:true});const runs=db.prepare('SELECT action,status FROM capability_runs WHERE mission_id=?').all(agent.missionId);db.close();
+const writes=runs.filter(run=>run.action==='filesystem.write');assert.equal(writes.length,1,'exactly one write capability run');assert.equal(writes[0].status,'succeeded');
+await control('client-network-on');const reconnected=await wire(f.ids.read,{});assert.equal(reconnected.ok,true);assert.deepEqual(reconnected.snapshot.hostIdentity,before.snapshot.hostIdentity);assert.equal(reconnected.snapshot.agents.agents.find(a=>a.id===agent.id).state,'COMPLETED');
+writeFileSync('test-results/ma3/t9r/phone-only-network.json',JSON.stringify({result:'PASS',classification:'LIVE paired credential, actual test-client transport listeners closed and restored, real admitted Host filesystem effect; SIMULATED loopback phone network adapter',agentId:completed.id,missionId:completed.missionId,held,off,transportFailure:error,hostIdentityUnchanged:true,successfulWrites:1,writeRuns:writes.length,capabilityRuns:runs,canonicalTaskCount:after.tasks.length,reconnected:true,physicalPhone:'NOT TESTED',realLan:'NOT TESTED',publicTunnel:false},null,2)+'\n');
+console.log('Client-only transport cut during admitted work, one Host effect and authenticated reconnect: PASS.');

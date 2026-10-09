@@ -1,0 +1,12 @@
+import {request} from 'node:https';
+import {readFileSync} from 'node:fs';
+import {toJSON,fromCrossJSON} from 'seroval';
+const f=JSON.parse(readFileSync('test-results/ma3/t9r/protocol/live-fixture.json'));
+const ca=readFileSync(f.certPath);
+const call=(path,method='GET',headers={},body='')=>new Promise((resolve,reject)=>{const q=request({hostname:'127.0.0.1',port:f.tlsPort,path,method,ca,headers:{'sec-fetch-site':'same-origin',...headers,...(body?{'content-length':Buffer.byteLength(body)}:{})}},r=>{let b='';r.on('data',x=>b+=x);r.on('end',()=>resolve({status:r.statusCode,headers:r.headers,body:b}));});q.on('error',reject);q.end(body);});
+const paired=await call('/__fixture/pair');
+const cookie=paired.headers['set-cookie']?.[0].split(';')[0]??'';
+const body=JSON.stringify(toJSON({data:{}}));
+const r=await call('/_serverFn/'+f.ids.read,'POST',{cookie,origin:f.remoteOrigin,'content-type':'application/json','x-tsr-serverFn':'true'},body);
+const result=r.headers['x-tss-serialized']?fromCrossJSON(JSON.parse(r.body),{refs:new Map()}):JSON.parse(r.body);
+console.log(JSON.stringify({status:r.status,headers:r.headers,resultType:typeof result,resultKeys:Object.keys(result),nestedKeys:result.result&&Object.keys(result.result),failure:result.error??null,viewer:result.result?.snapshot?.viewer}));

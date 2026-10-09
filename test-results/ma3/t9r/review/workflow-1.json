@@ -1,0 +1,1264 @@
+{
+  "coverage": {
+    "scenarios": [
+      {
+        "scenario": "1. Cross-Agent authorization: approval for Agent A substituted for Agent B must fail",
+        "tests": [
+          "src/lib/bunny-host/remote-remediation.test.ts:72 'T9R remote approval cannot substitute agentId across canonical offers' (template loop at :71; asserts :77-93)",
+          "src/lib/bunny-host/remote-device.test.ts:359 'T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers' (lines 376-380: device approve with extra maximumActions -> 'exact Host offer'; stale revision -> 400)",
+          "src/lib/bunny-missions/agentic-authorization.test.ts:86 'A34 remote client cannot invent or widen the Host offer' (agentCommand direct, not HTTP)"
+        ],
+        "realAdmissionPath": true,
+        "howReal": "remote-remediation.test.ts:72 is real: startHost HTTP /command with the paired device bearer, real SQLite, real Capability Bus replay of A's envelope at B's bus boundary (:86-89). It proves mission.respond rejects agentId and that no receipt is written in B's project. remote-device :376 is real HTTP but tests extra-field rejection on agent.authorization.approve, not a cross-agent id. agentic-authorization A34 is a direct command call, not an admission path.",
+        "gap": "(a) The agentId case is rejected by the key allowlist added at src/lib/bunny-missions/commands.server.ts:64-65 (any key outside requestId/decision/maxActions/ttlMs), so the test proves key rejection, not a binding check. (b) No HTTP test sends agent.authorization.approve with id=Agent B and a revision belonging to Agent A's offer. (c) Initial delegation approval from a device is always WORKSTATION_REQUIRED (remote-device.test.ts:373-374), so the cross-agent approve test must use a mid-run reissued offer, not the initial one.",
+        "proposedTest": "File: src/lib/bunny-host/remote-remediation.test.ts, reuse fixture() and make(name, projectId). Steps: const a = await f.make('Agent A'); const b = await f.make('Agent B', f.projectB). Drive a mid-run offer for both agents: device calls agent.pause {id} then agent.resume {id, revision} (pattern at remote-device.test.ts:387-401), then read each agent's current authorization.revision from f.state(f.device.token). Call f.api('agent.authorization.approve', {id: b.agent.id, revision: aOffer.revision}, f.device.token) and expect status 400 or 409 (not 200). Then assert f.host.missions.store.request(b.request.id)?.resolvedAt is null, and that B's receipt.txt under f.otherRoot does not exist. Finally run the matching approve with aOffer.id and bOffer.revision and assert it is refused. Record evidence with record('cross-agent-approve', {...}) matching the existing record() pattern."
+      },
+      {
+        "scenario": "2. Cross-Mission authorization",
+        "tests": [
+          "src/lib/bunny-host/remote-remediation.test.ts:72 'T9R remote approval cannot substitute missionId across canonical offers' (binding=missionId; assertions :77-93)",
+          "src/lib/bunny-host/remote-device.test.ts:503 'T9 F17/G7: Mission approvals bind to the reviewed plan; Agent Missions never start as bare Missions remotely' (lines 515-517: mission.approve with another Mission's planReference -> 400 'plan changed'; lines 527-529: Agent Mission approve/start from device refused)",
+          "src/lib/bunny-missions/approval-batches.test.ts:458 'T9 mission boundary: another mission, even for the same app and the same user, inherits nothing' (MissionManager level, not HTTP)",
+          "src/lib/bunny-missions/approval-batches.test.ts:479 'T9 stop: ending a mission ends its batch; the concurrent mission's batch and paused work survive untouched' (MissionManager level)"
+        ],
+        "realAdmissionPath": true,
+        "howReal": "remote-remediation :72 and remote-device :503 go through real HTTP /command with the device bearer, real SQLite and the real MissionManager. approval-batches :458 and :479 use the real MissionManager and bus with a fake Computer adapter, but no HTTP or device token. manager.server.ts:3172 (revokeBatch checks batch.missionId === id) is a code-level guard with no HTTP test.",
+        "gap": "(a) No device-level test that mission.revoke_batch for Mission A with the batchId of Mission B is refused (the guard exists at manager.server.ts:3172 but is unexercised over HTTP). (b) mission.stop is a supervise right and a device may stop any Mission it can see; that is by design but has no test asserting it is intentional. (c) No test with the device's requestId from Mission A answered after Mission B is stopped.",
+        "proposedTest": "File: src/lib/bunny-host/remote-device.test.ts, reuse fixture({agentic:true}), pair(), api(), op(). Create two Missions with mission.create (as in test at :503). Have Mission A's batch offered (desktop asks are needed, so use the approval-batches fake Computer pattern from approval-batches.test.ts:53-88 only if a computer adapter is wired; otherwise assert the 400). Call api('mission.revoke_batch', {missionId: missionB.id, batchId: batchOfA.id}, device.token) and expect status 400 with batch A still status 'active' in f.host.missions.store.batch(batchOfA.id). Keep the test deterministic by skipping the batch part if no computer adapter is present and asserting only the cross-mission mission.respond refusal already covered at :515-517."
+      },
+      {
+        "scenario": "3. Cross-Project authorization: request bound to Project A cannot grant access to Project B (incl. artifact access)",
+        "tests": [
+          "src/lib/bunny-host/remote-remediation.test.ts:72 binding=projectId case ('T9R remote approval cannot substitute projectId across canonical offers'; f.projectB substituted into mission.respond at :76-77)",
+          "src/lib/bunny-missions/project-live.test.ts:107 'T7 P04/P22/P41/P42/P43/P44/P45/P46/P59: real Project Mission and fresh Windows Host preserve identities and verified effects' (lines 226-231: workstation project.artifact with projectA+artifactId ok; projectB+same artifactId -> 400; project.get on B shows no A artifacts at ~line 221-222)",
+          "src/lib/bunny-host/remote-device.test.ts:116 'T9 F01/F02/F05/F11' (device projection only sees own device row; not project-scoped)"
+        ],
+        "realAdmissionPath": true,
+        "howReal": "remote-remediation :72 projectId case is real HTTP and proves key rejection of projectId in a device mission.respond. project-live :226-231 is a real forked Windows Host with real HTTP and SQLite, but uses the workstation token (host.api at :51-54 uses ready.token), so it is NOT the paired-device path. No test exercises project.artifact or project.get with a paired device token across two Projects.",
+        "gap": "(a) The projectId substitution is rejected by the generic key allowlist (commands.server.ts:64-65), not by a project-binding check, so a legitimate Project A request whose artifact lookup is retargeted is not tested. (b) No device-token test of project.artifact {projectId: B, artifactId: artifact-from-A} expecting 400 (DEVICE_RIGHTS lists project.artifact as 'read' at device-authority.server.ts:56 and http.server.ts:535 applies deviceArtifactRead to the result, so the device read path is untested). (c) Device-visible project.get on Project B is not asserted to omit Project A artifacts.",
+        "proposedTest": "File: src/lib/bunny-host/remote-remediation.test.ts, reuse fixture() (projectA, projectB, device, api). Obtain a verified artifact in Project A by running make('Artifact A') to completion (or copy the artifact-producing steps from project-live.test.ts:60-107 if the write does not create one). Then with the device token: f.api('project.artifact', {projectId: f.projectB, artifactId: artifactA.id}, f.device.token) and expect status 400 with no path or artifact body in the response. Also f.api('project.get', {id: f.projectB}, f.device.token) and assert artifactA.id is absent and no 'path' or 'location.path' key appears in the JSON. Positive control: f.api('project.artifact', {projectId: f.projectA, artifactId: artifactA.id}, f.device.token) returns 200 with location limited to {kind, mediaType} (deviceArtifactRead, device-authority.server.ts:426-437)."
+      },
+      {
+        "scenario": "4. Offline approval replay: stale approval held by a phone must not auto-apply after reconnect",
+        "tests": [
+          "src/lib/bunny-host/remote-remediation.test.ts:99 'T9R offline approval is refused after reconnect; only the new Host offer can execute' (lines 105-116: Pause/Resume reissues the ask; stale id refused with REFUSED at :111; replayed operationId at :112-113; receipt absent at :109 and :114; fresh request executes at :115-116)",
+          "src/lib/bunny-host/remote-device.test.ts:359 'T9 F12-F15/F19-F22/F50 (G2)' (lines 397-401: reissued ask; superseded ask 'can never be answered' -> REFUSED at :400)",
+          "src/lib/bunny-missions/approval-batches.test.ts:665 'T9 approval replay: changed planned action cannot answer an old offer and the request stays open' (bus-level)",
+          "src/lib/bunny-missions/agentic-live.test.ts:76 'T5 DISPOSABLE LIVE VERIFIED: fresh Host process/SQLite, revoked device, old approval, reviewed restart' (line 96: old request -> 400; line 98: 'reviewed consent never replays effects')"
+        ],
+        "realAdmissionPath": true,
+        "howReal": "remote-remediation :99 is real HTTP and real SQLite with the real mission request store, but the 'offline' part is simulated: the test never opens or closes an /events stream and never changes the Host epoch. The held payload is an in-memory object reused with the same expect hostId/epoch, so the refusal comes from request supersession (REFUSED), not from epoch mismatch. agentic-live :76 is the only real cross-process restart replay test, and it uses the workstation token, not the device.",
+        "gap": "(a) No SSE disconnect and reconnect on the device path around the held approval; the reconnect is only a /state read. (b) No held payload with an older epoch: the test's expect equals the current epoch, so HOST_EPOCH_CHANGED (http.server.ts:470-471) is never exercised for mission.respond. (c) No device-token replay across a real Host restart. The device credential survives restart in SQLite, but no test checks that a pre-restart held approval is refused on the new epoch.",
+        "proposedTest": "File: src/lib/bunny-host/remote-remediation.test.ts. Refactor fixture() so base, host and api are read through a mutable ref (current API closures bind host and base as const at :34-39), and add restart() that awaits host.close() and calls startHost again with the same dataDirectory/root/workspaceRoot and a new free port without the rmSync that close() does (:67). Steps: a = await f.make('Held approval'); open f.stream via fetch to /events with the device token and abort it (pattern at :153); capture const held = (await f.state(f.device.token)).body.hostIdentity; await f.restart(); assert f.state(f.device.token) is 200 with the same hostId and a new epoch; then api('mission.respond', {requestId: a.request.id, decision: 'allow_once'}, f.device.token, {expect: held}) and expect 409 with code HOST_EPOCH_CHANGED; assert receipt.txt absent in f.root. Then assert the post-restart reissued ask (if any) is refused for the old request id with REFUSED and only the fresh id can execute."
+      },
+      {
+        "scenario": "5. Device revocation during live SSE: post-revocation protected sequence delivery stops; canonical sequence correctness and payload redaction preserved",
+        "tests": [
+          "src/lib/bunny-host/ma2-t10.test.ts:49 'T10-T6-04: revocation ends an already authenticated Host SSE before future delivery' and the task-scoped variant of the same test (lines 55-72: positive control sequence delivered; redacted detail; revoke via command; POST_REVOKE event absent; 401 on /events, /state, /command)",
+          "src/lib/bunny-host/ma2-t10.test.ts:75 'T10-T6-04: revoking one device preserves workstation and independently paired streams' (lines 79-88: other device still gets canonical sequence and safe projection only)",
+          "src/lib/bunny-host/remote-device.test.ts:297 'T9 F43-limits: paired-device load is bounded per device; the workstation is unchanged' (lines 316-336: self sign-out closes 3 open device streams within 3s)",
+          "src/lib/bunny-host/remote-device.test.ts:452 'T9 device projection: bounded, path-free and transcript-free' (lines 463-465: direct device SSE contains no private transcript)",
+          "src/lib/bunny-host/remote-device.test.ts:544 'T9 revocation race: a delayed body cannot retain the authority authenticated before revocation'",
+          "src/lib/bunny-host/host.test.ts:75 'Host HTTP authentication, pairing revocation and approval validation' (401 after revoke; pairing refused 403)"
+        ],
+        "realAdmissionPath": true,
+        "howReal": "ma2-t10 uses real startHost HTTP /events with a paired bearer, the real SSE pump (http.server.ts:170-200 authorized() check before each write) and real SQLite events. Redaction is asserted on the wire. remote-device :297 covers closing open streams (DeviceStreams.closeDevice, http.server.ts:728). The workstation revoke path is covered; the self sign-out path is covered for streams only.",
+        "gap": "(a) device.revoke by the device itself (self sign-out) skips endDeviceGrants: http.server.ts:730 is 'const ended = local ? await endDeviceGrants(...) : {batches:0, delegations:0}'. So batches and Agentic delegations the phone approved remain ACTIVE after self sign-out. grep shows endDeviceGrants is referenced only in http.server.ts (lines 730 and 820), and no test exercises it, for either local or self revocation. This is a candidate authority-survival gap, not verified at runtime. (b) No assertion that the canonical sequence is gapless and monotonic across a revoke/re-pair cycle. (c) ma2-t10.test.ts:20-ish fixture hard-codes port 45139 (and host.test.ts:75 uses 43129) instead of a free port, so a port clash fails the test.",
+        "proposedTest": "File: src/lib/bunny-missions/agentic-authorization.test.ts is not HTTP, so use src/lib/bunny-host/remote-device.test.ts with fixture({agentic:true}) (has FilesystemCapability/Terminal/Git) plus pair(), stream(), api(), op(), until(). Steps: const device = await f.pair(); const a = await f.api('agent.create', {name:'Grant', objective:'Read then write', steps:[op('Inspect','filesystem.read',{path:'seed.txt'}), op('Write','filesystem.write',{path:'result.txt',content:'phone',overwrite:true},[0])]}); propose and use reviewed reduced revision as in :378-380 but using the device token for agent.authorization.approve on the mid-run reissue. Then open f.stream(device.token), call api('device.revoke', {}, device.token) (self sign-out), and assert: stream ends within 3s; the Agent's authorization is REVOKED (or the agent is stopped) per the workstation-revoke equivalent. Run the same flow with api('device.revoke', {id: device.deviceId}) from the workstation and assert the same outcome. Expected result: the self sign-out case fails until http.server.ts:730 is changed or a decision is recorded that self sign-out intentionally keeps delegations. Add a sequence check: read /events?after=0 before and after the revoke and assert the sequence numbers are strictly increasing with no duplicates."
+      },
+      {
+        "scenario": "6. Lost command acknowledgment: command applied by Host with lost client receipt reconciles by operation ID with no duplicate side effect (mission/agent commands: mission.respond approve, Pause/Resume/Stop, not only submit)",
+        "tests": [
+          "src/lib/bunny-host/remote-device.test.ts:196 'T9 F06/F35/F40: Host identity and epoch expectations refuse stale views; operation ids never execute twice' (submit applied replay: lines 208-215, replayed:true and no second task; approve refused replay: lines 229-236; operation.status states lines 219-226)",
+          "src/lib/bunny-host/remote-remediation.test.ts:99 (lines 110-113: refused mission.respond replayed with same operationId returns operation.replayed true; only the REFUSED path)",
+          "src/lib/bunny-host/remote-remediation.test.ts:148 'T9R client-only connection loss during admitted work leaves the same Host Agent completing once' (loss of SSE only, not command acknowledgment)",
+          "src/components/island/connection-model.test.ts:139 'T9 commands: a lost acknowledgement resolves only from the Host's own record' (pure reconcileCaption only)"
+        ],
+        "realAdmissionPath": true,
+        "howReal": "remote-device :196 is real HTTP with real SQLite and the real operation ledger (http.server.ts:474-493, ledger.finish at :755/:804). The applied replay is covered only for submit and the refused replay only for approve and mission.respond. connection-model :139 is a pure caption function. use-island.ts reconcile (lines 531-560, calls operation.status and forgets the row on epoch change) has no test file.",
+        "gap": "(a) No applied-path replay for mission.respond allow_once or allow_batch: the second identical call should return 200 with operation {state:'applied', replayed:true} and exactly one succeeded filesystem.write run. (b) No operationId replay for agent.pause, agent.resume, agent.stop or mission.stop, the Pause/Resume/Stop commands named in scope. (c) No HTTP test for OPERATION_IN_PROGRESS (http.server.ts:486-487); only the unit at remote-device.test.ts:571 checks the ledger error text 'still being confirmed'. (d) The OperationLedger is in memory (http.server.ts:300 'new OperationLedger()', no persistence), so a replay after a Host restart returns state 'unknown' (http.server.ts:579). The client treats a changed epoch as 'forget' (use-island.ts:546-547), and that path is untested for mission commands.",
+        "proposedTest": "File: src/lib/bunny-host/remote-remediation.test.ts, reuse fixture() and make(). (1) mission.respond applied replay: const opId = randomUUID(); const expect = (await f.state(f.device.token)).body.hostIdentity; first = api('mission.respond', {requestId: a.request.id, decision:'allow_once'}, f.device.token, {operationId: opId, expect}); assert 200 and operation {state:'applied', replayed:false}; second identical call -> 200 with operation {state:'applied', replayed:true}; assert f.host.missions.store.runs({missionId: a.agent.missionId!}).filter(r => r.action==='filesystem.write' && r.status==='succeeded').length === 1 after until(receipt.txt exists). (2) Pause/Stop replay: create a second Agent with make('Pause replay'); api('agent.pause', {id}, token, {operationId: opId2, expect}) twice; assert both return applied and the second has replayed:true, and the Agent state is PAUSED with the pause journal event (grep the event type emitted by the agent pause path before asserting the count). Use api('operation.status', {operationId: opId}, token) to assert state 'applied' and action 'mission.respond'. (3) Add an OPERATION_IN_PROGRESS case by holding HeldFilesystem (remote-remediation.test.ts:136-146) and replaying the same operationId while the write is still held: expect 409 code OPERATION_IN_PROGRESS."
+      },
+      {
+        "scenario": "7. Host replacement: client pinned to Host A rejects unexpected Host B (both server-side expect-check AND client-side UI/runtime behavior)",
+        "tests": [
+          "src/lib/bunny-host/remote-device.test.ts:196 'T9 F06/F35/F40' (lines 201-207: submit with expect.hostId of another Host -> 409 HOST_IDENTITY_CHANGED; expect.epoch 'previous-epoch' -> 409 HOST_EPOCH_CHANGED; nothing executed at :207)",
+          "src/components/island/connection-model.test.ts:95 'T9 connection: a different Host blocks every control until the user trusts it' (reducer only: host-changed state, canAct false, trust-host returns to polling)",
+          "src/components/island/connection-model.test.ts:125 'T9 commands: only mutating actions carry operation ids and epochs' (isMutating only)",
+          "src/components/island/connection-model.test.ts:131 'T9 commands: captions come from codes and outcomes' (HOST_EPOCH_CHANGED / HOST_IDENTITY_CHANGED captions)"
+        ],
+        "realAdmissionPath": true,
+        "howReal": "Server-side: remote-device :196 is real HTTP and proves the expect check runs before dispatch, but only for submit (a chat action). The expect check (http.server.ts:466-472) is generic, so mission.respond and approve are covered by code only. Client-side: connection-model tests are pure reducer and caption tests. The pin logic lives in src/store/use-island.ts (lines 400-409 pin-on-first-snapshot and hostChanged; 574-581 command() refuses mutating actions when canAct() is false; 690-695 trustHost re-pins; 546-547 reconcile epoch check). No test file covers use-island.ts (src/store has only use-island.ts and use-quorum.ts).",
+        "gap": "(a) No HTTP test that a mission.respond, agent.authorization.approve, or agent.pause with expect.hostId of another Host is refused with 409 and changes nothing. (b) No client test for the store-level pin: first device snapshot pins, a different hostId sets hostChanged, command() refuses mutating actions while host-changed, and trustHost re-pins and resumes. (c) Note from code reading only: apply() still ingests the snapshot content of an unpinned Host after setting hostChanged (use-island.ts:401-412), so Host B's data is rendered read-only until trust. This is inference from reading, not run. (d) Inference: a device token from Host A is refused by Host B with AUTH_REQUIRED because devices live in each Host's SQLite, so the pin mismatch branch is reachable mainly via a copied database, which is not tested.",
+        "proposedTest": "Server (src/lib/bunny-host/remote-remediation.test.ts, reuse fixture() and make()): const identity = (await f.state(f.device.token)).body.hostIdentity; for each action in [mission.respond with requestId, agent.pause with id, agent.authorization.approve with id+revision] call f.api(action, data, f.device.token, {operationId: randomUUID(), expect: {hostId: '00000000-0000-0000-0000-000000000000', epoch: identity.epoch}}) and expect 409 code HOST_IDENTITY_CHANGED, then assert the request is still unresolved and no receipt.txt exists. Client (pure, no server): extract the pin decision at use-island.ts:401-408 into an exported function such as pinDecision({viewer, identity, pinned}) returning {pinned, hostChanged}, and add a node test in src/components/island/connection-model.test.ts style: first snapshot pins, second with another hostId returns hostChanged true, canAct false via canAct(connectionReducer(...)), and trust resets. If extraction is not wanted, a store test needs stubs for commandBunnyHost (the server function import) to load use-island.ts in node."
+      },
+      {
+        "scenario": "8. Concurrent approvals: competing phone/desktop decisions produce exactly one canonical resolution",
+        "tests": [
+          "src/lib/bunny-host/remote-remediation.test.ts:121 'T9R concurrent desktop and phone approval has one canonical winner and one effect' (Promise.all of desktop allow_once and phone deny at :125; exactly one 200 and one 400 at :126-127; resolution from store and successful write count equals 1 only when allow at :131)",
+          "src/lib/bunny-missions/approval-batches.test.ts:696 'T9 Stop races preflight: canonical Stop wins before admission and unrelated work survives' (bus-level race)",
+          "src/lib/bunny-missions/approval-batches.test.ts:719 'T9 expiration races preflight: time is rechecked after the asynchronous target check' (bus-level)",
+          "src/lib/bunny-missions/approval-batches.test.ts:735 'T9 retries and provider reroute: each new admission consumes exactly one' (budget, not concurrency between approvers)"
+        ],
+        "realAdmissionPath": true,
+        "howReal": "remote-remediation :121 issues two concurrent real HTTP /command calls against one Host (desktop token and device token) and checks the real store resolution and the effect count. approval-batches :696 and :719 are real MissionManager races but not approval-versus-approval.",
+        "gap": "(a) Only two responders and only allow vs deny. No batch-versus-once race (phone allow_batch vs desktop allow_once on the same request). (b) No race between agent.authorization.approve (device, mid-run) and mission.respond on the same Agent. (c) The test asserts status codes and the store resolution but not that the loser's 400 is REFUSED with the winner's resolution. (d) No assertion that a second distinct phone operationId for the same request returns the canonical resolution and creates no second batch or write.",
+        "proposedTest": "File: src/lib/bunny-host/remote-remediation.test.ts, reuse fixture() and make(). const a = await f.make('Race'); const responses = await Promise.all([f.api('mission.respond', {requestId: a.request.id, decision:'allow_batch'}, f.device.token, {operationId: randomUUID(), expect: identity}), f.api('mission.respond', {requestId: a.request.id, decision:'allow_once'}), f.api('mission.respond', {requestId: a.request.id, decision:'allow_once'}, f.device.token, {operationId: randomUUID(), expect: identity}), f.api('mission.respond', {requestId: a.request.id, decision:'deny'})]). Assert exactly one 200 response; each 400 has code REFUSED; the resolvedBy of the stored request is the winner's actor (device:<id> or 'workstation' from actorOf at device-authority.server.ts:116); f.host.missions.store.batches(a.agent.missionId!).length <= 1; and successful filesystem.write runs equal 1 only when the winning resolution is allow. Record the winner in evidence via record('concurrent-four-way', {...})."
+      },
+      {
+        "scenario": "9. Host restart preserves Agent/Mission identity, hostId, new epoch, and rejects stale approval (find tests)",
+        "tests": [
+          "src/lib/bunny-missions/agentic-live.test.ts:76 'T5 DISPOSABLE LIVE VERIFIED: fresh Host process/SQLite, revoked device, old approval, reviewed restart' (real forked Host, lines 92-98: pid and generation differ; Agent id preserved and WAITING_FOR_USER after recovery; old request 'mission.respond' -> 400 at :96; renewed approval 200 at :97; admitted count stays 1 at :98)",
+          "src/lib/bunny-missions/approval-batches.test.ts:501 'T9 restart: every batch fails closed twice' (rotateBatchEpochForTest, recover(), endReason host_restart; MissionManager level)",
+          "src/lib/bunny-missions/approval-batches.test.ts:520 'T10-XG-13: Host restart invalidates a pending request; explicit retry creates a fresh decision' (old request resolvedBy 'bunny-host-restart', deny; retry creates a new request)",
+          "src/lib/bunny-missions/approval-batches.test.ts:540 'T10-XG-05: restart discards a one-time decision that has not begun GUI execution'",
+          "src/lib/bunny-host/remote-remediation.test.ts:148 (lines 157-166: 'no Host restart substituted for client loss' asserts the same epoch and the same Agent/Mission without restart)",
+          "src/lib/bunny-host/remote-device.test.ts:116 'T9 F01/F02/F05/F11' (lines 119-121: one stable hostId across two pairings in one process)"
+        ],
+        "realAdmissionPath": true,
+        "howReal": "agentic-live :76 is the strongest: a real forked Host process with real SQLite and the real HTTP surface, fresh pid and manager.instanceId (the worker reports generation = host.manager.instanceId, scripts/fixtures/agentic-host-worker.mjs:12). approval-batches restart tests are MissionManager-level recover()/rotateBatchEpochForTest, not a process restart. None of the restart tests uses a paired device token, and no restart test asserts hostId equality.",
+        "gap": "(a) hostId persistence across a real restart is not asserted anywhere: hostId comes from host_identity in SQLite (device-authority.server.ts:125-128; http.server.ts:298). (b) agentic-live :76 revokes the device before restart (line 90) so a paired device surviving restart is untested. (c) Mission identity (agent.missionId) is not compared before and after restart. (d) Epoch is checked only as manager generation over IPC, not via /state hostIdentity.epoch (http.server.ts:298 sets epoch = manager.instanceId). (e) No test sends a pre-restart expect {hostId, epoch} and expects HOST_EPOCH_CHANGED (http.server.ts:470-471) after a real restart; remote-device :206 uses a fabricated 'previous-epoch' string.",
+        "proposedTest": "File: src/lib/bunny-host/remote-remediation.test.ts, after the restart() helper from scenario 4 is added. Steps: const a = await f.make('Restart identity'); const before = (await f.state(f.device.token)).body.hostIdentity; const agentBefore = a.agent.id, missionBefore = a.agent.missionId; await f.restart(); const after = await f.state(f.device.token) (must be 200, a paired device surviving restart); assert after.body.hostIdentity.hostId === before.hostId and after.body.hostIdentity.epoch !== before.epoch; assert the Agent with id agentBefore keeps missionId missionBefore and state WAITING_FOR_USER; api('mission.respond', {requestId: a.request.id, decision:'allow_once'}, f.device.token, {expect: before}) -> 409 HOST_EPOCH_CHANGED; with no expect -> 400 REFUSED; assert receipt.txt absent. Use fixture data directory from f.directory so SQLite persists; do not call f.close() between restarts."
+      }
+    ]
+  },
+  "reviewed": [
+    {
+      "lens": "native-target",
+      "all": [
+        {
+          "id": "CAL-01",
+          "severity": "INFO",
+          "title": "PID reuse of frame or content process is rejected",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "After the Calculator process exits, an unrelated process (or a new process) receives the same PID and the approved identity is replayed against it.",
+          "evidence": "Blocked. Frame owner is re-read with Get-Process (line 258 in valid; line ~115-118 in Native-CalculatorFrame) and must pass Assert-CalculatorProcess (lines 102-110: session equality plus exact InstallLocation\\CalculatorApp.exe or Calculator.exe path) or, for ApplicationFrameHost, the frame AUMID must equal PackageFamilyName!AppId (lines 125-132). Lifetime is pinned: line 136 compares handle, processId and processStartedAt to the approved identity; lines 137-140 compare content process path and StartTime; Assert-BatchWindow lines 197-198 repeat the comparison. Ready-CalculatorWindow line 161 rejects a lifetime change during readiness.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:102-110 Assert-CalculatorProcess; :136 frame lifetime compare; :140 content StartTime compare; :197-198 Assert-BatchWindow identity compare",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts ('Frame PID lifetime changed', 'Content PID lifetime changed' - TS propagation only, with a simulated automate; PowerShell logic is not executed by any unit test)"
+        },
+        {
+          "id": "CAL-02",
+          "severity": "INFO",
+          "title": "HWND reuse is rejected unless the same verified process owns it",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "The approved HWND is closed and a different window receives the same handle value, then the old identity is reused against it.",
+          "evidence": "Blocked. Identity includes handle, processId and processStartedAt. valid script line 259 requires owner and StartTime to match and line 261 re-runs Native-CalculatorFrame. Native-CalculatorFrame line 136 and Assert-BatchWindow line 197 compare handle. Ready-CalculatorWindow re-fetches FromHandle($h) each iteration (line 159) and re-checks the lifetime (line 161). Residual: a same-process HWND reuse is accepted, but it is the same verified Calculator process and the same arithmetic surface is re-checked (num0Button path check at line ~203-212), so this is not a wrong-application path.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:136 and :197 handle compare; :259 owner/StartTime compare in valid",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts ('HWND replacement' - simulated TS propagation only)"
+        },
+        {
+          "id": "CAL-03",
+          "severity": "INFO",
+          "title": "Foreign top-level window named Calculator is never acted upon",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A non-Calculator process (Win32 or UWP) creates a top-level window titled exactly Calculator so that the approved or enumerated target is that window.",
+          "evidence": "Blocked from acting on it. Calculator-Frames line 147 calls Native-CalculatorFrame on every window with Name -eq 'Calculator'. Win32-owned windows fail Assert-CalculatorProcess (lines 102-110, throws 'The target is outside the verified Calculator application.'). AFH-hosted frames must match an installed Calculator AUMID (lines 125-132, throws 'Native frame does not identify the installed Calculator application.'). Batch-mode Find-Window (line ~66-68) calls Assert-BatchWindow on each title match and therefore throws rather than selecting it. Consequence is fail-closed denial, see CAL-20.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:102-110 Assert-CalculatorProcess; :125-132 AUMID trust; :147 Calculator-Frames calls Native per match",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-04",
+          "severity": "INFO",
+          "title": "ApplicationFrameHost frame hosting another UWP app is rejected at content level",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A foreign UWP app is hosted in ApplicationFrameHost with a title of Calculator, and its frame AUMID is either a different package (rejected by line 132) or a spoofed Calculator AUMID (passes line 132).",
+          "evidence": "Different package AUMID: blocked at Native-CalculatorFrame line 132. Spoofed AUMID: frame-level checks pass, but every action path also calls Assert-BatchWindow, whose content check requires the num0Button owner process to be CalculatorApp.exe or Calculator.exe inside the verified package (lines 203-212, 'The target is outside the verified Calculator application.'). The foreign content process cannot satisfy this, so no operation is admitted. Residual: restoration can still occur before this content check (see CAL-05), and the code assumes the AFH frame AUMID property is not app-settable, which cannot be verified from source.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:132 AUMID equality; :203-212 Assert-BatchWindow content path check (CalculatorApp.exe/Calculator.exe in verified package)",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-05",
+          "severity": "LOW",
+          "title": "Minimized window is restored before content-process identity is verified",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A window whose frame passes Native-CalculatorFrame but whose arithmetic content is not Calculator is minimized and occupies an admitted HWND, then open_app is admitted against that identity.",
+          "evidence": "Ready-CalculatorWindow line 156 calls ShowWindow(h, 9) after only Native-CalculatorFrame (frame-level, lines 113-143). Assert-BatchWindow, which contains the content-process check, runs only at the return of the readiness loop (around line 179-180), after restoration. The precondition is an AFH frame with a spoofed Calculator AUMID (not verifiable from code) plus an HWND reuse that keeps the same AFH pid and StartTime to match the approved identity. Impact is un-minimizing a non-Calculator window inside an admitted open. Not reachable with a genuine Calculator frame.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-06",
+          "severity": "INFO",
+          "title": "Stale UIA element after window replacement is re-fetched and re-verified",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A UIA element obtained before a window is replaced is used to invoke or focus a control of the new window.",
+          "evidence": "Blocked. Ready-CalculatorWindow line 159 uses $fresh = FromHandle($h) on every iteration and re-runs Native-CalculatorFrame (line 160). Focus loop (lines ~320-322) refetches FromHandle and runs Assert-BatchWindow each iteration. invoke_control runs Assert-BatchControl (lines 224-230), which revalidates the window, requires the control's ProcessId to equal the num0Button owner, requires Button type and IsEnabled, and checks foreground equality (line 229). A stale element throws (ElementNotAvailable) rather than acting.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:159-160 FromHandle and re-verify in Ready; :224-230 Assert-BatchControl",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts ('Stale UIA element' - simulated)"
+        },
+        {
+          "id": "CAL-07",
+          "severity": "INFO",
+          "title": "Content-process ownership mismatch is rejected for all control operations",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A control in a different process than the arithmetic surface is invoked or read.",
+          "evidence": "Blocked. Ready line 168 throws 'Calculator readiness controls have different native owners.' Assert-BatchWindow lines 203-212 require num0Button owner to be Calculator. Assert-BatchControl line 228 requires $e.Current.ProcessId -eq num0Button ProcessId. read_calculator line 381 throws 'Calculator result identity changed.' if CalculatorResults owner differs. Control allowlist (batches.server.ts:63, CALCULATOR_CONTROLS) restricts invocable automationIds to digits and arithmetic keys.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:168, :203-212, :228, :381; batches.server.ts:63 allowlist",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-08",
+          "severity": "INFO",
+          "title": "Restoration is only reachable from admitted open or focus operations",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A read, preparation or invoke path causes ShowWindow on the Calculator target without an admitted open.",
+          "evidence": "Blocked for Calculator. ShowWindow appears only at line 156 (Ready, reached only via valid with prepareReadiness, which is set only inside the acquire closures at lines 483 and 489 under perform's open_app branch), and at line 313 (focus_window, after Assert-BatchWindow, with batch present in crossApp). prepareBatchAction (lines 528-545) calls valid with {} (line 535), and its input gate (line 529, calculatorOperation) rejects injected keys such as prepareReadiness (batches.server.ts:56-57 allowlist). read_calculator and invoke_control scripts contain no ShowWindow. Residual outside Calculator scope: see CAL-18 (non-crossApp focus restores any pid).",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:529 prepareBatchAction gate; :535 probe with {} args; :156 only under prepareReadiness; batches.server.ts:56-57 key allowlist",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts ('preparation is a pure probe; only admitted open requests restoration' - asserts flags length 0 for injected preparation)"
+        },
+        {
+          "id": "CAL-09",
+          "severity": "INFO",
+          "title": "Preparation probes do not mutate native state",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A preparation call (prepareBatchAction) restores, focuses or launches as a side effect while deciding the approval identity.",
+          "evidence": "Blocked. prepareBatchAction probes use CALCULATOR_SCRIPTS.valid with {} (line 535) and CALCULATOR_SCRIPTS.existing (line 539). In those scripts, the prepareReadiness branch (line 262) is not taken, and the non-prepare branch only calls Assert-BatchWindow (no ShowWindow, no Start-Process, no SetFocus). Non-open preparation runs Find-Window and Batch-Identity only. Start-Process appears only at lines 279 and 371, SetFocus at 327, SetForegroundWindow at 329 and 334, all inside action scripts.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:529, :535, :539 (probes with fixed args); no mutating API in valid/existing/Find-Window paths",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts (first test, flags assertion)"
+        },
+        {
+          "id": "CAL-10",
+          "severity": "INFO",
+          "title": "Focus path does not synthesize input and verifies native foreground",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "Focus is faked by synthesized keystrokes, AttachThreadInput, foreground-lock changes, or by reporting success without native foreground equality.",
+          "evidence": "Blocked. The file contains no SendInput, keybd_event, AttachThreadInput, SystemParametersInfo or LockSetForegroundWindow (grep empty). Focus uses SetFocus (semantic UIA, line 327) plus SetForegroundWindow (line 329), loops up to 2000 ms (lines ~317-332), and reports focused = GetForegroundWindow() -eq $h. TypeScript verifies with output.focused === true in perform's verification line, so a denied focus yields status failed.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts verified focus flag; perform() verified = output.focused === true; no input-synthesis API in file",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts ('focus denial stays a failed operation and cannot report foreground success')"
+        },
+        {
+          "id": "CAL-11",
+          "severity": "INFO",
+          "title": "Acquisition and focus loops are bounded by deadlines and consent expiry",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A stuck readiness or launch wait runs past the approval or the operation budget.",
+          "evidence": "Blocked for loops. Ready deadline min(start+8000, batch.expiresAt) at line 153, checked at line 176 and in the loop condition at line 181. acquire deadline at line 280 with Assert-BatchClock at line 282. Focus deadline min(start+2000, expiresAt). powershell execFile has timeout: timeoutMs (line 387), so the child is killed. See CAL-12 for the budget overrun that remains.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:153, :176, :280, :387 (execFile timeout)",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts ('Readiness budget exhausted' - simulated)"
+        },
+        {
+          "id": "CAL-12",
+          "severity": "LOW",
+          "title": "Launch budget can exceed the operation timeout and strand the acquiring record",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/calculator-targets.server.ts",
+          "attack": "A slow launch (8 s wait for the window, then up to 8 s readiness, plus uncached Get-AppxPackage and full-tree FindAll costs) exceeds the outer execFile timeout after calc.exe has started.",
+          "evidence": "Per-phase bounds are each 8 s (computer.server.ts:280 and :153), while the outer kill is timeoutMs = min(context.timeoutMs, 60000) (computer.server.ts:474, :387). Deadline checks happen only between UIA calls, so a single slow FindAll or Get-AppxPackage (Assert-BatchWindow line 204 is uncached) is not interrupted. The kill leaves storage phase 'acquiring' (calculator-targets.server.ts:64), so later calls refuse to relaunch and wait for review. Fail-closed, no duplicate launch, but a usable Calculator can be stranded.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-missions/calculator-targets.test.ts ('unknown launch failure persists a guard and rapid retries cannot launch again')"
+        },
+        {
+          "id": "CAL-13",
+          "severity": "INFO",
+          "title": "Consent expiry is rechecked at every native step that acts",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A window is restored, focused or invoked after the admitted batch expired.",
+          "evidence": "Blocked. Assert-BatchClock is the first statement of Native-CalculatorFrame (line 114), runs in each Ready iteration (line 158) and in Assert-BatchWindow (line 193), and before focus (line ~318) and after focus (line 333). TypeScript launch closure rechecks Date.now() >= scope.expiresAt (line 500). Residual: the existing script with zero Calculator windows performs no clock check (no Native call), but it is read-only and the launch closure that follows checks expiry.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:114, :158, :193, :333 Assert-BatchClock; :500 expiry check before launch",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-14",
+          "severity": "LOW",
+          "title": "Consent revocation is not rechecked between execute and the valid probe",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A Mission's desktop consent is revoked after execute()'s revalidate (line 438) but before the valid probe at line 483 starts, and the probe restores a minimized Calculator window (line 156).",
+          "evidence": "The valid and existing closures (lines 483, 489, 494) do not call context.revalidate. Between line 438 and the probe, perform() awaits CalculatorTargets.acquire's tail (calculator-targets.server.ts), which is serialized only for acquisitions and is not held by non-crossApp acquisitions. Revocation (not expiry) is therefore not rechecked. Effect is limited to restoring the Calculator window; launch (line 499) does recheck revalidate.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts ('revoked canonical consent prevents every native call' - covers only the first call)"
+        },
+        {
+          "id": "CAL-15",
+          "severity": "INFO",
+          "title": "No unrelated Calculator process is terminated",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "Cleanup or replacement kills a Calculator process that Bunny did not create, or kills by name.",
+          "evidence": "Blocked by absence. grep finds no Stop-Process, taskkill, .Kill(, WM_CLOSE or PostMessage in computer.server.ts. The only process termination is the trackOwnedChild-wrapped powershell child killed by execFile timeout (line 387). Residual: the guard test regex (calculator-targets.test.ts line 130) is narrow and does not cover the kill alias or Stop-Process via a variable.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts: no termination API; calculator-targets.test.ts:130 regex (narrow)",
+          "existingTest": "src/lib/bunny-missions/calculator-targets.test.ts:129-134 ('production acquisition has no destructive cleanup')"
+        },
+        {
+          "id": "CAL-16",
+          "severity": "LOW",
+          "title": "Launch guard is keyed per owner, so another owner can launch during an uncertain outcome",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/calculator-targets.server.ts",
+          "attack": "Owner A's calc.exe launch has an uncertain outcome (phase acquiring persisted). Owner B, with no record, calls open_app while the window is not yet visible, and a second calc.exe is started.",
+          "evidence": "Guard at calculator-targets.server.ts:62 reads storage.load(owner) only for the same owner. Owner B's acquisition reaches Start-Process (computer.server.ts:279) when zero Calculator frames are visible. Impact is a possible second activation; the post-launch count check (computer.server.ts:288 and :292) fails closed on more than one window. Owner B's launch still requires its own admitted open (launch closure, lines 499-500 recheck revalidate and expiry).",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-missions/calculator-targets.test.ts ('unknown launch failure persists a guard' - same owner only)"
+        },
+        {
+          "id": "CAL-17",
+          "severity": "LOW",
+          "title": "powershell.exe is spawned by bare name with no working directory",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A planted powershell.exe in a directory searched before System32 (for example the Host's working directory) is executed in place of the system PowerShell, receiving BUNNY_COMPUTER_PARAMS and BUNNY_COMPUTER_BATCH.",
+          "evidence": "computer.server.ts:387 execFile(\"powershell.exe\", ...) with no absolute path and no cwd option. Whether Windows/libuv consults the working directory before PATH was not verified in-session (no run allowed). Exploitation requires write access to the Host's process working directory or application directory, which is a user-level write, so impact is limited.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-18",
+          "severity": "MEDIUM",
+          "title": "Non-crossApp computer operations skip Calculator target policy and use first substring match",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "In a general computer-enabled Mission (not cross-app), a step issues computer.invoke_control with title Calculator and a non-allowlisted automationId (for example a Close or Save control), or focus/read with pid only. Find-Window matches with substring -like and returns the first match, so a foreign window titled 'Calculator - ...' that is first in z-order is invoked or focused.",
+          "evidence": "perform line 447 enforces calculatorOperation only when context.desktopBatch is set. calculator flag at line 471 is false for pid-only focus and for invoke with non-allowlisted automationId (batches.server.ts:63), so batch stays undefined (line 473). Non-batch Find-Window line 75 uses -like '*title*' and returns the first match without uniqueness or identity checks. Non-batch focus restores via line 313 unconditionally. read_calculator with pid reads any window's CalculatorResults element (line 381 compares only within that window). Cross-app delegations are protected by authorization.server.ts:232 (calculatorOperation only) and the desktopBatch gate, so the exposure is the general computer capability approved by authorization.server.ts:134 (envelope.computer.enabled).",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-19",
+          "severity": "INFO",
+          "title": "Existing-window binding without readiness is caught before any control action",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "The existing-window path (acquire existing closure, no prepareReadiness) binds a visible, non-minimized window whose num0Button exists but whose buttons are disabled or not invokable, and a later action is performed on it.",
+          "evidence": "Blocked downstream. existing script (around lines 241-250) and existing closure (line 494) bind without readiness, which is a deviation from the stated readiness contract. Every control action re-checks: Assert-BatchControl requires IsEnabled, Button type, same owner and foreground (lines 224-230), and invoke requires an Invoke pattern while batch is set (script line ~340-341). So no unready control is invoked.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:224-230 Assert-BatchControl; invoke script Invoke-pattern requirement when $batch is set",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-20",
+          "severity": "LOW",
+          "title": "Any foreign window titled Calculator denies Calculator acquisition (availability)",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "A local process creates a top-level window named exactly Calculator, so that every existing, acquire and prepare call fails for as long as it exists.",
+          "evidence": "Calculator-Frames line 147 throws from Native-CalculatorFrame for the foreign window. The existing script has no try (around line 243). The acquire loop catch (lines 284-286) tolerates only two messages, so the foreign-window error propagates. prepareBatchAction (line 539) also fails. Fail-closed (no action performed), but any approval involving Calculator is blocked while the window exists.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-21",
+          "severity": "LOW",
+          "title": "Preparation probe is not cancellable by Stop",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "Stop is requested while prepareBatchAction is running, and the probe keeps running for its full budget.",
+          "evidence": "prepareBatchAction uses new AbortController().signal with a 20000 ms timeout (lines 535 and 539), not the mission's cancellation signal. The Bus re-reads cancellation only after prepare returns (bus.server.ts lines ~193-200). Bounded at 20 s, so no unbounded wait and no mutation, but Stop is delayed.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-22",
+          "severity": "LOW",
+          "title": "Content identity is read twice, so a process swap between reads can record an unverified PID",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "Between Assert-BatchWindow's content check (lines 203-212) and Batch-Identity's read (line 188-189, via Ready line 179-180), the Calculator content process exits and a non-Calculator process takes the same PID while the UIA element still resolves to it, so the recorded contentProcessId is unverified.",
+          "evidence": "Batch-Identity calls $zero.Current.ProcessId independently of the earlier $digit read verified at line 203. There is no single-snapshot read. Likelihood is very low: the UIA element would have to resolve to a new non-Calculator content process within milliseconds. Impact would be recording an identity that a later operation then compares against the same unverified PID.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "CAL-23",
+          "severity": "INFO",
+          "title": "PowerShell identity logic has no executing unit test",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/calculator-readiness.test.ts",
+          "attack": "Regressions in AUMID, path, lifetime or foreground checks go unnoticed because the tests never run the PowerShell.",
+          "evidence": "calculator-readiness.test.ts injects a fake automate (for example 'throw new Error(fault)') for every fault, so the 'Wrong signed application', 'Frame PID lifetime changed', 'Content PID lifetime changed', 'HWND replacement', 'Stale UIA element' and 'Modal or password control' tests prove only that TypeScript propagates errors, not that the script detects them. calculator-targets.test.ts:129-134 checks source text by regex. Only the external X53 acceptance exercises real UIA, and it is outside this lens.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts (simulated automate)"
+        }
+      ],
+      "verified": [
+        {
+          "id": "CAL-18",
+          "severity": "MEDIUM",
+          "title": "Non-crossApp computer operations skip Calculator target policy and use first substring match",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "attack": "In a general computer-enabled Mission (not cross-app), a step issues computer.invoke_control with title Calculator and a non-allowlisted automationId (for example a Close or Save control), or focus/read with pid only. Find-Window matches with substring -like and returns the first match, so a foreign window titled 'Calculator - ...' that is first in z-order is invoked or focused.",
+          "evidence": "perform line 447 enforces calculatorOperation only when context.desktopBatch is set. calculator flag at line 471 is false for pid-only focus and for invoke with non-allowlisted automationId (batches.server.ts:63), so batch stays undefined (line 473). Non-batch Find-Window line 75 uses -like '*title*' and returns the first match without uniqueness or identity checks. Non-batch focus restores via line 313 unconditionally. read_calculator with pid reads any window's CalculatorResults element (line 381 compares only within that window). Cross-app delegations are protected by authorization.server.ts:232 (calculatorOperation only) and the desktopBatch gate, so the exposure is the general computer capability approved by authorization.server.ts:134 (envelope.computer.enabled).",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "",
+          "lens": "native-target",
+          "verdicts": [
+            {
+              "refuted": false,
+              "realSeverity": "LOW",
+              "reasoning": "The code path is real and no canonical boundary blocks it. Verified in src/lib/bunny-missions/capabilities/computer.server.ts: perform() (around line 447) enforces calculatorOperation only when context.desktopBatch is set. The calculator flag (line 471) is false for pid-only focus and for invoke_control with a non-allowlisted automationId, because calculatorOperation (batches.server.ts:55-64) returns false there. So batch stays undefined (line 473) and the non-batch path runs. In non-batch mode, Find-Window (lines ~75-79) matches by pid or by `$c.Name -like '*title*'` and returns the first match with no uniqueness or identity check. The Calculator-specific Assert-BatchWindow and Native-CalculatorFrame checks run only when $batch is set. Authorization does not block it either: decide() in authorization.server.ts (around lines 150-185) only checks envelope.computer.enabled for computer.* actions. The scopeViolation computer branch is a bare enabled check, and bus.server.ts only routes approval batches for ordinary asks. The cross-app restriction (authorization.server.ts:232, calculatorOperation only) applies only when e.cross_app is set. The existing tests (approval-batches.test.ts, agentic-authorization.test.ts A30) exercise Calculator protection only on batch or cross-app paths, not the general path. Refutation fails because nothing blocks it. The severity is overstated, though. The harm stays inside the envelope the user already approved for general computer control, since the agent can already target any window by title or pid there. No cross-mission, cross-app or privilege escalation is shown. The defect is a generic targeting-precision weakness (first substring match, no uniqueness), not a Calculator-policy bypass, so LOW fits better than MEDIUM.",
+              "fixSuggestion": "Make title matching exact rather than -like substring for all non-batch Find-Window calls, and fail with an ambiguity error when more than one top-level window matches (the same rule the batch path already applies). Alternatively, when the requested title equals \"Calculator\", route the non-batch call through the Calculator identity checks even when no batch is present. Add a test that a foreign window titled \"Calculator - X\" listed first is not selected by a general-mission invoke_control or focus_window call."
+            },
+            {
+              "refuted": false,
+              "realSeverity": "LOW",
+              "reasoning": "Read-only review of computer.server.ts (perform, Find-Window, Assert-BatchWindow, Calculator flag), batches.server.ts calculatorOperation, authorization.server.ts decide()/scopeFor()/line 232, and manager.server.ts:1846.\n\nCore claim holds, with no blocking code: for invoke_control with title \"Calculator\" and a non-allowlisted automationId, calculatorOperation returns false (batches.server.ts:55-63), so the calculator flag (line 471) is false and batch stays undefined. Find-Window then takes the non-batch branch and returns the first -like '*Calculator*' match. Assert-BatchWindow returns early when $batch is unset, so no Calculator package or identity check runs. The non-cross-app gate (perform line 447) applies only when desktopBatch is set. Nothing in decide() blocks it either: invoke_control is not manifest.sensitive, and the only mission-level gates are envelope.computer.enabled and EXECUTE in riskClasses. EXECUTE is added when the mission has a model step or a cross-app step, so a model-step mission with computer enabled reaches this path. The cross-app gates (authorization.server.ts:232, manager.server.ts:1846) do not apply to general missions.\n\nSub-claim refuted: read_calculator with pid. For read_calculator, calculator is true whenever the call is calculatorOperation-valid (pid-only included), so batch is always set. Assert-BatchWindow then runs Native-CalculatorFrame, the Name=='Calculator' check, Batch-Identity and the Calculator package/process path check. A foreign pid window throws, so the claim that read_calculator reads any window's CalculatorResults is incorrect.\n\nSub-claim weakened: focus_window with pid-only is general behavior (\"Bring a window to the foreground\", title/pid contains semantics) and is not a Calculator-specific policy. Title-substring first-match is the documented general semantics for every title, not just Calculator. The Calculator policy (allowlist + identity binding) is intentionally scoped to batch/cross-app. The remaining exposure is wrong-window targeting inside an already user-approved general computer mission, so I rate it LOW rather than MEDIUM.",
+              "fixSuggestion": "Either (a) treat any title==='Calculator' operation as Calculator-targeted for identity binding even when calculatorOperation is false (bind to saved.identity when present, otherwise refuse with an ambiguity error when several windows match), or (b) document that non-batch computer.* title matching is general substring matching and narrow the finding to wrong-window targeting. Drop the read_calculator sub-claim, since Assert-BatchWindow already enforces the package identity there."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "lens": "remote-authority",
+      "all": [
+        {
+          "id": "F-01",
+          "severity": "HIGH",
+          "title": "Paired device can approve a Mission whose model steps launch write-access provider sessions with shell, bypassing DEV-01",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 1959,
+          "attack": "Workstation user (or Bunny planner) creates a Mission whose plan contains a model step with scope.access 'write' (authorization.server.ts requestedScope builder: model step sets execution=true, write=true, providers.sessions.steps[].scope.access='write', writeIncludesShell:true). The Mission sits in waiting_for_approval. A paired device sends mission.approve {id} (start defaults true, http/commands REMOTE set includes mission.approve). deviceMissionRefusal only refuses riskClasses in WORKSTATION_ONLY_RISKS (EXTERNAL_SIDE_EFFECT, DESTRUCTIVE), sensitive/hardApproval manifests, and capability manifests; it never inspects providers.execution/providers.sessions and never calls deviceMayLaunch. The envelope is then saved and start() runs; for each model step manager.server.ts:1354 calls taskViolation (authorization.server.ts:267-281) and providerScopeViolation (authorization.server.ts:255-264), which admit a write-access child inside the envelope's write roots, and manager.server.ts:1383 calls tasks.approveDelegated(child) with no device/provider check. Result: codex/claude/cursor-class workspace-tool sessions with write and shell authority launch on the Windows Host on the strength of a phone tap. This contradicts the DEV-01 rule that a paired device may only launch local tool-free inference: direct approve enforces it (http.server.ts:553-566, deviceMayLaunch) and provider.execute requests enforce it (manager.server.ts:1949-1956), but the Mission path does not.",
+          "evidence": "manager.server.ts:1959-1971 deviceMissionRefusal checks only riskClasses/capability manifests; manager.server.ts:1383 approveDelegated with check = taskViolation(child, envelope,...); authorization.server.ts:255-262 providerScopeViolation admits executionScope.access==='write' when authority.scope.access==='write'; http.server.ts:564 `if (!deviceMayLaunch(pending))` exists only on the direct 'approve' path. remote-device.test.ts:503-533 (the Mission approval test) uses read-only filesystem.read plans only, so the model-session path is untested.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:503 (read-only plans only; no model-step coverage)"
+        },
+        {
+          "id": "F-02",
+          "severity": "MEDIUM",
+          "title": "Workstation revocation of a device does not end Mission authorizations the device approved",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "line": 820,
+          "attack": "Device approves Mission M (mission.approve, start true). M's envelope records grantedBy='device:<id>' (envelopeFrom in authorization.server.ts:99; manager.server.ts:765 saveAuthorization). Workstation then revokes the device (device.revoke, local=true). endDeviceGrants only ends approval_batches created_by the device and agentic_authorizations whose authorization_provenance.actor matches (http.server.ts:820-841). The Mission envelope is untouched: envelope validity checks read only revokedAt/expiresAt (authorization.server.ts:174, 268; manager.server.ts:3102), never grantedBy or the device's credential. M keeps launching child sessions and tool actions within its envelope until expiry (up to maxMissionRuntimeMs) or completion, while the device is revoked. The code comment at http.server.ts:729 says 'A lost device's authority ends with it', which is not true for Mission envelopes.",
+          "evidence": "http.server.ts:730 `const ended = local ? await endDeviceGrants(...)`; endDeviceGrants (http.server.ts:820-841) queries only approval_batches and agentic_authorizations; authorization.server.ts:268-269 `if (envelope.revokedAt)` / `expiresAt <= now` only; manager.server.ts:765 saveAuthorization(envelope) with grantedBy from `by`.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "F-03",
+          "severity": "MEDIUM",
+          "title": "Mission approval plan binding is optional server-side, so a device can approve a replanned scope it never reviewed",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 717,
+          "attack": "Phone views Mission M at planReference A (waiting_for_approval). Workstation replans M (replan is allowed while waiting_for_approval; replan is workstation-only) to plan B, which may include WRITE/EXECUTE or provider-session steps. A device, or a stale or forged client, sends mission.approve {id} with no 'plan' field. manager.server.ts:717 is `if (planReference !== undefined && planReference !== this.agenticPlanReference(id))`, so the check is skipped and approval proceeds against plan B's requestedScope. deviceMissionRefusal (manager.server.ts:1959) only blocks workstation-only risks, so plan B is approved unseen. The comment at manager.server.ts:716 ('a replanned scope is never approved unseen') holds only for clients that send plan; the honest client does (use-island.ts:762), so the guarantee is client-enforced.",
+          "evidence": "manager.server.ts:716-718 comment and optional check; commands.server.ts mission.approve passes `data.plan === undefined ? undefined : text(data.plan, 200)`; use-island.ts:762-764 is the only sender.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "F-04",
+          "severity": "MEDIUM",
+          "title": "Paired device may answer EXECUTE and WRITE capability requests (terminal.exec, computer.open_app, filesystem.write, UI invoke)",
+          "file": "src/lib/bunny-host/device-authority.server.ts",
+          "line": 97,
+          "attack": "A Mission or Agent step pauses on a request for terminal.exec (EXECUTE, local.server.ts:136), computer.open_app (EXECUTE, computer.server.ts:420), computer.invoke_control/type/focus (EXECUTE), filesystem.write or browser.click/type/download (WRITE). deviceApprovalRefusal blocks only EXTERNAL_SIDE_EFFECT and DESTRUCTIVE plus sensitive/hardApproval manifests. A device then calls mission.respond {requestId, decision:'allow_once'} (or allow_batch within the offer), and the Host runs a shell command or launches an app on the workstation. The DEV-01 test name ('a paired device never launches ... a shell or an app') covers only capability.run and session paths, not request answers. This is an intended ceiling (the G2 test asserts a device can answer filesystem.write), but it is an authority the DEV-01 wording does not describe.",
+          "evidence": "device-authority.server.ts:101 `if (!risk || WORKSTATION_ONLY_RISKS.includes(risk) || manifest?.sensitive || manifest?.hardApproval) return APPROVAL_ON_HOST;` with WORKSTATION_ONLY_RISKS = [EXTERNAL_SIDE_EFFECT, DESTRUCTIVE] (line 25); manager.server.ts:3193-3196 respond() applies only this refusal; remote-device.test.ts:359-410 asserts `ask.remote?.answerable === true` for filesystem.write.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:359 (asserts WRITE answerable by design)"
+        },
+        {
+          "id": "F-05",
+          "severity": "LOW",
+          "title": "Device self sign-out leaves its batches and Agentic consents live; only workstation revocation ends them",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "line": 730,
+          "attack": "Phone creates an allow_batch (approval_batches.created_by='device:<id>') or an Agentic consent, then the user signs out on the phone. device.revoke from a device sets revoked_at, but ended = local ? endDeviceGrants(...) : {0,0} (http.server.ts:730), so the batch and consent keep covering desktop actions (batches.server.ts:194 checks only envelope.revokedAt and expiry; no device status check). The phone's authority is gone, but the grants it made are not. The comment says 'never on self sign-out', so this is deliberate, but the sign-out UI implies the device's authority ends.",
+          "evidence": "http.server.ts:730 `local ? await endDeviceGrants(`device:${id}`) : { batches: 0, delegations: 0 }`; batches.server.ts:194 `if (envelope.revokedAt || envelope.expiresAt <= now) return { match: false ...}`.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "F-06",
+          "severity": "LOW",
+          "title": "Sign-out with an unreachable Host clears the cookie but leaves the device credential valid on the Host",
+          "file": "src/routes/api/bunny-pair.ts",
+          "line": 34,
+          "attack": "If the Host does not answer the device.revoke call, DELETE /api/bunny-pair still clears the bunny_device cookie and returns signedOut:true, revoked:false, hostUnreachable:true. The bearer token remains valid in the Host's devices table (authenticateDevice checks only revoked_at, absolute lifetime and idle bound, device-authority.server.ts:147-163). Anyone who copied the cookie before sign-out (or from a backup) keeps access for up to the idle bound (30 days, refreshed by use) or the absolute lifetime (365 days) until the workstation revokes the device. The response text tells the user this, but the phone UI can report success.",
+          "evidence": "bunny-pair.ts:34 `return Response.json({signedOut:true,revoked:false,hostUnreachable:true},{headers:cleared})`; device-authority.server.ts:151-161 has no other revocation trigger.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "F-07",
+          "severity": "LOW",
+          "title": "Operation-id idempotency is memory-only with a 10-minute TTL and the epoch check is opt-in, so expired ids re-execute",
+          "file": "src/lib/bunny-host/device-authority.server.ts",
+          "line": 287,
+          "attack": "A device sends a mutating command with operationId X (ledger entry TTL 10 min, memory only, device-authority.server.ts:287 ttlMs=10*60_000). After expiry, or after a Host restart (ledger is per process), the same X re-enters begin() and the action runs again. Each command re-executes if the target still allows it: submit creates a second task; a stop or revoke is idempotent. Request answers are protected by the request's resolvedAt (manager.server.ts:3186-3187), so mission.respond does not double-fire. Separately, the stale-view guard is advisory: http.server.ts:466 `if (input.expect !== undefined)` means a device that omits expect bypasses HOST_EPOCH_CHANGED. Server-side protection therefore rests on per-object state (request resolution, mission state, revision, planReference), not on the ledger or epoch.",
+          "evidence": "device-authority.server.ts:287 constructor default ttl; http.server.ts:466-472 expect check gated on presence; http.server.ts:478-495 ledger.get then ledger.begin.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:196 (operation ids never execute twice, within TTL and epoch)"
+        },
+        {
+          "id": "F-08",
+          "severity": "LOW",
+          "title": "Reusing an operation id with a different payload returns the prior applied outcome, a false confirmation",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "line": 484,
+          "attack": "Device sends mission.respond {operationId:X, requestId:R1, allow_once} (applied). It then sends mission.respond {operationId:X, requestId:R2, allow_once}. The ledger is keyed by principal+operationId and checks only the action (http.server.ts:479-481), so the replay returns snapshot+operation 'applied, replayed' without answering R2. Nothing executes twice and no authority is gained, but a client that trusts 'applied' believes R2 was approved.",
+          "evidence": "http.server.ts:479-486: `if (prior && prior.action !== action) ...409`; `if (prior.state === 'applied') return json(res, { snapshot..., operation })` with no payload comparison.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "F-09",
+          "severity": "LOW",
+          "title": "After restart a device can re-consent an Agent with Write/Execute tool scope at the same revision and plan (design-accepted)",
+          "file": "src/lib/bunny-host/agent-runtime.server.ts",
+          "line": 883,
+          "attack": "Host restarts while an Agent is WAITING_FOR_USER (mission state waiting_for_user). Device sends agent.authorization.approve {id, revision} with the same revision the Host re-offers. deviceAgenticRefusal (manager.server.ts:1975-1993) refuses only cross_app, WORKSTATION_ONLY risk ceilings and sensitive/hardApproval manifests, and skips provider.execute. reauthorizeAgent (manager.server.ts:2059-2073) requires waiting_for_user, matching revision and plan_reference, and then re-grants tool-capable scope in the new generation. This is the documented 'post-restart re-consent of the same reviewed scope' path, so it is not a bypass, but it is a remote re-grant of tool-capable authority after a restart.",
+          "evidence": "agent-runtime.server.ts:886-895 device branch then reauthorizeAgent; manager.server.ts:1980-1993 comment and checks; manager.server.ts:2070-2071 plan_reference equality.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "F-10",
+          "severity": "LOW",
+          "title": "Workstation-versus-remote classification depends on proxy headers; a tunnel that strips them and rewrites Host to loopback would be treated as the owner",
+          "file": "src/lib/orch/host-bridge.server.ts",
+          "line": 17,
+          "attack": "authorizeBridge treats a request as local when the Host is loopback and the TCP peer is loopback, and only checks PROXY_HEADERS (cf-connecting-ip, cf-ray, x-forwarded-for, x-real-ip, forwarded) and x-forwarded-proto to reject it (lines 17-18, 27-28, 37). A tunnel connector on this machine that rewrites Host to localhost and adds none of those headers would reach the gateway as the workstation owner with full authority, including device.revoke of any device and remote.configure. Cloudflare-style connectors add cf-* headers, so the gate holds for them; the protection depends on the connector's configuration.",
+          "evidence": "host-bridge.server.ts:17 PROXY_HEADERS; :27 `if (loopbackHost && !loopbackPeer) throw`; :28 `const local = loopbackHost && loopbackPeer;`; :37 header check only inside the local branch.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "B-01",
+          "severity": "INFO",
+          "title": "Revoked, expired or forged device credentials are refused on every request, stream and dispatch",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "line": 390,
+          "attack": "Reuse of a revoked token or cookie: every HTTP request re-runs authenticateDevice (line 390), and a missing device yields 401 with the typed code (lines 410-411). The body is revalidated after a delayed read (line 458). SSE deliveries call deviceStillValid (device-authority.server.ts:157), and device.revoke closes the device's open streams (http.server.ts:728). Re-pairing issues a new token, so the old hash row stays revoked.",
+          "evidence": "http.server.ts:390 authenticateDevice; :410-411 `if (!local && !device) return 401`; :457-460 revalidate at dispatch; device-authority.server.ts:151 DEVICE_REVOKED, :157 deviceStillValid; http.server.ts:728 deviceStreams.closeDevice(id).",
+          "blocked": true,
+          "blockedBy": "http.server.ts:390-411 and 457-460; device-authority.server.ts:151-161",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:544 (revocation race: delayed body cannot keep authority); remote-device.test.ts:116 (per-credential identity)"
+        },
+        {
+          "id": "B-02",
+          "severity": "INFO",
+          "title": "Default-deny device role: unlisted actions are refused before any read or dispatch",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "line": 463,
+          "attack": "Device sends retarget, discover, agent.create, agent.start, capability.run, mission.create, mission.configure, project.add, provider.configure_path, remote.configure, pairing.create, terminal, session.input, or any unknown action to escalate.",
+          "evidence": "device-authority.server.ts:50-75 DEVICE_RIGHTS lists only read/supervise/answer/chat/self actions; :80-85 assertDeviceAction throws WorkstationRequiredError; http.server.ts:463 `if (device) assertDeviceAction(action);` runs before dispatch.",
+          "blocked": true,
+          "blockedBy": "device-authority.server.ts:80-85 with http.server.ts:463; commands.server.ts:30 `if (!access.local && !REMOTE.has(action))`; agent-runtime.server.ts:868-869 (agent.create/start for devices)",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:243-296 (DEV-01 list of forbidden actions, each asserting WORKSTATION_REQUIRED)"
+        },
+        {
+          "id": "B-03",
+          "severity": "INFO",
+          "title": "Cross-Mission, cross-Agent and cross-Project substitution on mission.respond is refused",
+          "file": "src/lib/bunny-missions/commands.server.ts",
+          "line": 65,
+          "attack": "Device answers request A while adding agentId, missionId or projectId fields pointing at Agent/Mission B or Project B, or replays A's authorization at B's Capability Bus admission.",
+          "evidence": "commands.server.ts:64-65 `if (!access.local && Object.keys(data).some(key => !['requestId','decision','maxActions','ttlMs'].includes(key))) throw ... Agent, Mission and Project binding cannot be supplied by a device`; manager.server.ts:3186-3190 derives mission and step from the stored request, so no client-supplied binding is used.",
+          "blocked": true,
+          "blockedBy": "commands.server.ts:64-65; manager.server.ts:3186-3190",
+          "existingTest": "src/lib/bunny-host/remote-remediation.test.ts:72-98 (agentId/missionId/projectId substitution, bus replay; asserts request unresolved and no receipt written)"
+        },
+        {
+          "id": "B-04",
+          "severity": "INFO",
+          "title": "Agent authorization approvals refuse extra fields (scope or batch smuggling)",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "line": 527,
+          "attack": "Device adds maximumActions, capabilities or other keys to agent.authorization.approve to widen scope.",
+          "evidence": "http.server.ts:523-529 `if (!local && Object.keys(data).some(k => !['id','revision'].includes(k)) && input.action.startsWith('agent.authorization.')) throw ... 'Remote approval can only answer the exact Host offer.'`",
+          "blocked": true,
+          "blockedBy": "http.server.ts:523-529; agent-runtime.server.ts:886-895 (deviceAgenticRefusal + revision-bound reauthorize)",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:359 (widened approval -> 'exact Host offer'; stale revision -> 400)"
+        },
+        {
+          "id": "B-05",
+          "severity": "INFO",
+          "title": "Batch knobs from the device can only shrink the Host offer",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 3124,
+          "attack": "Device sends maxActions 9999 or ttlMs 1 day on mission.respond allow_batch, or a non-integer, to enlarge a batch.",
+          "evidence": "manager.server.ts:3124-3133 `maxActions = Math.max(1, Math.min(options.maxActions ?? offer.maxActions, offer.maxActions))`, ttlMs likewise min with offer.ttlMs and floor 1000; commands.server.ts mission.respond validates integer >= min. The batch's actions, family, target and riskCeiling come only from request.batchOffer.",
+          "blocked": true,
+          "blockedBy": "manager.server.ts:3124-3133 (Math.min against the stated offer)",
+          "existingTest": "src/lib/bunny-missions/approval-batches.test.ts:560 (paired phone grants only the offered batch)"
+        },
+        {
+          "id": "B-06",
+          "severity": "INFO",
+          "title": "A changed planned action cannot be answered with an old offer",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 3109,
+          "attack": "Device answers allow_batch on an offer whose plan has since changed (e.g. the step's params or the Calculator target changed) to batch a different action.",
+          "evidence": "manager.server.ts:3109-3112 `const currentOffer = this.batchOfferFor(...); if (!currentOffer || JSON.stringify(currentOffer) !== JSON.stringify(offer)) throw 'The planned batch changed; a new approval is required.'`",
+          "blocked": true,
+          "blockedBy": "manager.server.ts:3109-3112",
+          "existingTest": "src/lib/bunny-missions/approval-batches.test.ts:665 (approval replay: changed planned action cannot answer an old offer; request stays open)"
+        },
+        {
+          "id": "B-07",
+          "severity": "INFO",
+          "title": "A request can be answered only once and only while its step still waits on it",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 3186,
+          "attack": "Device re-answers an already-answered request, a superseded Agentic ask after pause/resume, or a request whose step moved on, to re-trigger execution.",
+          "evidence": "manager.server.ts:3186-3191 `if (request.resolvedAt) throw 'already answered'`; `if (step.state !== 'waiting_for_approval' || step.pendingRequestId !== requestId) throw`; agentic requests also require revision and generation equality (manager.server.ts:3203-3206).",
+          "blocked": true,
+          "blockedBy": "manager.server.ts:3186-3206",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:359-410 (superseded ask 'can never be answered'; paused answer refused)"
+        },
+        {
+          "id": "B-08",
+          "severity": "INFO",
+          "title": "Host restart invalidates pending requests and one-time decisions",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 3691,
+          "attack": "Phone holds a request id from before a Host restart and answers it after the restart to reuse a pre-restart approval.",
+          "evidence": "recover() (manager.server.ts:3691 and the loop around 3736-3750): a pending step request is saved with resolvedAt=now, resolution 'deny', resolvedBy 'bunny-host-restart', and approvedOnce is cleared; comment: 'A renderer may retain an old request ID across a Host restart... may create authority in the new process.' Agentic requests also fail the generation check at manager.server.ts:3204.",
+          "blocked": true,
+          "blockedBy": "manager.server.ts recover() restart reconciliation (around 3736-3750); manager.server.ts:3204",
+          "existingTest": "src/lib/bunny-missions/approval-batches.test.ts:501 (restart fails batches closed), :520 (T10-XG-13 restart invalidates a pending request), :540 (T10-XG-05)"
+        },
+        {
+          "id": "B-09",
+          "severity": "INFO",
+          "title": "Operation-id replay across devices or across actions is refused",
+          "file": "src/lib/bunny-host/device-authority.server.ts",
+          "line": 292,
+          "attack": "Device B replays device A's operation id to read A's outcome (operation.status) or to re-run A's action. Or device A reuses an id with a different action.",
+          "evidence": "device-authority.server.ts:292-293 key = `${principal}\\u0000${operationId}`; http.server.ts:478 ledger.get(actor, id) with actor='device:<id>'; http.server.ts:479-482 action mismatch -> 409 OPERATION_CONFLICT; http.server.ts:575 operation.status reads only the caller's actor key; OPERATION_ID regex (line ~276) excludes NUL.",
+          "blocked": true,
+          "blockedBy": "device-authority.server.ts:292-293 (principal-keyed); http.server.ts:479-482 (409 on action mismatch); http.server.ts:575",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:196 (operation ids never execute twice); remote-device.test.ts:571 (ledger bounds)"
+        },
+        {
+          "id": "B-10",
+          "severity": "INFO",
+          "title": "A device cannot self-approve a tool-capable direct task; ollama tool-free self-approval is allowed by design",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "line": 553,
+          "attack": "Device submits a claude/codex/cursor task (chat right) and then approves it, or submits a Mission-owned child and approves it.",
+          "evidence": "http.server.ts:553-566: device approve refuses `pending.mission` and `!deviceMayLaunch(pending)` (non-ollama or cloud tag). manager.server.ts:3224-3226 approves a Mission provider child only through the request path with deviceRequestRefusal. A submitted task stays waiting_for_approval. Remaining self-approval is ollama, tool-free and non-cloud, which the DEV-01 test expects.",
+          "blocked": true,
+          "blockedBy": "http.server.ts:553-566; device-authority.server.ts deviceMayLaunch (~line 36-38)",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:243-260 (queued chat only; claude approve -> WORKSTATION_REQUIRED; ollama approve allowed)"
+        },
+        {
+          "id": "B-11",
+          "severity": "INFO",
+          "title": "A device cannot create Missions, Agents, triggers, capability runs, skills or retarget tasks",
+          "file": "src/lib/bunny-missions/commands.server.ts",
+          "line": 30,
+          "attack": "Device calls mission.create with steps, agent.create or agent.start, trigger.create, capability.run, skill.run, or retarget to force a tool-capable route.",
+          "evidence": "commands.server.ts:30 `if (!access.local && !REMOTE.has(action)) throw WorkstationRequiredError`; commands.server.ts:52-55 mission.create requires local for steps; agent-runtime.server.ts:868-869 blocks device agent.create and agent.start; device-authority.server.ts DEVICE_RIGHTS has no entry for these, so http.server.ts:463 refuses them.",
+          "blocked": true,
+          "blockedBy": "commands.server.ts:30; agent-runtime.server.ts:868-869; device-authority.server.ts:50-75 default deny",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:243-296 (agent.create, agent.start, mission.create, mission.configure, capability.run all WORKSTATION_REQUIRED)"
+        },
+        {
+          "id": "B-12",
+          "severity": "INFO",
+          "title": "project.artifact cannot read an artifact outside the selected Project",
+          "file": "src/lib/bunny-host/project-service.server.ts",
+          "line": 264,
+          "attack": "Device requests project.artifact with projectId=A and an artifactId from Project B, or an artifact file path under another Project's folder.",
+          "evidence": "project-service.server.ts:268-272 `if (mission.projectId !== projectId || (artifact.stepId && ...missionId !== mission.id)) throw 'Artifact is outside the selected Project.'`; :280-283 file must be inside canonical artifacts for that mission or inside this Project's path; deviceArtifactRead strips the location path (device-authority.server.ts deviceArtifactRead).",
+          "blocked": true,
+          "blockedBy": "project-service.server.ts:268-283; device-authority.server.ts deviceArtifactRead",
+          "existingTest": "not found by name in the listed tests; code evidence only"
+        },
+        {
+          "id": "B-13",
+          "severity": "INFO",
+          "title": "Model output or task text cannot create approval",
+          "file": "src/lib/bunny-missions/planner.server.ts",
+          "line": 1,
+          "attack": "A model response or task prompt says 'approved' or includes an approval field, expecting the Host to treat it as consent.",
+          "evidence": "Grep of src/lib for text-parsed approval (approv/allow/consent matched against output or prompt text) returned no matches. planner.server.ts contains no approval, authorization or autoApprove fields. Approvals enter only through authenticated /command actions keyed by requestId or mission id (manager.server.ts:3186; commands.server.ts:52-65), and the model has no route to /command.",
+          "blocked": true,
+          "blockedBy": "architecture: /command requires Bearer principal (http.server.ts:410-412); manager.server.ts:3186 keyed by requestId",
+          "existingTest": "not found by name; negative code search only (weaker evidence)"
+        },
+        {
+          "id": "B-14",
+          "severity": "INFO",
+          "title": "Cross-site CSRF on device commands and the device cookie is refused",
+          "file": "src/lib/orch/host-bridge.server.ts",
+          "line": 31,
+          "attack": "A cross-site page posts to the gateway command or sign-out route with the bunny_device cookie.",
+          "evidence": "host-bridge.server.ts:31-33 refuses sec-fetch-site cross-site and any Origin mismatch; bunny-pair.ts:5 cookie is HttpOnly; Secure; SameSite=Strict.",
+          "blocked": true,
+          "blockedBy": "host-bridge.server.ts:31-33; bunny-pair.ts:5",
+          "existingTest": ""
+        },
+        {
+          "id": "B-15",
+          "severity": "INFO",
+          "title": "Calculator repair: readiness restore runs only inside admitted execution; the pre-admission probe does not restore",
+          "file": "src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 262,
+          "attack": "A device or unadmitted path triggers ShowWindow(SW_RESTORE) on a minimized Calculator through the new prepareReadiness probe, or a pure target check restores a window.",
+          "evidence": "computer.server.ts:262 `if ($p.prepareReadiness) { Ready-CalculatorWindow }` is set only at lines 483 and 489, inside targets.acquire callbacks reached from perform() (computer.server.ts:433-443, 476-496). perform() runs only after bus admission (bus.server.ts:276). prepareBatchAction (computer.server.ts:528+) probes CALCULATOR_SCRIPTS.valid with no prepareReadiness. Native-CalculatorFrame and Calculator-Frames do not restore. A device has no direct route to capability execution (B-11).",
+          "blocked": true,
+          "blockedBy": "bus.server.ts:276 (execute only after decision); computer.server.ts:528-534 (no-restore probe); B-11 default deny",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts (T9R repair test, not reviewed in detail)"
+        },
+        {
+          "id": "B-16",
+          "severity": "INFO",
+          "title": "Scope of the T9R repair on the remote authority surface",
+          "file": "src/lib/bunny-missions/commands.server.ts",
+          "line": 65,
+          "attack": "Did the repair commits (e895fdf, 341aeaa, ea48c40) widen or move any remote authority?",
+          "evidence": "git diff 0a5988c ea48c40 -- src touches 4 files (422 insertions, 14 deletions). The only change to a remote-authority boundary is the mission.respond key allowlist in commands.server.ts (+2 lines). The rest is Calculator capability readiness and identity logic (computer.server.ts, plus two tests). Remote policy in device-authority.server.ts and http.server.ts is unchanged. Tests were not run (read-only audit).",
+          "blocked": true,
+          "blockedBy": "commands.server.ts:64-65",
+          "existingTest": "src/lib/bunny-host/remote-remediation.test.ts:72-98"
+        }
+      ],
+      "verified": [
+        {
+          "id": "F-01",
+          "severity": "HIGH",
+          "title": "Paired device can approve a Mission whose model steps launch write-access provider sessions with shell, bypassing DEV-01",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 1959,
+          "attack": "Workstation user (or Bunny planner) creates a Mission whose plan contains a model step with scope.access 'write' (authorization.server.ts requestedScope builder: model step sets execution=true, write=true, providers.sessions.steps[].scope.access='write', writeIncludesShell:true). The Mission sits in waiting_for_approval. A paired device sends mission.approve {id} (start defaults true, http/commands REMOTE set includes mission.approve). deviceMissionRefusal only refuses riskClasses in WORKSTATION_ONLY_RISKS (EXTERNAL_SIDE_EFFECT, DESTRUCTIVE), sensitive/hardApproval manifests, and capability manifests; it never inspects providers.execution/providers.sessions and never calls deviceMayLaunch. The envelope is then saved and start() runs; for each model step manager.server.ts:1354 calls taskViolation (authorization.server.ts:267-281) and providerScopeViolation (authorization.server.ts:255-264), which admit a write-access child inside the envelope's write roots, and manager.server.ts:1383 calls tasks.approveDelegated(child) with no device/provider check. Result: codex/claude/cursor-class workspace-tool sessions with write and shell authority launch on the Windows Host on the strength of a phone tap. This contradicts the DEV-01 rule that a paired device may only launch local tool-free inference: direct approve enforces it (http.server.ts:553-566, deviceMayLaunch) and provider.execute requests enforce it (manager.server.ts:1949-1956), but the Mission path does not.",
+          "evidence": "manager.server.ts:1959-1971 deviceMissionRefusal checks only riskClasses/capability manifests; manager.server.ts:1383 approveDelegated with check = taskViolation(child, envelope,...); authorization.server.ts:255-262 providerScopeViolation admits executionScope.access==='write' when authority.scope.access==='write'; http.server.ts:564 `if (!deviceMayLaunch(pending))` exists only on the direct 'approve' path. remote-device.test.ts:503-533 (the Mission approval test) uses read-only filesystem.read plans only, so the model-session path is untested.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:503 (read-only plans only; no model-step coverage)",
+          "lens": "remote-authority",
+          "verdicts": [
+            {
+              "refuted": false,
+              "realSeverity": "HIGH",
+              "reasoning": "Tried to find a canonical boundary that blocks a paired device from approving a Mission whose model steps launch write-access provider sessions. None found on the path; the claim holds as stated (read-only code review, no runs).\n\nVerified on ea48c40:\n- Model steps set execution=true and, when scope.access==='write', write=true, which adds \"EXECUTE\" and \"WRITE\" to riskClasses (authorization.server.ts:44-68, 81-93). WORKSTATION_ONLY_RISKS is only [\"EXTERNAL_SIDE_EFFECT\",\"DESTRUCTIVE\"] (device-authority.server.ts:25).\n- deviceMissionRefusal (manager.server.ts:1959-1971) checks only the agentic/origin guard, riskClasses against WORKSTATION_ONLY_RISKS, and capability manifests. It never reads providers.execution or providers.sessions.\n- Device mission.approve goes through missionCommand (commands.server.ts:52) into MissionManager.approve, which calls deviceMissionRefusal only (manager.server.ts:719-722). The envelope is saved and start() runs.\n- Per child, manager.server.ts:1354-1363 runs taskViolation/providerScopeViolation (authorization.server.ts:255-281). An in-envelope write child passes and goes to tasks.approveDelegated at manager.server.ts:1383. approveDelegated (bunny-host/manager.server.ts:980-1010) runs only the supplied check and missionScopeCheck (the authority check). It has no device or deviceMayLaunch check, and the only device check in the task manager is the direct-approve audit line at :971.\n- deviceMayLaunch is referenced only at http.server.ts:564 (direct approve) and manager.server.ts:1954 (provider.execute permission request). Neither runs on the in-envelope Mission child launch.\n- The codexMissionExclusion gate (orch/compatibility.ts:47) applies only to provider id codex and is not device-specific. It does not block claude or cursor-class write sessions.\n- The agentic-only provider.execute restriction (authorization.server.ts:233, T5) applies only to Agent Missions, which deviceMissionRefusal already refuses for devices. It does not cover plain Missions.\n- Existing tests: remote-device.test.ts:503-533 uses read-only plans (readPlan) and the destructive refusal case. No test covers a device approving a model-write Mission.\n\nMitigating context (does not refute): the Mission must be planned on the workstation with a write model step, and http.server.ts:553-556 says \"Mission work is answered through its exact Mission request\", so the Mission route may have been intentionally treated as scoped and risk-class governed. That does not reconcile with the DEV-01 comment and test title (\"never launches a tool-capable ... provider\") or with the stated rule that a paired device may only launch local tool-free inference. Severity is HIGH because it is a concrete, code-verified authority expansion that contradicts the stated DEV-01 invariant, with no test coverage.",
+              "fixSuggestion": "In MissionManager.deviceMissionRefusal (manager.server.ts:1959), refuse when requestedScope.providers.execution is true and any model step (requestedScope.providers.sessions.steps) would launch a non-local or tool-capable provider, or simply refuse any Mission with providers.execution for device actors (Mission model work stays on the workstation, consistent with DEV-01). Alternatively, enforce deviceMayLaunch-equivalent checks in the approveDelegated check callback for device-approved envelopes. Add a remote-device test that creates a Mission with a model write step, approves it as a paired device via mission.approve, and asserts WORKSTATION_REQUIRED with no adapter launch."
+            },
+            {
+              "refuted": false,
+              "realSeverity": "HIGH",
+              "reasoning": "I could not find a canonical boundary that blocks the Mission path for a paired device. The claim holds on the cited code.\n\n1. Device gate on the Mission path is only the risk/manifest check. manager.server.ts:1959-1971 (deviceMissionRefusal) refuses only riskClasses in WORKSTATION_ONLY_RISKS (EXTERNAL_SIDE_EFFECT, DESTRUCTIVE), capability manifests that are sensitive/hardApproval, and agent Missions. It never looks at providers.execution or providers.sessions and never calls deviceMayLaunch.\n\n2. A write model step passes that check. authorization.server.ts:47-69 sets execution=true and write=true for a model step with scope.access 'write', and adds risk \"EXECUTE\" and \"WRITE\". Neither is in WORKSTATION_ONLY_RISKS. The planner (planner.server.ts:106, 118, 181-203) gives write steps requiredCapabilities [\"filesystem.write\"], whose manifest (capabilities/local.server.ts:39) is risk \"WRITE\", not sensitive and not hardApproval. So deviceApprovalRefusal returns null.\n\n3. approve() then saves the envelope and calls start() (manager.server.ts:700-790). Child launch happens at manager.server.ts:1383 through tasks.approveDelegated with only the envelope check (taskViolation/providerScopeViolation). Host manager.server.ts:980-1020 approveDelegated/launch has no device or provider-route check. Mission start is also remotely reachable: commands.server.ts:27 puts mission.start in REMOTE, and it only blocks Agent Missions.\n\n4. The existing device-side gate is not applied here. http.server.ts:553-566 applies deviceMayLaunch only to direct task approve, and it refuses Mission-owned tasks outright (\"Mission work is approved through its Mission request\"). The Mission path never reaches that check. manager.server.ts:1949-1956 (deviceRequestRefusal for provider.execute) only runs when the Host raises a provider.execute request, which happens only on the violation branch (manager.server.ts:1366-1378). The non-violation branch goes straight to approveDelegated.\n\n5. Routing does not make it harmless. Write steps set requiresFilesystem=true (manager.server.ts:1256), which routes to tool-capable providers. ollama is marked toolCalling false (adapters ADAPTER_TOOL_CONTRACTS, routing.server.ts:79, 149-154), so the child is a codex or claude workspace-tool session, not a tool-free Ollama run. Codex Mission launches are gated by codexMissionExclusion (adapters.server.ts:309-321), but that is a host compatibility check, not a device-authority check. It does not remove the device gap.\n\n6. Test coverage: the cited remote-device.test.ts:503 uses read-only filesystem.read plans, as the finding says. I did not run tests (read-only task). Reading the code is enough here.\n\nLimits of this refutation: the attack needs a Mission already waiting_for_approval with a write model step, created from the workstation or the planner. The finding states this precondition and it is not a bypass. Also, codexMissionExclusion and the write-root and budget checks may stop some launches on a given machine, but they are not device-authority controls and do not stop the phone from approving the Mission.",
+              "fixSuggestion": "In deviceMissionRefusal (manager.server.ts ~1959), refuse paired-device approval when the envelope enables providers.execution with any model step whose required access is write, or whenever the planned model steps would not all be ollama tool-free (apply deviceMayLaunch to each step's routed task, or refuse any model-session scope such as providers.sessions with access 'write'). Also gate mission.start for paired devices against the same rule, and add a regression test in remote-device.test.ts that approves a Mission with a write model step from a device actor and expects WorkstationRequiredError."
+            }
+          ]
+        },
+        {
+          "id": "F-02",
+          "severity": "MEDIUM",
+          "title": "Workstation revocation of a device does not end Mission authorizations the device approved",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "line": 820,
+          "attack": "Device approves Mission M (mission.approve, start true). M's envelope records grantedBy='device:<id>' (envelopeFrom in authorization.server.ts:99; manager.server.ts:765 saveAuthorization). Workstation then revokes the device (device.revoke, local=true). endDeviceGrants only ends approval_batches created_by the device and agentic_authorizations whose authorization_provenance.actor matches (http.server.ts:820-841). The Mission envelope is untouched: envelope validity checks read only revokedAt/expiresAt (authorization.server.ts:174, 268; manager.server.ts:3102), never grantedBy or the device's credential. M keeps launching child sessions and tool actions within its envelope until expiry (up to maxMissionRuntimeMs) or completion, while the device is revoked. The code comment at http.server.ts:729 says 'A lost device's authority ends with it', which is not true for Mission envelopes.",
+          "evidence": "http.server.ts:730 `const ended = local ? await endDeviceGrants(...)`; endDeviceGrants (http.server.ts:820-841) queries only approval_batches and agentic_authorizations; authorization.server.ts:268-269 `if (envelope.revokedAt)` / `expiresAt <= now` only; manager.server.ts:765 saveAuthorization(envelope) with grantedBy from `by`.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "",
+          "lens": "remote-authority",
+          "verdicts": [
+            {
+              "refuted": false,
+              "realSeverity": "MEDIUM",
+              "reasoning": "Not refuted for the plain (non-Agentic) Mission case. The claim is accurate on the key points:\n- http.server.ts:730 calls endDeviceGrants only when local; endDeviceGrants (http.server.ts ~820-841) touches only approval_batches (created_by) and agentic_authorizations (provenance actor). Nothing else.\n- envelopeFrom is called with the approving actor as grantedBy (manager.server.ts:753-756, from approve(id, by) at :711), so the envelope carries grantedBy='device:<id>'.\n- Every envelope validity gate reads only revokedAt/expiresAt: authorization.server.ts:174 and :268-269, manager.server.ts:184, :2180, :3102, :3447, :3509, batches.server.ts:194, capabilities/bus.server.ts:145, agent-runtime.server.ts:205, and taskViolation (authorization.server.ts ~268). None checks grantedBy or the device's live credential (device-authority.server.ts:151 applies only to the request's own authentication).\n- The one blocking mechanism I found is partial: if the device-approved Mission has an Agentic delegation, endDeviceGrants calls missions.syncAgentic(state REVOKED) (manager.server.ts:1700-1710), which writes revokedAt onto the canonical envelope, and the agent-runtime/agentic checks then fail closed. So the defect is real only for Missions without Agentic consent. The finding's attack text does not mention that exception.\n- Mitigating context: device-approved scope is limited to non-WORKSTATION_ONLY risks, non-sensitive, non-hardApproval manifests (manager.server.ts:1959-1970; device-authority.server.ts:97-104), so the surviving authority is READ/WRITE/EXECUTE within the approved roots and terminal list, up to maxMissionRuntimeMs. The workstation user can still Stop the Mission (manager.server.ts stop path). The revoked device cannot issue new commands. That supports MEDIUM rather than HIGH, and arguably LOW, but the gap against the code's own stated intent is real.\n- The comment at http.server.ts:729 enumerates its scope as \"batches it created and Agentic consent it approved\". The finding's quote is a truncated version. The gap is that the enumeration omits Mission envelopes, so the comment's framing (\"authority ends with it\") overstates coverage. The code does what the comment lists, not what the surrounding framing implies.\nVerdict: the defect stands for plain Missions; narrow the finding to exclude Agentic-linked Missions.",
+              "fixSuggestion": "In endDeviceGrants (http.server.ts ~820), also end every non-terminal Mission whose canonical envelope has grantedBy === deviceActor and no revokedAt: set revokedAt on that envelope via the store (as manager.server.ts:3509 does), end its approval batches, and stop its live child tasks through the same path as Mission stop. Alternatively, add a live-device check to the envelope gates (taskViolation, agent-runtime, permission engine) so an envelope whose grantedBy is a revoked device fails closed. Also correct the comment at http.server.ts:729 to describe the actual scope, and add a test: device approves a non-Agentic Mission with start, workstation revokes the device, and the Mission launches no further child or tool action."
+            },
+            {
+              "refuted": false,
+              "realSeverity": "MEDIUM",
+              "reasoning": "Tried to refute F-02 and found no blocking code. (1) The revoke handler (src/lib/bunny-host/http.server.ts ~720-731) calls endDeviceGrants only when local, and that function (~820-841) touches only approval_batches with created_by=device and agentic_authorizations whose provenance actor matches. Neither covers a plain Mission envelope. (2) Envelope validity checks read only revokedAt/expiresAt: authorization.server.ts ~268-269 (permission engine: \"if (envelope.revokedAt)\" / \"expiresAt <= now\"), manager.server.ts ~3102 (approve-batch), ~2180 (agentic canonical check), ~184 (agentic launch admission), ~3447 (replan), and taskViolation ~285. grantedBy is only written (envelopeFrom, authorization.server.ts:93-99; manager.server.ts ~766 saveAuthorization) and never read for authority. (3) authenticateDevice runs only at the HTTP boundary per request (http.server.ts:390, 458, 760; device-authority.server.ts:135-164), and no mission or child-launch path consults the approving device's credential or revocation state. Device closeDevice only closes SSE streams. (4) The T9 device ceiling (manager.server.ts deviceMissionRefusal ~1959) limits what a device may approve (no EXTERNAL_SIDE_EFFECT/DESTRUCTIVE, no capabilities whose manifest is deviceApprovalRefusal, no Agent missions), which bounds severity but does not make the approved envelope end on revocation. (5) No existing test (remote-device.test.ts, ma2-t10.test.ts, approval-batches.test.ts) asserts that a Mission envelope survives device revocation intentionally. The code comment at http.server.ts:729 (\"A lost device's authority ends with it\") is contradicted for Mission envelopes. The cited line numbers are accurate. Severity: MEDIUM is defensible. The envelope is bounded by maxMissionRuntimeMs and the device ceiling excludes the highest-risk classes, and the workstation can still stop the mission manually. Still, a lost-phone approval keeps autonomous READ/WRITE/EXECUTE authority within project roots after revocation, so the defect stands.",
+              "fixSuggestion": "In the device.revoke path (http.server.ts ~730), also end Mission authorizations whose grantedBy equals device:<id>: mark the envelope revoked (saveAuthorization with revokedAt=Date.now()) and end the mission's active batches, or stop the mission with a workstation-revoked reason. Add a test in remote-device.test.ts that approves a Mission from a paired device, revokes that device from the workstation, and asserts the envelope is revoked and no further child launch or tool action is admitted. Alternatively, correct the comment at http.server.ts:729 if the intent is that Mission envelopes outlive the device."
+            }
+          ]
+        },
+        {
+          "id": "F-03",
+          "severity": "MEDIUM",
+          "title": "Mission approval plan binding is optional server-side, so a device can approve a replanned scope it never reviewed",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 717,
+          "attack": "Phone views Mission M at planReference A (waiting_for_approval). Workstation replans M (replan is allowed while waiting_for_approval; replan is workstation-only) to plan B, which may include WRITE/EXECUTE or provider-session steps. A device, or a stale or forged client, sends mission.approve {id} with no 'plan' field. manager.server.ts:717 is `if (planReference !== undefined && planReference !== this.agenticPlanReference(id))`, so the check is skipped and approval proceeds against plan B's requestedScope. deviceMissionRefusal (manager.server.ts:1959) only blocks workstation-only risks, so plan B is approved unseen. The comment at manager.server.ts:716 ('a replanned scope is never approved unseen') holds only for clients that send plan; the honest client does (use-island.ts:762), so the guarantee is client-enforced.",
+          "evidence": "manager.server.ts:716-718 comment and optional check; commands.server.ts mission.approve passes `data.plan === undefined ? undefined : text(data.plan, 200)`; use-island.ts:762-764 is the only sender.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "",
+          "lens": "remote-authority",
+          "verdicts": [
+            {
+              "refuted": false,
+              "realSeverity": "MEDIUM",
+              "reasoning": "No canonical boundary blocks the claimed path. Read-only check of the code:\n\n1. manager.server.ts:717 is as cited. When `planReference` is undefined the review-binding check is skipped, so a device approval with no `plan` field proceeds. commands.server.ts:52 passes `data.plan === undefined ? undefined : text(...)`, so omitting plan reaches approve() with undefined.\n\n2. The agentic plan-reference check (manager.server.ts:726) applies only when `this.agentic.forMission(id)` returns a record. Agent Missions are already refused to devices by deviceMissionRefusal (line 1960). It does not cover ordinary Missions.\n\n3. deviceMissionRefusal (manager.server.ts:1959-1970) is narrower than the finding says only in one respect. It also refuses on manifest `sensitive`/`hardApproval` via deviceApprovalRefusal. It does not refuse on WRITE or EXECUTE risk. WORKSTATION_ONLY_RISKS is only EXTERNAL_SIDE_EFFECT and DESTRUCTIVE (device-authority.server.ts:25). So a plan B with write-access steps and non-sensitive capabilities passes the device gate.\n\n4. The provider-sessions check (manager.server.ts:742-750) compares requestedScope to the steps of the same plan B, so it is self-consistent and does not block an unseen replan.\n\n5. replan (manager.server.ts:3490) is workstation-only and revokes the old authorization, but it leaves the mission in waiting_for_approval and creates no server-side record of what the device reviewed. Nothing ties a later approval to the reviewed plan when plan is omitted.\n\n6. Existing test evidence supports the gap: capabilities.test.ts:291 has a device call mission.approve with no plan on a model-plan mission that includes access \"write\" steps and asserts status 200. missions.test.ts:417 (MA0R) also approves a write-access plan from device:paired-phone with no plan reference and expects success.\n\nCorrections to the finding: the client sender is src/store/use-island.ts:762-763, not src/components/island/use-island.ts. The comment at manager.server.ts:716 is the author's stated intent. The exploit needs an authenticated paired device that omits plan (forged or stale client), which keeps the severity at MEDIUM rather than higher.",
+              "fixSuggestion": "For actor device:* in approve(), require planReference and refuse when it is absent or stale, e.g. `if (isDeviceActor(by) && planReference === undefined) throw new CommandRefusedError(\"Review the current plan before approving.\")` alongside the existing mismatch check. Optionally also refuse device approval of any scope containing WRITE or EXECUTE risk classes, and add a test that a device approve without plan on a replanned write-scope mission is refused. Correct the file path in the finding to src/store/use-island.ts."
+            },
+            {
+              "refuted": false,
+              "realSeverity": "MEDIUM",
+              "reasoning": "Attempted refutation found no blocking boundary; the defect holds as described.\n\n- manager.server.ts:717 is `if (planReference !== undefined && planReference !== this.agenticPlanReference(id))`, so omitting `plan` skips the binding check entirely.\n- commands.server.ts:52 passes `data.plan === undefined ? undefined : text(data.plan, 200)`, so an omitted plan reaches `approve()` as undefined with no other requirement.\n- http.server.ts:466-471 checks `expect.hostId`/`expect.epoch` only when the client supplies them, so that is also optional. The Agent-only check at http.server.ts:478-484 (\"Remote approval can only answer the exact Host offer\") does not cover mission.approve.\n- manager.server.ts:1959-1969 (deviceMissionRefusal) blocks only EXTERNAL_SIDE_EFFECT/DESTRUCTIVE risk, sensitive or hardApproval manifests. The WRITE/EXECUTE manifests I checked (filesystem.write, git.commit, git.merge, git.worktree_add, browser.click/type/download, terminal.exec, computer.type/focus_window/open_app/invoke_control) carry no sensitive or hardApproval flag, so a replanned plan B using them is approvable remotely with no plan argument.\n- replan (manager.server.ts:3490) is allowed in waiting_for_approval, revokes the old authorization and leaves the mission in waiting_for_approval, so plan B reaches approve() as described.\n- The existing test (remote-device.test.ts:503-530) covers only a wrong plan reference and a destructive plan. No test covers approval with the plan omitted after a replan.\n\nMitigating factors that keep this at MEDIUM rather than higher: the honest client always sends the reviewed planReference (src/store/use-island.ts:760-763, not src/components/island/ as the finding states), so the bypass needs a modified or forged client. The paired device is an authenticated principal, and the code comment at manager.server.ts:716 states a guarantee the server does not enforce.\n\nCitation correction: the client sender is at src/store/use-island.ts:760-763.",
+              "fixSuggestion": "Make the plan binding mandatory for device-originated mission.approve: in commands.server.ts or manager.approve(), when isDeviceActor(by) and the mission is waiting_for_approval, require a planReference and refuse if it is missing or does not equal agenticPlanReference(id), mirroring the Agent-only check in http.server.ts. Add a remote-device test that approves a replanned Mission with no plan field and expects a refusal."
+            }
+          ]
+        },
+        {
+          "id": "F-04",
+          "severity": "MEDIUM",
+          "title": "Paired device may answer EXECUTE and WRITE capability requests (terminal.exec, computer.open_app, filesystem.write, UI invoke)",
+          "file": "src/lib/bunny-host/device-authority.server.ts",
+          "line": 97,
+          "attack": "A Mission or Agent step pauses on a request for terminal.exec (EXECUTE, local.server.ts:136), computer.open_app (EXECUTE, computer.server.ts:420), computer.invoke_control/type/focus (EXECUTE), filesystem.write or browser.click/type/download (WRITE). deviceApprovalRefusal blocks only EXTERNAL_SIDE_EFFECT and DESTRUCTIVE plus sensitive/hardApproval manifests. A device then calls mission.respond {requestId, decision:'allow_once'} (or allow_batch within the offer), and the Host runs a shell command or launches an app on the workstation. The DEV-01 test name ('a paired device never launches ... a shell or an app') covers only capability.run and session paths, not request answers. This is an intended ceiling (the G2 test asserts a device can answer filesystem.write), but it is an authority the DEV-01 wording does not describe.",
+          "evidence": "device-authority.server.ts:101 `if (!risk || WORKSTATION_ONLY_RISKS.includes(risk) || manifest?.sensitive || manifest?.hardApproval) return APPROVAL_ON_HOST;` with WORKSTATION_ONLY_RISKS = [EXTERNAL_SIDE_EFFECT, DESTRUCTIVE] (line 25); manager.server.ts:3193-3196 respond() applies only this refusal; remote-device.test.ts:359-410 asserts `ask.remote?.answerable === true` for filesystem.write.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:359 (asserts WRITE answerable by design)",
+          "lens": "remote-authority",
+          "verdicts": [
+            {
+              "refuted": false,
+              "realSeverity": "MEDIUM",
+              "reasoning": "Refutation failed. No canonical boundary blocks a paired device from answering EXECUTE or WRITE requests.\n\nWhat I checked:\n- device-authority.server.ts:97-104 deviceApprovalRefusal refuses only when risk is null, in WORKSTATION_ONLY_RISKS (EXTERNAL_SIDE_EFFECT, DESTRUCTIVE), or the manifest is sensitive or hardApproval. EXECUTE and WRITE pass.\n- manager.server.ts:1949-1957 deviceRequestRefusal adds only a provider.execute special case, then delegates to deviceApprovalRefusal. terminal.exec (EXECUTE, not sensitive) and computer.open_app / invoke_control / type / focus (EXECUTE, not sensitive or hardApproval) therefore return null.\n- manager.server.ts:3193-3196 respond() applies only deviceRequestRefusal for device actors with decision != deny. After that, it saves resolution and resumes the step. Nothing else in respond() checks risk class or device identity.\n- commands.server.ts:63-76 (mission.respond) only restricts the field set for remote callers. It does not restrict risk class.\n- http.server.ts:354 and manager.server.ts:2007 use the same deviceRequestRefusal to compute the phone's answerable verdict, so the UI and server agree that these asks are answerable.\n- The capability adapters (capabilities/*.ts, excluding tests) contain no device or remote checks, so a device cannot be blocked at execution time either.\n- remote-device.test.ts:359-401 (G2) explicitly asserts a device can answer a filesystem.write (WRITE) ask with allow_once and gets 200, and that a paused or superseded ask is refused. This confirms the ceiling is intentional. It does not contradict the finding.\n\nAdditional facts that do not refute F-04 and slightly widen it:\n- Initial Agent delegation is workstation-only (manager.server.ts:1978 and 1981-1982, deviceAgenticRefusal). Post-restart re-consent of an EXECUTE-capable scope is device-answerable (1986-1987).\n- deviceMissionRefusal (manager.server.ts:1959-1969) lets a device approve a non-Agent Mission plan whose requested scope includes EXECUTE capabilities such as terminal.exec, since those manifests are not sensitive. That is a path the finding does not mention.\n\nLimits: this is a static read-only trace. I did not run the tests or the Host. The DEV-01 wording gap is a spec and documentation mismatch, not a code boundary. Severity MEDIUM is reasonable for a stated, intentional authority that the DEV-01 test name does not describe.</reasoning>\n<parameter name=\"fixSuggestion\">Either narrow deviceApprovalRefusal so EXECUTE-class requests (terminal.exec, computer.open_app, computer.invoke_control/type/focus) return APPROVAL_ON_HOST for devices, and mirror that in deviceMissionRefusal, or update the DEV-01 wording and docs to state that paired devices may answer EXECUTE and WRITE asks within the existing owner-consent ceiling. Either way, add a test that names the EXECUTE path explicitly."
+            },
+            {
+              "refuted": false,
+              "realSeverity": "LOW",
+              "reasoning": "No canonical boundary blocks the claimed path. deviceApprovalRefusal (device-authority.server.ts:97-103) refuses only EXTERNAL_SIDE_EFFECT, DESTRUCTIVE, sensitive and hardApproval, and the device-facing verdict (manager.server.ts:1949-1957 via remoteVerdicts and http.server.ts:354) uses that same function. The respond path (manager.server.ts:3193-3196) and the bus decision (bus.server.ts:128-140, which escalates risk through riskFor, so git push or npm install become EXTERNAL and are refused) enforce no further EXECUTE/WRITE block for device answers. terminal.exec and computer.open_app manifests (local.server.ts:136, computer.server.ts:420) carry no sensitive or hardApproval flag. mission.respond is in the REMOTE set (commands.server.ts:21-22, 56-67), and the device may send only requestId, decision, maxActions and ttlMs. So a device can answer a pending EXECUTE or WRITE request. The G2 test (remote-device.test.ts:359-410) asserts this as intended behaviour.\n\nMitigating facts that narrow the attack as written. The device cannot create asks; mission.create is workstation-only, and an ask exists only because the owner's Host-side mission or Agent scope reached it. The attack's \"shell command\" is overstated: terminal.exec runs without a shell (local.server.ts:140 comment; argv only, resolved executables, approved roots), and open_app is an allowlisted app set. Agentic terminal runs keep the exact-identity checks in agenticScopeViolation (authorization.server.ts:205-215), and those checks still apply to any answer. Plan approval with EXECUTE capabilities is also remotely allowed (deviceMissionRefusal), which matches the same owner-consent policy.\n\nSo the finding is a real scope of authority, not a bypass, and the design is documented in the code comment (device-authority.server.ts:19-23, \"Paired devices keep their existing MA0/MA2 right to answer other exact Host offers\") and in test-results/ma3/t9/acceptance-report.md:19. The acceptance report also says \"arbitrary tools/apps/shell ... require the Windows Host\", which the code only satisfies for device-originated asks, so the wording mismatch with DEV-01 is real. I rate it LOW (a documentation or policy-intent gap) rather than MEDIUM. refuted=false because nothing blocks it; the severity downgrade is my judgment.",
+              "fixSuggestion": "Decide the policy explicitly. Either keep EXECUTE/WRITE answerable and reword DEV-01 and acceptance-report.md:19 to say that a paired device can answer any exact Host-offered ask except EXTERNAL_SIDE_EFFECT, DESTRUCTIVE, sensitive and hardApproval, or add EXECUTE to WORKSTATION_ONLY_RISKS in device-authority.server.ts:25 (this changes G2 at remote-device.test.ts:359-410). Also add a test that pins terminal.exec and computer.open_app device answers to the chosen policy."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "lens": "transport",
+      "all": [
+        {
+          "id": "T-01",
+          "severity": "MEDIUM",
+          "title": "Paired-device projection leaks Host folder paths via /state, project.list and project.get",
+          "file": "src/lib/bunny-host/device-authority.server.ts",
+          "attack": "A paired phone (or a phone whose bunny_device cookie was stolen before revocation) calls /state, which carries projects[].path, missions[].requestedScope.projectRoots, missions[].steps[].workspace and tasks[].constraints.workingDirectory in plaintext. It calls the project.get command, which returns project.path, workspaces[].root/scratch/workspaceRoot.path and artifacts[].location.path, and tasks[].cwd unredacted. project.list returns project.path. The device learns absolute workstation folder layout, contrary to the stated 'no local folder facts' invariant.",
+          "evidence": "device-authority.server.ts:362-401 deviceSnapshot spreads ...snapshot and only filters devices/tasks/providers/presentation/agents; deviceTask (443-453) nulls cwd/pid/processTree/sessionId but leaves constraints. presentation.ts:422-530 dashboardSnapshot spreads ...task (constraints kept), keeps requestedScope.projectRoots via ...mission.requestedScope and steps via ...step (workspace kept). project-registry.server.ts:173-209 returns the full JSON record incl. path. project-service.server.ts:182-216 project detail returns project, workspaces (AgentWorkspace.root.path), artifacts raw, and tasks via ...t (cwd kept). http.server.ts:535 applies deviceArtifactRead only to project.artifact, so project.get and project.list return raw results. Existing test remote-device.test.ts:452-478 asserts only task cwd/pid/processTree and provider executable; no assertion covers projects, constraints, workspaces or artifact locations.",
+          "blocked": false
+        },
+        {
+          "id": "T-02",
+          "severity": "LOW",
+          "title": "Bridge pairing route buffers an unbounded request body before any size check",
+          "file": "src/routes/api/bunny-pair.ts",
+          "attack": "An unauthenticated remote client (anyone reaching the tunnel) POSTs a multi-megabyte or larger body to /api/bunny-pair. The route calls await request.json() on the full body before any length check and before forwarding, so the bridge process buffers it. Many concurrent requests could pressure bridge memory. The only bound is the tunnel edge's body limit; the Host's 4 MB cap in body() applies only after the bridge has already buffered the payload.",
+          "evidence": "bunny-pair.ts:11 const data=await request.json() with no size guard; http.server.ts body() (4_000_000 limit) runs only after the forwarded fetch at bunny-pair.ts:14.",
+          "blocked": false
+        },
+        {
+          "id": "T-03",
+          "severity": "LOW",
+          "title": "Global pairing failure cap lets any tunnel client block all pairing for 10 minutes",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "attack": "Any tunnel client without credentials sends 100 wrong pairing codes within 10 minutes. Once globalAttempts reaches 100, every /pair request, including the legitimate owner's, returns 429 until the window expires. The per-client key (clientKey in host-bridge.server.ts:48) takes its value from x-forwarded-for when cf-connecting-ip is absent, so per-client limits can be rotated away. Brute force remains infeasible (96-bit code, 100 guesses per window), so this is a denial of pairing, not a bypass.",
+          "evidence": "http.server.ts:376-377 clientAttempts=FailureLimiter(5,600000), globalAttempts=FailureLimiter(100,600000,1); 395-397 key from x-bunny-pair-client and 'if (clientAttempts.blocked(key,now) || globalAttempts.blocked(\"*\",now)) return 429' before any code check; host-bridge.server.ts:48 clientKey prefers cf-connecting-ip then x-forwarded-for; pairing code randomBytes(12) at http.server.ts ~line 'pairing.create' (96 bits).",
+          "blocked": false
+        },
+        {
+          "id": "T-04",
+          "severity": "LOW",
+          "title": "Revoked or unknown bearer load is not rate-limited at the Host or the bridge events route",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "attack": "A holder of a revoked (or expired) bunny_device cookie repeatedly calls /api/bunny-events or /state. Each request is forwarded to the Host and the Host answers 401 before any limiter runs, so every request costs a SQLite credential lookup with no per-device or per-IP budget. The cookie is a prerequisite, so this is load amplification by a formerly paired device, not a new access path.",
+          "evidence": "http.server.ts:410-411 'if (!local && !device) return 401' precedes the device limiter at 414-421 (deviceCommands/deviceReads/deviceStreamOpens are keyed by authenticated device.id only). host-bridge.server.ts:42 reads the cookie; src/routes/api/bunny-events.ts:23-37 calls the Host fetch on every request that carries a cookie, with no limiter.",
+          "blocked": false
+        },
+        {
+          "id": "T-05",
+          "severity": "LOW",
+          "title": "Device session cookie has no __Host- prefix or path/domain pinning, so a same-site sibling can shadow it",
+          "file": "src/routes/api/bunny-pair.ts",
+          "attack": "bunny_device is set with Path=/; HttpOnly; Secure; SameSite=Strict and no Domain attribute, but the name lacks the __Host- prefix. An attacker who controls a same-site sibling subdomain (for example after a subdomain takeover) sets a domain-scoped bunny_device=<attacker device token>. The victim phone then sends both cookies. authorizeBridge takes the first match (.find) in an order browsers do not guarantee. The victim's phone then acts under the attacker's paired-device identity, so attribution and approvals are misattributed. Full exploitation needs same-site control and an attacker-held device credential.",
+          "evidence": "bunny-pair.ts:5 DEVICE_COOKIE constant (no __Host- prefix, no Domain); bunny-pair.ts:17 Set-Cookie; host-bridge.server.ts:42 .find(part => part.startsWith(\"bunny_device=\")) takes the first matching cookie.",
+          "blocked": false
+        },
+        {
+          "id": "T-06",
+          "severity": "LOW",
+          "title": "Event stream stops replaying after 20,000 events and waits for the next bus event",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "attack": "A client whose cursor sits more than about 20,000 events behind head (retention is 20,000, trimmed every 500 inserts) opens /events?after=<old>. streamSse pumps at most 40 batches of 500 and then breaks without rescheduling. The remaining replay stays undelivered until some unrelated event is emitted on the bus. Heartbeats do not pump. Impact is a stale or gapped phone view, not disclosure. The client is invalidation-only (host-stream.ts:80-83), and its cursor normally comes from snapshot head, so the trigger is unusual.",
+          "evidence": "http.server.ts:176 for(;;) loop; line 196 'if (events.length < 500 || ++batches >= 40) break;'; line 219 bus.on(\"event\", pump) is the only re-trigger; heartbeat (around line 221-234) writes only ': heartbeat'; persistence.server.ts:55 retains 20,000 events.",
+          "blocked": false
+        },
+        {
+          "id": "T-07",
+          "severity": "INFO",
+          "title": "Cross-site, CSRF and null/missing Origin attacks on remote commands, events and sign-out",
+          "file": "src/lib/orch/host-bridge.server.ts",
+          "attack": "A cross-site page posts to the bridge or triggers server functions with the device cookie, using Origin mismatch, Origin 'null', sec-fetch-site: cross-site, or no Origin. Each of these is refused before any Host call, and the cookie is not sent cross-site. Same-site subdomain attacker: Origin mismatches the configured remote origin. Host-level direct access with any Origin is refused.",
+          "evidence": "host-bridge.server.ts:32 'if (request.headers.get(\"sec-fetch-site\") === \"cross-site\") throw'; host-bridge.server.ts:33 'if (origin && origin !== effectiveOrigin) throw' ('null' is truthy and mismatches); host-bridge.server.ts:44 remote returns token only after origin and loopback checks; bunny-pair.ts:5 SameSite=Strict; http.server.ts:382-383 rejects any Origin or cross-site request at the Host. Test coverage: host.test.ts:82 covers Origin at the Host. host-bridge.server.test.ts:1-22 has no test for host-bridge.server.ts:32-33 (gap, not a bypass).",
+          "blocked": true,
+          "blockedBy": "host-bridge.server.ts:32-33 + SameSite=Strict (bunny-pair.ts:5) + http.server.ts:382-383",
+          "existingTest": "src/lib/bunny-host/host.test.ts:82"
+        },
+        {
+          "id": "T-08",
+          "severity": "INFO",
+          "title": "Transport downgrade and x-forwarded-proto spoofing cannot grant remote or workstation access",
+          "file": "src/lib/orch/host-bridge.server.ts",
+          "attack": "Attacker sends x-forwarded-proto: https to fake a secure origin, or sends an http origin to get a downgraded session. Remote access requires a loopback TCP peer and an effectiveOrigin equal to BUNNY_REMOTE_ORIGIN over https. Spoofing the header can only pick the origin the attacker already reaches through TLS. Downgrade to http fails the https check. Secure cookie is set only over https.",
+          "evidence": "host-bridge.server.ts:30 effectiveOrigin uses x-forwarded-proto; line 37 local path refuses x-forwarded-proto https; line 40 'if (!remote || effectiveOrigin !== new URL(remote).origin || !effectiveOrigin.startsWith(\"https://\")) throw'; line 41 'if (!loopbackPeer) throw'; bunny-pair.ts:5 Secure.",
+          "blocked": true,
+          "blockedBy": "host-bridge.server.ts:40-41",
+          "existingTest": "src/lib/orch/host-bridge.server.test.ts:16-21"
+        },
+        {
+          "id": "T-09",
+          "severity": "INFO",
+          "title": "LAN peer, Host-header spoofing and X-Forwarded-For spoofing cannot obtain workstation authority",
+          "file": "src/lib/orch/host-bridge.server.ts",
+          "attack": "A LAN attacker sends Host: 127.0.0.1:8080 to claim loopback, or sets X-Forwarded-For: 127.0.0.1 to fake a loopback peer, to reach the workstation (local) branch with no credential.",
+          "evidence": "host-bridge.server.ts:23-27 loopbackPeer is derived from the TCP peer via peerAddress (getRequestIP without xForwardedFor; h3-v2 dist h3-Bz4OPZv_.mjs:649-657 ignores x-forwarded-for by default); line 27 throws when loopbackHost && !loopbackPeer; line 41 requires loopbackPeer for remote. Host daemon listens only on 127.0.0.1 (http.server.ts:874) and its Host check at 379-381 refuses other hosts. Where the framework populates clientAddress (not in repo) is unverified, but undefined peers fail closed.",
+          "blocked": true,
+          "blockedBy": "host-bridge.server.ts:27 and 41; http.server.ts:379-381; http.server.ts:874",
+          "existingTest": "src/lib/orch/host-bridge.server.test.ts:7-12; src/lib/bunny-host/remote-device.test.ts:152 (forged x-forwarded-for refused)"
+        },
+        {
+          "id": "T-10",
+          "severity": "INFO",
+          "title": "DNS rebinding of the bridge or Host to reach workstation authority",
+          "file": "src/lib/orch/host-bridge.server.ts",
+          "attack": "A page on attacker.example rebinds to 127.0.0.1 and sends Host: attacker.example:8080, then requests the bridge or Host API.",
+          "evidence": "host-bridge.server.ts:25 loopbackHost is false for the attacker Host, so it takes the remote path; line 40 requires effectiveOrigin to equal the configured https BUNNY_REMOTE_ORIGIN, which the rebinding origin cannot match without a valid certificate for that origin. Host daemon http.server.ts:379-381 rejects any Host other than 127.0.0.1:port or localhost:port.",
+          "blocked": true,
+          "blockedBy": "host-bridge.server.ts:40; http.server.ts:379-381",
+          "existingTest": "src/lib/orch/host-bridge.server.test.ts:16-21"
+        },
+        {
+          "id": "T-11",
+          "severity": "INFO",
+          "title": "Open device streams stay alive after revocation or expiry",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "attack": "A revoked device keeps reading SSE from an already-open stream, or reconnects with Last-Event-ID to resume.",
+          "evidence": "Revocation closes device streams at once: http.server.ts:728 deviceStreams.closeDevice(id). Per-event and per-heartbeat re-check: http.server.ts:448 stillAuthorized = deviceStillValid(...), used in streamSse at 176-181 and in the 15 s heartbeat. Reconnect: bunny-events.ts:19 reads Last-Event-ID; the Host auth at http.server.ts:390 and 410-411 returns 401 with code DEVICE_REVOKED; bunny-events.ts:53-61 maps it to a typed refusal. Bridge emits only sequence numbers (event-signal.ts:5-8), so no content crosses even if the stream were left open.",
+          "blocked": true,
+          "blockedBy": "http.server.ts:728 closeDevice; http.server.ts:448 stillAuthorized; http.server.ts:410-411; event-signal.ts:5-8",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:321-336 (self sign-out closes open streams at once); remote-device.test.ts:156-158 (DEVICE_REVOKED)"
+        },
+        {
+          "id": "T-12",
+          "severity": "INFO",
+          "title": "SSE payload redaction for devices (transcript sentinel) and bridge content stripping",
+          "file": "src/lib/bunny-host/event-signal.ts",
+          "attack": "A device reads transcript or prompt detail from the SSE channel or from /state.",
+          "evidence": "event-signal.ts:1-9 eventSignal forwards only sequence number to the phone; bunny-events.ts:66 uses signalStream with it. Host-side /events device path maps detail to publicEventDetail(type) (http.server.ts:443). /state uses dashboardSnapshot (presentation.ts:437-447, tasks output '' at 448-453, logs replaced at 478-481).",
+          "blocked": true,
+          "blockedBy": "event-signal.ts:5-8; http.server.ts:443; presentation.ts:437-481",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:452-466 (sentinel absent from /state, command extras and direct device SSE)"
+        },
+        {
+          "id": "T-13",
+          "severity": "INFO",
+          "title": "Per-device rate limits, stream caps and ledger bounds against retry budget exhaustion",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "attack": "A paired device floods /command, /state or /events, or saturates concurrent streams and in-flight operation ids, to exhaust the budget or starve other devices.",
+          "evidence": "http.server.ts:302-304 WindowLimiter(60/min commands, 300/min reads, 30/min stream opens) keyed by device.id, enforced at 414-421 after auth. http.server.ts:430-431 DeviceStreams admit (3 per device, 24 total via device-authority.server.ts:234). OperationLedger.begin (device-authority.server.ts:308-313) caps in-flight at 200 per principal and 2000 total and returns RATE_LIMITED. Other devices remain unaffected.",
+          "blocked": true,
+          "blockedBy": "http.server.ts:414-421; http.server.ts:430-431; device-authority.server.ts:312-313",
+          "existingTest": "src/lib/bunny-host/remote-device.test.ts:297-320 (61st command refused; 4th stream refused; per-device limits)"
+        },
+        {
+          "id": "T-14",
+          "severity": "INFO",
+          "title": "Stale-view guard is optional and operation ids are replayable after the 10-minute ledger TTL",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "attack": "A device omits the expect field to skip the hostId/epoch refusal, or replays a captured mutating command with the same operationId after the ledger TTL or a Host restart so it executes again.",
+          "evidence": "http.server.ts:466 'if (input.expect !== undefined)' gates the identity and epoch checks. Ledger TTL 10 min (device-authority.server.ts:287); get() returns null after TTL (device-authority.server.ts:302-305), so the operation re-executes; ledger is memory-only. Both require holding a valid device credential, which already grants the same actions, so this is not an escalation; it weakens the stated idempotency contract.",
+          "blocked": false
+        },
+        {
+          "id": "T-15",
+          "severity": "INFO",
+          "title": "Device self sign-out does not end device-granted consents (intentional, bounded)",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "attack": "A device grants an approval batch or Agentic consent, then signs out. The consent stays active because only workstation revocation runs endDeviceGrants.",
+          "evidence": "http.server.ts:730 'const ended = local ? await endDeviceGrants(...) : { batches: 0, delegations: 0 }'. The code comment near line 818 states the design: 'ends the authority that device granted (never on self sign-out)'. Device batches are created with by=device actor (manager.server.ts:3220) and TTL-clamped to at most 2 minutes (manager.server.ts:3160 comment). Duration of Agentic delegations not traced.",
+          "blocked": true,
+          "blockedBy": "design choice http.server.ts:730 and comment near 818; batch TTL clamp manager.server.ts:3160"
+        },
+        {
+          "id": "T-16",
+          "severity": "INFO",
+          "title": "Pairing code single-use and brute-force resistance",
+          "file": "src/lib/bunny-host/http.server.ts",
+          "attack": "Two concurrent /pair requests race with the same one-time code, or an attacker guesses the 96-bit code.",
+          "evidence": "http.server.ts:398-404: body is awaited first, then the code check, token insert and pairing=null all run synchronously, so the single-use check cannot interleave. randomBytes(12) gives 96 bits. Guessing is capped at 100 failures per 10 min (http.server.ts:377, 396-397) and the code expires after 10 min.",
+          "blocked": true,
+          "blockedBy": "http.server.ts:398-404 synchronous consume; http.server.ts:377,396-397 global cap; 10-min expiry at pairing.create"
+        },
+        {
+          "id": "T-17",
+          "severity": "INFO",
+          "title": "Loopback workstation classification depends on the tunnel adding forwarding or proxy headers",
+          "file": "src/lib/orch/host-bridge.server.ts",
+          "attack": "A tunnel that rewrites Host to localhost and adds none of cf-connecting-ip, cf-ray, x-forwarded-for, x-real-ip, forwarded or x-forwarded-proto would make a remote phone request look like a workstation request, with workstation authority and no credential.",
+          "evidence": "host-bridge.server.ts:9 PROXY_HEADERS; line 27 and 37 classify loopbackHost && loopbackPeer without a credential; the tunnel is spawned by scripts/bunny-tunnel.mjs:42 (cloudflared, whose edge adds CF-Connecting-IP). Named-tunnel config is operator-supplied and not in repo, so this is unverifiable here; blocked only under Cloudflare-style edge headers.",
+          "blocked": true,
+          "blockedBy": "host-bridge.server.ts:37 (PROXY_HEADERS and x-forwarded-proto refusal), conditional on the edge adding headers"
+        },
+        {
+          "id": "T-18",
+          "severity": "INFO",
+          "title": "Coverage gaps: no tests for bridge Origin/sec-fetch guards or for the SSE reconnect path and projection paths",
+          "file": "src/lib/orch/host-bridge.server.test.ts",
+          "attack": "Regression of host-bridge.server.ts:32-33 (Origin and sec-fetch-site) or of the device projection (T-01) would go undetected by the suite.",
+          "evidence": "host-bridge.server.test.ts:1-22 has three tests (loopback peer, proxy headers, remote config) and none for Origin mismatch, 'null' Origin, or sec-fetch-site cross-site. remote-device.test.ts:452-478 asserts cwd, pid, processTree and providers only, not projects[].path, constraints.workingDirectory, workspaces or artifact locations.",
+          "blocked": true,
+          "blockedBy": "n/a (test gap, not a bypass)"
+        }
+      ],
+      "verified": [
+        {
+          "id": "T-01",
+          "severity": "MEDIUM",
+          "title": "Paired-device projection leaks Host folder paths via /state, project.list and project.get",
+          "file": "src/lib/bunny-host/device-authority.server.ts",
+          "attack": "A paired phone (or a phone whose bunny_device cookie was stolen before revocation) calls /state, which carries projects[].path, missions[].requestedScope.projectRoots, missions[].steps[].workspace and tasks[].constraints.workingDirectory in plaintext. It calls the project.get command, which returns project.path, workspaces[].root/scratch/workspaceRoot.path and artifacts[].location.path, and tasks[].cwd unredacted. project.list returns project.path. The device learns absolute workstation folder layout, contrary to the stated 'no local folder facts' invariant.",
+          "evidence": "device-authority.server.ts:362-401 deviceSnapshot spreads ...snapshot and only filters devices/tasks/providers/presentation/agents; deviceTask (443-453) nulls cwd/pid/processTree/sessionId but leaves constraints. presentation.ts:422-530 dashboardSnapshot spreads ...task (constraints kept), keeps requestedScope.projectRoots via ...mission.requestedScope and steps via ...step (workspace kept). project-registry.server.ts:173-209 returns the full JSON record incl. path. project-service.server.ts:182-216 project detail returns project, workspaces (AgentWorkspace.root.path), artifacts raw, and tasks via ...t (cwd kept). http.server.ts:535 applies deviceArtifactRead only to project.artifact, so project.get and project.list return raw results. Existing test remote-device.test.ts:452-478 asserts only task cwd/pid/processTree and provider executable; no assertion covers projects, constraints, workspaces or artifact locations.",
+          "blocked": false,
+          "lens": "transport",
+          "verdicts": [
+            {
+              "refuted": false,
+              "realSeverity": "MEDIUM",
+              "reasoning": "Not refuted. No canonical boundary strips folder paths for paired devices on these routes.\n\nVerified facts:\n- /state: http.server.ts:368 applies deviceSnapshot then dashboardSnapshot to the device view. deviceSnapshot (device-authority.server.ts:362-401) spreads ...snapshot and filters only devices, tasks, providers, presentation and agents. The top-level `projects` field is never filtered. manager.server.ts:323 fills it with RegisteredProject records, and Project carries `path` (orch/types.ts:186). dashboardSnapshot (presentation.ts) has no `projects` or path handling.\n- project.list and project.get: DEVICE_RIGHTS grants both \"read\" (device-authority.server.ts:54-55). http.server.ts:534-535 passes results through unchanged; deviceArtifactRead is applied only to project.artifact. project-service.server.ts:36-72 does not gate list or get on `local`; only repository, add and folder-change commands are workstation-only.\n- project.get detail (project-service.server.ts:182-230): tasks are mapped with ...t and keep cwd; missions keep ...m, so requestedScope.projectRoots survives; workspaces come from workspaces.list unfiltered; artifacts are raw.\n- hidePaths (device-authority.server.ts:419) runs only on refusal messages, not on successful results.\n- No other gateway strips these. host.ts:45 applies dashboardSnapshot only on the workstation-side read, and host-bridge does no device filtering.\n- The existing test remote-device.test.ts:452-478 asserts only task cwd/pid/processTree and provider executable/evidence, so nothing covers projects, constraints, workspaces or artifact locations. Its \"path-free\" title overstates coverage.\n\nI did not separately confirm the presentation.ts constraints/steps claim beyond the spread pattern, but the top-level projects leak on /state and the project.list/project.get leak are sufficient on their own. The code's own comment (device-authority.server.ts:362-365) states the \"no local folder facts\" intent, so the gap is a real invariant violation. Severity MEDIUM is reasonable: it is a read-only disclosure to a paired or stolen-cookie device, not an execution path.",
+              "fixSuggestion": "In deviceSnapshot, map projects to a path-free projection (drop path, folder roots and identity fields). Apply the same stripping inside a device branch of projects.command for project.list and project.get: remove project.path, workspaces[].root/scratch/workspaceRoot path, artifacts[].location.path (reuse deviceArtifactRead's shape), tasks[].cwd and constraints.workingDirectory, and mission requestedScope.projectRoots and step workspace. Add regression assertions in remote-device.test.ts that a device /state, project.list and project.get response contains no absolute path sentinel."
+            },
+            {
+              "refuted": false,
+              "realSeverity": "MEDIUM",
+              "reasoning": "No canonical boundary blocks the leak. Traced paths:\n\n1. /state (http.server.ts:428) calls viewFor(), which calls snapshot(), which spreads manager.snapshot(), and manager.server.ts:323 sets projects = this.projects.list({limit:100}).projects. Project.path is a plain string (orch/types.ts:186). deviceSnapshot (device-authority.server.ts:362-401) spreads ...snapshot and only filters devices/tasks/providers/presentation/agents, so projects[].path passes through. dashboardSnapshot (presentation.ts:422-530) also spreads and does not touch projects. The only task/mission path-related strips are cwd/pid/processTree/sessionId (deviceTask) and executor params/requestedScope.terminal (dashboard). constraints, requestedScope.projectRoots and step workspace are not stripped (no grep hits for projectRoots or workingDirectory in presentation.ts).\n\n2. project.get/list (http.server.ts:532-535) return projects.command() output raw for devices. Only project.artifact goes through deviceArtifactRead, which strips artifact.location.path. Project detail returns refresh(projectId), a RegisteredProject with path, plus missions spread with ...m (requestedScope kept) and tasks spread with ...t (cwd kept). project.list returns registry rows with path.\n\n3. Route-level and transport checks: assertDeviceAction only gates the action name (project.list/get are \"read\"), not the fields. The tunnel worker (scripts/bunny-tunnel-worker.mjs) has no fetch/proxy/path filtering. The only error-text sanitizer is hidePaths, which applies to refusal messages, not success payloads.\n\n4. Tests: remote-device.test.ts:452-478 asserts only task cwd/pid/processTree and provider executable/evidence. No assertion covers projects, constraints, workspaces or artifact locations. The code comments at device-authority.server.ts:358-360 and 425 state the intended \"no local folder facts\" invariant, which the code does not enforce for these fields. The finding's evidence checks out.\n\nSeverity is kept at MEDIUM, not LOW: the leak breaks an explicit invariant and is reachable by a stolen device cookie before revocation, though the disclosed data is path layout only and grants no execution.",
+              "fixSuggestion": "Add a device projection for the project surface: in deviceSnapshot, map projects to remove path and any root identity fields; in dashboardSnapshot or deviceSnapshot, strip missions[].requestedScope.projectRoots, steps[].workspace and tasks[].constraints.workingDirectory for device principals. In http.server.ts, apply a device-specific projection to project.list and project.get results (drop project.path, workspaces[].root/scratch/workspaceRoot.path, artifacts[].location.path via the deviceArtifactRead logic, tasks[].cwd). Extend remote-device.test.ts:452 to assert none of these path fields appear in /state or project.get/project.list responses for a paired device."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "lens": "repair-regression",
+      "all": [
+        {
+          "id": "T9R-01",
+          "severity": "INFO",
+          "title": "Remote mission.respond cannot substitute Agent/Mission/Project binding fields",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/commands.server.ts",
+          "line": 64,
+          "attack": "A paired phone sends mission.respond with a genuine requestId for Agent A plus agentId/missionId/projectId of Agent B (or a different project) hoping the Host binds the approval to the substituted target, or replays A's envelope at B's Bus admission boundary.",
+          "evidence": "commands.server.ts:64-65: `if (!access.local && Object.keys(data).some(key => ![\"requestId\",\"decision\",\"maxActions\",\"ttlMs\"].includes(key))) throw new CommandRefusedError(\"Remote approval can only answer the exact Host request; ...\")`. Before the repair the handler read only `id(data.requestId)` (line ~70), so the extra fields were silently ignored; the repair converts that into an explicit 400. remote-remediation.test.ts:72-101 (LIVE: real startHost, real HTTP, real filesystem Bus) asserts status 400, /exact Host request/, no resolution of either canonical request, no receipt.txt in either project, and a Bus-level replay of A's envelope against B is not allowed. Test-result log remote-tests-third.log shows an earlier failing run, but prelim/full-regression-ea48c40.log shows the three substitution tests passing at ea48c40.",
+          "blocked": true,
+          "blockedBy": "commands.server.ts:64-65 key allowlist for non-local callers; remote-remediation.test.ts:72",
+          "existingTest": "src/lib/bunny-host/remote-remediation.test.ts:72"
+        },
+        {
+          "id": "T9R-02",
+          "severity": "INFO",
+          "title": "Workstation mission.respond not rejected by the new remote field check",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/http.server.ts",
+          "line": 388,
+          "attack": "The new allowlist could reject legitimate workstation approvals, or a paired device could obtain local=true and bypass the check.",
+          "evidence": "http.server.ts:388 `const local=equal(bearer,token);` (only the Host bearer is local). The new check is gated by `!access.local` (commands.server.ts:64). The only client caller, src/store/use-island.ts:796-797, sends `{ requestId, decision }` only, which passes the allowlist. Paired devices use their own tokens so `local` is false for them. No legitimate call is rejected by the diff.",
+          "blocked": true,
+          "blockedBy": "http.server.ts:388 bearer equality; commands.server.ts:64 !access.local gate",
+          "existingTest": ""
+        },
+        {
+          "id": "T9R-03",
+          "severity": "INFO",
+          "title": "Remote mission.approve still accepts revision/plan fields (outside T9R change)",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/manager.server.ts",
+          "line": 717,
+          "attack": "A paired device approves a Mission while supplying a different plan reference or revision to swap what is approved.",
+          "evidence": "manager.server.ts:716-717 `if (planReference !== undefined && planReference !== this.agenticPlanReference(id))` refuses a plan that differs from the reviewed one, and mission.approve is in REMOTE (commands.server.ts:27). The T9R repair does not touch this path; the binding is enforced by the manager's plan-reference check.",
+          "blocked": true,
+          "blockedBy": "manager.server.ts:717 planReference equality check",
+          "existingTest": ""
+        },
+        {
+          "id": "T9R-04",
+          "severity": "INFO",
+          "title": "Foreign or spoofed window named Calculator cannot be bound as the Calculator target",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 147,
+          "attack": "A non-Calculator process (or a foreign top-level window with UIA Name exactly 'Calculator') is selected by Calculator-Frames, so later invoke/read/focus operate on it.",
+          "evidence": "Calculator-Frames (line 147) calls Native-CalculatorFrame for every window named 'Calculator'. Native-CalculatorFrame requires the owner pid to match UIA ProcessId and the process path to equal <package InstallLocation>\\CalculatorApp.exe|Calculator.exe via Assert-CalculatorProcess (exact OrdinalIgnoreCase path compare, package filter PublisherId 8wekyb3d8bbwe and SignatureKind Store/System). For ApplicationFrameHost frames the path must equal System32\\ApplicationFrameHost.exe, the class must be ApplicationFrameWindow, and the AppUserModelID (PKEY 9F4C2855...,5) must equal PackageFamilyName!AppId from the installed manifest. Assert-BatchWindow (line 191-194 region) then requires the content process path to match the package and rejects modal or unexpected windows.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts Calculator-Packages / Assert-CalculatorProcess / Native-CalculatorFrame path and AUMID checks",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts:31 (SIMULATED fault stubs only; the path logic itself is LIVE evidence in test-results/ma3/t9r/native-adversarial-results.json)"
+        },
+        {
+          "id": "T9R-05",
+          "severity": "LOW",
+          "title": "Minimized Calculator is restored before the arithmetic trust and modal checks run",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 156,
+          "attack": "Restoration (ShowWindow SW_RESTORE) in Ready-CalculatorWindow is gated only by Native-CalculatorFrame. The full Assert-BatchWindow (content-process trust, modal and unexpected-window checks) runs only at line 177 after readiness succeeds. A minimized Calculator with a modal or unexpected child is therefore restored to the foreground and only then refused. The restore is also a TOCTOU: the HWND is checked at Native-CalculatorFrame and then passed to ShowWindow, so a handle reused between the two calls would restore a foreign window.",
+          "evidence": "computer.server.ts:156 `if ($restored) { Assert-BatchClock; [void](Native-CalculatorFrame $w); [void][BunnyWin]::ShowWindow($h, 9) }`; computer.server.ts:177 `Assert-BatchWindow $fresh` before return. The restoration is reached from the TS valid callback (computer.server.ts ~483) and existing path (~489) inside open_app. Whether a non-crossApp open_app is approval-gated was not verified in this read (the EXECUTE gating lives in bus.server.ts, outside the diff). The impact is limited to restoring a native-identity-verified Calculator window, with no input, no invocation and no binding.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts:13-29 covers only the stubbed call order, not the ordering against modal checks"
+        },
+        {
+          "id": "T9R-06",
+          "severity": "INFO",
+          "title": "Approval-time probe can bind a minimized window's identity without the full window checks",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 263,
+          "attack": "In the non-prepare valid path, an iconic window skips Assert-BatchWindow entirely (elseif at line 263), and the catch at line 265 turns 'No verified Calculator arithmetic surface' into valid=true with needsReadiness. prepareBatchAction (around line 535) then returns that identity as an approval-batch windowIdentity, so an approval could cover a window whose trust and modal checks were never run.",
+          "evidence": "computer.server.ts:262-265: `if ($p.prepareReadiness) { $prepared = Ready-CalculatorWindow $w } elseif (-not [BunnyWin]::IsIconic($h)) { try { Assert-BatchWindow $w } catch { ...; $needsReadiness = $true } }`. Identity is not authority (calculator-targets.server.ts header comment). At execution, perform() passes the admitted identity through valid with prepareReadiness:true (computer.server.ts ~488-491), which runs Ready-CalculatorWindow and then Assert-BatchWindow (line 177) before any reuse. calculator-readiness.test.ts:13-29 asserts flags [undefined, true] and that a caller cannot request preparation via params (calculatorOperation rejects extra keys, batches.server.ts:55-57).",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:490-491 execution-time prepareReadiness re-verification; computer.server.ts:177 Assert-BatchWindow before return; batches.server.ts:57 extra-key rejection",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts:13"
+        },
+        {
+          "id": "T9R-07",
+          "severity": "INFO",
+          "title": "Swallowed errors in the existing-window scan cannot bind an unverified identity",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 248,
+          "attack": "A window whose arithmetic surface is absent or incomplete is treated as reusable, or the catch hides a real failure and the scan returns an identity that was never verified.",
+          "evidence": "computer.server.ts:246-248: `if ($windows.Count -eq 1 -and -not IsIconic) { try { Assert-BatchWindow $windows[0]; $identity = Batch-Identity $windows[0] } catch { if (msg -ne 'Calculator arithmetic identity unavailable.' -and msg -ne 'No verified Calculator arithmetic surface.') { throw } } }`. $identity is assigned only after both Assert-BatchWindow and Batch-Identity succeed. The swallowed messages leave identity null, and awaitingReadiness routes the caller to the acquire script, which runs the full Ready-CalculatorWindow path. Every other exception rethrows. Note that in the same block Batch-Identity throws before the trust check, so both swallowed messages mean no identity is produced.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:247 identity assignment after checks; computer.server.ts:248 two-message allowlist",
+          "existingTest": ""
+        },
+        {
+          "id": "T9R-08",
+          "severity": "INFO",
+          "title": "Focus denial cannot report foreground success",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 327,
+          "attack": "SetFocus fails, or foreground never reaches the target, and the operation still reports focused=true, so a model claims the Calculator was focused when it was not.",
+          "evidence": "computer.server.ts:327 `try { $focusTarget.SetFocus() } catch [InvalidOperationException] { $focusProviderUnavailable = $true }` swallows only that exception and the variable is never read (dead code). The loop breaks only on `GetForegroundWindow() -eq $h`; `focused` is computed from that same comparison at the end, and `Assert-BatchWindow $w` runs after the loop, so an identity change throws before output. In the TS layer (computer.server.ts ~ verified line) `verified = output.focused === true`, else ok=false with errorCategory capability_failed. focus denial stays failed. Timeout bounded at line 316 (2s, min with expiresAt).",
+          "blocked": true,
+          "blockedBy": "computer.server.ts verified check on output.focused; post-loop Assert-BatchWindow",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts:79-87 (SIMULATED stub; the PowerShell path is not exercised by it)"
+        },
+        {
+          "id": "T9R-09",
+          "severity": "INFO",
+          "title": "No unbounded timeouts introduced in the Calculator path",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 153,
+          "attack": "Readiness, focus or launch wait loops hang the desktop queue indefinitely.",
+          "evidence": "Ready-CalculatorWindow deadline = min(start+8000, batch.expiresAt) (line 153), loop with 100ms sleep, throws at deadline. Focus loop deadline = min(start+2000, expiresAt) (line 316). Launch wait min(now+8000, expiresAt). PowerShell itself is killed by execFile timeout (powershell(), line ~387, timeout = min(context.timeoutMs,60000)). Assert-BatchClock is called inside each loop. All loops are bounded.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts:153 and :316 deadlines; execFile timeout in powershell()",
+          "existingTest": ""
+        },
+        {
+          "id": "T9R-10",
+          "severity": "LOW",
+          "title": "Launch plus readiness can exceed the single PowerShell budget and leave a persisted uncertain state",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 279,
+          "attack": "The launch wait (up to 8s) plus the new readiness wait (up to 8s) run under one PowerShell budget of about 20s that starts before PowerShell and Add-Type compilation. If execFile kills the child after Start-Process but before the acquire script returns, calculator-targets.server.ts persists phase 'acquiring'. Later calls throw 'Previous Calculator launch outcome is uncertain' whenever existing returns null (for example, the window is still minimized or not yet ready).",
+          "evidence": "computer.server.ts:279 Start-Process inside the acquire script; expiresAt is computed from Date.now() before PowerShell starts (perform, ~line 477); calculator-targets.server.ts acquire saves phase 'acquiring' before driver.launch and throws the uncertain error when existing is null and saved.phase is 'acquiring'. This is reasoned from the code only and was not reproduced live.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        },
+        {
+          "id": "T9R-11",
+          "severity": "LOW",
+          "title": "Calculator-Frames now throws on foreign 'Calculator'-named windows during the launch-wait loop",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 147,
+          "attack": "A non-Calculator window whose UIA name is exactly 'Calculator' appears while the launch-wait loop runs. Before T9R the loop's catch swallowed 'Calculator arithmetic identity unavailable.' and retried. Now Native-CalculatorFrame throws 'outside the verified Calculator application' (not in the swallow list), so open_app fails instead of waiting.",
+          "evidence": "Old code: Calculator-Windows -> Assert-BatchWindow -> Batch-Identity throws 'Calculator arithmetic identity unavailable.' and the launch loop's catch sets windows=@(). New Calculator-Frames -> Native-CalculatorFrame -> Assert-CalculatorProcess throws a different message not in the catch allowlist. The failure is fail-closed (no binding, no invoke), so this is an availability regression for an edge case only.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts Native-CalculatorFrame path check (fail-closed)",
+          "existingTest": ""
+        },
+        {
+          "id": "T9R-12",
+          "severity": "INFO",
+          "title": "open_app reuse path does not run the readiness probe but reports only what it verified",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/computer.server.ts",
+          "line": 505,
+          "attack": "An already-ready Calculator reused without admittedIdentity returns ok:true with no readiness evidence, so a caller might assume UIA readiness (num0/num2/clear/results enabled and invokable) was proven.",
+          "evidence": "On the existing path without admittedIdentity (computer.server.ts ~494), the existing script returns identity after Assert-BatchWindow only, with no Ready-CalculatorWindow. output.readiness is then absent (line 505 spreads readiness only when present), and the summary reads 'Reused the verified Calculator target.' That summary matches what was checked. Invocation still requires Assert-BatchControl (enabled, Button, same owner, foreground), so no control is invoked on an unproven surface.",
+          "blocked": true,
+          "blockedBy": "computer.server.ts Assert-BatchControl before any invoke",
+          "existingTest": ""
+        },
+        {
+          "id": "T9R-13",
+          "severity": "INFO",
+          "title": "ma2-t10.test.ts assertions were changed in T9 (0a5988c), not in T9R; the change is stronger, not a loosening",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/ma2-t10.test.ts",
+          "line": 86,
+          "attack": "Assertions in an existing test were weakened to match new behavior.",
+          "evidence": "git diff 987afea ea48c40 for test files: only ma2-t10.test.ts has removed lines (9 removed, 26 changed). Its last change is commit 0a5988c (T9), and the T9R diff (0a5988c..ea48c40) does not touch it. Changes: readUntil matches an exact '\"sequence\":N' instead of a substring; the authorized-positive assertion now also requires the raw detail to be absent (line ~57); the revoke test adds an exact forbidden-sequence check after revoke (~line 66); the other-device check at lines 86-87 was inverted from 'raw marker delivered' to 'raw marker absent' (safe projection). The old closed===false assertions are kept. No assertion was removed without a stronger replacement. All other test diffs (remote-device.test.ts, remote-remediation.test.ts, calculator-readiness.test.ts, island tests) are additions only (0 deleted lines).",
+          "blocked": true,
+          "blockedBy": "ma2-t10.test.ts:86-87 stronger redaction check",
+          "existingTest": "src/lib/bunny-host/ma2-t10.test.ts:86"
+        },
+        {
+          "id": "T9R-14",
+          "severity": "LOW",
+          "title": "Test classification: stub-driven 'refuses <fault>' tests overstate what they prove",
+          "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/calculator-readiness.test.ts",
+          "line": 30,
+          "attack": "A reader takes the seven 'T9R readiness refuses <fault> without replacement or invocation' tests as proof that the PowerShell detects wrong signer, PID lifetime change, HWND replacement, stale element, budget exhaustion and modal controls.",
+          "evidence": "calculator-readiness.test.ts:30-37: the injected automate stub throws `new Error(fault)` and the test asserts only that the adapter propagates the error and calls no script other than CALCULATOR_SCRIPTS.valid. The detection logic lives in PowerShell and is not executed by these tests. The header comment does label them SIMULATED and points to X53. The LIVE evidence for the native checks is test-results/ma3/t9r/native-adversarial-results.json (rows marked LIVE Windows UIA/native read-only validator, PASS), which is self-generated and was not re-run here. The test 'Stop while another Mission owns the desktop queue cannot restore' (line 58) actually exercises abort while queued. The name overstates it.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "src/lib/bunny-missions/calculator-readiness.test.ts:30"
+        },
+        {
+          "id": "T9R-15",
+          "severity": "MEDIUM",
+          "title": "Full-suite coverage of the Calculator repair is not evidenced in the regression log",
+          "file": "C:/Users/allam/Documents/new/bun-router/test-results/ma3/t9r/prelim/full-regression-ea48c40.log",
+          "line": 279,
+          "attack": "The regression log is cited as proof that ea48c40 is green, but it does not contain the Calculator repair tests or X53, so the claim is incomplete.",
+          "evidence": "full-regression-ea48c40.log (written 02:33) has 740 pass/fail lines and an 'ℹ tests 256 / pass 256' summary, but the summary is one of several concatenated node --test invocations. A grep for 'pure probe', 'revoked canonical consent' and 'focus denial' returns 0 matches, and 'X53' returns 0 matches, even though calculator-readiness.test.ts (modified 00:11) and cross-app-live.test.ts:30 (X53) are included in the package.json test glob. The T9R remote tests do appear as passing. Separate logs exist: readiness-final-focused.log (12/12 pass) and focus-repair-x53.log (1 pass), which are focused runs, not full-suite runs. The calculator-readiness comment claiming X53 'supplies independent real Windows UIA acceptance' is therefore not confirmed against ea48c40 in the full-suite log.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": ""
+        }
+      ],
+      "verified": [
+        {
+          "id": "T9R-15",
+          "severity": "MEDIUM",
+          "title": "Full-suite coverage of the Calculator repair is not evidenced in the regression log",
+          "file": "C:/Users/allam/Documents/new/bun-router/test-results/ma3/t9r/prelim/full-regression-ea48c40.log",
+          "line": 279,
+          "attack": "The regression log is cited as proof that ea48c40 is green, but it does not contain the Calculator repair tests or X53, so the claim is incomplete.",
+          "evidence": "full-regression-ea48c40.log (written 02:33) has 740 pass/fail lines and an 'ℹ tests 256 / pass 256' summary, but the summary is one of several concatenated node --test invocations. A grep for 'pure probe', 'revoked canonical consent' and 'focus denial' returns 0 matches, and 'X53' returns 0 matches, even though calculator-readiness.test.ts (modified 00:11) and cross-app-live.test.ts:30 (X53) are included in the package.json test glob. The T9R remote tests do appear as passing. Separate logs exist: readiness-final-focused.log (12/12 pass) and focus-repair-x53.log (1 pass), which are focused runs, not full-suite runs. The calculator-readiness comment claiming X53 'supplies independent real Windows UIA acceptance' is therefore not confirmed against ea48c40 in the full-suite log.",
+          "blocked": false,
+          "blockedBy": "",
+          "existingTest": "",
+          "lens": "repair-regression",
+          "verdicts": [
+            {
+              "refuted": true,
+              "realSeverity": "LOW",
+              "reasoning": "The claimed defect (Calculator repair tests and X53 absent from the full-suite log) is false as stated. Evidence from /c/Users/allam/Documents/new/bun-router/test-results/ma3/t9r/prelim/full-regression-ea48c40.log:\n- Line 888: \"✔ T9R readiness: preparation is a pure probe; only admitted open requests restoration\" (matches the finding's 'pure probe' grep, which returned 0 in the finding).\n- Line 896: \"✔ T9R readiness: revoked canonical consent prevents every native call\" (matches 'revoked canonical consent').\n- Line 900: \"✔ T9R focus denial stays a failed operation and cannot report foreground success\" (matches 'focus denial').\n- Line 940: \"✔ T6 X53 DISPOSABLE LIVE VERIFIED: ...\" (matches 'X53'; the test is defined at cross-app-live.test.ts:30).\n- Lines 807-899 also contain the other T9R readiness tests (wrong signed application, PID lifetime, HWND replacement, stale UIA, budget, modal/password refusals) and all pass.\npackage.json's test script includes src/lib/bunny-missions/*.test.ts (which covers calculator-readiness.test.ts) and src/lib/bunny-host/remote-remediation.test.ts, so these files are in the full-suite glob. There are no '✖' or 'not ok' lines in the log.\n\nThe one real gap is narrower: the single 'ℹ tests 256 / pass 256 / fail 0' summary at lines 279-286 belongs only to the first node --test invocation (scripts/*.test.mjs). The second, --experimental-strip-types invocation that contains the Calculator and X53 tests has no summary line in the log, and the log ends at the X23 line (line 953) with no exit status. So the second block's totals and exit code are not recorded. That weakens the 'green' claim's evidence, but it does not show that the Calculator repair or X53 is uncovered. The finding's stated attack and grep results are wrong, so I mark it refuted, with the residual evidence gap noted as LOW.",
+              "fixSuggestion": "Re-capture the full-suite run with the complete output of the second node --experimental-strip-types invocation, including its 'ℹ tests / pass / fail' summary and exit code, or record the exit code separately (for example in the same prelim directory). Do not restate the finding as missing coverage. The T9R and X53 tests are already present and passing in the existing log."
+            },
+            {
+              "refuted": true,
+              "realSeverity": "NONE",
+              "reasoning": "The claimed defect rests on grep results that do not match the log. In test-results/ma3/t9r/prelim/full-regression-ea48c40.log, all three Calculator repair tests appear as passing: line 888 \"T9R readiness: preparation is a pure probe; only admitted open requests restoration\", line 896 \"T9R readiness: revoked canonical consent prevents every native call\", and line 900 \"T9R focus denial stays a failed operation and cannot report foreground success\". X53 also appears and passes at line 940: \"T6 X53 DISPOSABLE LIVE VERIFIED ... (21844.2161ms)\". Grep for \"X53\" returns a match, not zero. The package.json test script includes src/lib/bunny-missions/*.test.ts, which covers calculator-readiness.test.ts, and cross-app-live.test.ts (X53) is in that same glob's scope and ran. The calculator-readiness.test.ts comment that X53 supplies independent real Windows UIA acceptance is a statement about the test design (X53 is an unchanged live test), not a claim about this log. No code blocks the Calculator tests from running; the finding's core assertion is false.\n\nResidual observation, not the claimed defect: at the time of reading, the log was still being appended (size went from 82579 to 84130 bytes during the session, now 973 lines, last line in the MA0R tests, after X23). It has 256 passes in one early summary block at line 279-286 and no completed summary for the second concatenated invocation, and node.exe processes were running. So this file does not by itself prove ea48c40 is fully green. That is a process/evidence-completeness point about citing an in-progress log, and it should be re-checked once the run finishes and emits its summary.",
+              "fixSuggestion": "No change to the repair code or tests needed for T9R-15 as stated. Before citing ea48c40 as green, wait for the full-regression run to finish, confirm its final ℹ tests/pass/fail summary lines for every invocation in package.json's test script, and then cite that completed log. Drop or correct the 'zero matches' evidence in T9R-15."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

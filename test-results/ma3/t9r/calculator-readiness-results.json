@@ -1,0 +1,169 @@
+{
+  "classification": "LIVE readiness receipts from unchanged original X53 runs + SIMULATED injected adapter boundary tests (labelled)",
+  "bound": {
+    "pollIntervalMs": 100,
+    "perPhaseMaxMs": 8000,
+    "alsoBoundedBy": [
+      "consent expiry",
+      "operation timeout"
+    ],
+    "focusDeadlineMs": 2000
+  },
+  "liveReadiness": [
+    {
+      "run": 1,
+      "mode": "cold",
+      "readiness": {
+        "attempts": 1,
+        "controls": [
+          "num0Button",
+          "num2Button",
+          "clearButton",
+          "CalculatorResults"
+        ],
+        "restored": false,
+        "elapsedMs": 298
+      }
+    },
+    {
+      "run": 2,
+      "mode": "warm",
+      "readiness": "not re-probed (reuse of an already-ready bound target)"
+    },
+    {
+      "run": 3,
+      "mode": "minimized",
+      "readiness": {
+        "attempts": 1,
+        "controls": [
+          "num0Button",
+          "num2Button",
+          "clearButton",
+          "CalculatorResults"
+        ],
+        "restored": true,
+        "elapsedMs": 379
+      }
+    },
+    {
+      "run": 4,
+      "mode": "warm",
+      "readiness": "not re-probed (reuse of an already-ready bound target)"
+    },
+    {
+      "run": 5,
+      "mode": "cold",
+      "readiness": {
+        "attempts": 1,
+        "controls": [
+          "num0Button",
+          "num2Button",
+          "clearButton",
+          "CalculatorResults"
+        ],
+        "restored": false,
+        "elapsedMs": 263
+      }
+    },
+    {
+      "run": 6,
+      "mode": "warm",
+      "readiness": "not re-probed (reuse of an already-ready bound target)"
+    },
+    {
+      "run": 7,
+      "mode": "minimized",
+      "readiness": {
+        "attempts": 1,
+        "controls": [
+          "num0Button",
+          "num2Button",
+          "clearButton",
+          "CalculatorResults"
+        ],
+        "restored": true,
+        "elapsedMs": 354
+      }
+    },
+    {
+      "run": 8,
+      "mode": "warm",
+      "readiness": "not re-probed (reuse of an already-ready bound target)"
+    },
+    {
+      "run": 9,
+      "mode": "cold",
+      "readiness": {
+        "attempts": 1,
+        "controls": [
+          "num0Button",
+          "num2Button",
+          "clearButton",
+          "CalculatorResults"
+        ],
+        "restored": false,
+        "elapsedMs": 453
+      }
+    },
+    {
+      "run": 10,
+      "mode": "warm",
+      "readiness": "not re-probed (reuse of an already-ready bound target)"
+    }
+  ],
+  "boundaryTests": [
+    {
+      "name": "T9R readiness: preparation is a pure probe; only admitted open requests restoration",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness refuses Wrong signed application without replacement or invocation",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness refuses Frame PID lifetime changed without replacement or invocation",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness refuses Content PID lifetime changed without replacement or invocation",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness refuses HWND replacement without replacement or invocation",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness refuses Stale UIA element without replacement or invocation",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness refuses Readiness budget exhausted without replacement or invocation",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness refuses Modal or password control without replacement or invocation",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness: revoked canonical consent prevents every native call",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness preserves restoration evidence across the subsequent identity validation",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness: Stop while another Mission owns the desktop queue cannot restore",
+      "status": "pass"
+    },
+    {
+      "name": "T9R readiness: another active Mission cannot restore the leased target",
+      "status": "pass"
+    },
+    {
+      "name": "T9R focus denial stays a failed operation and cannot report foreground success",
+      "status": "pass"
+    }
+  ],
+  "allPass": true
+}

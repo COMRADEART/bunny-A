@@ -1,0 +1,162 @@
+{
+  "summary": "Read-only adversarial check of 395d1c0 (remote-tag launch gate, marker ordering, sweep re-read)",
+  "agentCount": 2,
+  "logs": [],
+  "result": [
+    {
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "MEDIUM",
+          "title": "Remote-tag refusal relies on registry snapshot; launch-time probe checks presence only",
+          "evidence": "deviceMayLaunch (device-authority.server.ts:33-35) refuses a model only if it is in remoteModels, which comes from the registry record refreshed on each registry refresh (adapters.server.ts:145, OllamaAdapter.health = detect). At launch, orch/exec.server.ts execute() re-probes via probeOllama(), which returns a fresh `remote` list, but only checks `probe.models.includes(model)` (line ~52) and never consults probe.remote. A suffix-less tag that the workstation turns into a remote proxy after the last registry refresh passes the direct approve gate (http.server.ts:565), the reroute filter (manager.server.ts:588) and MissionManager.deviceRequestRefusal (missions manager.server.ts:1958), and then executes against the hosted service. Bounded by refresh interval and needs a workstation-side tag change, but the commit's stated invariant (device never reaches hosted tags) is only enforced to snapshot age. Suggested fix: pass probe.remote into the device-approved launch check in execute() (or refuse when request.model is in probe.remote for a device-approved task).",
+          "failure_scenario": "Registry last probed at T0 when tag qwen-x is local. At T1 the workstation makes qwen-x a remote proxy (remote_host set, no -cloud suffix). Paired phone approves a task routed to ollama/qwen-x before the next registry refresh. deviceMayLaunch returns true (remoteModels lacks qwen-x, name has no cloud suffix), execute() sees qwen-x in probe.models and posts to /api/generate, which is served by the hosted service.",
+          "blocked": false
+        },
+        {
+          "id": "F2",
+          "severity": "LOW",
+          "title": "deviceMayLaunch does not reject the 'auto' provider-default sentinel",
+          "evidence": "device-authority.server.ts:33-35 rejects only !model (empty/undefined). manager.server.ts:531-532 and 607 and 1084 use the literal 'auto' for a provider default, and adapters.server.ts:169 forwards task.model unchanged into execute(). With model 'auto', the gate passes and launch proceeds; execute() then uses `request.model || probe.models[0]`, but 'auto' is truthy so there is no fallback, and probe.models.includes('auto') is false, so it refuses with 'Model auto is no longer available'. No hosted escape found, but the comment's invariant ('an empty model never launches', provider default never launchable) is not expressed in code for this sentinel.",
+          "failure_scenario": "Device-approved ollama task with model 'auto' passes deviceMayLaunch, launch fails at exec.server.ts model-missing check. Benign today; would become a bypass only if a future change falls back to probe.models[0] for truthy sentinels.",
+          "blocked": false
+        },
+        {
+          "id": "F3",
+          "severity": "LOW",
+          "title": "No end-to-end test for a suffix-less hosted tag through the three real call sites",
+          "evidence": "remote-remediation.test.ts:451-454 covers deviceMayLaunch directly with an explicit array. No test drives http direct approve (http.server.ts:565), TaskManager reroute (manager.server.ts:588) or MissionManager.deviceRequestRefusal (missions manager.server.ts:1958) with a registry whose ollama record carries remoteModels for a non-suffixed tag. Reading the code: all three pass manager/tasks.live().find(provider.id===...)?.remoteModels correctly, so wiring is right, but it is unexercised. remote-device.test.ts fake ollama adapter sets no remoteModels, and missions.test.ts:757 only exercises remoteModels on the workstation launch path.",
+          "failure_scenario": "A future refactor drops the third argument at one call site (e.g. reverts http.server.ts:565) and no test fails.",
+          "blocked": false
+        },
+        {
+          "id": "F4",
+          "severity": "LOW",
+          "title": "approve() now reads the task before the containment gate, changing error precedence",
+          "evidence": "manager.server.ts:971-979: the new `this.db.get(id).state` runs before launch(), whose first statement is this.containment.assertAccepting('tasks') (manager.server.ts ~1027). persistence.server.ts:40 throws Error('Unknown task.') for an unknown id. Previously, an unknown id on a degraded Host got the containment refusal; now it gets 'Unknown task.'. Both are refusals; no crash path and no state write. Known tasks are unaffected. The marker fix itself is correct because approve() is synchronous and the state check only gates the Set mutation.",
+          "failure_scenario": "Host in degraded containment state receives approve for an unknown id: error text changes from the containment message to 'Unknown task.'. No security impact.",
+          "blocked": false
+        },
+        {
+          "id": "F5",
+          "severity": "INFO",
+          "title": "Behaviour change: null/empty-model device launches now refused; existing tests not traced to a regression",
+          "evidence": "deviceMayLaunch previously allowed model null for ollama (isRemoteOllamaTag({name:''}) is false). It now refuses, intentionally, in the direct gate, reroute filter and mission provider.execute. remote-device.test.ts:254-257 (device approve of an ollama task submitted with override 'ollama') depends on the submitted task carrying a non-empty model. The routed model comes from decision.recommended_model on the legacy path (manager.server.ts ~780), and I did not trace where that value is set, so whether this test still passes is UNVERIFIED. remote-device.test.ts:536-541, missions.test.ts and capabilities.test.ts contain no device-launch assertion for a null-model task.",
+          "failure_scenario": "If the legacy routed model is null for that fixture, remote-device.test.ts:255 gets 400 instead of 200 and the test fails. Only a test run can confirm; read-only review did not run it.",
+          "blocked": false
+        },
+        {
+          "id": "V1",
+          "severity": "INFO",
+          "title": "Verified correct: plumbing reaches all three callers; unprobed or absent data does not let a hosted tag launch",
+          "evidence": "All three deviceMayLaunch call sites pass the provider's remoteModels: http.server.ts:565 (manager.live()), manager.server.ts:588 (live from this.live() at line 582), missions manager.server.ts:1958 (this.tasks.live()). remoteModels undefined defaults to []. Before this run's probe, registry.live() returns availability 'unknown' (manager.server.ts:300-305), and launch() eligibility (router.ts:24) refuses non-ready/busy providers and missing providers, so an absent remoteModels never lets a launch through. Ollama detect always assigns remoteModels = found.remote ?? [] on each successful probe (adapters.server.ts:145). Revocation sweep re-read (http.server.ts ~856) is correct: the state is re-read after the save and the awaited stop, and the try/catch covers a missing mission. Workstation approve path does not call deviceMayLaunch, so workstation flows are unchanged. The duplicate-approve marker fix is correct: a duplicate workstation approve on a launching task leaves the marker intact, and remote-remediation.test.ts:442-443 would fail on the old code because the reroute would then occur.",
+          "failure_scenario": "None found beyond F1-F5.",
+          "blocked": false
+        }
+      ]
+    },
+    {
+      "findings": [
+        {
+          "id": "T1",
+          "severity": "HIGH",
+          "title": "F-02 mission.start 400 assertion is a state guard, not a revocation check",
+          "evidence": "File src/lib/bunny-host/remote-remediation.test.ts:252 asserts mission.start on the lost Mission returns 400 with message 'a revoked approval never starts'. The line above (251) asserts that Mission's state is 'stopped', because the revocation sweep (src/lib/bunny-host/http.server.ts, revocation block around lines 850-870, MISSION_ACTIVE includes 'ready' per src/lib/bunny-missions/machine.ts:30) stopped it. The 400 comes from src/lib/bunny-missions/commands.server.ts:56 ('if (mission.state !== \"ready\") throw ... Only an approved (ready) mission can be started.'). The start path (commands.server.ts:53-59, MissionManager.start() at manager.server.ts:799-811) contains no revokedAt check. So the assertion passes whether or not any revocation guard exists, and it cannot detect removal of the revocation logic in this path. Its message claims coverage it does not provide, and the commit message's 'restores the revoked-start check' is not backed by a guard I could find on this path. Non-vacuous alternative: set the lost Mission back to 'ready' with a revoked envelope via store and assert start is refused for revocation, which needs a real revocation guard in the start path to exist.",
+          "failure_scenario": "Delete every revocation check in the start path (or never add one): test line 252 still returns 400 because the state guard fires, so the suite stays green while a revoked ready Mission would be startable.",
+          "blocked": true
+        },
+        {
+          "id": "T2",
+          "severity": "MEDIUM",
+          "title": "Call-site wiring of probe remoteModels into the device gates has no failing assertion",
+          "evidence": "Three call sites now pass the probe's remoteModels: src/lib/bunny-host/http.server.ts:565, src/lib/bunny-host/manager.server.ts:588 (reroute filter), src/lib/bunny-missions/manager.server.ts:1958 (device provider.execute verdict). The DEV-01 test's live() (remote-remediation.test.ts ~line 415-420) sets no remoteModels, so the argument defaults to []. The only new remoteModels assertion (line 453) calls deviceMayLaunch directly. remote-device.test.ts:536-541 uses only cloud-suffixed tags. Removing the second argument at any of the three call sites leaves every assertion in remote-remediation.test.ts green. The headline behaviour of the commit (a probe-reported remote tag is refused at the device launch gate) is therefore unit-tested only at the function level.",
+          "failure_scenario": "A future edit drops '?.remoteModels' at manager.server.ts:588 or http.server.ts:565. Probe-reported hosted tags without a cloud suffix (e.g. qwen3:8b with remote_model set) become launchable from a paired device again, and no test in this file fails.",
+          "blocked": false
+        },
+        {
+          "id": "T3",
+          "severity": "LOW",
+          "title": "Duplicate-approve assertion is non-discriminating on its own; marker effect is observed only indirectly",
+          "evidence": "remote-remediation.test.ts:441 asserts tasks.approve(id,'workstation') throws /not awaiting approval/. The throw comes from the launch guard (manager.server.ts:1033), and in both pre-fix and post-fix code approve() reaches it, so this assertion passes either way. The marker mutation (manager.server.ts:974-978) runs before launch() in the pre-fix code, which clears deviceApproved. The marker is then only observed later, through the device run's 'launches' deepEqual to ['ollama'] (about line 476). I traced it: with the marker cleared, the reroute loop's deviceApproved filter (manager.server.ts:583-588) no longer applies, so the Claude route launches after the 429 and the device run becomes ['ollama','claude'] and fails. So the chain is sensitive, but the comment 'must not clear the device marker' is not checked directly at the point it is stated.",
+          "failure_scenario": "A regression that changes the marker but still throws on the duplicate would be caught only through the later reroute result, and any reroute change that stops launches for other reasons could mask or mislabel the failure.",
+          "blocked": false
+        },
+        {
+          "id": "T4",
+          "severity": "INFO",
+          "title": "Assertions verified non-vacuous by static reasoning",
+          "evidence": "(a) remote-remediation.test.ts:262 retry throws /authorization expired or was revoked/: missions.retry is synchronous (manager.server.ts:3444), so assert.throws catches it. The message matches manager.server.ts:3454 verbatim. Removing the revokedAt disjunct at 3452 falls through to 'No failed step to retry.' (the parked Mission was never run, so it has no failed step), and the regex then fails. The regex is a union with expiry, so it does not separate revoked from expired; the envelope is not expired within the test, as far as I checked. (b) line 453 deviceMayLaunch(...,['qwen3:8b']) === false: pre-fix the second argument is ignored and the result is true, so it fails; the name has no cloud suffix, so it isolates the new remoteModels branch. (c) line 454 model '' === false: pre-fix isRemoteOllamaTag({name:''}) is false and the result is true, so it fails; post-fix the !!model guard returns false. (d) line 452 deviceMayLaunch(qwen3:8b) === true is a positive control: it passes before and after and guards against over-blocking local tags, which is its intended role. The earlier HTTP regex /revoked|Host command failed/ matched the generic 'Host command failed' text, so the change to a manager-boundary assertion is a real improvement.",
+          "failure_scenario": "Not applicable (these assertions hold up); noted so the strong ones are not re-litigated.",
+          "blocked": false
+        },
+        {
+          "id": "T5",
+          "severity": "LOW",
+          "title": "Revocation sweep re-read has no test coverage",
+          "evidence": "src/lib/bunny-host/http.server.ts revocation sweep (around lines 855-860): 'if (MISSION_ACTIVE.includes(missions.store.mission(mission.id).state)) await missions.stop(...)' replaces a check on the stale 'mission' object. No assertion in remote-remediation.test.ts runs a concurrent Retry during the awaited stop, so reverting this line to the stale read would leave the suite green. The commit's 're-reads Mission state' claim is unverified by tests.",
+          "failure_scenario": "A concurrent Retry re-arms a Mission between the sweep's read and its stop; with the stale read the sweep skips stop and the re-armed Mission keeps running after the device is revoked.",
+          "blocked": false
+        },
+        {
+          "id": "T6",
+          "severity": "INFO",
+          "title": "Scope note: this review is static only",
+          "evidence": "Per the task (read-only), I did not run npm test, the Host, or touch %LOCALAPPDATA%\\Bunny-A. Every verdict above is from reading git show 395d1c0 and the cited source lines. Mutation outcomes are reasoned, not executed. The record() classification-string edits in the test file are documentation changes and contain no assertions.",
+          "failure_scenario": "Actual runtime results could differ from the static traces, especially for the DEV-01 timing chain, which depends on async launch ordering.",
+          "blocked": false
+        }
+      ]
+    }
+  ],
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Check"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "check:security",
+      "phaseIndex": 1,
+      "phaseTitle": "Check",
+      "agentId": "a1205b174408a6465",
+      "model": "claude-haiku-5-5",
+      "state": "done",
+      "startedAt": 1791530035859,
+      "queuedAt": 1791530035836,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Repository C:\\Users\\allam\\Documents\\new\\bun-router. Review `git show 395d1c0` only. STRICTLY READ-ONLY: no edits, no npm test, no Host start, never touch %LOCALAPPDATA%\\Bunny-A.\nCorrectness/security: does the remoteModels plumbing reach every deviceMayLaunch caller with the right provider's data (direct approve gate http.server.ts, MissionManager.deviceRequestRefusal, TaskManager reroute filter)? …",
+      "promptFramed": true,
+      "lastProgressAt": 1791530178274,
+      "tokens": 133297,
+      "toolCalls": 21,
+      "durationMs": 142415,
+      "resultPreview": "{\"findings\":[{\"id\":\"F1\",\"severity\":\"MEDIUM\",\"title\":\"Remote-tag refusal relies on registry snapshot; launch-time probe checks presence only\",\"evidence\":\"deviceMayLaunch (device-authority.server.ts:33-35) refuses a model only if it is in remoteModels, which comes from the registry record refreshed on each registry refresh (adapters.server.ts:145, OllamaAdapter.health = detect). At launch, orch/exec…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "check:tests",
+      "phaseIndex": 1,
+      "phaseTitle": "Check",
+      "agentId": "a69fde4175c2552ac",
+      "model": "claude-haiku-5-5",
+      "state": "done",
+      "startedAt": 1791530035859,
+      "queuedAt": 1791530035837,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Repository C:\\Users\\allam\\Documents\\new\\bun-router. Review `git show 395d1c0` only. STRICTLY READ-ONLY: no edits, no npm test, no Host start, never touch %LOCALAPPDATA%\\Bunny-A.\nTest honesty: are the new/changed assertions in src/lib/bunny-host/remote-remediation.test.ts non-vacuous (would they fail without the corresponding source change)? Reason concretely per assertion.",
+      "promptFramed": true,
+      "lastProgressAt": 1791530144722,
+      "tokens": 107200,
+      "toolCalls": 13,
+      "durationMs": 108066,
+      "resultPreview": "{\"findings\":[{\"id\":\"T1\",\"severity\":\"HIGH\",\"title\":\"F-02 mission.start 400 assertion is a state guard, not a revocation check\",\"evidence\":\"File src/lib/bunny-host/remote-remediation.test.ts:252 asserts mission.start on the lost Mission returns 400 with message 'a revoked approval never starts'. The line above (251) asserts that Mission's state is 'stopped', because the revocation sweep (src/lib/bun…"
+    }
+  ],
+  "totalTokens": 240497,
+  "totalToolCalls": 34
+}

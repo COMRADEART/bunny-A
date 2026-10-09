@@ -1,0 +1,49 @@
+{
+  "id": "S5",
+  "title": "Device revocation during live SSE",
+  "tests": [
+    {
+      "name": "T10-T6-04: revocation ends an already authenticated Host SSE before future delivery",
+      "status": "pass"
+    },
+    {
+      "name": "T10-T6-04: revocation ends an already authenticated task SSE before future delivery",
+      "status": "pass"
+    },
+    {
+      "name": "T10-T6-04: revoking one device preserves workstation and independently paired streams",
+      "status": "pass"
+    },
+    {
+      "name": "T9 F43-limits: paired-device load is bounded per device; the workstation is unchanged",
+      "status": "pass"
+    },
+    {
+      "name": "T9 revocation race: a delayed body cannot retain the authority authenticated before revocation",
+      "status": "pass"
+    },
+    {
+      "name": "T9R F-02: workstation revocation ends Mission approvals the lost device granted, including a failed Mission's Retry",
+      "status": "pass"
+    }
+  ],
+  "result": "PASS",
+  "evidence": {
+    "f02": {
+      "classification": "LIVE disposable Host HTTP, SQLite and MissionManager; SIMULATED failed state for the parked Mission (state write only)",
+      "lostDeviceMission": "stopped",
+      "failedMissionStateBefore": "waiting_for_user",
+      "failedMissionStateAfter": "stopped",
+      "retryStatus": 400,
+      "retryCode": "FAILED",
+      "simulatedFailedMission": {
+        "state": "failed",
+        "envelopeRevoked": true,
+        "retryStatus": 400
+      },
+      "workstationMission": "ready",
+      "selfSignOutMission": "ready"
+    }
+  },
+  "notes": "Already-open device streams close on revocation; post-revocation sequences are not delivered; payloads redacted."
+}

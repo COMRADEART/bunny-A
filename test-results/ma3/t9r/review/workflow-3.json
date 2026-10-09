@@ -1,0 +1,503 @@
+[
+  {
+    "lens": "dev01",
+    "all": [
+      {
+        "id": "A01",
+        "severity": "INFO",
+        "title": "Launch-time preflight reroute of a device-approved direct task to a tool tool-capable provider",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "After device approval, launch() preflight (revalidateCandidate) fails for the local route and calls rerouteFromDecision to pick a tool-capable fallback such as claude:null from the recorded fallback_order.",
+        "evidence": "approve() adds the id to deviceApproved before launch (manager.server.ts:973). launch() reroutes via rerouteFromDecision at manager.server.ts:1077. Inside rerouteFromDecision the guard at lines 583-588 skips any entry with !next.model_id or !deviceMayLaunch(next), so claude:null and every non-ollama entry are skipped. A manual-mode task throws instead (launch around line 1073). The DEV-01 regression test in src/lib/bunny-host/remote-remediation.test.ts:418 covers the recovery path with an explicit local model. Blocked for this path.",
+        "blocked": true
+      },
+      {
+        "id": "A02",
+        "severity": "INFO",
+        "title": "Failure-recovery reroute (reroute and reroute-larger-context) of a device-approved task",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "A device-approved local task fails with a taxonomy that triggers reroute or reroute-larger-context, and the recovery loop moves it to a cloud or tool-capable route.",
+        "evidence": "Both recovery reroutes (manager.server.ts:1560) go through rerouteFromDecision, so the same guard at 583-588 applies. largerContext reorders the fallback via orderedByWindow but keeps the same filter. The loop's startSession (call sites around lines 1523, 1553, 1567) only accepts those targets. Test coverage: remote-remediation.test.ts:418. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A03",
+        "severity": "INFO",
+        "title": "escalate-effort keeping the provider but switching model",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "A verification failure on a device-approved task takes the escalate-effort branch and relaunches on a different model under the same provider, or falls through to a cloud route.",
+        "evidence": "In the escalate-effort branch (around manager.server.ts:1534-1556), a raised effort produces target = {provider: current.provider, model: current.model, effort: raised}, so the model is unchanged. Only when raised is null (empty ladder) does it call rerouteFromDecision, which is guarded. Ollama's native effort ladder would need to be checked to confirm which branch fires; either way the model does not change. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A04",
+        "severity": "INFO",
+        "title": "retry-same relaunch changing provider or model",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "A retry-same action on a device-approved task relaunches with a different provider or model than the one approved.",
+        "evidence": "retry-same (around manager.server.ts:1520-1530) calls startSession({provider: current.provider, model: current.model, effort: current.effort}) with the live record, so the target matches the current route. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A05",
+        "severity": "INFO",
+        "title": "startSession invoked with a target not produced by rerouteFromDecision",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "Find a startSession caller whose target is an arbitrary provider or model, bypassing the guard.",
+        "evidence": "There are exactly three call sites: retry-same (same provider and model), escalate-effort (same model, or the rerouteFromDecision result), and reroute (rerouteFromDecision result only). startSession itself checks only eligibility, localOnly and mission scope, never the device set. The initial launch uses adapter.launch directly with the current record. Blocked: no caller can change provider or model outside rerouteFromDecision.",
+        "blocked": true
+      },
+      {
+        "id": "A06",
+        "severity": "LOW",
+        "title": "Ollama provider-default auto mapping to a cloud tag at launch",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/orch/exec.server.ts",
+        "attack": "A device-approved task with model auto is run on ollama, and execute() maps auto to probe.models[0], which may be a hosted cloud tag.",
+        "evidence": "execute() at exec.server.ts:51-53 does const model = request.model || probe.models[0]; then requires probe.models.includes(model). The string auto is truthy, so it is never replaced by models[0]. It is not in the model list and is refused with Model auto is no longer available. Blocked for the auto string. Latent gap: a falsy model (empty string, null or undefined) would be replaced by probe.models[0], and deviceMayLaunch (device-authority.server.ts:29-30) returns true for an empty model because isRemoteOllamaTag({name:''}) is false. I could not find a current producer of an empty model: manager.server.ts:748-751 and router.ts:130 coalesce to auto. So the attack is not reachable with current code. Recommend rejecting falsy models in deviceMayLaunch.",
+        "blocked": true
+      },
+      {
+        "id": "A07",
+        "severity": "MEDIUM",
+        "title": "deviceMayLaunch classifies remoteness by name only, so remote-metadata tags pass",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/device-authority.server.ts",
+        "attack": "An installed ollama tag whose name lacks the -cloud or :cloud suffix but which Ollama reports as remote (remote_host or remote_model set) is device-approved and launched. Ollama then proxies generation to a hosted service, which violates the local tool-free contract. Reroutes to such a tag from a device-approved task are also allowed.",
+        "evidence": "deviceMayLaunch (device-authority.server.ts:29-30) calls isRemoteOllamaTag({name: task.model}), so remote_host and remote_model are never seen. The Host's own classifier includes them (exec.server.ts:19-20). Probe data is kept in ProviderLive.remoteModels (adapters.server.ts:145) and used by runsLocally (router.ts:16-17, which also rejects anything in remoteModels), which the device guard ignores. All three callers pass name-only data: manager.server.ts:588, http.server.ts:565 (pending OrchTask) and missions manager.server.ts:1958. Whether Ollama ever returns a remote tag without the suffix is not verified offline. The DEV-01 test (remote-remediation.test.ts:418) only uses qwen3:8b with remote:[]. Fix: pass the provider's remoteModels or the probe remote flags into deviceMayLaunch.",
+        "blocked": false
+      },
+      {
+        "id": "A08",
+        "severity": "INFO",
+        "title": "Retarget of a device-approved task, or device-initiated retarget or feedback",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "Change the provider or model of a device-approved task via retarget, either by a device or after a failed device launch leaves the task waiting.",
+        "evidence": "retarget (manager.server.ts:869-871) requires state waiting_for_approval. A successful device approval moves the task to launching before adapter.launch (launch around 1029-1100). Only a launch that throws before the state change leaves the task waiting. Then the workstation can retarget, which is workstation authority. The id stays in deviceApproved, and a later device approval re-checks deviceMayLaunch on the new route (http.server.ts:565). DEVICE_RIGHTS (device-authority.server.ts:52-73) has no retarget, and assertDeviceAction (http.server.ts:464) refuses it. task.feedback only writes feedback on terminal tasks. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A09",
+        "severity": "INFO",
+        "title": "Same task id approved twice (device then workstation, or workstation then device)",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "Use a second approval to clear or re-set the device flag and change which reroute rules apply.",
+        "evidence": "The set is keyed by task id, which is a crypto UUID. After a successful launch the state is not waiting_for_approval, so a second approve throws at manager.server.ts:1029. Before a failed launch, a workstation approve deletes the id (line 974), which is user-authority consent, and a later device approve re-adds it only after deviceMayLaunch passes. A device approve on a running task adds the id, which only narrows reroutes. Once added, the flag is never cleared by a device action. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A10",
+        "severity": "INFO",
+        "title": "Relaunch after Host restart without the in-memory set",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "After a restart the deviceApproved set is empty, so a previously device-approved task relaunches on a tool-capable route.",
+        "evidence": "The constructor (around lines 131-151) marks launching, running, verifying, waiting_for_input and waiting_for_agent_approval tasks as failed and never relaunches anything. Only approve() (line 971) and approveDelegated (line 990) call launch(). approve() re-adds the id at line 973 before launch, so any post-restart launch re-enters the guard. Queued tasks are not auto-launched. Blocked. Note: the set is never pruned (memory-only growth), which is not a security issue.",
+        "blocked": true
+      },
+      {
+        "id": "A11",
+        "severity": "LOW",
+        "title": "Mission child launched via approveDelegated bypasses the device set",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "A Mission child is launched through approveDelegated, which never adds to deviceApproved, so the DEV-01 reroute guard does not apply and the child can reroute to a tool-capable provider.",
+        "evidence": "approveDelegated (manager.server.ts:990) calls launch() directly and never touches the set. Mission child reroutes are instead bounded by missionScopeCheck and missionAttemptAdmission, which enforce the envelope's providerScopeViolation (missions manager.server.ts:94-104 and 211). That is the accepted MA0R semantics: a phone-approved Mission envelope is exact authority, so provider scope comes from the envelope the device approved. Device-approved mission children answered through missions manager.server.ts:3285 are gated by deviceMayLaunch (line 1958) and are local only. The set is not consulted for mission children at all. Not a DEV-01 escape under the accepted design, but the guard covers direct tasks only.",
+        "blocked": true
+      },
+      {
+        "id": "A12",
+        "severity": "INFO",
+        "title": "Provider-reported model hook changing a device task's model after approval",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "A provider reports a different model through the hooks.model callback, rewriting task.model after approval without rerouteFromDecision.",
+        "evidence": "adapterHooks.model (manager.server.ts around 1205-1212) updates task.model via executor.model with no guard. The ollama adapter never calls hooks.model (adapters.server.ts:166-175 uses only event and output). Only parseAgentEvent (codex and claude normalizers, adapters.server.ts:182-184) calls it, and device-approved tasks are ollama only. Blocked for this path, but the callback is an unguarded model rewrite point if a non-ollama device route ever exists.",
+        "blocked": true
+      },
+      {
+        "id": "A13",
+        "severity": "INFO",
+        "title": "Time-of-check to time-of-use between the device HTTP check and manager.approve",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/http.server.ts",
+        "attack": "The task's route is changed between the deviceMayLaunch check (http.server.ts:565) and manager.approve, so the device launches a non-local route.",
+        "evidence": "The approve case reads pending from db, checks deviceMayLaunch, and calls manager.approve(id, actor) (http.server.ts:570) with no await between them. The database and manager calls are synchronous, and manager.approve re-reads the task at launch. Blocked by single-threaded synchronous execution. This depends on keeping the handler synchronous; an await inserted between the check and the approve would reopen it.",
+        "blocked": true
+      }
+    ],
+    "verified": [
+      {
+        "id": "A07",
+        "severity": "MEDIUM",
+        "title": "deviceMayLaunch classifies remoteness by name only, so remote-metadata tags pass",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/device-authority.server.ts",
+        "attack": "An installed ollama tag whose name lacks the -cloud or :cloud suffix but which Ollama reports as remote (remote_host or remote_model set) is device-approved and launched. Ollama then proxies generation to a hosted service, which violates the local tool-free contract. Reroutes to such a tag from a device-approved task are also allowed.",
+        "evidence": "deviceMayLaunch (device-authority.server.ts:29-30) calls isRemoteOllamaTag({name: task.model}), so remote_host and remote_model are never seen. The Host's own classifier includes them (exec.server.ts:19-20). Probe data is kept in ProviderLive.remoteModels (adapters.server.ts:145) and used by runsLocally (router.ts:16-17, which also rejects anything in remoteModels), which the device guard ignores. All three callers pass name-only data: manager.server.ts:588, http.server.ts:565 (pending OrchTask) and missions manager.server.ts:1958. Whether Ollama ever returns a remote tag without the suffix is not verified offline. The DEV-01 test (remote-remediation.test.ts:418) only uses qwen3:8b with remote:[]. Fix: pass the provider's remoteModels or the probe remote flags into deviceMayLaunch.",
+        "blocked": false,
+        "verdicts": [
+          {
+            "refuted": false,
+            "realSeverity": "MEDIUM",
+            "reasoning": "Not refuted. I found no code that blocks the path, and the cited lines match 0904132 exactly.\n\nConfirmed in code:\n- device-authority.server.ts:29-30: deviceMayLaunch checks only isRemoteOllamaTag({name: task.model}), so remote_host and remote_model are never read.\n- exec.server.ts:19-20: the Host's own classifier treats remote_host/remote_model as remote. probeOllama (line 29) and model-capability.server.ts:191 (local: !remote.has(tag)) both use it, so the Host already records such a tag as non-local.\n- router.ts:16-17: runsLocally also rejects anything in remoteModels, and the device guard ignores that.\n- Name-only callers: http.server.ts:565 (direct approve), manager.server.ts:588 (reroute of device-approved tasks), missions manager.server.ts:1958.\n- Nothing downstream closes the gap for device tasks. preLaunchRevalidate (routing.server.ts:316-337) checks listing and snapshot membership but not locality. manager.server.ts:1054 checks locality only when the task is localOnly/offlineOnly, and a device can omit those constraints.\n- The default route is ollama current_model = models[0] (orch/router.ts:130, adapters.server.ts:145), which can be a remote-flagged tag. A device chat submit can therefore reach a remote tag, and approve then passes the name-only guard.\n\nWhat keeps this at MEDIUM rather than higher: exploitation needs an installed Ollama tag that Ollama reports as remote (remote_host/remote_model set) but whose name lacks -cloud/:cloud. The repo does not show whether Ollama ever produces such a tag (e.g. via a Modelfile alias of a cloud model). That was not verified offline, so the precondition is unconfirmed, not disproven. The inconsistency with the Host's own classifier and runsLocally is real in code. The suggested fix (pass probe remote flags or provider.remoteModels into deviceMayLaunch) is sound.\n\nFiles: C:\\Users\\allam\\Documents\\new\\bun-router\\src\\lib\\bunny-host\\device-authority.server.ts (lines 29-30), C:\\Users\\allam\\Documents\\new\\bun-router\\src\\lib\\orch\\exec.server.ts (lines 19-29), C:\\Users\\allam\\Documents\\new\\bun-router\\src\\lib\\bunny-host\\router.ts (lines 16-17), C:\\Users\\allam\\Documents\\new\\bun-router\\src\\lib\\bunny-host\\routing.server.ts (lines 316-337), C:\\Users\\allam\\Documents\\new\\bun-router\\src\\lib\\bunny-host\\manager.server.ts (lines 588, 1054). This review was read-only: no edits, no tests, no Host start."
+          },
+          {
+            "refuted": false,
+            "realSeverity": "MEDIUM",
+            "reasoning": "Not refuted. The gap is real in the code as read (read-only, no edits or tests run).\n\nConfirmed:\n- src/lib/bunny-host/device-authority.server.ts:29-30 deviceMayLaunch passes only {name: task.model} to isRemoteOllamaTag, so remote_host and remote_model are never consulted.\n- src/lib/orch/exec.server.ts:19-20 is the Host classifier that does check remote_host/remote_model. Probe output goes into ProviderLive.remoteModels (adapters.server.ts:145), which router.ts:16-17 runsLocally uses. The device guard ignores both.\n- The repo's own fixture at src/lib/orch/exec.server.test.ts:34 treats {name:\"some-hosted-model\", remote_host:...} as remote. So the intended classifier covers unsuffixed remote tags, and the device guard disagrees with it.\n- The device tests (src/lib/bunny-host/remote-device.test.ts:537-539) only exercise suffixed names, so nothing covers this case.\n- exec.server.ts:42-67 execute() performs no remote check before POST /api/generate, so a remote-flagged tag runs hosted if launched.\n- All three callers are name-only: manager.server.ts:588 (reroute), http.server.ts:565 (approve), missions manager.server.ts:1958 (Mission approval).\n\nSearched for blocking code and found none:\n- The launch-time locality check at manager.server.ts:1053 and 1257 is gated on task.constraints localOnly/offlineOnly, so it does not run for ordinary device-approved tasks.\n- preLaunchRevalidate (routing.server.ts:316-337) checks eligibility and listing only, with no remote check.\n- validateSubmit and the device submit path do not force localOnly.\n\nReachability: the device needs an installed tag with remote_host or remote_model set but no -cloud or :cloud suffix. A device cannot install models itself. Whether Ollama produces such a name in practice (for example via an ollama cp alias that keeps the remote manifest) was not verified offline, so the severity stays at MEDIUM and does not rise above it. Once such a tag exists, a device can reach it through a chat submit (which may carry modelOverride) followed by approve, or through a router-chosen fallback, and it launches hosted. The proposed fix (pass remoteModels or the probe remote flags into deviceMayLaunch) matches the gap."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "lens": "f02f03",
+    "all": [
+      {
+        "id": "A1",
+        "severity": "INFO",
+        "title": "Extended endDeviceGrants list (failed) lets Retry revive a device approval",
+        "file": "src/lib/bunny-host/http.server.ts",
+        "attack": "After a workstation revokes a device, the device-approved Mission is in state failed. Attack: workstation or any path calls mission.retry to re-arm it under the lost device's envelope.",
+        "evidence": "http.server.ts:848 iterates missionsIn([...MISSION_ACTIVE,'failed']); line ~852 sets revokedAt on the envelope before any stop. manager.server.ts:3449-3453 retry() refuses when envelope is missing, revokedAt set, or expired, so the revoked envelope blocks Retry. The only other failed->ready edge is retry (machine.ts:12 allows failed->ready/planning/stopped; start only follows retry), and replan from failed also revokes (manager.server.ts:3512-3515). Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A2",
+        "severity": "INFO",
+        "title": "Revoke-then-stop covers waiting_for_user missions",
+        "file": "src/lib/bunny-missions/machine.ts",
+        "attack": "Device-approved Mission paused at waiting_for_user: revoke leaves admitted work running, or stop is skipped because the state is not active.",
+        "evidence": "machine.ts:30 MISSION_ACTIVE = ready, running, waiting_for_user, verifying, so http.server.ts:856 calls missions.stop for waiting_for_user. manager.server.ts:3357-3443 stop() cancels children, ends batches, marks non-terminal steps stopped, resolves open requests as deny, releases the workspace and sets state stopped. Blocked; no stop gap for waiting_for_user.",
+        "blocked": true
+      },
+      {
+        "id": "A3",
+        "severity": "INFO",
+        "title": "Device approval landing between the revoke and the grant sweep",
+        "file": "src/lib/bunny-host/http.server.ts",
+        "attack": "A device request already in flight when the device is revoked calls mission.approve after the credential change but before endDeviceGrants lists missions, so the new envelope is missed by the sweep.",
+        "evidence": "The /command handler re-runs authenticateDevice at dispatch (http.server.ts, 'Revalidate at dispatch') before any command runs. The revoke writes the credential change before endDeviceGrants (http.server.ts ~728-735). In the excerpt read, no await separates the dispatch revalidation from the synchronous missions.approve call, and the mission list is taken after the revoke. Device approvals that complete before revoke are therefore visible to the list. Blocked, with the caveat that the no-await property was checked only in the excerpt read.",
+        "blocked": true
+      },
+      {
+        "id": "A4",
+        "severity": "MEDIUM",
+        "title": "Stale pre-await mission.state in the sweep can skip stop for a Mission a concurrent Retry just re-armed",
+        "file": "src/lib/bunny-host/http.server.ts",
+        "attack": "Device revoke sweep lists failed device-approved Missions A and B. While the loop awaits missions.stop(A) (which yields during child cancellation), the workstation calls mission.retry(B). B's envelope is still unrevoked, so retry succeeds and B moves to ready and running. The loop then reaches B with the stale state 'failed', revokes the envelope, and does not call stop because MISSION_ACTIVE.includes('failed') is false.",
+        "evidence": "http.server.ts:848 iterates a materialized array (store.server.ts:105-107 returns Mission[] from .all()), so `mission.state` is the pre-await snapshot. http.server.ts:856 tests that stale value. manager.server.ts:3337 and 3381 await bus.cancel and cancelChildren, which yield. manager.server.ts:3444-3494 retry is synchronous and accepts a failed Mission whose envelope is not yet revoked. Result: B keeps running in-flight child work under a revoked envelope, the device.revoked event reports no unstopped Mission, and the stop the commit intends never happens. Fix: re-read missions.store.mission(mission.id).state before the active test, or stop any non-terminal Mission that has live steps. Not run; reasoned from code, and it requires a concurrent workstation Retry during the revoke.",
+        "blocked": false
+      },
+      {
+        "id": "A5",
+        "severity": "LOW",
+        "title": "unstopped counter conflates failures; a failed envelope revoke leaves Retry live with a misleading message",
+        "file": "src/lib/bunny-host/http.server.ts",
+        "attack": "(a) stop() throws 'already ended' or 'already in progress' for a Mission that finished or is being stopped concurrently, and the catch counts it as unstopped. (b) saveAuthorization throws before the revoke write, so the envelope stays live and failed Retry still works, yet the event says only that a Mission needs Stop.",
+        "evidence": "http.server.ts:859-861 catch increments unstopped for any throw, including the saveAuthorization write at ~852-854. manager.server.ts:3357-3360 stop() throws 'Mission has already ended.' and 'Mission Stop is already in progress.'. The commit claims 'Retry cannot revive it', which does not hold in case (b). Impact is limited to reporting and to a store-write failure; no device path reaches it. Fix: separate revoke failure from stop failure and re-check state.",
+        "blocked": false
+      },
+      {
+        "id": "A6",
+        "severity": "LOW",
+        "title": "Agent Mission envelope survives the sweep; Retry re-arms it, but agentic admission still blocks",
+        "file": "src/lib/bunny-host/http.server.ts",
+        "attack": "A device re-consented an Agent Mission via reauthorizeAgent (provenance and grantedBy = device). The first loop revokes the agentic delegation to REVOKED but skips agents.stop when the profile is already stopped. The second loop skips agentic Missions, so the mission envelope stays unrevoked and a workstation Retry on a failed agentic Mission is allowed.",
+        "evidence": "http.server.ts:834-839 sets REVOKED before the profile check. The second loop at 848-856 excludes missions.agentic.exists(mission.id). manager.server.ts:3449-3453 checks only the envelope. Blocked at admission: agenticIdentityViolation (manager.server.ts ~2160-2182) requires current_state === 'ACTIVE', and agenticProviderCheck (manager.server.ts ~1366-1368) routes provider launches through it. So no work starts. Residual: a stale envelope remains live, and the revoke is not uniform across Mission types.",
+        "blocked": true
+      },
+      {
+        "id": "A7",
+        "severity": "INFO",
+        "title": "Device approves a revised plan without naming planReference: replans is not incremented by plan() alone",
+        "file": "src/lib/bunny-missions/manager.server.ts",
+        "attack": "Revise the plan without replans going above 0, so an unbound device approve (no plan field) passes the F-03 check.",
+        "evidence": "plan() is called only from create (manager.server.ts:564, replans starts at 0) and from replan() (manager.server.ts:3544, which increments replans at 3539). grep found no other plan() caller. commands.server.ts:50-51 maps mission.plan to missions.replan. So every revised plan has replans >= 1 and the check at manager.server.ts:724 fires. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A8",
+        "severity": "INFO",
+        "title": "Host-internal or other step/scope mutation in waiting_for_approval without replan",
+        "file": "src/lib/bunny-missions/manager.server.ts",
+        "attack": "Change steps, requestedScope, root or providerConstraints while the Mission waits for approval, without incrementing replans, so a device approves a changed scope.",
+        "evidence": "replaceSteps is called only from plan() (manager.server.ts:675). requestedScope is assigned only inside plan() (~687). configure() (manager.server.ts:297-325) changes only enabled, triggersEnabled, browserHeadless and limits, and the maxReplans limit bounds replans. The reroute providerConstraints write (~2910) runs only for running steps. The root is set only at create (manager.server.ts:531-532). Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A9",
+        "severity": "INFO",
+        "title": "Device-initiated replan or plan",
+        "file": "src/lib/bunny-missions/commands.server.ts",
+        "attack": "A paired device calls mission.replan or mission.plan to create a new plan that bumps replans, or to supply explicit steps.",
+        "evidence": "commands.server.ts:27 REMOTE allow-list omits mission.plan, mission.replan and mission.create. The gate at the top of missionCommand throws WorkstationRequiredError for non-local access on any action outside REMOTE. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A10",
+        "severity": "INFO",
+        "title": "Replay of a stale planReference after a replan",
+        "file": "src/lib/bunny-missions/manager.server.ts",
+        "attack": "Device reviewed plan P1 (replans=0), the workstation replans to P2 (replans=1), and the device approves with the old P1 reference, or with no reference.",
+        "evidence": "manager.server.ts:717 refuses any planReference that differs from agenticPlanReference(id). agenticPlanReference (manager.server.ts:1686-1697) digests step ids, which replan regenerates with crypto.randomUUID (manager.server.ts:~568 ids map). So P1 and P2 never collide. manager.server.ts:724 refuses an unbound approve when replans > 0. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A11",
+        "severity": "INFO",
+        "title": "Agentic Mission consent or re-consent path bypasses the revised-plan rule",
+        "file": "src/lib/bunny-missions/manager.server.ts",
+        "attack": "A device approves an Agent Mission, or re-consents it through reauthorizeAgent, after a replan.",
+        "evidence": "deviceMissionRefusal (manager.server.ts ~1963-1966) refuses any mission for which agentic.exists or origin starts with 'agent:' before the replans check. reauthorizeAgent (manager.server.ts ~2063-2074) requires waiting_for_user, a WAITING_FOR_USER consent, and e.plan_reference === agenticPlanReference(missionId), so a replanned plan is refused. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A12",
+        "severity": "INFO",
+        "title": "Is failed the only non-active non-terminal state that can reuse an envelope",
+        "file": "src/lib/bunny-missions/machine.ts",
+        "attack": "Find another non-active, non-terminal state (draft, planning, waiting_for_approval) that still holds a usable envelope.",
+        "evidence": "machine.ts:3-15 transitions. authorizationId is set only in approve() with state ready (manager.server.ts:791) and by reauthorizeAgent (waiting_for_user). replan() revokes the envelope (manager.server.ts:3512-3515) and clears authorizationId (3536) before planning and waiting_for_approval. draft and planning have no envelope at all. So failed is the only such state. Blocked.",
+        "blocked": true
+      },
+      {
+        "id": "A13",
+        "severity": "LOW",
+        "title": "replan() awaits cancelChildren before revoking, so a concurrent Retry can re-arm the Mission mid-replan (pre-existing, not in 0904132)",
+        "file": "src/lib/bunny-missions/manager.server.ts",
+        "attack": "Replan on a failed or waiting_for_user Mission awaits cancelChildren while its envelope is still live. A concurrent mission.retry re-arms it to running. replan then revokes and calls plan(), which asserts running->planning and throws, leaving a running Mission with a revoked envelope and an incremented replans counter.",
+        "evidence": "manager.server.ts:3511 await cancelChildren precedes the revoke at 3512-3515. retry (manager.server.ts:3444) accepts failed and waiting_for_user with a live envelope. plan() setMission asserts the transition (manager.server.ts ~405-412, assertMissionTransition on owned.state), and plan's first setMission is outside its try. Not verified by running; reasoned from code. Impact is a stuck-but-revoked Mission, not an authority gap.",
+        "blocked": false
+      },
+      {
+        "id": "A14",
+        "severity": "INFO",
+        "title": "Device self sign-out does not sweep device-approved envelopes (intentional, pre-existing)",
+        "file": "src/lib/bunny-host/http.server.ts",
+        "attack": "Device signs out with approvals outstanding, expecting its grants to end.",
+        "evidence": "endDeviceGrants runs only when local is true (http.server.ts ~730: 'local ? await endDeviceGrants : {...zeros}'), per the comment 'never on self sign-out'. The device credential is revoked, so it cannot act. The envelopes remain for the workstation to stop or retry. This is unchanged by 0904132. Not a device capability; noted as a design observation, not a regression.",
+        "blocked": false
+      },
+      {
+        "id": "A15",
+        "severity": "INFO",
+        "title": "Workstation flows: regression check",
+        "file": "src/lib/bunny-missions/manager.server.ts",
+        "attack": "Check whether the F-03 narrowing, the endDeviceGrants change or the removed hostPathFree affect workstation approve, retry or the phone client.",
+        "evidence": "The F-03 branch is gated by isDeviceActor (manager.server.ts:719-725), so workstation approve is unchanged. The phone client sends the plan field when it has planReference (src/store/use-island.ts:760-763), and remoteVerdicts attaches planReference only to waiting_for_approval Missions (manager.server.ts:2002-2005), so no client regression. The only workstation-visible change is that Retry on a device-revoked failed Mission is refused until a replan, which is intended. The sign-out return default adds unstopped:0 consistently. No regression found.",
+        "blocked": true
+      }
+    ],
+    "verified": [
+      {
+        "id": "A4",
+        "severity": "MEDIUM",
+        "title": "Stale pre-await mission.state in the sweep can skip stop for a Mission a concurrent Retry just re-armed",
+        "file": "src/lib/bunny-host/http.server.ts",
+        "attack": "Device revoke sweep lists failed device-approved Missions A and B. While the loop awaits missions.stop(A) (which yields during child cancellation), the workstation calls mission.retry(B). B's envelope is still unrevoked, so retry succeeds and B moves to ready and running. The loop then reaches B with the stale state 'failed', revokes the envelope, and does not call stop because MISSION_ACTIVE.includes('failed') is false.",
+        "evidence": "http.server.ts:848 iterates a materialized array (store.server.ts:105-107 returns Mission[] from .all()), so `mission.state` is the pre-await snapshot. http.server.ts:856 tests that stale value. manager.server.ts:3337 and 3381 await bus.cancel and cancelChildren, which yield. manager.server.ts:3444-3494 retry is synchronous and accepts a failed Mission whose envelope is not yet revoked. Result: B keeps running in-flight child work under a revoked envelope, the device.revoked event reports no unstopped Mission, and the stop the commit intends never happens. Fix: re-read missions.store.mission(mission.id).state before the active test, or stop any non-terminal Mission that has live steps. Not run; reasoned from code, and it requires a concurrent workstation Retry during the revoke.",
+        "blocked": false,
+        "verdicts": [
+          {
+            "refuted": false,
+            "realSeverity": "LOW",
+            "reasoning": "Could not refute the race. The code path is concrete and matches the finding.\n\nConfirmed:\n- missions.store.missionsIn (src/lib/bunny-missions/store.server.ts:105-107) returns a materialized Mission[] from .all(), so mission.state in the sweep loop (src/lib/bunny-host/http.server.ts:848-856) is a pre-await snapshot.\n- Within the loop, stop(A) is awaited. stop() (src/lib/bunny-missions/manager.server.ts:3357) awaits cancelChildren, and that awaits bus.cancel and tasks.stop. tasks.stop (src/lib/bunny-host/manager.server.ts:1676) does real process inspection I/O when a session pid exists, so a macrotask yield is possible and an HTTP retry can interleave. Nothing serializes the device.revoke handler against other requests.\n- retry() (manager.server.ts:3444-3494) is workstation-only (commands.server.ts: mission.retry is not in REMOTE). It accepts a failed Mission whose envelope is unrevoked and unexpired, sets it to ready, and calls start(). start() (manager.server.ts:799-810) has no active-count limit (that check is only in approve() at line 736), so retry succeeds and B becomes running.\n- At B, the loop re-reads the envelope fresh and revokes it, but the stale state \"failed\" is not in MISSION_ACTIVE, so stop(B) is skipped while B is running.\n\nNarrowing points (these do not refute it):\n- The attack text lists A as failed. A failed A would never get stop() called, so the trigger needs A to be running at snapshot time. The defect still holds with that correction.\n- The race needs stop(A) to actually yield. If A has no live child I/O, the await chain stays in microtasks and no retry can interleave.\n- Bounded impact: tickOnce re-reads the revoked envelope each tick and the bus denies new admissions with \"authorization revoked\", so B's already-admitted in-flight work runs to completion and is not stopped. The device.revoked event would misreport unstopped=0. The workstation Stop remains available because B is in running state.\n- Trigger requires a deliberate workstation Retry during the revoke sweep window, so I rate it LOW rather than MEDIUM. The fix proposed in the finding (re-read state before the active test) is sound.\n\nNo blocking code found. Did not edit files or run tests."
+          },
+          {
+            "refuted": false,
+            "realSeverity": "LOW",
+            "reasoning": "Not refuted. The stale-snapshot defect is real, but the impact is narrower than MEDIUM.\n\nConfirmed in code:\n- http.server.ts:848 iterates a materialized array from missionsIn(), which is a SQL SELECT returning parsed records (store.server.ts:105-107). mission.state is the pre-await snapshot.\n- http.server.ts:854 re-reads the envelope fresh, so an unrevoked envelope is revoked at B's iteration. Line 856 then tests the stale 'failed' value against MISSION_ACTIVE, so stop(B) is skipped.\n- retry (manager.server.ts:3444-3494) is synchronous and only checks envelope.revokedAt, so it succeeds on B while the envelope is still unrevoked. B then moves to ready/running.\n- The window exists only if stop(A) yields to a macrotask. bus.cancel (bus.server.ts:159) resolves via microtasks when A has no in-flight runs. tasks.stop (manager.server.ts:1676) does real process I/O only when A has live child tasks. So the race needs A to be running with live children, plus a workstation Retry on B landing during that window.\n\nNo blocking code found: no lock on device.revoke, no per-mission guard that covers B (this.stopping is per-id and only set for A), and nothing else prevents the retry.\n\nWhy the severity is LOW rather than MEDIUM:\n- The authority guarantee holds. After the envelope is revoked, further admissions are refused (authorization.server.ts:174, manager.server.ts:184 and 2184), so B cannot acquire new authority.\n- The residual problem is that B's already-admitted child work is not canonically stopped, and the device.revoked audit reports unstopped=0 for B. B should then fail on its next denied admission rather than run indefinitely.\n- It needs two deliberate workstation actions (revoke and Retry on B) to overlap.\n\nThe suggested fix (re-read missions.store.mission(id).state before the active test) is valid and minimal."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "lens": "regression",
+    "all": [
+      {
+        "id": "A01",
+        "severity": "INFO",
+        "title": "T-01 and F-01 reverts are clean; no leftover references",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/device-authority.server.ts",
+        "attack": "Look for leftover hostPathFree/WHOLE_HOST_PATH references, a residual write-session refusal, or behavior drift from ea48c40 in the reverted paths.",
+        "evidence": "git grep for hostPathFree|WHOLE_HOST_PATH at 0904132 returns nothing in src (ea48c40 also had none in src, so the helper was only added by b345aa3). device-authority.server.ts does not appear in git diff ea48c40 0904132 --stat, so it is byte-identical to ea48c40. The ea48c40..0904132 diff of http.server.ts has no device snapshot, event, or command-reply path changes, and the missions manager diff only contains the narrowed F-03 hunk and the allow_batch CommandRefusedError change (line ~3221). The F-01 writeIncludesShell APPROVAL_ON_HOST branch is gone from deviceMissionRefusal. hidePaths (used for refusal text, http.server.ts ~line 540) is unchanged.",
+        "blocked": true
+      },
+      {
+        "id": "A02",
+        "severity": "INFO",
+        "title": "F-03 narrowing: unbound device approval of a revised plan is refused",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/manager.server.ts",
+        "attack": "After a replan, a paired phone approves with no planReference (the replanned scope it never saw), or with a stale reviewed planReference, hoping the narrowed rule (replans > 0 only) is skipped.",
+        "evidence": "Line 724: planReference === undefined && mission.planning.replans > 0 throws CommandRefusedError. Line 717-718 rejects any mismatched planReference. replans is incremented only in replan() (line ~3539). plan() is called only from create() (line 564, replans starts at 0 at line 543) and replan() (line 3544), so a plan can only change after replans is incremented. Replan clears authorizationId and revokes the envelope, so no earlier envelope survives. An unrevised plan (replans 0) still accepts an unbound approval, which is the accepted MA0R contract (missions.test.ts:412-420 still passes on that path).",
+        "blocked": true
+      },
+      {
+        "id": "A03",
+        "severity": "INFO",
+        "title": "DEV-01 reroute guard covers launch-time reroute, recovery reroute and effort ladder",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "Make a device-approved local tool-free direct task reach a tool-capable provider via (a) launch-time preflight failure, (b) recovery after a provider error, (c) the verification-retry path, or (d) a Host restart clearing the in-memory deviceApproved set.",
+        "evidence": "All reroute paths call rerouteFromDecision (launch-time at ~line 1077, recovery at ~line 1546 and 1560, verification retry at ~line 1260 via startSession). The guard at line 588 skips provider-default entries and any entry failing deviceMayLaunch for a device-approved task. The effort-ladder branch (~line 1545) keeps the same provider and model, so it is not a provider change. For (d), the set is in-memory only, but launch() is reachable only from approve() (line 971) and approveDelegated() (mission children). Host restart marks running tasks failed (~line 140-150) and never relaunches them, and there is no retry() for direct tasks in TaskManager. Mission children use missionScopeCheck and the agentic admission hook instead of deviceApproved, so they are out of this guard's scope by design.",
+        "blocked": true
+      },
+      {
+        "id": "A04",
+        "severity": "MEDIUM",
+        "title": "Workstation duplicate approve clears the device-approved marker before refusing",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "Phone approves local tool-free task T, so it launches on ollama and is marked device-approved. A desktop approve for T arrives close behind it (stale card or double click). Its launch() is refused as a duplicate, but the marker is already gone. A later ollama failure then reroutes T to claude with workspace tools.",
+        "evidence": "approve() (lines 972-975) runs `if (by.startsWith(\"device:\")) add; else delete;` before calling launch(). launch() throws \"Task is not awaiting approval; duplicate launches are refused.\" at line 1030 for any non-waiting task. The delete is a side effect of a refused command, so rerouteFromDecision (line 588) no longer restricts T. Actor derivation is actorOf (device-authority.server.ts:116-117): the workstation path produces \"workstation\", so this needs an owner-side approve call, not a device call. The commit's four-way race test covers mission.respond only, not task approve. Not executed; derived from code reading, and the probe log only covers the single-approval case.",
+        "blocked": false
+      },
+      {
+        "id": "A05",
+        "severity": "LOW",
+        "title": "Device gate is name-only; a hosted Ollama tag without a -cloud suffix passes",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/device-authority.server.ts",
+        "attack": "Install an Ollama tag whose /api/tags entry has remote_host or remote_model set but whose name does not end in -cloud or :cloud. deviceMayLaunch({provider:'ollama', model}) only receives the name, so the device can approve it and the DEV-01 reroute guard admits it as an exact local model.",
+        "evidence": "deviceMayLaunch (device-authority.server.ts:29-31) calls isRemoteOllamaTag({ name: task.model ?? \"\" }), which drops remote_host and remote_model. isRemoteOllamaTag (orch/exec.server.ts:19-20) treats remote_host/remote_model as authoritative. probeOllama (exec.server.ts:27-29) already computes a remote list from the live tags, but the device gate never consults it. Predates 0904132 (the predicate is in ea48c40), but the new reroute guard at manager.server.ts:588 inherits the same gap. Reproduction needs such a tag to be installed; not tested.",
+        "blocked": false
+      },
+      {
+        "id": "A06",
+        "severity": "LOW",
+        "title": "Initial device approval admits the provider-default 'auto' model, but reroute does not",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "A device approves an ollama task whose model is the literal 'auto' provider default. deviceMayLaunch accepts it, while the reroute guard (line 588) refuses provider defaults, so the two gates disagree about exact local models.",
+        "evidence": "deviceMayLaunch({provider:'ollama', model:'auto'}) returns true. Line 588 comments that a provider default could resolve to a hosted tag. In practice exec.server.ts:51 uses `request.model || probe.models[0]`, so the literal 'auto' is passed through and line 53 rejects it with 'Model auto is no longer available', so no hosted tag launches today. The gates are inconsistent, and the code comment's rationale does not match the ollama adapter. No escape found.",
+        "blocked": true
+      },
+      {
+        "id": "A07",
+        "severity": "LOW",
+        "title": "Plain Mission child launch-time reroute is not re-checked against the envelope",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "A device-approved (or workstation-approved) plain Mission child is on an allowed provider. Its launch-time preflight fails, and rerouteFromDecision selects a provider outside the envelope's provider scope, which the mission scope check would have refused.",
+        "evidence": "missionScopeCheck (bunny-missions/manager.server.ts:94-100, calling providerScopeViolation) runs once in launch() before the preflight at ~line 1040. The launch-time reroute at ~1077-1110 then rewrites provider with this.update() and does not re-run missionScopeCheck. The admission check at ~line 1119 uses admitAgenticProvider (manager.server.ts:2421-2422), which returns null for non-agentic missions. The recovery path (~line 1267) does re-run the check. Pre-existing from before 0904132 and not in this commit's scope. Not reproduced; depends on whether the recorded fallback order can contain out-of-envelope providers.",
+        "blocked": false
+      },
+      {
+        "id": "A08",
+        "severity": "INFO",
+        "title": "F-02 revocation: Retry, start and per-action admission are refused for the revoked envelope",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/manager.server.ts",
+        "attack": "After workstation revocation of the lost phone, use Retry on a failed device-approved Mission, start a ready one, or let a ready Mission with an unstopped envelope run steps.",
+        "evidence": "retry() (line ~3444-3452) refuses when the envelope is missing or revoked. mission.start (bunny-missions/commands.server.ts:53-56) only starts state 'ready' missions. If a ready Mission was not stopped (stop() threw, counted as unstopped in http.server.ts:858-859), authorization.server.ts:174 and :268 deny each action and provider admission for revoked envelopes. Revocation loop (http.server.ts ~844-861) covers MISSION_ACTIVE plus failed, and envelopes granted by a device whose actor matches. Self sign-out is excluded by design (local false) and the test asserts that explicitly.",
+        "blocked": true
+      },
+      {
+        "id": "A09",
+        "severity": "MEDIUM",
+        "title": "F-02 parked-Retry assertion is vacuous: it passes without the revocation fix",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-remediation.test.ts",
+        "attack": "Check whether the test would fail if F-02 revocation-to-Retry blocking were removed (the 'Retry cannot revive' claim).",
+        "evidence": "Lines 258-262: parkedRetry is a Mission saved as state 'failed' with no failed step (the approval used readStep and start:false). retry() (missions manager ~3444-3462) throws a plain Error, so the HTTP layer returns status 400 with the generic message 'Host command failed. Inspect operation state before retrying.' (http.server.ts ~786-800 and the default 400 at ~785). Without the revocation fix, retry() hits 'No failed step to retry.' and still returns 400. The regex /revoked|Host command failed/ matches any plain Error. The revocation-specific assertion (envelope(parked).revokedAt) is discriminating, but the Retry-refusal assertion is not. There is no positive control showing Retry succeeds on a non-revoked failed device-approved Mission.",
+        "blocked": false
+      },
+      {
+        "id": "A10",
+        "severity": "LOW",
+        "title": "F-02 failed-Mission Retry: failed state not asserted; 400 is generic",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-remediation.test.ts",
+        "attack": "The real failing Mission ('missing.txt' step) may not be in state 'failed' when the test checks Retry, since the until() accepts failed OR waiting_for_user.",
+        "evidence": "Lines 236-238 and the until() at ~line 238 accept either state, and the record at line 268 only logs failedMissionStateBefore. The retry assertion (line 253-255) only checks status 400. If the Mission is waiting_for_user, revocation stops it (MISSION_ACTIVE), and Retry is then refused by the state gate, so the Retry claim is not exercised. The assertion should check the state before retry and the error reason.",
+        "blocked": false
+      },
+      {
+        "id": "A11",
+        "severity": "LOW",
+        "title": "F-02 record labels the run LIVE only, omitting the simulated parked-failure write",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-remediation.test.ts",
+        "attack": "Check whether the evidence record's classification honestly labels the state written directly to the store.",
+        "evidence": "Line 239 code comment says 'SIMULATED terminal failure'. Line 240-241 uses store.saveMission to set state 'failed'. The record at line 268 has classification 'LIVE disposable Host HTTP, SQLite and MissionManager' with no SIMULATED label, though it includes simulatedFailedMission. The label is incomplete relative to the code.",
+        "blocked": false
+      },
+      {
+        "id": "A12",
+        "severity": "LOW",
+        "title": "b345aa3 assertion on start of a revoked approval was dropped from the F-02 test",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-remediation.test.ts",
+        "attack": "After revocation, mission.start on the lost Mission should be refused. The assertion present in b345aa3 is no longer in the test.",
+        "evidence": "b345aa3 test asserted mission.start on the lost Mission returns 400 ('a revoked approval can never start'). The 0904132 test has no mission.start call (grep). mission.start is still refused (lost Mission is 'stopped', and commands.server.ts:53-55 requires 'ready'), so the behavior holds, but the coverage was removed without replacement.",
+        "blocked": false
+      },
+      {
+        "id": "A13",
+        "severity": "LOW",
+        "title": "Restart evidence cites a nonexistent protocol/ path",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-remediation.test.ts",
+        "attack": "Check that the evidence pointer in the host-restart-continuity record resolves.",
+        "evidence": "Line 390 record says 'OS-process restart is in protocol/host-restart-recovery.json'. No protocol/ directory exists in the repo. The file is at test-results/ma3/t9/host-restart-recovery.json (git ls-files and find confirm). Traceability issue only.",
+        "blocked": false
+      },
+      {
+        "id": "A14",
+        "severity": "INFO",
+        "title": "DEV-01 test is non-vacuous: workstation positive control plus exact device launch list",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-remediation.test.ts",
+        "attack": "Check whether the DEV-01 test could pass without the guard (for example, if the reroute never fires, or the device run fails before a launch).",
+        "evidence": "Lines 418-453. Workstation run asserts launches exactly ['ollama','claude'] (positive control, so recovery reroute does fire in this harness). Device run asserts launches exactly ['ollama'], state 'failed', and events include 'routing.exhausted'. launched[0].finish requires a real launch, so a no-launch failure throws. Labels state SIMULATED for the AUTO selection (line 433 and line 453). Pre-fix evidence exists at test-results/ma3/t9r/review/t9r-01-prefix-probe.log (launches ['ollama','claude'] with by device:probe on b345aa3). Not re-run (read-only).",
+        "blocked": true
+      },
+      {
+        "id": "A15",
+        "severity": "INFO",
+        "title": "Existing device-behavior tests still hold against the reverted code",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/missions.test.ts",
+        "attack": "Check whether tests from earlier commits assert the reverted behaviors (write-session refusal, path scrub, unbound refusal) and would now fail, or assert old messages.",
+        "evidence": "No test at 0904132 greps for 'Review the current plan', 'must name the reviewed plan', or hostPathFree; only hidePaths tests remain (remote-device.test.ts:475-476). missions.test.ts:412-420 (MA0R phone approval with no plan on a replans 0 mission) still passes under the narrowed rule. remote-device.test.ts:515-518 plan-substitution still expects 'plan changed'. remote-device.test.ts:536-541 deviceMayLaunch assertions are unchanged. approval-batches.test.ts uses regex /does not offer/ which matches the CommandRefusedError message. Static reading only; no tests were run.",
+        "blocked": true
+      },
+      {
+        "id": "A16",
+        "severity": "LOW",
+        "title": "deviceApproved Set is never pruned",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "Repeated device approvals of direct tasks grow an in-memory set without bound, since entries are only removed by a workstation approve.",
+        "evidence": "Set added at line 973, deleted only in the workstation branch at line 974. No removal on task terminal state, task failure, or device revocation. Unbounded growth over a long Host lifetime; no security impact found.",
+        "blocked": false
+      }
+    ],
+    "verified": [
+      {
+        "id": "A04",
+        "severity": "MEDIUM",
+        "title": "Workstation duplicate approve clears the device-approved marker before refusing",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+        "attack": "Phone approves local tool-free task T, so it launches on ollama and is marked device-approved. A desktop approve for T arrives close behind it (stale card or double click). Its launch() is refused as a duplicate, but the marker is already gone. A later ollama failure then reroutes T to claude with workspace tools.",
+        "evidence": "approve() (lines 972-975) runs `if (by.startsWith(\"device:\")) add; else delete;` before calling launch(). launch() throws \"Task is not awaiting approval; duplicate launches are refused.\" at line 1030 for any non-waiting task. The delete is a side effect of a refused command, so rerouteFromDecision (line 588) no longer restricts T. Actor derivation is actorOf (device-authority.server.ts:116-117): the workstation path produces \"workstation\", so this needs an owner-side approve call, not a device call. The commit's four-way race test covers mission.respond only, not task approve. Not executed; derived from code reading, and the probe log only covers the single-approval case.",
+        "blocked": false,
+        "verdicts": [
+          {
+            "refuted": false,
+            "realSeverity": "LOW",
+            "reasoning": "Not refuted. The ordering defect is real in the code. manager.server.ts approve() (lines 972-975) deletes the id from deviceApproved before launch(), and launch() throws \"Task is not awaiting approval\" (line 1030) for any task not in waiting_for_approval. Nothing earlier in the path blocks it: http.server.ts approve (lines 552-571) runs no state check for the workstation actor, and the containment guard only checks acceptance. So a workstation approve on a running device-approved task clears the marker and is then refused. rerouteFromDecision (line 583-588) reads the marker, so a later failure at the launch-time revalidation (around line 1077) or in the retry loop (around lines 1546/1560) can reroute to any fallback_order candidate that passes preLaunchRevalidate. fallback_order (routing.server.ts:542) is built from the full selection order capped at CANDIDATE_CAP, so a tool-capable claude entry is plausible. Nothing in the device-constraint path blocks it: device submit does not force localOnly or offlineOnly (the only localOnly defaults are in agent-runtime.server.ts). I found no blocking code. Severity is reduced to LOW because the trigger needs an owner-side workstation approve, which the workstation can already perform with full authority. The device restriction is a guard against phone-initiated escalation, and the owner's stale click widens execution of a task the owner had already approved. Side note, same ordering pattern: a device approve on a non-waiting task adds the marker before its refusal, which is over-restrictive rather than an escape. Not executed, per the read-only scope. Evidence is code reading only: manager.server.ts:549-600, 972-1030, 1077, 1546-1560; http.server.ts:552-571; routing.server.ts:542."
+          },
+          {
+            "refuted": false,
+            "realSeverity": "LOW",
+            "reasoning": "Not refuted. I found no code that blocks the mechanism. approve() at manager.server.ts:973-974 deletes the deviceApproved marker unconditionally before launch() runs, and launch() refuses a non-waiting task at line 1030, so a refused workstation approve leaves the marker cleared. The only consumer of the marker is rerouteFromDecision at line 583-588, which is reached by the launch-time reroute (line 1077) and the failure-recovery reroutes (lines 1546 and 1560). Those paths do not re-check the marker, and preLaunchRevalidate (routing.server.ts:316-337) checks constraints only, which a device submit does not set by default, so nothing else blocks a claude reroute. The fallback order comes from the full routing selection (routing.server.ts:542), so claude can be in it.\n\nI downgrade severity from MEDIUM to LOW. Only the workstation principal reaches the delete: actorOf (device-authority.server.ts:116-117) maps workstation to \"workstation\", and the device branch in http.server.ts:549-566 can only add the marker, never delete it. A paired phone therefore cannot trigger this, so the DEV-01 device-escape threat model is not reopened. The trigger is an owner-side second approve on an already-running task, followed by an ollama failure that takes a reroute taxonomy, under auto routing (manual routing exhausts instead, manager.server.ts:1258 and 1546 area). The bug is real but limited to owner misclick or stale-card state corruption.\n\nFiles: /c/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts (lines 583-588, 971-975, 1030, 1077, 1546, 1560) and /c/Users/allam/Documents/new/bun-router/src/lib/bunny-host/http.server.ts (lines 549-572). Nothing was edited or executed, and the Host was not started."
+          }
+        ]
+      },
+      {
+        "id": "A09",
+        "severity": "MEDIUM",
+        "title": "F-02 parked-Retry assertion is vacuous: it passes without the revocation fix",
+        "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-remediation.test.ts",
+        "attack": "Check whether the test would fail if F-02 revocation-to-Retry blocking were removed (the 'Retry cannot revive' claim).",
+        "evidence": "Lines 258-262: parkedRetry is a Mission saved as state 'failed' with no failed step (the approval used readStep and start:false). retry() (missions manager ~3444-3462) throws a plain Error, so the HTTP layer returns status 400 with the generic message 'Host command failed. Inspect operation state before retrying.' (http.server.ts ~786-800 and the default 400 at ~785). Without the revocation fix, retry() hits 'No failed step to retry.' and still returns 400. The regex /revoked|Host command failed/ matches any plain Error. The revocation-specific assertion (envelope(parked).revokedAt) is discriminating, but the Retry-refusal assertion is not. There is no positive control showing Retry succeeds on a non-revoked failed device-approved Mission.",
+        "blocked": false,
+        "verdicts": [
+          {
+            "refuted": false,
+            "realSeverity": "LOW",
+            "reasoning": "The finding's narrow claim holds. The parked-Retry assertions at remote-remediation.test.ts:258-261 are vacuous. parked is saved as state \"failed\" with no failed or blocked step (the approval used readStep with start:false). Without the revocation loop (0904132 widens missionsIn to include \"failed\"), manager.server.ts retry() (3444-3462) passes the state and envelope checks and throws the plain Error \"No failed step to retry.\" at line 3459. The HTTP catch (http.server.ts ~785-801) maps any non-refusal Error to 400 with the generic \"Host command failed. Inspect operation state before retrying.\", so status 400 and the /revoked|Host command failed/ regex still pass. The state assertion at 261 also still holds. The regex is too loose for the revocation claim, and there is no positive control. Refutation fails because this is concrete code, not a blocking counterexample. Mitigation: the F-02 Retry claim is still discriminated by the real device-approved failed Mission at lines 253-254. Its failed step makes retry() proceed without the fix, returning 200, so the 254 assertion fails. The revocation assertion at line 257 also fails without the fix. So the defect is redundant or weak assertions and a missing positive control, not an unguarded regression. Downgrading to LOW. Static reading only; no tests were run."
+          },
+          {
+            "refuted": false,
+            "realSeverity": "LOW",
+            "reasoning": "Refutation failed; the core claim of A09 holds. Trace without the revocation fix: test lines 258-262 call mission.retry on `parked`. commands.server.ts:62 calls missions.retry(id, actor) directly with no pre-check. In manager.server.ts:3444-3459 the envelope check passes (not revoked, not expired, since the fix is absent), then `steps.filter(state===\"failed\")` is empty because `parked` was approved with start:false and its only step never ran. There is no blocked step either, so the code throws the plain Error \"No failed step to retry.\" before any mutation. http.server.ts:785 maps a non-CodedRefusal, non-CommandRefusedError to status 400 with code FAILED and the generic message \"Host command failed. Inspect operation state before retrying.\" So parkedRetry.status === 400, the regex /revoked|Host command failed/ matches, and state stays \"failed\". All three parked-Retry assertions pass with or without the F-02 fix, so they are vacuous as the finding says. The revocation-specific check `envelope(parked).revokedAt` (line 257) does discriminate. Mitigation: the naturally failed `failed` mission (lines 251-256) does have a failed step, so without the fix retry would succeed and return 200, failing `retry.status === 400`. The \"Retry cannot revive\" property is therefore still covered, and the gap is a weak assertion rather than an untested behavior. Severity lowered from MEDIUM to LOW for that reason. Read-only: no edits, no test runs, no Host start."
+          }
+        ]
+      }
+    ]
+  }
+]

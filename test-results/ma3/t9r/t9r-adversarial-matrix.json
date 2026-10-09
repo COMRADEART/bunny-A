@@ -1,0 +1,2752 @@
+{
+  "classification": "Four independent read-only adversarial review rounds (multi-agent, 2 refuters per open MEDIUM+ finding) plus executed reproductions where stated",
+  "rounds": [
+    "round-1 (ea48c40, T9 remote + native repair)",
+    "round-2 (b345aa3)",
+    "round-3 (0904132)",
+    "round-4 (395d1c0)"
+  ],
+  "totals": {
+    "findings": 231,
+    "blocked": 147,
+    "fixed": 14,
+    "policy": 5
+  },
+  "unresolvedHighOrBlocker": [],
+  "ownerPolicyDecisions": [
+    {
+      "id": "F-01",
+      "title": "Paired device can approve a Mission whose model steps launch write-access provider sessions with shell, bypassing DEV-01",
+      "note": "Reverted after b345aa3 broke accepted MA0R tests (missions.test.ts:412, capabilities.test.ts:264) that require a paired phone to approve exact Host-serialized Mission authority including write model steps. Escalated to the owner; not changed by T9R."
+    },
+    {
+      "id": "F-04",
+      "title": "Paired device may answer EXECUTE and WRITE capability requests (terminal.exec, computer.open_app, filesystem.write, UI invoke)",
+      "note": "Answering exact Host-offered WRITE/EXECUTE requests is the kept MA0/MA2/T9 phone right (remote-command-contract.md §2)."
+    },
+    {
+      "id": "T9R-02",
+      "title": "Workstation mission.respond not rejected by the new remote field check",
+      "note": "Read-scope Mission provider sessions remain device-approvable under MA0R."
+    },
+    {
+      "id": "T9R-02",
+      "title": "Read-scope Mission sessions with Claude Read or Codex shell are device-approvable",
+      "note": "Read-scope Mission provider sessions remain device-approvable under MA0R."
+    }
+  ],
+  "rows": [
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-01",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "PID reuse of frame or content process is rejected",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:102-110 Assert-CalculatorProcess; :136 frame lifetime compare; :140 content StartTime compare; :197-198 Assert-BatchWindow identity compare"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-02",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "HWND reuse is rejected unless the same verified process owns it",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:136 and :197 handle compare; :259 owner/StartTime compare in valid"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-03",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Foreign top-level window named Calculator is never acted upon",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:102-110 Assert-CalculatorProcess; :125-132 AUMID trust; :147 Calculator-Frames calls Native per match"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-04",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "ApplicationFrameHost frame hosting another UWP app is rejected at content level",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:132 AUMID equality; :203-212 Assert-BatchWindow content path check (CalculatorApp.exe/Calculator.exe in verified package)"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-05",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Minimized window is restored before content-process identity is verified",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-06",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Stale UIA element after window replacement is re-fetched and re-verified",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:159-160 FromHandle and re-verify in Ready; :224-230 Assert-BatchControl"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-07",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Content-process ownership mismatch is rejected for all control operations",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:168, :203-212, :228, :381; batches.server.ts:63 allowlist"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-08",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Restoration is only reachable from admitted open or focus operations",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:529 prepareBatchAction gate; :535 probe with {} args; :156 only under prepareReadiness; batches.server.ts:56-57 key allowlist"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-09",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Preparation probes do not mutate native state",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:529, :535, :539 (probes with fixed args); no mutating API in valid/existing/Find-Window paths"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-10",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Focus path does not synthesize input and verifies native foreground",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts verified focus flag; perform() verified = output.focused === true; no input-synthesis API in file"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-11",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Acquisition and focus loops are bounded by deadlines and consent expiry",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:153, :176, :280, :387 (execFile timeout)"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-12",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Launch budget can exceed the operation timeout and strand the acquiring record",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-13",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Consent expiry is rechecked at every native step that acts",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:114, :158, :193, :333 Assert-BatchClock; :500 expiry check before launch"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-14",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Consent revocation is not rechecked between execute and the valid probe",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-15",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "No unrelated Calculator process is terminated",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts: no termination API; calculator-targets.test.ts:130 regex (narrow)"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-16",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Launch guard is keyed per owner, so another owner can launch during an uncertain outcome",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-17",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "powershell.exe is spawned by bare name with no working directory",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-18",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Non-crossApp computer operations skip Calculator target policy and use first substring match",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "LOW"
+        },
+        {
+          "refuted": false,
+          "severity": "LOW"
+        }
+      ],
+      "disposition": "LIMITATION (LOW)",
+      "note": "Pre-existing non-crossApp computer path uses substring title match; each such action is individually consented. X53/cross-app path uses verified identity."
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-19",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Existing-window binding without readiness is caught before any control action",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:224-230 Assert-BatchControl; invoke script Invoke-pattern requirement when $batch is set"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-20",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Any foreign window titled Calculator denies Calculator acquisition (availability)",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-21",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Preparation probe is not cancellable by Stop",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-22",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Content identity is read twice, so a process swap between reads can record an unverified PID",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "native-target",
+      "id": "CAL-23",
+      "claimedSeverity": "INFO",
+      "blocked": false,
+      "title": "PowerShell identity logic has no executing unit test",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-01",
+      "claimedSeverity": "HIGH",
+      "blocked": false,
+      "title": "Paired device can approve a Mission whose model steps launch write-access provider sessions with shell, bypassing DEV-01",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "HIGH"
+        },
+        {
+          "refuted": false,
+          "severity": "HIGH"
+        }
+      ],
+      "disposition": "POLICY — owner decision",
+      "note": "Reverted after b345aa3 broke accepted MA0R tests (missions.test.ts:412, capabilities.test.ts:264) that require a paired phone to approve exact Host-serialized Mission authority including write model steps. Escalated to the owner; not changed by T9R."
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-02",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Workstation revocation of a device does not end Mission authorizations the device approved",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "FIXED",
+      "note": "b345aa3 + 0904132 + 395d1c0: workstation revocation revokes and stops device-approved plain Missions, including failed ones (Retry refused). Test: T9R F-02."
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-03",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Mission approval plan binding is optional server-side, so a device can approve a replanned scope it never reviewed",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "FIXED (narrowed)",
+      "note": "After a replan a device approval must name the reviewed planReference (0904132). Unrevised plans keep MA0R semantics. Test: T9R F-03."
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-04",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Paired device may answer EXECUTE and WRITE capability requests (terminal.exec, computer.open_app, filesystem.write, UI invoke)",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "LOW"
+        }
+      ],
+      "disposition": "POLICY — accepted design",
+      "note": "Answering exact Host-offered WRITE/EXECUTE requests is the kept MA0/MA2/T9 phone right (remote-command-contract.md §2)."
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-05",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Device self sign-out leaves its batches and Agentic consents live; only workstation revocation ends them",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-06",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Sign-out with an unreachable Host clears the cookie but leaves the device credential valid on the Host",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-07",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Operation-id idempotency is memory-only with a 10-minute TTL and the epoch check is opt-in, so expired ids re-execute",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-08",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Reusing an operation id with a different payload returns the prior applied outcome, a false confirmation",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-09",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "After restart a device can re-consent an Agent with Write/Execute tool scope at the same revision and plan (design-accepted)",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "F-10",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Workstation-versus-remote classification depends on proxy headers; a tunnel that strips them and rewrites Host to loopback would be treated as the owner",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-01",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Revoked, expired or forged device credentials are refused on every request, stream and dispatch",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts:390-411 and 457-460; device-authority.server.ts:151-161"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-02",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Default-deny device role: unlisted actions are refused before any read or dispatch",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "device-authority.server.ts:80-85 with http.server.ts:463; commands.server.ts:30 `if (!access.local && !REMOTE.has(action))`; agent-runtime.server.ts:868-869 (agent.create/start for devices)"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-03",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Cross-Mission, cross-Agent and cross-Project substitution on mission.respond is refused",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "commands.server.ts:64-65; manager.server.ts:3186-3190"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-04",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Agent authorization approvals refuse extra fields (scope or batch smuggling)",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts:523-529; agent-runtime.server.ts:886-895 (deviceAgenticRefusal + revision-bound reauthorize)"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-05",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Batch knobs from the device can only shrink the Host offer",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts:3124-3133 (Math.min against the stated offer)"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-06",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "A changed planned action cannot be answered with an old offer",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts:3109-3112"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-07",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "A request can be answered only once and only while its step still waits on it",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts:3186-3206"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-08",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Host restart invalidates pending requests and one-time decisions",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts recover() restart reconciliation (around 3736-3750); manager.server.ts:3204"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-09",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Operation-id replay across devices or across actions is refused",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "device-authority.server.ts:292-293 (principal-keyed); http.server.ts:479-482 (409 on action mismatch); http.server.ts:575"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-10",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "A device cannot self-approve a tool-capable direct task; ollama tool-free self-approval is allowed by design",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts:553-566; device-authority.server.ts deviceMayLaunch (~line 36-38)"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-11",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "A device cannot create Missions, Agents, triggers, capability runs, skills or retarget tasks",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "commands.server.ts:30; agent-runtime.server.ts:868-869; device-authority.server.ts:50-75 default deny"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-12",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "project.artifact cannot read an artifact outside the selected Project",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "project-service.server.ts:268-283; device-authority.server.ts deviceArtifactRead"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-13",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Model output or task text cannot create approval",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "architecture: /command requires Bearer principal (http.server.ts:410-412); manager.server.ts:3186 keyed by requestId"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-14",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Cross-site CSRF on device commands and the device cookie is refused",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "host-bridge.server.ts:31-33; bunny-pair.ts:5"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-15",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Calculator repair: readiness restore runs only inside admitted execution; the pre-admission probe does not restore",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "bus.server.ts:276 (execute only after decision); computer.server.ts:528-534 (no-restore probe); B-11 default deny"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "remote-authority",
+      "id": "B-16",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Scope of the T9R repair on the remote authority surface",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "commands.server.ts:64-65"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-01",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Paired-device projection leaks Host folder paths via /state, project.list and project.get",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "ACCEPTED DESIGN",
+      "note": "Path scrubbing reverted: MA0R test requires the phone to see the exact roots it consents to. Device artifact reads stay location-free; task cwd/process facts stay removed."
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-02",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Bridge pairing route buffers an unbounded request body before any size check",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-03",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Global pairing failure cap lets any tunnel client block all pairing for 10 minutes",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-04",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Revoked or unknown bearer load is not rate-limited at the Host or the bridge events route",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-05",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Device session cookie has no __Host- prefix or path/domain pinning, so a same-site sibling can shadow it",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-06",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Event stream stops replaying after 20,000 events and waits for the next bus event",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-07",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Cross-site, CSRF and null/missing Origin attacks on remote commands, events and sign-out",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "host-bridge.server.ts:32-33 + SameSite=Strict (bunny-pair.ts:5) + http.server.ts:382-383"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-08",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Transport downgrade and x-forwarded-proto spoofing cannot grant remote or workstation access",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "host-bridge.server.ts:40-41"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-09",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "LAN peer, Host-header spoofing and X-Forwarded-For spoofing cannot obtain workstation authority",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "host-bridge.server.ts:27 and 41; http.server.ts:379-381; http.server.ts:874"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-10",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "DNS rebinding of the bridge or Host to reach workstation authority",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "host-bridge.server.ts:40; http.server.ts:379-381"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-11",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Open device streams stay alive after revocation or expiry",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts:728 closeDevice; http.server.ts:448 stillAuthorized; http.server.ts:410-411; event-signal.ts:5-8"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-12",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "SSE payload redaction for devices (transcript sentinel) and bridge content stripping",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "event-signal.ts:5-8; http.server.ts:443; presentation.ts:437-481"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-13",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Per-device rate limits, stream caps and ledger bounds against retry budget exhaustion",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts:414-421; http.server.ts:430-431; device-authority.server.ts:312-313"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-14",
+      "claimedSeverity": "INFO",
+      "blocked": false,
+      "title": "Stale-view guard is optional and operation ids are replayable after the 10-minute ledger TTL",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-15",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device self sign-out does not end device-granted consents (intentional, bounded)",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "design choice http.server.ts:730 and comment near 818; batch TTL clamp manager.server.ts:3160"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-16",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Pairing code single-use and brute-force resistance",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts:398-404 synchronous consume; http.server.ts:377,396-397 global cap; 10-min expiry at pairing.create"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-17",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Loopback workstation classification depends on the tunnel adding forwarding or proxy headers",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "host-bridge.server.ts:37 (PROXY_HEADERS and x-forwarded-proto refusal), conditional on the edge adding headers"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "transport",
+      "id": "T-18",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Coverage gaps: no tests for bridge Origin/sec-fetch guards or for the SSE reconnect path and projection paths",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "n/a (test gap, not a bypass)"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-01",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Remote mission.respond cannot substitute Agent/Mission/Project binding fields",
+      "verdicts": null,
+      "disposition": "FIXED",
+      "note": "DEV-01 reroute escape reproduced on b345aa3 (review/t9r-01-prefix-probe.log); fixed in 0904132 (+ remote tags 395d1c0). Test: T9R DEV-01."
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-02",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Workstation mission.respond not rejected by the new remote field check",
+      "verdicts": null,
+      "disposition": "POLICY — accepted design",
+      "note": "Read-scope Mission provider sessions remain device-approvable under MA0R."
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-03",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Remote mission.approve still accepts revision/plan fields (outside T9R change)",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts:717 planReference equality check"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-04",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Foreign or spoofed window named Calculator cannot be bound as the Calculator target",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts Calculator-Packages / Assert-CalculatorProcess / Native-CalculatorFrame path and AUMID checks"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-05",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Minimized Calculator is restored before the arithmetic trust and modal checks run",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-06",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Approval-time probe can bind a minimized window's identity without the full window checks",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:490-491 execution-time prepareReadiness re-verification; computer.server.ts:177 Assert-BatchWindow before return; batches.server.ts:57 extra-key rejection"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-07",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Swallowed errors in the existing-window scan cannot bind an unverified identity",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:247 identity assignment after checks; computer.server.ts:248 two-message allowlist"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-08",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Focus denial cannot report foreground success",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts verified check on output.focused; post-loop Assert-BatchWindow"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-09",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "No unbounded timeouts introduced in the Calculator path",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts:153 and :316 deadlines; execFile timeout in powershell()"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-10",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Launch plus readiness can exceed the single PowerShell budget and leave a persisted uncertain state",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-11",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "Calculator-Frames now throws on foreign 'Calculator'-named windows during the launch-wait loop",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts Native-CalculatorFrame path check (fail-closed)"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-12",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "open_app reuse path does not run the readiness probe but reports only what it verified",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "computer.server.ts Assert-BatchControl before any invoke"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-13",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "ma2-t10.test.ts assertions were changed in T9 (0a5988c), not in T9R; the change is stronger, not a loosening",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "ma2-t10.test.ts:86-87 stronger redaction check"
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-14",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Test classification: stub-driven 'refuses <fault>' tests overstate what they prove",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-1 (ea48c40, T9 remote + native repair)",
+      "lens": "repair-regression",
+      "id": "T9R-15",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Full-suite coverage of the Calculator repair is not evidenced in the regression log",
+      "verdicts": [
+        {
+          "refuted": true,
+          "severity": "LOW"
+        },
+        {
+          "refuted": true,
+          "severity": "NONE"
+        }
+      ],
+      "disposition": "REFUTED",
+      "note": "Both verifiers refuted (log lines exist)."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-01",
+      "claimedSeverity": "HIGH",
+      "blocked": false,
+      "title": "Device direct-task approve can launch unscoped tool-capable provider via launch-time reroute",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "HIGH"
+        },
+        {
+          "refuted": false,
+          "severity": "HIGH"
+        }
+      ],
+      "disposition": "FIXED",
+      "note": "DEV-01 reroute escape reproduced on b345aa3 (review/t9r-01-prefix-probe.log); fixed in 0904132 (+ remote tags 395d1c0). Test: T9R DEV-01."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-02",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Read-scope Mission sessions with Claude Read or Codex shell are device-approvable",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "LOW"
+        },
+        {
+          "refuted": false,
+          "severity": "LOW"
+        }
+      ],
+      "disposition": "POLICY — accepted design",
+      "note": "Read-scope Mission provider sessions remain device-approvable under MA0R."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-03",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Device mission.start launches a ready write-scoped Mission with no device re-check",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-04",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Mission-child reroute from ollama is bounded by constraints, so tool-capable reroute is blocked",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "A tool-free mission child exists only when constraints.localOnly, budgetLocal or preferences.local is set (launchModel ~1229-1250 sets requiresFilesystem false only when localOnly). eligibility() then rejects every non-local provider (router.ts ~24-40: localOnly requires local_or_cloud==='local'). preLaunchRevalidate applies the same eligibility. codexMissionExclusion applies to missionAccess constraints. So the reroute candidates stay local, and no tool-capable local provider is routable (cline, opencode and cursor are detect-only)."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-05",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "mission.retry from a device is refused at the HTTP and command layers",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "DEVICE_RIGHTS has no mission.retry, so assertDeviceAction throws WORKSTATION_REQUIRED before dispatch (http.server.ts ~464; device-authority.server.ts DEVICE_RIGHTS). missionCommand REMOTE excludes mission.retry and refuses it for non-local access (commands.server.ts). Note: MissionManager.retry() (manager ~3447) has no actor guard of its own and relies on these layers."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-06",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Replanned Mission cannot be started from a stale ready state",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "mission.plan and mission.replan are not in DEVICE_RIGHTS (HTTP 400). replan() accepts only waiting_for_approval, waiting_for_user or failed, revokes the envelope, clears authorizationId, and plan() sets state waiting_for_approval (or failed). mission.start requires state==='ready'. Any child launch also runs taskViolation, which returns 'authorization revoked' for a revoked envelope (authorization.server.ts ~268)."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-07",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device answers to provider.execute requests cannot launch tool-capable children",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "deviceRequestRefusal (~1952-1960) returns APPROVAL_ON_HOST unless the child task is deviceMayLaunch (ollama, not a remote tag). respond() calls deviceRequestRefusal for non-deny decisions (~3200-3204). Write children cannot be ollama: requiresFilesystem is set for write steps and ollama's capabilities are text only. allow_batch on provider.execute creates a batch and reschedules the step (~3266 path). It never calls tasks.approve, and the relaunch creates a fresh child that runs taskViolation and agenticProviderCheck again. An allow_batch without a batchOffer is now a CommandRefusedError (~3220)."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-08",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Agentic agent.authorization.approve and agent.resume cannot launch non-ollama model children",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Model children are admitted through agenticProviderCheck -> agenticScopeViolation, which allows provider.execute only when provider==='ollama', access==='read' and filesystem===false (authorization.server.ts ~233). Every other child is asked for and then refused. launch() re-runs admitAgenticProvider on the post-reroute task (~1111-1113), so a reroute cannot escape this either. The write-session envelope built by reauthorizeAgent from e.scope (~2066-2110) is not checked by deviceMissionRefusal, but no launch is reachable from it."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-09",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "providers.execution false or sessions undefined cannot launch a provider session",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "scopeFor sets execution true iff a model step exists (authorization.server.ts ~48), and sessions.steps is built from model steps only (~77-81), so the two cannot disagree in a derived scope. taskViolation returns 'provider execution was not approved' when execution is false (~270). approve() refuses a model-step plan without matching sessions (manager ~745-752). providerScopeViolation returns 'authority missing' when sessions is undefined (~255-257) before taskViolation's non-null sessions access. A tool-free model step with no sessions cannot launch."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-10",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "F-01 refuses device approval of every write-session Mission plan, with no bypass found",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "approve() runs deviceMissionRefusal for device actors (~719-721) before any launch. The F-01 check reads requestedScope.providers.sessions.steps, the same object the envelope is built from (envelopeFrom uses requestedScope). The plannedAuthority equality check ties sessions to the current steps (~740-752). Client keys are ignored, and the plan is a Host-computed reference (planReference must equal agenticPlanReference, F-03). Replan requires the workstation. Write children route only to filesystem-capable providers, which are not tool-free."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-11",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device submit, feedback, ack and stop do not launch provider sessions",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "submit() never calls launch; the only callers of the private launch() are approve() (~965) and approveDelegated() (~998). The only submit callers are the device-capable HTTP submit (http.server.ts ~549, which leaves the task waiting_for_approval) and launchModel (manager ~1275). feedback() (~1829) only records the value on a terminal task. inbox.ack and stop do not launch."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-12",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device skill.run and skill steps cannot launch provider sessions",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "skill.run and skill.verify are not in DEVICE_RIGHTS (http.server.ts ~464) and not in the REMOTE set (commands.server.ts). Skill steps are expanded into concrete capability actions (authorization.server.ts ~50-57 and batch planner ~2975-2985), so a skill never creates a model step. Provider sessions come only from model executors in launchModel."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-13",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device direct approve of a Mission child task is refused",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts approve device branch: if pending.mission is set, it throws WorkstationRequiredError before any manager.approve call. deviceMayLaunch also applies. Mission children are answered only through mission.respond, which runs deviceRequestRefusal."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-14",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "F-03 planReference binding holds: device approve without or with a stale plan is refused",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "approve() compares planReference with agenticPlanReference(id) when defined (~713-716), and refuses device actors with an undefined plan (~722-724). commands.server.ts text() refuses empty or non-string plan values. remoteVerdicts reports planReference from the same agenticPlanReference function, so the phone and the Host agree."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-15",
+      "claimedSeverity": "INFO",
+      "blocked": false,
+      "title": "allow_batch on a provider.execute ask creates a batch with no device check on covered actions (unverified)",
+      "verdicts": null,
+      "disposition": "REFUTED",
+      "note": "Both verifiers refuted (log lines exist)."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-16",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "deviceMayLaunch checks only the task.model string, so an empty model may fall back to a cloud Ollama tag (unverified)",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f01-bypass",
+      "id": "T9R-17",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Regression check: F-01 and F-03 leave legitimate device and workstation flows intact",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "deviceMissionRefusal runs only for device actors (approve ~719 and remoteVerdicts ~2008). Workstation calls pass no planReference requirement. Device approval of read-scope and no-session plans is unchanged. The verdict shown to the phone (remoteVerdicts) and the approve/respond gates call the same functions, so they agree. Caveat: remoteVerdicts gives no verdict for ready Missions (see T9R-03)."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F02-1",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Failed device-approved Mission keeps a live envelope and Retry revives it",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "FIXED",
+      "note": "Failed Missions included in revocation sweep (0904132)."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F02-2",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Sequential revocation loop: one hung stop blocks revoking later Missions",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F02-3",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Errors swallowed after revocation leave a Mission active and unstopped with no audit event",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F02-4",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Active Mission states are all covered; new launches blocked after revoke",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "MISSION_ACTIVE loop + stop() + taskViolation revokedAt check (authorization.server.ts:268) + decide revokedAt deny (authorization.server.ts:174) + cancelChildren"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F02-5",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Revoke-then-stop ordering does not break stop()",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "stop() does not gate on authorization; synchronous ordering in the loop"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F02-6",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "No race between device approval and revocation, or with in-flight admission",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Synchronous device revalidation before approve; no await windows in capability/task admission; post-await re-check in batch path"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F02-7",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Agent Missions are excluded from the plain-Mission revocation loop correctly",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "deviceMissionRefusal runs before approval; agentic loop covers Agent consent"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F02-8",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "envelope.grantedBy format matches the revocation key",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Consistent actorOf/device:<id> derivation"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F02-9",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Expired or idle devices are not revoked, so their Mission approvals survive",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F03-1",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "No device approval path bypasses the planReference requirement",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "REMOTE allowlist; start requires ready; Agent refusal precedes plan check"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F03-2",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "plan cannot be supplied as non-string or empty to bypass",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "text() validation + digest equality check (manager.server.ts:717) + undefined refusal (manager.server.ts:723)"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F03-3",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "planReference is available to a legitimate client for every non-agentic waiting_for_approval Mission",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "remoteVerdicts sets planReference for all waiting_for_approval Missions"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F03-4",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Phone sends plan only when its local row carries planReference; otherwise fails closed",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Host refuses approve without plan (manager.server.ts:723-724)"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F03-5",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "No time-of-check/time-of-use gap between reviewed plan and envelope",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Synchronous approve; digest over steps changes on replan"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "f02-f03",
+      "id": "F03-6",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "planReference does not directly digest requestedScope; no unbound mutation found",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "requestedScope is derived deterministically from steps and create-time constants; no mutation path found"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-01",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "/pair responses carry no Host path",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Construction: no path-bearing field exists in the /pair reply or its error strings."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-02",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "session.get unreachable for devices",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "DEVICE_RIGHTS default-deny (assertDeviceAction) plus reply-level hostPathFree."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-03",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "operation.status error text scrubbed at write time",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Write-time hostPathFree in the catch block and reply-level hostPathFree at line 780."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-04",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Applied-replay snapshot is scrubbed",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "viewFor device branch hostPathFree."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-05",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Replayed refusal body bypasses hostPathFree; safe only by write-time scrub",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Write-time scrub in the catch block. Hardening suggestion: wrap the replay body in hostPathFree for devices."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-06",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "401/403/429 bodies are constant",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Constant message strings and typed code fields only."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-07",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "/health exposes no path",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Constant reason strings; no error text reaches health. Caveat: /health is not scrubbed, so any future reason built from error text would leak."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-08",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "SSE events: all fields scrubbed; bridge strips to sequence",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Whole-event hostPathFree at http.server.ts:444; bridge eventSignal reduces to sequence."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-09",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Gateway bridge adds no path-bearing data",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Constant gateway messages; Host-side scrub upstream; SSE reduced to sequence."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-10",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Forward-slash, lowercase-drive, UNC and extended-length paths are scrubbed",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "WHOLE_HOST_PATH and embedded drive/UNC/unix-root regexes in hostPathFree (device-authority.server.ts:425-439)."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-11",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Embedded Windows paths with spaces leak their tail (folder and file names)",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "WITHDRAWN",
+      "note": "Applies only to the reverted T-01 scrubber."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-12",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Node fs error text from project.artifact reaches the device with path tail",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "LIMITATION (LOW)",
+      "note": "Pre-existing hidePaths leaves the tail of a spaced path in a project.artifact fs error; device already sees roots by design."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-13",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Percent-encoded drive paths and POSIX file URLs survive",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-14",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Non-drive path forms survive: env references, MSYS, unlisted roots, drive-less backslash",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-15",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Drive path concatenated after a letter or digit is not scrubbed",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-16",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Object keys are not scrubbed (latent)",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-17",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Artifact text bodies are rewritten by hostPathFree while sha256 is still delivered",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-18",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Whole-value rule drops all text after a leading path",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-19",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "hostPathFree turns Date and Buffer values into plain objects (latent)",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-20",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device-echoed exact-compare values are not over-redacted",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Value formats (UUID, hex digest, integer) cannot match the regexes; scrub is outbound-only."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-21",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Base64, digests and URL schemes are not false positives",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "No colon in base64 or hex; the alphanumeric lookbehind protects URL schemes."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "t01-leakage",
+      "id": "T01-22",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "No performance or ReDoS problem on large inputs",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Linear regexes; measured timings well under budget."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F01-A1",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device approves a write-model Mission directly (F-01)",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts deviceMissionRefusal write-session check (~1968-1971) via approve() device branch (~719-721)"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F01-A2",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Pre-remediation Mission JSON with execution but no sessions list",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts approve() plannedAuthority vs sessions.steps check (~746-752)"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F01-A3",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device widens scope through mission.approve body fields",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "commands.server.ts:52 (only id/start/revision/plan are read); envelopeFrom uses stored requestedScope"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F01-A4",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device creates or replans a write-session Mission to avoid the check",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "device-authority.server.ts DEVICE_RIGHTS default-deny + assertDeviceAction"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F03-A5",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device approves without naming the plan (F-03), including destructive plans",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts approve() planReference===undefined check (~722-724), ordered after the device refusal"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F03-A6",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device replays another Mission's, a stale, or an empty planReference",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts approve() plan equality check (~716-718)"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F03-I7",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Stale plan on a destructive Mission returns REFUSED, not WORKSTATION_REQUIRED",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Both branches refuse before any mutation; no security effect"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F02-A8",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Lost device's active Mission approval survives workstation revocation",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts endDeviceGrants approvals loop (revoke then stop) plus envelope revokedAt admission checks"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F02-A9",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Failed Mission approved by a lost device keeps a live envelope; workstation retry reuses it",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F02-A10",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Stop fails or races after revocation, leaving admitted work running",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Envelope revoked before stop; admission denial in authorization.server.ts and manager.server.ts"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "F02-A11",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Agent Missions skipped by the plain-Mission loop",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Agent Mission skip plus agentic loop; agent-runtime device gating (agent-runtime.server.ts:868)"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "T01-A12",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Whole Host path value reaches a paired device",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "device-authority.server.ts WHOLE_HOST_PATH branch in hostPathFree"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "T01-A13",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Embedded Windows paths with spaces leak their tail to a paired device",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "T01-A14",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Environment-variable or drive-less backslash paths are not scrubbed",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "No device-visible emitter found (state-paths.server.ts:10, discovery.server.ts:112 only)"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "T01-A15",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Non-plain object values collapse to {} in device payloads",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Device payloads are JSON-shaped (ISO strings, plain objects); no Date or Error values found"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "T01-A16",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Workstation responses changed by the T-01 scrub",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Each hostPathFree call is gated on the device principal in http.server.ts"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "BATCH-A17",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "allow_batch without offer now REFUSED; client mis-handling of REFUSED vs FAILED",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "No client branch depends on FAILED for this path; status unchanged (http.server.ts:787)"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "SSE-A18",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "SSE replay semantics changed by scrubbing",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "hostPathFree changes string leaves only; sequence and cursor numbers and keys preserved"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "EVT-A19",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "device.revoked text change",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "No consumer of the text; no path content"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "REG-R20",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Existing test missions.test.ts MA0R will fail",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "RESOLVED",
+      "note": "Caused by b345aa3; reverted in 0904132; existing test green."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "REG-R21",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Existing test capabilities.test.ts Host HTTP will fail at the phone approval",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "RESOLVED",
+      "note": "Caused by b345aa3; reverted in 0904132; existing test green."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "regression",
+      "id": "REG-R22",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device-side tests predicted to still pass",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "Device refusal ordering and unchanged task and batch paths keep these tests green"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-01",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "hostPathFree leaks path segments after a space in embedded Host paths",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "WITHDRAWN",
+      "note": "Applies only to the reverted T-01 scrubber."
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-02",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Device-approved failed Mission keeps a live envelope after workstation revocation",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-03",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "F-02 'a revoked approval can never start' assertion passes on state, not revocation",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "authorization.server.ts:174 envelope.revokedAt deny; commands.server.ts mission.start state check"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-04",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "Cross-Project artifact test asserts only status 400, which every ordinary error also returns",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "project-service.server.ts:268-272 scope check; device-authority.server.ts:445-456 path strip"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-05",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "Restart 'pre-restart approval refused' asserts status 400 only",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts:3211-3213 generation check; http.server.ts:470-472 epoch pin"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-06",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "Four-way race: winner is arrival-ordered, deny never wins, resolvedBy not asserted",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts:3195 and :3229 synchronous check-and-set"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-07",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "Host-replacement test: no real replacement, synthetic pins, mission state never checked",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts:466-473 expect guard runs before dispatch"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-08",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Host restart test is in-process only, misses spec section 11 properties, and cites an unverified live fixture",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-09",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "T-01 HOST_PATH regex cannot see the leak it is meant to catch (drive-letter only, refusal probe has no path)",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-10",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "T-01 SSE read loop can break early and turn a slow first chunk into a false failure",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-11",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "F-01 assertion on writeIncludesShell is tautological; the read-session premise is untested",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts ~1968-1970 access-based refusal; adapters.server.ts:404-408 read-session tool restriction"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-12",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Evidence records contain hard-coded literals rather than observed values",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-13",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Lost-acknowledgment replay cannot apply twice; assertions are strong",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts operation ledger replay (~482-486); manager.server.ts:3195 already-answered check"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-14",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "allow_batch on a request with no batch offer is refused, not escalated",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts:3222-3223 CommandRefusedError before resolution write"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-15",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "F-03 approval must name the reviewed plan; replanned scope cannot be approved unseen",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "manager.server.ts:717-718 stale plan check; manager.server.ts:723-724 unbound device refusal"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-16",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device reads of verified artifacts cannot reveal the Host file location",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "device-authority.server.ts:445-456; project-service.server.ts:268-272"
+    },
+    {
+      "round": "round-2 (b345aa3)",
+      "lens": "test-quality",
+      "id": "A-17",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Self sign-out keeps the signing-out device's approvals; workstation revocation does not",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": "http.server.ts device.revoke local-only grant revocation; actorOf identity match"
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A01",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Launch-time preflight reroute of a device-approved direct task to a tool tool-capable provider",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A02",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Failure-recovery reroute (reroute and reroute-larger-context) of a device-approved task",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A03",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "escalate-effort keeping the provider but switching model",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A04",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "retry-same relaunch changing provider or model",
+      "verdicts": null,
+      "disposition": "FIXED",
+      "note": "Refused duplicate approve keeps the device marker (395d1c0); exercised in T9R DEV-01."
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A05",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "startSession invoked with a target not produced by rerouteFromDecision",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A06",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "Ollama provider-default auto mapping to a cloud tag at launch",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A07",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "deviceMayLaunch classifies remoteness by name only, so remote-metadata tags pass",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        },
+        {
+          "refuted": false,
+          "severity": "MEDIUM"
+        }
+      ],
+      "disposition": "FIXED",
+      "note": "deviceMayLaunch consults probed remoteModels and refuses empty model (395d1c0)."
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A08",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Retarget of a device-approved task, or device-initiated retarget or feedback",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A09",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Same task id approved twice (device then workstation, or workstation then device)",
+      "verdicts": null,
+      "disposition": "FIXED",
+      "note": "F-02 now asserts the exact canonical Retry refusal (395d1c0)."
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A10",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Relaunch after Host restart without the in-memory set",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A11",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "Mission child launched via approveDelegated bypasses the device set",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A12",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Provider-reported model hook changing a device task's model after approval",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "dev01",
+      "id": "A13",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Time-of-check to time-of-use between the device HTTP check and manager.approve",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A1",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Extended endDeviceGrants list (failed) lets Retry revive a device approval",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A2",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Revoke-then-stop covers waiting_for_user missions",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A3",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device approval landing between the revoke and the grant sweep",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A4",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Stale pre-await mission.state in the sweep can skip stop for a Mission a concurrent Retry just re-armed",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "LOW"
+        },
+        {
+          "refuted": false,
+          "severity": "LOW"
+        }
+      ],
+      "disposition": "FIXED",
+      "note": "Revocation sweep re-reads state before stop (395d1c0)."
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A5",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "unstopped counter conflates failures; a failed envelope revoke leaves Retry live with a misleading message",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A6",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "Agent Mission envelope survives the sweep; Retry re-arms it, but agentic admission still blocks",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A7",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device approves a revised plan without naming planReference: replans is not incremented by plan() alone",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A8",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Host-internal or other step/scope mutation in waiting_for_approval without replan",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A9",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Device-initiated replan or plan",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A10",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Replay of a stale planReference after a replan",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A11",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Agentic Mission consent or re-consent path bypasses the revised-plan rule",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A12",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Is failed the only non-active non-terminal state that can reuse an envelope",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A13",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "replan() awaits cancelChildren before revoking, so a concurrent Retry can re-arm the Mission mid-replan (pre-existing, not in 0904132)",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A14",
+      "claimedSeverity": "INFO",
+      "blocked": false,
+      "title": "Device self sign-out does not sweep device-approved envelopes (intentional, pre-existing)",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "f02f03",
+      "id": "A15",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Workstation flows: regression check",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A01",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "T-01 and F-01 reverts are clean; no leftover references",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A02",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "F-03 narrowing: unbound device approval of a revised plan is refused",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A03",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "DEV-01 reroute guard covers launch-time reroute, recovery reroute and effort ladder",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A04",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Workstation duplicate approve clears the device-approved marker before refusing",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "LOW"
+        },
+        {
+          "refuted": false,
+          "severity": "LOW"
+        }
+      ],
+      "disposition": "FIXED",
+      "note": "Refused duplicate approve keeps the device marker (395d1c0); exercised in T9R DEV-01."
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A05",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Device gate is name-only; a hosted Ollama tag without a -cloud suffix passes",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A06",
+      "claimedSeverity": "LOW",
+      "blocked": true,
+      "title": "Initial device approval admits the provider-default 'auto' model, but reroute does not",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A07",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Plain Mission child launch-time reroute is not re-checked against the envelope",
+      "verdicts": null,
+      "disposition": "FIXED",
+      "note": "deviceMayLaunch consults probed remoteModels and refuses empty model (395d1c0)."
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A08",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "F-02 revocation: Retry, start and per-action admission are refused for the revoked envelope",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A09",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "F-02 parked-Retry assertion is vacuous: it passes without the revocation fix",
+      "verdicts": [
+        {
+          "refuted": false,
+          "severity": "LOW"
+        },
+        {
+          "refuted": false,
+          "severity": "LOW"
+        }
+      ],
+      "disposition": "FIXED",
+      "note": "F-02 now asserts the exact canonical Retry refusal (395d1c0)."
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A10",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "F-02 failed-Mission Retry: failed state not asserted; 400 is generic",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A11",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "F-02 record labels the run LIVE only, omitting the simulated parked-failure write",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A12",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "b345aa3 assertion on start of a revoked approval was dropped from the F-02 test",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A13",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Restart evidence cites a nonexistent protocol/ path",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A14",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "DEV-01 test is non-vacuous: workstation positive control plus exact device launch list",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A15",
+      "claimedSeverity": "INFO",
+      "blocked": true,
+      "title": "Existing device-behavior tests still hold against the reverted code",
+      "verdicts": null,
+      "disposition": "BLOCKED (canonical boundary)",
+      "note": ""
+    },
+    {
+      "round": "round-3 (0904132)",
+      "lens": "regression",
+      "id": "A16",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "deviceApproved Set is never pruned",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "security",
+      "id": "F1",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Remote-tag refusal relies on registry snapshot; launch-time probe checks presence only",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW)",
+      "note": "Remote-tag refusal uses the registry snapshot; a suffix-less tag converted to a remote proxy by the workstation owner between refreshes could pass. Requires owner-side action; the phone cannot cause it."
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "security",
+      "id": "F2",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "deviceMayLaunch does not reject the 'auto' provider-default sentinel",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "security",
+      "id": "F3",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "No end-to-end test for a suffix-less hosted tag through the three real call sites",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "security",
+      "id": "F4",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "approve() now reads the task before the containment gate, changing error precedence",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "security",
+      "id": "F5",
+      "claimedSeverity": "INFO",
+      "blocked": false,
+      "title": "Behaviour change: null/empty-model device launches now refused; existing tests not traced to a regression",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "security",
+      "id": "V1",
+      "claimedSeverity": "INFO",
+      "blocked": false,
+      "title": "Verified correct: plumbing reaches all three callers; unprobed or absent data does not let a hosted tag launch",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "tests",
+      "id": "T1",
+      "claimedSeverity": "HIGH",
+      "blocked": true,
+      "title": "F-02 mission.start 400 assertion is a state guard, not a revocation check",
+      "verdicts": null,
+      "disposition": "TEST LABEL",
+      "note": "One assertion message overstates coverage; revocation itself is asserted by revokedAt and the canonical Retry refusal."
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "tests",
+      "id": "T2",
+      "claimedSeverity": "MEDIUM",
+      "blocked": false,
+      "title": "Call-site wiring of probe remoteModels into the device gates has no failing assertion",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW)",
+      "note": "Call-site wiring of remoteModels has no end-to-end failing assertion (unit + static review only)."
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "tests",
+      "id": "T3",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Duplicate-approve assertion is non-discriminating on its own; marker effect is observed only indirectly",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "tests",
+      "id": "T4",
+      "claimedSeverity": "INFO",
+      "blocked": false,
+      "title": "Assertions verified non-vacuous by static reasoning",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "tests",
+      "id": "T5",
+      "claimedSeverity": "LOW",
+      "blocked": false,
+      "title": "Revocation sweep re-read has no test coverage",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    },
+    {
+      "round": "round-4 (395d1c0)",
+      "lens": "tests",
+      "id": "T6",
+      "claimedSeverity": "INFO",
+      "blocked": false,
+      "title": "Scope note: this review is static only",
+      "verdicts": null,
+      "disposition": "LIMITATION (LOW/INFO) — recorded",
+      "note": ""
+    }
+  ]
+}
