@@ -311,10 +311,29 @@ $w = Find-Window $p
 $h = [IntPtr]$w.Current.NativeWindowHandle
 Assert-BatchWindow $w
 if ([BunnyWin]::IsIconic($h)) { [void][BunnyWin]::ShowWindow($h, 9) }
-[void][BunnyWin]::SetForegroundWindow($h)
-Start-Sleep -Milliseconds 250
+if ($batch) {
+  $focusStarted = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $focusDeadline = [Math]::Min($focusStarted + 2000, [long]$batch.expiresAt)
+  do {
+    Assert-BatchClock
+    $w = [System.Windows.Automation.AutomationElement]::FromHandle($h); Assert-BatchWindow $w
+    # Use the verified application's semantic focus provider; never attach to another
+    # process's input queue, synthesize keys, change foreground-lock policy or invoke a control.
+    $focusTarget = $w
+    if (-not $w.Current.IsKeyboardFocusable) {
+      $focusTarget = $w.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::AutomationIdProperty, 'num0Button')))
+    }
+    if ($focusTarget -and $focusTarget.Current.IsKeyboardFocusable) {
+      try { $focusTarget.SetFocus() } catch [InvalidOperationException] { $focusProviderUnavailable = $true }
+    }
+    [void][BunnyWin]::SetForegroundWindow($h)
+    if ([BunnyWin]::GetForegroundWindow() -eq $h) { break }
+    if ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -lt $focusDeadline) { Start-Sleep -Milliseconds 100 }
+  } while ([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() -lt $focusDeadline)
+  Assert-BatchClock; Assert-BatchWindow $w
+} else { [void][BunnyWin]::SetForegroundWindow($h); Start-Sleep -Milliseconds 250 }
 $after = [BunnyWin]::Title([BunnyWin]::GetForegroundWindow())
-@{ before = $before; after = $after; target = (Describe $w); windowIdentity = $(if ($batch) { Batch-Identity $w } else { $null }); focused = ([BunnyWin]::GetForegroundWindow() -eq $h) } | ConvertTo-Json -Depth 4 -Compress`,
+@{ before = $before; after = $after; target = (Describe $w); windowIdentity = $(if ($batch) { Batch-Identity $w } else { $null }); focusElapsedMs = $(if ($batch) { [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() - $focusStarted } else { $null }); focused = ([BunnyWin]::GetForegroundWindow() -eq $h) } | ConvertTo-Json -Depth 4 -Compress`,
   "computer.invoke_control": String.raw`
 $w = Find-Window $p
 $e = Find-Control $w $p

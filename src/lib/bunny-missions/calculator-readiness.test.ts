@@ -75,3 +75,12 @@ test("T9R readiness: another active Mission cannot restore the leased target", a
   await assert.rejects(adapter.execute("computer.open_app", { app: "calculator" }, { ...context(), missionId: "B" }), /busy in another Mission/);
   assert.equal(calls, 1);
 });
+
+test("T9R focus denial stays a failed operation and cannot report foreground success", async () => {
+  const adapter = new ComputerCapability("unused", undefined, async (_script, _args, _signal, _timeout, scope) => {
+    assert.deepEqual(scope!.windowIdentity, identity);
+    return { windowIdentity: identity, focused: false, before: "Other app", after: "Other app", focusElapsedMs: 2000 };
+  });
+  const result = await adapter.execute("computer.focus_window", { title: "Calculator" }, context());
+  assert.equal(result.ok, false); assert.equal(result.status, "failed"); assert.equal(result.errorCategory, "capability_failed");
+});
