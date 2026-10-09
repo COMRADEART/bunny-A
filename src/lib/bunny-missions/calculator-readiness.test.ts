@@ -43,6 +43,18 @@ test("T9R readiness: revoked canonical consent prevents every native call", asyn
   assert.equal(calls, 0);
 });
 
+test("T9R readiness preserves restoration evidence across the subsequent identity validation", async () => {
+  const adapter = new ComputerCapability("unused", undefined, async script => {
+    if (script === CALCULATOR_SCRIPTS.existing) return { identity: null, awaitingReadiness: true };
+    if (script === CALCULATOR_SCRIPTS.acquire) return { identity, decision: "reuse_existing", readiness: { restored: true, attempts: 2, elapsedMs: 100 } };
+    if (script === CALCULATOR_SCRIPTS.valid) return { valid: true, readiness: { restored: false, attempts: 1, elapsedMs: 50 } };
+    throw new Error("Unexpected operation");
+  });
+  const result = await adapter.execute("computer.open_app", { app: "calculator" }, { ...context(), desktopBatch: { expiresAt: Date.now() + 10000 } });
+  assert.match(result.evidence.join("\n"), /Calculator readiness:.*"restored":true/);
+  assert.equal((result.output as { newWindows: number }).newWindows, 0);
+});
+
 test("T9R readiness: Stop while another Mission owns the desktop queue cannot restore", async () => {
   let release!: () => void, calls = 0;
   const adapter = new ComputerCapability("unused", undefined, async () => { calls++; await new Promise<void>(resolve => { release = resolve; }); return { valid: true }; });

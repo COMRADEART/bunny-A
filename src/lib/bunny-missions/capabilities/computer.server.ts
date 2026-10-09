@@ -483,7 +483,7 @@ export class ComputerCapability implements CapabilityAdapter {
         },
       }, context.signal);
       if (context.desktopBatch?.windowIdentity && JSON.stringify(context.desktopBatch.windowIdentity) !== JSON.stringify(acquired.identity)) throw new Error("Acquired target differs from the admitted batch identity.");
-      output = { ...acquired, ...(readiness ? { readiness } : {}), file: args.file, pid: acquired.identity.processId, windowPid: acquired.identity.processId, windowIdentity: acquired.identity, newWindows: acquired.decision === "launched" ? 1 : 0 };
+      output = { ...acquired, ...(readiness && !("readiness" in acquired) ? { readiness } : {}), file: args.file, pid: acquired.identity.processId, windowPid: acquired.identity.processId, windowIdentity: acquired.identity, newWindows: acquired.decision === "launched" ? 1 : 0 };
     } else {
       const denied = context.revalidate?.(); if (denied) throw new Error(denied);
       output = await this.automate(script, args, context.signal, timeout, batch) as Record<string, unknown>;
