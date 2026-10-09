@@ -1,0 +1,943 @@
+{
+  "sourceCommit": "0a5988c5eef7e6beae3d1622529e2c638cca7788",
+  "allCasesPresent": true,
+  "allCasesExecuted": false,
+  "rows": [
+    {
+      "id": "F01",
+      "requirement": "Existing device identity is recognized correctly.",
+      "initialState": "Disposable Host with independently paired device credentials",
+      "action": "Read state, forge identity headers, use unknown/revoked credential",
+      "expectedResult": "Existing device identity is recognized correctly.",
+      "observedResult": "Same credential resolves the same device; unknown/revoked credentials and owner-header forgery refused. No production credential used.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F02",
+      "requirement": "Unknown device is rejected.",
+      "initialState": "Disposable Host with independently paired device credentials",
+      "action": "Read state, forge identity headers, use unknown/revoked credential",
+      "expectedResult": "Unknown device is rejected.",
+      "observedResult": "Same credential resolves the same device; unknown/revoked credentials and owner-header forgery refused. No production credential used.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F03",
+      "requirement": "Revoked device is rejected.",
+      "initialState": "Disposable Host with independently paired device credentials",
+      "action": "Read state, forge identity headers, use unknown/revoked credential",
+      "expectedResult": "Revoked device is rejected.",
+      "observedResult": "Same credential resolves the same device; unknown/revoked credentials and owner-header forgery refused. No production credential used.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F04",
+      "requirement": "Expired device session is rejected.",
+      "initialState": "Real disposable Host device row",
+      "action": "Move timestamps beyond absolute and idle bounds",
+      "expectedResult": "Expired device session is rejected.",
+      "observedResult": "DEVICE_EXPIRED; recent presence cannot extend absolute lifetime and does not revoke/edit the protected device row.",
+      "evidenceLocation": [
+        "security-regression-fixed.log"
+      ],
+      "classification": "SIMULATED",
+      "result": "PASS"
+    },
+    {
+      "id": "F05",
+      "requirement": "Device identity cannot be forged through request headers.",
+      "initialState": "Disposable Host with independently paired device credentials",
+      "action": "Read state, forge identity headers, use unknown/revoked credential",
+      "expectedResult": "Device identity cannot be forged through request headers.",
+      "observedResult": "Same credential resolves the same device; unknown/revoked credentials and owner-header forgery refused. No production credential used.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F06",
+      "requirement": "Wrong Host identity is rejected.",
+      "initialState": "Correct paired identity with canonical Host UUID and epoch",
+      "action": "Send wrong UUID / stale epoch; restart a disposable Host process",
+      "expectedResult": "Wrong Host identity is rejected.",
+      "observedResult": "409 refusal before effects; UUID persists and per-process epoch changes.",
+      "evidenceLocation": [
+        "remote-protocol-results.json",
+        "host-restart-recovery.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F07",
+      "requirement": "Transport downgrade is rejected.",
+      "initialState": "Built gateway behind no trusted HTTPS assertion",
+      "action": "Send raw insecure gateway request",
+      "expectedResult": "Transport downgrade is rejected.",
+      "observedResult": "Gateway refused; no production transport modified.",
+      "evidenceLocation": [
+        "transport-downgrade.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F08",
+      "requirement": "Invalid certificate/trust evidence fails closed.",
+      "initialState": "Loopback TLS proxy with self-signed fixture certificate",
+      "action": "Connect without the explicit fixture CA",
+      "expectedResult": "Invalid certificate/trust evidence fails closed.",
+      "observedResult": "DEPTH_ZERO_SELF_SIGNED_CERT; no trust bypass or OS trust changes.",
+      "evidenceLocation": [
+        "remote-protocol-results.json"
+      ],
+      "classification": "SIMULATED",
+      "result": "PASS"
+    },
+    {
+      "id": "F09",
+      "requirement": "Sensitive credentials do not appear in URLs or logs.",
+      "initialState": "Retained receipts and source projections",
+      "action": "Exact active-credential scan; redact captured expired pairing code",
+      "expectedResult": "Sensitive credentials do not appear in URLs or logs.",
+      "observedResult": "No active credential matches in scanned text; one expired pairing code was captured and redacted. Memory-only device bearers and binary content are scan limitations.",
+      "evidenceLocation": [
+        "secret-scan.json"
+      ],
+      "classification": "STATIC",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F10",
+      "requirement": "Unauthorized origin/CSRF attempt is rejected.",
+      "initialState": "Built configured-origin gateway",
+      "action": "Cross-origin command and anonymous SSE",
+      "expectedResult": "Unauthorized origin/CSRF attempt is rejected.",
+      "observedResult": "403 cross-site refusal and 401 anonymous stream; no pause effect.",
+      "evidenceLocation": [
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F11",
+      "requirement": "Device cannot forge owner role.",
+      "initialState": "Disposable Host with independently paired device credentials",
+      "action": "Read state, forge identity headers, use unknown/revoked credential",
+      "expectedResult": "Device cannot forge owner role.",
+      "observedResult": "Same credential resolves the same device; unknown/revoked credentials and owner-header forgery refused. No production credential used.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F12",
+      "requirement": "Phone cannot invent a new authorization envelope.",
+      "initialState": "Device observing workstation-created authority",
+      "action": "Invent/alter delegation, inject larger budget, approve initial/sensitive scope",
+      "expectedResult": "Phone cannot invent a new authorization envelope.",
+      "observedResult": "WORKSTATION_REQUIRED or exact-offer refusal; no owner scope granted.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F13",
+      "requirement": "Phone cannot widen Host-offered scope.",
+      "initialState": "Device observing workstation-created authority",
+      "action": "Invent/alter delegation, inject larger budget, approve initial/sensitive scope",
+      "expectedResult": "Phone cannot widen Host-offered scope.",
+      "observedResult": "WORKSTATION_REQUIRED or exact-offer refusal; no owner scope granted.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F14",
+      "requirement": "Phone cannot extend finite action budgets.",
+      "initialState": "Device observing workstation-created authority",
+      "action": "Invent/alter delegation, inject larger budget, approve initial/sensitive scope",
+      "expectedResult": "Phone cannot extend finite action budgets.",
+      "observedResult": "WORKSTATION_REQUIRED or exact-offer refusal; no owner scope granted.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F15",
+      "requirement": "Stale approval revision is rejected.",
+      "initialState": "Exact pending ask before Pause/Resume changes revision",
+      "action": "Submit old request/revision after reissue",
+      "expectedResult": "Stale approval revision is rejected.",
+      "observedResult": "Stale ask refused; fresh exact ask accepted and independently verified.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "browser-paused.txt",
+        "browser-resumed.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F16",
+      "requirement": "Cross-Agent approval substitution is rejected.",
+      "initialState": "Two Agent approval substitution scenario not independently executed",
+      "action": "Dedicated cross-Agent request substitution",
+      "expectedResult": "Cross-Agent approval substitution is rejected.",
+      "observedResult": "Ownership checks reviewed in source; dedicated adversarial request NOT TESTED.",
+      "evidenceLocation": [
+        "src/lib/bunny-missions/manager.server.ts"
+      ],
+      "classification": "NOT TESTED",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F17",
+      "requirement": "Cross-Mission approval substitution is rejected.",
+      "initialState": "Two different real disposable Missions with different plan references",
+      "action": "Offer first Mission plan to approve second Mission",
+      "expectedResult": "Cross-Mission approval substitution is rejected.",
+      "observedResult": "Plan changed refusal; exact second plan can be approved; bare Agent-owned Mission start refused.",
+      "evidenceLocation": [
+        "security-regression-fixed.log"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F18",
+      "requirement": "Cross-Project approval substitution is rejected.",
+      "initialState": "Cross-Project approval-substitution scenario not independently executed",
+      "action": "Dedicated approval resource substitution across Projects",
+      "expectedResult": "Cross-Project approval substitution is rejected.",
+      "observedResult": "Plan/Project/resource binding reviewed; artifact isolation is tested separately. Dedicated approval substitution NOT TESTED.",
+      "evidenceLocation": [
+        "src/lib/bunny-missions/manager.server.ts",
+        "artifact-access-results.json"
+      ],
+      "classification": "NOT TESTED",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F19",
+      "requirement": "Sensitive local-owner boundary is enforced.",
+      "initialState": "Device observing workstation-created authority",
+      "action": "Invent/alter delegation, inject larger budget, approve initial/sensitive scope",
+      "expectedResult": "Sensitive local-owner boundary is enforced.",
+      "observedResult": "WORKSTATION_REQUIRED or exact-offer refusal; no owner scope granted.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F20",
+      "requirement": "Remote denial persists correctly.",
+      "initialState": "Canonical unresolved request",
+      "action": "Remote deny",
+      "expectedResult": "Remote denial persists correctly.",
+      "observedResult": "Canonical resolution deny and device actor persisted; Agent did not proceed.",
+      "evidenceLocation": [
+        "remote-protocol-results.json",
+        "multi-device-race-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F21",
+      "requirement": "Remote Pause invokes canonical Host.",
+      "initialState": "Real Project-bound Agent waiting on one scoped write",
+      "action": "Phone browser Pause, Resume and exact allow_once; read workstation canonical snapshot",
+      "expectedResult": "Remote Pause invokes canonical Host.",
+      "observedResult": "Same Agent e75662c3-5697-4007-9ead-0d31ec91247c and Mission f4f1d69c-6657-41de-9320-ce61ae27cbf7; current revision reissued; Host COMPLETED with independently verified filesystem result. Browser origin is simulated.",
+      "evidenceLocation": [
+        "integrated-phone-mission.json",
+        "browser-paused.txt",
+        "browser-resumed.txt",
+        "browser-completed-final.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F22",
+      "requirement": "Remote Resume revalidates authority.",
+      "initialState": "Real Project-bound Agent waiting on one scoped write",
+      "action": "Phone browser Pause, Resume and exact allow_once; read workstation canonical snapshot",
+      "expectedResult": "Remote Resume revalidates authority.",
+      "observedResult": "Same Agent e75662c3-5697-4007-9ead-0d31ec91247c and Mission f4f1d69c-6657-41de-9320-ce61ae27cbf7; current revision reissued; Host COMPLETED with independently verified filesystem result. Browser origin is simulated.",
+      "evidenceLocation": [
+        "integrated-phone-mission.json",
+        "browser-paused.txt",
+        "browser-resumed.txt",
+        "browser-completed-final.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F23",
+      "requirement": "Remote Stop prevents future admissions.",
+      "initialState": "Disposable Agent with pending admission",
+      "action": "Remote Stop then attempt more control",
+      "expectedResult": "Remote Stop prevents future admissions.",
+      "observedResult": "STOPPED persisted; later admissions blocked.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F24",
+      "requirement": "Agent identity remains unchanged.",
+      "initialState": "Real Project-bound Agent waiting on one scoped write",
+      "action": "Phone browser Pause, Resume and exact allow_once; read workstation canonical snapshot",
+      "expectedResult": "Agent identity remains unchanged.",
+      "observedResult": "Same Agent e75662c3-5697-4007-9ead-0d31ec91247c and Mission f4f1d69c-6657-41de-9320-ce61ae27cbf7; current revision reissued; Host COMPLETED with independently verified filesystem result. Browser origin is simulated.",
+      "evidenceLocation": [
+        "integrated-phone-mission.json",
+        "browser-paused.txt",
+        "browser-resumed.txt",
+        "browser-completed-final.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F25",
+      "requirement": "Mission identity remains unchanged.",
+      "initialState": "Real Project-bound Agent waiting on one scoped write",
+      "action": "Phone browser Pause, Resume and exact allow_once; read workstation canonical snapshot",
+      "expectedResult": "Mission identity remains unchanged.",
+      "observedResult": "Same Agent e75662c3-5697-4007-9ead-0d31ec91247c and Mission f4f1d69c-6657-41de-9320-ce61ae27cbf7; current revision reissued; Host COMPLETED with independently verified filesystem result. Browser origin is simulated.",
+      "evidenceLocation": [
+        "integrated-phone-mission.json",
+        "browser-paused.txt",
+        "browser-resumed.txt",
+        "browser-completed-final.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F26",
+      "requirement": "Phone cannot directly invoke ProviderAdapter.",
+      "initialState": "Authenticated paired-device principal",
+      "action": "Try arbitrary capability, tool-capable/hosted provider, shell/app and session calls",
+      "expectedResult": "Phone cannot directly invoke ProviderAdapter.",
+      "observedResult": "Workstation-only/unknown commands refused; local tool-free inference alone allowed. Test adapters instrumented launch counts.",
+      "evidenceLocation": [
+        "security-regression-fixed.log"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F27",
+      "requirement": "Phone cannot bypass TaskManager.",
+      "initialState": "Authenticated paired-device principal",
+      "action": "Try arbitrary capability, tool-capable/hosted provider, shell/app and session calls",
+      "expectedResult": "Phone cannot bypass TaskManager.",
+      "observedResult": "Workstation-only/unknown commands refused; local tool-free inference alone allowed. Test adapters instrumented launch counts.",
+      "evidenceLocation": [
+        "security-regression-fixed.log"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F28",
+      "requirement": "Phone cannot directly execute arbitrary shell commands.",
+      "initialState": "Authenticated paired-device principal",
+      "action": "Try arbitrary capability, tool-capable/hosted provider, shell/app and session calls",
+      "expectedResult": "Phone cannot directly execute arbitrary shell commands.",
+      "observedResult": "Workstation-only/unknown commands refused; local tool-free inference alone allowed. Test adapters instrumented launch counts.",
+      "evidenceLocation": [
+        "security-regression-fixed.log"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F29",
+      "requirement": "Phone cannot launch an arbitrary app without Host authorization.",
+      "initialState": "Authenticated paired-device principal",
+      "action": "Try arbitrary capability, tool-capable/hosted provider, shell/app and session calls",
+      "expectedResult": "Phone cannot launch an arbitrary app without Host authorization.",
+      "observedResult": "Workstation-only/unknown commands refused; local tool-free inference alone allowed. Test adapters instrumented launch counts.",
+      "evidenceLocation": [
+        "security-regression-fixed.log"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F30",
+      "requirement": "Phone cannot read unrelated Project artifacts.",
+      "initialState": "Verified artifact belongs to one disposable Project",
+      "action": "Read through another Project and tamper the artifact before reading",
+      "expectedResult": "Phone cannot read unrelated Project artifacts.",
+      "observedResult": "Cross-Project read refused and hash mismatch refused. Tampered original restored in finally.",
+      "evidenceLocation": [
+        "remote-protocol-results.json",
+        "artifact-hash-mismatch.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F31",
+      "requirement": "Event stream requires authenticated device.",
+      "initialState": "Built configured-origin gateway",
+      "action": "Cross-origin command and anonymous SSE",
+      "expectedResult": "Event stream requires authenticated device.",
+      "observedResult": "403 cross-site refusal and 401 anonymous stream; no pause effect.",
+      "evidenceLocation": [
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F32",
+      "requirement": "Event stream applies authorization filtering.",
+      "initialState": "Authenticated device, another device and workstation SSE streams",
+      "action": "Deliver private activity; revoke only first device; deliver next canonical sequence",
+      "expectedResult": "Event stream applies authorization filtering.",
+      "observedResult": "Direct device payload redacted; revoked stream closes and receives no subsequent sequence; other authorized streams remain valid.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "dev/ma2-stream-revocation-final.log"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F33",
+      "requirement": "SSE cursor replay deduplicates events.",
+      "initialState": "UI merger with retained cursor and canonical history",
+      "action": "Duplicate/out-of-order events and retention gap inputs",
+      "expectedResult": "SSE cursor replay deduplicates events.",
+      "observedResult": "Stable IDs deduplicate; gap triggers canonical resync. Live mobile/tunnel buffering NOT TESTED.",
+      "evidenceLocation": [
+        "ui-test-results.log"
+      ],
+      "classification": "SIMULATED",
+      "result": "PASS"
+    },
+    {
+      "id": "F34",
+      "requirement": "Stale cursor triggers canonical reconciliation.",
+      "initialState": "UI merger with retained cursor and canonical history",
+      "action": "Duplicate/out-of-order events and retention gap inputs",
+      "expectedResult": "Stale cursor triggers canonical reconciliation.",
+      "observedResult": "Stable IDs deduplicate; gap triggers canonical resync. Live mobile/tunnel buffering NOT TESTED.",
+      "evidenceLocation": [
+        "ui-test-results.log"
+      ],
+      "classification": "SIMULATED",
+      "result": "PASS"
+    },
+    {
+      "id": "F35",
+      "requirement": "New Host epoch invalidates stale assumptions.",
+      "initialState": "Correct paired identity with canonical Host UUID and epoch",
+      "action": "Send wrong UUID / stale epoch; restart a disposable Host process",
+      "expectedResult": "New Host epoch invalidates stale assumptions.",
+      "observedResult": "409 refusal before effects; UUID persists and per-process epoch changes.",
+      "evidenceLocation": [
+        "remote-protocol-results.json",
+        "host-restart-recovery.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F36",
+      "requirement": "Offline phone displays stale/offline state.",
+      "initialState": "Built phone browser displaying real disposable Host state",
+      "action": "Close disposable Host process and observe bounded failed reads",
+      "expectedResult": "Offline phone displays stale/offline state.",
+      "observedResult": "Offline label, real freshness time and disabled mutation/artifact controls. Browser contains no execution engine. This is Host disconnection, not physical-phone network loss.",
+      "evidenceLocation": [
+        "browser-offline-final.txt",
+        "offline-reconnect.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F37",
+      "requirement": "Offline phone does not execute Agent work.",
+      "initialState": "Built phone browser displaying real disposable Host state",
+      "action": "Close disposable Host process and observe bounded failed reads",
+      "expectedResult": "Offline phone does not execute Agent work.",
+      "observedResult": "Offline label, real freshness time and disabled mutation/artifact controls. Browser contains no execution engine. This is Host disconnection, not physical-phone network loss.",
+      "evidenceLocation": [
+        "browser-offline-final.txt",
+        "offline-reconnect.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F38",
+      "requirement": "Old offline approval is not automatically replayed.",
+      "initialState": "Disconnected UI and pending approval",
+      "action": "Review mutation admission and reconnect paths",
+      "expectedResult": "Old offline approval is not automatically replayed.",
+      "observedResult": "No persistent/offline mutation queue or automatic approval replay; typed modeled stale/reconnect behavior passes. A dedicated real offline-approval replay injection NOT TESTED.",
+      "evidenceLocation": [
+        "ui-test-results.log",
+        "src/store/use-island.ts"
+      ],
+      "classification": "STATIC",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F39",
+      "requirement": "Lost Stop acknowledgment is reconciled safely.",
+      "initialState": "Real disposable Host Stop request with operation ID",
+      "action": "Discard real acknowledgment; query outcome and resend same ID",
+      "expectedResult": "Lost Stop acknowledgment is reconciled safely.",
+      "observedResult": "Host says applied and duplicate replayed; STOPPED has no repeated effect. Lost receipt injected by test client, not real carrier packet loss.",
+      "evidenceLocation": [
+        "remote-protocol-results.json"
+      ],
+      "classification": "SIMULATED",
+      "result": "PASS"
+    },
+    {
+      "id": "F40",
+      "requirement": "Duplicate command cannot duplicate Agent effects.",
+      "initialState": "Real disposable Host Stop request with operation ID",
+      "action": "Discard real acknowledgment; query outcome and resend same ID",
+      "expectedResult": "Duplicate command cannot duplicate Agent effects.",
+      "observedResult": "Host says applied and duplicate replayed; STOPPED has no repeated effect. Lost receipt injected by test client, not real carrier packet loss.",
+      "evidenceLocation": [
+        "remote-protocol-results.json"
+      ],
+      "classification": "SIMULATED",
+      "result": "PASS"
+    },
+    {
+      "id": "F41",
+      "requirement": "Host restart does not revive old grants.",
+      "initialState": "Completed artifact and pending envelope in real disposable process",
+      "action": "Gracefully close old process and boot a fresh process over same database",
+      "expectedResult": "Host restart does not revive old grants.",
+      "observedResult": "Different PID/epoch, stable Host and Agent/Mission IDs, completed artifact preserved, old authority invalidated. Not an abrupt power-loss test.",
+      "evidenceLocation": [
+        "host-restart-recovery.json",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F42",
+      "requirement": "Host restart preserves Agent identity.",
+      "initialState": "Completed artifact and pending envelope in real disposable process",
+      "action": "Gracefully close old process and boot a fresh process over same database",
+      "expectedResult": "Host restart preserves Agent identity.",
+      "observedResult": "Different PID/epoch, stable Host and Agent/Mission IDs, completed artifact preserved, old authority invalidated. Not an abrupt power-loss test.",
+      "evidenceLocation": [
+        "host-restart-recovery.json",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F43",
+      "requirement": "Host restart preserves completed artifacts.",
+      "initialState": "Completed artifact and pending envelope in real disposable process",
+      "action": "Gracefully close old process and boot a fresh process over same database",
+      "expectedResult": "Host restart preserves completed artifacts.",
+      "observedResult": "Different PID/epoch, stable Host and Agent/Mission IDs, completed artifact preserved, old authority invalidated. Not an abrupt power-loss test.",
+      "evidenceLocation": [
+        "host-restart-recovery.json",
+        "remote-protocol-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F44",
+      "requirement": "Device revocation blocks future commands.",
+      "initialState": "Independently paired device with protected browser artifact open",
+      "action": "Self-sign-out / workstation revoke; retry commands/read",
+      "expectedResult": "Device revocation blocks future commands.",
+      "observedResult": "DEVICE_REVOKED; browser clears protected state after authenticated reconciliation; no silent re-pair.",
+      "evidenceLocation": [
+        "revocation-acceptance.json",
+        "browser-revoked-final.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F45",
+      "requirement": "Device revocation blocks protected future events.",
+      "initialState": "Authenticated device, another device and workstation SSE streams",
+      "action": "Deliver private activity; revoke only first device; deliver next canonical sequence",
+      "expectedResult": "Device revocation blocks protected future events.",
+      "observedResult": "Direct device payload redacted; revoked stream closes and receives no subsequent sequence; other authorized streams remain valid.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "dev/ma2-stream-revocation-final.log"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F46",
+      "requirement": "Device revocation blocks artifact access.",
+      "initialState": "Independently paired device with protected browser artifact open",
+      "action": "Self-sign-out / workstation revoke; retry commands/read",
+      "expectedResult": "Device revocation blocks artifact access.",
+      "observedResult": "DEVICE_REVOKED; browser clears protected state after authenticated reconciliation; no silent re-pair.",
+      "evidenceLocation": [
+        "revocation-acceptance.json",
+        "browser-revoked-final.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F47",
+      "requirement": "Revoked device cannot silently re-pair.",
+      "initialState": "Independently paired device with protected browser artifact open",
+      "action": "Self-sign-out / workstation revoke; retry commands/read",
+      "expectedResult": "Revoked device cannot silently re-pair.",
+      "observedResult": "DEVICE_REVOKED; browser clears protected state after authenticated reconciliation; no silent re-pair.",
+      "evidenceLocation": [
+        "revocation-acceptance.json",
+        "browser-revoked-final.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F48",
+      "requirement": "Concurrent desktop/phone decisions are serialized.",
+      "initialState": "Same current pending ask viewed by owner and independently paired phone",
+      "action": "Concurrent desktop allow_once and phone deny",
+      "expectedResult": "Concurrent desktop/phone decisions are serialized.",
+      "observedResult": "Exactly one resolution (phone deny), owner request refused; one canonical actor.",
+      "evidenceLocation": [
+        "multi-device-race-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F49",
+      "requirement": "Concurrent conflicting approval requests are safely resolved.",
+      "initialState": "Same current pending ask viewed by owner and independently paired phone",
+      "action": "Concurrent desktop allow_once and phone deny",
+      "expectedResult": "Concurrent conflicting approval requests are safely resolved.",
+      "observedResult": "Exactly one resolution (phone deny), owner request refused; one canonical actor.",
+      "evidenceLocation": [
+        "multi-device-race-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F50",
+      "requirement": "Authorization revision wins over stale phone view.",
+      "initialState": "Exact pending ask before Pause/Resume changes revision",
+      "action": "Submit old request/revision after reissue",
+      "expectedResult": "Authorization revision wins over stale phone view.",
+      "observedResult": "Stale ask refused; fresh exact ask accepted and independently verified.",
+      "evidenceLocation": [
+        "security-regression-fixed.log",
+        "browser-paused.txt",
+        "browser-resumed.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F51",
+      "requirement": "Phone and desktop converge on same canonical state.",
+      "initialState": "Real Project-bound Agent waiting on one scoped write",
+      "action": "Phone browser Pause, Resume and exact allow_once; read workstation canonical snapshot",
+      "expectedResult": "Phone and desktop converge on same canonical state.",
+      "observedResult": "Same Agent e75662c3-5697-4007-9ead-0d31ec91247c and Mission f4f1d69c-6657-41de-9320-ce61ae27cbf7; current revision reissued; Host COMPLETED with independently verified filesystem result. Browser origin is simulated.",
+      "evidenceLocation": [
+        "integrated-phone-mission.json",
+        "browser-paused.txt",
+        "browser-resumed.txt",
+        "browser-completed-final.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F52",
+      "requirement": "Agent continues after phone UI closes.",
+      "initialState": "AgentRuntime can complete with zero UI involvement (A27); actual phone close/network sequence not exercised during active work",
+      "action": "Specific phone close / phone-only network disconnect acceptance",
+      "expectedResult": "Agent continues after phone UI closes.",
+      "observedResult": "A27 passes and client has no execution authority, but requested active-phone sequence NOT TESTED.",
+      "evidenceLocation": [
+        "agent-test-results.log",
+        "phone-architecture.md"
+      ],
+      "classification": "NOT TESTED",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F53",
+      "requirement": "Agent continues after phone network disconnects.",
+      "initialState": "AgentRuntime can complete with zero UI involvement (A27); actual phone close/network sequence not exercised during active work",
+      "action": "Specific phone close / phone-only network disconnect acceptance",
+      "expectedResult": "Agent continues after phone network disconnects.",
+      "observedResult": "A27 passes and client has no execution authority, but requested active-phone sequence NOT TESTED.",
+      "evidenceLocation": [
+        "agent-test-results.log",
+        "phone-architecture.md"
+      ],
+      "classification": "NOT TESTED",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F54",
+      "requirement": "No fake model identities or usage percentages appear.",
+      "initialState": "UI with real/unknown provider/model/usage projection fixtures",
+      "action": "Render missing model, unknown quota and hosted/local facts",
+      "expectedResult": "No fake model identities or usage percentages appear.",
+      "observedResult": "Missing facts remain unknown; no progress/model percentages inferred. Actual browser also showed provider-reported sources.",
+      "evidenceLocation": [
+        "ui-test-results.log"
+      ],
+      "classification": "SIMULATED",
+      "result": "PASS"
+    },
+    {
+      "id": "F55",
+      "requirement": "Unknown provider facts remain UNKNOWN.",
+      "initialState": "UI with real/unknown provider/model/usage projection fixtures",
+      "action": "Render missing model, unknown quota and hosted/local facts",
+      "expectedResult": "Unknown provider facts remain UNKNOWN.",
+      "observedResult": "Missing facts remain unknown; no progress/model percentages inferred. Actual browser also showed provider-reported sources.",
+      "evidenceLocation": [
+        "ui-test-results.log"
+      ],
+      "classification": "SIMULATED",
+      "result": "PASS"
+    },
+    {
+      "id": "F56",
+      "requirement": "Artifact hash mismatch is rejected.",
+      "initialState": "Verified artifact belongs to one disposable Project",
+      "action": "Read through another Project and tamper the artifact before reading",
+      "expectedResult": "Artifact hash mismatch is rejected.",
+      "observedResult": "Cross-Project read refused and hash mismatch refused. Tampered original restored in finally.",
+      "evidenceLocation": [
+        "remote-protocol-results.json",
+        "artifact-hash-mismatch.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F57",
+      "requirement": "Phone UI has no horizontal overflow on required sizes.",
+      "initialState": "Paired-device browser and final built dashboard",
+      "action": "Resize through 320,375,390,430,844 landscape and 768 tablet widths",
+      "expectedResult": "Phone UI has no horizontal overflow on required sizes.",
+      "observedResult": "No horizontal overflow; final built landscape recheck after fixing 40px targets. Required smoke covered desktop and 390x844.",
+      "evidenceLocation": [
+        "mobile-responsive-results.json",
+        "mobile-responsive-results-post-fix.json",
+        "../../../screenshots/t9-built-final.json"
+      ],
+      "classification": "SIMULATED",
+      "result": "PASS"
+    },
+    {
+      "id": "F58",
+      "requirement": "Touch and keyboard controls are accessible.",
+      "initialState": "Built dashboard controls",
+      "action": "Measure final touch targets; press Enter on Agentic/Home navigation",
+      "expectedResult": "Touch and keyboard controls are accessible.",
+      "observedResult": "Final measured landscape controls >=44px; navigation activated with keyboard and 2px focus-visible outline. Screen reader/hardware touch NOT TESTED.",
+      "evidenceLocation": [
+        "mobile-responsive-results-post-fix.json",
+        "keyboard-results.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F59",
+      "requirement": "Reduced-motion preference is honored.",
+      "initialState": "CSS stylesheet with prefers-reduced-motion rule",
+      "action": "Inspect reduced-motion override",
+      "expectedResult": "Reduced-motion preference is honored.",
+      "observedResult": "Transitions/animations disabled under media preference; real OS preference/emulated mobile media test NOT TESTED.",
+      "evidenceLocation": [
+        "src/components/island/premium.css"
+      ],
+      "classification": "STATIC",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F60",
+      "requirement": "No unsupported Agent Talk/Redirect represented as active.",
+      "initialState": "Phone Agent detail",
+      "action": "Inspect unsupported Talk/Redirect controls",
+      "expectedResult": "No unsupported Agent Talk/Redirect represented as active.",
+      "observedResult": "Both stay disabled with unsupported explanation.",
+      "evidenceLocation": [
+        "browser-completed-final.txt",
+        "mobile-ui-inventory.json"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F61",
+      "requirement": "Real Host command matches displayed acknowledgment.",
+      "initialState": "Real Project-bound Agent waiting on one scoped write",
+      "action": "Phone browser Pause, Resume and exact allow_once; read workstation canonical snapshot",
+      "expectedResult": "Real Host command matches displayed acknowledgment.",
+      "observedResult": "Same Agent e75662c3-5697-4007-9ead-0d31ec91247c and Mission f4f1d69c-6657-41de-9320-ce61ae27cbf7; current revision reissued; Host COMPLETED with independently verified filesystem result. Browser origin is simulated.",
+      "evidenceLocation": [
+        "integrated-phone-mission.json",
+        "browser-paused.txt",
+        "browser-resumed.txt",
+        "browser-completed-final.txt"
+      ],
+      "classification": "LIVE",
+      "result": "PASS"
+    },
+    {
+      "id": "F62",
+      "requirement": "Physical phone session tested or explicitly NOT TESTED.",
+      "initialState": "No physical phone or external network session",
+      "action": "Explicitly record unavailable acceptance",
+      "expectedResult": "Physical phone session tested or explicitly NOT TESTED.",
+      "observedResult": "Physical-phone, LAN and Internet remote reachability NOT TESTED; no tunnel configured.",
+      "evidenceLocation": [
+        "physical-phone-acceptance.json",
+        "separate-network-acceptance.json"
+      ],
+      "classification": "NOT TESTED",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F63",
+      "requirement": "Separate-network transport tested or explicitly NOT TESTED.",
+      "initialState": "No physical phone or external network session",
+      "action": "Explicitly record unavailable acceptance",
+      "expectedResult": "Separate-network transport tested or explicitly NOT TESTED.",
+      "observedResult": "Physical-phone, LAN and Internet remote reachability NOT TESTED; no tunnel configured.",
+      "evidenceLocation": [
+        "physical-phone-acceptance.json",
+        "separate-network-acceptance.json"
+      ],
+      "classification": "NOT TESTED",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F64",
+      "requirement": "Phone testing does not mutate production device records.",
+      "initialState": "Installed v26 release and processes; corrected installed-state baseline starts late",
+      "action": "Read-only manifests, CIM identities, SQLite snapshots and file hashes",
+      "expectedResult": "Phone testing does not mutate production device records.",
+      "observedResult": "160-file installed manifest and original processes unchanged; all 18 device rows, settings, counts, credentials, config and Startup match only in corrected final window. Whole-task database equality NOT TESTED.",
+      "evidenceLocation": [
+        "production-final.json",
+        "existing-device-audit.json"
+      ],
+      "classification": "LIVE",
+      "result": "LIMITATION"
+    },
+    {
+      "id": "F65",
+      "requirement": "Production v26 remains unchanged.",
+      "initialState": "Installed v26 release and processes; corrected installed-state baseline starts late",
+      "action": "Read-only manifests, CIM identities, SQLite snapshots and file hashes",
+      "expectedResult": "Production v26 remains unchanged.",
+      "observedResult": "160-file installed manifest and original processes unchanged; all 18 device rows, settings, counts, credentials, config and Startup match only in corrected final window. Whole-task database equality NOT TESTED.",
+      "evidenceLocation": [
+        "production-final.json",
+        "existing-device-audit.json"
+      ],
+      "classification": "LIVE",
+      "result": "LIMITATION"
+    }
+  ],
+  "additionalDefects": [
+    {
+      "id": "T9-G2",
+      "problem": "Exact reviewed cross-app filesystem allow_once was ignored at execution and incorrectly inherited by a different verification action",
+      "resolution": "Fixed exact resource/revision/generation/action binding and independent verification",
+      "evidence": "security-regression-fixed.log"
+    },
+    {
+      "id": "T9-G3",
+      "problem": "Sign-out could accept an already-admitted protected result",
+      "resolution": "Access-generation guards clear and reject stale responses",
+      "evidence": "src/store/use-island.ts"
+    },
+    {
+      "id": "T9-G4",
+      "problem": "Uncertain outcome unlocked after fixed reconciliation attempts",
+      "resolution": "Uncertainty retained until canonical outcome is confirmed",
+      "evidence": "src/store/use-island.ts"
+    },
+    {
+      "id": "T9-G5",
+      "problem": "Landscape targets measured 40px",
+      "resolution": "Fixed to 44px; final built DOM remeasured",
+      "evidence": "mobile-responsive-results-post-fix.json"
+    },
+    {
+      "id": "T9-X53",
+      "problem": "Final accepted native regression cannot acquire Calculator arithmetic identity",
+      "resolution": "UNRESOLVED; assertion and native ownership protections preserved",
+      "evidence": "full-test-results.log"
+    }
+  ]
+}

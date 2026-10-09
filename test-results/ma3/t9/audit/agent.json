@@ -1,0 +1,243 @@
+{
+  "subsystem": "Agent/Mission control and T5 agentic authorization as seen from a paired remote device (MA3 T9 audit; read-only)",
+  "capabilities": [
+    {
+      "name": "Remote read of Agents (agent.list / agent.get / GET /state agents field)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "http.server.ts:354 (/state identical for workstation and device), http.server.ts:384-396 (agent.list/agent.get are safeActions, readable while degraded), agent-runtime.server.ts:906-913, agent-runtime.server.ts:79-100, agent-store.server.ts:115-135; host.ts:7-14 (gateway readBunnyHost). Tests: agentic-authorization.test.ts:79 A27 calls agentCommand('agent.get') with actor 'device:test' (dispatcher only); agentic-live.test.ts:32 and project-live.test.ts:68 read /state only with the workstation token.",
+      "detail": "A device token reaches the same snapshot as the workstation. No test reads /state or agent.get over HTTP with a valid (non-revoked) device token. The gateway drops the `agents`/`agent` keys from command replies (presentation.ts:581-596), so the UI only sees agents through snapshot.agents."
+    },
+    {
+      "name": "agent.authorization.propose from a device",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "agent-runtime.server.ts:858-860 refuses an actor starting with 'device:'. Test: agentic-authorization.test.ts:85 A33 (dispatcher-level, actor 'device:revoked', /remote/).",
+      "detail": "A device cannot create Agentic scope. The test does not go through HTTP."
+    },
+    {
+      "name": "agent.authorization.adjust from a device (any change, including reductions)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "Refused in two layers: http.server.ts:400-405 (remote agent.authorization.* data keys limited to id+revision, so `patch` is refused) and agent-runtime.server.ts:875-878 (device actor refused). The workstation path allows reductions only: agentic-store.server.ts:101-114. Tests: agentic-authorization.test.ts:86 A34 (dispatcher plus reduce-only), agentic-live.test.ts:89 (HTTP device token returns 400), A50 at agentic-authorization.test.ts:102 (workstation reduction takes effect).",
+      "detail": "Consequence: a phone cannot reduce scope at all. Its only reducing levers are deny/revoke (both end in Stop), agent.pause, agent.stop and mission.revoke_batch."
+    },
+    {
+      "name": "agent.authorization.approve / agent.start from a device (initial T5 delegation)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "Data {id,revision} passes http.server.ts:400-405. agent-runtime.server.ts:866-871 calls start() when the mission is waiting_for_approval, which runs assertRevision (agent-runtime.server.ts:161-162). manager.server.ts:709-716 checks revision, plan_reference and WAITING_FOR_USER, and manager.server.ts:746-750 calls agentic.approve. Provenance is recorded as channel 'paired-device' (agentic-store.server.ts:98). The audit event is approval.remote_device (manager.server.ts:765-770). The same approval is also reachable through mission.approve with a revision, which is REMOTE-allowed (commands.server.ts:22,47).",
+      "detail": "With only id+revision, a device can turn a Host-offered WAITING_FOR_USER proposal into ACTIVE delegation and start the Mission. Nothing makes initial delegation workstation-only. Every live approve test uses the workstation token (agentic-live.test.ts:53, project-live.test.ts:205-208)."
+    },
+    {
+      "name": "agent.authorization.approve from a device after a restart (reauthorizeAgent)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "agent-runtime.server.ts:872 leads to manager.server.ts:1920-1993, which checks revision CAS, mission waiting_for_user, envelope WAITING_FOR_USER, plan_reference, root identity and command/script digests, then creates a fresh MA0 envelope. Tests (workstation token only): agentic-live.test.ts:97 (fresh revision returns 200) and project-live.test.ts:266-270 (old revision returns 400).",
+      "detail": "After a restart, a device can re-grant fresh executable consent with id+revision. This is not workstation-only."
+    },
+    {
+      "name": "agent.authorization.deny / revoke from a device",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "agent-runtime.server.ts:888-899: agentic.state(REVOKED, Number(revision)) with CAS (agentic-store.server.ts:115-123), then syncAgentic sets canonical revokedAt (manager.server.ts:1686-1695), then agents.stop. No test calls agentCommand deny/revoke. Revocation semantics are tested via the store: agentic-authorization.test.ts:76 A24 and :97 A45.",
+      "detail": "A missing revision becomes NaN and is refused as stale. Deny on a pending proposal also permanently Stops the Agent. Revoke on an EXPIRED, EXHAUSTED or COMPLETED envelope throws at agentic-store.server.ts:118 before the Stop at agent-runtime.server.ts:897. A repeat revoke at the current revision rewrites revoked_at and bumps the revision."
+    },
+    {
+      "name": "Revision CAS and stale-revision rejection",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "agentic-store.server.ts:89-93 (exact match), used at approve :95, adjust :102, state(rev) :116 and admit :127. Pending requests carry agentic {revision, generation} (manager.server.ts:2916-2921) and respond() refuses stale ones (manager.server.ts:3048-3055). approve does not bump the revision (agentic-store.server.ts:98); adjust and state() bump it (:112, :120). Tests: agentic-authorization.test.ts:54 A02, :84 A32, :81 A29, :101 A49; project-live.test.ts:266-270; agentic-live.test.ts:96-97.",
+      "detail": "Double approve is prevented by the state check (WAITING_FOR_USER required, agentic-store.server.ts:96), not by a revision bump."
+    },
+    {
+      "name": "Cross-Agent / Mission / Project substitution defenses",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "Clients name only an agent id; the mission and envelope are resolved Host-side (agent-runtime.server.ts:861-862,867-868,890-892). decide() denies a foreign envelope (authorization.server.ts:158). agenticIdentityViolation checks mission/revision/project/agent row/step/generation/canonical linkage (manager.server.ts:1994-2050). Cross-Agent envelope replay is checked at manager.server.ts:2067. project.artifact binding is at project-service.server.ts:268-272. Tests: agentic-authorization.test.ts:61 A09, :62 A10, :63 A11; project-live.test.ts:231.",
+      "detail": "There is no per-device ownership: any paired device may address any Agent, request or batch id. revokeBatch checks only mission binding, not createdBy (manager.server.ts:3025-3035)."
+    },
+    {
+      "name": "Agent Pause from a device",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "agent-runtime.server.ts:900-901 leads to :172-193. The flag is persisted first (:184), agentic becomes PAUSED with revision+1 (:186), and the run closes as PAUSED (:188-190). The admission gates are manager.server.ts:844 and :2013-2020. Tests (actor 'test'/'workstation', not a device): agent-runtime.test.ts:234-263 A06, agentic-authorization.test.ts:78 A26, :115 (Pause before consent refused).",
+      "detail": "Pause is refused unless the Agentic consent is ACTIVE (agent-runtime.server.ts:179-181). A second Pause is refused with 'already paused' (:175); no test covers that. There is no revision CAS on pause/resume/stop."
+    },
+    {
+      "name": "Agent Resume (revalidation)",
+      "classification": "PARTIAL",
+      "evidence": "agent-runtime.server.ts:195-228: workspace revalidation (:197), canonical envelope missing/revoked/expired (:201-207), Agentic consent must be PAUSED (:209-212), and state(ACTIVE) requires the same host_generation and unexpired consent (agentic-store.server.ts:119). Tests: agent-runtime.test.ts:294-320 'A08 refusals', :266-291 A08, agentic-authorization.test.ts:78 A26, agent-runtime.test.ts:469 (resume when not paused is refused).",
+      "detail": "The normal case works. Two dead-ends exist (see gaps G2 and G3): pause/resume makes pending scope requests stale, and a paused Agentic Agent cannot resume after a Host restart. A second Resume is refused ('not paused')."
+    },
+    {
+      "name": "Agent Stop from a device; duplicate Stop",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "agent-runtime.server.ts:230-253: the durable stop flag is written before missions.stop (:237), which revokes Agentic consent (manager.server.ts:3208-3213). A second Stop is refused (:233). Tests (non-device actor): agent-runtime.test.ts:323-348 A09 (second stop rejects at :342), agentic-authorization.test.ts:77 A25 and :98 A46, agent-recovery.test.ts:447-467 A22.",
+      "detail": "There is no device-token HTTP test. agent.stop is not in safeActions (http.server.ts:384-396), so it is refused while the Host is degraded or draining, whereas mission.stop and task stop are allowed."
+    },
+    {
+      "name": "Restart invalidation of grants, admissions, requests and batches",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "agentic-store.server.ts:33-46 (old-generation ADMITTED becomes UNKNOWN; ACTIVE/PAUSED becomes WAITING_FOR_USER with revision+1). manager.server.ts:3542-3547 (batches end), :3584-3617 (pending requests denied by 'bunny-host-restart'), :3655-3675 (Agentic missions go to waiting_for_user). agent-runtime.server.ts:596-598 (pause flag survives). Tests: agentic-authorization.test.ts:80 A28, :81 A29; agentic-live.test.ts:76-103; agent-recovery.test.ts:316-347 A15, :122-160 A07/A08 (non-agentic); approval-batches.test.ts:501-518, :520-538.",
+      "detail": "The pause-across-restart test uses a non-agentic Mission. For Agentic Agents the combination dead-ends (gap G3)."
+    },
+    {
+      "name": "Device answers Host-offered per-step approvals (mission.respond allow_once / allow_batch / deny; mission.revoke_batch)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "commands.server.ts:21-22,56-67 (REMOTE set). manager.server.ts:3036-3177: allow_batch is clamped to the Host offer (:2980-2990), and a device answer emits approval.remote_device (:3089). Tests: approval-batches.test.ts:560-585 'T9 remote' (device allow_batch clamped, device revoke_batch); missions.test.ts:584 (device allow_once of an out-of-envelope write); missions.test.ts:412-424 (phone mission.approve ignores client scope).",
+      "detail": "Covered for non-agentic Missions only. Agentic requests answered by a device are untested. No risk tier is reserved for the workstation: DESTRUCTIVE, EXTERNAL_SIDE_EFFECT, hardApproval and sensitive requests are all answerable from a phone (for agentic filesystem actions, the one-time exception is at manager.server.ts:2172-2184)."
+    },
+    {
+      "name": "Per-device rights / workstation-only approval tiers",
+      "classification": "UNSUPPORTED",
+      "evidence": "The devices table has no rights column (persistence.server.ts:26). Remote policy is only REMOTE (commands.server.ts:22), the agent.authorization key filter (http.server.ts:400-405) and device refusals for propose/adjust (agent-runtime.server.ts:859,876). The only actual workstation-only actions are pairing.create (http.server.ts:559-560), device.revoke (:572-573), remote/thermal/provider/policy/legacy/verification (:465-557), non-REMOTE mission actions such as retry/replan/configure/capability/skill/trigger (commands.server.ts:25), project mutations and repository inspection (project-service.server.ts:58-72), propose/adjust (agent-runtime.server.ts:858-887), and executable graphs in agent.create/mission.create (http.server.ts:398-399; commands.server.ts:39).",
+      "detail": "Initial Agentic delegation, restart re-consent, scope-expansion answers, DESTRUCTIVE/EXTERNAL approvals and direct task approve (http.server.ts:430-435) are all available to every paired device. Credentials and publication: Host private state is unreachable through Agentic file and terminal scope (manager.server.ts:2068-2107), and publication connectors are implemented:false."
+    },
+    {
+      "name": "Device revocation",
+      "classification": "PARTIAL",
+      "evidence": "A revoked token gets 401 (http.server.ts:331,350), and SSE re-checks per delivery (:366-373). Test: agentic-live.test.ts:90-91 (agent.list returns 401 after revoke). device.revoke only sets revoked_at (http.server.ts:572-578); the comment at :366-367 says grants are not cancelled.",
+      "detail": "Delegations, batches and approvals a device granted remain ACTIVE after that device is revoked (gap G5)."
+    },
+    {
+      "name": "Snapshot redaction for Agents (presentation.ts)",
+      "classification": "PARTIAL",
+      "evidence": "dashboardSnapshot applies to every gateway caller, workstation and remote alike (host.ts:11,35). It rewrites agent-lifecycle event details (presentation.ts:440-441), task output and logs (:448-487), Mission terminal command args (:497-503) and request reasons (:551-554), but passes snapshot.agents through untouched via the spread at :423-424. Agent rows include authorization.objective, roots, commands {command,args,cwd}, pending[].reason/resource and latestAdmission (agentic-store.server.ts:154-166; agentic-types.ts:35-45). No test: presentation.test.ts has no 'agents' or 'authorization' match.",
+      "detail": "Agent rows carry no transcripts or provider output; the note is a fixed phrase (agent-types.ts:171-175, agent-runtime.test.ts:351-377 A18). However, command arguments, absolute paths and raw Host reason strings that the Missions projection deliberately redacts reach every browser through agents.authorization. The objective is unredacted in both agents and missions, while project.get redacts it (project-service.server.ts:204-210)."
+    },
+    {
+      "name": "Per-device filtering of snapshots and events",
+      "classification": "UNSUPPORTED",
+      "evidence": "/state returns snapshot(after) for any authenticated caller (http.server.ts:354). The gateway SSE forwards only {sequence} to all callers (bunny-events.ts:59; event-signal.ts:2-9). Test: premium-model.test.ts:187-204 (SSE signal redaction).",
+      "detail": "Every paired device sees the same Agents, Missions, Tasks, requests and device list. There is no ownership or rights filter."
+    },
+    {
+      "name": "Verified artifact read from a device (project.artifact)",
+      "classification": "PARTIAL",
+      "evidence": "Allowed for remote callers (project-service.server.ts:56-57, before the local gate at :72); data passes the gateway allowlist (presentation.ts:589). Checks in project-service.server.ts:264-306: project binding (:268-272), verified-only (:273-274), noLinks/regularPath which rejects symlinks/junctions/UNC/ADS/device names (project-paths.server.ts:6-32), privateHostPath (paths.server.ts:29-32), containment in the artifacts/<missionId> folder or the Project root (:279-284), isFile and nlink==1 with size at most 1 MiB (:286-288), SHA-256 recompute against the verified hash (:291-295), base64 for png/jpeg/webp (:303-304). Test: project-live.test.ts:226-231 (workstation token: open succeeds; another project returns 400).",
+      "detail": "Not tested: device token, hash mismatch, size bound, link/hardlink rejection, unverified refusal. Agents and Missions without a projectId have no remote artifact read path: mission.get data is dropped by the gateway (presentation.ts:589). The reply includes the absolute location.path and provenance."
+    },
+    {
+      "name": "Remote mission.approve / mission.start on an Agent-owned Mission",
+      "classification": "UNSAFE_OR_BLOCKED",
+      "evidence": "commands.server.ts:22,47-53 allow it remotely. manager.server.ts:704-780 approves without the AgentRuntime, so no run is opened. AgentRuntime.onEvent returns early when there is no open run (agent-runtime.server.ts:295-296).",
+      "detail": "No new authority results (the same revision/plan checks apply), but the Agent stays CREATED/PLANNING with no checkpoints while its Mission executes. The phone shows a false state (gap G7)."
+    }
+  ],
+  "gaps": [
+    {
+      "id": "G1",
+      "severity": "HIGH",
+      "title": "No device-rights tier: any paired phone can grant initial Agentic delegation, restart re-consent and DESTRUCTIVE/EXTERNAL approvals",
+      "detail": "A paired phone posts {action:'agent.authorization.approve', data:{id, revision}}. The request passes the key filter at http.server.ts:400-405, and agent-runtime.server.ts:870-871 calls start(), then manager.server.ts:746-750 sets the delegation ACTIVE with provenance channel 'paired-device' (agentic-store.server.ts:98) and the Mission runs. The same phone can re-grant after a restart through reauthorizeAgent (agent-runtime.server.ts:872; manager.server.ts:1920-1993), or use mission.approve with a revision (commands.server.ts:47). It can also answer allow_once for a DESTRUCTIVE filesystem.delete scope request (commands.server.ts:56-67; manager.server.ts:3036-3177, :2172-2184). Nothing checks the actor's channel against the risk or the kind of approval.",
+      "suggestedMinimalFix": "Add one Host-side remote policy function reusing ALWAYS_ASK (authorization.server.ts:13) and bus.find(action).manifest.{hardApproval,sensitive}. When actor starts with 'device:': refuse agent.start and agent.authorization.approve if forMission(missionId) exists (initial or reauth consent stays on the workstation), refuse mission.approve when a revision or Agentic record exists, and refuse mission.respond allow_once/allow_batch when the request risk is in ALWAYS_ASK or the manifest is hardApproval/sensitive. Deny stays allowed. Add HTTP tests with a real device token."
+    },
+    {
+      "id": "G2",
+      "severity": "HIGH",
+      "title": "Pause/Resume (or a workstation adjust) makes a pending Agentic approval permanently unanswerable",
+      "detail": "An Agent is WAITING_FOR_USER on a scope request stamped with agentic.revision=r (manager.server.ts:2916-2921). The phone sends agent.pause, which runs agentic.state(PAUSED) and moves the revision to r+1 (agent-runtime.server.ts:186; agentic-store.server.ts:120). agent.resume then moves it to r+2. Afterwards, mission.respond allow_once or deny throws 'Agentic scope request is stale' (manager.server.ts:3050-3055). The request stays open, nothing re-asks (tick at manager.server.ts:862-881 only launches ready steps), and mission.retry needs failed or blocked steps (manager.server.ts:3301-3303) and is workstation-only anyway. Only Stop remains. No test covers this.",
+      "suggestedMinimalFix": "Add MissionManager.refreshAgenticRequests(missionId). For each unresolved request whose agentic.revision differs from the current revision, resolve it as superseded without calling agentic.deny, then call askPermission(mission, step, request.action, request.risk, request.reason, step.pendingPhase) so a fresh request is created at the current revision. Call it from AgentRuntime.resume after syncAgentic (agent-runtime.server.ts:212) and from adjustAgentAuthorization (manager.server.ts:1913-1919)."
+    },
+    {
+      "id": "G3",
+      "severity": "HIGH",
+      "title": "A paused Agentic Agent can never be resumed after a Host restart",
+      "detail": "The walk keeps the paused flag (agent-runtime.server.ts:596-598). AgenticStore moves PAUSED to WAITING_FOR_USER (agentic-store.server.ts:41-44), and recover() sets the Mission to waiting_for_user (manager.server.ts:3655-3675). agent.resume then refuses because consent is not PAUSED (agent-runtime.server.ts:210-211). agent.authorization.approve then calls reauthorizeAgent, which makes consent ACTIVE (manager.server.ts:1951; agentic-store.server.ts:98), but resume still refuses (ACTIVE is not PAUSED) and agent.pause refuses with 'already paused' (agent-runtime.server.ts:175). The paused flag cannot be cleared, so Stop is the only exit. agent-recovery.test.ts:122-160 covers only a non-agentic Mission.",
+      "suggestedMinimalFix": "In AgentRuntime.resume, also accept delegation.current_state === 'ACTIVE' when host_generation === missions.tasks.instanceId and missions.currentAgenticCanonical(missionId).agentic.revision === delegation.revision (fresh reviewed consent in this generation), skipping the state(ACTIVE) call. Add a restart test: agentic, pause, restart, reauthorize, resume."
+    },
+    {
+      "id": "G4",
+      "severity": "MEDIUM",
+      "title": "Agent authorization projection bypasses dashboard redaction for every browser, including the phone",
+      "detail": "GET /state goes through readBunnyHost to dashboardSnapshot (host.ts:11), which copies snapshot.agents unchanged (presentation.ts:423-424). Each row's authorization carries commands {command,args,cwd}, absolute roots, pending[].reason (raw decide()/agenticScopeViolation strings with paths) and pending[].resource ('<path or argv> in <workspace>'), plus latestAdmission (agentic-store.server.ts:158-164). The same snapshot's missions[] deliberately replaces command args (presentation.ts:497-503) and request reasons (:551-554). No presentation test covers agents.",
+      "suggestedMinimalFix": "Add an agents mapping in dashboardSnapshot that reuses the existing fixed phrases: commands become 'Scoped command (arguments retained on Host)', pending[].reason uses the same template as missions.requests, resource is dropped (or reduced to its basename), roots are reduced to their count or Project name, and latestAdmission is reduced to {capability,outcome,admitted_at}. Add a presentation.test.ts case using a secret marker."
+    },
+    {
+      "id": "G5",
+      "severity": "MEDIUM",
+      "title": "Revoking a lost phone does not revoke the authority it granted",
+      "detail": "A phone approves an Agentic delegation (authorization_provenance.actor='device:X', agentic-store.server.ts:98) or creates a batch (createdBy, manager.server.ts:3006). The workstation then runs device.revoke, which only sets devices.revoked_at (http.server.ts:572-578; the comment at :366-367 says grants are not cancelled). The delegation stays ACTIVE and the batch stays active, so the Agent keeps executing under the lost device's consent.",
+      "suggestedMinimalFix": "In the device.revoke handler, for every agentic_authorizations row with provenance.actor === `device:${id}` and current_state ACTIVE or PAUSED, call missions.syncAgentic(agentic.state(eid,'REVOKED')) followed by agents.stop(agentId,'workstation'). For active batches with createdBy === `device:${id}`, call store.endBatch(batchId,'revoked','workstation'). Emit device.revoked with the counts."
+    },
+    {
+      "id": "G6",
+      "severity": "MEDIUM",
+      "title": "agent.stop and agent.pause are refused while the Host is degraded or draining",
+      "detail": "safeActions (http.server.ts:384-396) includes 'stop' and 'mission.stop' but not 'agent.stop' or 'agent.pause'. When containment does not allow 'http' (failure.server.ts:226-237), for example after degrade('*'), a phone's agent.stop gets HostUnavailableError (503) while the same Agent's mission.stop would succeed. The T8 UI calls agent.stop (use-island.ts:448-449).",
+      "suggestedMinimalFix": "Add 'agent.stop' and 'agent.pause' to safeActions. Both only persist flags and cancel work (agent-runtime.server.ts:172-193, :230-253)."
+    },
+    {
+      "id": "G7",
+      "severity": "MEDIUM",
+      "title": "Agent-owned Missions can be approved or started through mission.approve or mission.start, bypassing the AgentRuntime",
+      "detail": "A device sends {action:'mission.approve', data:{id:<agent missionId>, revision}} (or no revision for a non-T5 Agent), which is REMOTE-allowed (commands.server.ts:22,47). manager.server.ts:704-780 approves and starts the Mission, but no agent run is opened (agent-runtime.server.ts:163-166 is skipped). onEvent then returns at agent-runtime.server.ts:295-296, so the Agent shows CREATED/PLANNING with no checkpoints while its Mission executes. This is false truth on the phone.",
+      "suggestedMinimalFix": "In missionCommand mission.approve and mission.start (commands.server.ts:47-53), refuse when `SELECT id FROM agents WHERE mission_id=?` returns a row, directing the caller to agent.start or agent.authorization.approve."
+    },
+    {
+      "id": "G8",
+      "severity": "MEDIUM",
+      "title": "agent.start leaves the Agent RUNNING with an open run when Mission approval fails",
+      "detail": "start() opens a run and transitions to RUNNING (agent-runtime.server.ts:164-166) before missions.approve (:167). approve can throw on the active-mission limit (manager.server.ts:717-721), a changed plan (:712-713), non-pending consent (:714-715) or changed provider scope (:727-735). The Agent row stays RUNNING while the Mission is still waiting_for_approval. RUNNING to PLANNING is illegal (agent-types.ts:15), so derivation cannot correct it, and each retry opens another generation without closing the previous run.",
+      "suggestedMinimalFix": "Wrap missions.approve in try/catch inside start(): on failure, call store.closeRun(run.id,'INTERRUPTED','Approval refused; nothing admitted.',now), restore the prior row state with saveProfile(agent, prior, flags), and rethrow."
+    },
+    {
+      "id": "G9",
+      "severity": "MEDIUM",
+      "title": "No remote artifact read for Agents without a Project; absolute host paths leak in project.artifact replies",
+      "detail": "agent.create accepts projectId:null (agent-runtime.server.ts:120). project.artifact requires a projectId bound to the artifact's Mission (project-service.server.ts:56-57,268-272), and mission.get data is stripped at the gateway (presentation.ts:589). A phone therefore cannot open verified artifacts of non-Project Agents. When it can open one, the reply's artifact.location.path holds the absolute host path (project-service.server.ts:299-300). Device-token, hash-mismatch, size and link paths are untested; the only test is project-live.test.ts:226-231 with the workstation token.",
+      "suggestedMinimalFix": "Add an 'agent.artifact' {id, artifactId} action that resolves agent to missionId Host-side and reuses ProjectService.artifact's checks, with containment limited to artifacts/<missionId> when there is no Project. Add it to the dashboardCommand data allowlist and strip location.path and provenance from the returned artifact. Add device-token tests for refusal of hash mismatch, links, >1 MiB and unverified artifacts."
+    },
+    {
+      "id": "G10",
+      "severity": "LOW",
+      "title": "Resume has no revision CAS or pause provenance; any device can lift a workstation-imposed pause",
+      "detail": "agentCommand passes only id to pause/resume/stop (agent-runtime.server.ts:900-905), and the profile records no pausedBy (agent-types.ts:66-78). A phone holding a stale view can send agent.resume and restore ACTIVE consent (agent-runtime.server.ts:212) after the owner paused at the workstation.",
+      "suggestedMinimalFix": "Record pausedBy in AgentProfile at pause time. For device actors, require data.revision to equal the current Agentic revision on resume (reuse agentic.assertRevision), and optionally refuse a device resume of a workstation pause."
+    },
+    {
+      "id": "G11",
+      "severity": "LOW",
+      "title": "Duplicate Pause/Stop are errors, not idempotent; duplicate Pause is untested",
+      "detail": "A phone retries agent.pause after a network timeout and gets 400 'The agent is already paused.' (agent-runtime.server.ts:175), which the UI shows as a failure. A second Stop gives 400 'already stopped' (:233, tested at agent-runtime.test.ts:342). Duplicate Pause has no test.",
+      "suggestedMinimalFix": "Have agentCommand return {agents: snapshot()} with no state change when the requested flag is already set (paused for pause, stoppedAt for stop). Keep the refusal for finished Agents."
+    },
+    {
+      "id": "G12",
+      "severity": "LOW",
+      "title": "Stop on a FAILED Agent rewrites its terminal state to STOPPED",
+      "detail": "For an Agent row in FAILED, completedAt and stoppedAt are both null, so stop() passes its guards (agent-runtime.server.ts:232-233) and saveProfile(...,'STOPPED') (:237) writes a new terminal state, bypassing AGENT_NEXT.FAILED=[] (agent-types.ts:21).",
+      "suggestedMinimalFix": "In stop(), refuse (or no-op) when rowState(agent.id) is COMPLETED, FAILED or STOPPED."
+    },
+    {
+      "id": "G13",
+      "severity": "LOW",
+      "title": "Revoke/deny fails on ended consent and so skips Stop",
+      "detail": "agent.authorization.revoke on an EXPIRED or EXHAUSTED envelope throws 'Ended authorization cannot be restored' (agentic-store.server.ts:118) before agents.stop (agent-runtime.server.ts:897), so the phone's Revoke button fails. Revoke on an already REVOKED envelope at the current revision rewrites revoked_at and bumps the revision (agentic-store.server.ts:120).",
+      "suggestedMinimalFix": "In agentCommand deny/revoke, if current_state is already REVOKED, EXPIRED, EXHAUSTED or COMPLETED, skip agentic.state and only run stop when the Agent is not finished."
+    },
+    {
+      "id": "G14",
+      "severity": "LOW",
+      "title": "One corrupt agents row breaks /state for every device",
+      "detail": "AgentStore.snapshot JSON.parses every row without a guard (agent-store.server.ts:121). A throw inside snapshot() at http.server.ts:292-297 makes GET /state return 400 'Host command failed' for all callers.",
+      "suggestedMinimalFix": "Wrap the per-row parse in try/catch and emit a placeholder row (state 'INTERRUPTED', failure 'RECOVERY_AMBIGUOUS', note set to a fixed phrase), matching the fail-closed handling at agent-runtime.server.ts:95-97."
+    },
+    {
+      "id": "G15",
+      "severity": "INFO",
+      "title": "No device-token HTTP coverage for Agent control",
+      "detail": "The remote-labelled agent tests call agentCommand with 'device:*' strings (agentic-authorization.test.ts:79,85,86). The only HTTP device tests are adjust returning 400 and a revoked token returning 401 (agentic-live.test.ts:89-91). There are no device-token tests for agent.pause, agent.resume, agent.stop, agent.authorization.approve/deny/revoke, mission.respond on Agentic requests, or project.artifact.",
+      "suggestedMinimalFix": "Extend agentic-live.test.ts test 2: pair a device before revoking it, then drive pause, resume, stop, deny and respond with device.token, asserting provenance, status codes and that no Host state changes on refusals."
+    }
+  ],
+  "keyFacts": [
+    "AGENT_ACTIONS (agent-runtime.server.ts:826-842): agent.create/start/pause/resume/stop/list/get plus agent.authorization.propose/approve/adjust/deny/revoke. agent.authorization.* is the only action family where a remote caller is limited to the data keys id and revision (http.server.ts:400-405); agent.create from a device refuses steps (:398-399).",
+    "With id+revision only: propose is refused for devices (agent-runtime.server.ts:859). approve starts the Mission (initial delegation, :870-871) or reauthorizes after a restart (:872). adjust is impossible remotely because it needs `patch`, and is also refused by actor (:876). deny and revoke both set REVOKED with revision CAS and then Stop the Agent (:888-899). A device cannot reduce scope.",
+    "Actor identity is `device:<id>` vs `workstation` (http.server.ts:410). Agentic approval provenance stores channel 'paired-device' or 'workstation' (agentic-store.server.ts:98). The devices table has no rights column (persistence.server.ts:26), so every paired device has identical authority.",
+    "REMOTE mission actions are mission.create, approve, start, stop, respond, get, revoke_batch and inbox.ack (commands.server.ts:22). Direct task approve, stop, retarget, input and submit in http.server.ts:427-458 have no local check.",
+    "Agentic CAS: exact revision match (agentic-store.server.ts:89-93). approve does not bump the revision (:98); adjust and state() bump it (:112, :120). Pending requests bind {revision, generation} (manager.server.ts:2916-2921), and respond() rejects stale ones (:3048-3055).",
+    "Pause and Resume each bump the Agentic revision (agent-runtime.server.ts:186, :212 via agentic-store.server.ts:120), which strands any open scope request (gap G2).",
+    "Restart: old-generation ACTIVE/PAUSED consent becomes WAITING_FOR_USER with revision+1 and old ADMITTED admissions become UNKNOWN (agentic-store.server.ts:33-46). Pending requests are denied by 'bunny-host-restart' (manager.server.ts:3584-3617), batches end (:3542-3547), Agentic Missions go to waiting_for_user (:3655-3675), and the Agent pause flag survives (agent-runtime.server.ts:596-598).",
+    "Mission Stop always revokes non-ended Agentic consent (manager.server.ts:3208-3213). AgentRuntime.stop persists the stop flag before calling missions.stop (agent-runtime.server.ts:237-242).",
+    "AgentSnapshot row fields (agent-types.ts:112-126; agent-store.server.ts:123-131; agent-runtime.server.ts:88-97): id, name, state, missionId, createdAt, updatedAt, failure category, run {id,generation,state,startedAt,endedAt}, checkpoint count, lastCheckpoint {boundary,at,replaySafety}, pausedAt, stoppedAt, note (fixed phrase), authorization (the AgenticProjection at agentic-store.server.ts:158-165), authorizationError, and activity for cross-app Missions.",
+    "dashboardSnapshot is applied by the gateway to every caller, workstation and phone alike (host.ts:11,35); redaction is not device-specific. It does not touch snapshot.agents (presentation.ts:423-424). The SSE bridge forwards only {sequence} (event-signal.ts:2-9; bunny-events.ts:59).",
+    "dashboardCommand forwards `data` only for project.* actions (presentation.ts:589). mission.get data and the agentCommand `agent`/`agents` reply keys never reach the browser.",
+    "project.artifact is remote-allowed (project-service.server.ts:56-57). It enforces Project binding, verified-only, no links/UNC/ADS, privateHostPath, artifacts/<missionId> or Project-root containment, nlink==1, size at most 1 MiB and SHA-256 recompute (:264-306). ArtifactStore keeps bodies of 64 KiB or less inline and hashes files up to 200 MiB (artifacts.server.ts:7-8, :40).",
+    "safeActions that are still accepted while the Host is degraded: stop, mission.stop, session.get, mission.get, capability.list, skill.list, inbox.list, trigger.list, agent.list, agent.get (http.server.ts:384-396). agent.stop and agent.pause are not among them.",
+    "Pause and Resume are not supported for direct Tasks (http.server.ts:579-583); only the Agent runtime has them. Admission is gated by missionPauseGate (manager.server.ts:844) and by agent paused/stopped flags in agenticIdentityViolation (:2009-2020).",
+    "Files read: agent-runtime.server.ts, agent-types.ts, agent-store.server.ts, authorization.server.ts, agentic-store.server.ts, agentic-types.ts, artifacts.server.ts, presentation.ts, http.server.ts, host-bridge.server.ts, host.ts, bunny-events.ts, event-signal.ts, commands.server.ts, project-service.server.ts, project-paths.server.ts, and manager.server.ts sections; tests agentic-authorization, agentic-live, approval-batches (remote/restart), agent-runtime, agent-recovery, project-live (artifact), missions (phone approval), premium-model (SSE). No files were modified."
+  ]
+}

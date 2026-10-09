@@ -1,0 +1,56 @@
+Bunny-A Host ready on loopback (2ca34eec-f2bf-4490-bbfc-377ad590ae90).
+✔ T9 F01/F02/F05/F11: device identity is per credential, projected, and never the owner (766.8263ms)
+Bunny-A Host ready on loopback (95cb5513-dc01-422b-84df-bba5e18f9ae4).
+✔ T9 F04: absolute lifetime and idle bound are enforced by the Host; presence never extends the lifetime (484.3899ms)
+Bunny-A Host ready on loopback (b2dc7376-a372-41ec-a0a0-d80db7bee52b).
+✔ T9 F06/F35/F40: Host identity and epoch expectations refuse stale views; operation ids never execute twice (779.3029ms)
+Bunny-A Host ready on loopback (c7067603-87ae-429b-b0fb-8fe027059288).
+✖ T9 F26-F29 (DEV-01): a paired device never launches a tool-capable or hosted provider, a shell or an app (502.6958ms)
+Bunny-A Host ready on loopback (6918821d-3afc-4126-be21-a7710b5fac60).
+✔ T9 F43-limits: paired-device load is bounded per device; the workstation is unchanged (1454.6104ms)
+Bunny-A Host ready on loopback (04e6e53b-8943-4ea3-a091-e48241a516f7).
+✔ T9 G6: holding and stopping an Agent still work while the Host is degraded (483.7669ms)
+Bunny-A Host ready on loopback (a1ff3bee-8ecf-4019-a98b-83f098b62c81).
+✔ T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/Resume reissue asks at the current revision (1147.1727ms)
+Bunny-A Host ready on loopback (47816471-031b-4b5b-834c-4293e2eb304e).
+✖ T9 F19/F20/F23: always-ask risks stay on the Windows Host; remote Deny persists; remote Stop blocks admissions (904.6345ms)
+Bunny-A Host ready on loopback (7498cb0c-836d-40a2-878d-1f8cf0b53e2d).
+✔ T9 device projection: bounded, path-free and transcript-free (502.7187ms)
+✔ T9 ledger and limiter units: bounded, per-principal, expiring (0.3301ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 8
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7293.8591
+
+✖ failing tests:
+
+test at src\lib\bunny-host\remote-device.test.ts:234:1
+✖ T9 F26-F29 (DEV-01): a paired device never launches a tool-capable or hosted provider, a shell or an app (502.6958ms)
+  AssertionError [ERR_ASSERTION]: Host command failed. Inspect operation state before retrying.
+  
+  400 !== 200
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-device.test.ts:247:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 400,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\lib\bunny-host\remote-device.test.ts:406:1
+✖ T9 F19/F20/F23: always-ask risks stay on the Windows Host; remote Deny persists; remote Stop blocks admissions (904.6345ms)
+  TypeError: Cannot read properties of undefined (reading 'agents')
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-device.test.ts:433:95)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7)
+EXIT=1

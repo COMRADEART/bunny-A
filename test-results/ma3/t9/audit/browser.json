@@ -1,0 +1,274 @@
+{
+  "subsystem": "Browser client as used on a phone (premium T8 shell: src/routes/index.tsx -> island.tsx -> workspace.tsx -> premium.tsx; store src/store/use-island.ts; live updates host-stream.ts; gateway calls src/lib/orch/host.ts)",
+  "capabilities": [
+    {
+      "name": "Phone vs desktop presentation decision",
+      "classification": "PARTIAL",
+      "evidence": "src/routes/index.tsx:4 (single '/' route); island.tsx:1 -> workspace.tsx:1 -> premium.tsx:54; premium.css:1015-1190 (@media max-width:767px), premium.css:1003-1014 (max-width:1100px); ?companion=1 read at premium.tsx:58,64,186,255 and use-island.ts:509 and phone.tsx:222-224; snapshot built at http.server.ts:292-311 has no viewer field; T8 evidence test-results/ma3/t8/responsive-matrix.json (390x844 emulated, noHorizontalOverflow)",
+      "detail": "There is no phone route and no remote/device flag. Layout is chosen by viewport width alone (CSS). ?companion=1 only changes the topbar label (premium.tsx:186), which is hidden at phone width (premium.css:1050-1052), sets the initial sheet to 'phone' (use-island.ts:509), which renders DevicesWorkspace (premium.tsx:241-242) and not the Phone component, and switches Pairing into its code-entry form (phone.tsx:242,301-358). The client cannot tell a paired device from the workstation because the /state and /command snapshots carry no viewer identity. The old desktop.tsx shell with a phone dock (desktop.tsx:52,174) is no longer routed. Phone.tsx's Phone component renders only as a fallback (premium.tsx:255-256), for sheet 'constellation' or a non-waiting 'decision' with ?companion=1. The 390x844 check was emulated in a browser; a physical phone was NOT TESTED (MA3_T8_PREMIUM_UI_ACCEPTANCE.md:25)."
+    },
+    {
+      "name": "Destinations available on a phone",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "premium.tsx:45-53 (NAV: Home, Agentic, Projects, Activity, Models, Devices, Settings), premium.tsx:157-166 (Bunny chat), premium.tsx:129-137 hamburger; premium.css:1030-1041 (nav hidden until menu opened, 2-column grid); deep links use-island.ts:510-537 (?view=, ?task=, ?mission=, ?agent=, ?theme=)",
+      "detail": "Phones get the same 7 destinations plus Bunny chat behind a hamburger. They can also reach Task detail (openTask task.tsx:41-43), Approval (sheet 'decision', premium.tsx:249-252), Telemetry ('system') and Notifications ('extensions', settings.tsx:220-222). Deep-link query params can focus an Agent or Mission."
+    },
+    {
+      "name": "Agent list/detail presentation on phone (fields, no fake progress)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "agentic.tsx:173-189 (counts, '—' until hydratedFromHost), agentic.tsx:304-347 (row fields), agentic.tsx:415-768 (detail); helpers workspace-model.ts:8-41 tested in premium-model.test.ts: 'T8: current Task requires a canonical active step link' (109), 'T8: retained completed Task is not current work' (116), 'T8: missing model remains explicitly unknown' (121), 'T8: authorization attention is distinct from CREATED execution state' (95), 'T8: failed verification is attention, never successful completion' (105); ui-model.test.ts:28 'progress needs finite integer steps, never elapsed time or a provider percentage'; premium.css:919-923 disables activity-dots/live-dot/status-dot animation",
+      "detail": "Each row shows name, Mission objective, either 'provider · model' of the current Task or a Last/Planned/Retained step label, then the verification or checkpoint label, a state label, 'Attention required' and the updatedAt HH:MM. Avatar and arrow are hidden on phones (premium.css:1121-1124). The detail view has Activity/Conversation/Results tabs, Mission plan steps and Execution facts (current Task, application, provider/model, last checkpoint with replay safety). It shows no percentages; a <progress> bar appears only for a determinate integer plan (ui.tsx:440-446). AgentsSection (agent.tsx:184-317, 'N of M steps') is not mounted in the routed shell. Physical phone untested."
+    },
+    {
+      "name": "Agent Pause/Resume/Stop control gating (client)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "workspace-model.ts:12-21; agentic.tsx:49,65-89; premium-model.test.ts 'T8: a terminal Agent never advertises mutable controls' (69), 'T8: offline controls remain disabled even for a running Agent' (77), 'T8: paused controls match T4 admission semantics' (83), 'T8: interrupted Agents do not invent a Resume or Pause command' (89)",
+      "detail": "Pause is enabled only when the Host is online, there is no authorization or it is ACTIVE, and agentCanTransition(state,'PAUSED') holds. Resume requires online and PAUSED. Stop requires online and agentCanTransition(state,'STOPPED'). Stop has a Radix confirm dialog (agentic.tsx:83-115). A local busy flag prevents double-taps (agentic.tsx:47,51)."
+    },
+    {
+      "name": "Agent Pause/Resume/Stop invocation from a paired phone",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "agentic.tsx:50-62 -> use-island.ts:442-450 (pauseAgent/resumeAgent/stopAgent) -> command() use-island.ts:372-382 -> commandBunnyHost host.ts:15-37 -> hostRequest host-bridge.server.ts:51-65 (device cookie token, :41,:57) -> Host /command AGENT_ACTIONS http.server.ts:397-411 with actor device:<id> -> agent-runtime.server.ts:900+ (agent.pause/resume/stop, no device restriction); workstation-only live evidence test-results/ma3/t8/agent-controls-acceptance.json",
+      "detail": "The mapping is 'agent.pause' / 'agent.resume' / 'agent.stop' with {id}. Nothing is optimistic: the UI changes only when apply(result.snapshot) runs (use-island.ts:376). Live evidence covers the workstation only; no evidence exists for the paired-device path."
+    },
+    {
+      "name": "Agent authorization approve/deny/revoke from phone",
+      "classification": "PARTIAL",
+      "evidence": "agent.tsx:16-28 (act -> store.agentAuthorization(id, action, a.revision, patch)), agent.tsx:151-174; use-island.ts:451-457 -> 'agent.authorization.<action>' {id, revision[, patch]}; Host remote key check http.server.ts:400-405; propose refused agent-runtime.server.ts:860; adjust refused agent-runtime.server.ts:878; UI offers propose at agentic.tsx:631-639 and adjust at agent.tsx:93-149,161-169",
+      "detail": "Authorize, Deny and Revoke send only {id, revision}, which passes the Host's remote key check. Revision is the stale-offer guard. 'Review bounded Mission access' (propose) and 'Reduce scope' (adjust) are enabled on a phone but the Host always refuses them for device actors. No client test covers the store-to-action mapping."
+    },
+    {
+      "name": "Answering per-request Host-offered approvals (mission.respond allow_once/allow_batch/deny) in the routed shell",
+      "classification": "UNSUPPORTED",
+      "evidence": "agent.tsx:87-92 renders authorization.pending as captions only; pending == unresolved mission.requests (agentic-store.server.ts:164); answer buttons exist only in mission.tsx:133-176 (Requests) via MissionPanel (mission.tsx:230-248) via MissionsSection (mission.tsx:309-344), mounted only by phone.tsx:67 (Phone fallback premium.tsx:255-256), dead desktop.tsx:380 and floating.tsx:349; store.respondMission use-island.ts:464-466 has no premium caller; Host allows mission.respond remotely commands.server.ts:22",
+      "detail": "In the routed premium shell, a pending capability request on an Agent's Mission cannot be answered on a phone (or on desktop web). The only actions offered are whole-authorization Revoke or Deny, which stop the Agent."
+    },
+    {
+      "name": "Task route approval (Approve & Run / Cancel / Change) on phone",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "task.tsx:350-515 (Approval), run/stop use-island.ts:697-713 -> 'approve'/'stop'; retarget use-island.ts:728-730; Host http.server.ts:430-438 (approve with actor device:<id>)",
+      "detail": "Approve & Run is gated on online, provider ready/busy and no local-only conflict (task.tsx:358-359). Cancel and Change are NOT disabled while offline (task.tsx:480-495)."
+    },
+    {
+      "name": "Live updates via SSE /api/bunny-events (client loop)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "host-stream.ts:28-54 (EventSource /api/bunny-events?after=cursor :38, onopen 'live' :39-42, onmessage=invalidate :43, onerror close+refresh+3s reconnect :44-50, offline retry every 3000ms :31-35, 30s invalidate :54); debounce/serialize host-stream.ts:13-27; single-flight use-island.ts:540-565; bridge route bunny-events.ts:11-74; bridge tests premium-model.test.ts 'T8: SSE signal redacts prompt, tokens, cookies and raw details' (187), 'T8: invalid SSE cursors never become replay identifiers' (200), 'T8: chunked SSE signal...' (205), 'T8: client cancellation cancels upstream...' (223), 'T8: overlong event refuses...' (237); live desktop evidence test-results/ma3/t8/activity-stream-acceptance.json, stream-live-probe.json",
+      "detail": "SSE carries only sequence signals and acts as an invalidation trigger; every update is a full readBunnyHost(after=cursor). Reconnect is a fixed 3 s with no backoff, jitter or cap. There is no visibilitychange or online handler. Native Last-Event-ID auto-reconnect is pre-empted by close() in onerror, so the server falls back to ?after=cursor (bunny-events.ts:16-18). The bridge is unit-tested; the client loop (host-stream.ts) has no test."
+    },
+    {
+      "name": "Live updates through Cloudflare quick tunnel (phone transport)",
+      "classification": "PARTIAL",
+      "evidence": "T6_FAILURE_LEDGER.md:23 ('Quick tunnels do not support SSE; phone/dashboard uses authenticated snapshot polling'); test-results/ma2-gate6r/sse-reconnect.json ('transport: Authenticated HTTPS polling'); pre-T8 1.5s polling git 8b71167:src/components/island/desktop.tsx:63-74; current fallback only host-stream.ts:54 (30s) or 3s error loop host-stream.ts:44-50",
+      "detail": "T8 replaced the documented 1.5 s polling with SSE plus a 30 s reconcile. Over a quick tunnel, a hung EventSource gives updates only every 30 s; an erroring one loops a read and a new EventSource every 3 s. The status label comes only from onopen and onerror (premium.tsx:188-194), so it can read 'Live Host updates' while the stream is not delivering, or 'Reconnecting activity' forever. This has not been live-verified through the tunnel for T8."
+    },
+    {
+      "name": "Snapshot reconciliation: cursor, duplicate suppression, out-of-order, gap, new Host epoch",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "activity-model.ts:12-69; use-island.ts:278-292,544-552; tests activity-model.test.ts 'T5: duplicate replay keeps stable activity IDs and does not notify twice' (40), 'T5: late snapshot cannot overwrite a newer canonical view' (47), 'T5: retention gap discards UI history and marks canonical resync' (68), 'T5: a new Host instance accepts reset cursor without reconstructing old work' (89), 'T5: a fast restart requests full canonical history even without connection loss' (100), 'T5: a 500-event backlog resumes the delivered cursor...' (124); premium-model.test.ts 'T8: replay and out-of-order snapshots cannot duplicate event identities' (251), 'T8: new Host epoch reconciles independently of an old larger cursor' (273); live test-results/ma3/t8/restart-reconnect.json",
+      "detail": "Events are deduplicated by sequence through a Map. Stale snapshots are rejected when cursor or presentation.revision is older; revision increments on every Host snapshot (http.server.ts:308). A new instanceId triggers a canonical after=0 re-read, drops retained events and activities, and shows 'Host restarted... old sessions were not resumed.' (use-island.ts:308-309). The first snapshot after an epoch change sends no notifications (fresh=[])."
+    },
+    {
+      "name": "Offline/stale presentation and disabling of controls",
+      "classification": "PARTIAL",
+      "evidence": "offline banner premium.tsx:205-222; health label premium.tsx:101-109,189-190; agentControls online param workspace-model.ts:12-19 (tested premium-model.test.ts:77); AuthorizationCard allowed agent.tsx:16; artifact open agentic.tsx:586-591; NOT disabled: task.tsx:711 (Stop task), task.tsx:480-495 (Cancel/Change), task.tsx:718-733 (feedback), phone.tsx:109, phone.tsx:284-289 (Revoke access); no client read timeout host.ts:7-14 + single-flight use-island.ts:541",
+      "detail": "Agent and authorization controls are disabled when host!=='online', and the retained state is labelled 'may be out of date'. Task and device controls still fire commands while offline and fail with a toast. 'online' only flips when a read fails. No 'last updated' time is shown, and a hung read keeps the UI 'online' indefinitely."
+    },
+    {
+      "name": "Browser storage contents",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "use-island.ts:22 KEY 'bunny-a.preferences.v1', save() use-island.ts:215-225 writes {theme, appearance{size,position,idle,motion,glass,collapse,theme,primary}, drafts[{id,prompt,mode,projectId,createdAt}], extensions{cline,cursor}, autoSubmit, cpuWarn, gpuWarn}; legacy 'jev.island.v1' read-only use-island.ts:23,481-485,501-502; device credential is HttpOnly cookie bunny_device bunny-pair.ts:16; sessionStorage 'grok-auth.bearer-token' only in template auth (src/lib/auth/client.ts:48-65) with VITE_AUTH_ENABLED=false (.grok/app-env.json)",
+      "detail": "No credentials are stored in localStorage or sessionStorage. Drafts keep plaintext prompt text indefinitely, with no cap, and are not cleared on revocation. No test covers the persistence format."
+    },
+    {
+      "name": "Queued / replayed mutations after reconnect",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "queueDraft use-island.ts:657-678 (text only); reviewDraft use-island.ts:679-688 opens compose; sendDrafts use-island.ts:693-696 only opens first draft; autoSubmit persisted but unused (no component reference besides dead desktop.tsx:446 sendDrafts); command() use-island.ts:372-382 has no retry/queue",
+      "detail": "Commands are never queued or replayed; offline drafts must be routed by hand. However, saved drafts are listed only in Phone (phone.tsx:140-155). The premium shell shows only a count (settings.tsx:136-140), and queueDraft navigates to DevicesWorkspace, which does not list them."
+    },
+    {
+      "name": "Lost command response / uncertain acknowledgment",
+      "classification": "UNSUPPORTED",
+      "evidence": "use-island.ts:378-381 (any exception -> note(message), return null); host-bridge.server.ts:63 drops Host requestId (http.server.ts:604); no refresh triggered on failure; agentic.tsx:59-61 re-enables controls; agentic.tsx:105-108 closes Stop dialog regardless",
+      "detail": "Transport loss after the Host has executed a command is reported as a failure, with a raw message, rather than 'outcome unknown'. There is no immediate reconciliation and no idempotency key. Host-side revision and state checks are the only protection against a repeated tap."
+    },
+    {
+      "name": "Talk/Redirect presentation",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "agentic.tsx:470-486 (disabled buttons, title-only reasons), agentic.tsx:540-562 (Conversation tab boundary + link to Bunny chat); evidence test-results/ma3/t8/agent-controls-acceptance.json talkRedirect STATIC VERIFIED",
+      "detail": "Talk/Redirect themselves are UNSUPPORTED by the Host. The UI handles this honestly but explains it through title tooltips, which touch devices do not show."
+    },
+    {
+      "name": "Device revocation (401) surfacing",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "host-bridge.server.ts:62 (401 && remote -> 'Pair this device ... access was revoked.'); use-island.ts:553-559 (pairingRequired via message.includes('Pair this device')); premium.tsx:103-104,205-222; bunny-events.ts:34,52-58 (401); Host per-delivery SSE check http.server.ts:368-373; command path use-island.ts:378-381 (toast only)",
+      "detail": "A failed read flips the UI to 'Pairing required' with the controls disabled. The mechanism is a string match with no test. A command-time 401 shows only a 6.5 s toast (premium.tsx:70-74). The banner offers only 'Reconnect', and the code-entry form needs ?companion=1 (phone.tsx:242). The retained in-memory Agents, Tasks and Projects stay visible after revocation."
+    },
+    {
+      "name": "Pairing from phone",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "phone.tsx:301-358 (POST /api/bunny-pair, requires https :225,:348 and ?companion=1 :222-224,242); bunny-pair.ts:7-17 (HttpOnly Secure SameSite=Strict cookie, Max-Age 1y)",
+      "detail": "Without ?companion=1, a phone sees the workstation branch (Create pairing code / Revoke access), and the Host refuses those actions for devices."
+    },
+    {
+      "name": "Touch target sizes",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "premium.css:255-262 (.btn min-height 44), 282-288 (icon/quiet 44), 294-305 (inputs 44), 619-625 (tabs 48), 147-157 (nav 44); live measurement test-results/ma3/t8/accessibility-observation.json (Pause/Resume/Stop/Talk/Redirect height 44, tabs 53.5; measured at width 1280)",
+      "detail": "Exceptions: authorization checkboxes are min-height:auto (premium.css:729-731), and <details><summary> disclosures (agentic.tsx:707-708, agent.tsx:73-74) have no minimum. Measurements were taken at desktop width, not on a physical phone."
+    },
+    {
+      "name": "Safe-area insets",
+      "classification": "UNSUPPORTED",
+      "evidence": "__root.tsx:12 viewport 'width=device-width, initial-scale=1' (no viewport-fit=cover); no env(safe-area-*) in premium.css; only bunny.css:2078-2080 (.phone-dock, dead shell); toast fixed bottom:24px bunny.css:1869-1872",
+      "detail": "Without viewport-fit=cover, iOS letterboxes the page, so content is not obscured. The shell is not edge-to-edge-aware."
+    },
+    {
+      "name": "Reduced motion",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "premium.css:1191-1197 (prefers-reduced-motion), premium.css:1199-1203 (data-motion off/reduced), premium.tsx:115; task.tsx:574-579 scrollIntoView honors both; bunny.css:2380-2390; test-results/ma3/t8/accessibility-results.json 'OSReducedMotionToggle': 'NOT TESTED'",
+      "detail": "The app-level data-motion setting does not reach Radix-portaled .t8-dialog nodes, but no dialog animations are defined. The OS-level toggle is untested."
+    },
+    {
+      "name": "Landscape handling",
+      "classification": "UNSUPPORTED",
+      "evidence": "no orientation/max-height media queries in premium.css; sticky sidebar height:100dvh without overflow (premium.css:110-120) applies when width>=768 (mobile rules only premium.css:1015)",
+      "detail": "A phone in landscape (e.g. 844x390) gets the desktop sidebar layout, about 660px of sidebar content in a 390px-tall sticky box. This is static analysis only, not verified."
+    },
+    {
+      "name": "Bounded client-memory arrays",
+      "classification": "PARTIAL",
+      "evidence": "events slice(-200) activity-model.ts:42 (tested activity-model.test.ts:124-136 events.length 200); activities slice(-240) activity-model.ts:61; audit slice(-80) use-island.ts:334-337; samples slice(-40) use-island.ts:623; tasks replaced wholesale from Host which returns ALL tasks persistence.server.ts:38 via manager.server.ts:322 and presentation.ts:448; drafts uncapped use-island.ts:660-670",
+      "detail": "Journal and presentation arrays are bounded. The tasks array grows with Host history and is re-sent on every read and every command response, including over the tunnel. Drafts are uncapped."
+    }
+  ],
+  "gaps": [
+    {
+      "id": "PHONE-01",
+      "severity": "HIGH",
+      "title": "Host-offered per-request approvals cannot be answered in the routed shell",
+      "detail": "Scenario: an Agent with ACTIVE Agentic authorization requests an out-of-scope capability. The Host records a mission request, surfaced as agent.authorization.pending (agentic-store.server.ts:164). The phone user opens Agentic -> Agent and sees only 'Additional access: <action> · <reason>' captions (agent.tsx:87-92). No Allow-once or Deny control exists. The only actions are 'Revoke access' or 'Deny' (agent.tsx:156,170), which revoke the whole authorization and stop the Agent (agent-runtime.server.ts deny/revoke case). The working Requests UI (mission.tsx:133-176) is mounted only via the Phone fallback (premium.tsx:255-256), dead desktop.tsx:380 and floating.tsx:349. store.respondMission (use-island.ts:464-466) has no caller in the premium shell, even though the Host allows mission.respond from devices (commands.server.ts:22).",
+      "suggestedMinimalFix": "In AuthorizationCard (agent.tsx:87-92), render 'Allow once' and 'Deny' buttons per pending request that call the existing store.respondMission(request.id, 'allow_once'|'deny'), with the existing busy/online gating. Do not add allow_batch on devices unless T9 policy permits it. No new Host action is needed."
+    },
+    {
+      "id": "PHONE-02",
+      "severity": "HIGH",
+      "title": "Live updates degrade to 30 s through the quick tunnel (SSE unsupported) and the status label can lie",
+      "detail": "The repo's own contract says quick tunnels do not support SSE and the phone uses polling (T6_FAILURE_LEDGER.md:23; test-results/ma2-gate6r/sse-reconnect.json). T8 removed the 1.5 s polling loop (git 8b71167 desktop.tsx:63-74) and relies on EventSource plus a 30 s invalidate (host-stream.ts:38,54). Scenario: phone on https://*.trycloudflare.com; an Agent becomes WAITING_FOR_USER. If the EventSource hangs without error, the phone sees the change up to 30 s later. If onopen fired, the topbar says 'Live Host updates' (premium.tsx:191-192). If it errors, the loop issues a read plus a new EventSource every 3 s forever (host-stream.ts:44-50). Heartbeats are stripped by the signal bridge, so the client cannot detect a stalled stream.",
+      "suggestedMinimalFix": "In useHostStream, when streamStatus!=='live' or no SSE message has arrived within ~20 s, schedule invalidate() every 1.5-3 s (reusing refreshOllama single-flight) and label it 'Updating by polling'. Mark the stream 'live' only after a first message, not on onopen."
+    },
+    {
+      "id": "PHONE-03",
+      "severity": "HIGH",
+      "title": "new Notification() inside apply() can turn successful refreshes and commands into failures on Android Chrome",
+      "detail": "apply() calls new Notification(...) for fresh approval, failure and completion events when Notification.permission==='granted' (use-island.ts:361-369). Users grant permission via Settings > Notifications > Enable (settings.tsx:203-215). Android Chrome throws TypeError 'Illegal constructor' for the page-level constructor. apply() runs inside refreshOllama's try (use-island.ts:546-548), so the catch marks host 'offline' and disconnected (use-island.ts:553-559). That disables all Agent controls until the next refresh, which can be up to 30 s away. Inside command() (use-island.ts:375-381), the throw makes a command the Host already executed (e.g., agent.authorization.approve) report as failed with a TypeError toast. Plausible from code reading; needs an Android device to confirm.",
+      "suggestedMinimalFix": "Wrap the notification block in try/catch so presentation can never fail state application. Optionally use navigator.serviceWorker?.ready.then(r => r.showNotification(...)) when a service worker exists."
+    },
+    {
+      "id": "PHONE-04",
+      "severity": "MEDIUM",
+      "title": "Lost command response is reported as failure; no 'outcome unknown' state and no immediate reconcile",
+      "detail": "Scenario: the phone taps Stop (agent.stop). The Host persists STOPPED, then the tunnel drops the response (cf. T6 F1 530/1033). command() catches, shows a raw error toast and returns null (use-island.ts:378-381). AgentControls re-enables the controls (agentic.tsx:59-61) and the Stop dialog closes (agentic.tsx:105-108). The Agent still shows as running until the next SSE or 30 s refresh, and the user may retry. The Host requestId in error bodies (http.server.ts:604) is dropped by hostRequest (host-bridge.server.ts:63).",
+      "suggestedMinimalFix": "In command()'s catch, show 'Outcome unknown — confirming with the Host…' and await get().refreshOllama() before returning, so the component keeps busy until a fresh snapshot arrives. Pass requestId through in the thrown error message."
+    },
+    {
+      "id": "PHONE-05",
+      "severity": "MEDIUM",
+      "title": "No client-side timeout on Host reads; one hung request freezes all updates while showing 'online'",
+      "detail": "readBunnyHost/commandBunnyHost have no client timeout (host.ts:7-37; the 15 s AbortSignal applies only to the gateway-to-Host leg, host-bridge.server.ts:59). refreshOllama is single-flight (use-island.ts:541), and host-stream's connect/update await it (host-stream.ts:14,29). Scenario: the phone switches from Wi-Fi to cellular mid-read. The fetch hangs until the OS gives up, and every SSE invalidation or 30 s tick returns the same hung promise. host stays 'online', controls stay enabled, Agent state is stale, and no last-updated time is shown.",
+      "suggestedMinimalFix": "Race readBunnyHost against a 15 s timeout (or pass an AbortSignal if the server-fn call supports it) so a timeout counts as offline in the existing catch. Show a 'Last updated hh:mm:ss' line from the time of the last applied snapshot."
+    },
+    {
+      "id": "PHONE-06",
+      "severity": "MEDIUM",
+      "title": "No viewer identity: the phone is offered workstation-only actions that the Host refuses (some with a misleading generic error)",
+      "detail": "Snapshots carry no viewer kind (http.server.ts:292-311), so a paired phone sees enabled controls that always fail. 'New Agent' (project.agent.create, agentic.tsx:164-171,198) is refused at project-service.server.ts:72. 'Review bounded Mission access' (propose, agentic.tsx:631-639) is refused at agent-runtime.server.ts:860. 'Reduce scope' (agent.tsx:161-169) is refused at http.server.ts:405 and agent-runtime.server.ts:878. Mission settings toggles are refused at commands.server.ts:25. 'Create workstation pairing code' and 'Revoke access' (phone.tsx:262-289), plus the thermal inputs (settings.tsx:230-259), throw plain Errors (http.server.ts:493-495,559-560,572-573). Those return the generic 'Host command failed. Inspect operation state before retrying.' and record a host.operation_failed incident (http.server.ts:595-613). Every phone also receives the list of all paired devices (manager.server.ts:331-333).",
+      "suggestedMinimalFix": "Have readBunnyHost/commandBunnyHost stamp viewer: 'workstation'|'device' from authorizeBridge's existing access.local (host-bridge.server.ts:52) into the returned snapshot. Hide or disable the listed controls for 'device' and omit devices[] for devices. The Host stays the enforcing authority."
+    },
+    {
+      "id": "PHONE-07",
+      "severity": "MEDIUM",
+      "title": "Reconnect loop has a fixed 3 s interval, no backoff or cap, and keeps polling after revocation",
+      "detail": "While host!=='online', connect() reschedules itself every 3000 ms indefinitely (host-stream.ts:31-35). onerror triggers a refresh and then connect, which refreshes again: two reads per cycle (host-stream.ts:44-50 plus :29). Scenario: a revoked phone left open issues about 1 read per 3 s forever, each a gateway round-trip ending in a Host 401. There is no visibilitychange or online listener, so a phone waking from background may wait up to 30 s to reconcile.",
+      "suggestedMinimalFix": "Use exponential backoff (3 s to 60 s, reset on success). Stop auto-reconnect while pairingRequired is true and require Reconnect or pairing instead. Add document visibilitychange and window 'online' listeners that call invalidate()."
+    },
+    {
+      "id": "PHONE-08",
+      "severity": "MEDIUM",
+      "title": "Task-level controls are not disabled offline",
+      "detail": "Scenario: the Host is unreachable and the phone opens Task detail. 'Stop task' (task.tsx:711), Approval 'Cancel' and 'Change' (task.tsx:480-495), feedback (task.tsx:718-733), Phone 'Stop task' (phone.tsx:109) and Pairing 'Revoke access' (phone.tsx:284-289) all stay enabled. Each fires a command that fails with a toast. The Agent controls are correctly gated (workspace-model.ts:12-19).",
+      "suggestedMinimalFix": "Add disabled={store.host !== 'online'} to these buttons, matching agentControls."
+    },
+    {
+      "id": "PHONE-09",
+      "severity": "MEDIUM",
+      "title": "Unbounded tasks payload on every refresh and command over the tunnel",
+      "detail": "The Host snapshot includes every task ever recorded (persistence.server.ts:38 has no LIMIT; manager.server.ts:322). The gateway only redacts fields (presentation.ts:448-481). Every 3-30 s refresh and every command response re-downloads the full history to the phone, and use-island holds it all (use-island.ts:319). Events, activities, audit and samples are capped (activity-model.ts:42,61; use-island.ts:334-337,623), but tasks are not.",
+      "suggestedMinimalFix": "In dashboardSnapshot (presentation.ts:448), keep active tasks plus the newest N (e.g., 100) and ensure Mission-linked current tasks are retained. Activity and Task history already page client-side."
+    },
+    {
+      "id": "PHONE-10",
+      "severity": "LOW",
+      "title": "'Refresh discovery' sends an action the Host does not know",
+      "detail": "ModelsWorkspace calls store.projectCommand('refresh', {}) (premium.tsx:463). The Host has no 'refresh' action; it falls to default 'Unknown Host action.' (http.server.ts:584-585). The user gets a generic failure toast and a host.operation_failed incident (http.server.ts:597-600). T8 evidence test-results/ma3/t8/ui-host-command-mapping.json wrongly claims an 'existing refresh command'.",
+      "suggestedMinimalFix": "Use the existing 'discover' action (http.server.ts:446-448), or just refreshOllama(). Hide the button for device viewers once PHONE-06 lands."
+    },
+    {
+      "id": "PHONE-11",
+      "severity": "LOW",
+      "title": "Attention badge hidden in the collapsed phone navigation",
+      "detail": "The Agentic attention count (premium.tsx:148-153) lives inside nav, which is display:none at <=767px until the hamburger is opened (premium.css:1034-1041). The phone header shows only the brand, the hamburger and the stream status, so a pending approval is not signalled unless the user is on Home (premium.tsx:312-317).",
+      "suggestedMinimalFix": "Render the same agents.filter(attentionRequired).length badge on the .mobile-menu button."
+    },
+    {
+      "id": "PHONE-12",
+      "severity": "LOW",
+      "title": "Revocation recovery path is unclear and retained data stays visible",
+      "detail": "After revocation, the banner says 'This device needs pairing.' with only a Reconnect button (premium.tsx:205-221). The pairing form exists only under ?companion=1 (phone.tsx:242). Detection depends on substring matching (use-island.ts:558), and a command-time 401 is only a toast (use-island.ts:378-381). The last Agents, Tasks and Projects remain rendered in memory.",
+      "suggestedMinimalFix": "Make the banner's action navigate to Devices with the companion form (or treat pairingRequired as companion mode in Pairing). On pairingRequired, clear agents, tasks, missions and projects from the store. Have hostRequest throw a typed error name ('DeviceRevoked') instead of relying on message text."
+    },
+    {
+      "id": "PHONE-13",
+      "severity": "LOW",
+      "title": "Offline drafts are saved but not listed in the routed shell",
+      "detail": "queueDraft stores the prompt and navigates to sheet 'phone' (use-island.ts:672), which renders DevicesWorkspace (premium.tsx:241-242) without drafts. The draft list with Review and Discard exists only in Phone (phone.tsx:140-155). Settings shows just a count (settings.tsx:139). Drafts accumulate in localStorage with plaintext prompts.",
+      "suggestedMinimalFix": "Render the existing drafts list (phone.tsx:140-155 markup) in DevicesWorkspace or ChatWorkspace, and cap drafts (e.g., 20)."
+    },
+    {
+      "id": "PHONE-14",
+      "severity": "LOW",
+      "title": "Phone landscape uses the desktop sticky sidebar, which may clip the bottom nav",
+      "detail": "At widths >=768 (e.g., an 844x390 phone in landscape) the sidebar is sticky with height:100dvh and no overflow (premium.css:110-120). Its content is about 660px tall, so Settings, Bunny chat and the theme toggle may be unreachable. There are no landscape or max-height rules. Unverified static analysis.",
+      "suggestedMinimalFix": "Add overflow-y:auto to .t8-app .app-sidebar, or apply the mobile layout under @media (max-height: 500px)."
+    },
+    {
+      "id": "PHONE-15",
+      "severity": "LOW",
+      "title": "Disabled-control explanations are title-only (invisible on touch)",
+      "detail": "Pause, Resume, Talk and Redirect explain themselves through the title attribute only (agentic.tsx:69,78,474,482). Touch devices do not show these tooltips, so phone users see disabled buttons without a reason. The Conversation tab does explain Talk (agentic.tsx:544-561).",
+      "suggestedMinimalFix": "Show a short visible caption under .agent-actionbar when Talk/Redirect are disabled or Pause is unavailable."
+    },
+    {
+      "id": "PHONE-16",
+      "severity": "INFO",
+      "title": "No safe-area handling and the phone-oriented shell is dead code",
+      "detail": "The viewport meta lacks viewport-fit=cover (__root.tsx:12) and premium.css has no env(safe-area-*). The only safe-area rule is for .phone-dock in the unrouted desktop.tsx shell (bunny.css:2078-2080; desktop.tsx:52,174). iOS letterboxes, so nothing is currently obscured.",
+      "suggestedMinimalFix": "No change is needed for T9 unless edge-to-edge or PWA standalone mode is adopted. If it is, add viewport-fit=cover and env() padding on the topbar and toast."
+    }
+  ],
+  "keyFacts": [
+    "Routing: one route '/' (src/routes/index.tsx:4) renders the premium shell (island.tsx:1 -> workspace.tsx:1 -> premium.tsx:54). The older desktop.tsx Island (phone dock, FloatingIsland, MissionsSection, AgentsSection) is not routed.",
+    "Phone presentation is chosen by CSS viewport width only (premium.css:1015 @media max-width:767px). There is no server-provided viewer or remote flag (http.server.ts:292-311). ?companion=1 affects only the label, the initial sheet and the Pairing branch.",
+    "The client never reads or holds the device credential: bunny_device is an HttpOnly Secure SameSite=Strict cookie set by /api/bunny-pair (bunny-pair.ts:16), and the gateway authorizeBridge reads it server-side (host-bridge.server.ts:41).",
+    "All mutations go through use-island.ts command() (372-382) -> commandBunnyHost (host.ts:15-37) -> Host POST /command. Agent actions: agent.pause/agent.resume/agent.stop {id}; agent.authorization.{approve|deny|revoke} {id,revision}; adjust adds a patch (refused remotely); propose {id} (refused remotely).",
+    "No optimistic UI: state changes only via apply(result.snapshot) (use-island.ts:376). Components hold only a local busy flag.",
+    "Live updates: EventSource /api/bunny-events?after=<cursor> is an invalidation signal only (sequence-only frames). Each message triggers a debounced (120 ms), serialized full /state read. Fallbacks: 30 s periodic reconcile (host-stream.ts:54) and a fixed 3 s reconnect with no backoff (host-stream.ts:33,49).",
+    "The repo's documented phone transport for quick tunnels is polling, because quick tunnels do not support SSE (T6_FAILURE_LEDGER.md:23). Pre-T8 polling was 1.5 s (git 8b71167 desktop.tsx:63-74); T8 removed it.",
+    "Reconciliation (activity-model.ts:16-69) is unit-tested: sequence-keyed dedupe, stale cursor/revision rejection, retention-gap reset, new-instance reset with a canonical after=0 re-read, 500-event backlog cursor, events capped at 200 and activities at 240.",
+    "localStorage key 'bunny-a.preferences.v1' holds theme, appearance, drafts (plaintext prompts), extensions, autoSubmit, cpuWarn and gpuWarn. Legacy 'jev.island.v1' is read but never written. There are no credentials and no queued commands; autoSubmit is unused.",
+    "Host device rights are hardcoded, not per-device: the mission REMOTE set (commands.server.ts:22), the key-only check for agent.authorization (http.server.ts:400-405), device refusals for propose and adjust (agent-runtime.server.ts:860,878), and project mutations requiring local access (project-service.server.ts:72). The client has no knowledge of these rights.",
+    "Per-request approvals (mission.respond) are not reachable in the routed premium UI. AgentDetail lists authorization.pending as text only (agent.tsx:87-92).",
+    "Talk/Redirect are disabled with title-only reasons (agentic.tsx:470-486); the Conversation tab explains that Agent messaging is unavailable (agentic.tsx:540-562).",
+    "Revocation surfaces when a read fails with 'Pair this device…' (host-bridge.server.ts:62 -> use-island.ts:558), setting pairingRequired. The SSE stream is re-checked per delivery on the Host (http.server.ts:368-373).",
+    "T8 evidence covers 390x844 emulated layout, 44 px controls (measured at 1280 width), and Pause/Stop on the workstation only. Physical phone, OS reduced-motion toggle and a paired-device control path are all NOT TESTED (MA3_T8_PREMIUM_UI_ACCEPTANCE.md:25; test-results/ma3/t8/accessibility-results.json).",
+    "Client-side stores and loops (use-island.ts, host-stream.ts) have no unit tests; only pure models (workspace-model.ts, activity-model.ts, ui-model.ts, event-signal.ts) are tested."
+  ]
+}

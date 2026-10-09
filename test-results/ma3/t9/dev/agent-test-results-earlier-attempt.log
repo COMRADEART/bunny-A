@@ -1,0 +1,34 @@
+✔ A07/A08: pause survives a real Host restart; nothing resumes by itself; resume completes under the same envelope (2419.3367ms)
+✔ A12: restart during a read child requeues it once; one interrupted row, one recovered row, same agent and mission (2470.4892ms)
+✔ A13/A28: verification recorded and crash before the mission heard — consume the canonical result, never re-execute (871.1694ms)
+✔ A30: completed child without recorded verification — re-run the check, never the underlying effect (808.7098ms)
+{"type":"host.degraded","at":1791512434204,"failureClass":"HOST_DEGRADED","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+{"type":"host.subsystem_failed","at":1791512434203,"failureClass":"SUBSYSTEM_FAILURE","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+✔ A19: a corrupt checkpoint stops recovery fail-closed; nothing replays and the mission waits for the user (3760.6531ms)
+✔ A15: a restart-invalidated approval is denied, cleared, and re-asked fresh — never reused (1026.6053ms)
+✔ A16/A17: the removed provider's requeue re-routes to the remaining eligible provider (834.0733ms)
+✔ A20: a foreign recovery claim blocks the walk; once released, a runtime picks the agent up (2418.5649ms)
+✔ A21: reconcile refuses completed/blocked-by-authority steps and non-completed canonical truth (944.2971ms)
+✔ A22: a COMPLETED agent stays COMPLETED across a restart; a STOPPED agent never resurrects (2252.7467ms)
+✔ A35: a historical direct task's canonical row is byte-identical across the restart (745.9752ms)
+✔ A01: create persists a profile with a stable id; bad input never persists (522.8301ms)
+✔ A32: the active bound refuses the 11th agent and frees the slot on stop (996.8534ms)
+✔ A02/A03/A04: two Tasks route to different providers under one agent, same mission, distinct sessions (1172.4024ms)
+✔ A05: a scope-violating capability ask lands WAITING_FOR_USER and the allow_once decision releases it (789.0045ms)
+✔ A06: pause blocks the next admission while the admitted step finishes; nothing resumes by itself (2162.5423ms)
+✔ A08: resume without restart reuses the same run and generation, then completes (792.1236ms)
+✔ A08 refusals: resume refuses a revoked, an expired, and a deleted envelope; the agent stays paused (674.6898ms)
+✔ A09: stop persists STOPPED first, stops the mission, and refuses pause/resume/second-stop (630.4577ms)
+✔ A18: a failing provider fails the mission; the agent's failure row carries fixed phrases only (801.9633ms)
+✔ A24: the agent retains its project reference; the mission runs at the project root (453.9112ms)
+✔ A31/§25: lifecycle rows are the agent's own vocabulary, once each, never colliding with task rows (869.2599ms)
+✔ A27: the agent runs to COMPLETED with zero UI involvement (643.7626ms)
+✔ agentCommand dispatch: list/get/create start; unknown agent and unknown action refuse (445.026ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30020.8187

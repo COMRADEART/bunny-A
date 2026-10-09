@@ -1,0 +1,44 @@
+Bunny-A Host ready on loopback (7b6e5e4b-e695-46b8-852c-a117a0ed6ba6).
+✔ T9 F01/F02/F05/F11: device identity is per credential, projected, and never the owner (941.7596ms)
+Bunny-A Host ready on loopback (5764518f-d526-474c-accd-1231e0ace735).
+✔ T9 F04: absolute lifetime and idle bound are enforced by the Host; presence never extends the lifetime (735.3028ms)
+Bunny-A Host ready on loopback (f1d54ba2-59f7-451f-9ea9-8de53fb26f8b).
+✔ T9 F06/F35/F40: Host identity and epoch expectations refuse stale views; operation ids never execute twice (1202.994ms)
+Bunny-A Host ready on loopback (ffb99f8e-2d20-43fe-8ae3-4e2e0532cbc5).
+✔ T9 F26-F29 (DEV-01): a paired device never launches a tool-capable or hosted provider, a shell or an app (1104.752ms)
+Bunny-A Host ready on loopback (d494fb16-50eb-4fed-802d-5e4673a70169).
+✔ T9 F43-limits: paired-device load is bounded per device; the workstation is unchanged (1702.436ms)
+Bunny-A Host ready on loopback (a559dacb-1f29-4984-9957-c155d6d0fd49).
+✔ T9 G6: holding and stopping an Agent still work while the Host is degraded (728.2243ms)
+Bunny-A Host ready on loopback (e03021d2-defc-4b66-9b4c-f77c4acbc327).
+✖ T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/Resume reissue asks at the current revision (22247.9539ms)
+Bunny-A Host ready on loopback (6b123393-d79d-4342-974d-cbcc591a5b5d).
+✔ T9 F19/F20/F23: always-ask risks stay on the Windows Host; remote Deny persists; remote Stop blocks admissions (1921.6942ms)
+Bunny-A Host ready on loopback (3a15a23e-d2e7-4d12-86ed-50f12a35ed0c).
+✔ T9 device projection: bounded, path-free and transcript-free (830.2175ms)
+✔ T9 ledger and limiter units: bounded, per-principal, expiring (0.4794ms)
+Bunny-A Host ready on loopback (f2538e71-c945-4f4d-ac62-76717a42d4c0).
+✔ T9 F17/G7: Mission approvals bind to the reviewed plan; Agent Missions never start as bare Missions remotely (988.7406ms)
+✔ T9 launch rule: only local tool-free inference may be launched by a paired device (0.4428ms)
+Bunny-A Host ready on loopback (305fd870-84b0-477a-90ca-36e50334bf38).
+✔ T9 revocation race: a delayed body cannot retain the authority authenticated before revocation (786.047ms)
+✔ T9 operation ledger bounds include in-progress commands without evicting them (0.6074ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 33449.0239
+
+✖ failing tests:
+
+test at src\lib\bunny-host\remote-device.test.ts:359:1
+✖ T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/Resume reissue asks at the current revision (22247.9539ms)
+  Error: Timed out: Agent completes on the Host
+      at until (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-device.test.ts:103:42)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/remote-device.test.ts:403:18)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7)
