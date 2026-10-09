@@ -5,6 +5,7 @@ import type { HostDatabase } from "./persistence.server.ts";
 import type { CreateMission, MissionManager } from "../bunny-missions/manager.server.ts";
 import type { JsonValue, MissionStep } from "../bunny-missions/types.ts";
 import { CommandRefusedError } from "./failure.server.ts";
+import { isDeviceActor, WorkstationRequiredError } from "./device-authority.server.ts";
 import { AgentStore } from "./agent-store.server.ts";
 import { classifyReplay, type ReplayFacts } from "./agent-replay.ts";
 import { operationContract } from "../bunny-missions/cross-app.ts";
@@ -192,7 +193,7 @@ export class AgentRuntime {
     return this.snapshot();
   }
 
-  resume(agentId: string, actor: string): AgentSnapshot {
+  resume(agentId: string, actor: string, revision?: number): AgentSnapshot {
     const agent = this.require(agentId);
     this.validateWorkspace(agent);
     const flags = this.store.agentFlags(agent.id);
@@ -207,9 +208,20 @@ export class AgentRuntime {
       throw new CommandRefusedError("The agent's authorization expired; resume is refused.");
     const delegation = this.missions.agentic.forMission(agent.missionId!);
     if (delegation) {
-      if (delegation.current_state !== "PAUSED")
-        throw new CommandRefusedError("Current Agentic consent does not permit Resume.");
-      this.missions.syncAgentic(this.missions.agentic.state(delegation.id, "ACTIVE"));
+      // M-A-3 T9: Resume restores admissions, so a client binds it to the consent revision it reviewed;
+      // a paired device always does, and a stale view is refused instead of lifting someone else's hold.
+      if (revision !== undefined || isDeviceActor(actor))
+        this.missions.agentic.assertRevision(delegation.id, revision ?? -1);
+      if (delegation.current_state === "PAUSED")
+        this.missions.syncAgentic(this.missions.agentic.state(delegation.id, "ACTIVE"));
+      // ACTIVE while paused only follows fresh reviewed consent in this Host generation (post-restart
+      // re-consent of a paused Agent); Resume then lifts the hold without re-granting anything.
+      else if (delegation.current_state !== "ACTIVE")
+        throw new CommandRefusedError(
+          delegation.current_state === "WAITING_FOR_USER"
+            ? "Fresh scope consent is required before Resume; review the Host offer first."
+            : "Current Agentic consent does not permit Resume.",
+        );
     }
     const mission = this.mission(agent);
     if (mission.state === "stopped" || mission.state === "failed")
@@ -222,6 +234,8 @@ export class AgentRuntime {
     const run = this.store.latestRun(agent.id);
     if (run && run.endedAt !== null && run.state === "PAUSED") this.store.openRun({ ...run, state: "RUNNING", endedAt: null, endReason: null });
     this.deriveTransition(agent);
+    // M-A-3 T9 (G2): asks stamped before the hold are reissued at the current revision, never revived.
+    if (delegation) this.missions.reissueStaleAgenticRequests(agent.missionId!, actor);
     this.missions.schedule(agent.missionId!);
     this.emitLifecycle("agent.resumed", agent, null, run?.id ?? null);
     return this.snapshot();
@@ -850,6 +864,9 @@ export async function agentCommand(
 ): Promise<Record<string, unknown>> {
   if (!AGENT_ACTIONS.has(action)) throw new Error("Unknown agent action.");
   const agentId = typeof data.id === "string" ? data.id.slice(0, 200) : "";
+  // M-A-3 T9: paired devices supervise existing Agents; creating or first starting one stays on the workstation.
+  if (isDeviceActor(actor) && (action === "agent.create" || action === "agent.start"))
+    throw new WorkstationRequiredError(`${action} requires workstation access on the Windows Host.`);
   switch (action) {
     case "agent.create":
       return { agents: agents.create(data, actor) };
@@ -866,6 +883,10 @@ export async function agentCommand(
     case "agent.authorization.approve": {
       const profile = agents.store.agent(agentId);
       if (!profile?.missionId) throw new CommandRefusedError("Unknown Agent.");
+      if (isDeviceActor(actor)) {
+        const refusal = agents.missions.deviceAgenticRefusal(profile.missionId);
+        if (refusal) throw new WorkstationRequiredError(refusal);
+      }
       const mission = agents.missions.mission(profile.missionId);
       if (mission.state === "waiting_for_approval")
         return { agents: agents.start(agentId, actor, Number(data.revision)) };
@@ -891,16 +912,20 @@ export async function agentCommand(
       if (!profile?.missionId) throw new CommandRefusedError("Unknown Agent.");
       const e = agents.missions.agentic.forMission(profile.missionId);
       if (!e) throw new CommandRefusedError("No Agentic consent record.");
-      agents.missions.syncAgentic(
-        agents.missions.agentic.state(e.id, "REVOKED", Number(data.revision)),
-      );
+      // Consent that already ended cannot be revoked again, but the Stop it implies must still happen.
+      if (!["REVOKED", "EXPIRED", "COMPLETED", "EXHAUSTED"].includes(e.current_state))
+        agents.missions.syncAgentic(
+          agents.missions.agentic.state(e.id, "REVOKED", Number(data.revision)),
+        );
       if (!profile.stoppedAt && !profile.completedAt) await agents.stop(agentId, actor);
       return { agents: agents.snapshot() };
     }
     case "agent.pause":
       return { agents: agents.pause(agentId, actor) };
     case "agent.resume":
-      return { agents: agents.resume(agentId, actor) };
+      return {
+        agents: agents.resume(agentId, actor, data.revision === undefined ? undefined : Number(data.revision)),
+      };
     case "agent.stop":
       return { agents: await agents.stop(agentId, actor) };
     case "agent.list":

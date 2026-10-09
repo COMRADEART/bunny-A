@@ -15,6 +15,10 @@ export type PerformanceProfile = {
   /** Below this many tasks the profile is shown but has no routing weight. */
   minimumSamples?: number; sufficient?: boolean;
 };
+export type HostIdentity = { hostId: string; epoch: string; startedAt: number };
+export type SnapshotViewer =
+  | { kind: "workstation" }
+  | { kind: "device"; deviceId: string; name: string; role: "paired-device"; pairedAt: number; expiresAt: number; lastSeenAt: number | null; rights: string[] };
 export type HostSnapshot = {
   app: "Bunny-A";
   instanceId: string;
@@ -31,7 +35,11 @@ export type HostSnapshot = {
   performance: PerformanceProfile[];
   remoteConfigured: boolean;
   remoteUrl?: string | null;
-  devices?: {id:string;name:string;createdAt:number}[];
+  devices?: {id:string;name:string;createdAt:number;expiresAt?:number;lastSeenAt?:number|null}[];
+  /** M-A-3 T9: stable installation identity plus the per-boot epoch (the instanceId). Optional: older clients ignore it. */
+  hostIdentity?: HostIdentity;
+  /** M-A-3 T9: who this snapshot was projected for. Never carries a credential or its hash. */
+  viewer?: SnapshotViewer;
   thermal: {cpuWarn:number;gpuWarn:number;autoStop:boolean};
   /** M-A-0 mission layer. Optional: older clients ignore it; when missions are disabled it reports enabled:false. */
   missions?: MissionSnapshot;

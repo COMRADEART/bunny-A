@@ -22,7 +22,10 @@ const gatewayState=assertApplicationDirectory(process.cwd());
 const containment=new HostContainment({diagnosticDirectory:assertApplicationDirectory(join(gatewayState,"logs/gateway")),runtimeDirectory:assertApplicationDirectory(join(gatewayState,"runtime/gateway")),exit:()=>process.exit(71),shutdown:async()=>{server.closeAllConnections();await new Promise(done=>server.close(done));}});
 containment.installProcessHandlers();
 const {middleware}=await import("./.output/server/index.mjs");
+// M-A-3 T9: the dashboard and the remote companion are never framed (approval clickjacking) and never leak a referrer.
+const SECURITY_HEADERS={"x-frame-options":"DENY","content-security-policy":"frame-ancestors 'none'","referrer-policy":"no-referrer"};
 const handler=async(req,res)=>{
+  for(const [name,value] of Object.entries(SECURITY_HEADERS)) res.setHeader(name,value);
   const origins=remoteOrigins();
   if(!requestAllowed(req.headers,req.method ?? "GET",origins)) {res.writeHead(403);res.end("Bunny-A origin refused.");return;}
   const path=(req.url ?? "/").split("?")[0];

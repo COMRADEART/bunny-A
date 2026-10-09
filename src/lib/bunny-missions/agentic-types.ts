@@ -40,7 +40,9 @@ export type AgenticProjection = {
   riskCeiling: RiskClass; expiresAt: number; durationMs: number; maximumActions: number;
   maximumConcurrency: number; admitted: number; completed: number; failed: number; unknown: number;
   remainingActions: number; remainingMs: number; latestAdmission: AgenticAdmission | null;
-  pending: { id: string; action: string; risk: RiskClass; reason: string; resource?: string }[];
+  pending: { id: string; action: string; risk: RiskClass; reason: string; resource?: string; remote?: import("./types.ts").RemoteAnswer }[];
   limitations: string[];
+  /** M-A-3 T9 projection only: whether a paired device may answer the pending consent offer (WAITING_FOR_USER). */
+  remoteOffer?: import("./types.ts").RemoteAnswer;
 };
 export type AgenticAdjustment = { capabilities?: string[]; maximumActions?: number; durationMs?: number; maximumConcurrency?: number };

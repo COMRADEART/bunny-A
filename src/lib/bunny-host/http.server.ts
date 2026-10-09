@@ -17,10 +17,16 @@ import type { ProviderAdapter, HostEvent } from "./contracts.ts";
 import type { HostSample } from "../orch/types.ts";
 import type { EventEmitter } from "node:events";
 import { stopOwnedChildren } from "./owned-processes.server.ts";
-import { projectHostActivity } from "./presentation.ts";
+import { dashboardSnapshot, publicEventDetail, projectHostActivity } from "./presentation.ts";
 import { releaseIdentity } from "./release-identity.server.ts";
 import { AGENT_ACTIONS, AgentRuntime, agentCommand } from "./agent-runtime.server.ts";
 import { ProjectService } from "./project-service.server.ts";
+import {
+  actorOf, APPROVAL_ON_HOST, assertDeviceAction, authenticateDevice, CodedRefusal, deviceArtifactRead, deviceExpiresAt,
+  deviceMayLaunch, DevicePresence, deviceSnapshot, deviceStillValid, DeviceStreams, deviceTask, ensureDeviceSchema,
+  hidePaths, hostId as stableHostId, mutating, OPERATION_ID, OperationLedger, viewerOf, WindowLimiter,
+  WorkstationRequiredError, type DevicePrincipal, type OperationState, type Principal,
+} from "./device-authority.server.ts";
 
 const PROVIDERS: ProviderId[]=["codex","claude","ollama","opencode","cline","cursor"];
 function record(value: unknown): Record<string,unknown> {if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("Expected an object.");return value as Record<string,unknown>;}
@@ -116,13 +122,14 @@ async function body(request: IncomingMessage) {
   return record(JSON.parse(data));
 }
 // charset is explicit: Windows PowerShell 5.1 (the native Island) otherwise decodes JSON as Latin-1.
-function json(response: ServerResponse, value: unknown, status = 200) {
+function json(response: ServerResponse, value: unknown, status = 200, headers: Record<string, string> = {}) {
   const encoded = JSON.stringify(value);
   if (response.destroyed || response.writableEnded) return;
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
     "x-content-type-options": "nosniff",
+    ...headers,
   });
   response.end(encoded);
 }
@@ -245,6 +252,8 @@ export async function startHost(
   registerDiagnosticSecret(token);
   const port = options.port ?? Number(process.env.BUNNY_HOST_PORT ?? 43119);
   const db = new HostDatabase(paths.database);
+  // M-A-3 T9: additive device tables exist before the state marker is reconciled below; never on a request path.
+  ensureDeviceSchema(db.db);
   containment.options.persist = (type, detail, owner) => {
     db.event(type, owner.taskId ?? null, detail, owner.missionId ?? null);
   };
@@ -284,6 +293,15 @@ export async function startHost(
   const agents = new AgentRuntime(db, missions);
   const projects = new ProjectService(missions, agents);
   missions.missionPauseGate = (missionId) => agents.blockedForMission(missionId);
+  // M-A-3 T9: one stable installation identity (persisted) plus this boot's epoch; a phone pins the first and
+  // refuses to act on a view from another Host or an earlier epoch.
+  const hostIdentity = { hostId: stableHostId(db.db), epoch: manager.instanceId, startedAt: Date.now() };
+  const presence = new DevicePresence(db.db);
+  const ledger = new OperationLedger();
+  const deviceStreams = new DeviceStreams();
+  const deviceCommands = new WindowLimiter(60, 60_000);
+  const deviceReads = new WindowLimiter(300, 60_000);
+  const deviceStreamOpens = new WindowLimiter(30, 60_000);
   // M-A-2 T9: this Host just applied its own additive schema; reconcile the installed-state marker
   // with the applied schema so the next boot validates a healthy database instead of refusing it.
   refreshStateMarker({ installed: paths.installed, data: paths.data, database: paths.database });
@@ -309,6 +327,46 @@ export async function startHost(
       ),
     };
   };
+  /** The snapshot as one principal may see it: Host identity and viewer for all, the device projection for devices. */
+  const viewFor = (after: number, principal: Principal): HostSnapshot => {
+    const base = snapshot(after);
+    const withVerdicts: HostSnapshot = {
+      ...base,
+      hostIdentity,
+      viewer: viewerOf(principal, presence),
+      missions: base.missions ? missions.remoteVerdicts(base.missions) : base.missions,
+      agents: base.agents
+        ? {
+            ...base.agents,
+            agents: base.agents.agents.map((agent) =>
+              agent.authorization && agent.missionId
+                ? {
+                    ...agent,
+                    authorization: {
+                      ...agent.authorization,
+                      ...(agent.authorization.state === "WAITING_FOR_USER"
+                        ? (() => {
+                            const refusal = missions.safeRefusal(() => missions.deviceAgenticRefusal(agent.missionId!));
+                            return { remoteOffer: { answerable: !refusal, reason: refusal } };
+                          })()
+                        : {}),
+                      pending: agent.authorization.pending.map((item) => {
+                        const refusal = missions.safeRefusal(() => missions.deviceRequestRefusal(missions.store.request(item.id)));
+                        return { ...item, remote: { answerable: !refusal, reason: refusal } };
+                      }),
+                    },
+                  }
+                : agent,
+            ),
+          }
+        : base.agents,
+      devices: (base.devices ?? []).map((row) => {
+        const lastSeenAt = presence.lastSeen(row.id);
+        return { ...row, lastSeenAt, expiresAt: deviceExpiresAt(row.createdAt, lastSeenAt) };
+      }),
+    };
+    return principal.kind === "device" ? dashboardSnapshot(deviceSnapshot(withVerdicts, principal, presence)) : withVerdicts;
+  };
   manager.remoteConfigured = !!process.env.BUNNY_REMOTE_ORIGIN || existsSync(paths.remote);
   if (existsSync(paths.remote))
     manager.remoteUrl = JSON.parse(readFileSync(paths.remote, "utf8")).url;
@@ -328,7 +386,9 @@ export async function startHost(
       });
     const bearer=(req.headers.authorization ?? "").replace(/^Bearer /,"");
     const local=equal(bearer,token);
-    const device=local ? null : (db.db.prepare("SELECT id FROM devices WHERE token_hash=? AND revoked_at IS NULL").get(hash(bearer)) as { id:string } | undefined);
+    // M-A-3 T9: every request re-authenticates the device: present, unrevoked, within its lifetime and idle bound.
+    const auth=local || !bearer ? null : authenticateDevice(db.db,hash(bearer));
+    const device:DevicePrincipal | null=auth?.ok ? auth.device : null;
     if(device) registerDiagnosticSecret(bearer);
     if(path.pathname === "/pair" && req.method === "POST") {
       if(!containment.allows("http")) return json(res,{error:new HostUnavailableError().message},503);
@@ -342,17 +402,33 @@ export async function startHost(
         registerDiagnosticSecret(deviceToken);
         db.db.prepare("INSERT INTO devices VALUES(?,?,?,?,NULL)").run(id,text(input.name,100),hash(deviceToken),now);
         pairing=null;clientAttempts.succeed(key);manager.emit(db.event("device.paired",null,`Paired device ${id}`));
-        return json(res, { token: deviceToken, deviceId: id });
+        return json(res, { token: deviceToken, deviceId: id, hostId: hostIdentity.hostId });
       } catch {
         return reject(400, "Pairing request failed.");
       }
     }
-    if (!local && !device) return json(res, { error: "Authentication required." }, 401);
+    if (!local && !device)
+      return json(res, { error: "Authentication required.", code: auth && !auth.ok ? auth.code : "AUTH_REQUIRED" }, 401);
+    const principal: Principal = device ?? { kind: "workstation" };
+    const actor = actorOf(principal);
+    if (device) {
+      // Paired-device load is bounded per device; the workstation is unchanged.
+      const limiter = path.pathname === "/command" ? deviceCommands : path.pathname === "/events" ? deviceStreamOpens : deviceReads;
+      const wait = limiter.take(device.id);
+      if (wait !== null)
+        return json(res, { error: "Too many requests from this device. Try again shortly.", code: "RATE_LIMITED", retryAfterMs: wait }, 429, { "retry-after": String(Math.max(1, Math.ceil(wait / 1000))) });
+      presence.touch(device.id, path.pathname);
+    }
+    let action = "";
+    let operationId: string | null = null;
+    let began = false;
     try {
       const after = Number(path.searchParams.get("after") ?? 0);
       if (!Number.isSafeInteger(after) || after < 0) throw new Error("Invalid event cursor.");
-      if (req.method === "GET" && path.pathname === "/state") return json(res, snapshot(after));
+      if (req.method === "GET" && path.pathname === "/state") return json(res, viewFor(after, principal));
       if (req.method === "GET" && path.pathname === "/events") {
+        if (device && !deviceStreams.admit(device.id))
+          return json(res, { error: "Too many open activity streams for this device.", code: "RATE_LIMITED", retryAfterMs: 5000 }, 429, { "retry-after": "5" });
         res.writeHead(200, {
           "content-type": "text/event-stream; charset=utf-8",
           "cache-control": "no-cache",
@@ -362,21 +438,62 @@ export async function startHost(
         res.flushHeaders();
         const taskId = path.searchParams.get("task");
         // ?task=<id> streams one task's normalized events (the Host-side streamEvents for that session).
-        const read = (from: number) => (taskId ? db.taskEvents(taskId, from) : db.events(from));
-        // Device identity is checked for every delivery, including an already-open stream.
-        // Revocation does not cancel an independently granted Host capability batch.
-        const stillAuthorized = () =>
-          local ||
-          !!db.db
-            .prepare("SELECT id FROM devices WHERE id=? AND token_hash=? AND revoked_at IS NULL")
-            .get(device!.id, hash(bearer));
-        streamSse(res, manager.bus, read, after, containment, stillAuthorized);
+        const read = (from: number) => {
+          const events = taskId ? db.taskEvents(taskId, from) : db.events(from);
+          return device ? events.map((event) => ({ ...event, detail: publicEventDetail(event.type) })) : events;
+        };
+        // Device identity, revocation and expiry are checked for every delivery, including an already-open
+        // stream; revocation also closes the device's open streams at once (DeviceStreams).
+        const tokenHash = hash(bearer);
+        const stillAuthorized = () => local || deviceStillValid(db.db, device!.id, tokenHash);
+        const closeStream = streamSse(res, manager.bus, read, after, containment, stillAuthorized);
+        if (device) res.once("close", deviceStreams.add(device.id, closeStream));
         return;
       }
       if (req.method !== "POST" || path.pathname !== "/command")
         return json(res, { error: "Not found" }, 404);
       const input = await body(req);
+      // Body delivery can be delayed while another request revokes the device. Revalidate at dispatch.
+      if (device) {
+        const currentAuth = authenticateDevice(db.db, hash(bearer));
+        if (!currentAuth.ok) return json(res, { error: "Authentication required.", code: currentAuth.code }, 401);
+      }
+      action = typeof input.action === "string" ? input.action.slice(0, 100) : "";
+      // M-A-3 T9: default-deny paired-device role, checked before anything is read or dispatched.
+      if (device) assertDeviceAction(action);
       const data = record(input.data ?? {});
+      // A view from another Host or an earlier epoch never drives a command; nothing below executes.
+      if (input.expect !== undefined) {
+        const expect = record(input.expect);
+        if (expect.hostId !== undefined && expect.hostId !== hostIdentity.hostId)
+          throw new CodedRefusal("HOST_IDENTITY_CHANGED", "This is not the Bunny-A Host this view came from. Nothing was changed.", 409);
+        if (expect.epoch !== undefined && expect.epoch !== hostIdentity.epoch)
+          throw new CodedRefusal("HOST_EPOCH_CHANGED", "The Host restarted after this view was loaded. Nothing was changed; review the current state.", 409);
+      }
+      // Idempotency: a retried operation id returns its recorded outcome and never executes twice.
+      if (input.operationId !== undefined) {
+        if (typeof input.operationId !== "string" || !OPERATION_ID.test(input.operationId))
+          throw new CommandRefusedError("Invalid operation id.");
+        if (mutating(action)) {
+          const prior = ledger.get(actor, input.operationId);
+          if (prior && prior.action !== action)
+            throw new CodedRefusal("OPERATION_CONFLICT", "This operation id was already used for a different action.", 409);
+          if (prior?.state === "in_progress")
+            throw new CodedRefusal("OPERATION_IN_PROGRESS", "The Host is still applying this operation.", 409);
+          operationId = input.operationId;
+          if (prior) {
+            const operation = { id: operationId, state: prior.state, replayed: true };
+            if (prior.state === "applied") return json(res, { snapshot: viewFor(after, principal), operation });
+            return json(
+              res,
+              { requestId: containment.context.getStore()?.owner.requestId, error: prior.error, code: prior.code, operation },
+              prior.status ?? 400,
+            );
+          }
+          ledger.begin(actor, operationId, action);
+          began = true;
+        }
+      }
       let task: OrchTask | undefined;
       let pairCode: string | undefined;
       let session: AgentSession | undefined;
@@ -392,8 +509,14 @@ export async function startHost(
         "trigger.list",
         "agent.list",
         "agent.get",
+        // M-A-3 T9: holding or stopping an Agent must work exactly when the Host is degraded.
+        "agent.stop",
+        "agent.pause",
+        "agent.authorization.deny",
+        "agent.authorization.revoke",
+        "operation.status",
       ]);
-      if (!safeActions.has(String(input.action))) containment.assertAccepting("http");
+      if (!safeActions.has(action)) containment.assertAccepting("http");
       if (typeof input.action === "string" && AGENT_ACTIONS.has(input.action)) {
         if (!local && input.action === "agent.create" && data.steps !== undefined)
           throw new CommandRefusedError("Remote devices cannot supply executable Agent graphs.");
@@ -403,36 +526,60 @@ export async function startHost(
           input.action.startsWith("agent.authorization.")
         )
           throw new CommandRefusedError("Remote approval can only answer the exact Host offer.");
-        extra = await agentCommand(
-          agents,
-          input.action,
-          data,
-          local ? "workstation" : `device:${device!.id}`,
-        );
+        extra = await agentCommand(agents, input.action, data, actor);
       } else if (typeof input.action === "string" && MISSION_ACTIONS.has(input.action))
-        extra = await missionCommand(missions, input.action, data, {
-          local,
-          actor: local ? "workstation" : `device:${device!.id}`,
-        });
+        extra = await missionCommand(missions, input.action, data, { local, actor });
       else if (typeof input.action === "string" && input.action.startsWith("project.")) {
         try {
-          extra = { data: await projects.command(input.action, data, local) };
+          const result = await projects.command(input.action, data, local);
+          extra = { data: device && action === "project.artifact" ? deviceArtifactRead(result) : result };
         } catch (error) {
-          throw new CommandRefusedError(
-            error instanceof Error ? error.message : "Project command refused.",
-          );
+          const message = error instanceof Error ? error.message : "Project command refused.";
+          // A paired device never receives local folder paths inside refusal text.
+          throw new CommandRefusedError(device ? hidePaths(message) : message);
         }
       } else
         switch (input.action) {
-          case "submit":
-            task = manager.submit(validateSubmit(data));
+          case "submit": {
+            const submitted = validateSubmit(data);
+            // A paired device queues chat for review; folders and verification checks are workstation settings.
+            if (device && (submitted.verify || submitted.constraints.workingDirectory))
+              throw new WorkstationRequiredError("Task folders and verification checks are set on the workstation (Windows Host).");
+            task = manager.submit(submitted);
             break;
-          case "approve":
-            task = manager.approve(
-              text(data.id, 200),
-              local ? "workstation" : `device:${device!.id}`,
-            );
+          }
+          case "approve": {
+            const id = text(data.id, 200);
+            if (device) {
+              // M-A-3 T9 (DEV-01): a direct task runs an unscoped provider session; a paired device may only
+              // launch local tool-free inference. Mission work is answered through its exact Mission request.
+              let pending: OrchTask;
+              try {
+                pending = db.get(id);
+              } catch {
+                throw new CommandRefusedError("Unknown task.");
+              }
+              if (pending.mission)
+                throw new WorkstationRequiredError("Mission work is approved through its Mission request.");
+              if (!deviceMayLaunch(pending))
+                throw new WorkstationRequiredError(
+                  `${APPROVAL_ON_HOST} This route can use workspace tools or a hosted model on the workstation.`,
+                );
+            }
+            task = manager.approve(id, actor);
             break;
+          }
+          case "operation.status": {
+            const id = text(data.operationId, 64);
+            if (!OPERATION_ID.test(id)) throw new CommandRefusedError("Invalid operation id.");
+            const found = ledger.get(actor, id);
+            extra = {
+              data: found
+                ? { operationId: id, state: found.state, action: found.action, at: found.at, code: found.code ?? null, error: found.error ?? null, epoch: hostIdentity.epoch }
+                : { operationId: id, state: "unknown", epoch: hostIdentity.epoch },
+            };
+            break;
+          }
           case "stop":
             task = await manager.stop(text(data.id, 200));
             break;
@@ -569,13 +716,27 @@ export async function startHost(
             );
             break;
           }
-          case "device.revoke":
-            if (!local) throw new Error("Device revocation requires workstation access.");
-            db.db
-              .prepare("UPDATE devices SET revoked_at=? WHERE id=?")
-              .run(Date.now(), text(data.id, 200));
-            manager.emit(db.event("device.revoked", null, "Device credential revoked."));
+          case "device.revoke": {
+            // The workstation revokes any device; a paired device may only sign itself out.
+            const id = data.id === undefined && device ? device.id : text(data.id, 200);
+            if (device && id !== device.id)
+              throw new WorkstationRequiredError("Revoking another device requires workstation access on the Windows Host.");
+            const changed = Number(
+              db.db.prepare("UPDATE devices SET revoked_at=? WHERE id=? AND revoked_at IS NULL").run(Date.now(), id).changes,
+            );
+            if (!changed) throw new CommandRefusedError("Unknown or already revoked device.");
+            const closed = deviceStreams.closeDevice(id);
+            // A lost device's authority ends with it: batches it created and Agentic consent it approved.
+            const ended = local ? await endDeviceGrants(`device:${id}`) : { batches: 0, delegations: 0 };
+            manager.emit(
+              db.event(
+                "device.revoked",
+                null,
+                `Device credential revoked: ${id} by ${local ? "the workstation" : "the device itself (sign out)"}; ${closed} open stream(s) closed; ${ended.batches} batch(es) and ${ended.delegations} Agentic consent(s) it granted ended.`,
+              ),
+            );
             break;
+          }
           case "resume":
           case "pause":
             throw new Error(
@@ -591,27 +752,95 @@ export async function startHost(
           `${local ? "workstation" : `device ${device!.id}`}: ${String(input.action)}`,
         ),
       );
-      json(res, { snapshot: snapshot(after), task, pairCode, session, ...extra });
+      if (began && operationId) ledger.finish(actor, operationId, { state: "applied", status: 200 });
+      if (device && action === "device.revoke")
+        return json(res, { signedOut: true, ...(operationId ? { operation: { id: operationId, state: "applied", replayed: false } } : {}) });
+      // Already-admitted effects may finish, but a revoked device receives no new protected projection.
+      if (device) {
+        const currentAuth = authenticateDevice(db.db, hash(bearer));
+        if (!currentAuth.ok) return json(res, { error: "Authentication required.", code: currentAuth.code }, 401);
+      }
+      const projected = viewFor(after, principal);
+      if (device) {
+        if (extra.agents) extra.agents = projected.agents;
+        if (extra.agent) extra.agent = projected.agents?.agents.find((row) => row.id === data.id);
+        if (extra.mission && typeof extra.mission === "object" && "id" in extra.mission)
+          extra.mission = projected.missions?.missions.find((row) => row.id === (extra.mission as { id: string }).id);
+      }
+      json(res, {
+        snapshot: projected,
+        task: device && task ? projected.tasks.find((row) => row.id === task!.id) ?? deviceTask(task) : task,
+        pairCode,
+        session,
+        ...extra,
+        ...(began && operationId ? { operation: { id: operationId, state: "applied", replayed: false } } : {}),
+      });
     } catch (error) {
       const requestId = containment.context.getStore()?.owner.requestId;
       if (!(error instanceof CommandRefusedError) && !(error instanceof HostUnavailableError))
         await containment.contain(error, "boundary", {
           owner: { subsystem: "http-command", requestId },
         });
+      const status = error instanceof HostUnavailableError ? 503 : error instanceof CodedRefusal ? error.status : 400;
+      const code =
+        error instanceof HostUnavailableError
+          ? "HOST_UNAVAILABLE"
+          : error instanceof WorkstationRequiredError
+            ? "WORKSTATION_REQUIRED"
+            : error instanceof CodedRefusal
+              ? error.code
+              : error instanceof CommandRefusedError
+                ? "REFUSED"
+                : "FAILED";
+      const message =
+        error instanceof HostUnavailableError
+          ? error.message
+          : error instanceof CommandRefusedError
+            ? safeError(error, [token]).message
+            : "Host command failed. Inspect operation state before retrying.";
+      // A refusal executed nothing; a failure (or an unavailable Host mid-command) may have partly applied,
+      // so its operation is "failed" and the client reconciles from canonical state.
+      const state: OperationState = code === "FAILED" || code === "HOST_UNAVAILABLE" ? "failed" : "refused";
+      if (began && operationId) ledger.finish(actor, operationId, { state, status, code, error: message });
+      if (device && action && code !== "RATE_LIMITED")
+        manager.emit(db.event("audit.device_refused", null, `device ${device.id}: ${action} (${code})`));
       json(
         res,
         {
           requestId,
-          error:
-            error instanceof HostUnavailableError
-              ? error.message
-              : error instanceof CommandRefusedError
-                ? safeError(error, [token]).message
-                : "Host command failed. Inspect operation state before retrying.",
+          error: message,
+          code,
+          ...(began && operationId ? { operation: { id: operationId, state, replayed: false } } : {}),
         },
-        error instanceof HostUnavailableError ? 503 : 400,
+        status,
       );
     }
+  };
+  /** Workstation revocation of a lost device ends the authority that device granted (never on self sign-out). */
+  const endDeviceGrants = async (deviceActor: string) => {
+    let batches = 0,
+      delegations = 0;
+    for (const row of db.db
+      .prepare("SELECT id, mission_id AS missionId FROM approval_batches WHERE status='active' AND created_by=?")
+      .all(deviceActor) as { id: string; missionId: string }[])
+      try {
+        missions.revokeBatch(row.missionId, row.id, `workstation (revoked ${deviceActor})`);
+        batches++;
+      } catch {
+        /* Already ended by its own lifecycle. */
+      }
+    for (const row of db.db.prepare("SELECT id, agent_id AS agentId FROM agentic_authorizations").all() as { id: string; agentId: string }[])
+      try {
+        const e = missions.agentic.get(row.id);
+        if (!e || e.authorization_provenance?.actor !== deviceActor || !["ACTIVE", "PAUSED"].includes(e.current_state)) continue;
+        missions.syncAgentic(missions.agentic.state(e.id, "REVOKED"));
+        delegations++;
+        const profile = agents.store.agent(row.agentId);
+        if (profile && !profile.stoppedAt && !profile.completedAt) await agents.stop(row.agentId, `workstation (revoked ${deviceActor})`);
+      } catch {
+        /* A corrupt or already-ended record fails closed; Stop remains available on the workstation. */
+      }
+    return { batches, delegations };
   };
   const server = createServer((req, res) => {
     const requestId = randomUUID();

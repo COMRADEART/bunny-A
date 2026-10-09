@@ -1,8 +1,10 @@
 import { Pause, Play, Square } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { useIsland } from "@/store/use-island";
 import { agentPanelRows, CHECKPOINT_LABEL } from "./agent-model";
 import { useState } from "react";
 import type { AgenticProjection } from "../../lib/bunny-missions/agentic-types";
+import { controlCaption, isDevice, offerVerdict, WORKSTATION_CAPTION } from "./remote-view-model";
 
 export function AuthorizationCard({
   id,
@@ -12,19 +14,24 @@ export function AuthorizationCard({
   authorization: AgenticProjection;
 }) {
   const store = useIsland();
-  const [busy, setBusy] = useState(false);
-  const allowed = store.host === "online" && !busy;
+  // M-A-3 T9: a fresh canonical view, no unconfirmed command on this Agent, and the Host's own verdict.
+  const caption = controlCaption({
+    canAct: store.canAct(),
+    targetId: id,
+    pending: store.pending,
+    uncertain: store.uncertain,
+  });
+  const busy = !!store.pending[id];
+  const allowed = caption === null;
+  const device = isDevice(store.viewer);
+  const offer = offerVerdict(a, store.viewer);
+  const [confirming, setConfirming] = useState<"deny" | "revoke" | null>(null);
   const act = async (
     action: "approve" | "adjust" | "deny" | "revoke",
     patch?: { maximumActions: number; durationMs: number; capabilities: string[] },
   ) => {
     if (!allowed) return;
-    setBusy(true);
-    try {
-      await store.agentAuthorization(id, action, a.revision, patch);
-    } finally {
-      setBusy(false);
-    }
+    await store.agentAuthorization(id, action, a.revision, patch);
   };
   const [adjusting, setAdjusting] = useState(false);
   const [actions, setActions] = useState(a.maximumActions);
@@ -40,7 +47,7 @@ export function AuthorizationCard({
           <li key={capability}>{capability}</li>
         ))}
       </ul>
-      <p className="caption">
+      <p className="caption wrap-anywhere">
         Workspace: {a.roots.filter((root, i, roots) => roots.indexOf(root) === i).join(", ")}
       </p>
       {a.browserOrigins?.length ? (
@@ -50,7 +57,7 @@ export function AuthorizationCard({
         <p className="caption">Applications: {a.applications.join(", ")}</p>
       ) : null}
       {a.commands.map((command, i) => (
-        <p className="caption" key={i}>
+        <p className="caption wrap-anywhere" key={i}>
           Exact test:{" "}
           <code>
             {command.command} {command.args.join(" ")}
@@ -85,12 +92,12 @@ export function AuthorizationCard({
         </p>
       ) : null}
       {a.pending.map((request) => (
-        <p className="caption" key={request.id}>
-          Additional access: {request.action} · {request.resource ? `${request.resource} · ` : ""}
+        <p className="caption wrap-anywhere" key={request.id}>
+          Pending request: {request.action} · {request.resource ? `${request.resource} · ` : ""}
           {request.reason}
         </p>
       ))}
-      {adjusting ? (
+      {adjusting && !device ? (
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -150,29 +157,70 @@ export function AuthorizationCard({
       <div className="actions">
         {a.state === "WAITING_FOR_USER" ? (
           <>
-            <button className="btn primary" disabled={!allowed} onClick={() => void act("approve")}>
-              Authorize Mission
-            </button>
-            <button className="btn quiet" disabled={!allowed} onClick={() => void act("deny")}>
+            {offer.allowed ? (
+              <button className="btn primary" disabled={!allowed} onClick={() => void act("approve")}>
+                {busy && store.pending[id] === "agent.authorization.approve" ? "Authorizing…" : "Authorize Mission"}
+              </button>
+            ) : (
+              <p className="control-caption host-required">{offer.caption}</p>
+            )}
+            <button className="btn quiet" disabled={!allowed} onClick={() => setConfirming("deny")}>
               Deny
             </button>
           </>
         ) : null}
         {!ended ? (
           <>
-            <button
-              className="btn quiet"
-              disabled={!allowed}
-              onClick={() => setAdjusting(!adjusting)}
-            >
-              Reduce scope
-            </button>
-            <button className="btn danger" disabled={!allowed} onClick={() => void act("revoke")}>
+            {device ? (
+              <p className="control-caption">Reducing scope · {WORKSTATION_CAPTION}</p>
+            ) : (
+              <button
+                className="btn quiet"
+                disabled={!allowed}
+                onClick={() => setAdjusting(!adjusting)}
+              >
+                Reduce scope
+              </button>
+            )}
+            <button className="btn danger" disabled={!allowed} onClick={() => setConfirming("revoke")}>
               Revoke access
             </button>
           </>
         ) : null}
       </div>
+      {caption && (
+        <p className="control-caption" role="status">
+          {caption}
+        </p>
+      )}
+      <Dialog.Root open={!!confirming} onOpenChange={(open) => !open && setConfirming(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="t8-overlay" />
+          <Dialog.Content className="t8-dialog" data-theme={store.theme}>
+            <Dialog.Title>{confirming === "deny" ? "Deny this Mission access?" : "Revoke this Mission access?"}</Dialog.Title>
+            <Dialog.Description>
+              {confirming === "deny"
+                ? "The Host refuses this consent offer and stops the Agent. Completed work and artifacts stay."
+                : "The Host ends this authorization and stops the Agent. Completed work and artifacts stay; effects already made are not undone."}
+            </Dialog.Description>
+            <div className="actions">
+              <Dialog.Close asChild>
+                <button className="btn secondary">Keep access</button>
+              </Dialog.Close>
+              <button
+                className="btn danger"
+                onClick={async () => {
+                  const action = confirming;
+                  setConfirming(null);
+                  if (action) await act(action);
+                }}
+              >
+                {confirming === "deny" ? "Deny access" : "Revoke access"}
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

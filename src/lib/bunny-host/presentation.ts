@@ -581,12 +581,14 @@ export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
 export function dashboardCommand<
   T extends { snapshot: HostSnapshot; task?: OrchTask; mission?: MissionView; pairCode?: string ;
     data?: import("../bunny-missions/types.ts").JsonValue;
+    operation?: { id: string; state: "applied" | "refused" | "failed" | "in_progress"; replayed: boolean };
   },
 >(result: T, projectAction?: string) {
   const snapshot = dashboardSnapshot(result.snapshot);
   return {
     snapshot,
-    ...(result.data === undefined || !["project.list", "project.get", "project.add", "project.create", "project.update", "project.relink", "project.remove", "project.artifact", "project.repository", "project.agent.create"].includes(projectAction ?? "") ? {} : { data: result.data }),
+    ...(result.data === undefined || !["project.list", "project.get", "project.add", "project.create", "project.update", "project.relink", "project.remove", "project.artifact", "project.repository", "project.agent.create", "operation.status"].includes(projectAction ?? "") ? {} : { data: result.data }),
+    ...(result.operation ? { operation: result.operation } : {}),
     pairCode: result.pairCode,
     task: result.task ? snapshot.tasks.find((task) => task.id === result.task!.id) : undefined,
     mission: result.mission

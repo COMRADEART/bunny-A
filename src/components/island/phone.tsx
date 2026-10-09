@@ -106,7 +106,7 @@ export function Phone({ now }: { now: number }) {
                   ) : (
                     <TaskActivity task={task} />
                   )}
-                  {task.state !== "waiting_for_approval" ? <button className="btn danger" onClick={()=>void store.stop(task.id)} aria-label={`Stop task ${task.title}`}>Stop task</button> : null}
+                  {task.state !== "waiting_for_approval" ? <button className="btn danger" disabled={!store.canAct()} onClick={()=>void store.stop(task.id)} aria-label={`Stop task ${task.title}`}>Stop task</button> : null}
                 </article>
               ))
             ) : (
@@ -219,10 +219,16 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
   const [name, setName] = useState("Phone companion");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
-  const companion =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("companion") === "1";
   const secure = typeof window !== "undefined" && window.location.protocol === "https:";
+  // M-A-3 T9: any non-workstation origin (the secure companion address) is a device; it pairs, never issues codes.
+  const remoteOrigin =
+    secure && typeof window !== "undefined" && !["127.0.0.1", "localhost", "[::1]"].includes(window.location.hostname);
+  const companion =
+    (typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("companion") === "1") ||
+    remoteOrigin ||
+    store.viewer?.kind === "device" ||
+    store.connection.state === "pairing";
   return (
     <section className={`pairing glass ${compact ? "compact" : ""}`}>
       <div className="pairing-title">
@@ -261,7 +267,7 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
             )}
             <button
               className="btn primary"
-              disabled={store.host !== "online" || !store.remoteConfigured}
+              disabled={!store.canAct() || !store.remoteConfigured}
               onClick={store.createPairCode}
             >
               <Plus size={15} />
@@ -274,25 +280,8 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
               </div>
             ) : null}
           </div>
-          {store.devices.length ? (
-            <div className="paired-devices">
-              <h3 className="eyebrow">Paired devices</h3>
-              {store.devices.map((d) => (
-                <div key={d.id}>
-                  <Smartphone size={16} />
-                  <span>{d.name}</span>
-                  <button
-                    className="quiet-button danger-text"
-                    onClick={() => store.revokeDevice(d.id)}
-                  >
-                    Revoke access
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : null}
         </>
-      ) : store.host === "online" ? (
+      ) : store.host === "online" && store.viewer?.kind === "device" ? (
         <p className="pair-status">
           <Check size={16} />
           This device is securely paired.
@@ -305,18 +294,12 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
             if (busy) return;
             setBusy(true);
             try {
-              const response = await fetch("/api/bunny-pair", {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ code, name }),
-              });
-              const result = await response.json();
-              if (!response.ok) throw new Error(result.error || "Pairing failed.");
-              setCode("");
-              setStatus("Paired securely. Reconnecting…");
-              await store.refreshOllama();
-            } catch (error) {
-              setStatus(error instanceof Error ? error.message : "Pairing failed.");
+              // The store pins the Host this device paired with; the credential stays an HttpOnly cookie.
+              const paired = await store.pairDevice(code, name);
+              if (paired) {
+                setCode("");
+                setStatus("Paired securely. Reconnecting…");
+              } else setStatus("Pairing failed. Check the one-time code on your workstation.");
             } finally {
               setBusy(false);
             }

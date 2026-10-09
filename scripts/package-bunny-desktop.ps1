@@ -1,5 +1,7 @@
 param(
   [string]$PackageName,
+  # Explicit prerelease metadata for a disposable test package; installed release pins stay unchanged.
+  [string]$TestVersion,
   # Pinned build input (M-A-1D): every runtime file comes from `git archive` of this commit, never from the
   # working tree, so a branch switch or an uncommitted edit cannot reach a release. Defaults to install/release-pin.json.
   [string]$SourceCommit,
@@ -33,6 +35,10 @@ $pin=(Invoke-Git @('-c','core.autocrlf=false','show',($toolingSha+':install/rele
 if(-not $PackageName) {$PackageName=$pin.release}
 if(-not $SourceCommit) {$SourceCommit=$pin.sourceCommit}
 if($PackageName -notmatch '^[A-Za-z0-9-]+$') {throw 'Invalid package name.'}
+if($TestVersion) {
+  if($PackageName -notmatch '-TEST$' -or $TestVersion -notmatch '^\d+\.\d+\.\d+-[A-Za-z0-9.-]+$') {throw 'TestVersion requires a named TEST package and prerelease version.'}
+  $pin.version=$TestVersion
+}
 $sourceSha=(Invoke-Git @('rev-parse','--verify',($SourceCommit+'^{commit}'))).Trim()
 $bunnyWorkspace=(Resolve-Path -LiteralPath $Repository).Path
 if(-not $OutputDirectory) {$OutputDirectory=Join-Path $bunnyWorkspace 'releases'}

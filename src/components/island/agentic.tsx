@@ -31,6 +31,15 @@ import { Empty, NAMES } from "./ui";
 import { openTask } from "./task";
 import { artifactStatus } from "@/lib/bunny-host/presentation";
 import type { MissionView, ArtifactSummary } from "@/lib/bunny-missions/types";
+import {
+  allowVerdict,
+  controlCaption,
+  isDevice,
+  pendingAsks,
+  TALK_CAPTION,
+  WORKSTATION_CAPTION,
+  type PendingAsk,
+} from "./remote-view-model";
 
 export function AgentState({ agent }: { agent: AgentView }) {
   return (
@@ -44,41 +53,47 @@ export function openAgent(agent: AgentView) {
 }
 export function AgentControls({ agent }: { agent: AgentView }) {
   const store = useIsland();
-  const [busy, setBusy] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
-  const allowed = agentControls(agent, store.host === "online");
+  // M-A-3 T9: controls act only on a fresh canonical view, and never on top of an unconfirmed command.
+  const actNow = store.canAct();
+  const caption = controlCaption({
+    canAct: actNow,
+    targetId: agent.id,
+    pending: store.pending,
+    uncertain: store.uncertain,
+  });
+  const busy = caption !== null && actNow;
+  const allowed = agentControls(agent, actNow && caption === null);
+  const consentFirst =
+    agent.state === "PAUSED" && agent.authorization?.state === "WAITING_FOR_USER"
+      ? "Review the Host's consent offer below before resuming."
+      : null;
   const run = async (action: "pause" | "resume" | "stop") => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await (action === "pause"
-        ? store.pauseAgent(agent.id)
-        : action === "resume"
-          ? store.resumeAgent(agent.id)
-          : store.stopAgent(agent.id));
-    } finally {
-      setBusy(false);
-    }
+    await (action === "pause"
+      ? store.pauseAgent(agent.id)
+      : action === "resume"
+        ? store.resumeAgent(agent.id)
+        : store.stopAgent(agent.id));
   };
   return (
     <div className="agent-controls" aria-label={`Controls for ${agent.name}`} aria-busy={busy}>
       <button
         className="btn secondary"
-        disabled={!allowed.pause || busy}
+        disabled={!allowed.pause}
         onClick={() => void run("pause")}
         title="Hold new work admissions; already admitted effects may finish."
       >
         <Pause size={15} />
-        Pause
+        {store.pending[agent.id] === "agent.pause" ? "Pausing…" : "Pause"}
       </button>
       <button
         className="btn secondary"
-        disabled={!allowed.resume || busy}
+        disabled={!allowed.resume || !!consentFirst}
         onClick={() => void run("resume")}
         title="Host revalidates authorization, checkpoints and dependencies."
       >
         <Play size={15} />
-        Resume
+        {store.pending[agent.id] === "agent.resume" ? "Resuming…" : "Resume"}
       </button>
       <Dialog.Root open={confirmStop} onOpenChange={setConfirmStop}>
         <Dialog.Trigger asChild>
@@ -92,8 +107,8 @@ export function AgentControls({ agent }: { agent: AgentView }) {
           <Dialog.Content className="t8-dialog" data-theme={store.theme}>
             <Dialog.Title>Stop {agent.name}?</Dialog.Title>
             <Dialog.Description>
-              Stop prevents future Agent admissions. Effects already admitted may have finished or
-              may still finish. Completed changes are not undone.
+              Stop prevents new work. Completed work and artifacts stay. Effects already made are not
+              undone, and an admitted step may still finish.
             </Dialog.Description>
             <div className="actions">
               <Dialog.Close asChild>
@@ -101,10 +116,10 @@ export function AgentControls({ agent }: { agent: AgentView }) {
               </Dialog.Close>
               <button
                 className="btn danger"
-                disabled={busy}
+                disabled={!allowed.stop}
                 onClick={async () => {
-                  await run("stop");
                   setConfirmStop(false);
+                  await run("stop");
                 }}
               >
                 Stop future work
@@ -113,7 +128,132 @@ export function AgentControls({ agent }: { agent: AgentView }) {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+      {(caption ?? consentFirst) && (
+        <p className="control-caption" role="status">
+          {caption ?? consentFirst}
+        </p>
+      )}
     </div>
+  );
+}
+
+/**
+ * M-A-3 T9 (PHONE-01): every unanswered Host ask for this Agent, answerable in place. Allow once appears only
+ * where the Host said this viewer may give it; Deny is always available and always confirmed.
+ */
+export function PendingAsks({ agent, mission }: { agent: AgentView; mission?: MissionView }) {
+  const store = useIsland();
+  const asks = pendingAsks(agent.authorization, mission);
+  const [denying, setDenying] = useState<PendingAsk | null>(null);
+  if (!asks.length) return null;
+  const actNow = store.canAct();
+  const caption = controlCaption({
+    canAct: actNow,
+    targetId: agent.id,
+    pending: store.pending,
+    uncertain: store.uncertain,
+  });
+  return (
+    <section className="t8-surface pending-asks" aria-label="Pending permission requests">
+      <div className="section-heading">
+        <h2>Bunny needs permission</h2>
+        <ShieldCheck size={18} />
+      </div>
+      {asks.map((ask) => {
+        const verdict = allowVerdict(ask, store.viewer);
+        return (
+          <article className="ask-card" key={ask.id} data-risk={ask.risk}>
+            <dl className="fact-list">
+              <div>
+                <dt>Mission</dt>
+                <dd>{mission?.title ?? mission?.objective ?? "Unavailable in this snapshot"}</dd>
+              </div>
+              <div>
+                <dt>Requested</dt>
+                <dd>
+                  <code>{ask.action}</code>
+                </dd>
+              </div>
+              {ask.resource && (
+                <div>
+                  <dt>Exact target</dt>
+                  <dd className="wrap-anywhere">{ask.resource}</dd>
+                </div>
+              )}
+              <div>
+                <dt>Risk</dt>
+                <dd>{ask.risk.replaceAll("_", " ").toLowerCase()}</dd>
+              </div>
+              <div>
+                <dt>Why the Host asks</dt>
+                <dd className="wrap-anywhere">{ask.reason}</dd>
+              </div>
+              {agent.authorization && (
+                <div>
+                  <dt>Budget</dt>
+                  <dd>
+                    {agent.authorization.remainingActions} of {agent.authorization.maximumActions}{" "}
+                    actions remain · {Math.ceil(agent.authorization.remainingMs / 60_000)} minutes
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt>Revision</dt>
+                <dd>{ask.revision ?? "Not an Agentic revision"}</dd>
+              </div>
+            </dl>
+            <div className="actions">
+              {verdict.allowed ? (
+                <button
+                  className="btn primary"
+                  disabled={caption !== null}
+                  onClick={() => void store.respondRequest(ask.id, "allow_once")}
+                >
+                  Allow once
+                </button>
+              ) : (
+                <p className="control-caption host-required">{verdict.caption}</p>
+              )}
+              <button className="btn quiet" disabled={caption !== null} onClick={() => setDenying(ask)}>
+                Deny
+              </button>
+            </div>
+          </article>
+        );
+      })}
+      {caption && (
+        <p className="control-caption" role="status">
+          {caption}
+        </p>
+      )}
+      <Dialog.Root open={!!denying} onOpenChange={(open) => !open && setDenying(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="t8-overlay" />
+          <Dialog.Content className="t8-dialog" data-theme={store.theme}>
+            <Dialog.Title>Deny {denying?.action}?</Dialog.Title>
+            <Dialog.Description>
+              The Host records your denial. This exact operation will not run, and the Mission step that
+              needed it ends. Other completed work stays.
+            </Dialog.Description>
+            <div className="actions">
+              <Dialog.Close asChild>
+                <button className="btn secondary">Keep reviewing</button>
+              </Dialog.Close>
+              <button
+                className="btn danger"
+                onClick={async () => {
+                  const target = denying;
+                  setDenying(null);
+                  if (target) await store.respondRequest(target.id, "deny");
+                }}
+              >
+                Deny this request
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </section>
   );
 }
 
@@ -161,14 +301,18 @@ export function AgenticWorkspace() {
           <h1>Agentic</h1>
           <p>Persistent work. Clear progress. You stay in control.</p>
         </div>
-        <button
-          className="btn primary"
-          disabled={store.host !== "online" || !store.missions?.enabled}
-          onClick={() => setCreating(!creating)}
-        >
-          <Plus size={16} />
-          New Agent
-        </button>
+        {isDevice(store.viewer) ? (
+          <p className="control-caption">New Agents · {WORKSTATION_CAPTION}</p>
+        ) : (
+          <button
+            className="btn primary"
+            disabled={!store.canAct() || !store.missions?.enabled}
+            onClick={() => setCreating(!creating)}
+          >
+            <Plus size={16} />
+            New Agent
+          </button>
+        )}
       </div>
       <div className="agentic-summary" aria-label="Agent overview">
         {[
@@ -187,7 +331,7 @@ export function AgenticWorkspace() {
           </div>
         ))}
       </div>
-      {creating && (
+      {creating && !isDevice(store.viewer) && (
         <form
           className="t8-surface new-agent-form"
           onSubmit={async (event) => {
@@ -460,14 +604,15 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
       <div className="page-heading">
         <div>
           <p className="eyebrow">Agent workspace</p>
-          <h1>{agent.name}</h1>
-          <p>{mission?.objective ?? "Mission not retained in this snapshot."}</p>
+          <h1 className="wrap-anywhere">{agent.name}</h1>
+          <p className="wrap-anywhere">{mission?.objective ?? "Mission not retained in this snapshot."}</p>
+          {agent.missionId && <p className="caption">Mission {agent.missionId.slice(0, 8)}</p>}
         </div>
         <AgentState agent={agent} />
       </div>
       <div className="agent-actionbar">
         <AgentControls agent={agent} />
-        <div className="actions">
+        <div className="actions talk-actions">
           <button
             className="btn quiet"
             disabled
@@ -483,6 +628,7 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
           >
             Redirect
           </button>
+          <p className="control-caption">{TALK_CAPTION}</p>
         </div>
       </div>
       {attentionRequired(agent) && (
@@ -506,6 +652,7 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
           )}
         </div>
       )}
+      <PendingAsks agent={agent} mission={mission} />
       <div className="agent-detail-grid">
         <div className="agent-detail-main">
           <section className="t8-surface">
@@ -628,15 +775,18 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
                 <p className="caption">
                   No current authorization. A Project and an objective do not grant access.
                 </p>
-                {["CREATED", "PLANNING"].includes(agent.state) && (
-                  <button
-                    className="btn secondary"
-                    disabled={store.host !== "online"}
-                    onClick={() => void store.agentAuthorization(agent.id, "propose")}
-                  >
-                    Review bounded Mission access
-                  </button>
-                )}
+                {["CREATED", "PLANNING"].includes(agent.state) &&
+                  (isDevice(store.viewer) ? (
+                    <p className="control-caption">Proposing Mission access · {WORKSTATION_CAPTION}</p>
+                  ) : (
+                    <button
+                      className="btn secondary"
+                      disabled={!store.canAct()}
+                      onClick={() => void store.agentAuthorization(agent.id, "propose")}
+                    >
+                      Review bounded Mission access
+                    </button>
+                  ))}
               </>
             )}
             {agent.authorizationError && <p role="alert">{agent.authorizationError}</p>}

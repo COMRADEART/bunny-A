@@ -4,6 +4,7 @@ import { useIsland } from "@/store/use-island";
 import type { MissionView } from "@/lib/bunny-missions/types";
 import { NAMES } from "./ui";
 import { openTask } from "./task";
+import { allowVerdict, missionApproveVerdict } from "./remote-view-model";
 import {
   agentDetail,
   agentRows,
@@ -119,10 +120,14 @@ function ApprovalCard({ mission }: { mission: MissionView }) {
       </ul>
       {mission.planning.rationale.length ? <p className="caption">{mission.planning.rationale.join(" ")}</p> : null}
       <div className="actions">
-        <button className="btn primary" onClick={() => void store.approveMission(mission.id)}>
-          Approve & start
-        </button>
-        <button className="btn quiet" onClick={() => void store.stopMission(mission.id)}>
+        {missionApproveVerdict(mission, store.viewer).allowed ? (
+          <button className="btn primary" disabled={!store.canAct()} onClick={() => void store.approveMission(mission.id)}>
+            Approve & start
+          </button>
+        ) : (
+          <p className="control-caption host-required">{missionApproveVerdict(mission, store.viewer).caption}</p>
+        )}
+        <button className="btn quiet" disabled={!store.canAct()} onClick={() => void store.stopMission(mission.id)}>
           Cancel
         </button>
       </div>
@@ -156,15 +161,21 @@ function Requests({ mission }: { mission: MissionView }) {
               </div>
             ) : null}
             <div className="actions">
-              <button className="btn primary" onClick={() => void store.respondMission(request.id, "allow_once")}>
-                {permissionLabel(mission, request.stepId)}
-              </button>
-              {offer ? (
-                <button className="btn secondary" data-testid="allow-batch" onClick={() => void store.respondMission(request.id, "allow_batch")}>
-                  {batchButtonLabel(offer)}
-                </button>
-              ) : null}
-              <button className="btn quiet" onClick={() => void store.respondMission(request.id, "deny")}>
+              {allowVerdict(request, store.viewer).allowed ? (
+                <>
+                  <button className="btn primary" disabled={!store.canAct()} onClick={() => void store.respondMission(request.id, "allow_once")}>
+                    {permissionLabel(mission, request.stepId)}
+                  </button>
+                  {offer ? (
+                    <button className="btn secondary" data-testid="allow-batch" disabled={!store.canAct()} onClick={() => void store.respondMission(request.id, "allow_batch")}>
+                      {batchButtonLabel(offer)}
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <p className="control-caption host-required">{allowVerdict(request, store.viewer).caption}</p>
+              )}
+              <button className="btn quiet" disabled={!store.canAct()} onClick={() => void store.respondMission(request.id, "deny")}>
                 Deny
               </button>
             </div>

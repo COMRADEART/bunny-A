@@ -14,6 +14,7 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import { liveProviders, useIsland } from "@/store/use-island";
+import { directApprovalVerdict, RECONNECT_CAPTION } from "./remote-view-model";
 import type { Mode, OrchTask, ProviderId } from "@/lib/orch/types";
 import { Empty, NAMES, ProviderIcon, ProviderStatus, TaskActivity, TaskBadge } from "./ui";
 import {
@@ -355,8 +356,10 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
   const [pending, setPending] = useState(false);
   const cloud = usesCloudModel(task);
   const conflict = conflictsWithLocalOnly(task);
+  const canAct = store.canAct();
+  const remote = directApprovalVerdict(task, store.viewer);
   const ready =
-    !conflict && store.host === "online" && ["ready", "busy"].includes(provider.availability);
+    !conflict && canAct && remote.allowed && ["ready", "busy"].includes(provider.availability);
   const action = async (type: "run" | "stop") => {
     setPending(true);
     try {
@@ -480,7 +483,7 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
         <button
           type="button"
           className="btn quiet"
-          disabled={pending}
+          disabled={pending || !canAct}
           onClick={() => void action("stop")}
         >
           Cancel
@@ -488,7 +491,7 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
         <button
           type="button"
           className="btn secondary"
-          disabled={pending}
+          disabled={pending || !canAct}
           onClick={() => setChanging(!changing)}
         >
           Change
@@ -504,10 +507,8 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
         </button>
       </div>
       {!ready ? (
-        <p className="caption">
-          {store.host !== "online"
-            ? "Reconnect your workstation to run this task."
-            : provider.detail}
+        <p className="caption control-caption">
+          {!canAct ? RECONNECT_CAPTION : !remote.allowed ? remote.caption : provider.detail}
         </p>
       ) : null}
     </section>
@@ -708,16 +709,18 @@ export function TaskDetail({ now }: { now: number }) {
               <Terminal size={15} />
               Terminal unavailable
             </button>
-            <button className="btn danger" onClick={() => void store.stop(task.id)}>
+            <button className="btn danger" disabled={!store.canAct()} onClick={() => void store.stop(task.id)}>
               <Square size={14} />
               Stop task
             </button>
+            {!store.canAct() && <p className="control-caption">{RECONNECT_CAPTION}</p>}
           </>
         ) : (
           <>
             <button
               className="btn quiet"
               aria-pressed={task.feedback === "positive"}
+              disabled={!store.canAct()}
               onClick={() => store.feedback(task.id, "positive")}
             >
               <ThumbsUp size={14} />
@@ -726,6 +729,7 @@ export function TaskDetail({ now }: { now: number }) {
             <button
               className="btn quiet"
               aria-pressed={task.feedback === "negative"}
+              disabled={!store.canAct()}
               onClick={() => store.feedback(task.id, "negative")}
             >
               <ThumbsDown size={14} />

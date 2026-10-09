@@ -8,10 +8,19 @@ export function eventSignal(line: string): string {
     : "";
 }
 
+/**
+ * M-A-3 T9 liveness: a remote client cannot see SSE comments, so a buffering tunnel or a stalled stream would
+ * look healthy forever. With liveness on, the bridge opens with a data-bearing ready event and turns each Host
+ * heartbeat into a named hb event. Neither carries Host content.
+ */
+export const READY_SIGNAL = "event: ready\ndata: {}\n\n";
+export const HEARTBEAT_SIGNAL = "event: hb\ndata: {}\n\n";
+
 export function signalStream(
   body: ReadableStream<Uint8Array>,
   cleanup: () => void,
   handshake = false,
+  liveness = false,
 ) {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
@@ -26,7 +35,7 @@ export function signalStream(
           while ((newline = pending.indexOf("\n")) >= 0) {
             const line = pending.slice(0, newline).trimEnd();
             pending = pending.slice(newline + 1);
-            const signal = eventSignal(line);
+            const signal = liveness && line.startsWith(":") ? HEARTBEAT_SIGNAL : eventSignal(line);
             if (signal) output.enqueue(encoder.encode(signal));
           }
         },
@@ -43,7 +52,7 @@ export function signalStream(
   return new ReadableStream<Uint8Array>({
     start(output) {
       // Flush the HTTP bridge even when the subscriber is already at the journal head.
-      if (handshake) output.enqueue(encoder.encode(": connected\n\n"));
+      if (handshake) output.enqueue(encoder.encode(liveness ? READY_SIGNAL : ": connected\n\n"));
     },
     async pull(output) {
       try {

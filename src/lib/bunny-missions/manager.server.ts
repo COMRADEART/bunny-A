@@ -39,9 +39,11 @@ import { SkillLibrary, fill } from "./skills.server.ts";
 import { MissionStore, redact } from "./store.server.ts";
 import { TriggerEngine } from "./triggers.server.ts";
 import type {
-  AuthorizationEnvelope, CapabilityResult, FailureCategory, Mission, MissionConfig, MissionSnapshot, MissionStep, MissionView,
-  PermissionRequest, StepState, Trigger,
+  ActionManifest, AuthorizationEnvelope, CapabilityResult, FailureCategory, Mission, MissionConfig, MissionSnapshot, MissionStep, MissionView,
+  PermissionRequest, RemoteAnswer, StepState, Trigger,
 } from "./types.ts";
+import { APPROVAL_ON_HOST, deviceApprovalRefusal, deviceMayLaunch, isDeviceActor, WorkstationRequiredError, WORKSTATION_ONLY_RISKS,
+} from "../bunny-host/device-authority.server.ts";
 import { WorkspaceCoordinator } from "./workspace.server.ts";
 import { CommandRefusedError, safeError, supervisedLoop, type SafeError ,
 } from "../bunny-host/failure.server.ts";
@@ -168,6 +170,7 @@ export class MissionManager {
               !admission ||
               admission.outcome !== "ADMITTED" ||
               admission.capability !== request.action ||
+              admission.resource_reference !== agenticFingerprint(request.action, request.params, request.cwd) ||
               admission.step_id !== request.stepId ||
               admission.host_generation !== this.tasks.instanceId ||
               !agent ||
@@ -186,15 +189,19 @@ export class MissionManager {
               this.agenticPlanReference(mission.id) !== live.plan_reference
             )
               return "Current cross-app admission, target operation or authorization changed; execution paused.";
-            return agenticScopeViolation(
+            const risk = this.bus.riskOf(request.action, request.params) ?? "READ";
+            const violation = agenticScopeViolation(
               live,
               request.action,
               request.params,
-              this.bus.riskOf(request.action, request.params) ?? "READ",
+              risk,
               request.cwd,
               executable,
               request.stepId,
             );
+            // Execution revalidation must honor the same exact Host-reviewed filesystem action
+            // used by admission. It never widens the standing delegation, or covers another target.
+            return violation && this.reviewedFilesystemOnce(request, live, risk) ? null : violation;
           } catch {
             return "Current cross-app execution authority cannot be revalidated.";
           }
@@ -701,11 +708,18 @@ export class MissionManager {
       );
     }
   }
-  approve(id: string, by: string, start = true, agenticRevision?: number): MissionView {
+  approve(id: string, by: string, start = true, agenticRevision?: number, planReference?: string): MissionView {
     this.requireEnabled();
     let mission = this.store.mission(id);
     if (mission.state !== "waiting_for_approval" || !mission.requestedScope)
-      throw new Error("Mission is not waiting for approval.");
+      throw new CommandRefusedError("Mission is not waiting for approval.");
+    // M-A-3 T9: a client that reviewed a plan binds its approval to it; a replanned scope is never approved unseen.
+    if (planReference !== undefined && planReference !== this.agenticPlanReference(id))
+      throw new CommandRefusedError("The plan changed after it was reviewed; review the current plan before approving.");
+    if (isDeviceActor(by)) {
+      const refusal = this.deviceMissionRefusal(mission);
+      if (refusal) throw new WorkstationRequiredError(refusal);
+    }
     const agentic = this.agentic.forMission(id);
     if (agentic) {
       this.agentic.assertRevision(agentic.id, agenticRevision ?? -1);
@@ -1431,7 +1445,7 @@ export class MissionManager {
       origin: `mission:${mission.id}`,
       cwd,
       roots,
-      oneTimeAction: step.approvedOnce?.action ?? null,
+      oneTimeAction: step.approvedOnce?.action === action ? action : null,
       timeoutMs: step.timeoutMs,
     };
   }
@@ -1915,7 +1929,132 @@ export class MissionManager {
     if (!e) throw new Error("No Agentic scope to adjust.");
     const next = this.agentic.adjust(e.id, revision, patch);
     this.syncAgentic(next);
+    this.reissueStaleAgenticRequests(missionId, "workstation");
     return this.agentic.projection(missionId);
+  }
+  // ── M-A-3 T9: paired-device owner-consent boundary ─────────────────────────
+  /** Every manifest an envelope capability names: an exact action id, or each action under "capability.*". */
+  manifestsFor(capability: string): ActionManifest[] {
+    if (capability.endsWith(".*")) {
+      const prefix = capability.slice(0, -1);
+      return this.bus
+        .list()
+        .flatMap((adapter) => adapter.actions)
+        .filter((action) => action.id.startsWith(prefix));
+    }
+    const found = this.bus.find(capability);
+    return found ? [found.manifest] : [];
+  }
+  /** Why a paired device may not answer this exact Host ask (allow), or null. Deny is never limited. */
+  deviceRequestRefusal(request: PermissionRequest): string | null {
+    if (request.action === "provider.execute") {
+      // The Host asked because this route exceeds what it can confine; only local tool-free inference launches remotely.
+      const step = this.store.step(request.stepId);
+      const task = step.taskId ? this.tasks.db.get(step.taskId) : null;
+      return task && deviceMayLaunch(task) ? null : APPROVAL_ON_HOST;
+    }
+    return deviceApprovalRefusal(request.risk, this.bus.find(request.action)?.manifest);
+  }
+  /** Why a paired device may not approve this pending Mission plan, or null. */
+  deviceMissionRefusal(mission: Mission): string | null {
+    if (this.agentic.exists(mission.id) || mission.origin.startsWith("agent:"))
+      return "Agent Missions are started from their Agent on the Windows Host.";
+    const scope = mission.requestedScope;
+    if (!scope) return null;
+    if (scope.riskClasses.some((risk) => WORKSTATION_ONLY_RISKS.includes(risk))) return APPROVAL_ON_HOST;
+    for (const capability of scope.capabilities)
+      for (const manifest of this.manifestsFor(capability))
+        if (deviceApprovalRefusal(manifest.risk, manifest)) return APPROVAL_ON_HOST;
+    return null;
+  }
+  /**
+   * Why a paired device may not answer this Agent's pending consent offer, or null. Initial delegation
+   * stays on the Windows Host; post-restart re-consent of the same reviewed scope may be answered remotely
+   * within the owner-consent boundary.
+   */
+  deviceAgenticRefusal(missionId: string): string | null {
+    const mission = this.store.mission(missionId);
+    if (mission.state === "waiting_for_approval")
+      return "Starting an Agent's first delegation requires approval on the Windows Host.";
+    const e = this.agentic.forMission(missionId);
+    if (!e) return null;
+    if (e.cross_app) return APPROVAL_ON_HOST;
+    if (WORKSTATION_ONLY_RISKS.includes(e.risk_ceiling)) return APPROVAL_ON_HOST;
+    for (const capability of e.permitted_capabilities) {
+      // T5 confines Agentic model delegation to tool-free local inference (agenticScopeViolation).
+      if (capability === "provider.execute") continue;
+      for (const manifest of this.manifestsFor(capability))
+        if (deviceApprovalRefusal(manifest.risk, manifest)) return APPROVAL_ON_HOST;
+    }
+    return null;
+  }
+  /** Host verdicts for the phone: which pending answers a paired device may give. Projection only. */
+  remoteVerdicts(snapshot: MissionSnapshot): MissionSnapshot {
+    const verdict = (refusal: string | null): RemoteAnswer => ({ answerable: !refusal, reason: refusal });
+    return {
+      ...snapshot,
+      missions: snapshot.missions.map((mission) => ({
+        ...mission,
+        ...(mission.state === "waiting_for_approval"
+          ? {
+              planReference: this.agenticPlanReference(mission.id),
+              remote: verdict(this.safeRefusal(() => this.deviceMissionRefusal(mission))),
+            }
+          : {}),
+        requests: mission.requests.map((request) =>
+          request.resolvedAt
+            ? request
+            : { ...request, remote: verdict(this.safeRefusal(() => this.deviceRequestRefusal(request))) },
+        ),
+      })),
+    };
+  }
+  /** A verdict that cannot be computed is a refusal, never an answerable offer. */
+  safeRefusal(check: () => string | null): string | null {
+    try {
+      return check();
+    } catch {
+      return APPROVAL_ON_HOST;
+    }
+  }
+  /**
+   * M-A-3 T9 (G2): a hold, resume or scope reduction moves the Agentic revision. An open ask stamped with
+   * an older revision can never be answered, so the Host closes it (never as a user denial, and without a
+   * denial fingerprint) and asks again at the current revision. Nothing is re-stamped in place.
+   */
+  reissueStaleAgenticRequests(missionId: string, by: string): number {
+    const e = this.agentic.forMission(missionId);
+    if (!e || e.current_state !== "ACTIVE") return 0;
+    let reissued = 0;
+    for (const request of this.store.requests(missionId)) {
+      if (request.resolvedAt || !request.agentic || request.agentic.revision === e.revision) continue;
+      if (request.agentic.generation !== this.tasks.instanceId) continue;
+      const step = this.store.step(request.stepId);
+      if (step.state !== "waiting_for_approval" || step.pendingRequestId !== request.id) continue;
+      this.store.saveRequest({
+        ...request,
+        resolvedAt: Date.now(),
+        resolution: "deny",
+        resolvedBy: `${by} (superseded at Agentic revision ${e.revision})`,
+      });
+      this.inbox.resolve(missionId, { requestId: request.id });
+      this.askPermission(
+        this.store.mission(missionId),
+        step,
+        request.action,
+        request.risk,
+        request.reason,
+        step.pendingPhase ?? "execute",
+      );
+      reissued++;
+    }
+    if (reissued)
+      this.emit(
+        "approval.request_reissued",
+        `${reissued} pending Agentic request(s) reissued at revision ${e.revision}; superseded asks can no longer be answered.`,
+        missionId,
+      );
+    return reissued;
   }
   reauthorizeAgent(missionId: string, revision: number, actor: string) {
     const e = this.agentic.forMission(missionId);
@@ -2170,22 +2309,27 @@ export class MissionManager {
           }
       }
       // One reviewed filesystem action can widen that exact resource, never the ongoing envelope.
-      const step = this.store.step(request.stepId!);
-      const once = step.approvedOnce ? this.store.request(step.approvedOnce.requestId) : null;
-      if (
-        request.action.startsWith("filesystem.") &&
-        once?.resolution === "allow_once" &&
-        once.action === request.action &&
-        once.risk === risk &&
-        once.agentic?.fingerprint === fingerprint &&
-        once.agentic.revision === e.revision &&
-        once.agentic.generation === this.tasks.instanceId
-      )
-        return null;
+      if (this.reviewedFilesystemOnce(request, e, risk)) return null;
       return violation;
     } catch {
       return "Agentic authorization integrity, target or identity validation failed closed.";
     }
+  }
+  private reviewedFilesystemOnce(request: CapabilityRequest, e: AgenticAuthorizationEnvelope, risk: PermissionRequest["risk"]): boolean {
+    if (!request.action.startsWith("filesystem.") || !request.stepId) return false;
+    const step = this.store.step(request.stepId);
+    const once = step.approvedOnce ? this.store.request(step.approvedOnce.requestId) : null;
+    return !!(
+      step.missionId === request.missionId &&
+      once?.missionId === request.missionId &&
+      once.stepId === request.stepId &&
+      once.resolution === "allow_once" &&
+      once.action === request.action &&
+      once.risk === risk &&
+      once.agentic?.fingerprint === agenticFingerprint(request.action, request.params, request.cwd) &&
+      once.agentic.revision === e.revision &&
+      once.agentic.generation === this.tasks.instanceId
+    );
   }
   private agenticProviderParams(task: OrchTask) {
     return {
@@ -3041,18 +3185,25 @@ export class MissionManager {
   ) {
     this.requireEnabled();
     const request = this.store.request(requestId);
-    if (request.resolvedAt) throw new Error("This request was already answered.");
+    if (request.resolvedAt) throw new CommandRefusedError("This request was already answered.");
     const step = this.store.step(request.stepId);
     if (step.state !== "waiting_for_approval" || step.pendingRequestId !== requestId)
-      throw new Error("The step is no longer waiting for this request.");
+      throw new CommandRefusedError("The step is no longer waiting for this request.");
+    // M-A-3 T9: a paired device answers only within the owner-consent boundary; deny is always available.
+    if (isDeviceActor(by) && decision !== "deny") {
+      const refusal = this.deviceRequestRefusal(request);
+      if (refusal) throw new WorkstationRequiredError(refusal);
+    }
     if (this.agentic.exists(request.missionId)) {
       const e = this.agentic.forMission(request.missionId)!;
+      if (e.current_state === "PAUSED")
+        throw new CommandRefusedError("The Agent is paused; resume it, then answer the reissued request.");
       if (
         !request.agentic ||
         request.agentic.revision !== e.revision ||
         request.agentic.generation !== this.tasks.instanceId
       )
-        throw new Error("Agentic scope request is stale; fresh Host review is required.");
+        throw new CommandRefusedError("Agentic scope request is stale; fresh Host review is required.");
       if (decision === "deny") {
         this.agentic.deny(request.missionId, request.agentic.fingerprint);
         this.agentic.audit("agent.action_denied", e, { requestId, action: request.action });

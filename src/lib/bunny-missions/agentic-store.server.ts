@@ -4,6 +4,7 @@ import type { HostDatabase } from "../bunny-host/persistence.server.ts";
 import type { MissionStore } from "./store.server.ts";
 import type { AgenticAdmission, AgenticAdjustment, AgenticAuthorizationEnvelope, AgenticProjection, AgenticState } from "./agentic-types.ts";
 import { AGENTIC_POLICY_VERSION, AGENTIC_STATES } from "./agentic-types.ts";
+import { CommandRefusedError } from "../bunny-host/failure.server.ts";
 
 export function digest(value: unknown): string { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 export function fileDigest(path: string): string { return createHash("sha256").update(readFileSync(path)).digest("hex"); }
@@ -88,12 +89,12 @@ export class AgenticStore {
   }
   assertRevision(id: string, revision: number): AgenticAuthorizationEnvelope {
     const e = this.get(id);
-    if (!e || e.revision !== revision) throw new Error("Stale or unknown Agentic authorization revision.");
+    if (!e || e.revision !== revision) throw new CommandRefusedError("Stale or unknown Agentic authorization revision.");
     return e;
   }
   approve(id: string, revision: number, authorizationId: string, actor: string): AgenticAuthorizationEnvelope {
     const e = this.assertRevision(id, revision);
-    if (e.current_state !== "WAITING_FOR_USER" || e.expires_at <= Date.now()) throw new Error("Agentic consent is not pending or has expired.");
+    if (e.current_state !== "WAITING_FOR_USER" || e.expires_at <= Date.now()) throw new CommandRefusedError("Agentic consent is not pending or has expired.");
     const now = Date.now();
     const next = this.put({ ...e, user_authorization_id: authorizationId, authorization_provenance: { actor, channel: actor.startsWith("device:") ? "paired-device" : "workstation", request_revision: revision }, approved_at: now, host_generation: this.generation, current_state: "ACTIVE" });
     this.audit("agent.authorization_approved", next); return next;

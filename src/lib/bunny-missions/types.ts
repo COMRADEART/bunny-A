@@ -212,7 +212,11 @@ export type PermissionRequest = {
   resolvedBy: string | null;
   /** Host-computed offer of one small bounded batch covering this ask; absent = no batch button. */
   batchOffer: PermissionBatchOffer | null;
+  /** M-A-3 T9 projection only (never stored): whether a paired device may answer this exact ask. */
+  remote?: RemoteAnswer;
 };
+/** M-A-3 T9: the Host's own verdict on a paired-device answer; the phone never re-derives policy. */
+export type RemoteAnswer = { answerable: boolean; reason: string | null };
 
 /**
  * One ephemeral, mission-scoped bounded desktop batch (Gate T9). Created only from a Host-computed
@@ -320,7 +324,12 @@ export type Mission = {
   accounting: MissionAccounting;
 };
 
-export type MissionView = Mission & { steps: MissionStep[]; progress: MissionProgress; requests: PermissionRequest[]; artifacts: ArtifactSummary[]; batch: BatchView | null };
+export type MissionView = Mission & { steps: MissionStep[]; progress: MissionProgress; requests: PermissionRequest[]; artifacts: ArtifactSummary[]; batch: BatchView | null;
+  /** M-A-3 T9: digest of the reviewed plan; a paired device binds mission.approve to it so a replanned scope is never approved unseen. */
+  planReference?: string;
+  /** M-A-3 T9: whether a paired device may approve this pending plan (Host verdict). */
+  remote?: RemoteAnswer;
+};
 
 export type ArtifactType =
   | "source_file"

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import {
   Activity,
   ArrowRight,
@@ -39,6 +40,15 @@ import { Pairing, Phone } from "./phone";
 import { Telemetry } from "./telemetry";
 import { useHostStream } from "./host-stream";
 import { attentionRequired, filteredActivities, type ActivityFilters } from "./workspace-model";
+import { CONNECTION_LABEL, freshnessLabel, pairingReason } from "./connection-model";
+import {
+  attentionCount,
+  attentionLabel,
+  isDevice,
+  rightsSummary,
+  shortId,
+  WORKSTATION_CAPTION,
+} from "./remote-view-model";
 
 import "./premium.css";
 
@@ -108,6 +118,10 @@ export function Island() {
           ? `Host ${store.hostHealth.operationalState}`
           : "Host connected";
   const task = store.tasks.find((row) => row.id === store.decisionTaskId);
+  const attention = attentionCount(store.agents?.agents ?? [], store.missions?.missions ?? []);
+  const connection = store.connection.state;
+  const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const freshness = freshnessLabel(store.connection.snapshotAt, now || Date.now(), clock);
   return (
     <div
       className="bunny-app t8-app"
@@ -126,15 +140,27 @@ export function Island() {
               Bunny<span className="brand-suffix">A</span>
             </span>
           </button>
-          <button
-            className="icon-button mobile-menu"
-            aria-label="Toggle navigation"
-            aria-expanded={menu}
-            aria-controls="primary-navigation"
-            onClick={() => setMenu(!menu)}
-          >
-            <Menu size={20} />
-          </button>
+          <span className="mobile-header-actions">
+            {attention > 0 && (
+              <button
+                className="mobile-attention"
+                aria-label={attentionLabel(attention)}
+                onClick={() => navigate("agentic")}
+              >
+                <ShieldCheck size={16} />
+                <span>{attention}</span>
+              </button>
+            )}
+            <button
+              className="icon-button mobile-menu"
+              aria-label="Toggle navigation"
+              aria-expanded={menu}
+              aria-controls="primary-navigation"
+              onClick={() => setMenu(!menu)}
+            >
+              <Menu size={20} />
+            </button>
+          </span>
         </div>
         <nav id="primary-navigation" aria-label="Primary navigation">
           {NAV.map(({ id, label, icon: Icon }) => (
@@ -185,12 +211,10 @@ export function Island() {
         <header className="app-topbar">
           <span>{companion ? "Bunny companion" : "Your personal workspace"}</span>
           <div>
-            <span className="stream-indicator" role="status">
-              {store.host !== "online"
-                ? health
-                : store.streamStatus === "live"
-                  ? "Live Host updates"
-                  : "Reconnecting activity"}
+            <span className="stream-indicator" role="status" data-connection={connection}>
+              {connection === "live" || connection === "polling"
+                ? `${CONNECTION_LABEL[connection]} · ${freshness}`
+                : CONNECTION_LABEL[connection]}
             </span>
             <button
               className="icon-button"
@@ -202,24 +226,7 @@ export function Island() {
           </div>
         </header>
         <HostHealthWarning />
-        {store.connectionChecked && store.host !== "online" && (
-          <div className="offline-banner" role="status">
-            <WifiOff size={18} />
-            <span>
-              <strong>
-                {store.pairingRequired
-                  ? "This device needs pairing."
-                  : "Your Host connection is unavailable."}
-              </strong>
-              <small>
-                Retained state may be out of date. Work status will reconcile after reconnection.
-              </small>
-            </span>
-            <button className="btn secondary" onClick={() => void store.refreshOllama()}>
-              Reconnect
-            </button>
-          </div>
-        )}
+        <ConnectionBanner freshness={freshness} />
         {store.syncStatus && (
           <p className="sync-message" role="status">
             {store.syncStatus}
@@ -264,6 +271,59 @@ export function Island() {
         </footer>
       </div>
       <Notice />
+    </div>
+  );
+}
+/**
+ * M-A-3 T9 connection truth for the whole shell. Retained data is labelled stale with its real time;
+ * controls are paused by the store until a fresh canonical view arrives. Work on the Host continues
+ * regardless of this device's connection.
+ */
+function ConnectionBanner({ freshness }: { freshness: string }) {
+  const store = useIsland();
+  const state = store.connection.state;
+  if (state === "pairing")
+    return (
+      <div className="connection-banner" data-state="pairing" role="status">
+        <div className="offline-banner">
+          <WifiOff size={18} />
+          <span>
+            <strong>This device needs pairing.</strong>
+            <small>{pairingReason(store.connection.pairingCode)} Agents keep running on your Windows Host.</small>
+          </span>
+        </div>
+        <Pairing compact />
+      </div>
+    );
+  if (state === "host-changed")
+    return (
+      <div className="offline-banner connection-banner" data-state="host-changed" role="alert">
+        <ShieldCheck size={18} />
+        <span>
+          <strong>This is a different Bunny-A Host.</strong>
+          <small>
+            This device was paired with Host {shortId(store.pinnedHostId)}; the address now answers as Host{" "}
+            {shortId(store.hostIdentity?.hostId)}. Controls stay off until you confirm this is your computer.
+          </small>
+        </span>
+        <button className="btn secondary" onClick={() => store.trustHost()}>
+          Trust this Host
+        </button>
+      </div>
+    );
+  if (state !== "reconnecting" && state !== "offline") return null;
+  return (
+    <div className="offline-banner connection-banner" data-state={state} role="status">
+      <WifiOff size={18} />
+      <span>
+        <strong>{state === "offline" ? "Offline" : "Reconnecting to your Host…"}</strong>
+        <small>
+          {freshness} — controls are paused. Shown state may be out of date; Agents keep running on the Host.
+        </small>
+      </span>
+      <button className="btn secondary" onClick={() => void store.refreshOllama()}>
+        Reconnect
+      </button>
     </div>
   );
 }
@@ -460,7 +520,8 @@ function ModelsWorkspace() {
           onClick={async () => {
             setBusy(true);
             try {
-              await store.projectCommand("refresh", {});
+              // Discovery re-probes providers on the workstation; a paired device only re-reads Host state.
+              if (!isDevice(store.viewer)) await store.projectCommand("discover", {});
               await store.refreshOllama();
             } finally {
               setBusy(false);
@@ -468,7 +529,7 @@ function ModelsWorkspace() {
           }}
         >
           <RefreshCw size={16} />
-          {busy ? "Refreshing…" : "Refresh discovery"}
+          {busy ? "Refreshing…" : isDevice(store.viewer) ? "Refresh" : "Refresh discovery"}
         </button>
       </div>
       <div className="models-list">
@@ -699,31 +760,154 @@ function ActivityWorkspace({ now }: { now: number }) {
 }
 function DevicesWorkspace() {
   const store = useIsland();
+  const [signingOut, setSigningOut] = useState(false);
+  const [revoking, setRevoking] = useState<{ id: string; name: string } | null>(null);
+  const viewer = store.viewer;
+  const when = (ms: number | null | undefined) => (ms ? new Date(ms).toLocaleString() : "Not recorded");
+  const identity = store.hostIdentity;
   return (
     <>
       <div className="page-heading">
         <div>
           <p className="eyebrow">Trusted connections</p>
           <h1>Devices</h1>
-          <p>Existing workstation and paired-device access.</p>
+          <p>Who can reach this Host, and what each connection may do.</p>
         </div>
       </div>
       <section className="t8-surface current-device">
         <Smartphone size={22} />
         <div>
-          <h2>Current UI connection</h2>
-          <p>{store.host === "online" ? "Connected to canonical Host" : "Host unavailable"}</p>
-          <p className="caption">
-            Host instance {store.hostInstanceId?.slice(0, 12) ?? "UNKNOWN"}. A device name or last
-            activity is shown only when the Host supplies it.
+          <h2>{viewer?.kind === "device" ? viewer.name : "This workstation"}</h2>
+          <p>
+            {CONNECTION_LABEL[store.connection.state]}
+            {viewer?.kind === "device" ? " · Paired device" : viewer ? " · Windows Host owner" : ""}
           </p>
+          <dl className="fact-list">
+            <div>
+              <dt>Host</dt>
+              <dd>
+                {identity
+                  ? `${shortId(identity.hostId)} · running since ${new Date(identity.startedAt).toLocaleString()}`
+                  : "Unknown until the Host answers"}
+              </dd>
+            </div>
+            {viewer?.kind === "device" && (
+              <>
+                <div>
+                  <dt>Paired</dt>
+                  <dd>{when(viewer.pairedAt)}</dd>
+                </div>
+                <div>
+                  <dt>Session expires</dt>
+                  <dd>{when(viewer.expiresAt)}</dd>
+                </div>
+                <div>
+                  <dt>Last seen by the Host</dt>
+                  <dd>{when(viewer.lastSeenAt)}</dd>
+                </div>
+              </>
+            )}
+          </dl>
+          {viewer?.kind === "device" && (
+            <>
+              <h3 className="eyebrow">This device may</h3>
+              <ul className="rights-list">
+                {rightsSummary(viewer).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              <p className="caption">
+                Creating Agents, first starts, scope changes, pairing and settings are {WORKSTATION_CAPTION.toLowerCase()}.
+              </p>
+              <button className="btn danger" onClick={() => setSigningOut(true)}>
+                Sign out this phone
+              </button>
+            </>
+          )}
         </div>
       </section>
-      <Pairing />
-      <p className="caption">
-        Phone Agentic control is a later gate. A responsive desktop view does not establish
-        physical-phone connectivity.
-      </p>
+      {viewer?.kind !== "device" && (
+        <>
+          <Pairing />
+          {store.devices.length ? (
+            <section className="t8-surface paired-devices">
+              <h2>Paired devices</h2>
+              {store.devices.map((device) => (
+                <div className="paired-device-row" key={device.id}>
+                  <Smartphone size={16} />
+                  <span>
+                    <strong className="wrap-anywhere">{device.name}</strong>
+                    <small>
+                      Paired {when(device.createdAt)} · last seen {when(device.lastSeenAt)} · expires{" "}
+                      {when(device.expiresAt)}
+                    </small>
+                  </span>
+                  <button
+                    className="btn quiet danger-text"
+                    disabled={!store.canAct()}
+                    onClick={() => setRevoking({ id: device.id, name: device.name })}
+                  >
+                    Revoke access
+                  </button>
+                </div>
+              ))}
+            </section>
+          ) : null}
+        </>
+      )}
+      <Dialog.Root open={signingOut} onOpenChange={setSigningOut}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="t8-overlay" />
+          <Dialog.Content className="t8-dialog" data-theme={store.theme}>
+            <Dialog.Title>Sign out this phone?</Dialog.Title>
+            <Dialog.Description>
+              This phone revokes its own access on the Host and forgets its session. Agents keep running on
+              your Windows Host. Pairing again needs a new code from the workstation.
+            </Dialog.Description>
+            <div className="actions">
+              <Dialog.Close asChild>
+                <button className="btn secondary">Stay signed in</button>
+              </Dialog.Close>
+              <button
+                className="btn danger"
+                onClick={async () => {
+                  setSigningOut(false);
+                  await store.signOutDevice();
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+      <Dialog.Root open={!!revoking} onOpenChange={(open) => !open && setRevoking(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="t8-overlay" />
+          <Dialog.Content className="t8-dialog" data-theme={store.theme}>
+            <Dialog.Title>Revoke {revoking?.name}?</Dialog.Title>
+            <Dialog.Description>
+              The device loses access immediately and its open activity streams close. Approval batches it
+              created and Agent consent it approved end, and those Agents stop. Completed work stays.
+            </Dialog.Description>
+            <div className="actions">
+              <Dialog.Close asChild>
+                <button className="btn secondary">Keep access</button>
+              </Dialog.Close>
+              <button
+                className="btn danger"
+                onClick={() => {
+                  const target = revoking;
+                  setRevoking(null);
+                  if (target) store.revokeDevice(target.id);
+                }}
+              >
+                Revoke access
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 }

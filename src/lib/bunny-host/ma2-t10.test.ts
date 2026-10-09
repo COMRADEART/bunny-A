@@ -32,17 +32,17 @@ async function fixture() {
     await reader.read();
     return reader;
   };
-  const emit = (message: string, taskId: string | null = null) => host.manager.emit(host.manager.db.event("t10.safe_probe", taskId, message));
+  const emit = (message: string, taskId: string | null = null) => { const event = host.manager.db.event("t10.safe_probe", taskId, message); host.manager.emit(event); return event; };
   const close = async () => { for (const c of controllers) c.abort(); await host.close(); rmSync(directory, { recursive: true, force: true }); };
   return { host, base, command, pair, stream, emit, close };
 }
-async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, marker: string) {
+async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, marker: number) {
   let text = "";
   for (let i = 0; i < 20; i++) {
     const next = await Promise.race([reader.read(), new Promise<never>((_, reject) => setTimeout(() => reject(new Error("bounded stream read timed out")), 2000))]);
     if (next.done) return { text, closed: true };
     text += new TextDecoder().decode(next.value);
-    if (text.includes(marker)) return { text, closed: false };
+    if (new RegExp(`"sequence"\\s*:\\s*${marker}(?=[,}])`).test(text)) return { text, closed: false };
   }
   throw new Error("bounded stream batch limit");
 }
@@ -52,14 +52,17 @@ for (const taskScoped of [false, true]) test(`T10-T6-04: revocation ends an alre
     const device = await f.pair();
     const taskId = taskScoped ? f.host.manager.submit({ prompt: "Safe unapproved stream fixture", mode: "balanced" }).id : null;
     const reader = await f.stream(device.token, taskId ? "/events?task=" + taskId : "/events");
-    f.emit("AUTHORIZED_POSITIVE_CONTROL", taskId);
-    assert.equal((await readUntil(reader, "AUTHORIZED_POSITIVE_CONTROL")).closed, false);
+    const positive = f.emit("AUTHORIZED_POSITIVE_CONTROL", taskId);
+    const delivered = await readUntil(reader, positive.sequence);
+    assert.equal(delivered.closed, false, "the authorized device receives this exact canonical event sequence");
+    assert.ok(!delivered.text.includes("AUTHORIZED_POSITIVE_CONTROL"), "paired streams redact raw detail, including unknown event types");
     assert.equal((await f.command("device.revoke", { id: device.deviceId })).status, 200);
-    f.emit("POST_REVOKE_FORBIDDEN_DELIVERY", taskId);
+    const forbidden = f.emit("POST_REVOKE_FORBIDDEN_DELIVERY", taskId);
     try {
-      const remaining = await readUntil(reader, "POST_REVOKE_FORBIDDEN_DELIVERY");
+      const remaining = await readUntil(reader, forbidden.sequence);
       assert.equal(remaining.closed, true);
       assert.ok(!remaining.text.includes("POST_REVOKE_FORBIDDEN_DELIVERY"));
+      assert.ok(!new RegExp(`"sequence"\\s*:\\s*${forbidden.sequence}(?=[,}])`).test(remaining.text), "even a redacted future event must never reach the revoked device");
     } catch (error) {
       // Destroyed HTTP streams report termination as a fetch TypeError on Node.
       assert.ok(error instanceof TypeError, String(error));
@@ -75,8 +78,13 @@ test("T10-T6-04: revoking one device preserves workstation and independently pai
     const a = await f.pair(), b = await f.pair();
     const workstation = await f.stream(f.host.token), other = await f.stream(b.token);
     assert.equal((await f.command("device.revoke", { id: a.deviceId })).status, 200);
-    f.emit("UNRELATED_AUTHORITY_SURVIVES");
-    for (const reader of [workstation, other]) assert.equal((await readUntil(reader, "UNRELATED_AUTHORITY_SURVIVES")).closed, false);
+    const positive = f.emit("UNRELATED_AUTHORITY_SURVIVES");
+    const ownerEvent = await readUntil(workstation, positive.sequence);
+    const deviceEvent = await readUntil(other, positive.sequence);
+    assert.equal(ownerEvent.closed, false);
+    assert.ok(ownerEvent.text.includes("UNRELATED_AUTHORITY_SURVIVES"), "workstation detail is unchanged");
+    assert.equal(deviceEvent.closed, false, "the other device still receives the exact canonical event");
+    assert.ok(!deviceEvent.text.includes("UNRELATED_AUTHORITY_SURVIVES"), "the other device retains only the safe projection");
     assert.equal((await fetch(f.base + "/state", { headers: { authorization: "Bearer " + b.token } })).status, 200);
   } finally { await f.close(); }
 });

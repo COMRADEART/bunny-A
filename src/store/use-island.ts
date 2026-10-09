@@ -1,6 +1,30 @@
 import { create } from "zustand";
-import { commandBunnyHost, readBunnyHost } from "@/lib/orch/host";
-import type { HostEvent, HostSnapshot, PerformanceProfile } from "@/lib/bunny-host/contracts";
+import {
+  commandBunnyHost,
+  readBunnyHost,
+  type HostCommandOk,
+  type HostCommandResult,
+  type HostFailure,
+} from "@/lib/orch/host";
+import type {
+  HostEvent,
+  HostIdentity,
+  HostSnapshot,
+  PerformanceProfile,
+  SnapshotViewer,
+} from "@/lib/bunny-host/contracts";
+import {
+  backoffMs,
+  canAct,
+  commandCaption,
+  connectionReducer,
+  initialConnection,
+  isMutating,
+  reconcileCaption,
+  type Connection,
+  type ConnectionEvent,
+  type Uncertain,
+} from "@/components/island/connection-model";
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
 import type { OperationalHealth } from "@/lib/bunny-host/failure.server";
@@ -111,10 +135,31 @@ type Island = Preferences & {
   cursor: number;
   hydratedFromHost: boolean;
   pairingRequired: boolean;
+  /** M-A-3 T9 connection truth (connection-model.ts); drives banners, retries and whether controls may act. */
+  connection: Connection;
+  connectionEvent: (event: ConnectionEvent) => void;
+  /** Mutating controls may act only on a fresh canonical view over a working connection. */
+  canAct: () => boolean;
+  /** Stable Host installation id + this boot's epoch, from the last snapshot. */
+  hostIdentity: HostIdentity | null;
+  /** Who the Host projected the last snapshot for (workstation, or this paired device). */
+  viewer: SnapshotViewer | null;
+  /** The Host this device paired with (non-secret; device viewers only). */
+  pinnedHostId: string | null;
+  /** Commands the Host has not confirmed; their targets stay disabled until reconciled. Never resent. */
+  uncertain: Uncertain[];
+  /** In-flight command action per target id (Agent, Mission, request or task id). */
+  pending: Record<string, string>;
+  /** Re-pin after the user confirms a different Host is the one they expect. */
+  trustHost: () => void;
+  /** Pair this device with a workstation-issued one-time code; pins the returned Host id. */
+  pairDevice: (code: string, name: string) => Promise<boolean>;
+  /** Sign this device out: it revokes its own credential on the Host and clears its cookie. */
+  signOutDevice: () => Promise<void>;
   performance: PerformanceProfile[];
   remoteConfigured: boolean;
   remoteUrl: string | null;
-  devices: { id: string; name: string; createdAt: number }[];
+  devices: { id: string; name: string; createdAt: number; expiresAt?: number; lastSeenAt?: number | null }[];
   revokeDevice: (id: string) => void;
   pairCode: string | null;
   localOnly: boolean;
@@ -151,6 +196,11 @@ type Island = Preferences & {
     requestId: string,
     decision: "allow_once" | "allow_batch" | "deny",
   ) => Promise<void>;
+  /** Answer one Host ask, recording which Agent/Mission it belongs to for pending/uncertain state. */
+  respondRequest: (
+    requestId: string,
+    decision: "allow_once" | "allow_batch" | "deny",
+  ) => Promise<boolean>;
   revokeBatch: (missionId: string, batchId: string) => Promise<void>;
   ackInbox: (id: string) => void;
   configureMissions: (patch: { enabled?: boolean; triggersEnabled?: boolean }) => void;
@@ -271,12 +321,68 @@ export function liveProviders(state: {
   );
 }
 let refreshing: Promise<void> | null = null;
+/** A hung read never freezes the client: it counts as a failure and frees the single-flight slot. */
+export const READ_TIMEOUT_MS = 12_000;
+/** The gateway waits 45 s for a command; beyond this the outcome is unknown and is reconciled, never resent. */
+export const COMMAND_TIMEOUT_MS = 50_000;
+const PIN_KEY = "bunny-a.remote-host.v1";
+function loadPin(): string | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(PIN_KEY) ?? "null") as { hostId?: unknown } | null;
+    return typeof value?.hostId === "string" ? value.hostId : null;
+  } catch {
+    return null;
+  }
+}
+function savePin(hostId: string | null) {
+  try {
+    if (hostId) localStorage.setItem(PIN_KEY, JSON.stringify({ hostId }));
+    else localStorage.removeItem(PIN_KEY);
+  } catch {
+    /* The pin is a convenience; the Host still checks every command's expected identity. */
+  }
+}
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+function newOperationId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/** Android Chrome throws for the page Notification constructor; a notification never breaks Host truth. */
+function notify(body: string, tag: string) {
+  try {
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted")
+      new Notification("Bunny-A", { body, tag });
+  } catch {
+    /* Unsupported constructor (mobile): the in-app attention badge still shows it. */
+  }
+}
 export const useIsland = create<Island>((set, get) => {
   let requestOrder = 0,
     appliedOrder = 0,
     disconnected = false;
-  const apply = (snapshot: HostSnapshot, after = 0, order = ++requestOrder) => {
+  let accessGeneration = 0;
+  const reconciling = new Set<string>();
+  const apply = (snapshot: HostSnapshot, after = 0, order = ++requestOrder, generation = accessGeneration) => {
     const state = get();
+    // A response admitted before sign-out/revocation cannot repopulate a cleared protected view.
+    if (generation !== accessGeneration || state.connection.state === "pairing") return;
     if (order < appliedOrder && snapshot.instanceId !== state.hostInstanceId) return;
     const reconciled = reconcileSnapshot(
       {
@@ -291,6 +397,17 @@ export const useIsland = create<Island>((set, get) => {
     );
     if (!reconciled) return;
     appliedOrder = Math.max(appliedOrder, order);
+    // M-A-3 T9: a paired device pins the Host it paired with; a different Host blocks controls until trusted.
+    const identity = snapshot.hostIdentity ?? null;
+    const viewer = snapshot.viewer ?? null;
+    let pinned = state.pinnedHostId;
+    if (viewer?.kind === "device" && identity && !pinned) {
+      pinned = identity.hostId;
+      savePin(pinned);
+    }
+    const hostChanged = viewer?.kind === "device" && !!identity && !!pinned && identity.hostId !== pinned;
+    set({ hostIdentity: identity, viewer, pinnedHostId: pinned });
+    get().connectionEvent({ type: "read-ok", at: Date.now(), hostChanged });
     const ollama = snapshot.providers.find((p) => p.id === "ollama");
     // The first snapshot only seeds the cursor: replaying history would notify about long-finished tasks.
     const fresh = reconciled.fresh;
@@ -358,28 +475,167 @@ export const useIsland = create<Island>((set, get) => {
         ].includes(event.type)
       ) {
         if (event.type === "thermal.warning") get().note(event.detail);
-        if (
-          typeof window !== "undefined" &&
-          "Notification" in window &&
-          Notification.permission === "granted"
-        )
-          new Notification("Bunny-A", {
-            body: event.type === "thermal.warning" ? event.detail : event.type.replaceAll(".", " "),
-            tag: event.taskId ?? event.missionId ?? event.type,
-          });
+        notify(
+          event.type === "thermal.warning" ? event.detail : event.type.replaceAll(".", " "),
+          event.taskId ?? event.missionId ?? event.type,
+        );
       }
   };
-  const command = async (action: string, data: Record<string, unknown>) => {
+  /** Revoked, expired or unpaired: stop retrying and drop every protected projection from memory. */
+  const enterPairing = (code: string) => {
+    accessGeneration++;
+    refreshing = null;
+    disconnected = true;
+    set({
+      host: "offline",
+      connectionChecked: true,
+      pairingRequired: true,
+      agents: null,
+      missions: null,
+      tasks: [],
+      projects: [],
+      events: [],
+      activities: [],
+      audit: [],
+      devices: [],
+      providerList: [],
+      providerUsage: null,
+      modelCapabilities: null,
+      samples: [],
+      uncertain: [],
+      pending: {},
+      hostInstanceId: null,
+      viewer: null,
+      hostIdentity: null,
+      hostHealth: null,
+      release: null,
+      performance: [],
+      remoteUrl: null,
+      pairCode: null,
+      cursor: 0,
+    });
+    get().connectionEvent({ type: "pairing", code });
+  };
+  const failRead = (failure: HostFailure | null) => {
+    if (failure?.pairing) return enterPairing(failure.code);
+    disconnected = true;
+    set({ host: "offline", connectionChecked: true, pairingRequired: false });
+    get().connectionEvent({ type: "read-fail", at: Date.now() });
+  };
+  const forget = (operationId: string, caption: string) => {
+    set({ uncertain: get().uncertain.filter((row) => row.operationId !== operationId) });
+    get().note(caption);
+  };
+  /**
+   * A command whose answer was lost: refresh canonical state and ask the Host what happened to that exact
+   * operation id. Nothing is ever resent; a new Host epoch means the ledger is gone, so only canonical state counts.
+   */
+  const reconcile = async (row: Uncertain) => {
+    if (reconciling.has(row.operationId)) return;
+    reconciling.add(row.operationId);
+    if (!get().uncertain.some((item) => item.operationId === row.operationId))
+      set({ uncertain: [...get().uncertain, row] });
+    get().note(commandCaption({ code: "OUTCOME_UNKNOWN", message: "", outcome: "unknown" }));
     try {
-      const order = ++requestOrder;
-      const result = await commandBunnyHost({ data: { action, data } });
-      apply(result.snapshot, 0, order);
-      return result;
-    } catch (error) {
-      get().note(error instanceof Error ? error.message : "Host command failed.");
-      return null;
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      if (!get().uncertain.some((item) => item.operationId === row.operationId)) return;
+      await get().refreshOllama();
+      const current = get();
+      if (current.connection.state === "pairing") return forget(row.operationId, "This device must pair again.");
+      if (current.host === "online" && current.connection.state !== "host-changed") {
+        const sameEpoch = !!row.epoch && current.hostIdentity?.epoch === row.epoch;
+        if (!sameEpoch) return forget(row.operationId, reconcileCaption("unknown", false));
+        const status = await command("operation.status", { operationId: row.operationId });
+        const data = status?.data as { state?: string; error?: string | null } | undefined;
+        if (data?.state && data.state !== "in_progress")
+          return forget(row.operationId, reconcileCaption(data.state, true, data.error));
+      }
+      await sleep(backoffMs(attempt));
+    }
+    // An in-progress or unreachable operation remains uncertain. A later successful refresh checks again;
+    // elapsed time is never authority to unlock a conflicting control.
+    get().note("The Host has not confirmed this action yet. Controls stay paused while it is checked.");
+    } finally {
+      reconciling.delete(row.operationId);
     }
   };
+  /**
+   * Every Host command. Mutating actions carry an operation id and the Host identity/epoch this view came from,
+   * are refused locally when the view is not fresh, and are never queued or resent. Returns the Host answer only
+   * when the Host applied it.
+   */
+  const command = async (
+    action: string,
+    data: Record<string, unknown>,
+    targetId: string | null = null,
+  ): Promise<HostCommandOk | null> => {
+    const mutating = isMutating(action);
+    const before = get();
+    if (mutating && !before.canAct()) {
+      before.note(
+        before.connection.state === "host-changed"
+          ? "This is a different Bunny-A Host. Review it before changing anything."
+          : "Reconnect to the Host before changing anything. Nothing was sent.",
+      );
+      return null;
+    }
+    if (targetId && (before.pending[targetId] || before.uncertain.some((row) => row.targetId === targetId))) {
+      before.note("Bunny is still confirming the previous action on this item.");
+      return null;
+    }
+    const operationId = mutating ? newOperationId() : undefined;
+    const generation = accessGeneration;
+    const identity = before.hostIdentity;
+    const expect = mutating && identity ? { hostId: identity.hostId, epoch: identity.epoch } : undefined;
+    if (targetId) set({ pending: { ...get().pending, [targetId]: action } });
+    const order = ++requestOrder;
+    let result: HostCommandResult;
+    try {
+      result = await withTimeout(
+        commandBunnyHost({
+          data: { action, data, ...(operationId ? { operationId } : {}), ...(expect ? { expect } : {}) },
+        }),
+        COMMAND_TIMEOUT_MS,
+      );
+    } catch {
+      result = {
+        ok: false,
+        outcome: mutating ? "unknown" : "refused",
+        code: mutating ? "OUTCOME_UNKNOWN" : "HOST_UNREACHABLE",
+        message: "Bunny-A Host did not answer.",
+        status: 0,
+        pairing: false,
+      };
+    } finally {
+      if (targetId) {
+        const { [targetId]: _done, ...rest } = get().pending;
+        set({ pending: rest });
+      }
+    }
+    if (generation !== accessGeneration) return null;
+    if (result.ok) {
+      apply(result.snapshot, 0, order, generation);
+      return result;
+    }
+    if (result.pairing) {
+      enterPairing(result.code);
+      return null;
+    }
+    if (result.outcome === "unknown" && operationId) {
+      void reconcile({ operationId, action, targetId, since: Date.now(), epoch: identity?.epoch ?? null });
+      return null;
+    }
+    get().note(commandCaption(result));
+    if (result.code === "HOST_EPOCH_CHANGED" || result.code === "HOST_IDENTITY_CHANGED") void get().refreshOllama();
+    return null;
+  };
+  const agentRevision = (id: string) =>
+    get().agents?.agents.find((agent) => agent.id === id)?.authorization?.revision;
+  const requestTarget = (requestId: string) =>
+    get().agents?.agents.find((agent) => agent.authorization?.pending.some((item) => item.id === requestId) ||
+      get().missions?.missions.find((mission) => mission.id === agent.missionId)?.requests.some((request) => request.id === requestId))?.id ??
+    get().missions?.missions.find((mission) => mission.requests.some((request) => request.id === requestId))?.id ??
+    requestId;
   return {
     theme: "dark",
     appearance: DEFAULT_APPEARANCE,
@@ -420,6 +676,71 @@ export const useIsland = create<Island>((set, get) => {
     cursor: 0,
     hydratedFromHost: false,
     pairingRequired: false,
+    connection: initialConnection(),
+    connectionEvent: (event) => {
+      const next = connectionReducer(get().connection, event);
+      if (next !== get().connection) set({ connection: next });
+    },
+    canAct: () => canAct(get().connection, Date.now()),
+    hostIdentity: null,
+    viewer: null,
+    pinnedHostId: null,
+    uncertain: [],
+    pending: {},
+    trustHost: () => {
+      const hostId = get().hostIdentity?.hostId ?? null;
+      if (!hostId) return;
+      savePin(hostId);
+      set({ pinnedHostId: hostId });
+      get().connectionEvent({ type: "trust-host", at: Date.now() });
+      get().note("This Host is now trusted on this device.");
+    },
+    pairDevice: async (code, name) => {
+      try {
+        accessGeneration++;
+        refreshing = null;
+        const response = await fetch("/api/bunny-pair", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ code: code.trim(), name: name.trim() || "Phone" }),
+        });
+        const result = (await response.json().catch(() => ({}))) as { error?: string; hostId?: string | null };
+        if (!response.ok) {
+          get().note(result.error ?? "Pairing failed. Check the one-time code on your workstation.");
+          return false;
+        }
+        if (result.hostId) {
+          savePin(result.hostId);
+          set({ pinnedHostId: result.hostId });
+        }
+        disconnected = true;
+        set({ pairingRequired: false });
+        get().connectionEvent({ type: "paired", at: Date.now() });
+        await get().refreshOllama();
+        return true;
+      } catch {
+        get().note("Pairing unavailable. Check the secure companion connection.");
+        return false;
+      }
+    },
+    signOutDevice: async () => {
+      try {
+        const response = await fetch("/api/bunny-pair", { method: "DELETE" });
+        const result = (await response.json().catch(() => ({}))) as { revoked?: boolean; hostUnreachable?: boolean };
+        get().note(
+          result.revoked
+            ? "This phone is signed out and its access was revoked on the Host."
+            : result.hostUnreachable
+              ? "Signed out on this phone. The Host was unreachable: revoke this device from your workstation too."
+              : "Signed out on this phone.",
+        );
+      } catch {
+        get().note("Sign out could not reach the Host. Revoke this device from your workstation.");
+      }
+      savePin(null);
+      set({ pinnedHostId: null });
+      enterPairing("PAIRING_REQUIRED");
+    },
     performance: [],
     remoteConfigured: false,
     pairCode: null,
@@ -437,35 +758,45 @@ export const useIsland = create<Island>((set, get) => {
     setComposeKind: (composeKind) => set({ composeKind }),
     openMission: (missionFocus) => set({ missionFocus }),
     approveMission: async (id) => {
-      await command("mission.approve", { id });
+      // Bind the approval to the plan this view reviewed; the Host refuses a replanned scope.
+      const plan = get().missions?.missions.find((mission) => mission.id === id)?.planReference;
+      await command("mission.approve", { id, ...(plan ? { plan } : {}) }, id);
     },
     pauseAgent: async (id) => {
-      await command("agent.pause", { id });
+      await command("agent.pause", { id }, id);
     },
     resumeAgent: async (id) => {
-      await command("agent.resume", { id });
+      // Resume restores admissions, so it is bound to the consent revision this view reviewed.
+      const revision = agentRevision(id);
+      await command("agent.resume", { id, ...(revision === undefined ? {} : { revision }) }, id);
     },
     stopAgent: async (id) => {
-      await command("agent.stop", { id });
+      await command("agent.stop", { id }, id);
     },
     agentAuthorization: async (id, action, revision, patch) => {
-      await command(`agent.authorization.${action}`, {
+      await command(
+        `agent.authorization.${action}`,
+        {
+          id,
+          ...(revision === undefined ? {} : { revision }),
+          ...(patch ? { patch } : {}),
+        },
         id,
-        ...(revision === undefined ? {} : { revision }),
-        ...(patch ? { patch } : {}),
-      });
+      );
     },
     stopMission: async (id) => {
-      await command("mission.stop", { id });
+      await command("mission.stop", { id }, id);
     },
     retryMission: async (id) => {
-      await command("mission.retry", { id });
+      await command("mission.retry", { id }, id);
     },
     respondMission: async (requestId, decision) => {
-      await command("mission.respond", { requestId, decision });
+      await get().respondRequest(requestId, decision);
     },
+    respondRequest: async (requestId, decision) =>
+      !!(await command("mission.respond", { requestId, decision }, requestTarget(requestId))),
     revokeBatch: async (missionId, batchId) => {
-      await command("mission.revoke_batch", { missionId, batchId });
+      await command("mission.revoke_batch", { missionId, batchId }, missionId);
     },
     ackInbox: (id) => {
       void command("inbox.ack", { id });
@@ -474,7 +805,7 @@ export const useIsland = create<Island>((set, get) => {
       void command("mission.configure", patch);
     },
     revokeDevice: (id) => {
-      void command("device.revoke", { id });
+      void command("device.revoke", { id }, id);
     },
     hydrate: () => {
       if (get().hydrated) return;
@@ -499,6 +830,7 @@ export const useIsland = create<Island>((set, get) => {
               : "light"
             : appearance.theme,
         drafts: loaded.drafts ?? legacy.drafts ?? [],
+        pinnedHostId: loadPin(),
         extensions: loaded.extensions ?? legacy.extensions ?? { cline: false, cursor: false },
         autoSubmit: loaded.autoSubmit ?? false,
         cpuWarn: loaded.cpuWarn ?? 90,
@@ -538,29 +870,33 @@ export const useIsland = create<Island>((set, get) => {
       void get().refreshOllama();
     },
     refreshOllama: async () => {
+      if (get().connection.state === "pairing") return;
       if (refreshing) return refreshing;
-      refreshing = (async () => {
+      const generation = accessGeneration;
+      const refreshJob = (async () => {
         try {
           const after = disconnected ? 0 : get().cursor;
           const order = ++requestOrder;
-          const snapshot = await readBunnyHost({ data: { after } });
-          const resync = needsCanonicalResync(get().hostInstanceId, snapshot, after);
-          apply(snapshot, after, order);
+          const read = await withTimeout(readBunnyHost({ data: { after } }), READ_TIMEOUT_MS);
+          if (generation !== accessGeneration) return;
+          if (!read.ok) return failRead(read);
+          const resync = needsCanonicalResync(get().hostInstanceId, read.snapshot, after);
+          apply(read.snapshot, after, order, generation);
           if (resync) {
-            const canonical = await readBunnyHost({ data: { after: 0 } });
-            apply(canonical, 0, ++requestOrder);
+            const canonical = await withTimeout(readBunnyHost({ data: { after: 0 } }), READ_TIMEOUT_MS);
+            if (generation !== accessGeneration) return;
+            if (canonical.ok) apply(canonical.snapshot, 0, ++requestOrder, generation);
+            else failRead(canonical);
           }
-        } catch (error) {
-          disconnected = true;
-          set({
-            host: "offline",
-            connectionChecked: true,
-            pairingRequired: error instanceof Error && error.message.includes("Pair this device"),
-          });
+        } catch {
+          if (generation === accessGeneration) failRead(null);
         }
       })().finally(() => {
-        refreshing = null;
+        if (refreshing === refreshJob) refreshing = null;
+        if (generation === accessGeneration && get().canAct())
+          for (const row of get().uncertain) if (!reconciling.has(row.operationId)) void reconcile(row);
       });
+      refreshing = refreshJob;
       return refreshing;
     },
     setSheet: (sheet) => set({ sheet }),
@@ -706,10 +1042,10 @@ export const useIsland = create<Island>((set, get) => {
         );
         return;
       }
-      await command("approve", { id });
+      await command("approve", { id }, id);
     },
     stop: async (id) => {
-      await command("stop", { id });
+      await command("stop", { id }, id);
     },
     pause: () => get().note("Pause unsupported by these executors."),
     resume: () => get().note("Live resume unsupported; route a new task for review."),

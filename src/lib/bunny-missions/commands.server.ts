@@ -5,6 +5,7 @@ import { isAbsolute } from "node:path";
 import { statSync } from "node:fs";
 import { scopedPath } from "./paths.server.ts";
 import { CommandRefusedError } from "../bunny-host/failure.server.ts";
+import { WorkstationRequiredError } from "../bunny-host/device-authority.server.ts";
 
 const PROVIDERS: ProviderId[] = ["codex", "claude", "ollama", "opencode", "cline", "cursor"];
 const GRANTS: GrantPolicy[] = ["always_allow", "allow_for_mission", "ask_every_time", "read_only", "never_allow"];
@@ -18,11 +19,15 @@ export const MISSION_ACTIONS = new Set([
   "skill.run", "skill.versions", "skill.repair", "skill.verify", "skill.record",
   "trigger.create", "trigger.enable", "trigger.disable", "trigger.delete",
 ]);
-/** What a paired phone may do: create, inspect, answer approvals (once or small batch) and stop. Everything else needs the workstation. */
-const REMOTE = new Set(["mission.create", "mission.approve", "mission.start", "mission.stop", "mission.respond", "mission.get", "mission.revoke_batch", "inbox.ack"]);
+/**
+ * What a paired phone may do: inspect, answer approvals (once or small batch) and stop. Everything else needs the
+ * workstation. M-A-3 T9: creating new Missions moved to the workstation; answers stay within the Host's owner-consent
+ * boundary (MissionManager.device*Refusal).
+ */
+const REMOTE = new Set(["mission.approve", "mission.start", "mission.stop", "mission.respond", "mission.get", "mission.revoke_batch", "inbox.ack"]);
 
 export async function missionCommand(missions: MissionManager, action: string, data: Record<string, unknown>, access: { local: boolean; actor: string }): Promise<{ mission?: unknown; data?: unknown }> {
-  if (!access.local && !REMOTE.has(action)) throw new CommandRefusedError(`${action} requires workstation access.`);
+  if (!access.local && !REMOTE.has(action)) throw new WorkstationRequiredError(`${action} requires workstation access.`);
   const roots = () => [...missions.tasks.db.projects().map((project) => project.path), missions.tasks.defaultRoot];
   const direct = (cwd: unknown) => {
     const all = roots();
@@ -44,11 +49,13 @@ export async function missionCommand(missions: MissionManager, action: string, d
     }
     case "mission.plan": case "mission.replan":
       return { mission: await missions.replan(id(data.id), access.actor, data.steps, data.objective === undefined ? undefined : text(data.objective)) };
-    case "mission.approve": return { mission: missions.approve(id(data.id), access.actor, data.start !== false, data.revision === undefined ? undefined : Number(data.revision)) };
+    case "mission.approve": return { mission: missions.approve(id(data.id), access.actor, data.start !== false, data.revision === undefined ? undefined : Number(data.revision), data.plan === undefined ? undefined : text(data.plan, 200)) };
     case "mission.start": {
       missions.requireEnabled();
       const mission = missions.mission(id(data.id));
       if (mission.state !== "ready") throw new CommandRefusedError("Only an approved (ready) mission can be started.");
+      // M-A-3 T9 (G7): an Agent's Mission runs through its Agent, never as a bare Mission started remotely.
+      if (!access.local && (missions.agentic.exists(mission.id) || mission.origin.startsWith("agent:"))) throw new WorkstationRequiredError("Agent Missions are started from their Agent on the Windows Host.");
       return { mission: missions.view(missions.start(mission)) };
     }
     case "mission.stop": return { mission: await missions.stop(id(data.id), access.actor) };

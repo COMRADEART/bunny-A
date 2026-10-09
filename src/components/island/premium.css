@@ -1201,3 +1201,201 @@
   animation: none !important;
   transition: none !important;
 }
+
+/* M-A-3 T9 — phone supervision: visible captions, Host-backed asks, connection truth, safe areas. */
+.t8-app .control-caption {
+  flex-basis: 100%;
+  margin: var(--s2) 0 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.t8-app .control-caption.host-required {
+  flex-basis: auto;
+  margin: 0;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-workspace-control);
+  color: var(--warning);
+}
+.t8-app .wrap-anywhere,
+.t8-dialog .wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
+}
+.t8-app .agent-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  align-items: center;
+}
+.t8-app .talk-actions {
+  flex-wrap: wrap;
+}
+.t8-app .pending-asks {
+  margin-bottom: var(--s5);
+  padding: var(--s5);
+  border-color: var(--warning);
+}
+.t8-app .ask-card {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4) 0;
+  border-top: 1px solid var(--border);
+}
+.t8-app .ask-card:first-of-type {
+  border-top: 0;
+}
+.t8-app .ask-card code {
+  overflow-wrap: anywhere;
+}
+.t8-app .ask-card .actions,
+.t8-app .agent-authorization .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  align-items: center;
+}
+.t8-app .connection-banner[data-state="pairing"] {
+  display: grid;
+  gap: var(--s3);
+  margin: var(--s5) var(--s6) 0;
+}
+.t8-app .connection-banner[data-state="pairing"] .offline-banner {
+  margin: 0;
+}
+.t8-app .connection-banner[data-state="host-changed"] > svg {
+  color: var(--warning);
+}
+.t8-app .stream-indicator[data-connection="live"]::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: var(--s2);
+  border-radius: 50%;
+  background: var(--positive);
+}
+.t8-app .mobile-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.t8-app .mobile-attention {
+  display: none;
+}
+.t8-app .rights-list {
+  margin: var(--s2) 0;
+  padding-left: var(--s5);
+  color: var(--fg);
+  font-size: var(--text-sm);
+}
+.t8-app .paired-devices {
+  display: grid;
+  gap: var(--s3);
+  margin-top: var(--s5);
+}
+.t8-app .paired-device-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3);
+}
+.t8-app .paired-device-row > span {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.t8-app .paired-device-row small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+@media (max-width: 767px) {
+  /* Every control a thumb can hit; ask cards and captions wrap instead of overflowing. */
+  .t8-app .btn,
+  .t8-app .quiet-button,
+  .t8-app .icon-button,
+  .t8-app .app-sidebar nav button {
+    min-height: 44px;
+  }
+  .t8-app .icon-button {
+    min-width: 44px;
+  }
+  .t8-app .mobile-attention {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s1);
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 var(--s3);
+    border: 1px solid var(--warning);
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--warning);
+    font-weight: 650;
+  }
+  .t8-app .pending-asks {
+    padding: var(--s4);
+  }
+  .t8-app .connection-banner[data-state="pairing"] {
+    margin: var(--s4);
+  }
+  .t8-app .agent-actionbar {
+    flex-wrap: wrap;
+    gap: var(--s3);
+  }
+}
+/* Safe areas (viewport-fit=cover): nothing sits under a notch, rounded corner or home indicator. */
+@supports (padding: env(safe-area-inset-top)) {
+  .t8-app .app-sidebar {
+    padding-left: max(var(--s3), env(safe-area-inset-left));
+  }
+  .t8-app .app-main {
+    padding-right: env(safe-area-inset-right);
+  }
+  .t8-app .workspace-footer {
+    padding-bottom: max(var(--s4), env(safe-area-inset-bottom));
+  }
+  @media (max-width: 767px) {
+    .t8-app .app-sidebar {
+      padding-top: max(var(--s2), env(safe-area-inset-top));
+      padding-left: max(var(--s4), env(safe-area-inset-left));
+      padding-right: max(var(--s4), env(safe-area-inset-right));
+    }
+    .t8-app .workspace-content {
+      padding-left: max(var(--s4), env(safe-area-inset-left));
+      padding-right: max(var(--s4), env(safe-area-inset-right));
+    }
+  }
+}
+/* Landscape phones (e.g. 844×390): the sidebar scrolls and compacts so every destination stays reachable. */
+@media (max-height: 500px) and (min-width: 768px) {
+  .t8-app .app-sidebar {
+    overflow-y: auto;
+    padding-top: max(var(--s2), env(safe-area-inset-top));
+    padding-bottom: var(--s2);
+  }
+  .t8-app .sidebar-brand {
+    padding-bottom: var(--s2);
+  }
+  .t8-app .app-sidebar nav button,
+  .t8-app .btn,
+  .t8-app .quiet-button,
+  .t8-app .icon-button {
+    min-height: 44px;
+    padding-block: var(--s1);
+  }
+  .t8-app .sidebar-bottom .caption {
+    display: none;
+  }
+}
+@supports (bottom: env(safe-area-inset-bottom)) {
+  .t8-app .bunny-toast {
+    margin-bottom: env(safe-area-inset-bottom);
+    max-width: min(540px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  }
+}
+.t8-app .bunny-toast span {
+  overflow-wrap: anywhere;
+}
