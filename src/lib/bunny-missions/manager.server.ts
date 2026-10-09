@@ -719,6 +719,9 @@ export class MissionManager {
     if (isDeviceActor(by)) {
       const refusal = this.deviceMissionRefusal(mission);
       if (refusal) throw new WorkstationRequiredError(refusal);
+      // M-A-3 T9R: a paired device always approves the exact plan it reviewed; an unbound approval is refused.
+      if (planReference === undefined)
+        throw new CommandRefusedError("Review the current plan before approving; the approval must name the reviewed plan.");
     }
     const agentic = this.agentic.forMission(id);
     if (agentic) {
@@ -1962,6 +1965,10 @@ export class MissionManager {
     const scope = mission.requestedScope;
     if (!scope) return null;
     if (scope.riskClasses.some((risk) => WORKSTATION_ONLY_RISKS.includes(risk))) return APPROVAL_ON_HOST;
+    // M-A-3 T9R: a write-scoped provider session includes a shell (writeIncludesShell) the Host cannot confine to
+    // the plan. Like a tool-capable direct task (DEV-01), launching one is approved on the Windows Host.
+    if (scope.providers.execution && (scope.providers.sessions?.steps ?? []).some((step) => step.scope.access === "write"))
+      return APPROVAL_ON_HOST;
     for (const capability of scope.capabilities)
       for (const manifest of this.manifestsFor(capability))
         if (deviceApprovalRefusal(manifest.risk, manifest)) return APPROVAL_ON_HOST;
@@ -3211,8 +3218,9 @@ export class MissionManager {
       // T5 never converts broad target/shell approval into general delegation. The explicit one-off
       // remains subordinate to its exact Host-offered resource fingerprint and the shared budget.
     }
+    // A refusal, not a failure: nothing was applied, so the phone must not treat it as an uncertain outcome.
     if (decision === "allow_batch" && !request.batchOffer)
-      throw new Error(
+      throw new CommandRefusedError(
         "This request does not offer a small approval batch; answer allow_once or deny.",
       );
     // Validate and create before answering: a failed validation leaves the request open.
