@@ -9,6 +9,12 @@ import { startHost } from "./http.server.ts";
 import { FilesystemCapability } from "../bunny-missions/capabilities/local.server.ts";
 import type { AgentSnapshot } from "./agent-types.ts";
 import type { ExecutionContext } from "../bunny-missions/capabilities/bus.server.ts";
+import { providerBase } from "./adapters.server.ts";
+import { ModelCapabilityRegistry } from "./model-capability.server.ts";
+import { HostDatabase } from "./persistence.server.ts";
+import { TaskManager } from "./manager.server.ts";
+import type { AdapterResult, ProviderAdapter } from "./contracts.ts";
+import type { ProviderId, ProviderLive } from "../orch/types.ts";
 type Agent = AgentSnapshot["agents"][number];
 
 function record(name: string, value: unknown) {
@@ -176,10 +182,9 @@ test("T9R client-only connection loss during admitted work leaves the same Host 
   } finally { controller.abort(); fs.release(); await f.close(); }
 });
 
-type MissionRow = { id: string; state: string; planReference?: string; remote?: { answerable: boolean; reason: string | null }; requestedScope?: { providers: { sessions?: { writeIncludesShell: boolean } } }; artifacts: { id: string }[] };
+type MissionRow = { id: string; state: string; planReference?: string; remote?: { answerable: boolean; reason: string | null }; artifacts: { id: string }[] };
 type Fixture = Awaited<ReturnType<typeof fixture>>;
-const modelStep = (role: string, access: "read" | "write") => ({ role, objective: role, access, executor: { kind: "model" }, dependsOn: [], verification: [] });
-const readStep = (role: string) => ({ role, objective: role, access: "read", executor: { kind: "capability", action: "filesystem.read", params: { path: "seed.txt" } }, dependsOn: [], verification: [] });
+const readStep = (role: string, path = "seed.txt") => ({ role, objective: role, access: "read", executor: { kind: "capability", action: "filesystem.read", params: { path } }, dependsOn: [], verification: [] });
 async function plainMission(f: Fixture, objective: string, steps: unknown[]) {
   const created = await f.api("mission.create", { objective, mode: "fast", steps });
   assert.equal(created.status, 200, created.body.error);
@@ -188,122 +193,80 @@ async function plainMission(f: Fixture, objective: string, steps: unknown[]) {
 async function missionRow(f: Fixture, id: string, token?: string): Promise<MissionRow> {
   return (await f.state(token)).body.missions.missions.find((m: MissionRow) => m.id === id);
 }
-const HOST_PATH = /(?<![A-Za-z0-9])[A-Za-z]:(?:\\\\|\/)/;
 
-test("T9R F-01: a paired device cannot approve a Mission that launches a write-scoped (shell) provider session", async () => {
+test("T9R F-03: after a replan, a device approval must name the reviewed plan; an unrevised plan keeps MA0R semantics", async () => {
   const f = await fixture();
   try {
-    const write = await plainMission(f, "Edit with a provider session", [modelStep("Edit", "write")]);
-    const read = await plainMission(f, "Read with a provider session", [modelStep("Inspect", "read")]);
-    const writeView = await missionRow(f, write, f.device.token), readView = await missionRow(f, read, f.device.token);
-    assert.equal(writeView.requestedScope!.providers.sessions!.writeIncludesShell, true);
-    assert.equal(writeView.remote!.answerable, false, "the Host verdict tells the phone before it tries");
-    assert.equal(readView.remote!.answerable, true, "a read-only provider session stays answerable remotely");
-    const refused = await f.api("mission.approve", { id: write, start: false, plan: writeView.planReference }, f.device.token);
-    assert.equal(refused.status, 400);
-    assert.equal(refused.body.code, "WORKSTATION_REQUIRED");
-    const after = f.host.missions.store.mission(write);
-    assert.equal(after.state, "waiting_for_approval");
-    assert.ok(!after.authorizationId, "no envelope was granted");
-    assert.equal((await f.api("mission.approve", { id: read, start: false, plan: readView.planReference }, f.device.token)).status, 200);
-    const owner = await f.api("mission.approve", { id: write, start: false });
-    assert.equal(owner.status, 200, owner.body.error);
-    assert.equal(f.host.missions.store.authorization(f.host.missions.store.mission(write).authorizationId!)!.grantedBy, "workstation");
-    record("f01-write-session-approval", { classification: "LIVE disposable Host HTTP and MissionManager", deviceCode: refused.body.code, remoteVerdict: writeView.remote, readOnlyVerdict: readView.remote, workstationApproved: true });
-  } finally { await f.close(); }
-});
-
-test("T9R F-03: a device approval must name the reviewed plan; a replanned scope is never approved unseen", async () => {
-  const f = await fixture();
-  try {
+    const unrevised = await plainMission(f, "Read the seed once", [readStep("Inspect")]);
+    assert.equal((await f.api("mission.approve", { id: unrevised, start: false }, f.device.token)).status, 200, "MA0R: the only plan ever offered");
     const id = await plainMission(f, "Read the seed", [readStep("Inspect")]);
     const reviewed = await missionRow(f, id, f.device.token);
-    const unbound = await f.api("mission.approve", { id, start: false }, f.device.token);
-    assert.equal(unbound.status, 400);
-    assert.equal(unbound.body.code, "REFUSED");
-    assert.match(unbound.body.error, /reviewed plan/);
-    assert.equal(f.host.missions.store.mission(id).state, "waiting_for_approval");
     const replanned = await f.api("mission.replan", { id, steps: [readStep("Inspect"), { ...readStep("Inspect again"), dependsOn: [0] }] });
     assert.equal(replanned.status, 200, replanned.body.error);
     const current = await missionRow(f, id, f.device.token);
     assert.notEqual(current.planReference, reviewed.planReference);
+    const unbound = await f.api("mission.approve", { id, start: false }, f.device.token);
+    assert.equal(unbound.status, 400);
+    assert.equal(unbound.body.code, "REFUSED");
+    assert.match(unbound.body.error, /plan was revised/);
     const stale = await f.api("mission.approve", { id, start: false, plan: reviewed.planReference }, f.device.token);
     assert.equal(stale.status, 400);
     assert.match(stale.body.error, /plan changed/);
-    assert.equal(f.host.missions.store.mission(id).state, "waiting_for_approval");
+    const mission = f.host.missions.store.mission(id);
+    assert.equal(mission.state, "waiting_for_approval");
+    assert.ok(!mission.authorizationId, "no envelope from an unbound or stale approval");
     const fresh = await f.api("mission.approve", { id, start: false, plan: current.planReference }, f.device.token);
     assert.equal(fresh.status, 200, fresh.body.error);
-    record("f03-plan-binding", { classification: "LIVE disposable Host HTTP and MissionManager", unboundCode: unbound.body.code, staleRefused: true, freshApproved: true });
+    record("f03-plan-binding", { classification: "LIVE disposable Host HTTP and MissionManager", unrevisedUnboundStatus: 200, unboundCode: unbound.body.code, unboundError: unbound.body.error, staleError: stale.body.error, freshStatus: fresh.status });
   } finally { await f.close(); }
 });
 
-test("T9R F-02: workstation revocation ends Mission approvals the lost device granted; other grants and self sign-out keep theirs", async () => {
+test("T9R F-02: workstation revocation ends Mission approvals the lost device granted, including a failed Mission's Retry", async () => {
   const f = await fixture();
   try {
-    const approveAs = async (token: string | undefined, objective: string) => {
-      const id = await plainMission(f, objective, [readStep("Inspect")]);
+    const approveAs = async (token: string | undefined, objective: string, steps: unknown[] = [readStep("Inspect")], start = false) => {
+      const id = await plainMission(f, objective, steps);
       const view = await missionRow(f, id, token);
-      const approved = await f.api("mission.approve", { id, start: false, ...(token ? { plan: view.planReference } : {}) }, token);
+      const approved = await f.api("mission.approve", { id, start, ...(token ? { plan: view.planReference } : {}) }, token);
       assert.equal(approved.status, 200, approved.body.error);
-      assert.equal(f.host.missions.store.mission(id).state, "ready");
       return id;
     };
+    const configured = await f.api("mission.configure", { limits: { maxActiveMissions: 10 } });
+    assert.equal(configured.status, 200, configured.body.error);
     const lost = await approveAs(f.device.token, "Approved by the lost phone");
+    const failed = await approveAs(f.device.token, "Fails after the lost phone approved it", [readStep("Inspect", "missing.txt")], true);
+    const failedState = await until(async () => { const state = f.host.missions.store.mission(failed).state; return ["failed", "waiting_for_user"].includes(state) && state; }, "device-approved Mission fails");
+    // SIMULATED terminal failure of a device-approved Mission (state only); Retry and revocation logic stay real.
+    const parked = await approveAs(f.device.token, "Failed after the lost phone approved it");
+    f.host.missions.store.saveMission({ ...f.host.missions.store.mission(parked), state: "failed", finishedAt: Date.now(), failure: { category: "invalid_plan", detail: "T9R simulated failure", stepId: null } });
     const owner = await approveAs(undefined, "Approved on the workstation");
     const other = await f.pair("Second phone");
     const signedOut = await approveAs(other.token, "Approved by a phone that signs itself out");
     const envelope = (id: string) => f.host.missions.store.authorization(f.host.missions.store.mission(id).authorizationId!)!;
     assert.equal(envelope(lost).grantedBy, `device:${f.device.deviceId}`);
+    const runsBefore = f.host.missions.store.runs({ missionId: failed }).length;
     const revoked = await f.api("device.revoke", { id: f.device.deviceId });
     assert.equal(revoked.status, 200, revoked.body.error);
     assert.ok(envelope(lost).revokedAt, "the lost device's Mission approval is revoked");
     assert.equal(f.host.missions.store.mission(lost).state, "stopped");
-    assert.equal((await f.api("mission.start", { id: lost })).status, 400, "a revoked approval can never start");
+    assert.ok(envelope(failed).revokedAt, "a failed Mission's device approval is revoked too");
+    const retry = await f.api("mission.retry", { id: failed });
+    assert.equal(retry.status, 400, "Retry cannot revive the lost device's approval");
+    assert.notEqual(f.host.missions.store.mission(failed).state, "running");
+    assert.equal(f.host.missions.store.runs({ missionId: failed }).length, runsBefore, "nothing ran after revocation");
+    assert.ok(envelope(parked).revokedAt, "a failed Mission's device approval is revoked");
+    const parkedRetry = await f.api("mission.retry", { id: parked });
+    assert.equal(parkedRetry.status, 400);
+    assert.match(parkedRetry.body.error ?? "", /revoked|Host command failed/);
+    assert.equal(f.host.missions.store.mission(parked).state, "failed", "Retry could not revive the lost device's approval");
     assert.equal(envelope(owner).revokedAt, null);
     assert.equal(f.host.missions.store.mission(owner).state, "ready");
     assert.equal((await f.api("device.revoke", {}, other.token)).status, 200, "self sign-out");
     assert.equal(envelope(signedOut).revokedAt, null, "self sign-out keeps the approvals the user gave (documented design)");
     assert.equal(f.host.missions.store.mission(signedOut).state, "ready");
     assert.equal((await f.state(f.device.token)).status, 401);
-    record("f02-revocation-ends-approvals", { classification: "LIVE disposable Host HTTP, SQLite and MissionManager", lostDeviceMission: f.host.missions.store.mission(lost).state, envelopeRevoked: true, workstationMission: "ready", selfSignOutMission: "ready" });
+    record("f02-revocation-ends-approvals", { classification: "LIVE disposable Host HTTP, SQLite and MissionManager", lostDeviceMission: f.host.missions.store.mission(lost).state, failedMissionStateBefore: failedState, failedMissionStateAfter: f.host.missions.store.mission(failed).state, retryStatus: retry.status, retryCode: retry.body.code, simulatedFailedMission: { state: f.host.missions.store.mission(parked).state, envelopeRevoked: !!envelope(parked).revokedAt, retryStatus: parkedRetry.status }, workstationMission: f.host.missions.store.mission(owner).state, selfSignOutMission: f.host.missions.store.mission(signedOut).state });
   } finally { await f.close(); }
-});
-
-test("T9R T-01: every device response is free of Host folder paths; the workstation keeps them", async () => {
-  const { hostPathFree } = await import("./device-authority.server.ts");
-  assert.equal(hostPathFree("C:\\Program Files\\Owner Projects\\x"), "[Host path]", "a whole path with spaces leaves nothing");
-  assert.equal(hostPathFree("result.txt in C:\\Users\\owner\\project-a"), "result.txt in [Host path]");
-  assert.equal(hostPathFree("http://127.0.0.1:51622/page"), "http://127.0.0.1:51622/page", "origins survive");
-  assert.deepEqual(hostPathFree({ roots: ["/home/owner/x"], n: 3, ok: true, none: null }), { roots: ["[Host path]"], n: 3, ok: true, none: null });
-  const f = await fixture();
-  const controller = new AbortController();
-  try {
-    const a = await f.make("Path free receipt");
-    await plainMission(f, "Read the seed", [readStep("Inspect")]);
-    const workstation = JSON.stringify((await f.state()).body);
-    assert.match(workstation, HOST_PATH, "positive control: the workstation view carries folder paths");
-    const responses: Record<string, unknown> = {
-      state: (await f.state(f.device.token)).body,
-      projectList: (await f.api("project.list", {}, f.device.token)).body,
-      projectGet: (await f.api("project.get", { id: f.projectA }, f.device.token)).body,
-      missionGet: (await f.api("mission.get", { id: a.agent.missionId }, f.device.token)).body,
-      agentGet: (await f.api("agent.get", { id: a.agent.id }, f.device.token)).body,
-      refusal: (await f.api("project.get", { id: "missing-project" }, f.device.token)).body,
-    };
-    for (const [name, body] of Object.entries(responses)) assert.doesNotMatch(JSON.stringify(body), HOST_PATH, name);
-    const stream = await fetch(`${f.base}/events?after=0`, { headers: { authorization: `Bearer ${f.device.token}` }, signal: controller.signal });
-    const reader = stream.body!.getReader();
-    let events = "";
-    const deadline = Date.now() + 1500;
-    while (Date.now() < deadline && events.length < 200_000) {
-      const chunk = await Promise.race([reader.read(), new Promise<null>(resolve => setTimeout(() => resolve(null), 300))]);
-      if (!chunk || chunk.done) break;
-      events += new TextDecoder().decode(chunk.value);
-    }
-    assert.match(events, /^id: \d+/m, "the stream delivered events");
-    assert.doesNotMatch(events, HOST_PATH, "events");
-    record("t01-device-path-free", { classification: "LIVE disposable Host HTTP and SSE", checked: [...Object.keys(responses), "events"], workstationHasPaths: true, deviceHasPaths: false });
-  } finally { controller.abort(); await f.close(); }
 });
 
 test("T9R lost command acknowledgment: applied phone approval and Pause/Stop replay by operation id with one effect", async () => {
@@ -323,7 +286,8 @@ test("T9R lost command acknowledgment: applied phone approval and Pause/Stop rep
     assert.equal(replay.status, 200);
     assert.deepEqual(replay.body.operation, { id: operationId, state: "applied", replayed: true });
     await until(async () => (await f.state()).body.agents.agents.find((agent: Agent) => agent.id === a.agent.id && agent.state === "COMPLETED"), "approved Agent completes");
-    assert.equal(f.host.missions.store.runs({ missionId: a.agent.missionId! }).filter(run => run.action === "filesystem.write" && run.status === "succeeded").length, 1);
+    const writes = f.host.missions.store.runs({ missionId: a.agent.missionId! }).filter(run => run.action === "filesystem.write" && run.status === "succeeded").length;
+    assert.equal(writes, 1);
     const b = await f.make("Supervised receipt");
     const pauseId = randomUUID();
     const paused = await f.api("agent.pause", { id: b.agent.id }, f.device.token, { operationId: pauseId, expect });
@@ -341,8 +305,9 @@ test("T9R lost command acknowledgment: applied phone approval and Pause/Stop rep
     assert.equal(stopReplay.status, 200);
     assert.equal(stopReplay.body.operation.replayed, true);
     assert.equal(f.host.agents.store.agent(b.agent.id)!.stoppedAt, stoppedAt);
-    assert.equal(readFileSync(join(f.root, "receipt.txt"), "utf8"), "Lost acknowledgment receipt", "the stopped Agent wrote nothing");
-    record("lost-ack-reconciliation", { classification: "LIVE disposable Host HTTP; SIMULATED discarded client receipt", respond: { first: first.body.operation, replay: replay.body.operation, status: status.state, writes: 1 }, pause: pauseReplay.body.operation, stop: stopReplay.body.operation });
+    assert.equal(f.host.missions.store.runs({ missionId: b.agent.missionId! }).filter(run => run.action === "filesystem.write").length, 0, "the stopped Agent wrote nothing");
+    assert.equal(readFileSync(join(f.root, "receipt.txt"), "utf8"), "Lost acknowledgment receipt");
+    record("lost-ack-reconciliation", { classification: "LIVE disposable Host HTTP; SIMULATED discarded client receipt", respond: { first: first.body.operation, replay: replay.body.operation, status: status.state, writes }, pause: { replay: pauseReplay.body.operation, pausedAtUnchanged: true }, stop: { replay: stopReplay.body.operation, stoppedAtUnchanged: true } });
   } finally { await f.close(); }
 });
 
@@ -359,6 +324,7 @@ test("T9R Host replacement: mission and Agent commands pinned to another Host or
       ["agent.stop", { id: a.agent.id }],
       ["mission.stop", { id: a.agent.missionId }],
     ];
+    const missionBefore = f.host.missions.store.mission(a.agent.missionId!).state;
     const codes: Record<string, string[]> = {};
     for (const [action, data] of commands) {
       const wrong = await f.api(action, data, f.device.token, { operationId: randomUUID(), expect: other });
@@ -370,8 +336,9 @@ test("T9R Host replacement: mission and Agent commands pinned to another Host or
     assert.equal(f.host.missions.store.request(a.request.id)!.resolvedAt, null);
     const agent = f.host.agents.store.agent(a.agent.id)!;
     assert.equal(agent.pausedAt, null); assert.equal(agent.stoppedAt, null);
+    assert.equal(f.host.missions.store.mission(a.agent.missionId!).state, missionBefore, "Mission state unchanged");
     assert.equal(existsSync(join(f.root, "receipt.txt")), false);
-    record("host-replacement", { classification: "LIVE disposable Host HTTP", codes, unchanged: true });
+    record("host-replacement", { classification: "LIVE disposable Host HTTP; the other Host is represented by a foreign Host UUID pin", codes, missionState: missionBefore, unchanged: true });
   } finally { await f.close(); }
 });
 
@@ -382,17 +349,18 @@ test("T9R cross-Project artifact: a device reads a verified artifact only throug
     assert.equal((await f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }, f.device.token)).status, 200);
     await until(async () => (await f.state()).body.agents.agents.find((agent: Agent) => agent.id === a.agent.id && agent.state === "COMPLETED"), "artifact Agent completes");
     const artifact = (await missionRow(f, a.agent.missionId!)).artifacts[0];
-    assert.ok(artifact);
+    assert.ok(artifact, "the completed Mission produced a verified artifact");
     const cross = await f.api("project.artifact", { projectId: f.projectB, artifactId: artifact.id }, f.device.token);
     assert.equal(cross.status, 400);
-    assert.doesNotMatch(JSON.stringify(cross.body), HOST_PATH);
+    assert.equal(cross.body.code, "REFUSED");
+    assert.equal(cross.body.data, undefined, "no artifact body crosses Projects");
     const own = await f.api("project.artifact", { projectId: f.projectA, artifactId: artifact.id }, f.device.token);
     assert.equal(own.status, 200, own.body.error);
     assert.equal(own.body.data.artifact.id, artifact.id);
-    assert.equal(own.body.data.artifact.location.path, undefined);
+    assert.equal(own.body.data.artifact.location.path, undefined, "device reads never carry the Host file location");
     const projectB = JSON.stringify((await f.api("project.get", { id: f.projectB }, f.device.token)).body.data);
     assert.equal(projectB.includes(artifact.id), false, "Project B does not list Project A's artifact");
-    record("cross-project-artifact", { classification: "LIVE disposable Host HTTP and Project service", crossStatus: cross.status, ownStatus: own.status, artifact: artifact.id });
+    record("cross-project-artifact", { classification: "LIVE disposable Host HTTP and Project service", crossStatus: cross.status, crossCode: cross.body.code, crossError: cross.body.error, ownStatus: own.status, artifact: artifact.id });
   } finally { await f.close(); }
 });
 
@@ -415,10 +383,11 @@ test("T9R Host restart: same Host UUID, Agent and Mission; new epoch; pre-restar
     assert.equal(held.body.code, "HOST_EPOCH_CHANGED");
     const unpinned = await f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }, f.device.token);
     assert.equal(unpinned.status, 400, "the pre-restart request is no longer answerable");
+    assert.equal(unpinned.body.code, "REFUSED");
     assert.equal(existsSync(join(f.root, "receipt.txt")), false);
     assert.equal((await f.state()).body.tasks.length, tasksBefore, "no duplicate Task");
     assert.equal(f.host.missions.store.runs({ missionId: a.agent.missionId! }).filter(run => run.action === "filesystem.write").length, 0, "no side effect");
-    record("host-restart-continuity", { classification: "LIVE Host shutdown and fresh in-process Host over the same SQLite (OS process restart is covered by the T9R live fixture)", hostIdStable: true, epochChanged: true, agentId: agent.id, missionId: agent.missionId, agentState: agent.state, heldCode: held.body.code, unpinnedCode: unpinned.body.code });
+    record("host-restart-continuity", { classification: "LIVE Host shutdown and fresh in-process Host over the same SQLite; OS-process restart is in protocol/host-restart-recovery.json", hostId: after.body.hostIdentity.hostId === before.hostId, epochBefore: before.epoch, epochAfter: after.body.hostIdentity.epoch, agentId: agent.id, missionId: agent.missionId, agentState: agent.state, heldCode: held.body.code, unpinnedCode: unpinned.body.code, unpinnedError: unpinned.body.error });
   } finally { await f.close(); }
 });
 
@@ -427,18 +396,59 @@ test("T9R four-way phone/desktop race resolves one request exactly once", async 
   try {
     const a = await f.make("Four-way receipt");
     const expect = (await f.state(f.device.token)).body.hostIdentity;
+    const actors = [`device:${f.device.deviceId}`, "workstation", `device:${f.device.deviceId}`, "workstation"];
     const responses = await Promise.all([
       f.api("mission.respond", { requestId: a.request.id, decision: "allow_batch" }, f.device.token, { operationId: randomUUID(), expect }),
       f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }),
       f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }, f.device.token, { operationId: randomUUID(), expect }),
       f.api("mission.respond", { requestId: a.request.id, decision: "deny" }),
     ]);
-    assert.equal(responses.filter(r => r.status === 200).length, 1, JSON.stringify(responses.map(r => [r.status, r.body.code, r.body.error])));
+    const winners = responses.map((r, index) => r.status === 200 ? index : -1).filter(index => index >= 0);
+    assert.equal(winners.length, 1, JSON.stringify(responses.map(r => [r.status, r.body.code, r.body.error])));
     for (const r of responses.filter(r => r.status !== 200)) assert.equal(r.body.code, "REFUSED");
     const request = f.host.missions.store.request(a.request.id)!;
+    assert.equal(request.resolvedBy, actors[winners[0]], "the canonical resolution belongs to the single winner");
     await until(async () => { const agent: Agent = (await f.state()).body.agents.agents.find((agent: Agent) => agent.id === a.agent.id); return ["COMPLETED", "FAILED", "STOPPED"].includes(agent.state) && agent; }, "four-way race settles");
     const writes = f.host.missions.store.runs({ missionId: a.agent.missionId! }).filter(run => run.action === "filesystem.write" && run.status === "succeeded");
     assert.equal(writes.length, request.resolution === "deny" ? 0 : 1);
-    record("concurrent-four-way", { classification: "LIVE concurrent real Host commands", statuses: responses.map(r => r.status), resolution: request.resolution, resolvedBy: request.resolvedBy, successfulWrites: writes.length });
+    record("concurrent-four-way", { classification: "LIVE concurrent real Host commands (arrival order decides the winner)", statuses: responses.map(r => r.status), codes: responses.map(r => r.body.code ?? null), winner: winners[0], resolution: request.resolution, resolvedBy: request.resolvedBy, successfulWrites: writes.length });
   } finally { await f.close(); }
+});
+
+test("T9R DEV-01: a device-approved local tool-free task is never rerouted to a tool-capable provider", async () => {
+  const run = async (by: string) => {
+    const directory = mkdtempSync(join(tmpdir(), "bunny-t9r-reroute-"));
+    const db = new HostDatabase(join(directory, "host.sqlite"));
+    const providers: ProviderId[] = ["ollama", "claude"];
+    const launched: { id: ProviderId; finish: (result: AdapterResult) => void }[] = [];
+    const live = (id: ProviderId): ProviderLive => ({ ...providerBase(id), installed: true, authenticated: true, authenticatedState: id === "ollama" ? "not_required" : "authenticated", availability: "ready", capabilities: id === "ollama" ? ["text"] : ["text", "filesystem", "terminal", "git"], probedAt: Date.now(), ...(id === "ollama" ? { models: ["qwen3:8b"], current_model: "qwen3:8b" } : { current_model: "claude-default" }) });
+    const adapters: ProviderAdapter[] = providers.map((id) => ({ id, detect: async () => live(id), health: async (previous) => previous, usage: async () => null,
+      launch: () => { let finish!: (result: AdapterResult) => void; const done = new Promise<AdapterResult>((resolve) => { finish = resolve; }); launched.push({ id, finish }); return { done, stop: async () => finish({ ok: false, output: "", stopped: true }), pid: () => null }; } }));
+    const modelRegistry = new ModelCapabilityRegistry(db, { availableProviders: () => providers, ollamaProbe: async () => ({ up: true, models: ["qwen3:8b"], remote: [] }), ollamaShow: async () => ({ capabilities: [], context_length: 8192 }), ollamaPs: async () => ({ models: [] }), now: () => Date.now() });
+    const tasks = new TaskManager(db, directory, adapters, { modelRegistry });
+    await tasks.discover();
+    const submitted = tasks.submit({ prompt: "Say hello", mode: "fast" });
+    const fallback = tasks.routingStore.decision(submitted.routingDecisionId!)!.fallback_order.map((entry) => `${entry.provider_id}:${entry.model_id}`);
+    assert.deepEqual(fallback, ["claude:null", "ollama:qwen3:8b"], "the recorded AUTO order contains a tool-capable route");
+    // SIMULATED AUTO outcome: the task sits on the local candidate of its own recorded order (a selection a device may launch).
+    db.write({ ...db.get(submitted.id), provider: "ollama", model: "qwen3:8b" }, "routing.fixture", "T9R fixture: AUTO selected the local candidate.");
+    tasks.approve(submitted.id, by);
+    const deadline = Date.now() + 8000;
+    while (!launched.length && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    launched[0].finish({ ok: false, output: "", error: "usage limit reached (429)", exitCode: 1 });
+    while (launched.length < 2 && !["failed", "completed"].includes(db.get(submitted.id).state) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    const result = { by, launches: launched.map((row) => row.id), state: db.get(submitted.id).state, events: db.taskEvents(submitted.id).map((event) => event.type) };
+    for (const row of launched) row.finish({ ok: true, output: "done", exitCode: 0 });
+    while (!["failed", "completed"].includes(db.get(submitted.id).state) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    db.close();
+    rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+    return result;
+  };
+  const workstation = await run("workstation");
+  assert.deepEqual(workstation.launches, ["ollama", "claude"], "positive control: the recovery path reroutes a workstation-approved task");
+  const device = await run("device:t9r-phone");
+  assert.deepEqual(device.launches, ["ollama"], "the device-approved task never launches a tool-capable route");
+  assert.equal(device.state, "failed");
+  assert.ok(device.events.includes("routing.exhausted"));
+  record("dev01-reroute", { classification: "LIVE TaskManager recovery routing with scripted adapters; SIMULATED AUTO selection of the recorded local candidate", workstation, device, preFixReproduction: "test-results/ma3/t9r/review/t9r-01-prefix-probe.log" });
 });

@@ -422,25 +422,6 @@ export function hidePaths(text: string) {
     .replace(/\\\\[^\s'"`,;)]+/g, "[Host path]")
     .replace(/(^|[\s'"`(])\/(?:Users|home|tmp|var|private|mnt|opt|root)\/[^\s'"`,;)]*/g, "$1[Host path]");
 }
-const WHOLE_HOST_PATH = /^(?:[A-Za-z]:[\\/]|\\\\|\/(?:Users|home|tmp|var|private|mnt|opt|root)\/)/;
-/**
- * M-A-3 T9R: every string a paired device receives is free of local folder facts. A whole path value is
- * replaced outright (so a path with spaces leaves nothing behind); embedded paths in text use hidePaths'
- * rules, but a drive letter must start a token, so URLs such as `http://127.0.0.1` survive.
- */
-export function hostPathFree<T>(value: T): T {
-  if (typeof value === "string") {
-    if (WHOLE_HOST_PATH.test(value)) return "[Host path]" as T;
-    return value
-      .replace(/(?<![A-Za-z0-9])[A-Za-z]:[\\/][^\s'"`,;)]*/g, "[Host path]")
-      .replace(/\\\\[^\s'"`,;)]+/g, "[Host path]")
-      .replace(/(^|[\s'"`(])\/(?:Users|home|tmp|var|private|mnt|opt|root)\/[^\s'"`,;)]*/g, "$1[Host path]") as T;
-  }
-  if (Array.isArray(value)) return value.map((item) => hostPathFree(item)) as T;
-  if (value && typeof value === "object")
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, hostPathFree(item)])) as T;
-  return value;
-}
 /** A device artifact read keeps the verified body and identity, never the Host file location. */
 export function deviceArtifactRead<T>(result: T): T {
   if (!result || typeof result !== "object" || !("artifact" in result)) return result;

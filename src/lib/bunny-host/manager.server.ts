@@ -24,6 +24,7 @@ import { describeTree, descendants, killProcess, processTable, sameProcessIdenti
 import { verifySpec } from "./verification.server.ts";
 import { HostContainment, safeError, type SafeError } from "./failure.server.ts";
 import { ProjectRegistry } from "./project-registry.server.ts";
+import { deviceMayLaunch } from "./device-authority.server.ts";
 
 const TERMINAL: TaskState[] = ["completed", "failed", "stopped"];
 const TRANSCRIPT_LIMIT = 20 * 1024 * 1024;
@@ -55,6 +56,8 @@ export class TaskManager {
   /** M-A-3 T3: safe persistence for routing decisions and the bounded attempt trail behind them. */
   routingStore: RoutingDecisionStore;
   bus = new EventEmitter();
+  /** M-A-3 T9R (DEV-01): direct tasks a paired device approved; their reroutes stay on local tool-free inference. */
+  private readonly deviceApproved = new Set<string>();
   instanceId: string = crypto.randomUUID();
   sessions = new Map<string, RunningSession>();
   stopping = new Set<string>();
@@ -577,8 +580,12 @@ export class TaskManager {
       ? this.orderedByWindow(record.fallback_order)
       : record.fallback_order;
     const live = this.live();
+    const deviceApproved = this.deviceApproved.has(task.id);
     for (const next of order) {
       if (isCurrent(next.provider_id, next.model_id) || attempted(next.provider_id, next.model_id))
+        continue;
+      // A provider default could resolve to a hosted tag, so a device-approved task needs an exact local model.
+      if (deviceApproved && (!next.model_id || !deviceMayLaunch({ provider: next.provider_id, model: next.model_id })))
         continue;
       const check = preLaunchRevalidate(
         {
@@ -962,6 +969,9 @@ export class TaskManager {
   }
   /** Direct user approval. Unchanged contract: launches exactly one task that is waiting for approval. */
   approve(id: string, by = "workstation"): OrchTask {
+    // M-A-3 T9R (DEV-01): a device approved a tool-free route; no launch-time or recovery reroute may leave it.
+    if (by.startsWith("device:")) this.deviceApproved.add(id);
+    else this.deviceApproved.delete(id);
     const launched = this.launch(
       id,
       { kind: "user", at: Date.now() },

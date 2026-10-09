@@ -25,7 +25,7 @@ import { ProjectService } from "./project-service.server.ts";
 import {
   actorOf, APPROVAL_ON_HOST, assertDeviceAction, authenticateDevice, CodedRefusal, deviceArtifactRead, deviceExpiresAt,
   deviceMayLaunch, DevicePresence, deviceSnapshot, deviceStillValid, DeviceStreams, deviceTask, ensureDeviceSchema,
-  hidePaths, hostId as stableHostId, hostPathFree, mutating, OPERATION_ID, OperationLedger, viewerOf, WindowLimiter,
+  hidePaths, hostId as stableHostId, mutating, OPERATION_ID, OperationLedger, viewerOf, WindowLimiter,
   WorkstationRequiredError, type DevicePrincipal, type OperationState, type Principal,
 } from "./device-authority.server.ts";
 
@@ -366,7 +366,7 @@ export async function startHost(
         return { ...row, lastSeenAt, expiresAt: deviceExpiresAt(row.createdAt, lastSeenAt) };
       }),
     };
-    return principal.kind === "device" ? hostPathFree(dashboardSnapshot(deviceSnapshot(withVerdicts, principal, presence))) : withVerdicts;
+    return principal.kind === "device" ? dashboardSnapshot(deviceSnapshot(withVerdicts, principal, presence)) : withVerdicts;
   };
   manager.remoteConfigured = !!process.env.BUNNY_REMOTE_ORIGIN || existsSync(paths.remote);
   if (existsSync(paths.remote))
@@ -441,7 +441,7 @@ export async function startHost(
         // ?task=<id> streams one task's normalized events (the Host-side streamEvents for that session).
         const read = (from: number) => {
           const events = taskId ? db.taskEvents(taskId, from) : db.events(from);
-          return device ? events.map((event) => hostPathFree({ ...event, detail: publicEventDetail(event.type) })) : events;
+          return device ? events.map((event) => ({ ...event, detail: publicEventDetail(event.type) })) : events;
         };
         // Device identity, revocation and expiry are checked for every delivery, including an already-open
         // stream; revocation also closes the device's open streams at once (DeviceStreams).
@@ -728,12 +728,12 @@ export async function startHost(
             if (!changed) throw new CommandRefusedError("Unknown or already revoked device.");
             const closed = deviceStreams.closeDevice(id);
             // A lost device's authority ends with it: batches it created and Agentic consent it approved.
-            const ended = local ? await endDeviceGrants(`device:${id}`) : { batches: 0, delegations: 0, approvals: 0 };
+            const ended = local ? await endDeviceGrants(`device:${id}`) : { batches: 0, delegations: 0, approvals: 0, unstopped: 0 };
             manager.emit(
               db.event(
                 "device.revoked",
                 null,
-                `Device credential revoked: ${id} by ${local ? "the workstation" : "the device itself (sign out)"}; ${closed} open stream(s) closed; ${ended.batches} batch(es), ${ended.delegations} Agentic consent(s) and ${ended.approvals} Mission approval(s) it granted ended.`,
+                `Device credential revoked: ${id} by ${local ? "the workstation" : "the device itself (sign out)"}; ${closed} open stream(s) closed; ${ended.batches} batch(es), ${ended.delegations} Agentic consent(s) and ${ended.approvals} Mission approval(s) it granted ended${ended.unstopped ? `; ${ended.unstopped} Mission(s) could not be stopped and need Stop on the workstation` : ""}.`,
               ),
             );
             break;
@@ -768,16 +768,14 @@ export async function startHost(
         if (extra.mission && typeof extra.mission === "object" && "id" in extra.mission)
           extra.mission = projected.missions?.missions.find((row) => row.id === (extra.mission as { id: string }).id);
       }
-      const reply = {
+      json(res, {
         snapshot: projected,
         task: device && task ? projected.tasks.find((row) => row.id === task!.id) ?? deviceTask(task) : task,
         pairCode,
         session,
         ...extra,
         ...(began && operationId ? { operation: { id: operationId, state: "applied", replayed: false } } : {}),
-      };
-      // M-A-3 T9R: command results (project.get/list data included) reach a device without local folder facts.
-      json(res, device ? hostPathFree(reply) : reply);
+      });
     } catch (error) {
       const requestId = containment.context.getStore()?.owner.requestId;
       if (!(error instanceof CommandRefusedError) && !(error instanceof HostUnavailableError))
@@ -799,9 +797,7 @@ export async function startHost(
         error instanceof HostUnavailableError
           ? error.message
           : error instanceof CommandRefusedError
-            ? device
-              ? hostPathFree(safeError(error, [token]).message)
-              : safeError(error, [token]).message
+            ? safeError(error, [token]).message
             : "Host command failed. Inspect operation state before retrying.";
       // A refusal executed nothing; a failure (or an unavailable Host mid-command) may have partly applied,
       // so its operation is "failed" and the client reconciles from canonical state.
@@ -845,21 +841,24 @@ export async function startHost(
       } catch {
         /* A corrupt or already-ended record fails closed; Stop remains available on the workstation. */
       }
-    // M-A-3 T9R: a plain Mission whose envelope this device approved stops with it; Agent Missions end above.
-    let approvals = 0;
-    for (const mission of missions.store.missionsIn(MISSION_ACTIVE))
+    // M-A-3 T9R: a plain Mission envelope this device approved ends with it; Agent Missions end above. A failed
+    // Mission is included so a later Retry cannot revive the lost device's approval.
+    let approvals = 0,
+      unstopped = 0;
+    for (const mission of missions.store.missionsIn([...MISSION_ACTIVE, "failed"]))
       try {
         if (!mission.authorizationId || missions.agentic.exists(mission.id) || mission.origin.startsWith("agent:")) continue;
         const envelope = missions.store.authorization(mission.authorizationId);
         if (!envelope || envelope.revokedAt || envelope.grantedBy !== deviceActor) continue;
-        // Revoke first so no further admission can use it, then stop admitted and pending work canonically.
+        // Revoke first so no further admission or Retry can use it, then stop admitted and pending work canonically.
         missions.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });
         approvals++;
-        await missions.stop(mission.id, `workstation (revoked ${deviceActor})`);
+        if (MISSION_ACTIVE.includes(mission.state)) await missions.stop(mission.id, `workstation (revoked ${deviceActor})`);
       } catch {
-        /* Already ending: the revoked envelope still refuses every further admission. */
+        // The revoked envelope still refuses every further admission; Stop remains available on the workstation.
+        unstopped++;
       }
-    return { batches, delegations, approvals };
+    return { batches, delegations, approvals, unstopped };
   };
   const server = createServer((req, res) => {
     const requestId = randomUUID();
