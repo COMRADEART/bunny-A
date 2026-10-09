@@ -195,14 +195,16 @@ export class GitCapability implements CapabilityAdapter {
     const git = resolveCommand("git");
     return git ? { availability: "available" as const, detail: `git at ${git.file}.` } : { availability: "unavailable" as const, detail: "git executable not found on PATH." };
   }
-  async git(args: string[], cwd: string, context: ExecutionContext, timeoutMs = 60_000) {
+  async git(args: string[], cwd: string, context: ExecutionContext, timeoutMs = 60_000, signal: AbortSignal = context.signal) {
     if (context.boundedDelegation) {
       const env: NodeJS.ProcessEnv = Object.fromEntries(["SystemRoot", "WINDIR", "TEMP", "TMP", "PATH"].flatMap(k => process.env[k] ? [[k, process.env[k]!]] : []));
       Object.assign(env, { GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_ATTR_NOSYSTEM: "1" });
       const safeArgs = args[0] === "diff" ? [args[0], "--no-ext-diff", "--no-textconv", ...args.slice(1)] : args;
       return runCommand("git", ["--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + join(context.dataDirectory, "disabled-hooks"), "-c", "diff.external=", ...safeArgs], { cwd, signal: context.signal, env, timeoutMs: Math.min(timeoutMs, context.timeoutMs), owner: { missionId: context.missionId, stepId: context.stepId, capabilityRunId: context.capabilityRunId, dataDirectory: context.dataDirectory, records: context.processOwnership, action: `git.${args[0]}` } });
     }
-    return runCommand("git", args, { cwd, signal: context.signal, timeoutMs: Math.min(timeoutMs, context.timeoutMs),owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:`git.${args[0]}`} });
+    // M-A-3 T9R-F01: under remote authority Git never runs repo-configured programs (hooks, fsmonitor, external diff or textconv).
+    const hardened = context.remoteAuthority ? ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + join(context.dataDirectory, "disabled-hooks"), "-c", "diff.external=", ...(args[0] === "diff" ? [args[0], "--no-ext-diff", "--no-textconv", ...args.slice(1)] : args)] : args;
+    return runCommand("git", hardened, { cwd, signal, timeoutMs: Math.min(timeoutMs, context.timeoutMs),owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:`git.${args[0]}`} });
   }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     const cwd = cwdOf(params, context);
@@ -234,7 +236,8 @@ export class GitCapability implements CapabilityAdapter {
     }
     if (action === "git.diff") {
       const against = typeof params.against === "string" && params.against ? params.against : "HEAD";
-      if (!/^[\w./@^~-]{1,120}$/.test(against)) return fail("Invalid ref.");
+      // A ref never starts with "-": an option there (e.g. --textconv, --ext-diff) would override Bunny's own flags.
+      if (!/^[\w./@^~][\w./@^~-]{0,119}$/.test(against)) return fail("Invalid ref.");
       const stat = await this.git(["diff", "--stat", against], cwd, context);
       const patch = await this.git(["diff", against], cwd, context);
       if (stat.exitCode !== 0 || patch.exitCode !== 0) return fail(`git diff failed: ${tail(stat.stderr || patch.stderr, 300)}`);
@@ -278,7 +281,8 @@ export class GitCapability implements CapabilityAdapter {
     if (action === "git.merge") {
       const branch = str(params, "branch");
       if (!/^bunny\/[A-Za-z0-9._-]{1,80}$/.test(branch)) return fail("Only bunny/* branches can be merged by a mission.");
-      return mergeTransaction(branch, cwd, context);
+      // M-A-3 T9R-F01: under remote authority the merge runs with the same hardened Git flags as every other call.
+      return mergeTransaction(branch, cwd, context, context.remoteAuthority ? (args, at, signal, timeoutMs) => this.git(args, at, context, timeoutMs, signal) : undefined);
     }
     return { ok: false, status: "unsupported", summary: `${action} is not supported.`, output: null, evidence: [] };
   }

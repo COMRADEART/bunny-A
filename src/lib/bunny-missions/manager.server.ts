@@ -1,11 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import type { TaskManager } from "../bunny-host/manager.server.ts";
 import type { HostEvent } from "../bunny-host/contracts.ts";
 import type { Mode, OrchTask, ProviderId, TaskConstraints, VerifySpec } from "../orch/types.ts";
 import { codexMissionExclusion } from "../orch/compatibility.ts";
 import { ArtifactStore } from "./artifacts.server.ts";
-import { agenticFingerprint, agenticOperationDigest, agenticScopeViolation, envelopeFrom, matches, MODE_BUDGET, providerScopeViolation, scopeFor, taskViolation ,
+import { agenticFingerprint, agenticOperationDigest, agenticScopeViolation, capabilityOperation, DESKTOP_GRANT_MAX_USES, DESKTOP_GRANT_TTL_MS, DESKTOP_REQUIRED, desktopGrantViolation, envelopeFrom, isRemoteEnvelope, isTrustedLocalActor, matches, MODE_BUDGET, providerScopeViolation, providerSessionAuthority, REMOTE_SESSION_CEILING, remoteExecutionRefusal, redactReviewListing, DEVICE_REVIEW_REASON, remoteSessionViolation, runsCode, scopeFor, scopeViolation, sessionOperation, taskViolation, type DesktopGrantContext,
 } from "./authorization.server.ts";
 import { AgenticStore, digest, fileDigest, rootIdentity } from "./agentic-store.server.ts";
 import { AGENTIC_POLICY_VERSION, type AgenticAdjustment, type AgenticAuthorizationEnvelope, type CommandBinding ,
@@ -40,9 +41,9 @@ import { MissionStore, redact } from "./store.server.ts";
 import { TriggerEngine } from "./triggers.server.ts";
 import type {
   ActionManifest, AuthorizationEnvelope, CapabilityResult, FailureCategory, Mission, MissionConfig, MissionSnapshot, MissionStep, MissionView,
-  PermissionRequest, RemoteAnswer, StepState, Trigger,
+  PermissionRequest, RemoteAnswer, StepState, Trigger, DesktopGrant, DesktopOperation, PermissionDecision,
 } from "./types.ts";
-import { APPROVAL_ON_HOST, deviceApprovalRefusal, deviceMayLaunch, isDeviceActor, WorkstationRequiredError, WORKSTATION_ONLY_RISKS,
+import { APPROVAL_ON_HOST, deviceApprovalRefusal, deviceMayLaunch, ensureDeviceSchema, hostId, isDeviceActor, WorkstationRequiredError, WORKSTATION_ONLY_RISKS,
 } from "../bunny-host/device-authority.server.ts";
 import { WorkspaceCoordinator } from "./workspace.server.ts";
 import { CommandRefusedError, safeError, supervisedLoop, type SafeError ,
@@ -69,6 +70,30 @@ export type CreateMission = { objective: string; title?: string; mode: Mode; pro
  * delegated approval inside the envelope, deterministic steps through the Capability Bus. It never calls
  * a provider adapter itself.
  */
+/** M-A-3 T9R-F01: what the workstation reviews for one paired-device change: size, SHA-256 and a bounded preview. */
+function describeRemoteChange(path: string): string {
+  try {
+    const info = statSync(path);
+    if (!info.isFile()) return "not a regular file";
+    const bytes = readFileSync(path);
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    // JSON-encoded (quotes, backslashes and line breaks escaped) so file text can never imitate prompt structure.
+    const text = JSON.stringify(bytes.subarray(0, REVIEW_BYTES).toString("utf8")).replace(/[\u2022\u2028\u2029\u202a-\u202e\u2066-\u2069]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`);
+    // Never an implicit preview: either the whole file is shown or the prompt says plainly that it is not.
+    return info.size > REVIEW_BYTES
+      ? `${info.size} bytes, sha256 ${digest}. TOO LARGE TO SHOW HERE: only the first ${REVIEW_BYTES} bytes follow; open the whole file on the Windows Host and check it before allowing. First bytes (JSON): ${text}`
+      : `${info.size} bytes, sha256 ${digest}, full content (JSON): ${text}`;
+  } catch {
+    return "removed or unreadable";
+  }
+}
+/** M-A-3 T9R-F01: paired-device changes one workstation prompt lists (and its answer acknowledges). */
+const REVIEW_PAGE = 12;
+/** M-A-3 T9R-F01: largest change shown in full in a review prompt; larger files are flagged explicitly. */
+const REVIEW_BYTES = 8192;
+/** M-A-3 T9R-F01: the project changed between a desktop-required ask and the workstation's answer. */
+class DesktopRequestStale extends CommandRefusedError {}
+
 export class MissionManager {
   projectContext: ProjectContextResolver | null = null;
   agentic: AgenticStore;
@@ -91,16 +116,37 @@ export class MissionManager {
     this.tasks = tasks; this.dataDirectory = options.dataDirectory;
     this.store = new MissionStore(tasks.db);
     this.agentic = new AgenticStore(tasks.db, this.store, tasks.instanceId);
-    tasks.missionScopeCheck = (task) => {
+    tasks.missionScopeCheck = (task, phase = "check") => {
       const mission = this.store.mission(task.mission!.missionId);
       const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
-      const authority = envelope ? providerScopeViolation(task, envelope, this.store.step(task.mission!.stepId)) : "no approved mission envelope";
+      if (!envelope) return "no approved mission envelope";
+      if (envelope.revokedAt) return "authorization revoked";
+      // M-A-3 T9R-F01: no shell-capable session starts while paired-device changes await workstation review.
+      if (!["tool_free", "read_tools"].includes(providerSessionAuthority(task.provider, task.executionScope?.access) ?? "") && this.pendingRemoteReview())
+        return `${DESKTOP_REQUIRED} Files were changed under paired-device authority and need review on the Windows Host first.`;
+      // M-A-3 T9R-F01: a remote envelope launches a shell-capable session only under a trusted-desktop grant for
+      // exactly this Task, provider, model, effort, access and folder. "launch" runs after the full check and every
+      // admission gate (which may legitimately exhaust an Agentic budget), so it only re-validates and spends the grant.
+      if (phase === "launch") {
+        const ceiling = remoteSessionViolation(task, envelope);
+        if (!ceiling) return null;
+        const held = this.desktopSessionGrant(task, envelope);
+        if (!held) return ceiling;
+        const spent = this.consumeDesktopGrant(held.requestId, (current) => this.desktopSessionViolation(task, envelope, current));
+        if (!spent && task.cwd) this.desktopExecutions.set(`task:${task.id}`, { root: task.cwd, live: () => !["completed", "failed", "stopped"].includes(this.tasks.db.get(task.id).state) });
+        return spent;
+      }
+      if (isRemoteEnvelope(envelope) && envelope.expiresAt <= Date.now()) return "remote authorization expired";
+      const grant = remoteSessionViolation(task, envelope) ? this.desktopSessionGrant(task, envelope) : null;
+      const authority = providerScopeViolation(task, envelope, this.store.step(task.mission!.stepId), { desktopGrant: !!grant });
       if (authority) return authority;
       const agentic = this.agenticProviderCheck(task);
       if (agentic) return agentic;
-      return task.provider === "codex" ? codexMissionExclusion({ id: "codex", securityCompatibility: this.tasks.live().find((provider ) => provider.id === "codex")?.securityCompatibility ,
+      const codex = task.provider === "codex" ? codexMissionExclusion({ id: "codex", securityCompatibility: this.tasks.live().find((provider ) => provider.id === "codex")?.securityCompatibility ,
             }, task.executionScope!.access,
           ) : null;
+      if (codex) return codex;
+      return null;
     };
     this.cached = this.store.config();
     this.artifacts = new ArtifactStore(this.store, options.dataDirectory);
@@ -126,6 +172,24 @@ export class MissionManager {
       } catch { return { reason: "Current Agentic authority/revision cannot be validated." }; }
     };
     this.bus.agenticFinish = (id, ok) => this.agentic.finish(id, ok ? "COMPLETED" : "FAILED");
+    // M-A-3 T9R-F01: the trusted-desktop grant for one exact capability operation; never from request parameters.
+    this.bus.desktopGrantFor = (request, executable) => this.desktopCapabilityGrant(request, executable);
+    this.bus.desktopGrantConsume = (id, request, executable) => this.consumeDesktopGrant(id, (grant) => this.desktopCapabilityViolation(request, executable, grant));
+    this.bus.remoteReviewFor = () => this.pendingRemoteReview();
+    tasks.codeRunGate = () => this.pendingRemoteReview() ? `${DESKTOP_REQUIRED} Files were changed under paired-device authority and need review on the Windows Host before a Python check runs.` : null;
+    this.bus.remoteMutationHeld = (request) => this.remoteMutationHeld(request);
+    this.bus.remoteMutationStarted = (request, runId) => {
+      const actor = this.remoteActorFor(request);
+      if (!actor) return;
+      const path = typeof request.params.path === "string" ? resolve(request.cwd, request.params.path) : request.cwd;
+      const root = request.roots.find((candidate) => within(candidate, path)) ?? request.cwd;
+      this.store.recordRemoteChange({ runId, missionId: request.missionId, path, root, actor });
+    };
+    this.bus.desktopExecutionStarted = (runId, request) => this.desktopExecutions.set(`run:${runId}`, { root: request.cwd, live: () => this.store.run(runId).status === "running" });
+    this.bus.desktopExecutionConflict = (request) => {
+      const target = typeof request.params.path === "string" ? resolve(request.cwd, request.params.path) : request.cwd;
+      return this.desktopExecutionConflict(target);
+    };
     this.bus.agenticExecutionContext = (request, admissionId, executable) => {
       const e = this.agentic.forMission(request.missionId!)!;
       if (!e.cross_app) return {};
@@ -783,7 +847,7 @@ export class MissionManager {
     if (by.startsWith("device:"))
       this.emit(
         "approval.remote_device",
-        `Mission envelope ${envelope.id} approved by paired ${by}; same scope as workstation approval.`,
+        `Mission envelope ${envelope.id} approved by paired ${by} with remote authority: provider sessions limited to ${REMOTE_SESSION_CEILING.join(" and ")}; shell sessions, terminal, Git hooks and other code execution need trusted-desktop approval on the Windows Host.`,
         id,
       );
     mission = this.setMission(
@@ -1123,6 +1187,7 @@ export class MissionManager {
             outcome.decision.risk,
             outcome.decision.reason,
             "execute",
+            outcome.decision,
           );
           return false;
         }
@@ -1271,6 +1336,14 @@ export class MissionManager {
       { kind: "task_spec"; spec: VerifySpec } | undefined;
     const mode: Mode =
       step.reasoning === "deep" ? "deep" : step.reasoning === "light" ? "fast" : mission.mode;
+    // M-A-3 T9R-F01: under remote authority prefer routes within the device ceiling, so benign work needs no
+    // extra prompt. This only steers routing; the session ceiling itself is enforced at every launch.
+    const outsideCeiling = isRemoteEnvelope(envelope)
+      ? (["codex", "claude", "ollama", "opencode", "cline", "cursor"] as ProviderId[]).filter((id) => {
+          const authority = providerSessionAuthority(id, step.scope.access);
+          return !authority || !REMOTE_SESSION_CEILING.includes(authority);
+        })
+      : [];
     let task: OrchTask;
     const submit = (input: TaskConstraints) =>
       this.tasks.submit(
@@ -1281,7 +1354,7 @@ export class MissionManager {
           projectId: mission.projectId,
           override: "auto",
           constraints: input,
-          verify: spec?.spec ?? null,
+          verify: spec && !(spec.spec.kind === "python" && isRemoteEnvelope(envelope)) ? spec.spec : null,
         },
         {
           missionId: mission.id,
@@ -1291,7 +1364,17 @@ export class MissionManager {
         },
       );
     try {
-      task = submit(constraints);
+      task = outsideCeiling.length
+        ? (() => {
+            try {
+              return submit({ ...constraints, providerDenylist: [...new Set([...(constraints.providerDenylist ?? []), ...outsideCeiling])] });
+            } catch (error) {
+              if (!/hard constraints|not eligible/.test(error instanceof Error ? error.message : String(error))) throw error;
+              // No route within remote authority: route normally; dispatch then asks the workstation for this Task.
+              return submit(constraints);
+            }
+          })()
+        : submit(constraints);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       // An independence preference never makes a step impossible: fall back to any eligible provider and say so.
@@ -1365,7 +1448,11 @@ export class MissionManager {
       sessionsUsed,
     );
     const agenticViolation = this.agenticProviderCheck(task);
-    if (violation || agenticViolation) {
+    // M-A-3 T9R-F01: a shell-capable session never starts over unreviewed paired-device changes, under any envelope.
+    const sessionClass = providerSessionAuthority(task.provider, task.executionScope?.access);
+    const review = sessionClass !== "tool_free" && sessionClass !== "read_tools" ? this.pendingRemoteReview() : null;
+    const reviewViolation = review ? `it can run code over files changed under paired-device authority; review their content before allowing:${review.listing}${review.more ? `\n${review.more} more changed file(s) are listed for review after these.` : ""}` : null;
+    if (violation || agenticViolation || reviewViolation) {
       // The child stays waiting_for_approval: the user may approve it directly or through the request.
       this.setStep(
         step,
@@ -1373,13 +1460,16 @@ export class MissionManager {
         "mission.step.child_created",
         `${step.role} child task ${task.id} routed to ${task.provider}.`,
       );
+      // M-A-3 T9R-F01: a session beyond remote authority is offered to the workstation for this exact Task only.
+      const remoteSession = remoteSessionViolation(task, envelope) ?? reviewViolation;
       this.askPermission(
         mission,
         this.store.step(step.id),
         "provider.execute",
         "EXECUTE",
-        `${task.provider} for ${step.role}: ${violation ?? agenticViolation}`,
+        `${task.provider} for ${step.role}: ${[violation ?? agenticViolation, reviewViolation].filter(Boolean).join("; ")}`,
         "execute",
+        remoteSession ? { desktopRequired: true, desktopOperation: sessionOperation(task), ...(review ? { remoteReview: review.ids } : {}) } : {},
       );
       return false;
     }
@@ -1436,7 +1526,9 @@ export class MissionManager {
     if (this.agentic.exists(mission.id))
       envelope = this.currentAgenticCanonical(mission.id) ?? envelope;
     // A one-time allowance covers exactly the path the user saw in the request, nothing around it.
-    const once = step.approvedOnce?.action === action && typeof params.path === "string";
+    // M-A-3 T9R-F01: only a workstation answer may extend roots to the path it reviewed; a device answer never does.
+    const answeredBy = (() => { try { return step.approvedOnce ? this.store.request(step.approvedOnce.requestId).resolvedBy : null; } catch { return null; } })();
+    const once = step.approvedOnce?.action === action && typeof params.path === "string" && isTrustedLocalActor(answeredBy);
     const roots = once
       ? [...envelope.projectRoots, dirname(resolve(cwd, params.path as string))]
       : envelope.projectRoots;
@@ -1470,7 +1562,7 @@ export class MissionManager {
         runId: string | null;
         category: FailureCategory | null;
         output: unknown;
-        permission: { action: string; risk: string; reason: string } | null;
+        permission: ({ action: string; risk: string; reason: string } & Pick<PermissionDecision, "desktopRequired" | "desktopOperation" | "remoteReview">) | null;
       };
       if (step.executor.kind === "capability") {
         const params = this.crossAppInputs(step);
@@ -1503,6 +1595,9 @@ export class MissionManager {
                   action: step.executor.action,
                   risk: outcome.decision.risk,
                   reason: outcome.decision.reason,
+                  desktopRequired: outcome.decision.desktopRequired,
+                  desktopOperation: outcome.decision.desktopOperation,
+                  remoteReview: outcome.decision.remoteReview,
                 }
               : null,
           category:
@@ -1538,6 +1633,9 @@ export class MissionManager {
                 action: run.permission.action,
                 risk: this.bus.riskOf(run.permission.action, {}) ?? "EXECUTE",
                 reason: run.permission.reason,
+                desktopRequired: run.permission.desktopRequired,
+                desktopOperation: run.permission.desktopOperation,
+                remoteReview: run.permission.remoteReview,
               }
             : null,
           category: run.ok
@@ -1584,6 +1682,7 @@ export class MissionManager {
           result.permission.risk as PermissionRequest["risk"],
           result.permission.reason,
           "execute",
+          result.permission,
         );
         return;
       }
@@ -1950,14 +2049,69 @@ export class MissionManager {
     return found ? [found.manifest] : [];
   }
   /** Why a paired device may not answer this exact Host ask (allow), or null. Deny is never limited. */
-  deviceRequestRefusal(request: PermissionRequest): string | null {
+  deviceRequestRefusal(request: PermissionRequest, decision: "allow_once" | "allow_batch" = "allow_once"): string | null {
+    // M-A-3 T9R-F01: an ask the Host marked as exceeding remote authority is answered on the workstation only.
+    if (request.desktopRequired || request.remoteReview?.length) return DESKTOP_REQUIRED;
+    // An answer resumes the Mission: a device never decides when workstation-held code execution continues, exactly
+    // as it may not start or resume it (remote envelopes pass; their code is desktop-gated per operation).
+    const resume = this.deviceResumeRefusal(request.missionId);
+    if (resume) return resume;
+    // A device never extends an expired or revoked envelope, for any action.
+    const mission = this.store.mission(request.missionId);
+    const live = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
+    if (!live || live.revokedAt || live.expiresAt <= Date.now()) return APPROVAL_ON_HOST;
     if (request.action === "provider.execute") {
       // The Host asked because this route exceeds what it can confine; only local tool-free inference launches remotely.
       const step = this.store.step(request.stepId);
       const task = step.taskId ? this.tasks.db.get(step.taskId) : null;
-      return task && deviceMayLaunch(task, this.tasks.live().find((provider) => provider.id === task.provider)?.remoteModels) ? null : APPROVAL_ON_HOST;
+      if (!task || !deviceMayLaunch(task, this.tasks.live().find((provider) => provider.id === task.provider)?.remoteModels)) return APPROVAL_ON_HOST;
+      // The exact Task must already fit the envelope (providers, local-only, budgets, roots, scope): a phone answers
+      // other asks about it, never one that would exceed the reviewed authorization.
+      const local = runsLocally(this.tasks.live().find((provider) => provider.id === task.provider), task.model);
+      const used = mission.accounting.externalModelCalls + mission.accounting.localModelCalls;
+      return taskViolation(task, live, local, mission.accounting.externalModelCalls, Date.now(), step, used) ? APPROVAL_ON_HOST : null;
     }
-    return deviceApprovalRefusal(request.risk, this.bus.find(request.action)?.manifest);
+    const owner = deviceApprovalRefusal(request.risk, this.bus.find(request.action)?.manifest);
+    if (owner) return owner;
+    // M-A-3 T9R-F01: a device never authorizes code execution, even inside a workstation-approved envelope. The
+    // Host-computed small batch is Calculator-bound by construction; a single answer is judged on the exact step.
+    const step = this.store.step(request.stepId);
+    const consent = this.agentic.forMission(request.missionId);
+    // A skill's inner request cannot be bound to exact params from the step; the workstation answers it.
+    if (step.executor.kind === "skill") return APPROVAL_ON_HOST;
+    const cwd = step.workspace ?? mission.root;
+    if (decision === "allow_batch" && request.batchOffer) {
+      // An Agent's consent bounds a device as well: a batch only within a cross-app consent that names every action.
+      if (consent && (!consent.cross_app || request.batchOffer.actions.some((action) => !consent.permitted_capabilities.includes(action)))) return APPROVAL_ON_HOST;
+      // Every planned operation the batch covers must be one a phone could approve alone (exact Calculator operations).
+      for (const planned of this.store.steps(request.missionId))
+        if (planned.executor.kind === "capability" && request.batchOffer.actions.includes(planned.executor.action)) {
+          const refusal = remoteExecutionRefusal(planned.executor.action, planned.executor.params as Record<string, unknown>, this.bus.find(planned.executor.action)?.manifest.risk ?? ("UNKNOWN" as never), planned.workspace ?? mission.root);
+          if (refusal) return refusal;
+        } else if (planned.executor.kind === "skill") return APPROVAL_ON_HOST;
+      return null;
+    }
+    // Judged on every params the one-time answer can reach in this step: the executor and every same-action
+    // verification check (a one-time allowance carries from execution into verification).
+    const candidates: Record<string, unknown>[] = [
+      ...(step.executor.kind === "capability" && step.executor.action === request.action ? [step.executor.params as Record<string, unknown>] : []),
+      ...step.verification.flatMap((check) => check.kind === "capability" && check.action === request.action ? [check.params as Record<string, unknown>]
+        : check.kind === "file_exists" && request.action === (check.contains ? "filesystem.read" : "filesystem.exists") ? [{ path: check.path }] : []),
+    ];
+    if (!candidates.length && step.executor.kind === "model") candidates.push(this.agenticRequestParams(step, request.action, step.pendingPhase ?? "execute"));
+    if (!candidates.length) return APPROVAL_ON_HOST;
+    for (const params of candidates) {
+      // A device answers only for what the reviewed envelope already covers: never a new capability, path, root,
+      // command or domain (a one-time answer is not a scope expansion from a phone).
+      if (request.action !== "project.context") {
+        if (!matches(live.capabilities, request.action)) return APPROVAL_ON_HOST;
+        if (scopeViolation(request.action, params, live, cwd)) return APPROVAL_ON_HOST;
+        if (request.action.startsWith("filesystem.") && typeof params.path !== "string") return APPROVAL_ON_HOST;
+      }
+      const refusal = remoteExecutionRefusal(request.action, params, request.risk, cwd);
+      if (refusal) return refusal;
+    }
+    return null;
   }
   /** Why a paired device may not approve this pending Mission plan, or null. */
   deviceMissionRefusal(mission: Mission): string | null {
@@ -1989,6 +2143,11 @@ export class MissionManager {
       if (capability === "provider.execute") continue;
       for (const manifest of this.manifestsFor(capability))
         if (deviceApprovalRefusal(manifest.risk, manifest)) return APPROVAL_ON_HOST;
+      // M-A-3 T9R-F01: re-consent never hands a device bound scripts, interpreters or hook-running Git.
+      // Writes and deletes are judged per path at execution under the (remote) envelope, so they are not refused here.
+      for (const manifest of this.manifestsFor(capability))
+        if (manifest.id !== "filesystem.write" && manifest.id !== "filesystem.delete" && remoteExecutionRefusal(manifest.id, {}, manifest.risk)) return DESKTOP_REQUIRED;
+      if (!this.manifestsFor(capability).length) return APPROVAL_ON_HOST;
     }
     return null;
   }
@@ -2002,16 +2161,98 @@ export class MissionManager {
         ...(mission.state === "waiting_for_approval"
           ? {
               planReference: this.agenticPlanReference(mission.id),
-              remote: verdict(this.safeRefusal(() => this.deviceMissionRefusal(mission))),
+              remote: { ...verdict(this.safeRefusal(() => this.deviceMissionRefusal(mission))), desktopFollowUp: this.remoteDesktopFollowUp(mission) },
             }
           : {}),
-        requests: mission.requests.map((request) =>
-          request.resolvedAt
-            ? request
-            : { ...request, remote: verdict(this.safeRefusal(() => this.deviceRequestRefusal(request))) },
-        ),
+        requests: mission.requests.map((full) => {
+          // M-A-3 T9R-F01: a paired device sees the desktop-required flag, never grant or exact-operation records.
+          const { desktopGrant: _grant, desktopOperation: _operation, desktopBinding: _binding, ...stripped } = full;
+          // The review listing (paths and content of paired-device changes, Host-wide) is for the workstation only.
+          const request = stripped.remoteReview?.length ? { ...stripped, reason: DEVICE_REVIEW_REASON } : stripped;
+          if (request.resolvedAt) return request;
+          const once = this.safeRefusal(() => this.deviceRequestRefusal(request));
+          // M-A-3 T9R-F01: a Calculator-bound batch can stay answerable where a single allow is workstation-only.
+          const batch = once && request.batchOffer ? this.safeRefusal(() => this.deviceRequestRefusal(request, "allow_batch")) : once;
+          return { ...request, remote: once && !batch ? { answerable: true, reason: null, batchOnly: true } : verdict(once) };
+        }),
       })),
     };
+  }
+  /**
+   * M-A-3 T9R-F01: why a paired device may not start this ready Mission, or null. A remote envelope is capped by
+   * itself; a workstation envelope that carries shell sessions, terminal commands or hook-running Git is started
+   * on the workstation, so a device never chooses when workstation-held code execution begins.
+   */
+  deviceStartRefusal(mission: Mission): string | null {
+    const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
+    if (!envelope || envelope.revokedAt) return APPROVAL_ON_HOST;
+    if (isRemoteEnvelope(envelope)) return null;
+    // A provider session may route to any allowed provider; judge each one's tool authority (unknown = shell).
+    const candidates: ProviderId[] = envelope.providers.localOnly ? ["ollama"] : envelope.providers.allow ?? ["codex", "claude", "ollama", "opencode", "cline", "cursor"];
+    const shellSessions = !!envelope.providers.execution && (envelope.providers.sessions?.steps ?? [{ scope: { access: "write" } }]).some((step) =>
+      candidates.some((provider) => { const authority = providerSessionAuthority(provider, step.scope.access); return !authority || !REMOTE_SESSION_CEILING.includes(authority); }));
+    const code = envelope.terminal.enabled || envelope.capabilities.some((capability) => capability === "terminal.exec" || capability.startsWith("terminal."))
+      || envelope.git.actions.some((action) => ["commit", "merge", "worktree"].includes(action));
+    if (shellSessions || code) return DESKTOP_REQUIRED;
+    // Workstation-held program launches and UI automation (EXECUTE, other than exact Calculator operations) start
+    // only from the workstation too; an unknown capability or a skill that may execute fails closed.
+    for (const step of this.store.steps(mission.id)) {
+      const operations = [
+        ...(step.executor.kind === "capability" ? [{ action: step.executor.action, params: step.executor.params as Record<string, unknown> }] : []),
+        ...step.verification.flatMap((check) => check.kind === "capability" ? [{ action: check.action, params: check.params as Record<string, unknown> }] : []),
+      ];
+      if (["completed", "skipped"].includes(step.state)) continue;
+      // Skills, command checks, Git-diff checks and Python task checks run programs; never on a device's timing.
+      if (step.executor.kind === "skill") return DESKTOP_REQUIRED;
+      if (step.verification.some((check) => check.kind === "command" || check.kind === "git_diff_nonempty" || (check.kind === "task_spec" && check.spec.kind === "python"))) return DESKTOP_REQUIRED;
+      for (const { action, params } of operations) {
+        const risk = this.bus.find(action)?.manifest.risk;
+        if (!risk) return DESKTOP_REQUIRED;
+        // Git and GitHub CLI reads run owner-configured programs (textconv, filters, fsmonitor) under workstation authority.
+        if (action.startsWith("git.") || action.startsWith("github.")) return DESKTOP_REQUIRED;
+        if (!runsCode(action, params, risk)) continue;
+        // Code that would still ask stays workstation-gated (a device can never answer it); code the workstation
+        // envelope would run without another answer means the device would decide when it runs.
+        try {
+          const decided = this.bus.decision(this.capabilityRequest(mission, step, envelope, action, params, step.workspace ?? mission.root));
+          if (decided.decision === "allow") return DESKTOP_REQUIRED;
+        } catch { return DESKTOP_REQUIRED; }
+      }
+    }
+    return null;
+  }
+  /**
+   * M-A-3 T9R-F01: why a paired device may not resume this Agent's Mission, or null. Pause and Stop are always
+   * available; resuming work whose consent includes bound scripts or hook-running Git stays on the workstation.
+   */
+  deviceResumeRefusal(missionId: string): string | null {
+    // The Mission's own envelope and plan, exactly as for a device start (missing or revoked fails closed).
+    const start = this.deviceStartRefusal(this.store.mission(missionId));
+    if (start) return start;
+    const e = this.agentic.forMission(missionId);
+    if (!e) return null;
+    // Cross-app computer actions are confined to exact Calculator operations by the agentic scope check; any other
+    // EXECUTE capability is workstation-held code or program execution.
+    return e.permitted_capabilities.some((capability) => capability === "terminal.exec" || ["git.commit", "git.merge", "git.worktree_add", "git.worktree_remove"].includes(capability)
+      || (this.bus.find(capability)?.manifest.risk === "EXECUTE" && !(e.cross_app && capability.startsWith("computer."))))
+      ? DESKTOP_REQUIRED : null;
+  }
+  /** M-A-3 T9R-F01: a Mission record as a paired device may see it: no grant, exact-operation or binding records. */
+  deviceMissionData<T extends { mission: MissionView }>(data: T): T {
+    return redactReviewListing({
+      ...data,
+      mission: { ...data.mission, requests: data.mission.requests.map(({ desktopGrant: _g, desktopOperation: _o, desktopBinding: _b, ...request }) => request.remoteReview?.length ? { ...request, reason: DEVICE_REVIEW_REASON } : request) },
+    });
+  }
+  /** M-A-3 T9R-F01: the parts of a plan a remote approval leaves for trusted-desktop approval. Projection only. */
+  remoteDesktopFollowUp(mission: Mission): string | null {
+    const scope = mission.requestedScope;
+    if (!scope) return null;
+    const parts: string[] = [];
+    if (scope.providers.sessions?.steps.some((step) => step.scope.access === "write")) parts.push("agent sessions that write files (they use a shell)");
+    if (scope.terminal.enabled || scope.capabilities.includes("terminal.exec")) parts.push("terminal commands and scripts");
+    if (scope.git.actions.some((action) => ["commit", "merge", "worktree"].includes(action))) parts.push("Git changes that can run repository hooks");
+    return parts.length ? `If approved here, these still need approval on the Windows Host when they run: ${parts.join("; ")}.` : null;
   }
   /** A verdict that cannot be computed is a refusal, never an answerable offer. */
   safeRefusal(check: () => string | null): string | null {
@@ -2020,6 +2261,208 @@ export class MissionManager {
     } catch {
       return APPROVAL_ON_HOST;
     }
+  }
+  // -- M-A-3 T9R-F01: trusted-desktop grants -------------------------------------
+  /** Stable identity of this Host installation; the per-boot epoch is tasks.instanceId. */
+  hostIdentity(): string {
+    ensureDeviceSchema(this.tasks.db.db);
+    return hostId(this.tasks.db.db);
+  }
+  /** Every binding a grant must match for this Mission step right now. */
+  desktopContext(missionId: string, stepId: string, operation: DesktopOperation): DesktopGrantContext {
+    return {
+      hostId: this.hostIdentity(),
+      epoch: this.tasks.instanceId,
+      missionId,
+      agentId: this.agentic.forMission(missionId)?.agent_id ?? null,
+      stepId,
+      taskId: this.store.step(stepId).taskId,
+      planReference: this.agenticPlanReference(missionId),
+      authorizationId: this.store.mission(missionId).authorizationId ?? "",
+      operation,
+      mutationSequence: this.store.mutationSequence(),
+    };
+  }
+  desktopSessionViolation(task: OrchTask, envelope: AuthorizationEnvelope, grant: DesktopGrant | undefined): string | null {
+    if (envelope.revokedAt) return "authorization revoked";
+    const context = this.desktopContext(task.mission!.missionId, task.mission!.stepId, sessionOperation(task));
+    return context.taskId !== task.id ? "Trusted-desktop authorization belongs to another Task." : desktopGrantViolation(grant, context);
+  }
+  /** The workstation's still-valid grant for exactly this provider session, or null. */
+  desktopSessionGrant(task: OrchTask, envelope: AuthorizationEnvelope): DesktopGrant | null {
+    for (const request of this.store.requests(task.mission!.missionId))
+      if (request.stepId === task.mission!.stepId && request.desktopGrant && !this.desktopSessionViolation(task, envelope, request.desktopGrant))
+        return request.desktopGrant;
+    return null;
+  }
+  desktopCapabilityViolation(request: CapabilityRequest, executable: Resolved | null | undefined, grant: DesktopGrant | undefined): string | null {
+    if (!request.missionId || !request.stepId || !request.envelope || request.envelope.revokedAt) return "No live Mission authorization.";
+    return desktopGrantViolation(grant, this.desktopContext(request.missionId, request.stepId, capabilityOperation(request.action, request.params, request.cwd, executable)));
+  }
+  /** The workstation's still-valid grant (its request id) for exactly this capability operation, or null. */
+  desktopCapabilityGrant(request: CapabilityRequest, executable?: Resolved | null): string | null {
+    if (!request.missionId || !request.stepId) return null;
+    for (const record of this.store.requests(request.missionId))
+      if (record.stepId === request.stepId && record.desktopGrant && !this.desktopCapabilityViolation(request, executable, record.desktopGrant))
+        return record.id;
+    return null;
+  }
+  /** Project paths written in this Mission while its envelope was a paired-device (remote) grant. */
+  remoteChanges(mission: Mission): string[] {
+    const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
+    if (!envelope || !isRemoteEnvelope(envelope)) return [];
+    return [...new Set(this.store.runs({ missionId: mission.id, limit: 500 })
+      .filter((run) => ["filesystem.write", "filesystem.delete", "browser.download"].includes(run.action) && run.status === "succeeded")
+      .map((run) => String((run.params as Record<string, unknown>).path ?? run.action)))];
+  }
+  /** The paired device behind a Mission change: a remote envelope's grantor, or the device that allowed it once. */
+  remoteActorFor(request: CapabilityRequest): string | null {
+    if (request.envelope && isRemoteEnvelope(request.envelope)) return request.envelope.grantedBy;
+    if (request.missionId) {
+      try {
+        const driven = this.store.mission(request.missionId).deviceDriven;
+        if (driven) return driven;
+      } catch { /* fall through */ }
+    }
+    if (!request.missionId) return null;
+    try {
+      // Any device allow in this Mission attributes its changes, even after a later workstation answer (to a hold or
+      // a review) replaced a step's one-time allowance.
+      // Mission-wide: a device answer resumes the Mission, so every later change in it lands on the device's timing.
+      const answered = this.store.requests(request.missionId).find((asked) => asked.resolution !== "deny" && asked.resolution !== null && !!asked.resolvedBy && isDeviceActor(asked.resolvedBy));
+      return answered?.resolvedBy ?? null;
+    } catch { return "device:unattributed"; } // unreadable attribution is treated as paired-device (held and reviewed)
+  }
+  /**
+   * Unreviewed paired-device changes. Host-wide on purpose: a command can load files from any folder (its own cwd,
+   * argument paths, another project root), so any code run waits for the workstation to review every one of them.
+   */
+  pendingRemoteReview(): { ids: string[]; paths: string[]; more: number; listing: string } | null {
+    const pending = this.store.pendingRemoteChanges();
+    if (!pending.length) return null;
+    // A workstation answer acknowledges exactly the paths its prompt shows; the rest ask again afterwards.
+    const all = [...new Set(pending.map((change) => change.path))];
+    const shown = all.slice(0, REVIEW_PAGE);
+    // Any file can be run as code by an interpreter whatever its name, so the workstation reviews content: size,
+    // SHA-256 and a bounded preview of each changed file (the answer is bound to this exact project state).
+    const listing = shown.map((path) => `\n• ${JSON.stringify(path)}: ${describeRemoteChange(path)}`).join("");
+    return { ids: pending.filter((change) => shown.includes(change.path)).map((change) => change.id), paths: shown, more: all.length - shown.length, listing };
+  }
+  /** M-A-3 T9R-F01: a paired device chose when this Mission (re)starts; its changes are paired-device changes. */
+  markDeviceDriven(missionId: string, actor: string) {
+    if (!isDeviceActor(actor)) return;
+    const mission = this.store.mission(missionId);
+    if (mission.deviceDriven !== actor) this.store.saveMission({ ...mission, deviceDriven: actor, updatedAt: Date.now() });
+  }
+  /** M-A-3 T9R-F01: a revoked device's start or resume ends with it: active Missions it drove are stopped. */
+  async endDeviceDriven(actor: string): Promise<number> {
+    let stopped = 0;
+    for (const mission of this.store.missions(Number.MAX_SAFE_INTEGER)) {
+      if (["completed", "failed", "stopped"].includes(mission.state)) continue;
+      const answered = this.store.requests(mission.id).some((request) => request.resolvedBy === actor && request.resolution !== "deny" && request.resolution !== null);
+      if (mission.deviceDriven !== actor && !answered) continue;
+      try { await this.stop(mission.id, `workstation (revoked ${actor})`); stopped++; } catch { /* already ending */ }
+    }
+    return stopped;
+  }
+  /** M-A-3 T9R-F01: a revoked device's unexecuted one-time answers end with it (the step asks again). */
+  endDeviceAnswers(actor: string): number {
+    let ended = 0;
+    for (const mission of this.store.missions(Number.MAX_SAFE_INTEGER)) for (const step of this.store.steps(mission.id)) {
+      if (!step.approvedOnce || ["completed", "skipped", "failed", "stopped"].includes(step.state)) continue;
+      try {
+        if (this.store.request(step.approvedOnce.requestId).resolvedBy !== actor) continue;
+      } catch { continue; }
+      this.store.saveStep({ ...this.store.step(step.id), approvedOnce: null });
+      this.emit("approval.device_revoked", `${actor} was revoked; its one-time answer for ${step.approvedOnce.action} no longer applies.`, mission.id);
+      ended++;
+    }
+    return ended;
+  }
+  /** Workstation-approved code running right now: code-running capability runs and shell-capable provider sessions. */
+  liveCodeExecutions(): string[] {
+    const classify = (provider: ProviderId, access: string | undefined, mission: boolean) =>
+      // Direct Ollama inference carries no scope but has no tools either.
+      provider === "ollama" && !mission ? "tool_free" : providerSessionAuthority(provider, access);
+    const live = (label: string, authority: string | null) => authority === "tool_free" || authority === "read_tools" ? [] : [label];
+    const sessions = [...this.tasks.sessions.keys()].flatMap((id) => {
+      try {
+        const task = this.tasks.db.get(id);
+        return live(`${task.provider} session ${id}`, classify(task.provider, task.executionScope?.access, !!task.mission));
+      } catch { return [`session ${id}`]; }
+    });
+    // Survivors are judged by the attempt that left them, never by the Task's current (possibly rerouted) provider.
+    const survivors = [...this.tasks.lingering.keys()].flatMap((key) => {
+      const attempt = this.tasks.lingeringAttempt.get(key);
+      return attempt ? live(`${attempt.provider} survivors ${key}`, classify(attempt.provider, attempt.access, attempt.mission)) : [`survivors ${key}`];
+    });
+    return [...[...this.bus.liveCode.values()], ...sessions, ...survivors];
+  }
+  /** A paired-device change waits while workstation-approved code runs, unless the workstation allowed this exact step. */
+  remoteMutationHeld(request: CapabilityRequest): string | null {
+    if (!this.remoteActorFor(request)) return null;
+    if (request.stepId) {
+      try {
+        const once = this.store.step(request.stepId).approvedOnce;
+        const step = this.store.step(request.stepId);
+        if (step.executor.kind === "capability" && once?.action === request.action && isTrustedLocalActor(this.store.request(once.requestId).resolvedBy)) return null;
+      } catch { /* fall through: held */ }
+    }
+    const live = this.liveCodeExecutions();
+    const target = typeof request.params.path === "string" ? resolve(request.cwd, request.params.path) : request.action;
+    return live.length ? `Approval required on Windows Host: code approved on the Windows Host is running (${live.slice(0, 4).join(", ")}); a paired-device ${request.action} of ${JSON.stringify(target)} waits until it ends. Allowing it now lets the running code read it unreviewed; it is listed for review only before code that starts later.` : null;
+  }
+  /** Executions running under a trusted-desktop grant: the folder they run in and how to tell they ended. */
+  desktopExecutions = new Map<string, { root: string; live: () => boolean }>();
+  /** Why a Mission change to this path must wait for a running trusted-desktop execution, or null. */
+  desktopExecutionConflict(path: string): string | null {
+    for (const [key, run] of this.desktopExecutions) {
+      let live = false;
+      try { live = run.live(); } catch { live = false; }
+      if (!live) { this.desktopExecutions.delete(key); continue; }
+      if (within(run.root, path) || within(path, run.root))
+        return "A trusted-desktop execution is running in this folder; this change waits until it finishes.";
+    }
+    return null;
+  }
+  /** Re-validates and spends one use; synchronous, so no other admission interleaves. Returns why not, or null. */
+  consumeDesktopGrant(requestId: string, violation: (grant: DesktopGrant | undefined) => string | null): string | null {
+    const record = this.store.request(requestId);
+    const reason = violation(record.desktopGrant);
+    if (reason) return reason;
+    const grant = record.desktopGrant!;
+    this.store.saveRequest({ ...record, desktopGrant: { ...grant, uses: grant.uses + 1 } });
+    this.emit(
+      "approval.desktop_grant_used",
+      `Trusted-desktop grant ${grant.id} used (${grant.uses + 1}/${grant.maxUses}) for ${grant.operation.kind === "provider_session" ? `${grant.operation.provider} ${grant.operation.access} session` : grant.operation.action}.`,
+      record.missionId,
+    );
+    return null;
+  }
+  /** Mints the exact-operation grant behind a workstation allow_once of a desktop-required ask. */
+  mintDesktopGrant(request: PermissionRequest): DesktopGrant {
+    if (!request.desktopOperation) throw new CommandRefusedError("This request is not bound to one exact operation; replan it on the workstation.");
+    const { now: _now, operation, ...bindings } = this.desktopContext(request.missionId, request.stepId, request.desktopOperation);
+    if (!bindings.authorizationId) throw new CommandRefusedError("The Mission has no live authorization.");
+    const asked = request.desktopBinding;
+    if (!asked || asked.taskId !== bindings.taskId || asked.authorizationId !== bindings.authorizationId || asked.planReference !== bindings.planReference)
+      throw new CommandRefusedError("The Task, authorization or plan changed after this request was raised; review the current request.");
+    // The workstation approves what its prompt showed: no project change may land between the ask and the answer.
+    if (asked.mutationSequence !== bindings.mutationSequence)
+      throw new DesktopRequestStale("Project files changed after this request was raised; a fresh request lists the changes.");
+    const now = Date.now();
+    return { id: crypto.randomUUID(), requestId: request.id, ...bindings, operation, grantedBy: "workstation", grantedAt: now, expiresAt: now + DESKTOP_GRANT_TTL_MS, maxUses: DESKTOP_GRANT_MAX_USES, uses: 0, revokedAt: null };
+  }
+  /** Ends every unused grant of a Mission (stop, replan). Grants are also void by epoch, plan, envelope and expiry. */
+  revokeDesktopGrants(missionId: string, reason: string) {
+    let ended = 0;
+    for (const record of this.store.requests(missionId))
+      if (record.desktopGrant && record.desktopGrant.revokedAt === null && record.desktopGrant.uses < record.desktopGrant.maxUses) {
+        this.store.saveRequest({ ...record, desktopGrant: { ...record.desktopGrant, revokedAt: Date.now() } });
+        ended++;
+      }
+    if (ended) this.emit("approval.desktop_grant_revoked", `${ended} unused trusted-desktop grant(s) ended: ${reason}.`, missionId);
+    return ended;
   }
   /**
    * M-A-3 T9 (G2): a hold, resume or scope reduction moves the Agentic revision. An open ask stamped with
@@ -2049,6 +2492,7 @@ export class MissionManager {
         request.risk,
         request.reason,
         step.pendingPhase ?? "execute",
+        request,
       );
       reissued++;
     }
@@ -2297,6 +2741,7 @@ export class MissionManager {
             now,
           )) {
             if (
+              isTrustedLocalActor(batch.createdBy) &&
               consultBatch(batch, {
                 action: request.action,
                 params: request.params,
@@ -2643,7 +3088,7 @@ export class MissionManager {
         const outcome = await this.bus.request(this.capabilityRequest(mission, step, envelope, check.action, check.params, cwd),
         );
         if (interrupted()) return;
-        if (outcome.decision.decision === "ask") { this.askPermission(mission, this.store.step(step.id), check.action, outcome.decision.risk, outcome.decision.reason, "verify",
+        if (outcome.decision.decision === "ask") { this.askPermission(mission, this.store.step(step.id), check.action, outcome.decision.risk, outcome.decision.reason, "verify", outcome.decision,
           ); return; }
         if (outcome.run) verificationRunIds.push(outcome.run.id);
         const value = outcome.result?.output && typeof outcome.result.output === "object" ? (outcome.result.output as Record<string, unknown>)[check.expect.field] : undefined;
@@ -2699,6 +3144,7 @@ export class MissionManager {
               outcome.decision.risk,
               outcome.decision.reason,
               "verify",
+              outcome.decision,
             );
             return;
           }
@@ -2738,6 +3184,7 @@ export class MissionManager {
             outcome.decision.risk,
             `Verification: ${outcome.decision.reason}`,
             "verify",
+            outcome.decision,
           );
           return;
         }
@@ -3016,6 +3463,7 @@ export class MissionManager {
     risk: PermissionRequest["risk"],
     reason: string,
     phase: "execute" | "verify",
+    desktop: Pick<PermissionDecision, "desktopRequired" | "desktopOperation" | "remoteReview"> = {},
   ) {
     const delegation = this.agentic.forMission(mission.id);
     const params = this.agenticRequestParams(step, action, phase);
@@ -3034,13 +3482,17 @@ export class MissionManager {
     let batchOffer: PermissionBatchOffer | null = null;
     // The user's standing "ask every time" rule outranks batching: asking for permission is the
     // point of that rule, so a batch button would only produce asks it can never rescue.
-    if (phase === "execute" && !/ask every time/.test(reason)) {
+    if (phase === "execute" && !/ask every time/.test(reason) && !desktop.desktopRequired) {
       try {
         batchOffer = this.batchOfferFor(mission, step, action);
       } catch {
         batchOffer = null;
       }
     }
+    // M-A-3 T9R-F01: the workstation sees which project files paired-device authority changed before it approves code.
+    const deviceChanges = desktop.desktopRequired ? this.remoteChanges(mission) : [];
+    if (deviceChanges.length)
+      reason = `${reason} Files changed in this Mission under paired-device authority: ${deviceChanges.slice(0, 12).map((path) => JSON.stringify(path)).join(", ")}${deviceChanges.length > 12 ? ` and ${deviceChanges.length - 12} more` : ""}. Review them before allowing.`;
     const request: PermissionRequest = {
       id: crypto.randomUUID(),
       missionId: mission.id,
@@ -3053,6 +3505,14 @@ export class MissionManager {
       resolution: null,
       resolvedBy: null,
       batchOffer,
+      ...(desktop.desktopRequired
+        ? {
+            desktopRequired: true,
+            ...(desktop.desktopOperation ? { desktopOperation: desktop.desktopOperation } : {}),
+            ...(desktop.remoteReview?.length ? { remoteReview: desktop.remoteReview } : {}),
+            desktopBinding: { taskId: this.store.step(step.id).taskId, authorizationId: mission.authorizationId ?? "", planReference: this.agenticPlanReference(mission.id), mutationSequence: this.store.mutationSequence() },
+          }
+        : {}),
     };
     if (delegation && fingerprint) {
       const resource =
@@ -3195,9 +3655,12 @@ export class MissionManager {
       throw new CommandRefusedError("The step is no longer waiting for this request.");
     // M-A-3 T9: a paired device answers only within the owner-consent boundary; deny is always available.
     if (isDeviceActor(by) && decision !== "deny") {
-      const refusal = this.deviceRequestRefusal(request);
+      const refusal = this.deviceRequestRefusal(request, decision);
       if (refusal) throw new WorkstationRequiredError(refusal);
     }
+    // M-A-3 T9R-F01: only the authenticated workstation allows a desktop-required ask, never as a batch.
+    if (request.desktopRequired && decision !== "deny" && (!isTrustedLocalActor(by) || decision !== "allow_once"))
+      throw new WorkstationRequiredError(DESKTOP_REQUIRED);
     if (this.agentic.exists(request.missionId)) {
       const e = this.agentic.forMission(request.missionId)!;
       if (e.current_state === "PAUSED")
@@ -3223,12 +3686,42 @@ export class MissionManager {
     // Validate and create before answering: a failed validation leaves the request open.
     if (decision === "allow_batch")
       this.createBatchFromOffer(request.missionId, step.id, requestId, by, options);
+    let desktopGrant: DesktopGrant | undefined;
+    try {
+      desktopGrant = request.desktopRequired && decision === "allow_once" ? this.mintDesktopGrant(request) : undefined;
+    } catch (error) {
+      if (!(error instanceof DesktopRequestStale)) throw error;
+      // Superseded (recorded as deny with a "superseded" resolver, not as the user's choice): ask again so the
+      // workstation reviews the current project state.
+      this.store.saveRequest({ ...request, resolvedAt: Date.now(), resolution: "deny", resolvedBy: `${by} (superseded: project changed)` });
+      this.inbox.resolve(request.missionId, { requestId });
+      const review = request.remoteReview?.length ? this.pendingRemoteReview() : null;
+      // A review re-ask shows exactly the changes it acknowledges (rebuilt from the current listing, never the old text).
+      const reason = review
+        ? `Approval required on Windows Host: this runs code over files changed under paired-device authority. Review their content before allowing:${review.listing}${review.more ? `\n${review.more} more changed file(s) are listed for review after these.` : ""}`
+        : request.reason.split(" Files changed in this Mission under paired-device authority")[0];
+      this.askPermission(this.store.mission(request.missionId), this.store.step(step.id), request.action, request.risk,
+        reason, step.pendingPhase ?? "execute",
+        { ...request, ...(review ? { remoteReview: review.ids } : {}) });
+      throw new CommandRefusedError(error.message);
+    }
     this.store.saveRequest({
       ...request,
       resolvedAt: Date.now(),
       resolution: decision,
       resolvedBy: by,
+      ...(desktopGrant ? { desktopGrant } : {}),
     });
+    if (decision === "allow_once" && isTrustedLocalActor(by) && request.remoteReview?.length) {
+      this.store.acknowledgeRemoteChanges(request.remoteReview, by);
+      this.emit("approval.remote_changes_reviewed", `${by} reviewed ${request.remoteReview.length} paired-device change(s) before code runs over them (request ${requestId}).`, request.missionId);
+    }
+    if (desktopGrant)
+      this.emit(
+        "approval.desktop_grant",
+        `Trusted-desktop grant ${desktopGrant.id} for request ${requestId}: ${desktopGrant.operation.kind === "provider_session" ? `${desktopGrant.operation.provider} ${desktopGrant.operation.access} session (${desktopGrant.operation.sessionAuthority})` : desktopGrant.operation.action}; single use until ${new Date(desktopGrant.expiresAt).toISOString()} in Host epoch ${desktopGrant.epoch}.`,
+        request.missionId,
+      );
     this.inbox.resolve(request.missionId, { requestId });
     this.inbox.resolve(request.missionId, { kinds: ["requires_attention"] });
     this.memory.record(
@@ -3284,7 +3777,20 @@ export class MissionManager {
       try {
         this.tasks.approve(step.taskId, by);
       } catch (error) {
+        // M-A-3 T9R-F01: a grant whose launch was refused never lingers.
+        const answered = this.store.request(requestId);
+        if (answered.desktopGrant && answered.desktopGrant.revokedAt === null)
+          this.store.saveRequest({ ...answered, desktopGrant: { ...answered.desktopGrant, revokedAt: Date.now() } });
         const current = this.store.step(step.id);
+        // More paired-device changes than one prompt lists: the workstation reviews the next page, not a failure.
+        const review = request.remoteReview?.length && current.state === "waiting_for_approval" ? this.pendingRemoteReview() : null;
+        if (review) {
+          const task = this.tasks.db.get(step.taskId);
+          this.askPermission(this.store.mission(mission.id), current, "provider.execute", "EXECUTE",
+            `${task.provider} for ${current.role}: it can run code over files changed under paired-device authority; review their content before allowing:${review.listing}${review.more ? `\n${review.more} more changed file(s) are listed for review after these.` : ""}`,
+            "execute", { desktopRequired: true, desktopOperation: sessionOperation(task), remoteReview: review.ids });
+          return this.view(this.store.mission(mission.id));
+        }
         if (current.state === "waiting_for_approval")
           this.stepFailed(
             this.store.mission(mission.id),
@@ -3360,6 +3866,7 @@ export class MissionManager {
       throw new Error("Mission has already ended.");
     if (this.stopping.has(id)) throw new Error("Mission Stop is already in progress.");
     this.stopping.add(id);
+    this.revokeDesktopGrants(id, `Mission stopped by ${by}`);
     try {
       const delegation = this.agentic.forMission(id);
       if (
@@ -3446,6 +3953,8 @@ export class MissionManager {
     let mission = this.store.mission(id);
     if (!["failed", "waiting_for_user"].includes(mission.state))
       throw new Error("Only failed or waiting missions can be retried.");
+    // M-A-3 T9R-F01: a trusted-desktop grant covers one attempt; Retry always asks again.
+    this.revokeDesktopGrants(id, `Mission retried by ${by}`);
     const envelope = mission.authorizationId
       ? this.store.authorization(mission.authorizationId)
       : null;
@@ -3472,6 +3981,9 @@ export class MissionManager {
     }
     for (const step of this.store.steps(id))
       if (step.state === "blocked") this.setStep(step, { state: "pending", failure: null });
+    // M-A-3 T9R-F01: a one-time allowance belongs to the attempt it was given for, never to a Retry.
+    for (const step of this.store.steps(id))
+      if (step.approvedOnce && step.state !== "completed") this.setStep(step, { approvedOnce: null });
     if (mission.state === "failed")
       mission = this.setMission(
         mission,
@@ -3528,6 +4040,7 @@ export class MissionManager {
         `Small approval batch revoked with the replanned mission (${batch.usedCount} / ${batch.maxActions} actions used).`,
         id,
       );
+    this.revokeDesktopGrants(id, `Mission replanned by ${by}`);
     this.workspace.releaseMission(id);
     const base = this.setMission(
       mission,
@@ -3708,6 +4221,23 @@ export class MissionManager {
         summary: "Host restarted while this capability ran; it was not resumed.",
         finishedAt: now,
       });
+    // M-A-3 T9R-F01: paired-device authority belongs to the Host epoch that granted it. It never resumes, and a
+    // later Retry cannot revive it; the workstation replans and approves again.
+    const staleRemote = new Set<string>();
+    // A one-time allowance never crosses a Host restart, including on failed Missions a later Retry could revive.
+    for (const failed of this.store.missionsIn(["failed"]))
+      for (const step of this.store.steps(failed.id))
+        if (step.approvedOnce) this.setStep(step, { approvedOnce: null });
+    for (const envelope of this.store.liveAuthorizations())
+      if (isRemoteEnvelope(envelope)) {
+        this.store.saveAuthorization({ ...envelope, revokedAt: now });
+        staleRemote.add(envelope.missionId);
+        this.emit(
+          "authorization.revoked",
+          `Remote authorization ${envelope.id} granted by ${envelope.grantedBy} ended with the Host restart; paired-device approval never carries into a new Host epoch.`,
+          envelope.missionId,
+        );
+      }
     for (const mission of this.store.missionsIn([
       "running",
       "verifying",
@@ -3830,7 +4360,8 @@ export class MissionManager {
             );
           continue;
         }
-        if (!this.cached.enabled || this.tasks.containment.health.lastFatal) {
+        const remote = staleRemote.has(mission.id);
+        if (!this.cached.enabled || this.tasks.containment.health.lastFatal || remote) {
           const current = ["ready", "verifying"].includes(mission.state)
             ? this.setMission(mission, { state: "running" })
             : mission;
@@ -3841,13 +4372,16 @@ export class MissionManager {
                 state: "waiting_for_user",
                 recovery: {
                   at: now,
-                  detail:
-                    "Host restart paused scheduling. No old execution was resumed; review and replan or stop this Mission.",
+                  detail: remote
+                    ? "Paired-device approval ended with the Host restart. Nothing was resumed; replan and approve again, or stop this Mission."
+                    : "Host restart paused scheduling. No old execution was resumed; review and replan or stop this Mission.",
                   interruptedSteps: [],
                 },
               },
               "mission.recovered",
-              "Host restart paused scheduling; user review is required.",
+              remote
+                ? "Remote approval from an earlier Host epoch was not resumed; fresh approval is required."
+                : "Host restart paused scheduling; user review is required.",
             );
           continue;
         }
@@ -3876,7 +4410,9 @@ export class MissionManager {
           state: "waiting_for_user",
           recovery: {
             at: now,
-            detail: `${interrupted.length} step(s) were interrupted by a Host restart and were not resumed. Retry starts fresh child tasks under the same authorization.`,
+            detail: staleRemote.has(mission.id)
+              ? `${interrupted.length} step(s) were interrupted by a Host restart and were not resumed. The paired-device approval ended with the restart; replan and approve again, or stop this Mission.`
+              : `${interrupted.length} step(s) were interrupted by a Host restart and were not resumed. Retry starts fresh child tasks under the same authorization.`,
             interruptedSteps: interrupted,
           },
         },

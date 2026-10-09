@@ -163,9 +163,11 @@ function Requests({ mission }: { mission: MissionView }) {
             <div className="actions">
               {allowVerdict(request, store.viewer).allowed ? (
                 <>
-                  <button className="btn primary" disabled={!store.canAct()} onClick={() => void store.respondMission(request.id, "allow_once")}>
-                    {permissionLabel(mission, request.stepId)}
-                  </button>
+                  {request.remote?.batchOnly ? null : (
+                    <button className="btn primary" disabled={!store.canAct()} onClick={() => void store.respondMission(request.id, "allow_once")}>
+                      {permissionLabel(mission, request.stepId)}
+                    </button>
+                  )}
                   {offer ? (
                     <button className="btn secondary" data-testid="allow-batch" disabled={!store.canAct()} onClick={() => void store.respondMission(request.id, "allow_batch")}>
                       {batchButtonLabel(offer)}

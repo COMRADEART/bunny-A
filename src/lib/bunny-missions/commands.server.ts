@@ -56,7 +56,9 @@ export async function missionCommand(missions: MissionManager, action: string, d
       if (mission.state !== "ready") throw new CommandRefusedError("Only an approved (ready) mission can be started.");
       // M-A-3 T9 (G7): an Agent's Mission runs through its Agent, never as a bare Mission started remotely.
       if (!access.local && (missions.agentic.exists(mission.id) || mission.origin.startsWith("agent:"))) throw new WorkstationRequiredError("Agent Missions are started from their Agent on the Windows Host.");
-      return { mission: missions.view(missions.start(mission)) };
+      // M-A-3 T9R-F01: a device never decides when workstation-held code execution begins.
+      if (!access.local) { const refusal = missions.deviceStartRefusal(mission); if (refusal) throw new WorkstationRequiredError(refusal); missions.markDeviceDriven(mission.id, access.actor); }
+      return { mission: missions.view(missions.start(missions.mission(mission.id))) };
     }
     case "mission.stop": return { mission: await missions.stop(id(data.id), access.actor) };
     case "mission.retry": return { mission: missions.retry(id(data.id), access.actor) };
@@ -75,10 +77,14 @@ export async function missionCommand(missions: MissionManager, action: string, d
       }
       return { mission: await missions.respond(id(data.requestId), data.decision, access.actor, options) };
     }
-    case "mission.get": return { data: missions.get(id(data.id)) };
+    case "mission.get": { const view = missions.get(id(data.id)); return { data: access.local ? view : missions.deviceMissionData(view) }; }
     case "mission.revoke_batch": return { mission: missions.revokeBatch(id(data.missionId), id(data.batchId), access.actor) };
     case "mission.configure": return { data: missions.configure(object(data), access.actor) };
-    case "inbox.ack": return { data: missions.inbox.acknowledge(id(data.id)) };
+    case "inbox.ack": {
+      // M-A-3 T9R-F01: a device clears its own view of notices, never the workstation's pending-approval prompts.
+      if (!access.local && missions.store.inboxEvent(id(data.id)).kind === "requires_approval") throw new WorkstationRequiredError("Pending approvals are cleared by answering them, not by a paired device acknowledgement.");
+      return { data: missions.inbox.acknowledge(id(data.id)) };
+    }
     case "capability.refresh": await missions.bus.refreshHealth(); return { data: missions.bus.list() };
     case "capability.run": {
       missions.requireEnabled();

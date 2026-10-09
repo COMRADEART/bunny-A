@@ -162,10 +162,10 @@ test("A02/A03/A04: two Tasks route to different providers under one agent, same 
         { role: "Prepare", objective: "Inspect the existing notes.", access: "read", executor: { kind: "model" }, providers: { allow: ["codex"] } },
         { role: "Implement", objective: "Write the plan file.", access: "write", executor: { kind: "model" }, providers: { allow: ["claude"] }, dependsOn: [0], verification: [{ kind: "file_exists", path: "plan.md", contains: "Plan" }] },
       ],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
     await until(() => env.missions.mission(missionId).state === "waiting_for_approval", "mission planned");
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.launched.length === 1, "task 1 admitted");
     assert.equal(env.launched[0]!.provider, "codex", "A03: task 1 routes per its step constraint");
     const authAtTask1 = env.missions.get(missionId).authorization;
@@ -214,15 +214,15 @@ test("A05: a scope-violating capability ask lands WAITING_FOR_USER and the allow
     env.agents.create({
       objective: "write a file outside the approved roots",
       steps: [{ role: "Implement", objective: "Write outside.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: outside, content: "hello" } }, verification: [] }],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     const waitingRow = await until(() => env.agents.snapshot().agents.find((a) => a.id === id)?.state === "WAITING_FOR_USER" ? env.agents.snapshot().agents.find((a) => a.id === id) : undefined, "the agent lands on the ask");
     assert.equal(waitingRow.state, "WAITING_FOR_USER");
     assert.equal(exists(outside), false, "the ask happens BEFORE the effect");
     const request = await until(() => env.missions.store.requests(missionId)[0], "the approval request is persisted");
     assert.equal(request.resolvedAt ?? null, null, "the ask is open, not pre-answered");
-    env.missions.respond(request.id, "allow_once", "test");
+    env.missions.respond(request.id, "allow_once", "workstation");
     await until(() => exists(outside), "the write lands only after allow");
     const answered = await until(() => env.missions.get(missionId).mission.state === "completed" ? env.missions.get(missionId) : undefined, "mission completes", 30_000);
     assert.ok(answered.events.some((e) => e.type === "approval.additional_capability"), "the ask/answer pair is in the mission timeline");
@@ -355,9 +355,9 @@ test("A18: a failing provider fails the mission; the agent's failure row carries
     env.agents.create({
       objective: "model work that will rate-limit",
       steps: [{ role: "Prepare", objective: "Call the failing model.", access: "read", executor: { kind: "model" }, providers: { allow: ["codex"] } }],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.missions.mission(missionId).state === "failed", "routing exhausts and the mission fails", 60_000);
     const row = await until(() => env.agents.snapshot().agents.find((a) => a.id === id)?.state === "FAILED" ? env.agents.snapshot().agents.find((a) => a.id === id) : undefined, "agent lands FAILED", 20_000);
     const category = row.failure!;
@@ -372,7 +372,7 @@ test("A18: a failing provider fails the mission; the agent's failure row carries
     // Persistence is uncorrupted: runs and checkpoints remain readable after the failure.
     const runs = env.agents.store.runs(id);
     assert.ok(runs.length >= 1 && runs.every((r) => r.endedAt !== null), "the failed run is sealed");
-    assert.throws(() => { env.agents.pause(id, "test"); }, /finished/);
+    assert.throws(() => { env.agents.pause(id, "workstation"); }, /finished/);
   } finally { await env.cleanup(); }
 });
 

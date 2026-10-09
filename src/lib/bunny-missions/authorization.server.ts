@@ -1,8 +1,9 @@
-import { basename, isAbsolute, resolve } from "node:path";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import type { Mode, ProviderId, ProviderExecutionScope } from "../orch/types.ts";
 import { withinAny } from "./paths.server.ts";
 import { resolveCommand, type Resolved } from "./capabilities/process.server.ts";
-import type { ActionManifest, AuthorizationEnvelope, Budget, GitAction, GrantPolicy, MissionStep, PermissionDecision, RiskClass, ScopeRequest } from "./types.ts";
+import type { ActionManifest, AuthorizationEnvelope, Budget, DesktopGrant, DesktopOperation, EnvelopeAuthority, GitAction, GrantPolicy, MissionStep, PermissionDecision, RiskClass, ScopeRequest, SessionAuthority } from "./types.ts";
 import type { AgenticAuthorizationEnvelope } from "./agentic-types.ts";
 import { canonical } from "./paths.server.ts";
 import { digest, fileDigest, rootIdentity } from "./agentic-store.server.ts";
@@ -92,12 +93,222 @@ export function scopeFor(steps: (Pick<MissionStep, "executor" | "requiredCapabil
 
 export function envelopeFrom(request: ScopeRequest, missionId: string, grantedBy: string, maxRuntimeMs: number, extraRoots: string[] = []): AuthorizationEnvelope {
   const now = Date.now();
+  const authority = authorityFor(grantedBy);
+  const providers = structuredClone(request.providers);
+  // M-A-3 T9R-F01: a remote grant never carries shell-capable provider authority, whatever was displayed.
+  if (authority.kind === "remote" && providers.sessions) providers.sessions.writeIncludesShell = false;
   return {
     ...structuredClone(request),
+    providers,
     projectRoots: [...request.projectRoots, ...extraRoots],
     filesystem: { read: [...request.filesystem.read, ...extraRoots], write: request.filesystem.write.length ? [...request.filesystem.write, ...extraRoots] : [] },
     id: crypto.randomUUID(), missionId, grantedAt: now, grantedBy, expiresAt: now + Math.min(maxRuntimeMs, request.budget.maxRuntimeMs), revokedAt: null,
+    authority,
   };
+}
+
+// ── M-A-3 T9R-F01: remote (paired-device) authority ceiling ─────────────────
+/** The provider-session authority a paired device may grant. Anything else needs a trusted-desktop grant. */
+export const REMOTE_SESSION_CEILING: readonly SessionAuthority[] = ["tool_free", "read_tools"];
+export const DESKTOP_REQUIRED = "Approval required on Windows Host: a paired device cannot authorize command or code execution.";
+/** Trusted-desktop grants are short-lived and single use. */
+export const DESKTOP_GRANT_TTL_MS = 5 * 60_000;
+export const DESKTOP_GRANT_MAX_USES = 1;
+
+/** Only the authenticated workstation principal is trusted-local. Every other actor string is remote (fail closed). */
+const GIT_MUTATIONS = ["git.commit", "git.merge", "git.worktree_add", "git.worktree_remove"];
+/** `.git` and its Windows 8.3 alias (segments are normalized first: no stream suffix, trailing dots or spaces). */
+const GIT_SEGMENT = /^(\.git|git~\d+)$/i;
+/** Files and folders whose content configures programs that later run (Git drivers, package scripts, hooks, tasks). */
+const EXECUTION_CONFIG_FILE = /^(\.gitattributes|\.gitmodules|\.gitconfig|package\.json|\.npmrc|\.yarnrc(\.yml)?|\.pnpmfile\.cjs|bunfig\.toml|makefile|gnumakefile|\.envrc|taskfile\.ya?ml|justfile|\.?lefthook\.ya?ml|\.pre-commit-config\.yaml|pyproject\.toml|setup\.py|setup\.cfg|conftest\.py|tox\.ini|noxfile\.py|build\.rs|rakefile|gemfile|[^/\\]+\.config\.[cm]?[jt]s|gulpfile\.[cm]?[jt]s|gruntfile\.[cm]?[jt]s|\.[\w-]+rc\.[cm]?[jt]s|[^/\\]+\.conf\.[cm]?[jt]s|nodemon\.json|deno\.jsonc?|composer\.json|cargo\.toml|\.?mise\.toml|\.tool-versions|wrangler\.toml|(docker-)?compose\.ya?ml|dockerfile|vagrantfile|procfile|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|gradle\.properties|cmakelists\.txt|[^/\\]+\.cmake|directory\.build\.(props|targets|rsp)|directory\.packages\.props|[^/\\]+\.(csproj|vbproj|fsproj|vcxproj|sln)|\.env(\.[\w.-]+)?|\.(babelrc|mocharc|prettierrc|eslintrc|stylelintrc|huskyrc|lintstagedrc|swcrc|aider[\w.-]*)(\.[\w]+)?|lint-staged\.config\.[\w]+|babel\.config\.[\w]+|[\w.-]*devcontainer\.json|vercel\.json|netlify\.toml|firebase\.json|\.gitlab-ci\.ya?ml|azure-pipelines\.ya?ml|bitbucket-pipelines\.ya?ml|\.travis\.ya?ml|appveyor\.ya?ml|\.drone\.ya?ml|docker-compose\.json|package-lock\.json|npm-shrinkwrap\.json|tsconfig([\w.-]*)\.json|jsconfig\.json)$/i;
+const EXECUTION_CONFIG_DIR = /^(\.husky|\.vscode|\.github|\.devcontainer|node_modules|\.cargo|\.yarn|\.mvn|\.config|\.idea|\.claude|\.cursor|\.codex|\.gemini|\.continue|\.clinerules|\.windsurf|\.roo|\.kiro|\.aider|\.circleci|\.buildkite|\.azure|\.woodpecker|\.gitlab)$/i;
+/** Data and document types a paired device may write (risk reduction; the content review is the authoritative control). */
+const INERT_DATA_FILE = /\.(txt|text|md|markdown|csv|tsv|json|jsonl|ndjson|yaml|yml|log)$/i;
+const AGENT_CONFIG_FILE = /^(\.mcp\.json|claude\.md|agents\.md|gemini\.md|\.clinerules|\.cursorrules|\.windsurfrules|copilot-instructions\.md)$/i;
+const segmentsOf = (path: string) => path.split(/[\\/]+/).filter(Boolean);
+/** A segment as Windows resolves it: no NTFS stream suffix (name:stream:$DATA), no trailing dots or spaces. */
+const normalizeSegment = (segment: string) => segment.replace(/:.*$/, "").replace(/[. ]+$/, "");
+/**
+ * Every name a path can reach: its lexical segments and the native canonical segments of its longest existing
+ * prefix (which expands 8.3 short names such as GIT~1 or PACKAG~1.JSO, links and junctions), all normalized.
+ */
+function resolvedNames(path: string): { segments: string[]; leaves: string[] } {
+  // Network and device paths are never probed (a dead share blocks for seconds); callers fail closed.
+  if (/^([\\/]{2})/.test(path)) throw new Error("Network or device path.");
+  const lexical = segmentsOf(path).map(normalizeSegment);
+  let probe = resolve(path);
+  const rest: string[] = [];
+  while (!existsSync(probe)) {
+    const up = dirname(probe);
+    if (up === probe) return { segments: lexical, leaves: [lexical.at(-1) ?? ""] };
+    rest.unshift(basename(probe));
+    probe = up;
+  }
+  const native = [...segmentsOf(realpathSync.native(probe)), ...rest].map(normalizeSegment);
+  return { segments: [...lexical, ...native], leaves: [lexical.at(-1) ?? "", native.at(-1) ?? ""] };
+}
+/** Whether a path is inside Git metadata under any name it can reach. A path that cannot be resolved fails closed. */
+export function touchesGitMetadata(path: string): boolean {
+  try { return resolvedNames(path).segments.some((segment) => GIT_SEGMENT.test(segment)); } catch { return true; }
+}
+/** Whether writing this path can change what a later command, hook or Git driver executes. Fails closed. */
+/** M-A-3 T9R-F01: what a paired device sees instead of any text that carries the workstation's review listing. */
+export const DEVICE_REVIEW_REASON = "Approval required on Windows Host: changes made under paired-device authority are reviewed on the Windows Host before code runs.";
+const REVIEW_TEXT = /under paired-device authority|paired-device change|a paired-device [\w.]+ of |trusted-desktop grant/i;
+/** Records a paired device never receives: trusted-desktop grants, exact operations and their ask-time bindings. */
+const DEVICE_HIDDEN_KEYS = new Set(["desktopGrant", "desktopOperation", "desktopBinding"]);
+/** Replaces every string that carries review listings (changed paths, digests, content) for a paired-device view. */
+export function redactReviewListing<T>(value: T): T {
+  const walk = (item: unknown): unknown =>
+    typeof item === "string" ? (REVIEW_TEXT.test(item) ? DEVICE_REVIEW_REASON : item)
+      : Array.isArray(item) ? item.map(walk)
+      : item && typeof item === "object" ? Object.fromEntries(Object.entries(item).filter(([key]) => !DEVICE_HIDDEN_KEYS.has(key)).map(([key, entry]) => [key, walk(entry)]))
+      : item;
+  return walk(value) as T;
+}
+/** Whether every name this path resolves to (lexical, 8.3 alias and real) is an inert data or document file. */
+export function inertDataPath(path: string): boolean {
+  // A named NTFS stream (name:stream) is never an inert document, whatever the visible name says.
+  if ((path.split(/[\\/]/).pop() ?? "").includes(":")) return false;
+  try {
+    const { leaves } = resolvedNames(path);
+    return leaves.length > 0 && leaves.every((leaf) => INERT_DATA_FILE.test(leaf) && !AGENT_CONFIG_FILE.test(leaf));
+  } catch {
+    return false;
+  }
+}
+export function executionConfigPath(path: string): boolean {
+  try {
+    const { segments, leaves } = resolvedNames(path);
+    return segments.some((segment) => GIT_SEGMENT.test(segment) || EXECUTION_CONFIG_DIR.test(segment)) || leaves.some((leaf) => EXECUTION_CONFIG_FILE.test(leaf));
+  } catch { return true; }
+}
+/** An exact reviewed Calculator operation that also names the Calculator window (a pid alone is not an identity). */
+function remoteCalculatorOperation(action: string, params: Record<string, unknown>) {
+  return calculatorOperation(action, params) && (action === "computer.open_app" || params.title === "Calculator");
+}
+export function isTrustedLocalActor(actor: unknown): boolean { return actor === "workstation"; }
+export function authorityFor(grantedBy: string): EnvelopeAuthority {
+  return isTrustedLocalActor(grantedBy) ? { kind: "workstation" } : { kind: "remote", actor: grantedBy, sessionCeiling: [...REMOTE_SESSION_CEILING], codeExecution: "desktop_only" };
+}
+/**
+ * Whether an envelope carries only remote authority. Older JSON without `authority` is judged by `grantedBy`
+ * ("device:*" is remote). Any remote marker wins, so a stored "workstation" label cannot widen a remote grant.
+ */
+export function isRemoteEnvelope(envelope: Pick<AuthorizationEnvelope, "grantedBy" | "authority" | "providers">): boolean {
+  if (envelope.authority?.kind === "remote") return true;
+  if (envelope.providers.sessions?.writeIncludesShell === false) return true;
+  if (envelope.authority && envelope.authority.kind !== "workstation") return true;
+  // Only the authenticated workstation is trusted-local; every other or missing grantor is remote (fail closed).
+  return !isTrustedLocalActor(envelope.grantedBy);
+}
+/**
+ * The tool authority a provider session runs with, from the exact launch contracts (claudeLaunchArgs,
+ * codexLaunchArgs, OllamaAdapter). Unknown providers or access values return null and fail closed.
+ */
+export function providerSessionAuthority(provider: unknown, access: unknown): SessionAuthority | null {
+  if (access !== "read" && access !== "write") return null;
+  if (provider === "ollama") return "tool_free";
+  // Claude read: --restricted --tools Read; Write/Edit/Bash/PowerShell disallowed. Claude write: Bash and PowerShell.
+  if (provider === "claude") return access === "read" ? "read_tools" : "shell";
+  // Codex runs commands in both read-only and workspace-write sandboxes.
+  if (provider === "codex") return "shell";
+  return null;
+}
+/** Why a remote envelope may not launch this provider session on its own authority, or null. */
+export function remoteSessionViolation(task: { provider?: unknown; executionScope?: { access?: unknown } }, envelope: Pick<AuthorizationEnvelope, "grantedBy" | "authority" | "providers">): string | null {
+  if (!isRemoteEnvelope(envelope)) return null;
+  const authority = providerSessionAuthority(task.provider, task.executionScope?.access);
+  const ceiling = envelope.authority?.kind === "remote" ? envelope.authority.sessionCeiling.filter((item) => REMOTE_SESSION_CEILING.includes(item)) : REMOTE_SESSION_CEILING;
+  if (authority && ceiling.includes(authority)) return null;
+  return `${DESKTOP_REQUIRED} ${String(task.provider)} ${String(task.executionScope?.access)} sessions run with ${authority ?? "unclassified"} authority.`;
+}
+/**
+ * Why a remote envelope may not run this capability action without a trusted-desktop grant, or null.
+ * EXECUTE-risk actions are allowed remotely only as exact reviewed Calculator operations; Git metadata
+ * writes are refused because Git config, hooks and filters can run commands. Unknown risk fails closed.
+ */
+export function remoteExecutionRefusal(action: string, params: Record<string, unknown>, risk: RiskClass, cwd?: string): string | null {
+  if (!["READ", "WRITE", "EXECUTE", "EXTERNAL_SIDE_EFFECT", "DESTRUCTIVE"].includes(risk)) return `${DESKTOP_REQUIRED} Unknown action risk.`;
+  if (action === "terminal.exec") return `${DESKTOP_REQUIRED} terminal.exec runs a program.`;
+  if (action === "provider.execute") return `${DESKTOP_REQUIRED} provider sessions are judged by their tool authority.`;
+  if (risk === "EXECUTE" && !remoteCalculatorOperation(action, params)) return `${DESKTOP_REQUIRED} ${action} is not an exact reviewed Calculator operation.`;
+  // Commit, merge and worktree changes run repository hooks and merge drivers.
+  if (GIT_MUTATIONS.includes(action)) return `${DESKTOP_REQUIRED} ${action} can run repository hooks.`;
+  // A download can bring any program or script into the project; the workstation reviews it.
+  if (action === "browser.download") return `${DESKTOP_REQUIRED} a download can bring executable content onto this computer.`;
+  if (action === "filesystem.write" || action === "filesystem.delete") {
+    if (typeof params.path !== "string") return `${DESKTOP_REQUIRED} ${action} has no concrete path.`;
+    const path = isAbsolute(params.path) || !cwd ? params.path : resolve(cwd, params.path);
+    if (executionConfigPath(path)) return `${DESKTOP_REQUIRED} ${params.path} configures Git, package scripts, hooks or tasks that run commands.`;
+    // A device writes only data and document types (risk reduction: no recognized code or configuration). An
+    // interpreter can still run any file it is pointed at, so the authoritative control is the Host-wide review: no
+    // Bunny code run starts until the workstation reviews the content of every paired-device change.
+    if (action === "filesystem.write" && !inertDataPath(path)) return `${DESKTOP_REQUIRED} ${params.path} is not a plain data or document file; a paired device writes only inert files (.txt, .md, .csv, .json, .yaml and similar).`;
+  }
+  return null;
+}
+/** Whether an action runs a program or repository hooks (terminal, Git mutations, non-Calculator UI automation). */
+export function runsCode(action: string, params: Record<string, unknown>, risk: RiskClass): boolean {
+  return action === "terminal.exec" || GIT_MUTATIONS.includes(action) || (risk === "EXECUTE" && !remoteCalculatorOperation(action, params));
+}
+/** Exact provider-session operation for a trusted-desktop grant. */
+export function sessionOperation(task: { provider: string; model: string; effort?: string | null; cwd?: string; executionScope?: { access?: unknown } }): DesktopOperation {
+  return { kind: "provider_session", provider: task.provider, model: task.model, effort: task.effort ?? null, access: String(task.executionScope?.access), cwd: task.cwd ?? "", sessionAuthority: providerSessionAuthority(task.provider, task.executionScope?.access) ?? "unknown" };
+}
+/** Content identity of the existing files a command names, so an approved script cannot change before it runs. */
+function fileIdentities(params: Record<string, unknown>, base: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  // Names resolve where the program actually starts: the command's own working folder, like the terminal adapter.
+  const cwd = typeof params.cwd === "string" && params.cwd ? resolve(base, params.cwd) : base;
+  // A file can be named directly or as an option value (--require=./x.js, --import=./x.mjs).
+  const names = [params.command, ...(Array.isArray(params.args) ? params.args : [])]
+    .filter((value): value is string => typeof value === "string" && !!value)
+    .map((value) => value.startsWith("-") ? (value.includes("=") ? value.slice(value.indexOf("=") + 1) : "") : value)
+    .filter(Boolean);
+  for (const name of names)
+    try {
+      const path = resolve(cwd, name);
+      if (!existsSync(path) || !statSync(path).isFile()) continue;
+      const size = statSync(path).size;
+      out[name] = size <= 8 * 1024 * 1024 ? fileDigest(path) : `large:${size}:${statSync(path).mtimeMs}`;
+    } catch { out[name] = "unreadable"; }
+  return out;
+}
+/** Exact capability operation for a trusted-desktop grant: action, every parameter, folder and resolved executable. */
+export function capabilityOperation(action: string, params: Record<string, unknown>, cwd: string, executable?: Resolved | null): DesktopOperation {
+  return { kind: "capability", action, digest: operationDigest(action, params), cwd, executable: executable ? { file: executable.file, prefix: [...executable.prefix] } : null, ...(action === "terminal.exec" ? { files: fileIdentities(params, cwd) } : {}) };
+}
+function sameOperation(a: DesktopOperation, b: DesktopOperation) {
+  const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical)
+    : value && typeof value === "object" ? Object.fromEntries(Object.entries(value).sort(([x], [y]) => x.localeCompare(y)).map(([key, item]) => [key, canonical(item)])) : value;
+  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+}
+export type DesktopGrantContext = {
+  hostId: string; epoch: string; missionId: string; agentId: string | null; stepId: string; taskId: string | null;
+  planReference: string; authorizationId: string; operation: DesktopOperation;
+  /** Host-wide count of project-mutating capability runs; any change after approval voids the grant. */
+  mutationSequence: number; now?: number;
+};
+/** Why this trusted-desktop grant cannot authorize this exact operation now, or null. Every binding is exact. */
+export function desktopGrantViolation(grant: DesktopGrant | null | undefined, context: DesktopGrantContext): string | null {
+  const now = context.now ?? Date.now();
+  if (!grant) return "No trusted-desktop authorization covers this operation.";
+  if (grant.grantedBy !== "workstation") return "Trusted-desktop authorization was not granted by the workstation.";
+  if (grant.revokedAt !== null) return "Trusted-desktop authorization was revoked.";
+  if (!(grant.expiresAt > now)) return "Trusted-desktop authorization expired.";
+  if (!Number.isSafeInteger(grant.uses) || !Number.isSafeInteger(grant.maxUses) || grant.uses >= grant.maxUses || grant.maxUses > DESKTOP_GRANT_MAX_USES) return "Trusted-desktop authorization was already used.";
+  if (grant.hostId !== context.hostId) return "Trusted-desktop authorization belongs to another Host.";
+  if (grant.epoch !== context.epoch) return "Trusted-desktop authorization belongs to an earlier Host epoch.";
+  if (grant.missionId !== context.missionId || grant.agentId !== context.agentId || grant.stepId !== context.stepId || grant.taskId !== context.taskId)
+    return "Trusted-desktop authorization belongs to another Mission, Agent, step or Task.";
+  if (grant.planReference !== context.planReference) return "The plan changed after trusted-desktop authorization.";
+  if (grant.authorizationId !== context.authorizationId) return "The Mission authorization changed after trusted-desktop authorization.";
+  // Imported modules, directory entry points and other project files are bound by the mutation sequence: any
+  // file-changing capability run after the desktop approval means the approved code may differ.
+  if (grant.mutationSequence !== context.mutationSequence) return "Project files changed after trusted-desktop authorization; review the action again.";
+  if (!sameOperation(grant.operation, context.operation)) return "The operation differs from the one authorized on the desktop.";
+  return null;
 }
 
 /** Parameter-level scope check for one action against an envelope. Returns why it is outside, or null. */
@@ -152,7 +363,7 @@ function grantFor(grants: GrantRow[], action: string, missionId: string | null):
  * - `direct`: a workstation user invoked the action explicitly outside any mission (still asks for
  *   EXTERNAL_SIDE_EFFECT / DESTRUCTIVE / hard-approval actions unless `confirmed`).
  */
-export function decide(manifest: ActionManifest, params: Record<string, unknown>, context: { envelope: AuthorizationEnvelope | null; missionId: string | null; grants: GrantRow[]; oneTime?: boolean; direct?: { confirmed: boolean }; now?: number; base?: string; executable?: Resolved | null; agenticViolation?: string | null }): PermissionDecision {
+export function decide(manifest: ActionManifest, params: Record<string, unknown>, context: { envelope: AuthorizationEnvelope | null; missionId: string | null; grants: GrantRow[]; oneTime?: boolean; direct?: { confirmed: boolean }; now?: number; base?: string; executable?: Resolved | null; agenticViolation?: string | null; desktopGrant?: boolean }): PermissionDecision {
   const risk = manifest.risk; const now = context.now ?? Date.now();
   const deny = (reason: string): PermissionDecision => ({ decision: "deny", reason, risk });
   if (context.envelope && context.envelope.missionId !== context.missionId) return deny("Authorization belongs to a different Mission; it cannot authorize this request.");
@@ -163,7 +374,17 @@ export function decide(manifest: ActionManifest, params: Record<string, unknown>
   const grant = grantFor(context.grants, manifest.id, context.missionId);
   if (grant === "never_allow") return deny(`A persistent "never allow" rule covers ${manifest.id}.`);
   if (grant === "read_only" && risk !== "READ") return deny(`A persistent "read only" rule covers ${manifest.id}.`);
+  // M-A-3 T9R-F01: remote authority never runs code. Only a trusted-desktop grant for this exact operation
+  // lifts the ceiling; a one-time answer, a batch or a standing grant cannot. Never a direct workstation call.
+  if (context.envelope && !context.direct && isRemoteEnvelope(context.envelope)) {
+    const remote = remoteExecutionRefusal(manifest.id, params, risk, context.base);
+    if (remote && !context.desktopGrant) return { decision: "ask", reason: remote, risk, desktopRequired: true };
+  }
   if (context.agenticViolation) return ask(context.agenticViolation);
+  // M-A-3 T9R-F01: a one-time allowance never outlives its envelope's revocation.
+  if (context.envelope?.revokedAt && !context.direct) return deny("The mission authorization was revoked.");
+  // A remote (paired-device) envelope is never extended by a one-time answer once it expired.
+  if (context.envelope && !context.direct && isRemoteEnvelope(context.envelope) && context.envelope.expiresAt <= now) return ask("The remote mission authorization expired.");
   if (context.oneTime) return allow("The user allowed this invocation or the matching action in this skill run.");
   if (context.direct) {
     if ((manifest.hardApproval || ALWAYS_ASK.includes(risk) || manifest.sensitive) && !context.direct.confirmed) return ask(`${manifest.id} is ${risk.toLowerCase().replaceAll("_", " ")}${manifest.sensitive ? " and privacy-sensitive" : ""}; explicit confirmation required.`);
@@ -199,7 +420,7 @@ export function agenticScopeViolation(e: AgenticAuthorizationEnvelope, action: s
     if (action.startsWith("filesystem.")) {
       if (typeof params.path !== "string" && action !== "filesystem.list") return "Filesystem action has no concrete resource.";
       const path = canonical(resolve(cwd, typeof params.path === "string" ? params.path : "."));
-      if (/(^|[\\/])\.git([\\/]|$)/i.test(path) && action !== "filesystem.read" && action !== "filesystem.list" && action !== "filesystem.exists") return "Git metadata requires specific Git authority.";
+      if (touchesGitMetadata(path) && action !== "filesystem.read" && action !== "filesystem.list" && action !== "filesystem.exists") return "Git metadata requires specific Git authority.";
       return roots.some(r => r.kind === "filesystem" && r.operations.includes(action) && withinAny([r.root], path)) ? null : "Filesystem resource or operation exceeds approved roots.";
     }
     if (action === "terminal.exec") {
@@ -252,7 +473,7 @@ export function agenticFingerprint(action: string, params: Record<string, unknow
 }
 
 /** Extra approval can change provider/budget consent, never the child's declared access. */
-export function providerScopeViolation(task: { mission?: { missionId: string; stepId: string } | null; executionScope?: ProviderExecutionScope; cwd?: string }, envelope: AuthorizationEnvelope, step?: Pick<MissionStep, "id" | "scope">): string | null {
+export function providerScopeViolation(task: { provider?: ProviderId; mission?: { missionId: string; stepId: string } | null; executionScope?: ProviderExecutionScope; cwd?: string }, envelope: AuthorizationEnvelope, step?: Pick<MissionStep, "id" | "scope">, options: { desktopGrant?: boolean } = {}): string | null {
   if (!task.mission || task.mission.missionId !== envelope.missionId) return "child belongs to another mission";
   const authority = envelope.providers.sessions?.steps.find((item) => item.stepId === task.mission!.stepId);
   if (!authority || !task.executionScope) return "provider-session authority is missing; replan and approve again";
@@ -260,6 +481,8 @@ export function providerScopeViolation(task: { mission?: { missionId: string; st
   if (task.executionScope.access === "write" && (authority.scope.access !== "write" || step && step.scope.access !== "write")) return "child exceeds step or mission provider-session authority";
   if (!["read", "write"].includes(task.executionScope.access)) return "invalid child provider-session authority";
   if (task.executionScope.access === "write" && (!task.cwd || !withinAny(envelope.filesystem.write, task.cwd))) return "provider write authority exceeds approved write roots";
+  // M-A-3 T9R-F01: the provider/tool actually launched decides, so no reroute, retry or model switch widens it.
+  if (!options.desktopGrant) return remoteSessionViolation(task, envelope);
   return null;
 }
 

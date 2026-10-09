@@ -206,6 +206,13 @@ export class AgentRuntime {
       throw new CommandRefusedError("The agent's authorization was revoked; resume is refused.");
     if (envelope.expiresAt !== null && envelope.expiresAt <= Date.now())
       throw new CommandRefusedError("The agent's authorization expired; resume is refused.");
+    // M-A-3 T9R-F01: a device never decides when workstation-held code execution resumes, with or without an
+    // Agentic consent record (the Mission envelope and plan are judged either way).
+    if (isDeviceActor(actor)) {
+      const refusal = this.missions.safeRefusal(() => this.missions.deviceResumeRefusal(agent.missionId!));
+      if (refusal) throw new WorkstationRequiredError(refusal);
+      this.missions.markDeviceDriven(agent.missionId!, actor);
+    }
     const delegation = this.missions.agentic.forMission(agent.missionId!);
     if (delegation) {
       // M-A-3 T9: Resume restores admissions, so a client binds it to the consent revision it reviewed;

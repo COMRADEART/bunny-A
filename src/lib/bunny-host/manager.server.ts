@@ -70,12 +70,27 @@ export class TaskManager {
   hotSensors = new Set<string>();
   flushers = new Map<string, () => void>();
   treeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /**
+   * M-A-3 T9R-F01: sessions whose root process ended but whose descendants may still run ("checking" until the
+   * first process-table read). Fail-closed liveness for the paired-device mid-run hold.
+   */
+  lingering = new Map<string, ProcessInfo[] | "checking">();
+  survivorWatches = 0;
+  /** M-A-3 T9R-F01: why a Host code run (a Python verification) must wait for the workstation, or null. */
+  codeRunGate: (() => string | null) | null = null;
+  /** Ended attempts (session objects) whose survivors are already watched. */
+  survivorAttempts = new WeakSet<object>();
+  /** The provider and access of the attempt each lingering entry belongs to (a reroute never reclassifies it). */
+  lingeringAttempt = new Map<string, { provider: OrchTask["provider"]; access: string | undefined; mission: boolean }>();
   sessionDirectory: string | null;
   readProcesses: () => Promise<ProcessInfo[]>;
   /** Host-owned folders (mission worktrees) a delegated child task may use as its working directory. */
   workspaceRoots: string[] = [];
-  /** Installed by the mission owner; checked for direct approvals of pending children too. */
-  missionScopeCheck: ((task: OrchTask) => string | null) | null = null;
+  /**
+   * Installed by the mission owner; checked for direct approvals of pending children too. "launch" is the final
+   * check on the exact provider/model that will start (after any launch-time reroute) and spends a single-use grant.
+   */
+  missionScopeCheck: ((task: OrchTask, phase?: "check" | "launch") => string | null) | null = null;
   missionAttemptAdmission:
     ((task: OrchTask, kind: "action" | "retry" | "reroute") => string | null) | null = null;
   missionAttemptSettled: ((task: OrchTask, ok: boolean) => void) | null = null;
@@ -1119,8 +1134,20 @@ export class TaskManager {
     const provider=this.live().find((p) =>p.id===this.db.get(id).provider);if(!provider) throw new Error("Executor is no longer eligible. Route again.");
     const adapter=this.adapters.find((a) =>a.id===provider.id);if(!adapter) throw new Error("Adapter unsupported.");
     if(!task.cwd || realpathSync(task.cwd)!==task.cwd || !statSync(task.cwd).isDirectory()) throw new Error("Execution root changed or is unavailable.");
-    const admissionViolation = this.missionAttemptAdmission?.(this.db.get(id), "action");
+    // M-A-3 T9R-F01: a launch-time reroute may have changed provider or model; the session that actually starts
+    // passes the Mission scope check again (this also spends a trusted-desktop grant exactly once).
+    const final = this.db.get(id);
+    if (final.mission) {
+      const outside = this.missionScopeCheck ? this.missionScopeCheck(final, "check") : "mission scope validator is unavailable";
+      if (outside) throw new Error(`Outside mission execution scope: ${outside}`);
+    }
+    const admissionViolation = this.missionAttemptAdmission?.(final, "action");
     if (admissionViolation) throw new Error(`Outside current Agentic authority: ${admissionViolation}`);
+    // Last refusal point before the session starts: this spends a single-use trusted-desktop grant, if one applies.
+    if (final.mission) {
+      const spent = this.missionScopeCheck ? this.missionScopeCheck(final, "launch") : "mission scope validator is unavailable";
+      if (spent) throw new Error(`Outside mission execution scope: ${spent}`);
+    }
     const accepted = this.update(
       task,
       {
@@ -1264,11 +1291,13 @@ export class TaskManager {
         const targetAdapter = this.adapters.find((a) => a.id === target.provider);
         if (!targetAdapter) return null;
         const rerouting = current.provider !== target.provider || current.model !== target.model;
-        const targetTask = { ...current, provider: target.provider, model: target.model };
+        const targetTask = { ...current, provider: target.provider, model: target.model, effort: target.effort ?? null };
         if (targetTask.mission) {
+          // M-A-3 T9R-F01: every relaunch is a new session start, so it spends a trusted-desktop grant like a launch.
           const outside =
-            this.missionScopeCheck?.(targetTask) ??
-            this.missionAttemptAdmission?.(targetTask, rerouting ? "reroute" : "retry");
+            this.missionScopeCheck?.(targetTask, "check") ??
+            this.missionAttemptAdmission?.(targetTask, rerouting ? "reroute" : "retry") ??
+            this.missionScopeCheck?.(targetTask, "launch");
           if (outside) {
             this.emit(
               this.db.event(
@@ -1398,6 +1427,8 @@ export class TaskManager {
           this.missionAttemptSettled?.(this.db.get(id), result.ok);
           flush();
           this.stopTree(id);
+          // M-A-3 T9R-F01: this attempt's descendants stay tracked even if a retry or reroute replaces the session.
+          this.watchSurvivors(id, session.pid?.() ?? this.db.get(id).pid ?? undefined, session);
           if (this.stopping.has(id)) return;
           const current = this.db.get(id);
           if (TERMINAL.includes(current.state)) return;
@@ -1428,7 +1459,9 @@ export class TaskManager {
               "agent.verifying",
               `Bunny-A is independently verifying ${spec.name}.`,
             );
-            verification = await verifySpec(verifying, spec);
+            // M-A-3 T9R-F01: a Python check is a code run; it never starts over unreviewed paired-device changes.
+            const held = spec.kind === "python" ? this.codeRunGate?.() ?? null : null;
+            verification = held ? { passed: false, detail: held } : await verifySpec(verifying, spec);
             this.update(
               this.db.get(id),
               { verification },
@@ -1617,6 +1650,8 @@ export class TaskManager {
         if (flushTimer) clearTimeout(flushTimer);
         this.stopTree(id);
         this.flushers.delete(id);
+        // M-A-3 T9R-F01: descendants of the ended root process stay "live code" until none survives.
+        try { this.watchSurvivors(id, this.sessions.get(id)?.pid?.() ?? this.db.get(id).pid ?? undefined, this.sessions.get(id)); } catch { /* fail closed below */ }
         this.sessions.delete(id);
       }
     });
@@ -1670,6 +1705,46 @@ export class TaskManager {
         2000,
       ),
     );
+  }
+  /**
+   * Tracks what a finished session leaves behind until none of it survives. The lineage only grows: the root, every
+   * process the tree snapshots saw, and every process later found descending from any lineage member (alive or
+   * already exited, born after it). One entry per ended attempt, so a retry never hides an earlier attempt's survivors.
+   */
+  watchSurvivors(id: string, rootPid: number | undefined, attempt?: object) {
+    // One watcher per ended attempt (keyed by the session object, never by a PID that the OS may recycle).
+    if (!rootPid || (attempt && this.survivorAttempts.has(attempt))) return;
+    if (attempt) this.survivorAttempts.add(attempt);
+    const key = `${id}#${++this.survivorWatches}`;
+    this.lingering.set(key, "checking");
+    try { const task = this.db.get(id); this.lingeringAttempt.set(key, { provider: task.provider, access: task.executionScope?.access, mission: !!task.mission }); } catch { /* unknown: fail closed */ }
+    const snapshot = (() => { try { return this.db.get(id).processTree ?? []; } catch { return []; } })();
+    const lineage = new Map<number, number | null>([[rootPid, snapshot.find((row) => row.pid === rootPid)?.createdAt ?? null]]);
+    for (const row of snapshot) lineage.set(row.pid, row.createdAt);
+    const check = async () => {
+      const rows = await this.readProcesses().catch(() => null);
+      if (!rows) { setTimeout(() => void check(), 10_000).unref?.(); return; }
+      const alive = new Map<number, ProcessInfo>();
+      for (const row of rows) {
+        if (!lineage.has(row.pid)) continue;
+        const born = lineage.get(row.pid);
+        if (born === null || born === undefined || row.createdAt === born) alive.set(row.pid, row);
+      }
+      for (let grew = true; grew; ) {
+        grew = false;
+        for (const row of rows) {
+          if (alive.has(row.pid) || !lineage.has(row.ppid)) continue;
+          const parentBorn = lineage.get(row.ppid);
+          if (row.createdAt !== null && parentBorn !== null && parentBorn !== undefined && row.createdAt < parentBorn) continue;
+          if (lineage.has(row.pid) && lineage.get(row.pid) !== row.createdAt && lineage.get(row.pid) !== null) continue;
+          alive.set(row.pid, row); lineage.set(row.pid, row.createdAt); grew = true;
+        }
+      }
+      if (!alive.size) { this.lingering.delete(key); this.lingeringAttempt.delete(key); return; }
+      this.lingering.set(key, [...alive.values()]);
+      setTimeout(() => void check(), 10_000).unref?.();
+    };
+    void check();
   }
   stopTree(id: string) {
     const timer = this.treeTimers.get(id);

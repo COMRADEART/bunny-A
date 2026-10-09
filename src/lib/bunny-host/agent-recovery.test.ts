@@ -62,7 +62,7 @@ async function openStack(dir: string, root: string, env: { launched: Launch[]; s
   const tasks = new TaskManager(db, root, providers.map((id) => fakeAdapter(id, env.launched, env.sessions)), { modelRegistry: factLess });
   await tasks.discover();
   const missions = new MissionManager(tasks, { dataDirectory: dir, adapters: [new FilesystemCapability(), new TerminalCapability(), new NotificationsCapability(() => {}), ...communicationConnectors()] });
-  missions.configure({ enabled: true }, "test");
+  missions.configure({ enabled: true }, "workstation");
   await missions.bus.refreshHealth();
   const agents = new AgentRuntime(db, missions);
   missions.missionPauseGate = (missionId) => agents.blockedForMission(missionId);
@@ -129,11 +129,11 @@ test("A07/A08: pause survives a real Host restart; nothing resumes by itself; re
         { role: "Prepare", objective: "Call the model once.", access: "read", executor: { kind: "model" } },
         { role: "Implement", objective: "Write two.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: join(env.root, "two.txt"), content: "two" } }, dependsOn: [0], verification: [] },
       ],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.launched.length === 1, "step 1 admitted");
-    env.agents.pause(id, "test");
+    env.agents.pause(id, "workstation");
     const preRow = await until(() => agentRow(env, id)?.state === "PAUSED" ? agentRow(env, id) : undefined, "paused");
     env.launched[0]!.finish({ ok: true, output: "task one done", exitCode: 0 });
     await until(() => SHAPE(env.missions.get(missionId).mission.steps)[0]!.state === "completed", "step 1 finished under pause");
@@ -149,7 +149,7 @@ test("A07/A08: pause survives a real Host restart; nothing resumes by itself; re
     await staysAbsent(() => exists(join(env.root, "two.txt")), "A07: no auto-resume admission");
     assert.equal(env.missions.mission(missionId).state, "running", "the mission holds; recovery did not revive it");
     // A08: resume revalidates the same envelope and continues; admission lands without new authority.
-    env.agents.resume(id, "test");
+    env.agents.resume(id, "workstation");
     assert.equal(env.agents.store.agentFlags(id).paused, false, "resume revalidates from the canonical store and unpauses");
     await until(() => exists(join(env.root, "two.txt")), "A08: admission lands after resume", 30_000);
     await until(() => env.missions.get(missionId).mission.state === "completed" ? true : undefined, "mission completes", 30_000);
@@ -170,9 +170,9 @@ test("A12: restart during a read child requeues it once; one interrupted row, on
         { role: "Prepare", objective: "Inspect files.", access: "read", executor: { kind: "model" }, maxRetries: 1 },
         { role: "Implement", objective: "Write final.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: join(env.root, "final.txt"), content: "done" } }, dependsOn: [0], verification: [] },
       ],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.launched.length === 1, "read child admitted");
     const runId = agentRow(env, id).run!.id;
     const childId = env.launched[0]!.task.id;
@@ -221,9 +221,9 @@ test("A13/A28: verification recorded and crash before the mission heard — cons
         { role: "Implement", objective: "Write one.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: join(env.root, "one.txt"), content: "one" } }, verification: [] },
         { role: "Prepare", objective: "Summarize the artifact.", access: "read", executor: { kind: "model" }, providers: { allow: ["codex"] }, dependsOn: [0], verification: [{ kind: "file_exists", path: "one.txt", contains: "one" }] },
       ],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.launched.length === 1, "step 2 child admitted");
     const childId = env.launched[0]!.task.id;
     const artifactsBefore = SHAPE(env.missions.get(missionId).mission.artifacts.map((a) => a.id));
@@ -261,9 +261,9 @@ test("A30: completed child without recorded verification — re-run the check, n
     env.agents.create({
       objective: "write then verify, crash during verification",
       steps: [{ role: "Prepare", objective: "Read the artifact.", access: "read", executor: { kind: "model" }, providers: { allow: ["codex"] }, verification: [{ kind: "file_exists", path: "one.txt", contains: "one" }] }],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.launched.length === 1, "child admitted");
     const childId = env.launched[0]!.task.id;
     // The child's effect landed on disk; its completion and verification were never recorded.
@@ -292,9 +292,9 @@ test("A19: a corrupt checkpoint stops recovery fail-closed; nothing replays and 
     env.agents.create({
       objective: "read work interrupted by the restart",
       steps: [{ role: "Prepare", objective: "Inspect files.", access: "read", executor: { kind: "model" } }],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.launched.length === 1, "child admitted");
     const runId = agentRow(env, id).run!.id;
     // Corrupt every checkpoint row of this run (fixture-crafted corruption, not a real crash).
@@ -321,9 +321,9 @@ test("A15: a restart-invalidated approval is denied, cleared, and re-asked fresh
     env.agents.create({
       objective: "a write that needs its own decision",
       steps: [{ role: "Implement", objective: "Write outside.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: outside, content: "hello" } }, verification: [] }],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     const request = await until(() => env.missions.store.requests(missionId)[0], "the permission ask exists");
     const oldRequestId = request.id;
     await until(() => agentRow(env, id)?.state === "WAITING_FOR_USER" ? true : undefined, "the agent waits on the ask");
@@ -336,11 +336,11 @@ test("A15: a restart-invalidated approval is denied, cleared, and re-asked fresh
     // The re-ask is created by the user's mission-level retry lever (§9: recovery itself never
     // replays a write — the ask_user verdict hands the decision to the user). The fresh decision
     // is a NEW request; the old decision id is not reused anywhere.
-    await env.missions.retry(missionId, "test");
+    await env.missions.retry(missionId, "workstation");
     const fresh = await until(() => env.missions.store.requests(missionId).find((r) => r.id !== oldRequestId), "a fresh request is created");
     assert.ok(fresh.id !== oldRequestId);
     await until(() => agentRow(env, id)?.state === "WAITING_FOR_USER" ? true : undefined, "the agent waits on the fresh ask");
-    env.missions.respond(fresh.id, "allow_once", "test");
+    env.missions.respond(fresh.id, "allow_once", "workstation");
     await until(() => exists(outside), "the fresh decision admits the effect");
     await until(() => env.missions.get(missionId).mission.state === "completed" ? true : undefined, "mission completes", 30_000);
   } finally { await env.cleanup(); }
@@ -354,9 +354,9 @@ test("A16/A17: the removed provider's requeue re-routes to the remaining eligibl
     env.agents.create({
       objective: "read work that must re-route after the restart",
       steps: [{ role: "Prepare", objective: "Inspect files.", access: "read", executor: { kind: "model" }, providers: { allow: ["codex", "claude"] }, maxRetries: 1 }],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.launched.length === 1, "the child is admitted");
     const firstProvider = env.launched[0]!.provider;
     const runId = agentRow(env, id).run!.id;
@@ -382,9 +382,9 @@ test("A20: a foreign recovery claim blocks the walk; once released, a runtime pi
   const env = await agentSetup("duplicate-worker");
   try {
     const before = new Set(env.agents.snapshot().agents.map((a) => a.id));
-    env.agents.create({ objective: "read work for the claim test", steps: [{ role: "Prepare", objective: "Inspect files.", access: "read", executor: { kind: "model" } }] }, "test");
+    env.agents.create({ objective: "read work for the claim test", steps: [{ role: "Prepare", objective: "Inspect files.", access: "read", executor: { kind: "model" } }] }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.launched.length === 1, "child admitted");
     // Another Host (fixture: a foreign claim with a fresh timestamp) holds the recovery claim.
     const claim = env.agents.store.claimRecovery(id, "foreign-worker", 2, "host:999999", Date.now());
@@ -417,9 +417,9 @@ test("A21: reconcile refuses completed/blocked-by-authority steps and non-comple
         { role: "Prepare", objective: "Inspect files.", access: "read", executor: { kind: "model" } },
         { role: "Implement", objective: "Write final.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: join(env.root, "final.txt"), content: "done" } }, dependsOn: [0], verification: [] },
       ],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.launched.length === 1, "child admitted");
     await env.reopen();
     await until(() => env.launched.length === 2, "first recovery finished its requeue", 40_000);
@@ -451,9 +451,9 @@ test("A22: a COMPLETED agent stays COMPLETED across a restart; a STOPPED agent n
     env.agents.create({
       objective: "complete then restart",
       steps: [{ role: "Implement", objective: "Write one.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: join(env.root, "one.txt"), content: "one" } }, verification: [] }],
-    }, "test");
+    }, "workstation");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.missions.get(missionId).mission.state === "completed" ? true : undefined, "mission completes", 30_000);
     await until(() => agentRow(env, id)?.state === "COMPLETED" ? true : undefined, "agent completed");
     const preRuns = env.agents.store.runs(id).length;
@@ -481,9 +481,9 @@ test("A35: a historical direct task's canonical row is byte-identical across the
     env.agents.create({
       objective: "one write after the direct task",
       steps: [{ role: "Implement", objective: "Write one.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: join(env.root, "one.txt"), content: "one" } }, verification: [] }],
-    }, "test");
+    }, "workstation");
     const { id, missionId: mid } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.missions.get(mid).mission.state === "completed" ? true : undefined, "mission completes", 30_000);
     await env.reopen();
     const recordAfter = env.db.db.prepare("SELECT record FROM tasks WHERE id=?").get(direct.id) as { record: string };

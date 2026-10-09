@@ -1,3 +1,4 @@
+import { redactReviewListing } from "../bunny-missions/authorization.server.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomBytes, createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -123,8 +124,11 @@ async function body(request: IncomingMessage) {
   return record(JSON.parse(data));
 }
 // charset is explicit: Windows PowerShell 5.1 (the native Island) otherwise decodes JSON as Latin-1.
+/** Responses addressed to an authenticated paired device (M-A-3 T9R-F01 review-listing redaction). */
+const DEVICE_RESPONSES = new WeakSet<ServerResponse>();
 function json(response: ServerResponse, value: unknown, status = 200, headers: Record<string, string> = {}) {
-  const encoded = JSON.stringify(value);
+  // M-A-3 T9R-F01: a paired device never receives the workstation's review listings, whatever surface carries them.
+  const encoded = JSON.stringify(DEVICE_RESPONSES.has(response) ? redactReviewListing(value) : value);
   if (response.destroyed || response.writableEnded) return;
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
@@ -390,7 +394,7 @@ export async function startHost(
     // M-A-3 T9: every request re-authenticates the device: present, unrevoked, within its lifetime and idle bound.
     const auth=local || !bearer ? null : authenticateDevice(db.db,hash(bearer));
     const device:DevicePrincipal | null=auth?.ok ? auth.device : null;
-    if(device) registerDiagnosticSecret(bearer);
+    if(device) { registerDiagnosticSecret(bearer); DEVICE_RESPONSES.add(res); }
     if(path.pathname === "/pair" && req.method === "POST") {
       if(!containment.allows("http")) return json(res,{error:new HostUnavailableError().message},503);
       const key=String(req.headers["x-bunny-pair-client"] ?? "bridge").slice(0,80);const now=Date.now();
@@ -728,6 +732,7 @@ export async function startHost(
             if (!changed) throw new CommandRefusedError("Unknown or already revoked device.");
             const closed = deviceStreams.closeDevice(id);
             // A lost device's authority ends with it: batches it created and Agentic consent it approved.
+            // Self sign-out keeps the approvals the user gave (documented T9R design; owner decision still open).
             const ended = local ? await endDeviceGrants(`device:${id}`) : { batches: 0, delegations: 0, approvals: 0, unstopped: 0 };
             manager.emit(
               db.event(
@@ -819,6 +824,9 @@ export async function startHost(
   };
   /** Workstation revocation of a lost device ends the authority that device granted (never on self sign-out). */
   const endDeviceGrants = async (deviceActor: string) => {
+    // M-A-3 T9R-F01: the device's unexecuted one-time answers end with it, and so do Missions it started or resumed.
+    missions.endDeviceAnswers(deviceActor);
+    await missions.endDeviceDriven(deviceActor);
     let batches = 0,
       delegations = 0;
     for (const row of db.db
@@ -847,9 +855,17 @@ export async function startHost(
       unstopped = 0;
     for (const mission of missions.store.missionsIn([...MISSION_ACTIVE, "failed"]))
       try {
-        if (!mission.authorizationId || missions.agentic.exists(mission.id) || mission.origin.startsWith("agent:")) continue;
+        if (!mission.authorizationId) continue;
         const envelope = missions.store.authorization(mission.authorizationId);
         if (!envelope || envelope.revokedAt || envelope.grantedBy !== deviceActor) continue;
+        // M-A-3 T9R-F01: an Agent Mission envelope this device re-consented ends too (and the Mission stops below).
+        if (missions.agentic.exists(mission.id) || mission.origin.startsWith("agent:")) {
+          missions.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });
+          approvals++;
+          if (MISSION_ACTIVE.includes(missions.store.mission(mission.id).state))
+            await missions.stop(mission.id, `workstation (revoked ${deviceActor})`);
+          continue;
+        }
         // Revoke first so no further admission or Retry can use it, then stop admitted and pending work canonically.
         missions.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });
         approvals++;

@@ -72,6 +72,12 @@ function Find-Window($p) {
       $matches += ,$w
       continue
     }
+    # M-A-3 T9R-F01: the reviewed "Calculator" target is the window named exactly Calculator, never a title containing it.
+    # With a pid as well, both must identify the same window (a recycled pid never redirects a Calculator operation).
+    if ([string]$p.title -eq 'Calculator') {
+      if ($c.Name -eq 'Calculator' -and (-not $p.pid -or $c.ProcessId -eq [int]$p.pid)) { return $w }
+      continue
+    }
     if (($p.pid -and $c.ProcessId -eq [int]$p.pid) -or ($p.title -and $c.Name -like ('*' + $p.title + '*'))) { return $w }
   }
   if ($batch -and $matches.Count -eq 1) { return $matches[0] }

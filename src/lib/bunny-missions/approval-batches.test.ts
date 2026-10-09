@@ -584,6 +584,25 @@ test("T9 remote: a paired phone may grant only the offered batch, revoke its own
   } finally { await env.cleanup(); }
 });
 
+test("T9R-F01: a phone keeps the Calculator batch where a single allow would exceed remote authority (batch-only verdict)", async () => {
+  const env = await setup();
+  try {
+    const view = pausedBatchMission(env, "Phone batch-only");
+    await until(() => env.missions.store.requests(view.id).length === 1, "the ask");
+    const ask = env.missions.store.requests(view.id)[0];
+    assert.ok(ask.batchOffer, "a Host-computed Calculator batch is offered");
+    const foreign = env.missions.store.steps(view.id).find((step) => step.role === "Foreign")!;
+    const typeAsk = { ...ask, id: "f01-synthetic", action: "computer.type", stepId: foreign.id };
+    assert.match(env.missions.deviceRequestRefusal(typeAsk) ?? "", /Approval required on Windows Host/, "a single phone allow of computer.type is workstation-only");
+    assert.equal(env.missions.deviceRequestRefusal(typeAsk, "allow_batch"), null, "the bounded Calculator batch stays remote-approvable");
+    const snapshot = env.missions.snapshot();
+    const projected = env.missions.remoteVerdicts({ ...snapshot, missions: snapshot.missions.map((m) => m.id === view.id ? { ...m, requests: [typeAsk] } : m) });
+    assert.deepEqual(projected.missions.find((m) => m.id === view.id)!.requests[0].remote, { answerable: true, reason: null, batchOnly: true });
+    const ordinary = env.missions.remoteVerdicts(env.missions.snapshot()).missions.find((m) => m.id === view.id)!.requests[0].remote!;
+    assert.equal(ordinary.answerable, true); assert.equal(ordinary.batchOnly, undefined, "exact Calculator operations keep Allow once");
+  } finally { await env.cleanup(); }
+});
+
 test("T9 ask_every_time refuses batching: ask again forever, no rescue, no batch button; a denied offer creates nothing", async () => {
   const env = await setup();
   try {

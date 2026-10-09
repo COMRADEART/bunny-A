@@ -292,7 +292,11 @@ test("Host HTTP: snapshot stays backward compatible, mission commands are valida
     assert.equal(desktopApproval.status, 200); assert.equal(phoneApproval.status, 200);
     const desktopEnvelope = (await command("mission.get", { id: desktopMission.id })).body.data.authorization;
     const phoneEnvelope = (await command("mission.get", { id: phoneMission.id }, device.token)).body.data.authorization;
-    assert.deepEqual(phoneEnvelope.providers, phoneMission.requestedScope.providers, "phone grants exactly the displayed serialized provider authority");
+    // M-A-3 T9R-F01 (owner-approved contract revision): the phone grants the displayed provider authority minus shell.
+    assert.deepEqual(phoneEnvelope.providers, { ...phoneMission.requestedScope.providers, sessions: { ...phoneMission.requestedScope.providers.sessions, writeIncludesShell: false } }, "phone grants the displayed provider authority without shell-capable sessions");
+    assert.equal(phoneEnvelope.authority.kind, "remote");
+    assert.equal(desktopEnvelope.authority.kind, "workstation");
+    assert.equal(desktopEnvelope.providers.sessions.writeIncludesShell, true, "workstation approval keeps its shell-capable write sessions");
     assert.deepEqual(phoneEnvelope.projectRoots, desktopEnvelope.projectRoots);
     assert.equal(phoneEnvelope.providers.sessions.maxSessions, desktopEnvelope.providers.sessions.maxSessions);
     assert.deepEqual(phoneEnvelope.providers.sessions.steps.map((step: { scope: unknown }) => step.scope), desktopEnvelope.providers.sessions.steps.map((step: { scope: unknown }) => step.scope));

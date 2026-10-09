@@ -2,6 +2,7 @@ import type { ActionManifest, CapabilityAvailability, CapabilityResult } from ".
 import type { CapabilityAdapter, ExecutionContext } from "./bus.server.ts";
 import { resolveCommand, runCommand, tail } from "./process.server.ts";
 import { scopedPath } from "../paths.server.ts";
+import { join } from "node:path";
 
 const input = (name: string, type: ActionManifest["inputs"][number]["type"], required: boolean, description: string) => ({ name, type, required, description });
 
@@ -40,7 +41,9 @@ export class GitHubCapability implements CapabilityAdapter {
     if (!args[action]) return { ok: false, status: "unsupported", summary: `${action} is not implemented in M-A-0.`, output: null, evidence: [] };
     // gh can inspect the repository through child Git processes. Contain the
     // connector root at creation so those children inherit the same boundary.
-    const result = await runCommand("gh", args[action], { cwd, signal: context.signal, timeoutMs: Math.min(context.timeoutMs, 30_000), owned: true, owner: { missionId: context.missionId, stepId: context.stepId, capabilityRunId: context.capabilityRunId, dataDirectory: context.dataDirectory, records: context.processOwnership, action } });
+    // M-A-3 T9R-F01: under remote authority gh's child Git processes get the same hardening as Bunny's own Git calls.
+    const env = context.remoteAuthority ? { ...process.env, GIT_PAGER: "cat", GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_0: "core.fsmonitor", GIT_CONFIG_VALUE_0: "false", GIT_CONFIG_KEY_1: "core.hooksPath", GIT_CONFIG_VALUE_1: join(context.dataDirectory, "disabled-hooks"), GIT_CONFIG_KEY_2: "diff.external", GIT_CONFIG_VALUE_2: "" } : undefined;
+    const result = await runCommand("gh", args[action], { cwd, signal: context.signal, ...(env ? { env } : {}), timeoutMs: Math.min(context.timeoutMs, 30_000), owned: true, owner: { missionId: context.missionId, stepId: context.stepId, capabilityRunId: context.capabilityRunId, dataDirectory: context.dataDirectory, records: context.processOwnership, action } });
     if (result.exitCode !== 0) return { ok: false, status: "failed", summary: `gh failed: ${tail(result.stderr, 300)}`, output: null, evidence: [`gh ${args[action].join(" ")} in ${cwd} → exit ${result.exitCode}`], errorCategory: "capability_failed" };
     let data: unknown; try { data = JSON.parse(result.stdout); } catch { return { ok: false, status: "failed", summary: "gh returned unreadable JSON.", output: null, evidence: [], errorCategory: "capability_failed" }; }
     const count = Array.isArray(data) ? `${data.length} item(s)` : "repository details";

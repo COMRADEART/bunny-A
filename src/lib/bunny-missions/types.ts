@@ -54,7 +54,18 @@ export type RiskClass = "READ" | "WRITE" | "EXECUTE" | "EXTERNAL_SIDE_EFFECT" | 
 /** Persistent permission choices. The data model supports all of them; M-A-0 enforces them in decisions. */
 export type GrantPolicy = "always_allow" | "allow_for_mission" | "ask_every_time" | "read_only" | "never_allow";
 
-export type PermissionDecision = { decision: "allow" | "ask" | "deny"; reason: string; risk: RiskClass; /** Set when an approval batch rescued the ask; admission consumes from it. */ batch?: { id: string } };
+export type PermissionDecision = {
+  decision: "allow" | "ask" | "deny"; reason: string; risk: RiskClass;
+  /** Set when an approval batch rescued the ask; admission consumes from it. */ batch?: { id: string };
+  /** M-A-3 T9R-F01: the ask exceeds remote authority; only the trusted workstation may allow it, never a batch. */
+  desktopRequired?: boolean;
+  /** M-A-3 T9R-F01: the exact operation a desktop answer to this ask would cover (Host-computed). */
+  desktopOperation?: DesktopOperation;
+  /** M-A-3 T9R-F01: paired-device-authorized changes the workstation reviews by answering this ask. */
+  remoteReview?: string[];
+  /** M-A-3 T9R-F01: the trusted-desktop grant (its request id) this allow relies on; admission consumes it. */
+  desktopGrant?: { id: string };
+};
 
 export type Budget = {
   /** Child tasks routed to a cloud provider. */
@@ -99,9 +110,15 @@ export type AuthorizationEnvelope = {
   capabilities: string[];
   providers: {
     execution: boolean; allow: ProviderId[] | null; localOnly: boolean;
-    /** Optional on pre-remediation JSON. Missing authority never permits delegated model launches. */
-    sessions?: { steps: { stepId: string; scope: ProviderExecutionScope }[]; maxSessions: number; writeIncludesShell: true };
+    /**
+     * Optional on pre-remediation JSON. Missing authority never permits delegated model launches.
+     * M-A-3 T9R-F01: `writeIncludesShell` is false on an envelope a paired device granted; such an envelope
+     * never launches a shell-capable provider session without a trusted-desktop grant for that exact session.
+     */
+    sessions?: { steps: { stepId: string; scope: ProviderExecutionScope }[]; maxSessions: number; writeIncludesShell: boolean };
   };
+  /** M-A-3 T9R-F01: where this approval came from. Absent on older JSON; derived from `grantedBy` then (fail closed). */
+  authority?: EnvelopeAuthority;
   filesystem: { read: string[]; write: string[] };
   browser: { enabled: boolean; domains: string[] | "public" };
   terminal: { enabled: boolean; commands: string[]; executables?: { command: string; file: string; prefix: string[] }[] };
@@ -114,6 +131,50 @@ export type AuthorizationEnvelope = {
   revokedAt: number | null;
 };
 export type GitAction = "status" | "diff" | "log" | "commit" | "worktree" | "merge";
+/**
+ * M-A-3 T9R-F01: the tool authority a provider session actually runs with.
+ * tool_free: text generation only (Ollama). read_tools: file reading only, no command execution (Claude read).
+ * shell: the session can run commands or code (Claude write, Codex in any sandbox mode).
+ */
+export type SessionAuthority = "tool_free" | "read_tools" | "shell";
+/**
+ * Who granted an envelope. A remote (paired-device) grant is capped: provider sessions stay within
+ * `sessionCeiling` and code-executing actions need a trusted-desktop grant for the exact operation.
+ */
+export type EnvelopeAuthority =
+  | { kind: "workstation" }
+  | { kind: "remote"; actor: string; sessionCeiling: SessionAuthority[]; codeExecution: "desktop_only" };
+/** The exact operation a trusted-desktop grant covers; compared field for field before use. */
+export type DesktopOperation =
+  | { kind: "provider_session"; provider: string; model: string; effort: string | null; access: string; cwd: string; sessionAuthority: SessionAuthority | "unknown" }
+  | { kind: "capability"; action: string; digest: string; cwd: string; executable: { file: string; prefix: string[] } | null; files?: Record<string, string> };
+/**
+ * M-A-3 T9R-F01: a trusted-desktop authorization. Minted only when the authenticated workstation answers
+ * allow_once to a Host request marked `desktopRequired`. It is bound to this Host and boot epoch, to the
+ * exact Mission/Agent/step/Task, plan and envelope, and to one exact operation. It expires quickly, is
+ * used at most `maxUses` times and is void once revoked. A paired device can never mint or use one.
+ */
+export type DesktopGrant = {
+  id: string;
+  requestId: string;
+  hostId: string;
+  epoch: string;
+  missionId: string;
+  agentId: string | null;
+  stepId: string;
+  taskId: string | null;
+  planReference: string;
+  authorizationId: string;
+  operation: DesktopOperation;
+  /** Host-wide count of project-mutating capability runs at approval time. */
+  mutationSequence: number;
+  grantedBy: "workstation";
+  grantedAt: number;
+  expiresAt: number;
+  maxUses: number;
+  uses: number;
+  revokedAt: number | null;
+};
 
 /** Requested scope shown before approval; becomes the envelope when approved. */
 export type ScopeRequest = Omit<AuthorizationEnvelope, "id" | "missionId" | "grantedAt" | "grantedBy" | "expiresAt" | "revokedAt" | "agentic">;
@@ -214,9 +275,25 @@ export type PermissionRequest = {
   batchOffer: PermissionBatchOffer | null;
   /** M-A-3 T9 projection only (never stored): whether a paired device may answer this exact ask. */
   remote?: RemoteAnswer;
+  /** M-A-3 T9R-F01: Host-set; only the trusted workstation may allow this ask. */
+  desktopRequired?: boolean;
+  /** M-A-3 T9R-F01: Host-computed exact operation the workstation's allow_once binds to. */
+  desktopOperation?: DesktopOperation;
+  /** M-A-3 T9R-F01: ids of paired-device-authorized changes this workstation answer acknowledges. */
+  remoteReview?: string[];
+  /** M-A-3 T9R-F01: the Task, envelope and plan in force when the Host asked; a grant is minted only against these. */
+  desktopBinding?: { taskId: string | null; authorizationId: string; planReference: string; mutationSequence?: number };
+  /** M-A-3 T9R-F01: the exact-operation grant minted by the workstation's allow_once. */
+  desktopGrant?: DesktopGrant;
 };
 /** M-A-3 T9: the Host's own verdict on a paired-device answer; the phone never re-derives policy. */
-export type RemoteAnswer = { answerable: boolean; reason: string | null };
+export type RemoteAnswer = {
+  answerable: boolean; reason: string | null;
+  /** M-A-3 T9R-F01: what a remote approval of this plan leaves for trusted-desktop approval on the Windows Host. */
+  desktopFollowUp?: string | null;
+  /** M-A-3 T9R-F01: a device may grant only the Host-offered small batch here, not a single allow. */
+  batchOnly?: boolean;
+};
 
 /**
  * One ephemeral, mission-scoped bounded desktop batch (Gate T9). Created only from a Host-computed
@@ -297,6 +374,8 @@ export type MissionAccounting = {
 };
 
 export type Mission = {
+  /** M-A-3 T9R-F01: the paired device that started or resumed this Mission (its changes are reviewed as such). */
+  deviceDriven?: string;
   id: string;
   title: string;
   objective: string;

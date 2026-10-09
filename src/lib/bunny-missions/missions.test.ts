@@ -409,17 +409,29 @@ test("MA0R: child <= step <= envelope is enforced even on direct child approval"
   } finally { await env.cleanup(); }
 });
 
-test("MA0R: phone approval serializes exactly the desktop authority and ignores client scope overrides", async () => {
+// M-A-3 T9R-F01 (owner-approved contract revision): this MA0R test asserted that a phone approval serializes exactly
+// the desktop authority, including writeIncludesShell: true. A paired phone now grants the same Host-owned scope with a
+// remote authority marker and without shell-capable provider sessions; everything else is unchanged.
+test("MA0R/T9R-F01: phone approval keeps the Host-owned scope, ignores client scope overrides and never carries shell authority", async () => {
   const env = await setup();
   try {
-    const view = env.missions.create({ objective: "Inspect then edit", mode: "fast", origin: "workstation", steps: [model("A", "Inspect", [], { access: "read" }), model("B", "Edit", [0], { access: "write" })] });
+    const plan = [model("A", "Inspect", [], { access: "read" }), model("B", "Edit", [0], { access: "write" })];
+    const view = env.missions.create({ objective: "Inspect then edit", mode: "fast", origin: "workstation", steps: plan });
     const before = JSON.parse(JSON.stringify(view.requestedScope));
+    assert.equal(before.providers.sessions.writeIncludesShell, true, "the displayed request states that write sessions use a shell");
     await missionCommand(env.missions, "mission.approve", { id: view.id, start: false, scope: { projectRoots: ["C:/"], providers: { execution: true } } }, { local: false, actor: "device:paired-phone" });
     const envelope = JSON.parse(JSON.stringify(env.missions.get(view.id).authorization)) as Record<string, unknown>;
-    for (const key of ["id", "missionId", "grantedAt", "grantedBy", "expiresAt", "revokedAt"]) delete envelope[key];
-    assert.deepEqual(envelope, before, "remote command uses Host-owned requested scope only");
+    assert.deepEqual(envelope.authority, { kind: "remote", actor: "device:paired-phone", sessionCeiling: ["tool_free", "read_tools"], codeExecution: "desktop_only" });
+    for (const key of ["id", "missionId", "grantedAt", "grantedBy", "expiresAt", "revokedAt", "authority"]) delete envelope[key];
+    const expected = structuredClone(before); expected.providers.sessions.writeIncludesShell = false;
+    assert.deepEqual(envelope, expected, "remote command uses Host-owned requested scope only, minus shell authority");
     assert.ok(env.missions.get(view.id).events.some((event) => event.type === "approval.mission_envelope"));
-    assert.ok(env.missions.get(view.id).events.some((event) => event.type === "approval.remote_device" && /paired-phone/.test(event.detail)));
+    assert.ok(env.missions.get(view.id).events.some((event) => event.type === "approval.remote_device" && /paired-phone/.test(event.detail) && /trusted-desktop/.test(event.detail)));
+    const desk = env.missions.create({ objective: "Inspect then edit", mode: "fast", origin: "workstation", steps: plan });
+    env.missions.approve(desk.id, "workstation", false);
+    const desktop = env.missions.get(desk.id).authorization!;
+    assert.deepEqual(desktop.authority, { kind: "workstation" }, "the workstation approval path is unchanged");
+    assert.equal(desktop.providers.sessions!.writeIncludesShell, true);
   } finally { await env.cleanup(); }
 });
 
@@ -581,7 +593,12 @@ test("out-of-envelope capability asks; deny fails the step; allow-once runs only
     const second = env.missions.create({ objective: "Write2", mode: "fast", origin: "workstation", steps: [{ role: "Writer", objective: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: outside, content: "allowed once" } } }] });
     env.missions.approve(second.id, "workstation");
     await until(() => env.missions.store.requests(second.id).length === 1, "request");
-    await env.missions.respond(env.missions.store.requests(second.id)[0].id, "allow_once", "device:phone");
+    // T9R-F01: a paired device never authorizes a write outside the reviewed envelope; the workstation's allow-once does.
+    const secondRequest = env.missions.store.requests(second.id)[0];
+    await assert.rejects(env.missions.respond(secondRequest.id, "allow_once", "device:phone"), /Approval required on Windows Host/);
+    assert.equal(env.missions.store.request(secondRequest.id).resolvedAt, null, "the device refusal leaves the ask open");
+    assert.ok(!existsSync(outside), "nothing written on the device's answer");
+    await env.missions.respond(secondRequest.id, "allow_once", "workstation");
     await until(() => env.missions.mission(second.id).state === "completed", "completion after allow once");
     assert.ok(env.missions.memory.entries(second.id).some((m) => m.kind === "user_decision" && m.verified && /allowed once/.test(m.key)));
     rmSync(outside, { force: true });

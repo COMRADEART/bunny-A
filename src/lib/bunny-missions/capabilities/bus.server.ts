@@ -1,5 +1,5 @@
 import type { ArtifactStore } from "../artifacts.server.ts";
-import { decide, matches } from "../authorization.server.ts";
+import { capabilityOperation, decide, isRemoteEnvelope, matches, remoteExecutionRefusal, runsCode } from "../authorization.server.ts";
 import { consultBatch, currentBatchEpoch, extractObservedPid, targetLabelOf } from "../batches.server.ts";
 import { redact, type MissionStore } from "../store.server.ts";
 import { resolveCommand, type Resolved } from "./process.server.ts";
@@ -21,6 +21,8 @@ export type ExecutionContext = {
   boundedEnvironment?: NodeJS.ProcessEnv;
   boundedDelegation?: boolean;
   boundedScriptHash?: string;
+  /** M-A-3 T9R-F01: remote (paired-device) authority; Git ignores repo-configured programs (hooks, fsmonitor, external diff). */
+  remoteAuthority?: boolean;
   missionId: string | null;
   stepId: string | null;
   capabilityRunId?: string;
@@ -67,6 +69,8 @@ export type CapabilityRequest = {
 export type CapabilityOutcome = { decision: PermissionDecision; run: CapabilityRun | null; result: CapabilityResult | null; artifactIds: string[] };
 
 const RANK: RiskClass[] = ["READ", "WRITE", "EXECUTE", "EXTERNAL_SIDE_EFFECT", "DESTRUCTIVE"];
+/** Actions that change project files (or what a running program would load). */
+const MUTATIONS = new Set(["filesystem.write", "filesystem.delete", "git.commit", "git.merge", "git.worktree_add", "git.worktree_remove", "browser.download"]);
 const STATUS_FOR: Record<Exclude<CapabilityAvailability, "available" | "degraded">, CapabilityResult["status"]> = { unavailable: "unavailable", unconfigured: "unconfigured", unsupported: "unsupported" };
 
 /**
@@ -88,6 +92,22 @@ export class CapabilityBus {
   agenticCheck: ((request: CapabilityRequest, risk: RiskClass, executable?: Resolved | null) => string | null) | null = null;
   agenticAdmit: ((request: CapabilityRequest, runId: string, executable?: Resolved | null) => { id?: string; reason?: string; timeoutMs?: number; scriptHash?: string }) | null = null;
   agenticFinish: ((id: string, ok: boolean) => void) | null = null;
+  /** M-A-3 T9R-F01: the valid trusted-desktop grant (request id) for this exact request, installed by MissionManager. */
+  desktopGrantFor: ((request: CapabilityRequest, executable?: Resolved | null) => string | null) | null = null;
+  /** M-A-3 T9R-F01: why this Mission mutation must wait for a running trusted-desktop execution in the same folder. */
+  desktopExecutionConflict: ((request: CapabilityRequest) => string | null) | null = null;
+  /** M-A-3 T9R-F01: unreviewed paired-device changes this code-running request would execute over (ids and paths). */
+  remoteReviewFor: ((request: CapabilityRequest) => { ids: string[]; paths: string[]; more: number; listing: string } | null) | null = null;
+  /** M-A-3 T9R-F01: records a project change attempted under paired-device authority (before the adapter runs). */
+  remoteMutationStarted: ((request: CapabilityRequest, runId: string) => void) | null = null;
+  /** M-A-3 T9R-F01: why a paired-device change must wait (workstation-approved code is running), or null. */
+  remoteMutationHeld: ((request: CapabilityRequest) => string | null) | null = null;
+  /** M-A-3 T9R-F01: code-running capability executions in flight (run id -> action). */
+  liveCode = new Map<string, string>();
+  /** M-A-3 T9R-F01: records a capability execution running under a trusted-desktop grant. */
+  desktopExecutionStarted: ((runId: string, request: CapabilityRequest) => void) | null = null;
+  /** M-A-3 T9R-F01: consumes one use of the grant immediately before execution; returns why it cannot, or null. */
+  desktopGrantConsume: ((grantId: string, request: CapabilityRequest, executable?: Resolved | null) => string | null) | null = null;
   agenticExecutionContext: ((request: CapabilityRequest, admissionId: string, executable?: Resolved | null) => Partial<ExecutionContext>) | null = null;
   clearCancellation(missionId: string) { this.cancelledMissions.delete(missionId); }
   constructor(store: MissionStore, artifacts: ArtifactStore, dataDirectory: string, emit: (type: string, detail: string, missionId: string | null) => void, containment=new HostContainment()) {
@@ -137,7 +157,25 @@ export class CapabilityBus {
     if (!found) return { decision: "deny", reason: `Unknown capability action ${request.action}.`, risk: "READ" };
     const risk = this.riskOf(request.action, request.params) ?? found.manifest.risk;
     const violation = this.agenticCheck?.(request, risk, executable);
-    const base = decide({ ...found.manifest, risk }, request.params, { envelope: request.envelope, missionId: request.missionId, grants: this.store.grants(), oneTime: request.oneTime || (!!request.oneTimeAction && request.oneTimeAction === request.action), direct: request.direct, base: request.cwd, executable, agenticViolation: violation });
+    // M-A-3 T9R-F01: while a trusted-desktop execution runs in a folder, Mission changes there wait, so the code the
+    // workstation approved cannot be rewritten underneath it (scripts and the modules they load at run time).
+    const busy = request.missionId && !request.direct && MUTATIONS.has(request.action) ? this.desktopExecutionConflict?.(request) ?? null : null;
+    if (busy) return { decision: "ask", reason: busy, risk };
+    // M-A-3 T9R-F01: a paired-device change never lands under workstation-approved code that is already running.
+    const held = request.missionId && !request.direct && MUTATIONS.has(request.action) ? this.remoteMutationHeld?.(request) ?? null : null;
+    if (held) return { decision: "ask", reason: held, risk, desktopRequired: true, desktopOperation: capabilityOperation(request.action, request.params, request.cwd, executable) };
+    // M-A-3 T9R-F01: code never runs over paired-device changes the workstation has not reviewed, under any envelope.
+    // Git reads count too: owner-configured textconv, clean filters or fsmonitor can run project files.
+    const review = request.missionId && !request.direct && (runsCode(request.action, request.params, risk) || request.action.startsWith("git.") || request.action.startsWith("github.")) ? this.remoteReviewFor?.(request) ?? null : null;
+    if (review) return { decision: "ask", risk, desktopRequired: true, desktopOperation: capabilityOperation(request.action, request.params, request.cwd, executable), remoteReview: review.ids,
+      reason: `Approval required on Windows Host: this runs code over files changed under paired-device authority. Review their content before allowing:${review.listing}${review.more ? `\n${review.more} more changed file(s) are listed for review after these.` : ""}` };
+    // M-A-3 T9R-F01: remote authority never runs code; only a trusted-desktop grant for this exact operation lifts it.
+    const remote = !!request.envelope && !request.direct && isRemoteEnvelope(request.envelope) && remoteExecutionRefusal(request.action, request.params, risk, request.cwd) !== null;
+    const grant = remote ? this.desktopGrantFor?.(request, executable) ?? null : null;
+    const base = decide({ ...found.manifest, risk }, request.params, { envelope: request.envelope, missionId: request.missionId, grants: this.store.grants(), oneTime: request.oneTime || (!!request.oneTimeAction && request.oneTimeAction === request.action), direct: request.direct, base: request.cwd, executable, agenticViolation: violation, desktopGrant: !!grant });
+    if (base.desktopRequired) return { ...base, desktopOperation: capabilityOperation(request.action, request.params, request.cwd, executable) }; // never batch-rescued
+    if (grant && base.decision === "allow") return { ...base, desktopGrant: { id: grant } };
+    if (remote) return base;
     if (violation) return base; // T9 cannot launder an Agent identity, budget or resource mismatch.
     // Gate T9: an approval batch may rescue an ORDINARY ask — same mission, its own planned step,
     // alive envelope, exact covered action, bound target, risk at/below the ceiling. Never a deny,
@@ -258,8 +296,16 @@ export class CapabilityBus {
         this.emit("approval.batch_exhausted", `Small approval batch reached its ${consumed.maxActions}-action limit; further ${request.action.split(".")[0]}.* actions ask again.`, request.missionId);
       }
     }
+    if (decision.desktopGrant) {
+      const refused = this.desktopGrantConsume ? this.desktopGrantConsume(decision.desktopGrant.id, request, executable) : "No trusted-desktop grant validator is installed.";
+      if (refused) { this.emit("authorization.required", `${request.action}: ${refused}`, request.missionId); return { decision: { decision: "ask", risk: decision.risk, reason: refused, desktopRequired: true, desktopOperation: capabilityOperation(request.action, request.params, request.cwd, executable) }, run: null, result: null, artifactIds: [] }; }
+    }
     this.emit("authorization.granted", `${request.action}: ${decision.reason}`, request.missionId);
     this.store.host.transaction(()=>{this.store.saveRun(base);this.emit("capability.started", `${request.action} started.`, request.missionId);});
+    if (decision.desktopGrant) this.desktopExecutionStarted?.(base.id, request);
+    // Recorded before the adapter runs: a change that fails after touching disk is still reviewed.
+    if (request.missionId && MUTATIONS.has(request.action)) this.remoteMutationStarted?.(request, base.id);
+    if (runsCode(request.action, request.params, decision.risk) || request.action.startsWith("git.") || request.action.startsWith("github.")) this.liveCode.set(base.id, request.action);
     const controller = new AbortController(); this.inFlight.set(base.id, controller);
     let settled!: () => void;
     this.settling.set(base.id, new Promise<void>((done) => { settled = done; }));
@@ -273,7 +319,7 @@ export class CapabilityBus {
       const delegated = agenticAdmission.id ? this.agenticExecutionContext?.(request, agenticAdmission.id, executable) ?? {} : {};
       const currentViolation = delegated.revalidate?.();
       if (currentViolation) throw new Error(currentViolation);
-      result = await found.adapter.execute(request.action, request.params, { ...delegated, resourceValidation: path => this.resourceValidation?.(request,path) ?? null, missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch: delegated.desktopBatch ?? desktopBatch, boundedEnvironment, boundedDelegation: !!agenticAdmission.id, boundedScriptHash: admitted?.scriptHash });
+      result = await found.adapter.execute(request.action, request.params, { ...delegated, resourceValidation: path => this.resourceValidation?.(request,path) ?? null, missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch: delegated.desktopBatch ?? desktopBatch, boundedEnvironment, boundedDelegation: !!agenticAdmission.id, boundedScriptHash: admitted?.scriptHash, remoteAuthority: !!request.envelope && isRemoteEnvelope(request.envelope) });
       if(processOwnership.length) result={...result,output:{...(result.output && typeof result.output === "object" ? result.output : {value:result.output}),processOwnership}};
     } catch (error) {
       const message = safeError(error).message;
@@ -300,7 +346,7 @@ export class CapabilityBus {
       const message=safeError(error).message;
       try {return finish("failed",message,{ok:false,status:"failed",summary:message,output:null,evidence:[],errorCategory:"capability_failed"});}
       catch(persistenceError) {this.containment.fatal(persistenceError,{subsystem:"persistence",capabilityRunId:base.id});throw persistenceError;}
-    } finally { clearTimeout(timer); this.inFlight.delete(base.id); this.settling.delete(base.id); settled(); }
+    } finally { clearTimeout(timer); this.inFlight.delete(base.id); this.liveCode.delete(base.id); this.settling.delete(base.id); settled(); }
   }
   /**
    * Gate T9 post-run target review: the Computer Runtime's structured output carries the window's

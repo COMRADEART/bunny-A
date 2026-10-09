@@ -6,7 +6,9 @@ import { developmentStateDirectory } from "../bunny-host/state-paths.server.ts";
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost", "[::1]"]);
 const LOOPBACK_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 // A tunnel or reverse proxy on this machine connects over loopback too, so its headers disqualify workstation access.
-const PROXY_HEADERS = ["cf-connecting-ip", "cf-ray", "x-forwarded-for", "x-real-ip", "forwarded"];
+/** Header families relays and tunnels add (Cloudflare, Tailscale, Envoy, Fastly, Vercel, AWS, Azure, ngrok, IIS ARR, rewrites). */
+const RELAY_PREFIX = /^(x-forwarded-|x-original-|x-rewrite-|cf-|tailscale-|x-envoy-|fastly-|x-vercel-|x-amzn-|x-azure-|x-arr-|x-ms-|ngrok-|x-ngrok-|x-cluster-client-)/;
+const PROXY_HEADERS = ["cf-connecting-ip", "cf-ray", "x-forwarded-for", "x-real-ip", "forwarded", "via", "cdn-loop", "true-client-ip", "x-client-ip"];
 
 /** The TCP peer address of the current request; undefined (and therefore never "local") when it cannot be determined. */
 function peerAddress(): string | undefined {
@@ -34,7 +36,12 @@ export function authorizeBridge(request: Request, remoteAddress: string | undefi
   if (local) {
     const forwarded = request.headers.get("x-forwarded-host");
     if (forwarded && forwarded !== url.host) throw new Error("Untrusted forwarded host.");
-    if (PROXY_HEADERS.some(name => request.headers.has(name)) || request.headers.get("x-forwarded-proto") === "https") throw new Error("Remote requests cannot use workstation authentication.");
+    // M-A-3 T9R-F01: any forwarding marker (x-forwarded-*, x-original-*, cf-*, ...) means a proxy relayed the request.
+    const relayed = [...request.headers.keys()].some(name => PROXY_HEADERS.includes(name) || RELAY_PREFIX.test(name) || ["front-end-https", "x-url-scheme"].includes(name));
+    if (relayed) throw new Error("Remote requests cannot use workstation authentication.");
+    // A paired-device credential is only ever set on the remote origin, so a "local" request carrying one (in any
+    // spacing) arrived through a proxy that rewrote Host. It is remote and never receives the workstation token.
+    if (/(^|;)\s*bunny_device\s*=/i.test(request.headers.get("cookie") ?? "")) throw new Error("Remote requests cannot use workstation authentication.");
     return { local: true, token: null };
   }
   if (!remote || effectiveOrigin !== new URL(remote).origin || !effectiveOrigin.startsWith("https://")) throw new Error("Remote gateway is not configured for this HTTPS origin.");
