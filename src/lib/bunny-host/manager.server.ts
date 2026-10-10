@@ -1810,7 +1810,8 @@ export class TaskManager {
             cleanup =
               stopCleanup.status !== "complete"
                 ? ` Cleanup incomplete: ${alive.length} corroborated owned process(es) remain; ${stopCleanup.terminationFailures} identity-checked termination(s) refused or failed.`
-                : ` Verified ${before.length} recorded process lifetime(s) ended; none remain (${describeTree(before)}).`;
+                : // M-A-3 T9R-F03: only recorded processes can be verified; one spawned after the last sample is not seen.
+                  ` Verified ${before.length} recorded process lifetime(s) ended; none of the recorded processes remain (${describeTree(before)}). A process spawned after the last process sample, or not recorded in it, is not tracked.`;
           }
         }
       } else if (session) cleanup = " No OS process belonged to this session (in-process request).";

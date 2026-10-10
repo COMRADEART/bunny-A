@@ -2644,7 +2644,7 @@ export class MissionManager {
     if (staged.contentSize > REVIEW_BYTES && staged.inspectedHash !== staged.contentHash)
       throw new CommandRefusedError(`Promotion refused: the change is ${staged.contentSize} bytes and only ${REVIEW_BYTES} were shown. Inspect the whole staged content on the Windows Host first (mission.staging.inspect ${staged.id}).`);
     const live = this.liveCodeExecutions();
-    if (live.length) throw new CommandRefusedError(`Promotion waits: code is running on this computer (${live.slice(0, 4).join(", ")}); promote after it ends so it cannot read the change mid-run.`);
+    if (live.length) throw new CommandRefusedError(`Promotion waits: code Bunny tracks is running on this computer (${live.slice(0, 4).join(", ")}); promote after it ends so it cannot read the change mid-run.`);
     if (this.desktopExecutionConflict(staged.destination)) throw new CommandRefusedError("Promotion waits: a trusted-desktop execution is running in this folder.");
     // Authority: the Mission, its envelope, the Agent consent and the producing device, as they are NOW.
     const mission = this.store.mission(request.missionId);
@@ -2669,7 +2669,10 @@ export class MissionManager {
       if (!withinAny([...envelope!.filesystem.write, ...once], staged.destination)) end("INVALIDATED_BY_SCOPE_CHANGE", "the destination is outside the Mission's current write authority.");
     }
     // Resource identity: the destination path, its folder chain and its current content are what was staged against.
-    const reclassified = classifyDeviceWrite(staged.destination, { base: staged.destinationRoot, operation: "write", content: null });
+    let bytes: Buffer;
+    try { bytes = this.staging.readVerified(staged); } catch (error) { return end("FAILED", error instanceof Error ? error.message : String(error)); }
+    // Re-classified with the exact staged bytes, so a content-triggered class never passes at promotion (review round 5).
+    const reclassified = classifyDeviceWrite(staged.destination, { base: staged.destinationRoot, operation: "write", content: bytes.toString("utf8") });
     if (reclassified.classification === "UNKNOWN") end("FAILED", `the destination can no longer be resolved safely (${reclassified.reasons.at(-1)}).`);
     if (staged.envelopeRemote && !PHONE_SAFE_CLASSES.includes(reclassified.classification)) end("INVALIDATED_BY_SCOPE_CHANGE", `the destination is now ${reclassified.classification} (${reclassified.reasons.at(-1)}).`);
     if (canonical(staged.destination) !== staged.destination) end("FAILED", "the destination now resolves elsewhere.");
@@ -2677,8 +2680,6 @@ export class MissionManager {
     let now: StagingRecord["destinationBefore"];
     try { now = destinationState(staged.destination); } catch (error) { return end("FAILED", `the destination changed (${error instanceof Error ? error.message : String(error)}).`); }
     if (now.existed !== staged.destinationBefore.existed || now.sha256 !== staged.destinationBefore.sha256) end("FAILED", "the destination file was created, replaced or edited after the change was staged.");
-    let bytes: Buffer;
-    try { bytes = this.staging.readVerified(staged); } catch (error) { return end("FAILED", error instanceof Error ? error.message : String(error)); }
     // Commit: intent first (a crash is reconciled at recovery), then the bounded atomic write, then independent read-back.
     if (!this.staging.transition(staged.id, ["STAGED"], "PROMOTING", by, `Promotion approved by ${by} (request ${request.id}).`)) throw new CommandRefusedError("Promotion refused: the staged change was ended concurrently.");
     let written: { sha256: string; size: number };
@@ -2751,7 +2752,7 @@ export class MissionManager {
     }
     const live = this.liveCodeExecutions();
     const target = typeof request.params.path === "string" ? resolve(request.cwd, request.params.path) : request.action;
-    return live.length ? `Approval required on Windows Host: code approved on the Windows Host is running (${live.slice(0, 4).join(", ")}); a paired-device ${request.action} of ${JSON.stringify(target)} waits until it ends. Allowing it now lets the running code read it unreviewed; it is listed for review only before code that starts later.` : null;
+    return live.length ? `Approval required on Windows Host: code approved on the Windows Host that Bunny tracks is running (${live.slice(0, 4).join(", ")}); a paired-device ${request.action} of ${JSON.stringify(target)} waits until it ends. Allowing it now lets the running code read it unreviewed; it is listed for review only before code that starts later.` : null;
   }
   /** Executions running under a trusted-desktop grant: the folder they run in and how to tell they ended. */
   desktopExecutions = new Map<string, { root: string; live: () => boolean }>();
@@ -4315,8 +4316,6 @@ export class MissionManager {
     let mission = this.store.mission(id);
     if (!["failed", "waiting_for_user"].includes(mission.state))
       throw new Error("Only failed or waiting missions can be retried.");
-    // M-A-3 T9R-F01: a trusted-desktop grant covers one attempt; Retry always asks again.
-    this.revokeDesktopGrants(id, `Mission retried by ${by}`);
     const envelope = mission.authorizationId
       ? this.store.authorization(mission.authorizationId)
       : null;
@@ -4337,8 +4336,18 @@ export class MissionManager {
         throw new Error(
           `${step.role} reached its attempt ceiling (${step.attempts.length}); replan instead.`,
         );
-    for (const step of waitingPromotion)
-      this.setStep(step, { state: "failed", pendingRequestId: null, pendingPhase: null, failure: { category: "permission_required", detail: `Retried by ${by}: the change is staged again for a fresh review.` } });
+    // M-A-3 T9R-F01: a trusted-desktop grant covers one attempt; Retry always asks again (after every refusal check).
+    this.revokeDesktopGrants(id, `Mission retried by ${by}`);
+    for (const step of waitingPromotion) {
+      const detail = `Retried by ${by}: the change is staged again for a fresh review.`;
+      // The attempt that staged the change ends here (review F03 round 2), so no attempt stays "running".
+      const attempts = step.attempts.map((attempt, index) =>
+        index === step.attempts.length - 1 && attempt.outcome === "running"
+          ? { ...attempt, finishedAt: Date.now(), outcome: "failed" as const, category: "permission_required" as const, detail }
+          : attempt,
+      );
+      this.setStep(step, { state: "failed", attempts, pendingRequestId: null, pendingPhase: null, failure: { category: "permission_required", detail } });
+    }
     this.withdrawStaged(id, by, `Mission retried by ${by}; the step stages its change again.`);
     const failed = this.store.steps(id).filter((step) => step.state === "failed");
     for (const step of failed) {
@@ -4391,6 +4400,9 @@ export class MissionManager {
     if (mission.planning.replans >= this.cached.limits.maxReplans)
       throw new Error(`Replan limit (${this.cached.limits.maxReplans}) reached.`);
     await this.cancelChildren(id, "Mission is being replanned.");
+    // M-A-3 T9R-F02 (round 5): the replaced steps' one-time answers end with them (WITHDRAWN), never silently.
+    for (const step of this.store.steps(id))
+      if (step.approvedOnce && step.state !== "completed") this.setStep(step, { approvedOnce: null });
     if (mission.authorizationId) {
       const envelope = this.store.authorization(mission.authorizationId);
       if (envelope && !envelope.revokedAt)

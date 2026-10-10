@@ -1,5 +1,5 @@
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync, type Dirent } from "node:fs";
+import { closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, readSync, realpathSync, statSync, type Dirent } from "node:fs";
 import type { Mode, ProviderId, ProviderExecutionScope } from "../orch/types.ts";
 import { withinAny } from "./paths.server.ts";
 import { resolveCommand, type Resolved } from "./capabilities/process.server.ts";
@@ -535,94 +535,310 @@ const CONSUMED_TEXT_FILE = /^([\w.-]*(requirements|constraints)[\w.-]*\.txt|runt
  * manifests are consumers too.
  */
 const CONSUMER_FILE = /^(package\.json|makefile|gnumakefile|justfile|taskfile\.ya?ml|pyproject\.toml|setup\.cfg|setup\.py|tox\.ini|noxfile\.py|pipfile|gemfile|rakefile|cargo\.toml|go\.mod|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|cmakelists\.txt|dockerfile|containerfile|(docker-)?compose\.ya?ml|vercel\.json|netlify\.toml|firebase\.json|wrangler\.toml|deno\.jsonc?|tsconfig[\w.-]*\.json|jsconfig\.json|turbo\.json|nx\.json|project\.json|lerna\.json|pnpm-workspace\.yaml|jenkinsfile|\.gitlab-ci\.ya?ml|azure-pipelines\.ya?ml|bitbucket-pipelines\.ya?ml|\.travis\.ya?ml|appveyor\.ya?ml|\.drone\.ya?ml|buildspec\.ya?ml|appspec\.ya?ml|cloudbuild\.ya?ml|codemagic\.ya?ml|\.woodpecker\.ya?ml|\.pre-commit-config\.ya?ml|\.?lefthook\.ya?ml|mkdocs\.ya?ml|_config\.ya?ml|hugo\.(toml|ya?ml|json)|book\.toml|[^/\\]+\.config\.[cm]?[jt]s|[^/\\]+\.conf\.[cm]?[jt]s|\.[\w-]+rc(\.[\w]+)?|\.env(\.[\w.-]+)?|[^/\\]+\.(csproj|vbproj|fsproj|vcxproj|sln|props|targets))$/i;
-/** Root folders of CI systems, Git hooks, editors and agents; every text file inside is scanned for references. */
-const CONSUMER_DIR = /^(\.github|\.gitlab|\.circleci|\.buildkite|\.azure-pipelines|\.woodpecker|\.forgejo|\.gitea|\.husky|\.githooks|\.devcontainer|\.vscode|\.idea)$/i;
-const SCANNED_TEXT = /(\.(ya?ml|json|jsonc|toml|md|mdc|txt|sh|bash|ps1|psm1|cmd|bat|[cm]?[jt]s|py|cfg|ini|xml|conf|env|properties|rules)|^[^.]+)$/i;
+/** Dot-folders that hold caches, environments, downloaded tools or build output rather than instructions (not scanned). */
+const CACHE_DIR = /^(\.git|\.venv|\.tox|\.nox|\.mypy_cache|\.pytest_cache|\.ruff_cache|\.cache|\.parcel-cache|\.next|\.nuxt|\.svelte-kit|\.turbo|\.angular|\.expo|\.output|\.docusaurus|\.vercel|\.netlify|\.wrangler|\.serverless|\.terraform|\.gradle|\.yarn|\.pnpm-store|\.vs|\.vscode-test|\.nyc_output|\.hypothesis|\.ipynb_checkpoints|\.trash|\.stversions|\.godot|\.stack-work|\.build|\.nx|\.dart_tool|\.sass-cache|\.hg|\.svn|\.cxx|\.zig-cache|\.kotlin|\.m2|\.npm|\.pub-cache|\.bundle)$/i;
+/** Folders anywhere in the project that hold dependencies or build output (not scanned for consumers). */
+const SKIPPED_DIR = /^(node_modules|bower_components|jspm_packages|vendor|site-packages|__pycache__|venv|dist|out|build|target|coverage|test-results|playwright-report|artifacts|releases?)$/i;
+/** Files that are not text a tool reads as instructions: binaries, media, databases and lock files (not scanned). */
+const OPAQUE_FILE = /(\.(png|jpe?g|gif|ico|icns|webp|bmp|tiff?|svgz|pdf|zip|gz|tgz|bz2|xz|7z|rar|jar|war|whl|woff2?|ttf|otf|eot|mp[34]|wav|ogg|flac|mov|avi|mkv|webm|exe|dll|so|dylib|bin|obj|o|a|lib|pdb|class|pyc|wasm|node|sqlite3?|db|mdb|accdb|docx?|xlsx?|pptx?|odt|ods|parquet|feather|h5|npy|npz|pkl|heic|heif|avif|m4a|aac|opus|amr|epub|mobi|psd|ai|eps|indd|key|pages|numbers|one|kdbx|gpg|msi|dmg|pkg|deb|rpm|apk|ipa|appx|msix|iso|sketch|fig|html?|svg)(-wal|-shm|-journal)?|\.lock|-lock\.ya?ml|-lock\.json|shrinkwrap\.json|\.sample|^\.ds_store|^thumbs\.db|^desktop\.ini)$/i;
+/** Files whose presence in a folder means a tool runs or is configured there, so it may process the folder's documents. */
+const PROGRAM_OR_TOOL_FILE = /(\.(py|pyw|[cm]?[jt]sx?|rb|sh|bash|zsh|ps1|psm1|bat|cmd|go|rs|java|kt|cs|fs|vb|php|pl|lua|r|ipynb|toml|ini|cfg|conf|mk|gradle|props|targets|csproj|sln)|^(makefile|gnumakefile|justfile|dockerfile[\w.-]*|containerfile|procfile[\w.-]*|rakefile|gemfile|jenkinsfile|earthfile|tiltfile|caddyfile|vagrantfile))$/i;
+/** Shell, CI, build and install files that are read wherever they are in the project (review F03 round 1). */
+const TREE_CONSUMER = /(\.(sh|bash|zsh|ps1|psm1|bat|cmd|mk|ya?ml|toml|cfg|ini)|^(makefile|gnumakefile|justfile|dockerfile[\w.-]*|containerfile|procfile[\w.-]*|jenkinsfile|earthfile|tiltfile|package\.json|[\w.-]*(requirements|constraints)[\w.-]*\.(txt|in)))$/i;
+/** Consumers whose text is run by a shell (where a bare argument or a computed glob means a path). */
+const SHELL_RUN = /^(makefile|gnumakefile|justfile|taskfile\.ya?ml|dockerfile[\w.-]*|containerfile|procfile[\w.-]*|jenkinsfile|earthfile|package\.json|[^/]*\.(ya?ml|sh|bash|zsh|ps1|psm1|cmd|bat|mk)|[^.]*)$/i;
+/** Ignore lists and editor state name paths but run nothing, so they are not consumers. */
+const NON_CONSUMER = /^(\.gitignore|\.dockerignore|\.npmignore|\.prettierignore|\.eslintignore|\.stylelintignore|\.gitattributes|\.obsidian)$/i;
+const CONFIG_TEXT = /\.(ya?ml|json|jsonc|toml|md|mdc|txt|sh|bash|ps1|psm1|cmd|bat|[cm]?[jt]s|py|cfg|ini|xml|conf|env|properties|rules)$/i;
 const CONSUMER_READ_LIMIT = 1024 * 1024;
-const CONSUMER_BUDGET = 400;
-type Consumer = { by: string; agent: boolean } | { unknown: string };
-/** Lowercased, "/"-separated, with "./" and repeated separators collapsed, so equivalent spellings compare equal. */
+/** Notebooks carry large outputs; their cell sources are read up to this size. */
+const NOTEBOOK_READ_LIMIT = 64 * 1024 * 1024;
+const CONSUMER_BUDGET = 2000;
+const CONSUMER_DEPTH = 32;
+type Consumer = { by: string; agent: boolean; folder?: boolean } | { unknown: string };
+/** Lowercased, "/"-separated, with "./", repeated separators and percent-encoded separators collapsed. */
 function referenceText(text: string): string {
-  let out = text.toLowerCase().replaceAll("\\\\", "/").replaceAll("\\", "/");
+  // JSON and JavaScript escapes (\u002f) spell the same path.
+  const decode = (hex: string) => { const code = parseInt(hex, 16); return code <= 0x10ffff ? String.fromCodePoint(code) : ""; };
+  let out = text.replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\u([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})/g, (_, braced?: string, four?: string, two?: string) => decode(braced ?? four ?? two ?? "")).toLowerCase().replaceAll("\\\\", "/").replaceAll("\\", "/").replace(/%2f|%5c/g, "/");
   for (let previous = ""; previous !== out;) { previous = out; out = out.replaceAll("/./", "/").replace(/\/{2,}/g, "/"); }
   return out;
 }
+const NUL = String.fromCharCode(0);
+/** UTF-8, or UTF-16 with or without a BOM; UTF-32 and any other NUL-bearing text cannot be checked (null). */
+function consumerText(bytes: Buffer): string | null {
+  const wide = (text: string) => (text.includes(NUL) ? null : text);
+  if (bytes.length >= 4 && ((bytes[0] === 0xff && bytes[1] === 0xfe && bytes[2] === 0 && bytes[3] === 0) || (bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 0xfe && bytes[3] === 0xff))) return null;
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return wide(bytes.subarray(2).toString("utf16le"));
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) { const body = Buffer.from(bytes.subarray(2, 2 + ((bytes.length - 2) & ~1))); return wide(body.swap16().toString("utf16le")); }
+  if (!bytes.includes(0)) return bytes.toString("utf8");
+  // UTF-16 without a BOM: every other byte is zero.
+  const even = bytes.length & ~1; let oddZero = 0; let evenZero = 0;
+  for (let i = 0; i < even; i += 2) { if (bytes[i] === 0) evenZero++; if (bytes[i + 1] === 0) oddZero++; }
+  if (even >= 4 && oddZero * 2 >= even / 2 * 1.8) return wide(bytes.subarray(0, even).toString("utf16le"));
+  if (even >= 4 && evenZero * 2 >= even / 2 * 1.8) return wide(Buffer.from(bytes.subarray(0, even)).swap16().toString("utf16le"));
+  return null;
+}
+/** True when `token` occurs in `text` with no name character (letter, digit, _ or -) directly before or after it. */
+function tokenIn(text: string, token: string): boolean {
+  if (!token) return false;
+  for (let at = text.indexOf(token); at >= 0; at = text.indexOf(token, at + 1))
+    if (!/[a-z0-9_-]/.test(text[at - 1] ?? "") && !/[a-z0-9_-]/.test(text[at + token.length] ?? "")) return true;
+  return false;
+}
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\/-]/g, "\\$&");
 /**
- * The project file that names this destination as a tool, CI, build or agent input, or why that cannot be checked.
- * Scans the consumer files in the root and in every folder above the destination (a reference is matched both
- * relative to the root and relative to that file's own folder) plus the root CI, hook, editor and agent folders.
- * An oversize, unreadable or linked consumer fails closed.
+ * Whether `text` names `folder` as a folder (review F03 round 1). Counted: a path into it with a glob, variable,
+ * quote or command part (docs/*.txt, ci/reqs-$(ENV).txt, docs/'x.txt'), the folder path itself (docs/, docs/**), a
+ * whole quoted value that is not a key ("docs", but not "docs": ...), an option or setting value (--source=site,
+ * testpaths = docs, D: docs), a list item ([docs], {ci,tests}, - docs), and, in shell-run text, a bare argument.
+ * Not counted: a bare word in prose, comments or descriptions, or a path to another literal file in the folder.
+ */
+function folderRef(text: string, folder: string, shell: boolean): boolean {
+  const f = escapeRegExp(folder);
+  const name = "(?<![a-z0-9_.-])";
+  const forms = [
+    // A glob, variable or command part, or a quote that splits the path (docs/'x.txt'); a closing quote is not one.
+    String.raw`${name}${f}/[^\s'"\x60]*?(?:[*?\[{$%]|['"\x60](?=[^\s,;)\]}'"\x60]))`,
+    String.raw`${name}${f}(?:/(?=[\s'",;)\]}]|$)|(?=[*?\[]))`,
+    String.raw`['"\x60]${f}/?['"\x60](?![ \t]*:)`,
+    String.raw`(?:=|:)[ \t]*['"]?${f}/?['"]?(?=[\s,;)\]}]|$)`,
+    String.raw`[\[{,(][ \t]*['"]?${f}/?['"]?[ \t]*(?=[,\])}])`,
+    String.raw`^[ \t]*-[ \t]+['"]?${f}/?['"]?[ \t]*$`,
+  ];
+  // A bare shell argument; a word followed by = or : is an assignment or a key, not an argument.
+  if (shell) forms.push(String.raw`(?<=[ \t])${f}(?=[ \t]|$)(?![ \t]*[=:])`);
+  return forms.some((source) => new RegExp(source, "m").test(text));
+}
+/** Tools that only read, format or lint files: a glob of the extension on their line does not run anything. */
+const READ_ONLY_TOOL = /\b(prettier|markdownlint(-cli2?)?|eslint|stylelint|cspell|remark(-cli)?|alex|write-good|vale|textlint|editorconfig-checker|dprint|biome|typos|codespell|lychee|markdown-link-check|git add|git diff|wc|grep|rg|ls)\b/;
+/** Execution context on a line: a glob of the destination's extension here is run, collected or sourced. */
+const RUNS_GLOB = /(doctest|wildcard|\bfor\b.*\bin\b|\b(sh|bash|zsh|source|python3?|py|node|deno|bun|pwsh|powershell|cmd|exec|eval|xargs|pip|pytest|ruby|perl|php)\b)/;
+/** Lines a shell actually runs: comments dropped; for package.json only the scripts. */
+function shellLines(name: string, text: string): string {
+  if (/^package\.json$/i.test(name)) {
+    try { const scripts = (JSON.parse(text) as { scripts?: Record<string, unknown> }).scripts; return scripts && typeof scripts === "object" ? Object.values(scripts).filter((value) => typeof value === "string").join("\n").toLowerCase() : ""; } catch { return text; }
+  }
+  return text.split("\n").filter((line) => !/^[ \t]*(#|rem\b|::|\/\/)/.test(line)).join("\n");
+}
+/**
+ * The project file that may consume this destination, or why that cannot be checked (F02 rounds 4-5, F03 round 1).
+ * Consumers:
+ * - every non-document file in the project root and in each folder above the destination;
+ * - shell, CI, build, container and install files anywhere in the project (dependency and build-output folders
+ *   skipped), and agent instruction files anywhere;
+ * - every text file inside the project's dot-folders (caches excluded) and Git hooks in .git/hooks;
+ * - a root or ancestor .txt that carries package-installer directives.
+ * A consumer references the destination when its normalized text contains the destination path (root-relative or
+ * relative to the consumer's folder), the file name as a token, a folder above the destination as a folder (see
+ * folderRef), or, on a line that runs or collects files, a glob of the destination's extension. Agent instruction
+ * files count exact paths and file names only. A folder below the root that also holds a program or tool file is
+ * one some tool works in. Oversize, unreadable, binary-looking or linked consumers, too many consumers or too deep a
+ * tree fail closed.
  */
 function consumerOf(root: string, rel: string): Consumer | null {
   const relText = referenceText(rel);
   const parts = relText.split("/").filter(Boolean);
+  const leaf = parts.at(-1) ?? "";
+  const extension = /\.([a-z0-9]+)$/.exec(leaf)?.[1] ?? "";
+  // A glob that can match the destination's extension: *.md, **/*.md, *.{md,txt}, *.*, and (for a root file or with **/) a bare *.
+  const extensionGlob = extension ? new RegExp(String.raw`\*[^\s'"\x60]*\.(?:${escapeRegExp(extension)}(?![a-z0-9])|\*|\{[^}\s]*\b${escapeRegExp(extension)}\b[^}\s]*\})`) : null;
+  const bareGlob = new RegExp(String.raw`(?:^|[\s'"=(])${parts.length === 1 ? "(?:\\*\\*/)?" : "\\*\\*/"}\*(?:\.\*)?(?=[\s'";)|&]|$)`);
   let budget = CONSUMER_BUDGET;
-  const check = (file: string, shown: string, needles: string[], agent: boolean): Consumer | null => {
+  const seen = new Set<string>();
+  // An agent-instruction reference is the stronger label: a tool reference is remembered while the scan looks for one.
+  let toolReference: Consumer | null = null;
+  const settle = (found: Consumer | null): Consumer | null => {
+    if (!found) return null;
+    if ("unknown" in found || found.agent) return found;
+    toolReference ??= found;
+    return null;
+  };
+  // `automatic`: run without anyone choosing to (root and ancestor files, dot-folder CI, hook and editor files, Git hooks),
+  // where a computed glob can reach any folder; elsewhere in the tree only references are matched.
+  const check = (file: string, shown: string, folderParts: string[], agent: boolean, skipBinary = false, automatic = true): Consumer | null => {
+    const key = file.toLowerCase();
+    if (seen.has(key)) return null;
+    seen.add(key);
     let info: ReturnType<typeof lstatSync>;
     try { info = lstatSync(file); } catch { return null; }
     if (info.isSymbolicLink()) return { unknown: `${shown} is a link, so its references cannot be checked` };
     if (!info.isFile()) return null;
-    if (--budget < 0) return { unknown: "too many project files name tool and agent inputs to check them all" };
-    if (info.size > CONSUMER_READ_LIMIT) return { unknown: `${shown} is too large to check for references` };
-    let text: string;
-    try { text = referenceText(readFileSync(file, "utf8")); } catch { return { unknown: `${shown} could not be read` }; }
-    return needles.some((needle) => needle && text.includes(needle)) ? { by: shown, agent } : null;
+    if (--budget < 0) return { unknown: "too many project files could consume this file to check them all" };
+    let bytes: Buffer;
+    try {
+      if (info.size > CONSUMER_READ_LIMIT && !(/\.ipynb$/i.test(file) && info.size <= NOTEBOOK_READ_LIMIT)) {
+        // A large binary in a dot-folder is skipped; a large text consumer cannot be checked.
+        const head = Buffer.alloc(8192); const fd = openSync(file, "r");
+        try { readSync(fd, head, 0, head.length, 0); } finally { closeSync(fd); }
+        if (skipBinary && head.includes(0) && consumerText(head) === null) return null;
+        return { unknown: `${shown} is too large to check for references` };
+      }
+      bytes = readFileSync(file);
+    } catch { return { unknown: `${shown} could not be read` }; }
+    let raw = consumerText(bytes);
+    // A notebook is read as its cell sources (outputs can be large and are not run).
+    if (raw !== null && /\.ipynb$/i.test(file)) {
+      try { raw = ((JSON.parse(raw) as { cells?: { source?: string | string[] }[] }).cells ?? []).map((cell) => (Array.isArray(cell.source) ? cell.source.join("") : cell.source ?? "")).join("\n"); }
+      catch { return { unknown: `${shown} is not a readable notebook, so its references cannot be checked` }; }
+    }
+    // A binary-looking file that may be skipped is still searched as NUL-stripped text (review F03 round 3).
+    if (raw === null && skipBinary) raw = bytes.toString("latin1").replaceAll(NUL, "");
+    if (raw === null) return { unknown: `${shown} is not readable text, so its references cannot be checked` };
+    const name = shown.split("/").pop() ?? "";
+    const shell = !agent && SHELL_RUN.test(name);
+    // Shell-style computed globs ($(cmd)/*, $VAR/*, `cmd`*) can reach any folder: fail closed.
+    if (shell && automatic && /(?:\$\([^)\n]*\)|`[^`\n]*`|\$\{?[a-z_][a-z0-9_]*\}?)\/?\*/i.test(raw)) return { unknown: `${shown} builds a path from a variable or command, so it cannot be checked` };
+    const text = referenceText(raw);
+    const depth = folderParts.length;
+    const local = parts.slice(0, depth).join("/") === folderParts.join("/") ? parts.slice(depth).join("/") : relText;
+    if ([local, relText].some((path) => path && text.includes(path)) || tokenIn(text, leaf)) return { by: shown, agent };
+    if (agent) return null;
+    const run = shell ? shellLines(name, text) : text;
+    for (let end = 1; end < parts.length; end++) {
+      const folders = [parts.slice(0, end).join("/")];
+      if (end > depth && parts.slice(0, depth).join("/") === folderParts.join("/")) folders.push(parts.slice(depth, end).join("/"));
+      if (folders.some((folder) => folderRef(text, folder, false) || (shell && folderRef(run, folder, true)))) return { by: shown, agent };
+    }
+    // In shell-run text any glob of the extension counts unless the line names a read-only tool (an unknown runner
+    // fails safe); elsewhere only on lines that visibly run or collect files (review F03 round 2).
+    // Each simple command is judged on its own: a read-only tool earlier on the line does not exempt a later runner.
+    const commands = run.split(/\n|&&|\|\||;|\||&/);
+    if (extensionGlob && commands.some((command) => extensionGlob.test(command) && (shell ? !READ_ONLY_TOOL.test(command) : RUNS_GLOB.test(command)))) return { by: shown, agent };
+    // A bare * counts only in a command that visibly runs or collects files (not arithmetic or prose).
+    if (shell && commands.some((command) => bareGlob.test(command) && RUNS_GLOB.test(command) && !READ_ONLY_TOOL.test(command))) return { by: shown, agent };
+    // pytest-markdown-docs collects every Markdown file under the test paths.
+    if (/^(md|markdown)$/.test(extension) && text.includes("markdown-docs")) return { by: shown, agent };
+    return null;
   };
+  const followsToFolder = (path: string) => { try { return statSync(path).isDirectory(); } catch { return false; } };
+  const linkedFolders = new Set<string>();
+  // 1. The root and every folder above the destination: every non-document file is a consumer.
   for (let depth = 0; depth < parts.length; depth++) {
     const folderShown = parts.slice(0, depth).join("/");
     const folder = depth ? resolve(root, ...parts.slice(0, depth)) : root;
-    const needles = [...new Set([parts.slice(depth).join("/"), relText])];
-    let entries: string[];
-    try { entries = readdirSync(folder); } catch (error) {
+    let entries: Dirent[];
+    try { entries = readdirSync(folder, { withFileTypes: true }); } catch (error) {
       // A folder the write would create holds no consumers (and neither do the folders below it).
       if ((error as NodeJS.ErrnoException).code === "ENOENT") break;
       return { unknown: `${folderShown || "the project root"} could not be listed` };
     }
-    for (const name of entries) {
+    for (const entry of entries) {
+      const name = entry.name; const lower = name.toLowerCase();
+      if (NON_CONSUMER.test(name) || entry.isDirectory()) continue;
+      if (depth === parts.length - 1 && lower === leaf) continue;
+      const path = resolve(folder, name);
+      if (entry.isSymbolicLink() && followsToFolder(path)) continue;
+      const shown = folderShown ? `${folderShown}/${name}` : name;
       const agent = AGENT_INSTRUCTION_FILE.test(name);
-      if (!agent && !CONSUMER_FILE.test(name)) continue;
-      if (depth === parts.length - 1 && name.toLowerCase() === parts.at(-1)) continue;
-      const found = check(resolve(folder, name), folderShown ? `${folderShown}/${name}` : name, needles, agent);
+      if (depth > 0 && !agent && (PROGRAM_OR_TOOL_FILE.test(name) || CONSUMER_FILE.test(name))) { settle({ by: shown, agent: false, folder: true }); continue; }
+      if (!agent) {
+        if (OPAQUE_FILE.test(name)) continue;
+        if (DATA_FILE.test(name)) continue;
+        // A .txt is a consumer when it carries installer directives (pip -r chains); other documents are not.
+        if (DOCUMENT_FILE.test(name) && !CONSUMED_TEXT_FILE.test(name)) {
+          let directives = false;
+          try { const info = lstatSync(path); const text = info.isFile() && info.size <= CONSUMER_READ_LIMIT ? consumerText(readFileSync(path)) : null;
+            // A .txt with any directive is an install input; another document only when it is a requirements list
+            // (every non-empty, non-comment line a directive or a requirement).
+            const lines = (text ?? "").split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith("#"));
+            directives = text !== null && (/\.txt$/i.test(name) ? INSTALLER_DIRECTIVE.test(text) : lines.length > 0 && lines.every((line) => INSTALLER_DIRECTIVE.test(line) || REQUIREMENT_LINE.test(line)));
+          } catch { directives = false; }
+          if (!directives) continue;
+        }
+        // Structured data inside a data folder is data, not a consumer.
+        if (depth > 0 && STRUCTURED_DATA_FILE.test(name) && !CONSUMER_FILE.test(name) && DATA_DIR.test(parts[depth - 1] ?? "")) continue;
+      }
+      const consumerName = agent || CONSUMER_FILE.test(name) || TREE_CONSUMER.test(name) || PROGRAM_OR_TOOL_FILE.test(name);
+      const found = settle(check(path, shown, parts.slice(0, depth), agent, !consumerName));
       if (found) return found;
     }
   }
-  const walk = (dir: string, shown: string, depth: number, agent: boolean): Consumer | null => {
+  // Markdown site generators that build (and may execute) every page by default (review F03 round 2):
+  // VitePress compiles the Markdown under the folder holding .vitepress; MkDocs builds docs_dir (default docs/).
+  if (/^(md|markdown)$/.test(extension)) {
+    for (let depth = 0; depth < parts.length; depth++) {
+      const folder = depth ? resolve(root, ...parts.slice(0, depth)) : root;
+      if (existsSync(resolve(folder, ".vitepress"))) return { by: `${[...parts.slice(0, depth), ".vitepress"].join("/")}`, agent: false };
+    }
+    for (const name of ["mkdocs.yml", "mkdocs.yaml"]) {
+      const file = resolve(root, name);
+      if (!existsSync(file)) continue;
+      let docsDir = "docs";
+      try { docsDir = referenceText(/^docs_dir:[ \t]*['"]?([^'"\s#]+)/m.exec(readFileSync(file, "utf8"))?.[1] ?? "docs").replace(/^\.\//, "").replace(/\/$/, ""); } catch { return { unknown: `${name} could not be read` }; }
+      if (docsDir === "" || docsDir === "." || relText === docsDir || relText.startsWith(`${docsDir}/`)) return { by: name, agent: false };
+    }
+  }
+  // 2. The whole project tree: shell, CI, build and install files and agent instructions anywhere; everything in
+  // dot-folders; Git hooks.
+  const walk = (dir: string, shown: string, folderParts: string[], depth: number, inDot: boolean, agentDir: boolean): Consumer | null => {
     let entries: Dirent[];
-    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return { unknown: `${shown} could not be listed` }; }
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return { unknown: `${shown || "the project root"} could not be listed` }; }
     for (const entry of entries) {
-      const path = resolve(dir, entry.name); const label = `${shown}/${entry.name}`;
-      if (entry.isDirectory()) {
-        if (/^(node_modules|\.git)$/i.test(entry.name)) continue;
-        if (depth >= 6) return { unknown: `${label} is nested too deeply to check for references` };
-        const found = walk(path, label, depth + 1, agent);
+      const name = entry.name;
+      const path = resolve(dir, name); const label = shown ? `${shown}/${name}` : name;
+      if (entry.isDirectory() || (entry.isSymbolicLink() && followsToFolder(path))) {
+        // A linked folder is followed (it may live outside the project; review F03 round 2), once per real folder.
+        if (entry.isSymbolicLink()) {
+          if (CACHE_DIR.test(name) || SKIPPED_DIR.test(name) || NON_CONSUMER.test(name)) continue;
+          let real: string;
+          try { real = realpathSync(path).toLowerCase(); } catch { return { unknown: `${label} is a link that cannot be resolved, so its references cannot be checked` }; }
+          if (linkedFolders.has(real)) continue;
+          linkedFolders.add(real);
+        }
+        if (CACHE_DIR.test(name) || SKIPPED_DIR.test(name) || NON_CONSUMER.test(name)) {
+          if (depth === 0 && /^\.hg$/i.test(name)) {
+            for (const file of ["hgrc"]) {
+              const found = settle(check(resolve(path, file), `.hg/${file}`, [], false, true));
+              if (found) return found;
+            }
+          }
+          if (depth === 0 && /^\.(git|hg)$/i.test(name)) {
+            const hooks = resolve(path, "hooks");
+            let names: string[] = [];
+            try { names = readdirSync(hooks); } catch { names = []; }
+            for (const hook of names) {
+              if (OPAQUE_FILE.test(hook)) continue;
+              const found = settle(check(resolve(hooks, hook), `${name}/hooks/${hook}`, [], false, true));
+              if (found) return found;
+            }
+          }
+          continue;
+        }
+        if (depth + 1 > CONSUMER_DEPTH) return { unknown: `${label} is nested too deeply to check for references` };
+        const dot = inDot || name.startsWith(".");
+        const found = walk(path, label, [...folderParts, name.toLowerCase()], depth + 1, dot, agentDir || (name.startsWith(".") && AGENT_INSTRUCTION_DIR.test(name)));
         if (found) return found;
         continue;
       }
-      if (!entry.isSymbolicLink() && !SCANNED_TEXT.test(entry.name)) continue;
-      const found = check(path, label, [relText], agent);
+      if (NON_CONSUMER.test(name) || OPAQUE_FILE.test(name)) continue;
+      const agent = agentDir || AGENT_INSTRUCTION_FILE.test(name);
+      if (!inDot && !agent && !TREE_CONSUMER.test(name)) {
+        // An extensionless script with a #! line is a program some tool or person runs.
+        if (name.includes(".")) continue;
+        let shebang = false;
+        try { const head = Buffer.alloc(2); const fd = openSync(path, "r"); try { shebang = readSync(fd, head, 0, 2, 0) === 2 && head.toString("latin1") === "#!"; } finally { closeSync(fd); } } catch { shebang = false; }
+        if (!shebang) continue;
+      }
+      // Structured data inside a data folder is data, not a consumer.
+      if (!inDot && !agent && STRUCTURED_DATA_FILE.test(name) && !CONSUMER_FILE.test(name) && folderParts.some((part) => DATA_DIR.test(part))) continue;
+      const found = settle(check(path, label, folderParts, agent, inDot && !CONFIG_TEXT.test(name), inDot));
       if (found) return found;
     }
     return null;
   };
-  let top: string[];
-  try { top = readdirSync(root); } catch (error) {
+  try { if (!statSync(root).isDirectory()) return null; } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    return { unknown: "the project root could not be listed" };
+    return { unknown: "the project root could not be read" };
   }
-  for (const name of top) {
-    const agent = name.startsWith(".") && AGENT_INSTRUCTION_DIR.test(name);
-    if (!agent && !CONSUMER_DIR.test(name)) continue;
-    let info: ReturnType<typeof lstatSync>;
-    try { info = lstatSync(resolve(root, name)); } catch { continue; }
-    if (info.isSymbolicLink()) return { unknown: `${name} is a link, so its references cannot be checked` };
-    if (!info.isDirectory()) continue;
-    const found = walk(resolve(root, name), name, 1, agent);
-    if (found) return found;
-  }
-  return null;
+  const found = walk(root, "", [], 0, false, false);
+  if (found) return found;
+  return toolReference;
 }
 /** Structured files whose name marks them as program, build, site or pipeline configuration, wherever they are. */
 const CONFIG_LIKE_DATA = /(^_|config|(^|[\W_])conf([\W_]|$)|settings|pipeline|workflow|compose|manifest|values|chart|kustomiz|mkdocs|hugo|jekyll|netlify|vercel|deploy|build|(^|[\W_])ci([\W_]|$)|renovate|dependabot|codecov|lerna|turbo|tsconfig|eslint|prettier|babel|jest|vitest|playwright|cypress|openapi|swagger|schema)/i;
+/** A pinned package requirement line (name[extras] ==/>=/~=/!= version), as pip and similar installers read. */
+const REQUIREMENT_LINE = /^[ \t]*[A-Za-z0-9][\w.-]*(\[[\w ,.-]*\])?[ \t]*(?:(===?|~=|!=|>=|<=)[ \t]*[\w.*+!-]+|@[ \t]*\S+)[ \t]*(;.*)?$/m;
 /** Package-installer directives (pip -r/-e/--index-url ...) in a text file make it an install input. */
 const INSTALLER_DIRECTIVE = /^[ \t]*(-[rcefi]|--requirement|--constraint|--editable|--index-url|--extra-index-url|--find-links|--trusted-host)([ \t=]|$)/m;
 /** A symlink or junction on any existing component below the root can retarget a write after it was judged. */
@@ -692,9 +908,16 @@ export function classifyDeviceWrite(path: string, context: { base: string; opera
   // Site generators (Jekyll, Hugo, Eleventy) treat underscore folders as layouts, includes, plugins and data (review round 4).
   if (dirs.some((segment) => segment.startsWith("_"))) return out("CONFIGURATION", "site-generator folder (_layouts, _includes, _plugins, _data) is build input");
   if (leaves.some((item) => CONSUMED_TEXT_FILE.test(item))) return out("CONFIGURATION", "file name a package manager, build tool or web server consumes");
+  // pytest collects test*.txt as doctests with no configuration at all (review F03 round 1).
+  if (leaves.some((item) => /^test[^/\\]*\.txt$/i.test(item))) return out("EXECUTION_RELEVANT", "file name a test runner collects and runs by default (test*.txt doctests)");
   if (typeof context.content === "string" && startsLikeProgram(context.content)) return out("EXECUTION_RELEVANT", "new content starts like a program or script");
   // A Markdown pipeline that understands MDX evaluates ESM import/export lines wherever they appear.
   if (typeof context.content === "string" && /^[ \t]*(import|export)\b/m.test(context.content)) return out("EXECUTION_RELEVANT", "content has ESM import/export lines (evaluated by MDX-style pipelines)");
+  if (typeof context.content === "string" && /^[ \t]*(?:`{3,}|~{3,})\{(?:code-cell|code|jupyter-execute|ipython|exec|eval-rst)\b|^[ \t]*\.\. (?:jupyter-execute|ipython)::/im.test(context.content)) return out("EXECUTION_RELEVANT", "content has an executable MyST or reST code directive");
+  if (typeof context.content === "string" && /<script\b/i.test(context.content)) return out("EXECUTION_RELEVANT", "content has a <script> block (VitePress, MDX and HTML pipelines run it)");
+  if (typeof context.content === "string" && (/<%[*=_-]?[\s\S]*?%>/.test(context.content) || /^[ \t>]*(?:(?:[-*+]|\d+[.)])[ \t]+)?(?:`{3,}|~{3,})[ \t]*(dataviewjs|meta-bind-js|js-engine|templater)\b/im.test(context.content))) return out("EXECUTION_RELEVANT", "content has a note-app script block (Templater, DataviewJS) that runs when opened or rendered");
+  if (typeof context.content === "string" && /^[ \t]*>>>[ \t]/m.test(context.content)) return out("EXECUTION_RELEVANT", "content has interactive-interpreter prompts (doctest and pytest run them)");
+  if (typeof context.content === "string" && REQUIREMENT_LINE.test(context.content)) return out("EXECUTION_RELEVANT", "content looks like a package requirement list (a package installer would install it)");
   if (typeof context.content === "string" && INSTALLER_DIRECTIVE.test(context.content)) return out("EXECUTION_RELEVANT", "content has package-installer directives (-r, -e, --index-url ...)");
   if (existing) {
     try {
@@ -705,7 +928,9 @@ export function classifyDeviceWrite(path: string, context: { base: string; opera
   if (consumer && "unknown" in consumer) return out("UNKNOWN", consumer.unknown);
   if (consumer) return consumer.agent
     ? out("AGENT_INSTRUCTIONS", `referenced by agent instructions (${consumer.by})`)
-    : out("EXECUTION_RELEVANT", `named by project metadata (${consumer.by}) as a tool input`);
+    : consumer.folder
+      ? out("EXECUTION_RELEVANT", `its folder also holds a program or tool file (${consumer.by}) that may process it`)
+      : out("EXECUTION_RELEVANT", `named by project metadata (${consumer.by}) as a tool input`);
   if (leaves.some((item) => STRUCTURED_DATA_FILE.test(item))) {
     if (leaves.some((item) => CONFIG_LIKE_DATA.test(item))) return out("CONFIGURATION", "structured file whose name marks it as program, build, site or pipeline configuration");
     if (!dirs.some((segment) => DATA_DIR.test(segment))) return out("CONFIGURATION", "JSON or YAML outside a recognized data or document folder can configure programs");
@@ -714,6 +939,7 @@ export function classifyDeviceWrite(path: string, context: { base: string; opera
   }
   if (leaves.every((item) => DATA_FILE.test(item))) {
     warnings.push("Programs may read this data file.");
+    if (typeof context.content === "string" && /(^|[,\t\n])[ \t]*"?[=+@-][^,\t\n]*[A-Za-z(]/m.test(context.content)) warnings.push("Some cells start with = + - or @; a spreadsheet may evaluate them as formulas when the file is opened.");
     return out("PHONE_SAFE_DATA", "tabular or log data");
   }
   if (leaves.every((item) => DOCUMENT_FILE.test(item))) {

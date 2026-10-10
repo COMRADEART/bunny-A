@@ -20,6 +20,7 @@ import type { CapabilityAdapter } from "./capabilities/bus.server.ts";
 import {
   capabilityOperation, decide, DESKTOP_GRANT_TTL_MS, desktopGrantViolation, envelopeFrom, isRemoteEnvelope, providerSessionAuthority,
   executionConfigPath, redactReviewListing, remoteExecutionRefusal, scopeFor, sessionOperation, taskViolation, touchesGitMetadata, type DesktopGrantContext,
+  classifyDeviceWrite,
 } from "./authorization.server.ts";
 import type { ActionManifest, DesktopGrant, MissionStep } from "./types.ts";
 import { simulatedCodexProfile } from "../bunny-host/testing/codex.test.ts";
@@ -744,7 +745,11 @@ test("F01-R6 (LOW): grants are attempt-bound, bound to the Task/plan in force wh
     await env.missions.respond(ask.id, "allow_once", "workstation");
     env.tasks.approve = approve;
     env.missions.setMission(env.missions.mission(view.id), { state: "failed" });
-    try { env.missions.retry(view.id, "workstation"); } catch { /* the grant revocation happens first */ }
+    // M-A-3 T9R-F03: a refused Retry changes nothing, so the grant survives it; a Retry that proceeds ends the unspent grant.
+    assert.throws(() => env.missions.retry(view.id, "workstation"), /No failed step/);
+    assert.equal(env.missions.store.request(ask.id).desktopGrant!.revokedAt, null, "a refused Retry leaves the grant untouched");
+    env.missions.setStep(env.missions.store.step(ask.stepId), { state: "failed", failure: { category: "provider_failed", detail: "F03 retry fixture" } });
+    env.missions.retry(view.id, "workstation");
     assert.notEqual(env.missions.store.request(ask.id).desktopGrant!.revokedAt, null, "Retry ends the unspent grant");
   } finally { await env.cleanup(); }
 });
@@ -1144,8 +1149,12 @@ test("F01-R27 (HIGH): a paired-device change never lands under workstation-appro
     // F02: the helper lives in data/ (PHONE_SAFE_DATA); a root .json is CONFIGURATION and never a device write.
     mkdirSync(join(env.root, "data"));
     writeFileSync(join(env.root, "data", "helper.json"), JSON.stringify({ v: "host" }));
-    writeFileSync(join(env.root, "slow.mjs"), "import { readFileSync, writeFileSync } from 'node:fs'; await new Promise((r) => setTimeout(r, 1500)); writeFileSync('ran.txt', JSON.parse(readFileSync('data/helper.json', 'utf8')).v);");
-    const run = env.missions.create({ objective: "Run slow", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: ["slow.mjs"] })] });
+    // M-A-3 T9R-F03: the running program lives OUTSIDE the project, where the D1 consumer scan cannot see that it reads
+    // data/helper.json; that unseen-consumer case is exactly what the hold protects. (Inside the project the scan now
+    // refuses the promotion outright; asserted at the end.)
+    const slow = "import { readFileSync, writeFileSync } from 'node:fs'; await new Promise((r) => setTimeout(r, 1500)); writeFileSync('ran.txt', JSON.parse(readFileSync('data/helper.json', 'utf8')).v);";
+    writeFileSync(join(env.dir, "slow.mjs"), slow);
+    const run = env.missions.create({ objective: "Run slow", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: [join(env.dir, "slow.mjs")] })] });
     env.missions.approve(run.id, "workstation");
     await until(() => env.missions.bus.liveCode.size === 1, "workstation run in flight");
     const edit = env.missions.create({ objective: "Edit helper", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "data/helper.json", content: "{\"v\":\"phone\"}", overwrite: true })] });
@@ -1159,6 +1168,8 @@ test("F01-R27 (HIGH): a paired-device change never lands under workstation-appro
     await promoteStaged(env, edit.id); // F02: the held change is staged; the workstation promotes the exact bytes
     await until(() => env.missions.mission(edit.id).state === "completed", "held change lands after the workstation allows it");
     assert.equal(readFileSync(join(env.root, "data", "helper.json"), "utf8"), "{\"v\":\"phone\"}");
+    writeFileSync(join(env.root, "slow.mjs"), slow);
+    assert.equal(classifyDeviceWrite("data/helper.json", { base: env.root, operation: "write", content: "{}" }).classification, "EXECUTION_RELEVANT", "a project program that reads the file makes it non-phone-safe (F03)");
   } finally { await env.cleanup(); }
 });
 
