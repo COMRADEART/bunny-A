@@ -1,0 +1,207 @@
+{
+  "classification": "DISPOSABLE LIVE VERIFIED",
+  "first": {
+    "pid": 16100,
+    "generation": "9928575a-b0d4-4a63-922d-ec4a82741eb0"
+  },
+  "fresh": {
+    "pid": 9528,
+    "generation": "fe8ea9a8-1cb4-4cff-87fb-a32f4ac8d838"
+  },
+  "agentId": "ad01106c-9d10-47bf-a091-0084380e6cca",
+  "missionId": "e9e78b15-b3fa-4616-9874-00fce469cdd1",
+  "recovered": {
+    "id": "ad01106c-9d10-47bf-a091-0084380e6cca",
+    "name": "Cross-app acceptance",
+    "state": "WAITING_FOR_USER",
+    "missionId": "e9e78b15-b3fa-4616-9874-00fce469cdd1",
+    "createdAt": 1791576065933,
+    "updatedAt": 1791576068256,
+    "failure": null,
+    "run": {
+      "id": "aa324f25-c2c9-4cc2-9b16-322e74272483",
+      "generation": 2,
+      "state": "WAITING_FOR_USER",
+      "startedAt": 1791576068247,
+      "endedAt": null
+    },
+    "checkpoints": 0,
+    "lastCheckpoint": null,
+    "pausedAt": null,
+    "stoppedAt": null,
+    "note": null,
+    "authorization": {
+      "id": "15157cfa-cdd3-445b-9925-bb65b29ce09d",
+      "revision": 2,
+      "state": "WAITING_FOR_USER",
+      "objective": "Carry verified instruction through local tools and applications",
+      "capabilities": [
+        "browser.navigate",
+        "browser.read",
+        "computer.focus_window",
+        "computer.invoke_control",
+        "computer.open_app",
+        "computer.read_calculator",
+        "filesystem.compare",
+        "filesystem.exists",
+        "filesystem.list",
+        "filesystem.read",
+        "filesystem.write",
+        "git.status",
+        "terminal.exec"
+      ],
+      "browserOrigins": [
+        "http://127.0.0.1:52251"
+      ],
+      "applications": [
+        "Microsoft Calculator (verified native lifetime)"
+      ],
+      "roots": [
+        "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-QaFNQq\\project",
+        "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-QaFNQq\\project"
+      ],
+      "commands": [
+        {
+          "command": "node",
+          "args": [
+            "check.mjs"
+          ],
+          "cwd": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-QaFNQq\\project",
+          "timeoutMs": 60000
+        }
+      ],
+      "riskCeiling": "EXECUTE",
+      "expiresAt": 1791579666088,
+      "durationMs": 3600000,
+      "maximumActions": 40,
+      "maximumConcurrency": 1,
+      "admitted": 7,
+      "completed": 7,
+      "failed": 0,
+      "unknown": 0,
+      "remainingActions": 33,
+      "remainingMs": 3597620,
+      "latestAdmission": {
+        "agent_id": "ad01106c-9d10-47bf-a091-0084380e6cca",
+        "mission_id": "e9e78b15-b3fa-4616-9874-00fce469cdd1",
+        "task_id": null,
+        "step_id": "f786bbce-5cd9-4371-a126-573419dbf79b",
+        "capability": "terminal.exec",
+        "resource_reference": "9f1cdeaa6c8867cf5835ce83920bc3ef59f28db6cb2fafabbdad8a240810aac4",
+        "attempt_kind": "action",
+        "id": "fb1121f0-8d31-4650-a564-d53cc62f3fd1",
+        "envelope_id": "15157cfa-cdd3-445b-9925-bb65b29ce09d",
+        "revision": 1,
+        "host_generation": "9928575a-b0d4-4a63-922d-ec4a82741eb0",
+        "admitted_at": 1791576067605,
+        "finished_at": 1791576067832,
+        "outcome": "COMPLETED"
+      },
+      "pending": [],
+      "limitations": [
+        "Restart requires fresh reviewed consent.",
+        "Model delegation supports tool-free Ollama inference; workspace CLI tools require separate review.",
+        "Terminal delegation supports pure read/assertion Node checks in a read-only snapshot, with no executable imports, subprocesses or network APIs; script edits require new consent.",
+        "Browser observation is bound to exact approved origins and a Mission-owned profile. Desktop scope is verified Calculator arithmetic only; ambiguous effects require review."
+      ],
+      "remoteOffer": {
+        "answerable": false,
+        "reason": "Approval required on Windows Host."
+      }
+    },
+    "activity": {
+      "application": "Mission browser",
+      "action": "browser.navigate",
+      "step": "Browser",
+      "completed": 4,
+      "total": 10,
+      "verification": "Pending verification",
+      "artifacts": [
+        {
+          "id": "8b76b92e-f1ca-444d-81ef-8834dffdc49b",
+          "title": "git.status observation",
+          "verified": true
+        },
+        {
+          "id": "aecd9ebf-a5b2-40ee-8254-9212c505b2b2",
+          "title": "filesystem.write observation",
+          "verified": true
+        },
+        {
+          "id": "50d149d0-68ba-4fdb-96a1-6827e515b6b4",
+          "title": "result.txt",
+          "verified": true
+        },
+        {
+          "id": "afe16ba6-c7b1-4118-a484-ddc25c6dc637",
+          "title": "filesystem.compare observation",
+          "verified": true
+        },
+        {
+          "id": "f8342eee-2abc-40c4-b87c-e4931800c0fc",
+          "title": "terminal.exec observation",
+          "verified": true
+        },
+        {
+          "id": "47447ae7-21c3-43be-afa2-4382bf166933",
+          "title": "node check.mjs output",
+          "verified": true
+        }
+      ],
+      "history": [
+        {
+          "step": "Inspect",
+          "action": "filesystem.read",
+          "state": "completed"
+        },
+        {
+          "step": "Repository",
+          "action": "git.status",
+          "state": "completed"
+        },
+        {
+          "step": "Edit",
+          "action": "filesystem.write",
+          "state": "completed"
+        },
+        {
+          "step": "Check",
+          "action": "terminal.exec",
+          "state": "completed"
+        },
+        {
+          "step": "Browser",
+          "action": "browser.navigate",
+          "state": "pending"
+        },
+        {
+          "step": "Acquire",
+          "action": "computer.open_app",
+          "state": "pending"
+        },
+        {
+          "step": "Focus",
+          "action": "computer.focus_window",
+          "state": "pending"
+        },
+        {
+          "step": "Clear",
+          "action": "computer.invoke_control",
+          "state": "pending"
+        },
+        {
+          "step": "Enter",
+          "action": "computer.invoke_control",
+          "state": "pending"
+        },
+        {
+          "step": "Report",
+          "action": "filesystem.write",
+          "state": "pending"
+        }
+      ]
+    }
+  },
+  "priorAdmissions": 7,
+  "oldTransientAuthorityInactive": true
+}

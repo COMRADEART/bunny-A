@@ -1,0 +1,2456 @@
+{
+  "classification": "DISPOSABLE LIVE VERIFIED",
+  "modelPlanning": "NOT TESTED; deterministic preauthored Mission",
+  "modelExecution": "NOT TESTED; zero model calls",
+  "accepted": true,
+  "projectA": {
+    "id": "0b529478-0595-418f-831b-107ab79017bf",
+    "name": "Sample application",
+    "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+    "preferred": "auto",
+    "description": "",
+    "createdAt": 1791578459439,
+    "updatedAt": 1791578459439,
+    "lastActivityAt": 1791578459439,
+    "lifecycle": "ACTIVE",
+    "sourceType": "existing",
+    "projectType": "repository",
+    "ownerScope": "host-owner",
+    "tags": [],
+    "favorite": false,
+    "rootIdentity": "1309165269:75998243711941458:1791578458289785600",
+    "revision": 1,
+    "schemaVersion": "ma3.projects.v1",
+    "attention": []
+  },
+  "projectB": {
+    "id": "61e148d4-0255-46fd-96e0-da2d4ffcf379",
+    "name": "Private repository",
+    "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-b",
+    "preferred": "auto",
+    "description": "",
+    "createdAt": 1791578459460,
+    "updatedAt": 1791578459460,
+    "lastActivityAt": 1791578459460,
+    "lifecycle": "ACTIVE",
+    "sourceType": "existing",
+    "projectType": "repository",
+    "ownerScope": "host-owner",
+    "tags": [],
+    "favorite": false,
+    "rootIdentity": "1309165269:48976645947781442:1791578458289785600",
+    "revision": 1,
+    "schemaVersion": "ma3.projects.v1",
+    "attention": []
+  },
+  "agentId": "f9fc1465-96d6-4039-b29d-d761ccba0883",
+  "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+  "steps": [
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "4975b101-33a6-4901-8d7f-da0b2211c6f8",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "index": 0,
+      "role": "Inspect",
+      "objective": "Inspect",
+      "dependsOn": [],
+      "requiredCapabilities": [
+        "filesystem.read"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "filesystem.read",
+        "params": {
+          "path": "instruction.txt"
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "filesystem.compare",
+          "params": {
+            "path": "instruction.txt",
+            "content": "T7 approved result\n"
+          },
+          "expect": {
+            "field": "matches",
+            "equals": true
+          }
+        }
+      ],
+      "maxRetries": 2,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "d98a2505-255f-4657-be3c-20b13285c144",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791578459916,
+          "finishedAt": 1791578460171,
+          "taskId": null,
+          "capabilityRunId": "d98a2505-255f-4657-be3c-20b13285c144",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "Read 19 bytes from C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\instruction.txt.",
+        "artifactIds": [
+          "99db3cf0-b42d-4da0-84d9-73a3686e5747",
+          "0291a6b1-52d9-4cac-b8c0-e8925279479d"
+        ],
+        "verified": true,
+        "verification": [
+          "filesystem.compare matches: passed (independent capability observation)"
+        ],
+        "outputRef": "99db3cf0-b42d-4da0-84d9-73a3686e5747",
+        "verificationRunIds": [
+          "c194223d-10f8-4cae-a979-e333176465fe"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 117,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791578459916,
+      "finishedAt": 1791578460171
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "fc7ae7fa-cd5c-427f-9532-d41fcab64a55",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "index": 1,
+      "role": "Repository",
+      "objective": "Repository",
+      "dependsOn": [
+        "4975b101-33a6-4901-8d7f-da0b2211c6f8"
+      ],
+      "requiredCapabilities": [
+        "git.status"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "git.status",
+        "params": {}
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "git.status",
+          "params": {},
+          "expect": {
+            "field": "clean",
+            "equals": true
+          }
+        }
+      ],
+      "maxRetries": 2,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "6b4f9600-2c21-442b-bcbb-57e5c569139d",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791578460250,
+          "finishedAt": 1791578460881,
+          "taskId": null,
+          "capabilityRunId": "6b4f9600-2c21-442b-bcbb-57e5c569139d",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "master: clean.",
+        "artifactIds": [
+          "31d8d8a7-bad1-45b0-b222-3773ba57917c",
+          "0cb15828-e32d-40b3-98be-6b2112dce012"
+        ],
+        "verified": true,
+        "verification": [
+          "git.status clean: passed (independent capability observation)"
+        ],
+        "outputRef": "31d8d8a7-bad1-45b0-b222-3773ba57917c",
+        "verificationRunIds": [
+          "f93995f8-b9bd-413d-9c89-44092ca85838"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 306,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791578460250,
+      "finishedAt": 1791578460881
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "055ca877-6e46-4482-ab26-1fbde23dfeab",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "index": 2,
+      "role": "Edit",
+      "objective": "Edit",
+      "dependsOn": [
+        "fc7ae7fa-cd5c-427f-9532-d41fcab64a55"
+      ],
+      "requiredCapabilities": [
+        "filesystem.write"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+        "access": "write",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "filesystem.write",
+        "params": {
+          "path": "result.txt",
+          "content": "T7 approved result\n",
+          "overwrite": true
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "filesystem.compare",
+          "params": {
+            "path": "result.txt",
+            "content": "T7 approved result\n"
+          },
+          "expect": {
+            "field": "matches",
+            "equals": true
+          }
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "06b4357d-1b0f-4e26-aed1-e6abb6934921",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791578460970,
+          "finishedAt": 1791578461247,
+          "taskId": null,
+          "capabilityRunId": "06b4357d-1b0f-4e26-aed1-e6abb6934921",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "Wrote 19 bytes to C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\result.txt.",
+        "artifactIds": [
+          "f870d87c-d766-47e1-a7c6-812efa7637c4",
+          "5008c9da-a35c-4378-9ba2-2a898c51e25b",
+          "660a3a43-3d17-4b2b-a397-a9a95ff381e5"
+        ],
+        "verified": true,
+        "verification": [
+          "filesystem.compare matches: passed (independent capability observation)"
+        ],
+        "outputRef": "f870d87c-d766-47e1-a7c6-812efa7637c4",
+        "verificationRunIds": [
+          "bacdd91a-9ffc-46dd-b43e-ce60a46d4531"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 135,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791578460970,
+      "finishedAt": 1791578461247
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "d101e01c-8fa7-47bc-a814-33a28ffe19b7",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "index": 3,
+      "role": "Check",
+      "objective": "Check",
+      "dependsOn": [
+        "055ca877-6e46-4482-ab26-1fbde23dfeab"
+      ],
+      "requiredCapabilities": [
+        "terminal.exec"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "terminal.exec",
+        "params": {
+          "command": "node",
+          "args": [
+            "check.mjs"
+          ],
+          "timeoutMs": 30000
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability_run",
+          "expectExit": 0,
+          "stdoutIncludes": "T7 CHECK PASS"
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "187993ab-8580-4d36-b549-645d3447e7af",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791578461337,
+          "finishedAt": 1791578461923,
+          "taskId": null,
+          "capabilityRunId": "187993ab-8580-4d36-b549-645d3447e7af",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "node check.mjs exited 0.",
+        "artifactIds": [
+          "001b60f3-7eab-4d03-a16e-80681e14d6a0",
+          "3a9bc36f-254d-49c5-beb0-e41fbfce2905"
+        ],
+        "verified": true,
+        "verification": [
+          "Owned terminal exit/output: passed"
+        ],
+        "outputRef": "001b60f3-7eab-4d03-a16e-80681e14d6a0",
+        "verificationRunIds": []
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 538,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791578461337,
+      "finishedAt": 1791578461923
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "4980e80e-8e11-4514-831a-3ffdd875227f",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "index": 4,
+      "role": "Report",
+      "objective": "Report",
+      "dependsOn": [
+        "d101e01c-8fa7-47bc-a814-33a28ffe19b7"
+      ],
+      "requiredCapabilities": [
+        "filesystem.write"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+        "access": "write",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "filesystem.write",
+        "params": {
+          "path": "report.txt",
+          "content": "T7 project verified."
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "filesystem.compare",
+          "params": {
+            "path": "report.txt",
+            "content": "T7 project verified."
+          },
+          "expect": {
+            "field": "matches",
+            "equals": true
+          }
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "fa2a4ffa-9e98-4a90-9c36-2a6c9f4558ec",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791578462034,
+          "finishedAt": 1791578462387,
+          "taskId": null,
+          "capabilityRunId": "fa2a4ffa-9e98-4a90-9c36-2a6c9f4558ec",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "Wrote 20 bytes to C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\report.txt.",
+        "artifactIds": [
+          "64f721fe-2ad3-491a-9280-f3695068a310",
+          "05b5abaa-35eb-48fd-a96f-f0ce1eb61669",
+          "8498b1a3-c8b8-4aaa-a497-3ea7d54b84b7"
+        ],
+        "verified": true,
+        "verification": [
+          "filesystem.compare matches: passed (independent capability observation)"
+        ],
+        "outputRef": "64f721fe-2ad3-491a-9280-f3695068a310",
+        "verificationRunIds": [
+          "4e8e5323-ecb2-421b-a502-805b34e92d08"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 143,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791578462034,
+      "finishedAt": 1791578462387
+    }
+  ],
+  "runs": [
+    {
+      "id": "d98a2505-255f-4657-be3c-20b13285c144",
+      "action": "filesystem.read",
+      "capability": "filesystem",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "stepId": "4975b101-33a6-4901-8d7f-da0b2211c6f8",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization f882379f-8ec0-42da-adae-bc21012ef67d.",
+      "params": {
+        "path": "instruction.txt"
+      },
+      "status": "succeeded",
+      "summary": "Read 19 bytes from C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\instruction.txt.",
+      "evidence": [
+        "Read C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\instruction.txt (19 bytes)"
+      ],
+      "artifactIds": [
+        "99db3cf0-b42d-4da0-84d9-73a3686e5747"
+      ],
+      "startedAt": 1791578459987,
+      "finishedAt": 1791578460048,
+      "durationMs": 61,
+      "origin": "mission:f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "outputRef": "99db3cf0-b42d-4da0-84d9-73a3686e5747"
+    },
+    {
+      "id": "c194223d-10f8-4cae-a979-e333176465fe",
+      "action": "filesystem.compare",
+      "capability": "filesystem",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "stepId": "4975b101-33a6-4901-8d7f-da0b2211c6f8",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization f882379f-8ec0-42da-adae-bc21012ef67d.",
+      "params": {
+        "path": "instruction.txt",
+        "content": "[19 characters]"
+      },
+      "status": "succeeded",
+      "summary": "Current file content independently observed.",
+      "evidence": [
+        "SHA-256 44a3fdaf9b3d8733dd906e5548a986825f846ecfdfbb36eb2f4fa1f5b57029a8"
+      ],
+      "artifactIds": [
+        "0291a6b1-52d9-4cac-b8c0-e8925279479d"
+      ],
+      "startedAt": 1791578460098,
+      "finishedAt": 1791578460152,
+      "durationMs": 54,
+      "origin": "mission:f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "outputRef": "0291a6b1-52d9-4cac-b8c0-e8925279479d"
+    },
+    {
+      "id": "6b4f9600-2c21-442b-bcbb-57e5c569139d",
+      "action": "git.status",
+      "capability": "git",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "stepId": "fc7ae7fa-cd5c-427f-9532-d41fcab64a55",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization f882379f-8ec0-42da-adae-bc21012ef67d.",
+      "params": {},
+      "status": "succeeded",
+      "summary": "master: clean.",
+      "evidence": [
+        "git status in C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a"
+      ],
+      "artifactIds": [
+        "31d8d8a7-bad1-45b0-b222-3773ba57917c"
+      ],
+      "startedAt": 1791578460328,
+      "finishedAt": 1791578460573,
+      "durationMs": 245,
+      "origin": "mission:f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "outputRef": "31d8d8a7-bad1-45b0-b222-3773ba57917c"
+    },
+    {
+      "id": "f93995f8-b9bd-413d-9c89-44092ca85838",
+      "action": "git.status",
+      "capability": "git",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "stepId": "fc7ae7fa-cd5c-427f-9532-d41fcab64a55",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization f882379f-8ec0-42da-adae-bc21012ef67d.",
+      "params": {},
+      "status": "succeeded",
+      "summary": "master: clean.",
+      "evidence": [
+        "git status in C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a"
+      ],
+      "artifactIds": [
+        "0cb15828-e32d-40b3-98be-6b2112dce012"
+      ],
+      "startedAt": 1791578460613,
+      "finishedAt": 1791578460859,
+      "durationMs": 246,
+      "origin": "mission:f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "outputRef": "0cb15828-e32d-40b3-98be-6b2112dce012"
+    },
+    {
+      "id": "06b4357d-1b0f-4e26-aed1-e6abb6934921",
+      "action": "filesystem.write",
+      "capability": "filesystem",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "stepId": "055ca877-6e46-4482-ab26-1fbde23dfeab",
+      "risk": "WRITE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization f882379f-8ec0-42da-adae-bc21012ef67d.",
+      "params": {
+        "path": "result.txt",
+        "content": "[19 characters]",
+        "overwrite": true
+      },
+      "status": "succeeded",
+      "summary": "Wrote 19 bytes to C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\result.txt.",
+      "evidence": [
+        "Wrote and read back C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\result.txt; before 9160d4be34c8695bd172a76c7c7966587ea5a4d991ad22c87b2b91af54aa9ebb; after 44a3fdaf9b3d8733dd906e5548a986825f846ecfdfbb36eb2f4fa1f5b57029a8"
+      ],
+      "artifactIds": [
+        "f870d87c-d766-47e1-a7c6-812efa7637c4",
+        "5008c9da-a35c-4378-9ba2-2a898c51e25b"
+      ],
+      "startedAt": 1791578461053,
+      "finishedAt": 1791578461119,
+      "durationMs": 66,
+      "origin": "mission:f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "outputRef": "f870d87c-d766-47e1-a7c6-812efa7637c4"
+    },
+    {
+      "id": "bacdd91a-9ffc-46dd-b43e-ce60a46d4531",
+      "action": "filesystem.compare",
+      "capability": "filesystem",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "stepId": "055ca877-6e46-4482-ab26-1fbde23dfeab",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization f882379f-8ec0-42da-adae-bc21012ef67d.",
+      "params": {
+        "path": "result.txt",
+        "content": "[19 characters]"
+      },
+      "status": "succeeded",
+      "summary": "Current file content independently observed.",
+      "evidence": [
+        "SHA-256 44a3fdaf9b3d8733dd906e5548a986825f846ecfdfbb36eb2f4fa1f5b57029a8"
+      ],
+      "artifactIds": [
+        "660a3a43-3d17-4b2b-a397-a9a95ff381e5"
+      ],
+      "startedAt": 1791578461167,
+      "finishedAt": 1791578461225,
+      "durationMs": 58,
+      "origin": "mission:f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "outputRef": "660a3a43-3d17-4b2b-a397-a9a95ff381e5"
+    },
+    {
+      "id": "187993ab-8580-4d36-b549-645d3447e7af",
+      "action": "terminal.exec",
+      "capability": "terminal",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "stepId": "d101e01c-8fa7-47bc-a814-33a28ffe19b7",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization f882379f-8ec0-42da-adae-bc21012ef67d.",
+      "params": {
+        "command": "node",
+        "args": [
+          "check.mjs"
+        ],
+        "timeoutMs": 30000
+      },
+      "status": "succeeded",
+      "summary": "node check.mjs exited 0.",
+      "evidence": [
+        "node check.mjs in C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a → exit 0 after 98 ms"
+      ],
+      "artifactIds": [
+        "001b60f3-7eab-4d03-a16e-80681e14d6a0",
+        "3a9bc36f-254d-49c5-beb0-e41fbfce2905"
+      ],
+      "startedAt": 1791578461529,
+      "finishedAt": 1791578461889,
+      "durationMs": 360,
+      "origin": "mission:f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "outputRef": "001b60f3-7eab-4d03-a16e-80681e14d6a0"
+    },
+    {
+      "id": "fa2a4ffa-9e98-4a90-9c36-2a6c9f4558ec",
+      "action": "filesystem.write",
+      "capability": "filesystem",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "stepId": "4980e80e-8e11-4514-831a-3ffdd875227f",
+      "risk": "WRITE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization f882379f-8ec0-42da-adae-bc21012ef67d.",
+      "params": {
+        "path": "report.txt",
+        "content": "[20 characters]"
+      },
+      "status": "succeeded",
+      "summary": "Wrote 20 bytes to C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\report.txt.",
+      "evidence": [
+        "Wrote and read back C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\report.txt; before absent; after 2d51dddc1bb4cadaf77618246748da8ca93ad33aef9fb85131ced1d0fec9abe4"
+      ],
+      "artifactIds": [
+        "64f721fe-2ad3-491a-9280-f3695068a310",
+        "05b5abaa-35eb-48fd-a96f-f0ce1eb61669"
+      ],
+      "startedAt": 1791578462120,
+      "finishedAt": 1791578462193,
+      "durationMs": 73,
+      "origin": "mission:f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "outputRef": "64f721fe-2ad3-491a-9280-f3695068a310"
+    },
+    {
+      "id": "4e8e5323-ecb2-421b-a502-805b34e92d08",
+      "action": "filesystem.compare",
+      "capability": "filesystem",
+      "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "stepId": "4980e80e-8e11-4514-831a-3ffdd875227f",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization f882379f-8ec0-42da-adae-bc21012ef67d.",
+      "params": {
+        "path": "report.txt",
+        "content": "[20 characters]"
+      },
+      "status": "succeeded",
+      "summary": "Current file content independently observed.",
+      "evidence": [
+        "SHA-256 2d51dddc1bb4cadaf77618246748da8ca93ad33aef9fb85131ced1d0fec9abe4"
+      ],
+      "artifactIds": [
+        "8498b1a3-c8b8-4aaa-a497-3ea7d54b84b7"
+      ],
+      "startedAt": 1791578462263,
+      "finishedAt": 1791578462361,
+      "durationMs": 98,
+      "origin": "mission:f6900e52-8d29-4138-a0f0-4ea41c555831",
+      "outputRef": "8498b1a3-c8b8-4aaa-a497-3ea7d54b84b7"
+    }
+  ],
+  "before": {
+    "project": {
+      "id": "0b529478-0595-418f-831b-107ab79017bf",
+      "name": "Sample application",
+      "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+      "preferred": "auto",
+      "description": "",
+      "createdAt": 1791578459439,
+      "updatedAt": 1791578459479,
+      "lastActivityAt": 1791578462523,
+      "lifecycle": "ACTIVE",
+      "sourceType": "existing",
+      "projectType": "repository",
+      "ownerScope": "host-owner",
+      "tags": [
+        "application"
+      ],
+      "favorite": true,
+      "rootIdentity": "1309165269:75998243711941458:1791578458289785600",
+      "revision": 2,
+      "schemaVersion": "ma3.projects.v1",
+      "attention": []
+    },
+    "missions": [
+      {
+        "id": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "title": "Inspect, edit, test and retain verified output",
+        "objective": "[Retained on Host]",
+        "request": "[Retained on Host]",
+        "projectId": "0b529478-0595-418f-831b-107ab79017bf",
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+        "mode": "balanced",
+        "state": "completed",
+        "origin": "agent:workstation",
+        "createdAt": 1791578459542,
+        "updatedAt": 1791578462494,
+        "startedAt": 1791578459846,
+        "finishedAt": 1791578462493,
+        "planning": {
+          "planner": "bunny-planner-deterministic-v1",
+          "complexity": "medium",
+          "rationale": [
+            "User-supplied plan; validated and bounded by Bunny."
+          ],
+          "replans": 0,
+          "plannedAt": 1791578459566
+        },
+        "requestedScope": {
+          "projectRoots": [
+            "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a"
+          ],
+          "riskClasses": [
+            "READ",
+            "WRITE",
+            "EXECUTE"
+          ],
+          "capabilities": [
+            "filesystem.compare",
+            "filesystem.exists",
+            "filesystem.list",
+            "filesystem.read",
+            "filesystem.write",
+            "git.status",
+            "notifications.send",
+            "terminal.exec"
+          ],
+          "providers": {
+            "execution": false,
+            "allow": null,
+            "localOnly": false,
+            "sessions": {
+              "steps": [],
+              "maxSessions": 0,
+              "writeIncludesShell": true
+            }
+          },
+          "filesystem": {
+            "read": [
+              "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a"
+            ],
+            "write": [
+              "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a"
+            ]
+          },
+          "browser": {
+            "enabled": false,
+            "domains": "public"
+          },
+          "terminal": {
+            "enabled": true,
+            "commands": [
+              "node"
+            ],
+            "executables": [
+              {
+                "command": "node",
+                "file": "C:\\Program Files\\nodejs\\node.exe",
+                "prefix": []
+              }
+            ]
+          },
+          "git": {
+            "actions": [
+              "status"
+            ]
+          },
+          "network": {
+            "allowed": false
+          },
+          "computer": {
+            "enabled": false
+          },
+          "budget": {
+            "maxExternalModelCalls": 6,
+            "maxRuntimeMs": 3600000,
+            "maxRetries": 4,
+            "maxTokens": null
+          },
+          "alwaysAsk": [
+            "EXTERNAL_SIDE_EFFECT",
+            "DESTRUCTIVE"
+          ]
+        },
+        "authorizationId": "f882379f-8ec0-42da-adae-bc21012ef67d",
+        "capabilityRequirements": [
+          "filesystem.compare",
+          "filesystem.exists",
+          "filesystem.list",
+          "filesystem.read",
+          "filesystem.write",
+          "git.status",
+          "notifications.send",
+          "terminal.exec"
+        ],
+        "providerConstraints": {
+          "localOnly": false
+        },
+        "budget": {
+          "maxExternalModelCalls": 6,
+          "maxRuntimeMs": 3600000,
+          "maxRetries": 4,
+          "maxTokens": null
+        },
+        "retryPolicy": {
+          "maxRetriesPerStep": 2
+        },
+        "verificationRequired": true,
+        "result": null,
+        "failure": null,
+        "recovery": null,
+        "accounting": {
+          "runtimeMs": 1239,
+          "externalModelCalls": 0,
+          "localModelCalls": 0,
+          "deterministicSteps": 5,
+          "retries": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "tokensReported": false
+        }
+      }
+    ],
+    "tasks": [],
+    "artifacts": [
+      {
+        "id": "8498b1a3-c8b8-4aaa-a497-3ea7d54b84b7",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4980e80e-8e11-4514-831a-3ffdd875227f",
+        "type": "structured_result",
+        "title": "filesystem.compare observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "f2fab2b6d42320d1108e6d926db97a3cb5e2d46e09cb4a8b7c7bb181e22437ae",
+        "bytes": 185,
+        "createdAt": 1791578462357,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:4e8e5323-ecb2-421b-a502-805b34e92d08"
+      },
+      {
+        "id": "05b5abaa-35eb-48fd-a96f-f0ce1eb61669",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4980e80e-8e11-4514-831a-3ffdd875227f",
+        "type": "source_file",
+        "title": "report.txt",
+        "location": {
+          "kind": "file",
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\report.txt",
+          "mediaType": "text/plain"
+        },
+        "sha256": "2d51dddc1bb4cadaf77618246748da8ca93ad33aef9fb85131ced1d0fec9abe4",
+        "bytes": 20,
+        "createdAt": 1791578462186,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:fa2a4ffa-9e98-4a90-9c36-2a6c9f4558ec"
+      },
+      {
+        "id": "64f721fe-2ad3-491a-9280-f3695068a310",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4980e80e-8e11-4514-831a-3ffdd875227f",
+        "type": "structured_result",
+        "title": "filesystem.write observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "20710753b38bf88ddd2845bd27c8f071de8415ff72581cdac24c6c5db1b3075a",
+        "bytes": 216,
+        "createdAt": 1791578462182,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:fa2a4ffa-9e98-4a90-9c36-2a6c9f4558ec"
+      },
+      {
+        "id": "3a9bc36f-254d-49c5-beb0-e41fbfce2905",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "d101e01c-8fa7-47bc-a814-33a28ffe19b7",
+        "type": "test_report",
+        "title": "node check.mjs output",
+        "location": {
+          "kind": "inline",
+          "mediaType": "text/plain"
+        },
+        "sha256": "f04ab37e5ea3e501f1117a783db767e5a569211cae9b3f0c401cffc7b78f2847",
+        "bytes": 115,
+        "createdAt": 1791578461885,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:187993ab-8580-4d36-b549-645d3447e7af"
+      },
+      {
+        "id": "001b60f3-7eab-4d03-a16e-80681e14d6a0",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "d101e01c-8fa7-47bc-a814-33a28ffe19b7",
+        "type": "structured_result",
+        "title": "terminal.exec observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "34dfb45cbbf61c6f7e4a6033ae4a5c4af09553e4e5fbf275ce6cab4021d653b3",
+        "bytes": 127,
+        "createdAt": 1791578461879,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:187993ab-8580-4d36-b549-645d3447e7af"
+      },
+      {
+        "id": "660a3a43-3d17-4b2b-a397-a9a95ff381e5",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "055ca877-6e46-4482-ab26-1fbde23dfeab",
+        "type": "structured_result",
+        "title": "filesystem.compare observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "9b7bc6c05fbbafccad9153629c1650c77521a9f794004a9d429d96be22a43aa9",
+        "bytes": 185,
+        "createdAt": 1791578461221,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:bacdd91a-9ffc-46dd-b43e-ce60a46d4531"
+      },
+      {
+        "id": "5008c9da-a35c-4378-9ba2-2a898c51e25b",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "055ca877-6e46-4482-ab26-1fbde23dfeab",
+        "type": "source_file",
+        "title": "result.txt",
+        "location": {
+          "kind": "file",
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\result.txt",
+          "mediaType": "text/plain"
+        },
+        "sha256": "44a3fdaf9b3d8733dd906e5548a986825f846ecfdfbb36eb2f4fa1f5b57029a8",
+        "bytes": 19,
+        "createdAt": 1791578461111,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:06b4357d-1b0f-4e26-aed1-e6abb6934921"
+      },
+      {
+        "id": "f870d87c-d766-47e1-a7c6-812efa7637c4",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "055ca877-6e46-4482-ab26-1fbde23dfeab",
+        "type": "structured_result",
+        "title": "filesystem.write observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "58c2133c84244da7c415fdb287bd221b12a9948d96425aa51cecd1ebbbcb824e",
+        "bytes": 279,
+        "createdAt": 1791578461107,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:06b4357d-1b0f-4e26-aed1-e6abb6934921"
+      },
+      {
+        "id": "0cb15828-e32d-40b3-98be-6b2112dce012",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "fc7ae7fa-cd5c-427f-9532-d41fcab64a55",
+        "type": "structured_result",
+        "title": "git.status observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "b23347b21f6e54614b09e44d97edbe7112b310a007f4e577bcd79d65c191ed67",
+        "bytes": 45,
+        "createdAt": 1791578460849,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:f93995f8-b9bd-413d-9c89-44092ca85838"
+      },
+      {
+        "id": "31d8d8a7-bad1-45b0-b222-3773ba57917c",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "fc7ae7fa-cd5c-427f-9532-d41fcab64a55",
+        "type": "structured_result",
+        "title": "git.status observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "b23347b21f6e54614b09e44d97edbe7112b310a007f4e577bcd79d65c191ed67",
+        "bytes": 45,
+        "createdAt": 1791578460569,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:6b4f9600-2c21-442b-bcbb-57e5c569139d"
+      },
+      {
+        "id": "0291a6b1-52d9-4cac-b8c0-e8925279479d",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4975b101-33a6-4901-8d7f-da0b2211c6f8",
+        "type": "structured_result",
+        "title": "filesystem.compare observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "3c42c9558b4b652796f3df9405143c2ecc7b0329ddc70038988ad0d65c46bd21",
+        "bytes": 190,
+        "createdAt": 1791578460149,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:c194223d-10f8-4cae-a979-e333176465fe"
+      },
+      {
+        "id": "99db3cf0-b42d-4da0-84d9-73a3686e5747",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4975b101-33a6-4901-8d7f-da0b2211c6f8",
+        "type": "structured_result",
+        "title": "filesystem.read observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "905ebae38ae063deac34ea98c5af5732721d09d679428110c51dfd215dafa9d2",
+        "bytes": 216,
+        "createdAt": 1791578460045,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:d98a2505-255f-4657-be3c-20b13285c144"
+      }
+    ],
+    "agents": [
+      {
+        "id": "f9fc1465-96d6-4039-b29d-d761ccba0883",
+        "name": "Project acceptance Agent",
+        "state": "COMPLETED",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "createdAt": 1791578459540,
+        "updatedAt": 1791578462503,
+        "failure": null,
+        "run": {
+          "id": "f672bc91-daca-439a-a144-607fb0080f7f",
+          "generation": 1,
+          "state": "COMPLETED",
+          "startedAt": 1791578459770,
+          "endedAt": 1791578462503
+        },
+        "checkpoints": 34,
+        "lastCheckpoint": {
+          "boundary": "after_verification",
+          "at": 1791578462392,
+          "replaySafety": "VERIFY_BEFORE_REPLAY"
+        },
+        "pausedAt": null,
+        "stoppedAt": null,
+        "note": null
+      }
+    ],
+    "workspaces": [
+      {
+        "id": "f777f81c-4ebd-4c6a-9580-238d0e4f3fb1",
+        "agentId": "f9fc1465-96d6-4039-b29d-d761ccba0883",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "projectId": "0b529478-0595-418f-831b-107ab79017bf",
+        "root": {
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\workspace\\agents\\f9fc1465-96d6-4039-b29d-d761ccba0883\\f6900e52-8d29-4138-a0f0-4ea41c555831",
+          "identity": "1309165269:10696049117215815:1791578459594585100"
+        },
+        "scratch": {
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\workspace\\agents\\f9fc1465-96d6-4039-b29d-d761ccba0883\\f6900e52-8d29-4138-a0f0-4ea41c555831\\scratch",
+          "identity": "1309165269:10414574140505160:1791578459594585100"
+        },
+        "workspaceRoot": {
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\workspace",
+          "identity": "1309165269:215046882206989613:1791578458288785600"
+        },
+        "state": "READY",
+        "createdAt": 1791578459594,
+        "lastUsedAt": 1791578459594,
+        "ownershipMarker": "59bf2d67-902f-4226-b980-03d8c9fe8a15",
+        "manifestRevision": 1,
+        "maxBytes": 67108864
+      }
+    ],
+    "events": [
+      {
+        "sequence": 172,
+        "at": 1791578462523,
+        "type": "agent.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 171,
+        "at": 1791578462514,
+        "type": "agent.state_changed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 170,
+        "at": 1791578462494,
+        "type": "mission.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 169,
+        "at": 1791578462485,
+        "type": "mission.verifying",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 168,
+        "at": 1791578462481,
+        "type": "agent.authorization_changed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 167,
+        "at": 1791578462462,
+        "type": "agent.cross_app_step_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 166,
+        "at": 1791578462453,
+        "type": "agent.capability_verified",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 165,
+        "at": 1791578462441,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 164,
+        "at": 1791578462432,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 163,
+        "at": 1791578462424,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 162,
+        "at": 1791578462415,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 161,
+        "at": 1791578462405,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 160,
+        "at": 1791578462396,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 159,
+        "at": 1791578462387,
+        "type": "mission.step.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 158,
+        "at": 1791578462362,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 157,
+        "at": 1791578462362,
+        "type": "capability.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 156,
+        "at": 1791578462315,
+        "type": "capability.started",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 155,
+        "at": 1791578462305,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 154,
+        "at": 1791578462301,
+        "type": "agent.action_admitted",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 153,
+        "at": 1791578462253,
+        "type": "capability.requested",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 152,
+        "at": 1791578462218,
+        "type": "agent.state_changed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 151,
+        "at": 1791578462206,
+        "type": "mission.step.verifying",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 150,
+        "at": 1791578462193,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 149,
+        "at": 1791578462193,
+        "type": "capability.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 148,
+        "at": 1791578462153,
+        "type": "capability.started",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 147,
+        "at": 1791578462145,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 146,
+        "at": 1791578462142,
+        "type": "agent.action_admitted",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 145,
+        "at": 1791578462112,
+        "type": "capability.requested",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 144,
+        "at": 1791578462083,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 143,
+        "at": 1791578462076,
+        "type": "agent.capability_selected",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 142,
+        "at": 1791578462067,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 141,
+        "at": 1791578462059,
+        "type": "agent.application_handoff",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 140,
+        "at": 1791578462050,
+        "type": "agent.task_started",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 139,
+        "at": 1791578462042,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 138,
+        "at": 1791578462034,
+        "type": "mission.step.started",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 137,
+        "at": 1791578462008,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 136,
+        "at": 1791578461998,
+        "type": "mission.step.ready",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 135,
+        "at": 1791578461983,
+        "type": "agent.cross_app_step_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 134,
+        "at": 1791578461975,
+        "type": "agent.capability_verified",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 133,
+        "at": 1791578461966,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 132,
+        "at": 1791578461957,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 131,
+        "at": 1791578461949,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 130,
+        "at": 1791578461940,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 129,
+        "at": 1791578461932,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 128,
+        "at": 1791578461923,
+        "type": "mission.step.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 127,
+        "at": 1791578461903,
+        "type": "mission.step.verifying",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 126,
+        "at": 1791578461890,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 125,
+        "at": 1791578461889,
+        "type": "capability.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 124,
+        "at": 1791578461658,
+        "type": "capability.started",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 123,
+        "at": 1791578461649,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      }
+    ],
+    "offset": 0,
+    "limit": 50,
+    "totals": {
+      "missions": 1,
+      "tasks": 0,
+      "artifacts": 12,
+      "events": 162
+    }
+  },
+  "after": {
+    "project": {
+      "id": "0b529478-0595-418f-831b-107ab79017bf",
+      "name": "Sample application",
+      "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+      "preferred": "auto",
+      "description": "",
+      "createdAt": 1791578459439,
+      "updatedAt": 1791578462639,
+      "lastActivityAt": 1791578462523,
+      "lifecycle": "ACTIVE",
+      "sourceType": "existing",
+      "projectType": "repository",
+      "ownerScope": "host-owner",
+      "tags": [
+        "application"
+      ],
+      "favorite": true,
+      "rootIdentity": "1309165269:75998243711941458:1791578458289785600",
+      "revision": 4,
+      "schemaVersion": "ma3.projects.v1",
+      "attention": []
+    },
+    "missions": [
+      {
+        "id": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "title": "Inspect, edit, test and retain verified output",
+        "objective": "[Retained on Host]",
+        "request": "[Retained on Host]",
+        "projectId": "0b529478-0595-418f-831b-107ab79017bf",
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a",
+        "mode": "balanced",
+        "state": "completed",
+        "origin": "agent:workstation",
+        "createdAt": 1791578459542,
+        "updatedAt": 1791578462494,
+        "startedAt": 1791578459846,
+        "finishedAt": 1791578462493,
+        "planning": {
+          "planner": "bunny-planner-deterministic-v1",
+          "complexity": "medium",
+          "rationale": [
+            "User-supplied plan; validated and bounded by Bunny."
+          ],
+          "replans": 0,
+          "plannedAt": 1791578459566
+        },
+        "requestedScope": {
+          "projectRoots": [
+            "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a"
+          ],
+          "riskClasses": [
+            "READ",
+            "WRITE",
+            "EXECUTE"
+          ],
+          "capabilities": [
+            "filesystem.compare",
+            "filesystem.exists",
+            "filesystem.list",
+            "filesystem.read",
+            "filesystem.write",
+            "git.status",
+            "notifications.send",
+            "terminal.exec"
+          ],
+          "providers": {
+            "execution": false,
+            "allow": null,
+            "localOnly": false,
+            "sessions": {
+              "steps": [],
+              "maxSessions": 0,
+              "writeIncludesShell": true
+            }
+          },
+          "filesystem": {
+            "read": [
+              "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a"
+            ],
+            "write": [
+              "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a"
+            ]
+          },
+          "browser": {
+            "enabled": false,
+            "domains": "public"
+          },
+          "terminal": {
+            "enabled": true,
+            "commands": [
+              "node"
+            ],
+            "executables": [
+              {
+                "command": "node",
+                "file": "C:\\Program Files\\nodejs\\node.exe",
+                "prefix": []
+              }
+            ]
+          },
+          "git": {
+            "actions": [
+              "status"
+            ]
+          },
+          "network": {
+            "allowed": false
+          },
+          "computer": {
+            "enabled": false
+          },
+          "budget": {
+            "maxExternalModelCalls": 6,
+            "maxRuntimeMs": 3600000,
+            "maxRetries": 4,
+            "maxTokens": null
+          },
+          "alwaysAsk": [
+            "EXTERNAL_SIDE_EFFECT",
+            "DESTRUCTIVE"
+          ]
+        },
+        "authorizationId": "f882379f-8ec0-42da-adae-bc21012ef67d",
+        "capabilityRequirements": [
+          "filesystem.compare",
+          "filesystem.exists",
+          "filesystem.list",
+          "filesystem.read",
+          "filesystem.write",
+          "git.status",
+          "notifications.send",
+          "terminal.exec"
+        ],
+        "providerConstraints": {
+          "localOnly": false
+        },
+        "budget": {
+          "maxExternalModelCalls": 6,
+          "maxRuntimeMs": 3600000,
+          "maxRetries": 4,
+          "maxTokens": null
+        },
+        "retryPolicy": {
+          "maxRetriesPerStep": 2
+        },
+        "verificationRequired": true,
+        "result": null,
+        "failure": null,
+        "recovery": null,
+        "accounting": {
+          "runtimeMs": 1239,
+          "externalModelCalls": 0,
+          "localModelCalls": 0,
+          "deterministicSteps": 5,
+          "retries": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "tokensReported": false
+        }
+      }
+    ],
+    "tasks": [],
+    "artifacts": [
+      {
+        "id": "8498b1a3-c8b8-4aaa-a497-3ea7d54b84b7",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4980e80e-8e11-4514-831a-3ffdd875227f",
+        "type": "structured_result",
+        "title": "filesystem.compare observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "f2fab2b6d42320d1108e6d926db97a3cb5e2d46e09cb4a8b7c7bb181e22437ae",
+        "bytes": 185,
+        "createdAt": 1791578462357,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:4e8e5323-ecb2-421b-a502-805b34e92d08"
+      },
+      {
+        "id": "05b5abaa-35eb-48fd-a96f-f0ce1eb61669",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4980e80e-8e11-4514-831a-3ffdd875227f",
+        "type": "source_file",
+        "title": "report.txt",
+        "location": {
+          "kind": "file",
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\report.txt",
+          "mediaType": "text/plain"
+        },
+        "sha256": "2d51dddc1bb4cadaf77618246748da8ca93ad33aef9fb85131ced1d0fec9abe4",
+        "bytes": 20,
+        "createdAt": 1791578462186,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:fa2a4ffa-9e98-4a90-9c36-2a6c9f4558ec"
+      },
+      {
+        "id": "64f721fe-2ad3-491a-9280-f3695068a310",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4980e80e-8e11-4514-831a-3ffdd875227f",
+        "type": "structured_result",
+        "title": "filesystem.write observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "20710753b38bf88ddd2845bd27c8f071de8415ff72581cdac24c6c5db1b3075a",
+        "bytes": 216,
+        "createdAt": 1791578462182,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:fa2a4ffa-9e98-4a90-9c36-2a6c9f4558ec"
+      },
+      {
+        "id": "3a9bc36f-254d-49c5-beb0-e41fbfce2905",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "d101e01c-8fa7-47bc-a814-33a28ffe19b7",
+        "type": "test_report",
+        "title": "node check.mjs output",
+        "location": {
+          "kind": "inline",
+          "mediaType": "text/plain"
+        },
+        "sha256": "f04ab37e5ea3e501f1117a783db767e5a569211cae9b3f0c401cffc7b78f2847",
+        "bytes": 115,
+        "createdAt": 1791578461885,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:187993ab-8580-4d36-b549-645d3447e7af"
+      },
+      {
+        "id": "001b60f3-7eab-4d03-a16e-80681e14d6a0",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "d101e01c-8fa7-47bc-a814-33a28ffe19b7",
+        "type": "structured_result",
+        "title": "terminal.exec observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "34dfb45cbbf61c6f7e4a6033ae4a5c4af09553e4e5fbf275ce6cab4021d653b3",
+        "bytes": 127,
+        "createdAt": 1791578461879,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:187993ab-8580-4d36-b549-645d3447e7af"
+      },
+      {
+        "id": "660a3a43-3d17-4b2b-a397-a9a95ff381e5",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "055ca877-6e46-4482-ab26-1fbde23dfeab",
+        "type": "structured_result",
+        "title": "filesystem.compare observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "9b7bc6c05fbbafccad9153629c1650c77521a9f794004a9d429d96be22a43aa9",
+        "bytes": 185,
+        "createdAt": 1791578461221,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:bacdd91a-9ffc-46dd-b43e-ce60a46d4531"
+      },
+      {
+        "id": "5008c9da-a35c-4378-9ba2-2a898c51e25b",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "055ca877-6e46-4482-ab26-1fbde23dfeab",
+        "type": "source_file",
+        "title": "result.txt",
+        "location": {
+          "kind": "file",
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\project-a\\result.txt",
+          "mediaType": "text/plain"
+        },
+        "sha256": "44a3fdaf9b3d8733dd906e5548a986825f846ecfdfbb36eb2f4fa1f5b57029a8",
+        "bytes": 19,
+        "createdAt": 1791578461111,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:06b4357d-1b0f-4e26-aed1-e6abb6934921"
+      },
+      {
+        "id": "f870d87c-d766-47e1-a7c6-812efa7637c4",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "055ca877-6e46-4482-ab26-1fbde23dfeab",
+        "type": "structured_result",
+        "title": "filesystem.write observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "58c2133c84244da7c415fdb287bd221b12a9948d96425aa51cecd1ebbbcb824e",
+        "bytes": 279,
+        "createdAt": 1791578461107,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:06b4357d-1b0f-4e26-aed1-e6abb6934921"
+      },
+      {
+        "id": "0cb15828-e32d-40b3-98be-6b2112dce012",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "fc7ae7fa-cd5c-427f-9532-d41fcab64a55",
+        "type": "structured_result",
+        "title": "git.status observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "b23347b21f6e54614b09e44d97edbe7112b310a007f4e577bcd79d65c191ed67",
+        "bytes": 45,
+        "createdAt": 1791578460849,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:f93995f8-b9bd-413d-9c89-44092ca85838"
+      },
+      {
+        "id": "31d8d8a7-bad1-45b0-b222-3773ba57917c",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "fc7ae7fa-cd5c-427f-9532-d41fcab64a55",
+        "type": "structured_result",
+        "title": "git.status observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "b23347b21f6e54614b09e44d97edbe7112b310a007f4e577bcd79d65c191ed67",
+        "bytes": 45,
+        "createdAt": 1791578460569,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:6b4f9600-2c21-442b-bcbb-57e5c569139d"
+      },
+      {
+        "id": "0291a6b1-52d9-4cac-b8c0-e8925279479d",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4975b101-33a6-4901-8d7f-da0b2211c6f8",
+        "type": "structured_result",
+        "title": "filesystem.compare observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "3c42c9558b4b652796f3df9405143c2ecc7b0329ddc70038988ad0d65c46bd21",
+        "bytes": 190,
+        "createdAt": 1791578460149,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:c194223d-10f8-4cae-a979-e333176465fe"
+      },
+      {
+        "id": "99db3cf0-b42d-4da0-84d9-73a3686e5747",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "stepId": "4975b101-33a6-4901-8d7f-da0b2211c6f8",
+        "type": "structured_result",
+        "title": "filesystem.read observation",
+        "location": {
+          "kind": "inline",
+          "mediaType": "application/json"
+        },
+        "sha256": "905ebae38ae063deac34ea98c5af5732721d09d679428110c51dfd215dafa9d2",
+        "bytes": 216,
+        "createdAt": 1791578460045,
+        "verification": "verified",
+        "consumers": [],
+        "provenance": "bunny:capability:d98a2505-255f-4657-be3c-20b13285c144"
+      }
+    ],
+    "agents": [
+      {
+        "id": "f9fc1465-96d6-4039-b29d-d761ccba0883",
+        "name": "Project acceptance Agent",
+        "state": "COMPLETED",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "createdAt": 1791578459540,
+        "updatedAt": 1791578462503,
+        "failure": null,
+        "run": {
+          "id": "f672bc91-daca-439a-a144-607fb0080f7f",
+          "generation": 1,
+          "state": "COMPLETED",
+          "startedAt": 1791578459770,
+          "endedAt": 1791578462503
+        },
+        "checkpoints": 34,
+        "lastCheckpoint": {
+          "boundary": "after_verification",
+          "at": 1791578462392,
+          "replaySafety": "VERIFY_BEFORE_REPLAY"
+        },
+        "pausedAt": null,
+        "stoppedAt": null,
+        "note": null
+      }
+    ],
+    "workspaces": [
+      {
+        "id": "f777f81c-4ebd-4c6a-9580-238d0e4f3fb1",
+        "agentId": "f9fc1465-96d6-4039-b29d-d761ccba0883",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831",
+        "projectId": "0b529478-0595-418f-831b-107ab79017bf",
+        "root": {
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\workspace\\agents\\f9fc1465-96d6-4039-b29d-d761ccba0883\\f6900e52-8d29-4138-a0f0-4ea41c555831",
+          "identity": "1309165269:10696049117215815:1791578459594585100"
+        },
+        "scratch": {
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\workspace\\agents\\f9fc1465-96d6-4039-b29d-d761ccba0883\\f6900e52-8d29-4138-a0f0-4ea41c555831\\scratch",
+          "identity": "1309165269:10414574140505160:1791578459594585100"
+        },
+        "workspaceRoot": {
+          "path": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t7-live-w7vRVy\\workspace",
+          "identity": "1309165269:215046882206989613:1791578458288785600"
+        },
+        "state": "READY",
+        "createdAt": 1791578459594,
+        "lastUsedAt": 1791578459594,
+        "ownershipMarker": "59bf2d67-902f-4226-b980-03d8c9fe8a15",
+        "manifestRevision": 1,
+        "maxBytes": 67108864
+      }
+    ],
+    "events": [
+      {
+        "sequence": 178,
+        "at": 1791578462639,
+        "type": "project.updated",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": null
+      },
+      {
+        "sequence": 176,
+        "at": 1791578462622,
+        "type": "project.updated",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": null
+      },
+      {
+        "sequence": 172,
+        "at": 1791578462523,
+        "type": "agent.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 171,
+        "at": 1791578462514,
+        "type": "agent.state_changed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 170,
+        "at": 1791578462494,
+        "type": "mission.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 169,
+        "at": 1791578462485,
+        "type": "mission.verifying",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 168,
+        "at": 1791578462481,
+        "type": "agent.authorization_changed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 167,
+        "at": 1791578462462,
+        "type": "agent.cross_app_step_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 166,
+        "at": 1791578462453,
+        "type": "agent.capability_verified",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 165,
+        "at": 1791578462441,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 164,
+        "at": 1791578462432,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 163,
+        "at": 1791578462424,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 162,
+        "at": 1791578462415,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 161,
+        "at": 1791578462405,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 160,
+        "at": 1791578462396,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 159,
+        "at": 1791578462387,
+        "type": "mission.step.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 158,
+        "at": 1791578462362,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 157,
+        "at": 1791578462362,
+        "type": "capability.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 156,
+        "at": 1791578462315,
+        "type": "capability.started",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 155,
+        "at": 1791578462305,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 154,
+        "at": 1791578462301,
+        "type": "agent.action_admitted",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 153,
+        "at": 1791578462253,
+        "type": "capability.requested",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 152,
+        "at": 1791578462218,
+        "type": "agent.state_changed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 151,
+        "at": 1791578462206,
+        "type": "mission.step.verifying",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 150,
+        "at": 1791578462193,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 149,
+        "at": 1791578462193,
+        "type": "capability.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 148,
+        "at": 1791578462153,
+        "type": "capability.started",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 147,
+        "at": 1791578462145,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 146,
+        "at": 1791578462142,
+        "type": "agent.action_admitted",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 145,
+        "at": 1791578462112,
+        "type": "capability.requested",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 144,
+        "at": 1791578462083,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 143,
+        "at": 1791578462076,
+        "type": "agent.capability_selected",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 142,
+        "at": 1791578462067,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 141,
+        "at": 1791578462059,
+        "type": "agent.application_handoff",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 140,
+        "at": 1791578462050,
+        "type": "agent.task_started",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 139,
+        "at": 1791578462042,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 138,
+        "at": 1791578462034,
+        "type": "mission.step.started",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 137,
+        "at": 1791578462008,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 136,
+        "at": 1791578461998,
+        "type": "mission.step.ready",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 135,
+        "at": 1791578461983,
+        "type": "agent.cross_app_step_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 134,
+        "at": 1791578461975,
+        "type": "agent.capability_verified",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 133,
+        "at": 1791578461966,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 132,
+        "at": 1791578461957,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 131,
+        "at": 1791578461949,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 130,
+        "at": 1791578461940,
+        "type": "agent.task_completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 129,
+        "at": 1791578461932,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 128,
+        "at": 1791578461923,
+        "type": "mission.step.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 127,
+        "at": 1791578461903,
+        "type": "mission.step.verifying",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 126,
+        "at": 1791578461890,
+        "type": "agent.checkpointed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      },
+      {
+        "sequence": 125,
+        "at": 1791578461889,
+        "type": "capability.completed",
+        "taskId": null,
+        "detail": "Canonical Host event; related work is available in Mission and Task detail.",
+        "missionId": "f6900e52-8d29-4138-a0f0-4ea41c555831"
+      }
+    ],
+    "offset": 0,
+    "limit": 50,
+    "totals": {
+      "missions": 1,
+      "tasks": 0,
+      "artifacts": 12,
+      "events": 164
+    }
+  },
+  "privateProjectUnchanged": true,
+  "artifactsOpenedWithHashCheck": true,
+  "crossProjectArtifactDenied": true
+}
