@@ -1,4 +1,5 @@
 import { execFile, type ChildProcess, type ExecFileOptions } from "node:child_process";
+import { systemTool } from "./system-tools.server.ts";
 
 /** Live handles created by Bunny only. Persisted PIDs and executable names confer no authority. */
 const owned = new Set<ChildProcess>();
@@ -40,7 +41,7 @@ export async function stopOwnedChildren() {
       if (process.platform === "win32")
         await new Promise<void>((done) =>
           execFile(
-            "taskkill.exe",
+            systemTool("taskkill.exe"),
             ["/PID", String(child.pid), "/T", "/F"],
             { windowsHide: true, timeout: 1800 },
             () => {

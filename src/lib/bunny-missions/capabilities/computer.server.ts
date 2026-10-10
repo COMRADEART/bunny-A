@@ -7,6 +7,7 @@ import { calculatorOperation } from "../batches.server.ts";
 import type { CapabilityAdapter, ExecutionContext } from "./bus.server.ts";
 import { trackOwnedChild } from "../../bunny-host/owned-processes.server.ts";
 import { CalculatorTargets, type CalculatorIdentity, type CalculatorAcquisition, type CalculatorTargetStorage } from "./calculator-targets.server.ts";
+import { systemTool } from "../../bunny-host/system-tools.server.ts";
 
 const input = (name: string, type: ActionManifest["inputs"][number]["type"], required: boolean, description: string) => ({ name, type, required, description });
 /** Applications Bunny may start by name. Anything else needs a new skill or capability, not a free-form command. */
@@ -390,7 +391,7 @@ if ($result.Current.IsPassword -or $result.Current.ProcessId -ne $zero.Current.P
 
 function powershell(script: string, params: Record<string, unknown>, signal: AbortSignal, timeoutMs: number, batch?: ExecutionContext["desktopBatch"]): Promise<unknown> {
   return new Promise((resolveRun, reject) => {
-    const child = trackOwnedChild(execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", `${PRELUDE}\n${script}`], { windowsHide: true, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, BUNNY_COMPUTER_PARAMS: JSON.stringify(params), BUNNY_COMPUTER_BATCH: batch ? JSON.stringify(batch) : "" }, signal }, (error, stdout, stderr) => {
+    const child = trackOwnedChild(execFile(systemTool("powershell.exe"), ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", `${PRELUDE}\n${script}`], { windowsHide: true, timeout: timeoutMs, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, BUNNY_COMPUTER_PARAMS: JSON.stringify(params), BUNNY_COMPUTER_BATCH: batch ? JSON.stringify(batch) : "" }, signal }, (error, stdout, stderr) => {
       if (error) { reject(new Error(((stderr || error.message).split(/\r?\n/).filter(Boolean)[0] ?? "UI Automation failed.").replace(/\s+At line:\d+.*$/, "").slice(0, 600))); return; }
       try { resolveRun(JSON.parse(stdout.trim().split(/\r?\n/).at(-1) ?? "null")); } catch { reject(new Error(`Unreadable automation result: ${stdout.slice(0, 200)}`)); }
     }));

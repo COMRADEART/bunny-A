@@ -22,15 +22,29 @@ import { activityLabel } from "./events.ts";
 import { describeTree, descendants, killProcess, processTable, sameProcessIdentity, survivors ,
 } from "./process-tree.server.ts";
 import { verifySpec } from "./verification.server.ts";
+import { markProviderSessionReview, readProviderSessions, reconcileProviderSession, type InterruptedProviderSession } from "./owned-process-group.server.ts";
 import { HostContainment, safeError, type SafeError } from "./failure.server.ts";
 import { ProjectRegistry } from "./project-registry.server.ts";
 import { deviceMayLaunch } from "./device-authority.server.ts";
 
 const TERMINAL: TaskState[] = ["completed", "failed", "stopped"];
 const TRANSCRIPT_LIMIT = 20 * 1024 * 1024;
+/** Hold key for a provider-sessions folder that could not be listed at startup (review round 5). */
+const FOLDER_UNREADABLE = "provider-sessions (folder unreadable)";
 const lastLine = (text: string) => text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).at(-1) ?? "";
 const clip = (text: string, max = 300) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
 
+/**
+ * Restart liveness (never kill authority): same PID and image, and either the same birth time or a birth time that
+ * cannot be read now or was not recorded. Unknown means possibly alive (fail closed).
+ */
+function possiblyAlive(expected: ProcessInfo, rows: ProcessInfo[]): boolean {
+  const current = rows.find((row) => row.pid === expected.pid);
+  if (!current) return false;
+  if (expected.name && current.name && current.name.toLowerCase() !== expected.name.toLowerCase()) return false;
+  const known = (value: number | null) => value !== null && Number.isFinite(value) && value > 0;
+  return !known(expected.createdAt) || !known(current.createdAt) || current.createdAt === expected.createdAt;
+}
 export type ManagerOptions = {
   workspaceRoot?: string;
   /** Folder for raw provider transcripts (one JSONL file per task); null disables them. */
@@ -41,6 +55,8 @@ export type ManagerOptions = {
   containment?: HostContainment;
   /** M-A-3 T3: test/fixture injection point for the T1 model registry; production builds the real one. */
   modelRegistry?: ModelCapabilityRegistry;
+  /** M-A-3 T9R-F04: Host state folder; provider-session job records live in runtime/provider-sessions. */
+  dataDirectory?: string | null;
 };
 
 export class TaskManager {
@@ -83,6 +99,8 @@ export class TaskManager {
   /** The provider and access of the attempt each lingering entry belongs to (a reroute never reclassifies it). */
   lingeringAttempt = new Map<string, { provider: OrchTask["provider"]; access: string | undefined; mission: boolean }>();
   sessionDirectory: string | null;
+  /** M-A-3 T9R-F04: where provider-session job records are kept (null: not persisted). */
+  dataDirectory: string | null = null;
   readProcesses: () => Promise<ProcessInfo[]>;
   /** Host-owned folders (mission worktrees) a delegated child task may use as its working directory. */
   workspaceRoots: string[] = [];
@@ -134,6 +152,7 @@ export class TaskManager {
     this.routingStore = new RoutingDecisionStore(db);
     this.sessionDirectory = options.sessionDirectory ?? null;
     this.readProcesses = options.processTable ?? processTable;
+    this.dataDirectory = options.dataDirectory ?? null;
     const savedThermal = db.db
       .prepare("SELECT value FROM settings WHERE key='thermal_policy'")
       .get() as { value: string } | undefined;
@@ -156,13 +175,124 @@ export class TaskManager {
           {
             state: "failed",
             error:
-              "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis; no process was killed.",
+              "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.",
             finishedAt: Date.now(),
           },
           "task.failed",
           "Host restarted; session recovery unsupported.",
         );
       }
+    if (this.dataDirectory) {
+      let found: ReturnType<typeof readProviderSessions> = { records: [], unreadable: [] };
+      try { found = readProviderSessions(this.dataDirectory, this.instanceId); } catch { found = { records: [], unreadable: [FOLDER_UNREADABLE] }; }
+      for (const record of found.records) {
+        try { this.reconcileInterruptedProviderSessions([record]); }
+        catch { found.unreadable.push(`${record.operationId}.json`); }
+      }
+      this.holdUnreadableProviderSessions(found.unreadable);
+    }
+  }
+  /**
+   * M-A-3 T9R-F04 restart: the previous Host's provider jobs were killed by the kernel when its handles closed. Each
+   * interrupted record is corroborated against the current process table by full identity (PID + creation time +
+   * image). Until that read succeeds, and while any recorded identity is still alive, the session counts as live code
+   * (fail closed) and needs review. Nothing is killed and no handle is recreated.
+   */
+  /** Set at Host shutdown: restart/unreadable/job watchers stop instead of touching a closed database. */
+  disposed = false;
+  dispose() { this.disposed = true; }
+  /** Restart holds by Mission/Task: a new provider session for the same work waits while a prior one may survive. */
+  restartSurvivorMission = new Map<string, { missionId: string | null; taskId: string | null }>();
+  /** Why a provider launch for this task must wait for an interrupted earlier session, or null (review round 1, RESTART-04). */
+  restartSurvivorRefusal(task: OrchTask): string | null {
+    for (const [key, owner] of this.restartSurvivorMission) {
+      if (!this.lingering.has(key)) continue;
+      if ((owner.missionId && owner.missionId === task.mission?.missionId) || (owner.taskId && owner.taskId === task.id))
+        return `A provider session for this work from before the Host restarted (${key.slice(8)}) may still be running; Bunny is verifying its recorded processes and starts no new session for the same work until none is alive.`;
+    }
+    return null;
+  }
+  /** Unreadable job records may name live processes: each is held as live code until the file is readable or removed. */
+  holdUnreadableProviderSessions(files: string[]) {
+    for (const file of files) {
+      const key = `unreadable:${file}`;
+      this.lingering.set(key, "checking");
+      this.emit(this.db.event("provider_session.unreadable", null, `Requires review: provider-session record ${file} could not be read. It is treated as live code (fail closed) until the record is readable or removed; nothing was killed.`));
+      let failureReported = false;
+      const check = () => {
+        if (this.disposed) return;
+        let found: ReturnType<typeof readProviderSessions> | null = null;
+        try { found = readProviderSessions(this.dataDirectory!, this.instanceId); } catch { found = null; }
+        if (found && !found.unreadable.includes(file)) {
+          // Readable again: reconcile it like any interrupted record before the hold is released (review round 3, HOLD-4).
+          // A folder that was unreadable at startup releases only after EVERY record in it is reconciled, and files that
+          // are still unreadable get their own holds (review round 5). A reconcile failure keeps the hold and retries
+          // (review round 4, F04-R3-3): it never escapes the timer and is reported once.
+          const folder = file === FOLDER_UNREADABLE;
+          let reconciled = false;
+          try {
+            this.reconcileInterruptedProviderSessions(folder ? found.records : found.records.filter((record) => `${record.operationId}.json` === file));
+            if (folder) this.holdUnreadableProviderSessions(found.unreadable.filter((name) => !this.lingering.has(`unreadable:${name}`)));
+            reconciled = true;
+          } catch (error) {
+            reconciled = false;
+            if (!failureReported) { failureReported = true; try { this.emit(this.db.event("provider_session.reconcile_failed", null, `Requires review: provider-session record ${file} is readable but could not be reconciled (${safeError(error).message}). It stays live code (fail closed) and is retried; nothing was killed.`)); } catch { /* the hold stands */ } }
+          }
+          if (reconciled) { this.lingering.delete(key); return; }
+        }
+        setTimeout(check, 10_000).unref?.();
+      };
+      setTimeout(check, 10_000).unref?.();
+    }
+  }
+  /** Operations already reconciled by this Host: a later folder re-read never reconciles or reports them twice. */
+  reconciledOperations = new Set<string>();
+  reconcileInterruptedProviderSessions(records: InterruptedProviderSession[]) {
+    for (const record of records) {
+      const key = `restart:${record.operationId}`;
+      // A record whose earlier reconcile is held (or done) is not started again: a partial failure leaves its restart
+      // hold in place, fail closed (review round 5).
+      if (this.reconciledOperations.has(record.operationId) || this.lingering.has(key)) continue;
+      this.reconciledOperations.add(record.operationId);
+      this.lingering.set(key, "checking");
+      this.lingeringAttempt.set(key, { provider: (record.provider ?? "codex") as OrchTask["provider"], access: undefined, mission: !!record.missionId });
+      this.restartSurvivorMission.set(key, { missionId: record.missionId, taskId: record.taskId });
+      this.emit(this.db.event("provider_session.interrupted", record.taskId, `Host restarted while a ${record.provider ?? "provider"} session ran in a Bunny-owned Windows job (operation ${record.operationId}, generation ${record.hostGeneration ?? "unknown"}); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped.`, record.missionId));
+      // Every recorded identity is checked; none is silently dropped (review round 1, RESTART-01). A record with no
+      // process identity at all (crash between job creation and the first inspection) cannot be corroborated.
+      const expected: ProcessInfo[] = [
+        { pid: record.launcherPid, ppid: 0, name: record.launcherPath.split(/[\\/]/).at(-1) ?? "", createdAt: record.launcherCreatedAt },
+        ...record.members.map((member) => ({ pid: member.pid, ppid: 0, name: (member.file ?? "").split(/[\\/]/).at(-1) ?? "", createdAt: member.createdAt })),
+      ].filter((row) => row.pid > 0);
+      if (!expected.length) {
+        this.lingering.delete(key); this.lingeringAttempt.delete(key); this.restartSurvivorMission.delete(key);
+        try { markProviderSessionReview(this.dataDirectory!, record.operationId); } catch { /* history stays interrupted */ }
+        this.emit(this.db.event("provider_session.cleanup_unverifiable", record.taskId, `Requires review: interrupted provider session ${record.operationId} has no recorded process identity, so its end cannot be corroborated independently. The kernel ends job members when the previous Host's job handle closed; nothing was killed by this Host.`, record.missionId));
+        continue;
+      }
+      let reported = false;
+      const check = async () => {
+        if (this.disposed) return;
+        // An empty table is a failed read, never proof of absence (review round 2, L1).
+        const rows = await this.readProcesses().then((table) => (table.length ? table : null)).catch(() => null);
+        if (!rows) { setTimeout(() => void check(), 10_000).unref?.(); return; }
+        if (this.disposed) return;
+        const alive = expected.filter((old) => possiblyAlive(old, rows));
+        if (!alive.length) {
+          this.lingering.delete(key); this.lingeringAttempt.delete(key); this.restartSurvivorMission.delete(key);
+          try { reconcileProviderSession(this.dataDirectory!, record.operationId); } catch { /* history stays interrupted */ }
+          this.emit(this.db.event("provider_session.reconciled", record.taskId, `Interrupted provider session ${record.operationId}: none of its ${expected.length} recorded process identities appears in an independent process-table read (kernel accounting does not exist after the job died with the previous Host; recorded as absent_after_restart, not kernel-verified empty). No process was killed by this Host.`, record.missionId));
+          return;
+        }
+        this.lingering.set(key, alive);
+        if (!reported) {
+          reported = true;
+          this.emit(this.db.event("provider_session.cleanup_unconfirmed", record.taskId, `Requires review: ${alive.length} recorded process(es) of interrupted provider session ${record.operationId} are still alive (${describeTree(alive)}). They are treated as live code; Bunny does not kill them on restart.`, record.missionId));
+        }
+        setTimeout(() => void check(), 10_000).unref?.();
+      };
+      void check();
+    }
   }
   /** Compatibility view of the registry. */
   get providers(): ProviderLive[] {
@@ -1046,6 +1176,8 @@ export class TaskManager {
     const task = this.db.get(id);
     if (task.state !== "waiting_for_approval")
       throw new Error("Task is not awaiting approval; duplicate launches are refused.");
+    const survivor = this.restartSurvivorRefusal(task);
+    if (survivor) throw new Error(survivor);
     if (task.projectId) {
       const project = this.projects.forExecution(task.projectId);
       if (task.cwd !== project.path && !task.mission)
@@ -1204,6 +1336,7 @@ export class TaskManager {
     // M-A-3 T3 §22: one hooks object shared by the initial launch and every relaunch; each
     // handler re-reads the live task record, so provider/model reroutes flow through unrebound.
     const adapterHooks: AdapterHooks = {
+      owner: { dataDirectory: this.dataDirectory, hostGeneration: this.instanceId, taskId: id, missionId: task.mission?.missionId ?? null, agentId: this.agentForMission(task.mission?.missionId ?? null) },
       event: (type, detail) => {
         // Output that arrived first is written first, so the latest activity is really the latest.
         flush();
@@ -1712,6 +1845,9 @@ export class TaskManager {
    * already exited, born after it). One entry per ended attempt, so a retry never hides an earlier attempt's survivors.
    */
   watchSurvivors(id: string, rootPid: number | undefined, attempt?: object) {
+    // M-A-3 T9R-F04: a job-contained attempt is judged by kernel job accounting, not by process samples.
+    const contained = (attempt as RunningSession | undefined)?.containment;
+    if (contained) { if (!this.survivorAttempts.has(attempt!)) { this.survivorAttempts.add(attempt!); this.watchContainedJob(id, contained); } return; }
     // One watcher per ended attempt (keyed by the session object, never by a PID that the OS may recycle).
     if (!rootPid || (attempt && this.survivorAttempts.has(attempt))) return;
     if (attempt) this.survivorAttempts.add(attempt);
@@ -1746,18 +1882,80 @@ export class TaskManager {
     };
     void check();
   }
+  /** Live code until the attempt's job reports 0 active processes; a refused admission never ran anything. */
+  watchContainedJob(id: string, containment: () => import("./contracts.ts").SessionContainment) {
+    const settled = (state: string) => state === "empty" || state === "refused";
+    if (settled(containment().state)) return;
+    const key = `${id}#${++this.survivorWatches}`;
+    this.lingering.set(key, "checking");
+    try { const task = this.db.get(id); this.lingeringAttempt.set(key, { provider: task.provider, access: task.executionScope?.access, mission: !!task.mission }); } catch { /* unknown: fail closed */ }
+    const check = () => {
+      if (this.disposed) return;
+      if (settled(containment().state)) { this.lingering.delete(key); this.lingeringAttempt.delete(key); return; }
+      setTimeout(check, 500).unref?.();
+    };
+    check();
+  }
+  /** The Agent that owns a Mission, for job-record identity only (never an authority input). */
+  agentForMission(missionId: string | null): string | null {
+    if (!missionId) return null;
+    try { return (this.db.db.prepare("SELECT id FROM agents WHERE mission_id=? ORDER BY created_at LIMIT 1").get(missionId) as { id: string } | undefined)?.id ?? null; } catch { return null; }
+  }
   stopTree(id: string) {
     const timer = this.treeTimers.get(id);
     if (timer) clearTimeout(timer);
     this.treeTimers.delete(id);
   }
+  /**
+   * M-A-3 T9R-F04 Stop of a job-contained session: the session terminates its exact Windows job (the kernel kills every
+   * member, including orphans whose parent exited) and the result comes from job accounting. No PID list, process
+   * name or table sample is kill authority.
+   */
+  async stopContained(id: string, detail: string, session: RunningSession) {
+    await session.stop();
+    this.flushers.get(id)?.();
+    this.stopTree(id);
+    const job = session.containment!();
+    const stopCleanup: NonNullable<OrchTask["stopCleanup"]> = { status: "complete", inspectedAt: Date.now(), unresolvedProcessCount: 0, terminationFailures: 0 };
+    let cleanup: string;
+    if (!job.admitted && (job.state === "empty" || job.state === "refused" || job.state === "launching")) cleanup = " No provider process was admitted for this session.";
+    else if (job.state === "empty") cleanup = ` Windows job verified empty by kernel accounting: ${job.terminatedAtEnd === null ? "an unknown number of" : job.terminatedAtEnd} process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.`;
+    else {
+      stopCleanup.status = "cleanup_incomplete";
+      stopCleanup.unresolvedProcessCount = job.activeProcesses !== null && job.activeProcesses >= 0 ? job.activeProcesses : null;
+      cleanup = ` Cleanup incomplete: ${job.detail}`;
+    }
+    if (stopCleanup.status !== "complete") this.emit(this.db.event("task.cleanup_incomplete", id, cleanup.trim()));
+    const current = this.db.get(id);
+    if (!canTransition(current.state, "stopped")) return current;
+    return this.update(
+      current,
+      {
+        state: "stopped", finishedAt: Date.now(),
+        activity: stopCleanup.status === "complete" ? "Stopped" : "Stopped; cleanup incomplete",
+        stopReason: detail, stopCleanup,
+        latestEvent: this.activity(current, "agent.stopped", detail + cleanup, "bunny"),
+      },
+      "task.stopped",
+      detail + cleanup,
+    );
+  }
+  /** Stops in flight, so Host shutdown can wait for their final accounting before the database closes. */
+  stopsInFlight = new Map<string, Promise<unknown>>();
+  async settleStops() { await Promise.allSettled([...this.stopsInFlight.values()]); }
   async stop(id: string, detail = "User stopped the selected task.") {
     const task = this.db.get(id);
     if (!canTransition(task.state, "stopped")) throw new Error("Task has already ended.");
     if (this.stopping.has(id)) throw new Error("Stop already in progress.");
+    const running = this.stopNow(id, detail);
+    this.stopsInFlight.set(id, running);
+    try { return await running; } finally { this.stopsInFlight.delete(id); }
+  }
+  private async stopNow(id: string, detail: string) {
     this.stopping.add(id);
     try {
       const session = this.sessions.get(id);
+      if (session?.containment) return await this.stopContained(id, detail, session);
       // Pre-stop observations remain evidence only; failed fresh inspection confers no kill authority.
       const root = session?.pid?.() ?? null;
       const initial = root ? await this.readProcesses().catch(() => null) : [];

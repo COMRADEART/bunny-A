@@ -31,6 +31,40 @@ guarantee. Normal completion kills remaining descendants as well as closing
 handles. Inspect rechecks membership of each opened process handle before
 reporting PID/creation time; those values are evidence only.
 
+## Provider sessions (M-A-3 T9R-F04)
+
+Codex and Claude sessions and provider probes use the same job helper. `launch` takes an
+optional seventh argument, a Buffer that is the provider prompt. The helper copies it, creates an
+unnamed anonymous pipe, lets the root inherit only the read end (through `HANDLE_LIST`), and a Host
+thread writes the bytes after `ResumeThread` and then closes the pipe. No pipe name exists to
+squat or read. After the limits are set, the Host keeps a duplicate job handle with only
+`ASSIGN_PROCESS | QUERY | TERMINATE`. Through that handle, `KILL_ON_JOB_CLOSE` and the absence of
+breakaway cannot be changed. `inspect` reports kernel accounting (`ActiveProcesses`,
+`TotalProcesses`). `terminate` calls `TerminateJobObject` and returns the current `ActiveProcesses` at once,
+without waiting on the Host thread. The Host polls every 100 ms for up to 30 s, then retries with backoff.
+It keeps the handle, so an unconfirmed termination stays observable. `close` still waits up to 1.5 s before
+dropping the handle (T4 Git semantics). Provider sessions close only at zero.
+When the root exits, the session terminates its whole job. Descendants never outlive the session,
+including those whose parent had already exited. A session ends as "empty" only on
+`ActiveProcesses = 0`, never because a process sample lacked a row. On Windows, a containment
+failure refuses the session. There is no fallback to an unowned spawn.
+
+Restart never reopens a job. Interrupted provider-session records
+(`runtime/provider-sessions`) are checked against the current process table by PID, creation
+time and image. An unknown birth time counts as possibly alive, and an empty table read is a failed read.
+A live identity is held as live code and reported for review. Nothing is killed. An absent identity
+is recorded as `absent_after_restart`, not as kernel-verified `empty`: once the job dies with its
+Host, no kernel accounting exists. Unreadable records, and records without any identity, are
+listed for review. Unreadable records are also held as live code. Host verification runs (Python)
+execute in their own jobs and count as live code while open.
+
+Explicitly outside the job: requests to already-running services (Ollama HTTP, the user's daemons,
+IDE or COM servers), brokered launches (WMI, Task Scheduler, services, shell hand-off to an
+existing Explorer, WSL VM processes), and remote hosted execution. A deliberately hostile
+same-user or elevated process that targets the Host itself is also outside this contract. The
+jobs are lifetime ownership, not a sandbox. Authorization (T5, F01-F03) still decides whether
+anything runs.
+
 Link flags retain ASLR/NX and use a fixed preferred image base, no linker
 timestamp and stripped local symbols. Two independent output directories must
 produce identical bytes (`scripts/owned-process-build.test.mjs`). The module's

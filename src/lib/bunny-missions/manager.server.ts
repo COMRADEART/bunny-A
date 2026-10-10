@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
+import { liveHostCodeRuns } from "../bunny-host/owned-process-group.server.ts";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import type { TaskManager } from "../bunny-host/manager.server.ts";
@@ -2738,7 +2739,8 @@ export class MissionManager {
       const attempt = this.tasks.lingeringAttempt.get(key);
       return attempt ? live(`${attempt.provider} survivors ${key}`, classify(attempt.provider, attempt.access, attempt.mission)) : [`survivors ${key}`];
     });
-    return [...[...this.bus.liveCode.values()], ...sessions, ...survivors];
+    // M-A-3 T9R-F04 (review round 2, L3): Host-run verification jobs execute project content too.
+    return [...[...this.bus.liveCode.values()], ...sessions, ...survivors, ...liveHostCodeRuns()];
   }
   /** A paired-device change waits while workstation-approved code runs, unless the workstation allowed this exact step. */
   remoteMutationHeld(request: CapabilityRequest): string | null {

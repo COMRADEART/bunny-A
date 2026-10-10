@@ -611,15 +611,193 @@ function folderRef(text: string, folder: string, shell: boolean): boolean {
   return forms.some((source) => new RegExp(source, "m").test(text));
 }
 /** Tools that only read, format or lint files: a glob of the extension on their line does not run anything. */
-const READ_ONLY_TOOL = /\b(prettier|markdownlint(-cli2?)?|eslint|stylelint|cspell|remark(-cli)?|alex|write-good|vale|textlint|editorconfig-checker|dprint|biome|typos|codespell|lychee|markdown-link-check|git add|git diff|wc|grep|rg|ls)\b/;
+const READ_ONLY_PROGRAM = /^(prettier|markdownlint(-cli2?)?|eslint|stylelint|cspell|remark(-cli)?|alex|write-good|vale|textlint|editorconfig-checker|dprint|biome|typos|codespell|lychee|markdown-link-check|wc|grep|rg|ls)$/;
+/**
+ * T9R-F04 F03 follow-up (F03-FOLLOWUP-1 and its three verification rounds): the read-only exemption fails closed. It
+ * applies only on a line nothing can hide in — no substitution, variable, redirection, subshell or quoted separator,
+ * with an unquoted trailing comment set aside by a quote-aware scan — so splitting the line on separators is exact.
+ * Within a statement EVERY pipeline stage must be a bare read-only program (no path, no environment assignment) whose
+ * options are allow-listed and whose arguments name no program, plugin, script or path.
+ */
+const UNSAFE_SHELL_LINE = /[$`<>()\\]|"[^"]*[;&|][^"]*"|'[^']*[;&|][^']*'/;
+/** Options a read-only statement may carry: an allow-list, so an option that loads a program, plugin, rule or config never passes. */
+const SAFE_OPTION = /^(-[lwnirvqsLH]+|--(write|check|list-different|fix|quiet|no-progress|stat|name-only|name-status|cached|count|files-with-matches|no-color|color|dot|cache|verbose|silent|recursive|ignore-unknown|no-error-on-unmatched-pattern|ignore|ignore-path|ignore-pattern|log-level|loglevel|max-warnings|print-width|tab-width|use-tabs|prose-wrap|end-of-line|single-quote|no-semi)(=[^/]*)?)$/;
+const PATH_OR_SCRIPT = /[/]|\.(m?[jt]sx?|cjs|cts|sh|bash|zsh|py|rb|pl|php|ps1|psm1|exe|cmd|bat|lua)$/;
+function readOnlyStatement(statement: string, line: string): boolean {
+  if (UNSAFE_SHELL_LINE.test(line)) return false;
+  return statement.split("|").every((segment) => {
+    let words = segment.trim().split(/\s+/).filter(Boolean).map((word) => word.replace(/^["']|["']$/g, ""));
+    if (["npx", "bunx", "pnpx"].includes(words[0] ?? "")) words = words.slice(1);
+    else if (["npm", "pnpm", "yarn"].includes(words[0] ?? "") && ["exec", "dlx"].includes(words[1] ?? "")) words = words.slice(words[2] === "--" ? 3 : 2);
+    const program = words[0];
+    let args = words.slice(1);
+    if (!program || /[/=]/.test(program)) return false;
+    // git only as exactly "git add" / "git diff" (single space; review verification NEW-7).
+    if (program === "git") { if (!/^(?:\S+ )*?git (add|diff)(\s|$)/.test(segment.trim()) || (args[0] !== "add" && args[0] !== "diff")) return false; args = args.slice(1); }
+    else if (!READ_ONLY_PROGRAM.test(program)) return false;
+    return args.every((arg) => (arg.startsWith("-") ? SAFE_OPTION.test(arg) : /[*?[{]/.test(arg) || !PATH_OR_SCRIPT.test(arg)));
+  });
+}
+/**
+ * Quote-aware scan of one line: the code before an unquoted trailing comment, and whether a quote stays open at the
+ * end of the line. `#` starts a comment only at a word start; PowerShell <# #> markers are never treated as comments.
+ */
+function scanLine(line: string, hashComments: boolean): { code: string; open: boolean } {
+  let quote = "";
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (quote) { if (c === quote) quote = ""; else if (c === "\\" && quote === "\"") i++; continue; }
+    if (c === "\\") { i++; continue; }
+    if (c === "\"" || c === "'") { quote = c; continue; }
+    if (hashComments && c === "#" && line[i + 1] !== ">" && (i === 0 || (/\s/.test(line[i - 1]) && line[i - 1] !== "<"))) return { code: line.slice(0, i), open: false };
+  }
+  return { code: line, open: !!quote };
+}
+/** Files whose `#` starts a comment. Not cmd/bat, and not package.json: npm runs scripts with cmd.exe on Windows. */
+const hashCommentFile = (name: string) => !/\.(cmd|bat)$|^package\.json$/i.test(name);
+/**
+ * Whether any shell statement in this consumer can span physical lines (backslash, caret or backtick line ends, an
+ * open quote, a YAML folded or multi-line plain scalar, a multi-line package.json script). Lines are judged one by
+ * one, so such a file gets no read-only exemption at all (F03 follow-up verifications 2-3). Judged on the raw text.
+ * YAML literal blocks (run: |) keep their newlines, so each of their lines is its own shell line.
+ */
+function statementsSpanLines(name: string, raw: string): boolean {
+  if (/^package\.json$/i.test(name)) {
+    try { const scripts = (JSON.parse(raw) as { scripts?: Record<string, unknown> }).scripts; return !!scripts && typeof scripts === "object" && Object.values(scripts).some((value) => typeof value === "string" && /[\r\n]/.test(value)); } catch { return true; }
+  }
+  const yaml = /\.ya?ml$/i.test(name), hash = hashCommentFile(name);
+  const shellSpans = (line: string) => { const { code, open } = scanLine(line, hash); return open || /[\\^`]$/.test(code.trimEnd()); };
+  if (!yaml) return raw.split(/\r?\n/).filter((line) => !commentLine(name, line)).some(shellSpans);
+  let literalIndent = -1, lastIndent = 0;
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const indent = line.length - line.trimStart().length;
+    if (literalIndent >= 0 && indent > literalIndent) { if (shellSpans(line.trimStart())) return true; continue; }
+    literalIndent = -1;
+    const trimmed = line.trim();
+    if (trimmed.startsWith("#")) continue;
+    const code = scanLine(trimmed, true).code.trimEnd();
+    if (/(^|[:-]\s*)\|[-+0-9]*$/.test(code)) { literalIndent = indent; lastIndent = indent; continue; }
+    if (/(^|[:-]\s*)>[-+0-9]*$/.test(code)) return true;
+    if (!/^(-(\s|$)|[[{]|[^\s:]+:(\s|$))/.test(trimmed) && indent > lastIndent) return true;
+    if (shellSpans(yamlValue(trimmed))) return true;
+    lastIndent = indent;
+  }
+  return false;
+}
+/** The value part of a YAML line ("- run: npx prettier ..." → "npx prettier ..."). */
+const yamlValue = (line: string) => line.replace(/^\s*(-\s+)?([\w.-]+:\s+)?/, "");
+/** Full-line comments: rem/:: only in cmd/bat (rem=1 is an sh assignment); a PowerShell #> line is code. */
+function commentLine(name: string, line: string): boolean {
+  // cmd.exe ends REM only at a delimiter (space, tab, comma, semicolon, equals) or the line end: "rem:x & node" runs.
+  if (/\.(cmd|bat)$/i.test(name)) return /^[ \t]*@?(rem([ \t,;=]|$)|::)/i.test(line);
+  return /\.psm?1$/i.test(name) ? /^[ \t]*#(?!>)/.test(line) : /^[ \t]*#/.test(line);
+}
+/** Brace expansion as bash does it (nested, comma lists), bounded; null when it would exceed the bound. */
+function expandBraces(word: string, limit = 64): string[] | null {
+  const open = word.indexOf("{");
+  if (open < 0) return [word];
+  let depth = 0, close = -1; const commas: number[] = [];
+  for (let i = open; i < word.length; i++) {
+    if (word[i] === "{") depth++;
+    else if (word[i] === "}") { depth--; if (depth === 0) { close = i; break; } }
+    else if (word[i] === "," && depth === 1) commas.push(i);
+  }
+  if (close < 0) return [word];
+  if (!commas.length) { const rest = expandBraces(word.slice(close + 1), limit); return rest && rest.map((tail) => word.slice(0, close + 1) + tail); }
+  const out: string[] = []; let start = open + 1;
+  for (const end of [...commas, close]) {
+    const expanded = expandBraces(word.slice(0, open) + word.slice(start, end) + word.slice(close + 1), limit);
+    if (!expanded) return null;
+    out.push(...expanded); start = end + 1;
+    if (out.length > limit) return null;
+  }
+  return out;
+}
+/**
+ * A word that names a file of the destination's extension by a computed, quoted, aliased, braced or pattern form
+ * ($N.md, %N%.md, $(echo n).md, %.md, "notes".md, notes.md., ARCHIT~1.MD, notes.m{d,}, {a,b}.md) or that globs a
+ * whole folder (./*, **). The classifier does not evaluate these, so they count (review verifications 2-3).
+ */
+function computedName(word: string, extension: string, leaf: string): boolean {
+  const cleaned = word.replace(/["']/g, "");
+  const trimmed = cleaned.replace(/[.\s]+$/, "");
+  // Quoted ("notes".md) or trailing-dot (notes.md.) spellings of the name; the plain literal is caught by tokenIn.
+  if (trimmed === leaf && trimmed !== word) return true;
+  if (/(^|\/)\*\*?$/.test(cleaned) && (cleaned.includes("/") || cleaned === "**")) return true;
+  if (cleaned.includes("{")) {
+    const expanded = expandBraces(cleaned);
+    if (!expanded) return true;
+    if (expanded.some((form) => form !== cleaned && ((form.split("/").pop() ?? "") === leaf || globNamesLeaf(form, leaf)))) return true;
+    if (extension && /\{[^}]*,[^}]*\}/.test(cleaned) && new RegExp(`(^|[^a-z0-9])${escapeRegExp(extension)}([^a-z0-9]|$)`).test(cleaned)) return true;
+  }
+  return !!extension && trimmed.endsWith(`.${extension}`) && /[$%{}()*?[\]~`"']/.test(word);
+}
+/** A shell glob word whose last segment matches the destination's file name (n*, *.m?, *.m[d], *.{md,txt}). */
+function globNamesLeaf(word: string, leaf: string): boolean {
+  const last = word.replace(/^["']|["']$/g, "").split("/").pop() ?? "";
+  if (!/[*?[]/.test(last) || last === "*" || last === "**") return false;
+  // Forms this translation does not model exactly fail closed: nested braces, a class opening with ], POSIX classes.
+  if (/\{[^}]*\{/.test(last) || /\[!?\][^\]]*\]/.test(last) || /\[\[?[:.=]/.test(last)) return true;
+  let pattern = "";
+  for (let i = 0; i < last.length; i++) {
+    const c = last[i];
+    if (c === "*") pattern += "[^/]*";
+    else if (c === "?") pattern += "[^/]";
+    else if (c === "[") { const close = last.indexOf("]", i + 2); if (close < 0) { pattern += "\\["; continue; } pattern += "[" + last.slice(i + 1, close).replace(/^!/, "^").replace(/\\/g, "\\\\") + "]"; i = close; }
+    else if (c === "{") { const close = last.indexOf("}", i); if (close < 0) { pattern += "\\{"; continue; } pattern += "(?:" + last.slice(i + 1, close).split(",").map(escapeRegExp).join("|") + ")"; i = close; }
+    else pattern += escapeRegExp(c);
+  }
+  try { return new RegExp(`^${pattern}$`).test(leaf); } catch { return true; }
+}
+/**
+ * Raw-text names hidden by shell or cmd escapes (n\otes.md, notes\.md, notes.m^d). Reference normalisation turns
+ * every backslash into a separator, so these are checked on the raw consumer text (review verification 3, V5/V7).
+ */
+function escapedName(raw: string, extension: string, leaf: string): boolean {
+  return raw.split(/[\s;&|<>()=]+/).some((word) => {
+    if (!/[\\^]/.test(word)) return false;
+    // Both readings: sh (backslash escapes, / separates) and cmd (caret escapes, backslash separates). The last path
+    // segment is judged, so folder-qualified escapes (zq/ho\ld.md, zq\ho^ld.md) count (review verification 4).
+    const readings = [word.replace(/\\(.)/g, "$1"), word.replace(/\^(.)/g, "$1").replaceAll("\\", "/")];
+    return readings.some((reading) => {
+      const plain = reading.replace(/["']/g, "").toLowerCase().replace(/[.\s]+$/, "");
+      const last = plain.split("/").pop() ?? "";
+      return last === leaf || globNamesLeaf(plain, leaf) || computedName(last, extension, leaf);
+    });
+  });
+}
+/** The raw script and lint-staged command strings of a package.json (JSON escapes decoded), or the text itself. */
+function packageScripts(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as { scripts?: Record<string, unknown>; "lint-staged"?: Record<string, unknown> };
+    return [...Object.values(parsed.scripts ?? {}), ...Object.values(parsed["lint-staged"] ?? {}).flat()].filter((value) => typeof value === "string").join("\n");
+  } catch { return raw; }
+}
 /** Execution context on a line: a glob of the destination's extension here is run, collected or sourced. */
 const RUNS_GLOB = /(doctest|wildcard|\bfor\b.*\bin\b|\b(sh|bash|zsh|source|python3?|py|node|deno|bun|pwsh|powershell|cmd|exec|eval|xargs|pip|pytest|ruby|perl|php)\b)/;
-/** Lines a shell actually runs: comments dropped; for package.json only the scripts. */
-function shellLines(name: string, text: string): string {
+/** Config keys that collect or run matching files without a runner word (pytest python_files, tox commands). */
+const COLLECTS_GLOB = /\b(python_files|python_classes|commands|commands_pre|commands_post)\b/;
+/** Source files: a glob of the destination's extension anywhere in one collects those files for the program. */
+const PROGRAM_SOURCE = /\.(py|pyw|[cm]?[jt]sx?|rb|pl|php|lua|go|rs|ps1|psm1)$/i;
+/** package.json keys that name files but never run them. */
+const INERT_PACKAGE_KEYS = new Set(["name", "version", "description", "keywords", "files", "license", "author", "contributors", "maintainers", "repository", "homepage", "bugs", "funding", "dependencies", "devDependencies", "peerDependencies", "peerDependenciesMeta", "optionalDependencies", "bundleDependencies", "bundledDependencies", "overrides", "resolutions", "engines", "os", "cpu", "private", "publishConfig", "type", "types", "typings", "workspaces", "browserslist", "packageManager", "sideEffects", "lint-staged"]);
+/**
+ * Lines a shell actually runs: comments dropped; for package.json the scripts plus lint-staged entries (as
+ * "command glob"), parsed from the raw text (reference normalisation rewrites JSON escapes such as \" and would make
+ * the parse fail; T9R-F04 F03 follow-up).
+ */
+function shellLines(name: string, text: string, raw: string = text): string {
   if (/^package\.json$/i.test(name)) {
-    try { const scripts = (JSON.parse(text) as { scripts?: Record<string, unknown> }).scripts; return scripts && typeof scripts === "object" ? Object.values(scripts).filter((value) => typeof value === "string").join("\n").toLowerCase() : ""; } catch { return text; }
+    try {
+      const parsed = JSON.parse(raw) as { scripts?: Record<string, unknown>; "lint-staged"?: Record<string, unknown> };
+      const lines = parsed.scripts && typeof parsed.scripts === "object" ? Object.values(parsed.scripts).filter((value): value is string => typeof value === "string") : [];
+      const staged = parsed["lint-staged"];
+      if (staged && typeof staged === "object") for (const [glob, command] of Object.entries(staged)) for (const each of Array.isArray(command) ? command : [command]) lines.push(typeof each === "string" ? `${each} ${glob}` : `(lint-staged ${glob})`);
+      return referenceText(lines.join("\n"));
+    } catch { return text; }
   }
-  return text.split("\n").filter((line) => !/^[ \t]*(#|rem\b|::|\/\/)/.test(line)).join("\n");
+  return text.split("\n").filter((line) => !commentLine(name, line)).join("\n");
 }
 /**
  * The project file that may consume this destination, or why that cannot be checked (F02 rounds 4-5, F03 round 1).
@@ -694,7 +872,7 @@ function consumerOf(root: string, rel: string): Consumer | null {
     const local = parts.slice(0, depth).join("/") === folderParts.join("/") ? parts.slice(depth).join("/") : relText;
     if ([local, relText].some((path) => path && text.includes(path)) || tokenIn(text, leaf)) return { by: shown, agent };
     if (agent) return null;
-    const run = shell ? shellLines(name, text) : text;
+    const run = shell ? shellLines(name, text, raw) : text;
     for (let end = 1; end < parts.length; end++) {
       const folders = [parts.slice(0, end).join("/")];
       if (end > depth && parts.slice(0, depth).join("/") === folderParts.join("/")) folders.push(parts.slice(depth, end).join("/"));
@@ -703,10 +881,50 @@ function consumerOf(root: string, rel: string): Consumer | null {
     // In shell-run text any glob of the extension counts unless the line names a read-only tool (an unknown runner
     // fails safe); elsewhere only on lines that visibly run or collect files (review F03 round 2).
     // Each simple command is judged on its own: a read-only tool earlier on the line does not exempt a later runner.
-    const commands = run.split(/\n|&&|\|\||;|\||&/);
-    if (extensionGlob && commands.some((command) => extensionGlob.test(command) && (shell ? !READ_ONLY_TOOL.test(command) : RUNS_GLOB.test(command)))) return { by: shown, agent };
-    // A bare * counts only in a command that visibly runs or collects files (not arithmetic or prose).
-    if (shell && commands.some((command) => bareGlob.test(command) && RUNS_GLOB.test(command) && !READ_ONLY_TOOL.test(command))) return { by: shown, agent };
+    // Statements split on sequencing only: a pipeline is judged whole, so a glob in a read-only stage feeding a runner
+    // (ls *.md | xargs node r.js) counts. In shell-run text the exemption is decided per line by readOnlyStatement,
+    // which refuses any line where a separator, redirection, comment or substitution could hide (F03-FOLLOWUP-1).
+    const leafName = leaf.toLowerCase();
+    // Names hidden by shell or cmd escapes are checked on the raw text (review verification 3, V5/V7).
+    if (shell && escapedName(/^package\.json$/i.test(name) ? packageScripts(raw) : raw, extension, leafName)) return { by: shown, agent };
+    // Config glob values: split on whitespace and quotes, drop key= prefixes, split comma lists outside braces.
+    const words = (command: string) => command.split(/[\s"']+/).map((word) => word.replace(/^[\w.-]+=/, "")).flatMap((word) => word.split(/,(?![^{]*\})/)).filter(Boolean);
+    const named = (command: string) => words(command).some((word) => word === "*" || word === "**" || globNamesLeaf(word, leafName) || computedName(word, extension, leafName));
+    // Shell words keep their quotes ("notes".md is one word); an option=value word is also judged by its value.
+    const shellNamed = (command: string) => command.split(/\s+/).filter(Boolean).flatMap((word) => [word, word.replace(/^-*[\w.-]+=/, "")]).some((word) => globNamesLeaf(word, leafName) || computedName(word, extension, leafName));
+    if (!shell) {
+      // Config text that runs or collects files (pytest doctest/python_files, tox commands, ...): any glob value naming
+      // the destination counts, including n*, *.m?, [n]otes.md, braces and a lone * (review verifications 2-3).
+      const commands = run.split(/\n|&&|\|\||;|&/);
+      if (commands.some((command) => (RUNS_GLOB.test(command) || COLLECTS_GLOB.test(command)) && ((extensionGlob?.test(command) ?? false) || named(command)))) return { by: shown, agent };
+      // A program source that globs the destination's name collects those files for itself, whatever line runs them.
+      if (PROGRAM_SOURCE.test(name) && [...run.matchAll(/(["'`])([^"'`\n]{1,512})\1/g)].some(([, , literal]) => (extensionGlob?.test(literal) ?? false) || globNamesLeaf(literal, leafName))) return { by: shown, agent };
+    } else {
+      const spanning = statementsSpanLines(name, raw);
+      const yaml = /\.ya?ml$/i.test(name), hash = hashCommentFile(name);
+      // Make suffix rules (.md.html:) and .SUFFIXES apply a recipe to every file of the extension (verification 3, NB-2).
+      if (extension && /^(gnu)?makefile$|\.mk$/i.test(name) && new RegExp(`^[ \\t]*(\\.suffixes[ \\t]*:.*\\.${escapeRegExp(extension)}\\b|\\.${escapeRegExp(extension)}(\\.[a-z0-9]+)?[ \\t]*:)`, "m").test(run)) return { by: shown, agent };
+      // package.json content outside "scripts" and lint-staged (ava, jest, c8, ... map globs to runs) is checked for
+      // globs on one line that can never be exempt (verification NEW-5); keys that only list files are inert.
+      let rest = "";
+      if (/^package\.json$/i.test(name)) {
+        try { const other = Object.fromEntries(Object.entries(JSON.parse(raw) as Record<string, unknown>).filter(([key]) => key !== "scripts" && !INERT_PACKAGE_KEYS.has(key))); rest = Object.keys(other).length ? `\n(${referenceText(JSON.stringify(other))})` : ""; }
+        catch { rest = `\n(${text})`; }
+      }
+      for (const physical of (run + rest).split("\n")) {
+        const source = yaml ? yamlValue(physical) : physical;
+        const { code } = scanLine(source, hash);
+        // A comment is set aside only on a line where nothing can hide (no substitution, variable, block marker).
+        const line = UNSAFE_SHELL_LINE.test(code) || /<#|#>/.test(source) ? source : code;
+        for (const command of line.split(/&&|\|\||;|&/)) {
+          // Any glob or computed word naming the destination counts, not only extension globs (n*, *.m?, $N.md).
+          const globbed = (extensionGlob?.test(command) ?? false) || shellNamed(command);
+          // A bare * counts only in a command that visibly runs or collects files (not arithmetic or prose).
+          const bare = bareGlob.test(command) && RUNS_GLOB.test(command);
+          if ((globbed || bare) && (spanning || line !== code || !readOnlyStatement(command, line))) return { by: shown, agent };
+        }
+      }
+    }
     // pytest-markdown-docs collects every Markdown file under the test paths.
     if (/^(md|markdown)$/.test(extension) && text.includes("markdown-docs")) return { by: shown, agent };
     return null;

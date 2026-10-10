@@ -1,6 +1,7 @@
 import { execOwnedFile } from "./owned-processes.server.ts";
 import { windowsOwnershipModule } from "./owned-process-group.server.ts";
 import type { ProcessInfo } from "../orch/types.ts";
+import { systemTool } from "./system-tools.server.ts";
 
 const exec = execOwnedFile;
 
@@ -8,7 +9,7 @@ const exec = execOwnedFile;
 export async function processTable(): Promise<ProcessInfo[]> {
   if (process.platform === "win32") {
     const script = "Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,CreationDate | ForEach-Object { '{0}|{1}|{2}|{3}' -f $_.ProcessId,$_.ParentProcessId,$_.Name,$(if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().ToString('o') } else { '' }) }";
-    const { stdout } = await exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 15000, maxBuffer: 16 * 1024 * 1024 });
+    const { stdout } = await exec(systemTool("powershell.exe"), ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 15000, maxBuffer: 16 * 1024 * 1024 });
     return stdout.split(/\r?\n/).filter(Boolean).map((line) => {
       const [pid, ppid, name, created] = line.split("|");
       return { pid: Number(pid), ppid: Number(ppid), name, createdAt: created ? Date.parse(created) : null };

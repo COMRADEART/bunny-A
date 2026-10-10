@@ -124,6 +124,8 @@ try {
   $layoutVersion=if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'src/lib/bunny-host/state-paths.server.ts')) {2} else {1}
   $compatibility=[ordered]@{hostEntry='Bunny-Host.mjs';launcher='Start-Bunny-Release.ps1';hostPortDefault=43119;stateLayoutVersion=$layoutVersion;databaseSchemaVersion=3;codexCompatibilityPolicyVersion=1;hostFailurePolicyVersion=1}
   if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'native/bunny-owned-process.c')) {$compatibility.gitProcessOwnershipPolicyVersion=1}
+  # M-A-3 T9R-F04: provider sessions and probes run in the reduced-access, stdin-capable job helper.
+  if((Test-Path -LiteralPath (Join-Path $bunnyBuild 'native/bunny-owned-process.c')) -and (Select-String -LiteralPath (Join-Path $bunnyBuild 'native/bunny-owned-process.c') -SimpleMatch 'OWNED_JOB_ACCESS' -Quiet)) {$compatibility.providerProcessContainmentPolicyVersion=1}
   $record=[ordered]@{release=$PackageName;version=$pin.version;sourceCommit=$sourceSha;toolingCommit=$toolingSha;builtAt=$build.builtAt;build=$build;compatibility=$compatibility;origins=$origins}
   [IO.File]::WriteAllText((Join-Path $bunnyPackage '.release-build.json'),($record | ConvertTo-Json -Depth 6))
   $helper=Join-Path $PSScriptRoot 'bunny-release.mjs'

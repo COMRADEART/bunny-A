@@ -3,6 +3,7 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import { delimiter, dirname, extname, join, resolve } from "node:path";
 import { trackOwnedChild } from "../../bunny-host/owned-processes.server.ts";
 import { runWindowsOwnedProcess, type ProcessOwner, type OwnedProcessRecord } from "../../bunny-host/owned-process-group.server.ts";
+import { systemTool } from "../../bunny-host/system-tools.server.ts";
 
 /** How a command is actually launched: always a real executable plus argv, never a shell string. */
 export type Resolved = { file: string; prefix: string[]; display: string; owned?: boolean };
@@ -62,7 +63,8 @@ export type RunOptions = { cwd: string; signal: AbortSignal; timeoutMs: number; 
 /** Runs one owned process (argv, no shell) with bounded output; abort ends exactly that process tree. */
 export function runProcess(resolved: Resolved, args: string[], options: RunOptions): Promise<RunResult> {
   if(options.owned || resolved.owned) options={...options,env:{...(options.env??process.env),GIT_TERMINAL_PROMPT:"0",GCM_INTERACTIVE:"never",GIT_EDITOR:"false",GIT_SEQUENCE_EDITOR:"false",GIT_PAGER:"cat"}};
-  if(process.platform === "win32" && (options.owned || resolved.owned)) return runWindowsOwnedProcess(resolved.file,[...resolved.prefix,...args],options);
+  // M-A-3 T9R-F04 (review round 1, LOW-2): on Windows every Mission process runs in a Bunny-owned job; there is no unowned branch.
+  if(process.platform === "win32") return runWindowsOwnedProcess(resolved.file,[...resolved.prefix,...args],options);
   const max = options.maxOutput ?? 200_000; const started = Date.now();
   return new Promise((resolveRun, reject) => {
     if (options.signal.aborted) { reject(new Error("Aborted before start.")); return; }
@@ -73,7 +75,7 @@ export function runProcess(resolved: Resolved, args: string[], options: RunOptio
     child.stderr.on("data", (chunk: Buffer) => { stderr = append(stderr, chunk); });
     const kill = () => {
       if (child.pid === undefined || child.exitCode !== null) return;
-      if (process.platform === "win32") execFile("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
+      if (process.platform === "win32") execFile(systemTool("taskkill.exe"), ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
       else child.kill("SIGKILL");
     };
     const timer = setTimeout(() => { timedOut = true; kill(); }, options.timeoutMs);

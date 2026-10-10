@@ -278,6 +278,7 @@ export async function startHost(
   if (!paths.installed && !options.workspaceRoot) mkdirSync(workspaceRoot, { recursive: true });
   const manager = new TaskManager(db, options.root ?? process.cwd(), options.adapters, {
     sessionDirectory: paths.sessions,
+    dataDirectory,
     containment,
     workspaceRoot,
   });
@@ -962,6 +963,9 @@ export async function startHost(
         await missions.close();
       } finally {
         await ownedCleanup;
+        // M-A-3 T9R-F04: a Stop already in flight (user, Mission, runtime limit) finishes its job accounting first.
+        await manager.settleStops();
+        manager.dispose();
       }
       await new Promise<void>((r) => {
         server.closeAllConnections();

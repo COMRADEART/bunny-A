@@ -64,6 +64,24 @@ export type AdapterHooks = {
   rateLimits?: (windows: UsageWindow[], status?: string) => void;
   /** Raw provider stdout/stderr lines, kept in the Host's private session transcript. */
   raw?: (stream: "stdout" | "stderr", text: string) => void;
+  /** M-A-3 T9R-F04: who owns a contained provider process (job record identity; confers no authority). */
+  owner?: ProviderProcessOwner;
+};
+export type ProviderProcessOwner = { dataDirectory: string | null; hostGeneration: string; taskId: string; missionId: string | null; agentId: string | null };
+/**
+ * M-A-3 T9R-F04: lifetime of a local provider process tree as the Windows job reports it. "empty" is kernel
+ * accounting (ActiveProcesses 0 after the job was terminated), never the absence of rows in a process sample.
+ */
+export type SessionContainment = {
+  mechanism: "windows-job-object";
+  state: "launching" | "running" | "terminating" | "empty" | "unconfirmed" | "refused";
+  /** A provider process was created in the job (false: stopped or refused before any process existed). */
+  admitted: boolean;
+  operationId: string | null; rootPid: number | null; rootCreatedAt: number | null;
+  activeProcesses: number | null; totalProcesses: number | null;
+  /** Processes still in the job when the root ended or Stop arrived; all were terminated with the job. */
+  terminatedAtEnd: number | null;
+  detail: string;
 };
 export type RunningSession = {
   stop: () => Promise<void>;
@@ -71,6 +89,8 @@ export type RunningSession = {
   /** Root process of the owned session, when there is one. */
   pid?: () => number | null;
   sendInput?: (input: string) => Promise<void>;
+  /** Present only for a job-contained local process tree (M-A-3 T9R-F04). */
+  containment?: () => SessionContainment;
 };
 /**
  * Provider adapter contract. Session-level operations (getSession, streamEvents, stop, sendInput by
