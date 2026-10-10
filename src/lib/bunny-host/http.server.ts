@@ -24,7 +24,7 @@ import { releaseIdentity } from "./release-identity.server.ts";
 import { AGENT_ACTIONS, AgentRuntime, agentCommand } from "./agent-runtime.server.ts";
 import { ProjectService } from "./project-service.server.ts";
 import {
-  actorOf, APPROVAL_ON_HOST, assertDeviceAction, authenticateDevice, CodedRefusal, deviceArtifactRead, deviceExpiresAt,
+  actorOf, APPROVAL_ON_HOST, assertDeviceAction, authenticateDevice, CodedRefusal, deviceArtifactRead, deviceExpiresAt, DEVICE_SESSION_MS,
   deviceMayLaunch, DevicePresence, deviceSnapshot, deviceStillValid, DeviceStreams, deviceTask, ensureDeviceSchema,
   hidePaths, hostId as stableHostId, mutating, OPERATION_ID, OperationLedger, viewerOf, WindowLimiter,
   WorkstationRequiredError, type DevicePrincipal, type OperationState, type Principal,
@@ -298,6 +298,13 @@ export async function startHost(
   const agents = new AgentRuntime(db, missions);
   const projects = new ProjectService(missions, agents);
   missions.missionPauseGate = (missionId) => agents.blockedForMission(missionId);
+  // M-A-3 T9R-F02 (D3/D5): admission-time liveness of the device behind a one-time answer or a staged change. A
+  // revoked, signed-out or expired device's earlier answers never authorize anything again.
+  missions.deviceActive = (actor) => {
+    if (!actor.startsWith("device:")) return true;
+    const row = db.db.prepare("SELECT d.created_at AS createdAt, d.revoked_at AS revokedAt, p.last_seen_at AS lastSeenAt FROM devices d LEFT JOIN device_presence p ON p.device_id=d.id WHERE d.id=?").get(actor.slice("device:".length)) as { createdAt: number; revokedAt: number | null; lastSeenAt: number | null } | undefined;
+    return !!row && row.revokedAt === null && row.createdAt + DEVICE_SESSION_MS > Date.now() && deviceExpiresAt(row.createdAt, row.lastSeenAt ?? null) > Date.now();
+  };
   // M-A-3 T9: one stable installation identity (persisted) plus this boot's epoch; a phone pins the first and
   // refuses to act on a view from another Host or an earlier epoch.
   const hostIdentity = { hostId: stableHostId(db.db), epoch: manager.instanceId, startedAt: Date.now() };
@@ -389,7 +396,8 @@ export async function startHost(
     const path = new URL(req.url ?? "/", `http://${host}`);
     if(path.pathname === "/health" && req.method === "GET") return json(res,{app:"Bunny-A",instanceId:manager.instanceId,pid:process.pid,...containment.snapshot(),
       });
-    const bearer=(req.headers.authorization ?? "").replace(/^Bearer /,"");
+    // M-A-3 T9R-F02 (D4): only an exact "Bearer <credential>" header authenticates; a bare or other-scheme value is no credential.
+    const bearer=/^Bearer (\S+)$/.exec(req.headers.authorization ?? "")?.[1] ?? "";
     const local=equal(bearer,token);
     // M-A-3 T9: every request re-authenticates the device: present, unrevoked, within its lifetime and idle bound.
     const auth=local || !bearer ? null : authenticateDevice(db.db,hash(bearer));
@@ -731,14 +739,17 @@ export async function startHost(
             );
             if (!changed) throw new CommandRefusedError("Unknown or already revoked device.");
             const closed = deviceStreams.closeDevice(id);
-            // A lost device's authority ends with it: batches it created and Agentic consent it approved.
-            // Self sign-out keeps the approvals the user gave (documented T9R design; owner decision still open).
-            const ended = local ? await endDeviceGrants(`device:${id}`) : { batches: 0, delegations: 0, approvals: 0, unstopped: 0 };
+            // M-A-3 T9R-F02 (D5): sign-out and revocation both end the device's FUTURE authority at once: unused one-time
+            // answers, staged changes awaiting promotion, batches it created, Agentic consent and Mission envelopes it
+            // granted. History, completed work and independent workstation approvals are kept. Only a workstation
+            // revocation of a lost device also stops workstation-approved Missions the device drove (F01).
+            const cause = local ? "revocation" : "signout";
+            const ended = await endDeviceGrants(`device:${id}`, cause);
             manager.emit(
               db.event(
                 "device.revoked",
                 null,
-                `Device credential revoked: ${id} by ${local ? "the workstation" : "the device itself (sign out)"}; ${closed} open stream(s) closed; ${ended.batches} batch(es), ${ended.delegations} Agentic consent(s) and ${ended.approvals} Mission approval(s) it granted ended${ended.unstopped ? `; ${ended.unstopped} Mission(s) could not be stopped and need Stop on the workstation` : ""}.`,
+                `Device credential revoked: ${id} by ${local ? "the workstation" : "the device itself (sign out)"}; ${closed} open stream(s) closed; ${ended.answers} unused one-time answer(s), ${ended.staged} staged change(s), ${ended.batches} batch(es), ${ended.delegations} Agentic consent(s) and ${ended.approvals} Mission approval(s) it granted ended${ended.unstopped ? `; ${ended.unstopped} Mission(s) could not be stopped and need Stop on the workstation` : ""}.`,
               ),
             );
             break;
@@ -822,11 +833,14 @@ export async function startHost(
       );
     }
   };
-  /** Workstation revocation of a lost device ends the authority that device granted (never on self sign-out). */
-  const endDeviceGrants = async (deviceActor: string) => {
-    // M-A-3 T9R-F01: the device's unexecuted one-time answers end with it, and so do Missions it started or resumed.
-    missions.endDeviceAnswers(deviceActor);
-    await missions.endDeviceDriven(deviceActor);
+  /**
+   * Ends the authority a device granted. M-A-3 T9R-F02: runs for workstation revocation AND self sign-out. Everything
+   * that can admit new work is invalidated synchronously, in the same turn as the revocation commit, so no answer,
+   * batch, consent or staged change of this device is admitted afterwards; Mission and Agent stops follow.
+   */
+  const endDeviceGrants = async (deviceActor: string, cause: "signout" | "revocation") => {
+    const answers = missions.endDeviceAnswers(deviceActor, cause);
+    const staged = missions.invalidateDeviceStaging(deviceActor, cause);
     let batches = 0,
       delegations = 0;
     for (const row of db.db
@@ -838,45 +852,53 @@ export async function startHost(
       } catch {
         /* Already ended by its own lifecycle. */
       }
+    const agentsToStop: string[] = [];
     for (const row of db.db.prepare("SELECT id, agent_id AS agentId FROM agentic_authorizations").all() as { id: string; agentId: string }[])
       try {
         const e = missions.agentic.get(row.id);
-        if (!e || e.authorization_provenance?.actor !== deviceActor || !["ACTIVE", "PAUSED"].includes(e.current_state)) continue;
+        if (!e || e.authorization_provenance?.actor !== deviceActor || !["ACTIVE", "PAUSED", "WAITING_FOR_USER"].includes(e.current_state)) continue;
         missions.syncAgentic(missions.agentic.state(e.id, "REVOKED"));
         delegations++;
-        const profile = agents.store.agent(row.agentId);
-        if (profile && !profile.stoppedAt && !profile.completedAt) await agents.stop(row.agentId, `workstation (revoked ${deviceActor})`);
+        agentsToStop.push(row.agentId);
       } catch {
         /* A corrupt or already-ended record fails closed; Stop remains available on the workstation. */
       }
-    // M-A-3 T9R: a plain Mission envelope this device approved ends with it; Agent Missions end above. A failed
-    // Mission is included so a later Retry cannot revive the lost device's approval.
-    let approvals = 0,
-      unstopped = 0;
+    // Envelopes this device granted are revoked before anything is awaited (no admission can use them after this line).
+    const revokedMissions: string[] = [];
     for (const mission of missions.store.missionsIn([...MISSION_ACTIVE, "failed"]))
       try {
         if (!mission.authorizationId) continue;
         const envelope = missions.store.authorization(mission.authorizationId);
         if (!envelope || envelope.revokedAt || envelope.grantedBy !== deviceActor) continue;
-        // M-A-3 T9R-F01: an Agent Mission envelope this device re-consented ends too (and the Mission stops below).
-        if (missions.agentic.exists(mission.id) || mission.origin.startsWith("agent:")) {
-          missions.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });
-          approvals++;
-          if (MISSION_ACTIVE.includes(missions.store.mission(mission.id).state))
-            await missions.stop(mission.id, `workstation (revoked ${deviceActor})`);
-          continue;
-        }
-        // Revoke first so no further admission or Retry can use it, then stop admitted and pending work canonically.
         missions.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });
-        approvals++;
+        revokedMissions.push(mission.id);
+      } catch {
+        /* Unreadable: the Mission is listed for Stop below and fails closed at admission. */
+      }
+    const stopReason = `workstation (${cause === "signout" ? "signed out" : "revoked"} ${deviceActor})`;
+    for (const agentId of agentsToStop)
+      try {
+        const profile = agents.store.agent(agentId);
+        if (profile && !profile.stoppedAt && !profile.completedAt) await agents.stop(agentId, stopReason);
+      } catch {
+        /* Stop remains available on the workstation. */
+      }
+    // M-A-3 T9R: a Mission whose envelope this device approved stops (a failed one stays failed and its revoked envelope
+    // refuses any Retry). Already-admitted effects finish and are recorded as they happened.
+    const approvals = revokedMissions.length;
+    let unstopped = 0;
+    for (const missionId of revokedMissions)
+      try {
         // Re-read: an earlier awaited stop may have let a concurrent Retry re-arm this Mission.
-        if (MISSION_ACTIVE.includes(missions.store.mission(mission.id).state))
-          await missions.stop(mission.id, `workstation (revoked ${deviceActor})`);
+        if (MISSION_ACTIVE.includes(missions.store.mission(missionId).state)) await missions.stop(missionId, stopReason);
       } catch {
         // The revoked envelope still refuses every further admission; Stop remains available on the workstation.
         unstopped++;
       }
-    return { batches, delegations, approvals, unstopped };
+    // M-A-3 T9R-F01: a LOST device (workstation revocation) also stops workstation-approved Missions it started, resumed or
+    // answered. A self sign-out leaves them to the owner's independent authority; its unused answers already ended above.
+    if (cause === "revocation") await missions.endDeviceDriven(deviceActor);
+    return { answers, staged, batches, delegations, approvals, unstopped };
   };
   const server = createServer((req, res) => {
     const requestId = randomUUID();

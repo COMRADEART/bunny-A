@@ -1,5 +1,5 @@
-import { basename, dirname, isAbsolute, resolve } from "node:path";
-import { existsSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync, statSync, type Dirent } from "node:fs";
 import type { Mode, ProviderId, ProviderExecutionScope } from "../orch/types.ts";
 import { withinAny } from "./paths.server.ts";
 import { resolveCommand, type Resolved } from "./capabilities/process.server.ts";
@@ -156,7 +156,7 @@ export function touchesGitMetadata(path: string): boolean {
 export const DEVICE_REVIEW_REASON = "Approval required on Windows Host: changes made under paired-device authority are reviewed on the Windows Host before code runs.";
 const REVIEW_TEXT = /under paired-device authority|paired-device change|a paired-device [\w.]+ of |trusted-desktop grant/i;
 /** Records a paired device never receives: trusted-desktop grants, exact operations and their ask-time bindings. */
-const DEVICE_HIDDEN_KEYS = new Set(["desktopGrant", "desktopOperation", "desktopBinding"]);
+const DEVICE_HIDDEN_KEYS = new Set(["desktopGrant", "desktopOperation", "desktopBinding", "promotion"]);
 /** Replaces every string that carries review listings (changed paths, digests, content) for a paired-device view. */
 export function redactReviewListing<T>(value: T): T {
   const walk = (item: unknown): unknown =>
@@ -245,6 +245,10 @@ export function remoteExecutionRefusal(action: string, params: Record<string, un
     // interpreter can still run any file it is pointed at, so the authoritative control is the Host-wide review: no
     // Bunny code run starts until the workstation reviews the content of every paired-device change.
     if (action === "filesystem.write" && !inertDataPath(path)) return `${DESKTOP_REQUIRED} ${params.path} is not a plain data or document file; a paired device writes only inert files (.txt, .md, .csv, .json, .yaml and similar).`;
+    // M-A-3 T9R-F02 (D1): the extension is only the first filter; the destination's purpose decides (configuration,
+    // agent instructions, execution-relevant or unknown roles need the Windows Host).
+    const purpose = deviceWriteClassRefusal(params.path, cwd ?? dirname(path), action === "filesystem.write" ? "write" : "delete", typeof params.content === "string" ? params.content : null);
+    if (purpose) return purpose;
   }
   return null;
 }
@@ -501,4 +505,225 @@ export function taskViolation(task: { provider: ProviderId; cwd?: string; decisi
     if (sessionsUsed >= envelope.providers.sessions!.maxSessions) return "provider-session budget exhausted";
   }
   return null;
+}
+
+// ── M-A-3 T9R-F02 (D1): purpose-aware classification of paired-device file writes ─────────────────────────
+/**
+ * What a paired device may write into a project. Only the two PHONE_SAFE classes ever receive phone-write
+ * authority; everything else needs the Windows Host. The classification judges the destination's verified
+ * context (canonical path, directory roles, link and hard-link state, existing content and project metadata)
+ * and the new content's leading bytes. It is risk reduction, never a proof that content is harmless: any
+ * program can be pointed at any file, which is why device changes also go through inert staging (D2).
+ */
+export type DeviceWriteClass = "PHONE_SAFE_DOCUMENT" | "PHONE_SAFE_DATA" | "EXECUTION_RELEVANT" | "CONFIGURATION" | "AGENT_INSTRUCTIONS" | "UNKNOWN";
+export type DeviceWriteClassification = { classification: DeviceWriteClass; reasons: string[]; warnings: string[] };
+export const PHONE_SAFE_CLASSES: readonly DeviceWriteClass[] = ["PHONE_SAFE_DOCUMENT", "PHONE_SAFE_DATA"];
+const DOCUMENT_FILE = /\.(md|markdown|txt|text)$/i;
+const DATA_FILE = /\.(csv|tsv|jsonl|ndjson|log)$/i;
+const STRUCTURED_DATA_FILE = /\.(json|ya?ml)$/i;
+const AGENT_INSTRUCTION_FILE = /^(agents?(\.override)?\.md|claude(\.local)?\.md|gemini\.md|qwen\.md|warp\.md|crush\.md|opencode\.md|kilocode\.md|cody\.md|conventions\.md|skill\.md|copilot-instructions\.md|\.mcp\.json|\.cursorrules|\.windsurfrules|\.clinerules|\.goosehints|\.aider[\w.-]*|llms(-full)?\.txt|[^/\\]+\.(prompt|instructions|chatmode|agent)\.md|[^/\\]+\.mdc)$/i;
+const AGENT_INSTRUCTION_DIR = /^(\.claude|\.cursor|\.codex|\.gemini|\.continue|\.clinerules|\.windsurf|\.roo|\.kiro|\.aider|\.grok|\.agents?|agents?|\.?skills|\.?prompts|\.?rules|\.?instructions|\.?chatmodes|\.amazonq|\.junie|\.opencode|\.cline|\.augment|\.qwen|\.warp|\.trae|\.crush|\.goose|\.agent|\.specify|\.amp|\.zed|\.codebuddy|\.kilocode|\.tabnine|\.sourcegraph|\.copilot)$/i;
+const EXECUTION_DIR = /^(\.git|git~\d+|\.husky|\.githooks|hooks|bin|scripts?|node_modules|\.github|\.gitlab|\.circleci|\.buildkite|\.azure-pipelines|\.woodpecker|\.forgejo|\.gitea|\.vscode|\.devcontainer|\.idea|\.cargo|\.yarn|\.mvn|\.gradle|\.venv|venv|__pycache__)$/i;
+/** Folders a running dev server, bundler, test runner or framework watches, serves or imports from. */
+const WATCHED_SOURCE_DIR = /^(src|app|lib|pages|components|server|api|public|static|assets|routes|test|tests|__tests__|spec|e2e|fixtures|migrations|prisma|db|include|cmd|pkg|internal|content|plugins|middleware|functions|netlify|supabase|layouts|styles|views|templates)$/i;
+const CONFIG_DIR = /^(config|\.config|configs|settings|conf|\.settings|etc|env|environments)$/i;
+const DATA_DIR = /^(data|datasets|docs|doc|notes|reports|exports|documents|journal|inbox|records|logs)$/i;
+const CONSUMED_TEXT_FILE = /^([\w.-]*(requirements|constraints)[\w.-]*\.txt|runtime\.txt|cmakelists\.txt|dependencies\.txt|packages\.txt|apt\.txt|robots\.txt|ads\.txt|security\.txt|humans\.txt)$/i;
+/**
+ * Files whose text names the commands, includes and inputs that tools, CI pipelines and agents use (bounded read,
+ * never executed). Review round 4: agent instruction files (@-imports), CI pipeline roots and nested package
+ * manifests are consumers too.
+ */
+const CONSUMER_FILE = /^(package\.json|makefile|gnumakefile|justfile|taskfile\.ya?ml|pyproject\.toml|setup\.cfg|setup\.py|tox\.ini|noxfile\.py|pipfile|gemfile|rakefile|cargo\.toml|go\.mod|pom\.xml|build\.gradle(\.kts)?|settings\.gradle(\.kts)?|cmakelists\.txt|dockerfile|containerfile|(docker-)?compose\.ya?ml|vercel\.json|netlify\.toml|firebase\.json|wrangler\.toml|deno\.jsonc?|tsconfig[\w.-]*\.json|jsconfig\.json|turbo\.json|nx\.json|project\.json|lerna\.json|pnpm-workspace\.yaml|jenkinsfile|\.gitlab-ci\.ya?ml|azure-pipelines\.ya?ml|bitbucket-pipelines\.ya?ml|\.travis\.ya?ml|appveyor\.ya?ml|\.drone\.ya?ml|buildspec\.ya?ml|appspec\.ya?ml|cloudbuild\.ya?ml|codemagic\.ya?ml|\.woodpecker\.ya?ml|\.pre-commit-config\.ya?ml|\.?lefthook\.ya?ml|mkdocs\.ya?ml|_config\.ya?ml|hugo\.(toml|ya?ml|json)|book\.toml|[^/\\]+\.config\.[cm]?[jt]s|[^/\\]+\.conf\.[cm]?[jt]s|\.[\w-]+rc(\.[\w]+)?|\.env(\.[\w.-]+)?|[^/\\]+\.(csproj|vbproj|fsproj|vcxproj|sln|props|targets))$/i;
+/** Root folders of CI systems, Git hooks, editors and agents; every text file inside is scanned for references. */
+const CONSUMER_DIR = /^(\.github|\.gitlab|\.circleci|\.buildkite|\.azure-pipelines|\.woodpecker|\.forgejo|\.gitea|\.husky|\.githooks|\.devcontainer|\.vscode|\.idea)$/i;
+const SCANNED_TEXT = /(\.(ya?ml|json|jsonc|toml|md|mdc|txt|sh|bash|ps1|psm1|cmd|bat|[cm]?[jt]s|py|cfg|ini|xml|conf|env|properties|rules)|^[^.]+)$/i;
+const CONSUMER_READ_LIMIT = 1024 * 1024;
+const CONSUMER_BUDGET = 400;
+type Consumer = { by: string; agent: boolean } | { unknown: string };
+/** Lowercased, "/"-separated, with "./" and repeated separators collapsed, so equivalent spellings compare equal. */
+function referenceText(text: string): string {
+  let out = text.toLowerCase().replaceAll("\\\\", "/").replaceAll("\\", "/");
+  for (let previous = ""; previous !== out;) { previous = out; out = out.replaceAll("/./", "/").replace(/\/{2,}/g, "/"); }
+  return out;
+}
+/**
+ * The project file that names this destination as a tool, CI, build or agent input, or why that cannot be checked.
+ * Scans the consumer files in the root and in every folder above the destination (a reference is matched both
+ * relative to the root and relative to that file's own folder) plus the root CI, hook, editor and agent folders.
+ * An oversize, unreadable or linked consumer fails closed.
+ */
+function consumerOf(root: string, rel: string): Consumer | null {
+  const relText = referenceText(rel);
+  const parts = relText.split("/").filter(Boolean);
+  let budget = CONSUMER_BUDGET;
+  const check = (file: string, shown: string, needles: string[], agent: boolean): Consumer | null => {
+    let info: ReturnType<typeof lstatSync>;
+    try { info = lstatSync(file); } catch { return null; }
+    if (info.isSymbolicLink()) return { unknown: `${shown} is a link, so its references cannot be checked` };
+    if (!info.isFile()) return null;
+    if (--budget < 0) return { unknown: "too many project files name tool and agent inputs to check them all" };
+    if (info.size > CONSUMER_READ_LIMIT) return { unknown: `${shown} is too large to check for references` };
+    let text: string;
+    try { text = referenceText(readFileSync(file, "utf8")); } catch { return { unknown: `${shown} could not be read` }; }
+    return needles.some((needle) => needle && text.includes(needle)) ? { by: shown, agent } : null;
+  };
+  for (let depth = 0; depth < parts.length; depth++) {
+    const folderShown = parts.slice(0, depth).join("/");
+    const folder = depth ? resolve(root, ...parts.slice(0, depth)) : root;
+    const needles = [...new Set([parts.slice(depth).join("/"), relText])];
+    let entries: string[];
+    try { entries = readdirSync(folder); } catch (error) {
+      // A folder the write would create holds no consumers (and neither do the folders below it).
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") break;
+      return { unknown: `${folderShown || "the project root"} could not be listed` };
+    }
+    for (const name of entries) {
+      const agent = AGENT_INSTRUCTION_FILE.test(name);
+      if (!agent && !CONSUMER_FILE.test(name)) continue;
+      if (depth === parts.length - 1 && name.toLowerCase() === parts.at(-1)) continue;
+      const found = check(resolve(folder, name), folderShown ? `${folderShown}/${name}` : name, needles, agent);
+      if (found) return found;
+    }
+  }
+  const walk = (dir: string, shown: string, depth: number, agent: boolean): Consumer | null => {
+    let entries: Dirent[];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return { unknown: `${shown} could not be listed` }; }
+    for (const entry of entries) {
+      const path = resolve(dir, entry.name); const label = `${shown}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (/^(node_modules|\.git)$/i.test(entry.name)) continue;
+        if (depth >= 6) return { unknown: `${label} is nested too deeply to check for references` };
+        const found = walk(path, label, depth + 1, agent);
+        if (found) return found;
+        continue;
+      }
+      if (!entry.isSymbolicLink() && !SCANNED_TEXT.test(entry.name)) continue;
+      const found = check(path, label, [relText], agent);
+      if (found) return found;
+    }
+    return null;
+  };
+  let top: string[];
+  try { top = readdirSync(root); } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    return { unknown: "the project root could not be listed" };
+  }
+  for (const name of top) {
+    const agent = name.startsWith(".") && AGENT_INSTRUCTION_DIR.test(name);
+    if (!agent && !CONSUMER_DIR.test(name)) continue;
+    let info: ReturnType<typeof lstatSync>;
+    try { info = lstatSync(resolve(root, name)); } catch { continue; }
+    if (info.isSymbolicLink()) return { unknown: `${name} is a link, so its references cannot be checked` };
+    if (!info.isDirectory()) continue;
+    const found = walk(resolve(root, name), name, 1, agent);
+    if (found) return found;
+  }
+  return null;
+}
+/** Structured files whose name marks them as program, build, site or pipeline configuration, wherever they are. */
+const CONFIG_LIKE_DATA = /(^_|config|(^|[\W_])conf([\W_]|$)|settings|pipeline|workflow|compose|manifest|values|chart|kustomiz|mkdocs|hugo|jekyll|netlify|vercel|deploy|build|(^|[\W_])ci([\W_]|$)|renovate|dependabot|codecov|lerna|turbo|tsconfig|eslint|prettier|babel|jest|vitest|playwright|cypress|openapi|swagger|schema)/i;
+/** Package-installer directives (pip -r/-e/--index-url ...) in a text file make it an install input. */
+const INSTALLER_DIRECTIVE = /^[ \t]*(-[rcefi]|--requirement|--constraint|--editable|--index-url|--extra-index-url|--find-links|--trusted-host)([ \t=]|$)/m;
+/** A symlink or junction on any existing component below the root can retarget a write after it was judged. */
+function linkBelow(root: string, rel: string): string | null {
+  let at = root;
+  for (const part of ["", ...rel.split(/[\\/]+/).filter(Boolean)]) {
+    at = part ? resolve(at, part) : at;
+    let info: ReturnType<typeof lstatSync>;
+    try { info = lstatSync(at); } catch { return null; }
+    if (info.isSymbolicLink()) return `${at} is a link or junction`;
+  }
+  return null;
+}
+const PROGRAM_START = /^(\uFEFF)?(#!|@echo|MZ|\x7fELF|<\?php|<script|import\s|export\s|require\(|["']use strict["'])/i;
+const startsLikeProgram = (text: string) => PROGRAM_START.test(text.trimStart().slice(0, 64));
+/**
+ * Classifies a paired-device write or delete. `base` is the step's working folder (the project or its isolated
+ * workspace); directory roles are judged relative to it, so a project kept under C:\dev\app is not "app".
+ */
+export function classifyDeviceWrite(path: string, context: { base: string; operation: "write" | "delete"; content?: string | null }): DeviceWriteClassification {
+  const reasons: string[] = []; const warnings: string[] = [];
+  const out = (classification: DeviceWriteClass, reason: string): DeviceWriteClassification => ({ classification, reasons: [...reasons, reason], warnings });
+  if (typeof path !== "string" || !path) return out("UNKNOWN", "no concrete path");
+  const leafRaw = path.split(/[\\/]/).pop() ?? "";
+  if (/^([\\/]{2})/.test(path) || /^[a-z]:(?![\\/])/i.test(path)) return out("UNKNOWN", "network, device or drive-relative path");
+  if (leafRaw.includes(":") || /[. ]$/.test(leafRaw)) return out("UNKNOWN", "alternate path form (stream suffix or trailing dot or space)");
+  // Bidi, zero-width and other format or control characters can show a reviewer a different name than the real one.
+  if (/[\p{Cf}\p{Cc}\p{Zl}\p{Zp}\u034f\u115f\u1160\u2800\u3164\uffa0\p{Variation_Selector}]/u.test(path)) return out("UNKNOWN", "path contains invisible, bidirectional or control characters");
+  let names: { segments: string[]; leaves: string[] };
+  let target: string; let root: string; let lexicalRel: string;
+  try {
+    const absolute = isAbsolute(path) ? path : resolve(context.base, path);
+    root = canonical(context.base);
+    target = canonical(absolute);
+    names = resolvedNames(absolute);
+    lexicalRel = relative(resolve(context.base), resolve(absolute));
+  } catch { return out("UNKNOWN", "path could not be resolved"); }
+  const rel = relative(root, target);
+  if (!rel || rel.startsWith("..") || isAbsolute(rel)) return out("UNKNOWN", "outside the step's working folder");
+  if (!lexicalRel || lexicalRel.startsWith("..") || isAbsolute(lexicalRel)) return out("UNKNOWN", "path leaves the step's working folder before resolution");
+  // Any 8.3 short-name component below the step folder is an alias whose real name (and role) is hidden.
+  if (lexicalRel.split(/[\\/]+/).some((segment) => /~\d/.test(segment))) return out("UNKNOWN", "short (8.3) name form in the path; write the full names");
+  // Links are judged on the path as written (canonicalization would already have followed them).
+  const link = linkBelow(resolve(context.base), lexicalRel) ?? linkBelow(root, rel);
+  if (link) return out("UNKNOWN", link);
+  if (lexicalRel.toLowerCase() !== rel.toLowerCase()) return out("UNKNOWN", "path reaches its destination through an alias (8.3 name, link or junction)");
+  let existing: ReturnType<typeof lstatSync> | null = null;
+  try { existing = lstatSync(target); } catch { existing = null; }
+  if (existing && !existing.isFile()) return out("UNKNOWN", "destination exists and is not a regular file");
+  if (existing && existing.nlink > 1) return out("UNKNOWN", "destination has other hard links (possibly in another root)");
+  const relSegments = rel.split(/[\\/]+/).filter(Boolean).map(normalizeSegment);
+  const dirs = relSegments.slice(0, -1);
+  const leaves = [...new Set([...names.leaves, relSegments.at(-1) ?? ""].filter(Boolean))];
+  // Agent instructions first: a Markdown file an agent loads is an instruction, however harmless it reads.
+  if (leaves.some((leaf) => AGENT_INSTRUCTION_FILE.test(leaf)) || dirs.some((segment) => AGENT_INSTRUCTION_DIR.test(segment)) || /(^|[\\/])\.github[\\/](instructions|prompts|chatmodes|agents)([\\/]|$)/i.test(rel))
+    return out("AGENT_INSTRUCTIONS", "agent instruction or agent configuration location");
+  if (names.segments.some((segment) => GIT_SEGMENT.test(segment))) return out("EXECUTION_RELEVANT", "Git metadata");
+  if (dirs.some((segment) => EXECUTION_DIR.test(segment)) || names.segments.some((segment) => /^(\.husky|\.githooks|node_modules)$/i.test(segment))) return out("EXECUTION_RELEVANT", "hook, script, CI, tool or dependency folder");
+  if (dirs.some((segment) => WATCHED_SOURCE_DIR.test(segment))) return out("EXECUTION_RELEVANT", "source folder a dev server, bundler or test runner watches, serves or imports");
+  if (leaves.some((leaf) => EXECUTION_CONFIG_FILE.test(leaf)) || names.segments.some((segment) => EXECUTION_CONFIG_DIR.test(segment))) return out("CONFIGURATION", "file or folder that configures programs that run");
+  if (!leaves.every((item) => DOCUMENT_FILE.test(item) || DATA_FILE.test(item) || STRUCTURED_DATA_FILE.test(item))) return out("EXECUTION_RELEVANT", "not a document or data file type (code, binary or extensionless)");
+  if (leaves.some((item) => item.startsWith("."))) return out("CONFIGURATION", "dotfile");
+  // Dot-folders hold tool, editor and agent settings; a new tool's folder is unknown to any list, so every dot-folder
+  // inside the project fails closed (review round 2).
+  if (dirs.some((segment) => segment.startsWith("."))) return out("CONFIGURATION", "dot-folder (tool, editor or agent settings)");
+  if (dirs.some((segment) => CONFIG_DIR.test(segment) || /^requirements$/i.test(segment))) return out("CONFIGURATION", "configuration folder");
+  // Site generators (Jekyll, Hugo, Eleventy) treat underscore folders as layouts, includes, plugins and data (review round 4).
+  if (dirs.some((segment) => segment.startsWith("_"))) return out("CONFIGURATION", "site-generator folder (_layouts, _includes, _plugins, _data) is build input");
+  if (leaves.some((item) => CONSUMED_TEXT_FILE.test(item))) return out("CONFIGURATION", "file name a package manager, build tool or web server consumes");
+  if (typeof context.content === "string" && startsLikeProgram(context.content)) return out("EXECUTION_RELEVANT", "new content starts like a program or script");
+  // A Markdown pipeline that understands MDX evaluates ESM import/export lines wherever they appear.
+  if (typeof context.content === "string" && /^[ \t]*(import|export)\b/m.test(context.content)) return out("EXECUTION_RELEVANT", "content has ESM import/export lines (evaluated by MDX-style pipelines)");
+  if (typeof context.content === "string" && INSTALLER_DIRECTIVE.test(context.content)) return out("EXECUTION_RELEVANT", "content has package-installer directives (-r, -e, --index-url ...)");
+  if (existing) {
+    try {
+      if (startsLikeProgram(readFileSync(target, "utf8").slice(0, 256))) return out("EXECUTION_RELEVANT", "existing destination content starts like a program or script");
+    } catch { return out("UNKNOWN", "existing destination could not be read"); }
+  }
+  const consumer = consumerOf(root, rel);
+  if (consumer && "unknown" in consumer) return out("UNKNOWN", consumer.unknown);
+  if (consumer) return consumer.agent
+    ? out("AGENT_INSTRUCTIONS", `referenced by agent instructions (${consumer.by})`)
+    : out("EXECUTION_RELEVANT", `named by project metadata (${consumer.by}) as a tool input`);
+  if (leaves.some((item) => STRUCTURED_DATA_FILE.test(item))) {
+    if (leaves.some((item) => CONFIG_LIKE_DATA.test(item))) return out("CONFIGURATION", "structured file whose name marks it as program, build, site or pipeline configuration");
+    if (!dirs.some((segment) => DATA_DIR.test(segment))) return out("CONFIGURATION", "JSON or YAML outside a recognized data or document folder can configure programs");
+    warnings.push("Structured data can still be read by programs as settings; review its consumers.");
+    return out("PHONE_SAFE_DATA", "JSON or YAML inside a recognized data or document folder");
+  }
+  if (leaves.every((item) => DATA_FILE.test(item))) {
+    warnings.push("Programs may read this data file.");
+    return out("PHONE_SAFE_DATA", "tabular or log data");
+  }
+  if (leaves.every((item) => DOCUMENT_FILE.test(item))) {
+    warnings.push("Any program can be pointed at a text file; it is staged and reviewed on the Windows Host before it reaches the project.");
+    return out("PHONE_SAFE_DOCUMENT", "plain document");
+  }
+  return out("UNKNOWN", "no recognized safe document or data role");
+}
+/** Why a paired device may not write or delete this path (D1), or null when it is a phone-safe document or data file. */
+export function deviceWriteClassRefusal(path: string, base: string, operation: "write" | "delete", content?: string | null): string | null {
+  const result = classifyDeviceWrite(path, { base, operation, content });
+  return PHONE_SAFE_CLASSES.includes(result.classification) ? null : `${DESKTOP_REQUIRED} ${path} is classified ${result.classification} (${result.reasons.at(-1)}); a paired device writes only phone-safe documents and data.`;
 }

@@ -285,7 +285,20 @@ export type PermissionRequest = {
   desktopBinding?: { taskId: string | null; authorizationId: string; planReference: string; mutationSequence?: number };
   /** M-A-3 T9R-F01: the exact-operation grant minted by the workstation's allow_once. */
   desktopGrant?: DesktopGrant;
+  /**
+   * M-A-3 T9R-F02 (D2): a Host-raised request to promote one staged paired-device change into the project. Only a
+   * current workstation allow_once promotes, and only these exact bytes (stagingId + contentHash) to this destination.
+   */
+  promotion?: { stagingId: string; contentHash: string; contentSize: number; destination: string; classification: string };
+  /**
+   * M-A-3 T9R-F02 (section 12): why an answered request no longer authorizes anything. OFFERED / APPROVED / DENIED
+   * derive from `resolution`; the first recorded end state wins and is never rewritten.
+   */
+  lifecycle?: { state: ApprovalLifecycleState; at: number; by: string; reason: string };
 };
+export type ApprovalLifecycleState =
+  | "CONSUMED" | "EXPIRED" | "WITHDRAWN" | "INVALIDATED_BY_SCOPE_CHANGE" | "INVALIDATED_BY_SIGNOUT"
+  | "INVALIDATED_BY_DEVICE_REVOCATION" | "INVALIDATED_BY_HOST_RESTART";
 /** M-A-3 T9: the Host's own verdict on a paired-device answer; the phone never re-derives policy. */
 export type RemoteAnswer = {
   answerable: boolean; reason: string | null;

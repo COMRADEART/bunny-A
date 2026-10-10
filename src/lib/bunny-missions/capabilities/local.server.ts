@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
-import { canonical, scopedPath, within, privateHostPath } from "../paths.server.ts";
+import { canonical, scopedPath, within, privateHostPath, stagingPath } from "../paths.server.ts";
 import { sha256 } from "../artifacts.server.ts";
 import type { ActionManifest, CapabilityResult, RiskClass } from "../types.ts";
 import type { CapabilityAdapter, ExecutionContext } from "./bus.server.ts";
@@ -45,9 +45,11 @@ export class FilesystemCapability implements CapabilityAdapter {
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     if (action === "filesystem.list") {
       const path = scopedPath(context.cwd, str(params, "path", false) || ".", context.roots);
-      if (context.boundedDelegation && privateHostPath(context.dataDirectory, path)) throw new Error("Private Host state is outside project scope.");
+      if (privateScope(context) && privateHostPath(context.dataDirectory, path)) throw new Error("Private Host state is outside project scope.");
+      // M-A-3 T9R-F02: staged paired-device changes are never listed, read or written by any Mission, bounded or not.
+      if (stagingPath(context.dataDirectory, path)) throw new Error("Staged paired-device changes are private Host state.");
       if (!statSync(path).isDirectory()) return fail(`${path} is not a folder.`);
-      const entries = readdirSync(path, { withFileTypes: true }).filter(entry => !context.resourceValidation?.(join(path,entry.name)) && (!context.boundedDelegation || !privateHostPath(context.dataDirectory, join(path, entry.name)))).slice(0, 500).map((entry) => {
+      const entries = readdirSync(path, { withFileTypes: true }).filter(entry => !context.resourceValidation?.(join(path,entry.name)) && (!privateScope(context) || !privateHostPath(context.dataDirectory, join(path, entry.name)))).slice(0, 500).map((entry) => {
         const full = join(path, entry.name); let bytes: number | null = null;
         try { if (entry.isFile()) bytes = statSync(full).size; } catch { bytes = null; }
         return { name: entry.name, kind: entry.isDirectory() ? "folder" : entry.isFile() ? "file" : "other", bytes };
@@ -55,7 +57,8 @@ export class FilesystemCapability implements CapabilityAdapter {
       return ok(`${entries.length} entries in ${path}.`, { path, entries }, [`Listed ${path}`]);
     }
     const path = scopedPath(context.cwd, str(params, "path"), context.roots);
-    if (context.boundedDelegation && privateHostPath(context.dataDirectory, path)) throw new Error("Private Host authority state is outside project scope.");
+    if (privateScope(context) && privateHostPath(context.dataDirectory, path)) throw new Error("Private Host authority state is outside project scope.");
+    if (stagingPath(context.dataDirectory, path)) throw new Error("Staged paired-device changes are private Host state.");
     if (action === "filesystem.metadata") {
       const info = statSync(path);
       return ok("Read current file metadata.", { path, bytes: info.size, kind: info.isFile() ? "file" : info.isDirectory() ? "folder" : "other", modifiedAt: info.mtime.toISOString() }, ["Metadata observed from disk."]);
@@ -78,6 +81,7 @@ export class FilesystemCapability implements CapabilityAdapter {
           context.signal.throwIfAborted();
           if (++inspected > 1000 || matches.length >= 100 || bytes > 8 * READ_LIMIT) { truncated = true; return; }
           if (entry.isSymbolicLink() || entry.name === ".git" || entry.name === "node_modules") continue;
+          if (stagingPath(context.dataDirectory, join(folder, entry.name))) continue;
           const child = scopedPath(folder, entry.name, context.roots);
           if (context.resourceValidation?.(child)) continue;
           if (privateHostPath(context.dataDirectory, child)) continue;
@@ -126,6 +130,13 @@ export class FilesystemCapability implements CapabilityAdapter {
     return { ok: false, status: "unsupported", summary: `${action} is not supported.`, output: null, evidence: [] };
   }
 }
+
+/**
+ * M-A-3 T9R-F02 (E48): private Host state (database, credentials, sessions, staging) is never a Mission resource, under
+ * any envelope or root. Before F02 this applied only to Agentic delegation; a plain Mission with a broad root could read it.
+ * Direct workstation capability calls outside any Mission keep their existing behaviour.
+ */
+function privateScope(context: ExecutionContext) { return !!context.boundedDelegation || !!context.missionId; }
 
 const DESTRUCTIVE_GIT = [/^reset$/, /^clean$/, /^push$/, /^rebase$/, /^checkout$/, /^restore$/, /^branch$/, /^filter-branch$/, /^update-ref$/, /^gc$/, /^prune$/];
 export class TerminalCapability implements CapabilityAdapter {

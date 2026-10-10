@@ -6,13 +6,14 @@ import type { HostEvent } from "../bunny-host/contracts.ts";
 import type { Mode, OrchTask, ProviderId, TaskConstraints, VerifySpec } from "../orch/types.ts";
 import { codexMissionExclusion } from "../orch/compatibility.ts";
 import { ArtifactStore } from "./artifacts.server.ts";
-import { agenticFingerprint, agenticOperationDigest, agenticScopeViolation, capabilityOperation, DESKTOP_GRANT_MAX_USES, DESKTOP_GRANT_TTL_MS, DESKTOP_REQUIRED, desktopGrantViolation, envelopeFrom, isRemoteEnvelope, isTrustedLocalActor, matches, MODE_BUDGET, providerScopeViolation, providerSessionAuthority, REMOTE_SESSION_CEILING, remoteExecutionRefusal, redactReviewListing, DEVICE_REVIEW_REASON, remoteSessionViolation, runsCode, scopeFor, scopeViolation, sessionOperation, taskViolation, type DesktopGrantContext,
+import { agenticFingerprint, agenticOperationDigest, agenticScopeViolation, capabilityOperation, DESKTOP_GRANT_MAX_USES, DESKTOP_GRANT_TTL_MS, DESKTOP_REQUIRED, desktopGrantViolation, envelopeFrom, isRemoteEnvelope, isTrustedLocalActor, matches, MODE_BUDGET, classifyDeviceWrite, PHONE_SAFE_CLASSES, providerScopeViolation, providerSessionAuthority, REMOTE_SESSION_CEILING, remoteExecutionRefusal, redactReviewListing, DEVICE_REVIEW_REASON, remoteSessionViolation, runsCode, scopeFor, scopeViolation, sessionOperation, taskViolation, type DesktopGrantContext,
 } from "./authorization.server.ts";
 import { AgenticStore, digest, fileDigest, rootIdentity } from "./agentic-store.server.ts";
 import { AGENTIC_POLICY_VERSION, type AgenticAdjustment, type AgenticAuthorizationEnvelope, type CommandBinding ,
 } from "./agentic-types.ts";
 import { resolveCommand, type Resolved } from "./capabilities/process.server.ts";
-import { canonical, within } from "./paths.server.ts";
+import { canonical, privateHostPath, stagingPath, within, withinAny } from "./paths.server.ts";
+import { DeviceStaging, destinationState, escapedText, writePromoted, type StagingRecord, type StagingState } from "./staging.server.ts";
 import { boundedTestResources } from "./capabilities/bounded-terminal.server.ts";
 import { batchActionLabel, batchOffer, batchView, consultBatch, currentBatchEpoch, type BatchPlanEntry ,
 } from "./batches.server.ts";
@@ -91,6 +92,11 @@ function describeRemoteChange(path: string): string {
 const REVIEW_PAGE = 12;
 /** M-A-3 T9R-F01: largest change shown in full in a review prompt; larger files are flagged explicitly. */
 const REVIEW_BYTES = 8192;
+/**
+ * M-A-3 T9R-F02 (D3): how long a paired device's one-time answer stays usable if the step has not used it yet. The
+ * same single TTL as a trusted-desktop grant; the envelope's own expiry still bounds it.
+ */
+export const DEVICE_ANSWER_TTL_MS = DESKTOP_GRANT_TTL_MS;
 /** M-A-3 T9R-F01: the project changed between a desktop-required ask and the workstation's answer. */
 class DesktopRequestStale extends CommandRefusedError {}
 
@@ -105,6 +111,13 @@ export class MissionManager {
   containing = new Set<string>();
   /** M-A-3 T4 additive: admission gate the Agent runtime wires in. Undefined → byte-identical behavior. */
   missionPauseGate: ((missionId: string) => boolean) | null = null;
+  /** M-A-3 T9R-F02 (D2): Host-owned inert staging of paired-device file changes. */
+  staging: DeviceStaging;
+  /**
+   * M-A-3 T9R-F02 (D3/D5): whether a paired-device actor is still paired and unrevoked, from the Host's devices table
+   * (wired by the HTTP Host). Unwired only in in-process tests, where device actors are synthetic.
+   */
+  deviceActive: ((actor: string) => boolean) | null = null;
   loops: { stop: () => void }[] = [];
   listener = (event: HostEvent) => {
     try { this.onHostEvent(event); }
@@ -116,6 +129,7 @@ export class MissionManager {
     this.tasks = tasks; this.dataDirectory = options.dataDirectory;
     this.store = new MissionStore(tasks.db);
     this.agentic = new AgenticStore(tasks.db, this.store, tasks.instanceId);
+    this.staging = new DeviceStaging(tasks.db, options.dataDirectory);
     tasks.missionScopeCheck = (task, phase = "check") => {
       const mission = this.store.mission(task.mission!.missionId);
       const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
@@ -178,6 +192,17 @@ export class MissionManager {
     this.bus.remoteReviewFor = () => this.pendingRemoteReview();
     tasks.codeRunGate = () => this.pendingRemoteReview() ? `${DESKTOP_REQUIRED} Files were changed under paired-device authority and need review on the Windows Host before a Python check runs.` : null;
     this.bus.remoteMutationHeld = (request) => this.remoteMutationHeld(request);
+    // M-A-3 T9R-F02 (D2): a paired-device file change is staged, never written into the project directly.
+    this.bus.stageRemoteWrite = (request, runId) => this.stageRemoteWrite(request, runId);
+    // M-A-3 T9R-F02 (section 12): the step's one-time answer is CONSUMED when it authorizes an admitted run.
+    this.bus.onceAdmitted = (request) => {
+      if (!request.stepId || request.oneTimeAction !== request.action) return;
+      try {
+        const once = this.store.step(request.stepId).approvedOnce;
+        if (once?.action === request.action) this.stampLifecycle(once.requestId, "CONSUMED", "bunny-host", `${request.action} was admitted under this one-time answer.`);
+      } catch { /* the run is already admitted; the stamp is audit only */ }
+    };
+    this.bus.deviceAttributed = (request) => this.remoteActorFor(request);
     this.bus.remoteMutationStarted = (request, runId) => {
       const actor = this.remoteActorFor(request);
       if (!actor) return;
@@ -487,6 +512,11 @@ export class MissionManager {
     if (patch.state && ["completed", "stopped", "skipped"].includes(owned.state)) return owned;
     step = owned;
     if (patch.state) assertStepTransition(step.state, patch.state);
+    // M-A-3 T9R-F02 (section 12): a one-time answer leaving its step (failure, retry, replan, stop, a later answer)
+    // records that it no longer authorizes anything. A more specific stamp recorded earlier (CONSUMED, EXPIRED,
+    // INVALIDATED_BY_*) wins; this one only fills the gap.
+    if (step.approvedOnce && "approvedOnce" in patch && patch.approvedOnce?.requestId !== step.approvedOnce.requestId)
+      this.stampLifecycle(step.approvedOnce.requestId, "WITHDRAWN", "bunny-host", `The step ${patch.state ?? step.state} ended this one-time answer${patch.approvedOnce ? " (a later answer replaced it)" : ""}.`);
     const next = { ...step, ...patch };
     const event = this.tasks.db.transaction(() => {
       this.store.saveStep(next);
@@ -1525,6 +1555,9 @@ export class MissionManager {
   ): CapabilityRequest {
     if (this.agentic.exists(mission.id))
       envelope = this.currentAgenticCanonical(mission.id) ?? envelope;
+    // M-A-3 T9R-F02 (D3): a device's one-time answer authorizes only while it is current (device still paired, within its
+    // TTL, at the Agent revision and Host generation it answered); otherwise it is invalidated and the step asks again.
+    step = this.liveOnce(step);
     // A one-time allowance covers exactly the path the user saw in the request, nothing around it.
     // M-A-3 T9R-F01: only a workstation answer may extend roots to the path it reviewed; a device answer never does.
     const answeredBy = (() => { try { return step.approvedOnce ? this.store.request(step.approvedOnce.requestId).resolvedBy : null; } catch { return null; } })();
@@ -1563,6 +1596,8 @@ export class MissionManager {
         category: FailureCategory | null;
         output: unknown;
         permission: ({ action: string; risk: string; reason: string } & Pick<PermissionDecision, "desktopRequired" | "desktopOperation" | "remoteReview">) | null;
+        /** M-A-3 T9R-F02 (D2): the executor's write was staged, not applied; the step waits for workstation promotion. */
+        staged?: string | null;
       };
       if (step.executor.kind === "capability") {
         const params = this.crossAppInputs(step);
@@ -1583,7 +1618,9 @@ export class MissionManager {
           this.capabilityRequest(mission, step, envelope, step.executor.action, params, workspace),
         );
         const status = outcome.run?.status;
+        const stagedOutput = outcome.result?.output && typeof outcome.result.output === "object" ? (outcome.result.output as { staged?: boolean; stagingId?: string }) : null;
         result = {
+          staged: status === "succeeded" && stagedOutput?.staged === true && typeof stagedOutput.stagingId === "string" ? stagedOutput.stagingId : null,
           ok: status === "succeeded",
           summary: outcome.run?.summary ?? outcome.decision.reason,
           artifactIds: outcome.artifactIds,
@@ -1608,6 +1645,9 @@ export class MissionManager {
                 : this.capabilityCategory(outcome.result, status),
         };
       } else if (step.executor.kind === "skill") {
+        // M-A-3 T9R-F02 (round 4): a re-run never reuses a one-time answer that was consumed, withdrawn or invalidated.
+        step = this.liveOnce(step);
+        if (step.executor.kind !== "skill") throw new Error("step executor changed");
         const run = await this.skills.run(step.executor.skillId, step.executor.params, {
           missionId,
           stepId,
@@ -1673,6 +1713,16 @@ export class MissionManager {
             : attempt,
         ),
       });
+      if (result.staged) {
+        // M-A-3 T9R-F02 (D2): nothing reached the project. The step completes only after the workstation reviews the exact
+        // staged bytes and promotes them; it never completes or verifies on the strength of the staging write.
+        const record = this.staging.get(result.staged);
+        this.workspace.release(stepId);
+        if (!record) { this.stepFailed(this.store.mission(missionId), step, "capability_failed", "The staged change record is missing."); return; }
+        this.setStep(step, { result: { summary: result.summary, artifactIds: result.artifactIds, verified: null, verification: [] } });
+        this.askPromotion(this.store.mission(missionId), this.store.step(stepId), record);
+        return;
+      }
       if (result.permission) {
         this.workspace.release(stepId);
         this.askPermission(
@@ -2032,6 +2082,13 @@ export class MissionManager {
     if (!e) throw new Error("No Agentic scope to adjust.");
     const next = this.agentic.adjust(e.id, revision, patch);
     this.syncAgentic(next);
+    // M-A-3 T9R-F02 (D3): a narrowed permission stays narrowed. An answer given at the earlier revision, used or not,
+    // never authorizes again: its step asks afresh at the new revision.
+    for (const step of this.store.steps(missionId))
+      if (step.approvedOnce && !["completed", "skipped", "failed", "stopped"].includes(step.state)) {
+        this.stampLifecycle(step.approvedOnce.requestId, "INVALIDATED_BY_SCOPE_CHANGE", "workstation", `The Agent's permissions were narrowed to revision ${next.revision}.`);
+        this.setStep(step, { approvedOnce: null });
+      }
     this.reissueStaleAgenticRequests(missionId, "workstation");
     return this.agentic.projection(missionId);
   }
@@ -2083,6 +2140,7 @@ export class MissionManager {
     if (decision === "allow_batch" && request.batchOffer) {
       // An Agent's consent bounds a device as well: a batch only within a cross-app consent that names every action.
       if (consent && (!consent.cross_app || request.batchOffer.actions.some((action) => !consent.permitted_capabilities.includes(action)))) return APPROVAL_ON_HOST;
+      if (consent && (consent.current_state !== "ACTIVE" || consent.host_generation !== this.tasks.instanceId || consent.expires_at <= Date.now())) return APPROVAL_ON_HOST;
       // Every planned operation the batch covers must be one a phone could approve alone (exact Calculator operations).
       for (const planned of this.store.steps(request.missionId))
         if (planned.executor.kind === "capability" && request.batchOffer.actions.includes(planned.executor.action)) {
@@ -2100,6 +2158,16 @@ export class MissionManager {
     ];
     if (!candidates.length && step.executor.kind === "model") candidates.push(this.agenticRequestParams(step, request.action, step.pendingPhase ?? "execute"));
     if (!candidates.length) return APPROVAL_ON_HOST;
+    // M-A-3 T9R-F02 (D3): effective authority = Host policy ∩ Mission envelope ∩ Agent consent ∩ device rights ∩ the exact
+    // Host offer. For an Agent Mission a device answers only inside the Agent's CURRENT consent (state, generation,
+    // expiry, revision and resource scope); it never restores a capability the owner narrowed away.
+    if (consent) {
+      if (consent.current_state !== "ACTIVE" || consent.host_generation !== this.tasks.instanceId || consent.expires_at <= Date.now()) return APPROVAL_ON_HOST;
+      if (!request.agentic || request.agentic.revision !== consent.revision || request.agentic.generation !== this.tasks.instanceId) return APPROVAL_ON_HOST;
+      for (const params of candidates)
+        if (agenticScopeViolation(consent, request.action, params, request.risk, cwd, undefined, step.id))
+          return `${APPROVAL_ON_HOST} This is outside the Agent's current permissions; a paired device cannot widen them.`;
+    }
     for (const params of candidates) {
       // A device answers only for what the reviewed envelope already covers: never a new capability, path, root,
       // command or domain (a one-time answer is not a scope expansion from a phone).
@@ -2166,9 +2234,10 @@ export class MissionManager {
           : {}),
         requests: mission.requests.map((full) => {
           // M-A-3 T9R-F01: a paired device sees the desktop-required flag, never grant or exact-operation records.
-          const { desktopGrant: _grant, desktopOperation: _operation, desktopBinding: _binding, ...stripped } = full;
-          // The review listing (paths and content of paired-device changes, Host-wide) is for the workstation only.
-          const request = stripped.remoteReview?.length ? { ...stripped, reason: DEVICE_REVIEW_REASON } : stripped;
+          const { desktopGrant: _grant, desktopOperation: _operation, desktopBinding: _binding, promotion: _promotion, ...stripped } = full;
+          // The review listing (paths and content of paired-device changes, Host-wide) is for the workstation only, and so
+          // is a staged change's promotion review (M-A-3 T9R-F02: destination, digest and content).
+          const request = stripped.remoteReview?.length || _promotion ? { ...stripped, reason: DEVICE_REVIEW_REASON } : stripped;
           if (request.resolvedAt) return request;
           const once = this.safeRefusal(() => this.deviceRequestRefusal(request));
           // M-A-3 T9R-F01: a Calculator-bound batch can stay answerable where a single allow is workstation-only.
@@ -2311,8 +2380,10 @@ export class MissionManager {
   remoteChanges(mission: Mission): string[] {
     const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
     if (!envelope || !isRemoteEnvelope(envelope)) return [];
+    // M-A-3 T9R-F02: a staged write changed nothing in the project until (and unless) it was promoted.
+    const unpromoted = new Set(this.staging.forMission(mission.id).filter((record) => record.promotionState !== "PROMOTED").map((record) => record.runId));
     return [...new Set(this.store.runs({ missionId: mission.id, limit: 500 })
-      .filter((run) => ["filesystem.write", "filesystem.delete", "browser.download"].includes(run.action) && run.status === "succeeded")
+      .filter((run) => ["filesystem.write", "filesystem.delete", "browser.download"].includes(run.action) && run.status === "succeeded" && !unpromoted.has(run.id))
       .map((run) => String((run.params as Record<string, unknown>).path ?? run.action)))];
   }
   /** The paired device behind a Mission change: a remote envelope's grantor, or the device that allowed it once. */
@@ -2365,19 +2436,289 @@ export class MissionManager {
     }
     return stopped;
   }
-  /** M-A-3 T9R-F01: a revoked device's unexecuted one-time answers end with it (the step asks again). */
-  endDeviceAnswers(actor: string): number {
+  /**
+   * M-A-3 T9R-F01/F02: a revoked or signed-out device's unexecuted one-time answers end with it (the step asks again).
+   * Idempotent; the request keeps its answer for audit and gains its end state.
+   */
+  endDeviceAnswers(actor: string, cause: "signout" | "revocation" = "revocation"): number {
     let ended = 0;
+    const state = cause === "signout" ? "INVALIDATED_BY_SIGNOUT" : "INVALIDATED_BY_DEVICE_REVOCATION";
     for (const mission of this.store.missions(Number.MAX_SAFE_INTEGER)) for (const step of this.store.steps(mission.id)) {
       if (!step.approvedOnce || ["completed", "skipped", "failed", "stopped"].includes(step.state)) continue;
       try {
         if (this.store.request(step.approvedOnce.requestId).resolvedBy !== actor) continue;
       } catch { continue; }
       this.store.saveStep({ ...this.store.step(step.id), approvedOnce: null });
-      this.emit("approval.device_revoked", `${actor} was revoked; its one-time answer for ${step.approvedOnce.action} no longer applies.`, mission.id);
+      // An answer already admitted (its step is running or verifying) did take effect: that is recorded as CONSUMED; it
+      // authorizes nothing further (verification asks again). An unused answer is invalidated.
+      // An answer that already authorized an admitted run carries CONSUMED (first stamp wins); an unused one is invalidated.
+      this.stampLifecycle(step.approvedOnce.requestId, state, "bunny-host", `${actor} ${cause === "signout" ? "signed out" : "was revoked"}; the one-time answer authorizes nothing further.`);
+      this.emit("approval.device_revoked", `${actor} ${cause === "signout" ? "signed out" : "was revoked"}; its one-time answer for ${step.approvedOnce.action} no longer applies.`, mission.id);
       ended++;
     }
     return ended;
+  }
+  /**
+   * M-A-3 T9R-F02 (section 12): records why an answered request no longer authorizes anything. The first end state wins;
+   * repeating it is a no-op (idempotent), and the answer itself is never rewritten.
+   */
+  stampLifecycle(requestId: string, state: NonNullable<PermissionRequest["lifecycle"]>["state"], by: string, reason: string): boolean {
+    let request: PermissionRequest;
+    try { request = this.store.request(requestId); } catch { return false; }
+    if (request.lifecycle) return false;
+    this.store.saveRequest({ ...request, lifecycle: { state, at: Date.now(), by, reason: reason.slice(0, 300) } });
+    this.emit("approval.lifecycle", `Request ${requestId} (${request.action}) ${state}: ${reason.slice(0, 300)}`, request.missionId);
+    return true;
+  }
+  /** Why this step's one-time answer cannot authorize now, or null. Workstation answers keep their existing rules. */
+  onceInvalidity(step: MissionStep): { state: NonNullable<PermissionRequest["lifecycle"]>["state"]; reason: string } | null {
+    if (!step.approvedOnce) return null;
+    let request: PermissionRequest;
+    try { request = this.store.request(step.approvedOnce.requestId); } catch { return { state: "INVALIDATED_BY_SCOPE_CHANGE", reason: "The answered request is unreadable." }; }
+    if (request.lifecycle) return { state: request.lifecycle.state, reason: request.lifecycle.reason };
+    if (!request.resolvedBy || !isDeviceActor(request.resolvedBy)) return null;
+    if (this.deviceActive && !this.deviceActive(request.resolvedBy)) return { state: "INVALIDATED_BY_DEVICE_REVOCATION", reason: `${request.resolvedBy} is no longer a paired device.` };
+    if ((request.resolvedAt ?? 0) + DEVICE_ANSWER_TTL_MS <= Date.now()) return { state: "EXPIRED", reason: "The paired-device answer was not used within its lifetime." };
+    try {
+      const mission = this.store.mission(step.missionId);
+      const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
+      if (!envelope || envelope.revokedAt || envelope.expiresAt <= Date.now()) return { state: "EXPIRED", reason: "The Mission authorization the paired device answered under has ended." };
+    } catch { return { state: "EXPIRED", reason: "The Mission authorization could not be read." }; }
+    const consent = this.agentic.forMission(step.missionId);
+    if (consent && (!request.agentic || request.agentic.revision !== consent.revision || request.agentic.generation !== this.tasks.instanceId))
+      return { state: "INVALIDATED_BY_SCOPE_CHANGE", reason: "The Agent's permissions changed after the paired device answered." };
+    return null;
+  }
+  /** The step with an invalid one-time answer cleared (and its request's end state recorded). */
+  liveOnce(step: MissionStep): MissionStep {
+    const invalid = this.onceInvalidity(step);
+    if (!invalid || !step.approvedOnce) return step;
+    this.stampLifecycle(step.approvedOnce.requestId, invalid.state, "bunny-host", invalid.reason);
+    const current = this.store.step(step.id);
+    if (current.approvedOnce?.requestId !== step.approvedOnce.requestId) return { ...step, approvedOnce: current.approvedOnce };
+    const next = { ...current, approvedOnce: null };
+    this.store.saveStep(next);
+    return { ...step, approvedOnce: null };
+  }
+  // ── M-A-3 T9R-F02 (D2): inert staging and workstation promotion of paired-device changes ─────────────────
+  /**
+   * Called by the bus after admission and instead of the filesystem adapter: a write attributed to a paired device is
+   * written into Host-owned staging, never into the project. Returns null when the write is not device-attributed.
+   */
+  stageRemoteWrite(request: CapabilityRequest, runId: string): CapabilityResult | null {
+    if (!request.missionId) return null;
+    const actor = this.remoteActorFor(request);
+    if (!actor) return null;
+    const fail = (summary: string): CapabilityResult => ({ ok: false, status: "failed", summary, output: null, evidence: [], errorCategory: "capability_failed" });
+    if (!request.stepId || !request.envelope) return fail("A paired-device change must belong to an authorized Mission step.");
+    const mission = this.store.mission(request.missionId);
+    const content = typeof request.params.content === "string" ? request.params.content : null;
+    if (content === null || typeof request.params.path !== "string") return fail('Parameters "path" and "content" are required.');
+    const step = this.store.step(request.stepId);
+    // Only a step's own write executor can wait for promotion; a skill or a verification check cannot be paused for it.
+    if (step.executor.kind !== "capability" || step.executor.action !== "filesystem.write")
+      return fail(`${DESKTOP_REQUIRED} A paired-device change inside a skill or check cannot be staged for review; run it on the Windows Host.`);
+    const destination = scopedPath(request.cwd, request.params.path, request.roots);
+    if (privateHostPath(this.dataDirectory, destination) || stagingPath(this.dataDirectory, destination))
+      return fail("Private Host state is outside project scope.");
+    const root = request.roots.find((candidate) => within(candidate, destination)) ?? request.cwd;
+    const classified = classifyDeviceWrite(request.params.path, { base: request.cwd, operation: "write", content });
+    let before: StagingRecord["destinationBefore"];
+    try { before = destinationState(destination); } catch (error) { return fail(error instanceof Error ? error.message : String(error)); }
+    if (before.existed && request.params.overwrite !== true) return fail(`${destination} already exists; overwrite was not requested.`);
+    const hash = sha256(content);
+    // A Retry after a restart or a lost answer never writes twice: the same promoted bytes are already in place.
+    const applied = this.staging.forMission(mission.id).find((record) => record.stepId === request.stepId && record.destination === destination && record.contentHash === hash && record.promotionState === "PROMOTED");
+    if (applied && before.sha256 === hash)
+      return { ok: true, status: "succeeded", summary: `Already promoted on the Windows Host: paired-device change ${applied.id}; ${destination} holds the reviewed bytes.`, output: { path: destination, bytes: Buffer.byteLength(content), created: false, sha256: hash, alreadyPromoted: applied.id }, evidence: [`Destination SHA-256 ${hash} equals promoted paired-device change ${applied.id}`] };
+    const consent = this.agentic.forMission(mission.id);
+    const record = this.staging.stage({
+      missionId: mission.id, agentId: consent?.agent_id ?? null, stepId: request.stepId, runId, deviceId: actor,
+      envelopeId: request.envelope.id, envelopeRemote: isRemoteEnvelope(request.envelope),
+      destination, destinationRoot: root, destinationBefore: before,
+      classification: classified.classification, reasons: classified.reasons, warnings: classified.warnings,
+      approvalRevision: consent ? `agentic:${consent.revision}` : `authorization:${request.envelope.id}`, hostGeneration: this.tasks.instanceId,
+    }, content, request.envelope.projectRoots);
+    this.emit("staging.staged", `Paired-device change ${record.id} staged for ${JSON.stringify(destination)} (${record.contentSize} bytes, sha256 ${record.contentHash}, ${record.classification}); it reaches the project only after review and promotion on the Windows Host.`, mission.id);
+    return {
+      ok: true, status: "succeeded",
+      summary: `Staged a paired-device change of ${record.contentSize} bytes for ${destination}; awaiting review and promotion on the Windows Host.`,
+      output: { staged: true, stagingId: record.id, destination, sha256: record.contentHash, bytes: record.contentSize, classification: record.classification },
+      evidence: [`Staged paired-device change ${record.id} in Host-owned staging (sha256 ${record.contentHash}); the project was not changed.`],
+    };
+  }
+  /** The workstation's review text for one staged change: identity, classification, warnings and exact bytes. */
+  promotionReason(record: StagingRecord): string {
+    const content = (() => { try { return this.staging.readVerified(record); } catch { return null; } })();
+    const shown = content
+      ? record.contentSize > REVIEW_BYTES
+        ? `TOO LARGE TO SHOW HERE: only the first ${REVIEW_BYTES} bytes follow. Inspect the whole staged content on the Windows Host (mission.staging.inspect) before allowing; promotion is refused until every byte was inspected. First bytes (JSON): ${escapedText(content.subarray(0, REVIEW_BYTES))}`
+        : `full content (JSON): ${escapedText(content)}`
+      : "STAGED CONTENT UNREADABLE: promotion will be refused.";
+    const safe = (text: string) => escapedText(Buffer.from(text, "utf8"));
+    return `Approval required on Windows Host: promote a paired-device change into the project. Destination ${safe(record.destination)}; source ${record.deviceId}; Mission ${record.missionId}${record.agentId ? `; Agent ${record.agentId}` : ""}; classification ${record.classification} (${safe(record.reasons.at(-1) ?? "")})${record.warnings.length ? `; warnings: ${safe(record.warnings.join(" "))}` : ""}; ${record.contentSize} bytes, sha256 ${record.contentHash}; ${record.destinationBefore.existed ? `replaces the current file (sha256 ${record.destinationBefore.sha256})` : "creates a new file"}; ${shown}`;
+  }
+  /** Raises the Host's promotion request for a staged change (workstation-only; bound to the exact bytes and destination). */
+  askPromotion(mission: Mission, step: MissionStep, record: StagingRecord) {
+    this.askPermission(mission, step, "filesystem.promote", "WRITE", this.promotionReason(record), "verify", {
+      desktopRequired: true,
+      promotion: { stagingId: record.id, contentHash: record.contentHash, contentSize: record.contentSize, destination: record.destination, classification: record.classification },
+    });
+  }
+  /** Workstation-only: the whole staged content, so more than the preview can be reviewed before promotion. */
+  inspectStaged(stagingId: string, by: string): { stagingId: string; destination: string; sha256: string; bytes: number; classification: string; content: string } {
+    if (!isTrustedLocalActor(by)) throw new WorkstationRequiredError(DESKTOP_REQUIRED);
+    const record = this.staging.get(stagingId);
+    if (!record) throw new CommandRefusedError("Unknown staged change.");
+    let bytes: Buffer;
+    try { bytes = this.staging.readVerified(record); } catch (error) { throw new CommandRefusedError(error instanceof Error ? error.message : String(error)); }
+    this.staging.recordInspection(record.id, record.contentHash, by);
+    this.emit("staging.inspected", `${by} inspected all ${record.contentSize} bytes of staged paired-device change ${record.id} (sha256 ${record.contentHash}).`, record.missionId);
+    // Escaped exactly like the preview: invisible or bidirectional code points cannot reorder what the reviewer reads.
+    return { stagingId: record.id, destination: record.destination, sha256: record.contentHash, bytes: record.contentSize, classification: record.classification, content: escapedText(bytes) };
+  }
+  /** Ends a staged change's chance of promotion (content kept for audit) and closes its open promotion request. */
+  endStaged(record: StagingRecord, state: StagingState, by: string, reason: string, from: StagingState[] = ["STAGED"]): boolean {
+    const ended = this.staging.transition(record.id, from, state, by, reason);
+    if (!ended) return false;
+    for (const request of this.store.requests(record.missionId))
+      if (request.promotion?.stagingId === record.id && !request.resolvedAt) {
+        this.store.saveRequest({ ...request, resolvedAt: Date.now(), resolution: "deny", resolvedBy: `${by} (${state.toLowerCase()})` });
+        this.inbox.resolve(record.missionId, { requestId: request.id });
+      }
+    this.emit("staging.ended", `Staged paired-device change ${record.id} for ${JSON.stringify(record.destination)} is ${state}: ${reason}`, record.missionId);
+    return true;
+  }
+  /** M-A-3 T9R-F02 (D5): staged, unpromoted changes a signed-out or revoked device produced can no longer be promoted. */
+  invalidateDeviceStaging(actor: string, cause: "signout" | "revocation"): number {
+    let ended = 0;
+    for (const record of this.staging.inState("STAGED"))
+      if (record.deviceId === actor) {
+        if (!this.endStaged(record, cause === "signout" ? "INVALIDATED_BY_SIGNOUT" : "INVALIDATED_BY_DEVICE_REVOCATION", "bunny-host", `${actor} ${cause === "signout" ? "signed out" : "was revoked"} before promotion.`)) continue;
+        ended++;
+        const step = this.store.step(record.stepId);
+        if (step.state === "waiting_for_approval" && this.store.request(step.pendingRequestId ?? "").promotion?.stagingId === record.id) {
+          const mission = this.store.mission(record.missionId);
+          this.stepFailed(mission, this.setStep(this.store.step(step.id), { state: "running", pendingRequestId: null, pendingPhase: null }), "permission_required", `The paired device that produced this change ${cause === "signout" ? "signed out" : "was revoked"}; it was not promoted.`);
+        }
+      }
+    return ended;
+  }
+  /** Withdraws every staged, unpromoted change of a Mission (Stop, Retry, Replan). */
+  withdrawStaged(missionId: string, by: string, reason: string, stepId?: string) {
+    for (const record of this.staging.forMission(missionId))
+      if (record.promotionState === "STAGED" && (!stepId || record.stepId === stepId)) this.endStaged(record, "WITHDRAWN", by, reason);
+  }
+  /**
+   * The workstation's promotion of one staged change: every identity and authority is re-validated against CURRENT
+   * state, then exactly the staged bytes are written atomically and read back. Synchronous end to end, so no other
+   * Host admission interleaves. Throws CommandRefusedError before any project mutation when anything fails; staleness
+   * ends the staged change (it is never promoted later), a temporary condition leaves the request open.
+   */
+  promoteStaged(request: PermissionRequest, by: string) {
+    if (!isTrustedLocalActor(by)) throw new WorkstationRequiredError(DESKTOP_REQUIRED);
+    const binding = request.promotion!;
+    const record = this.staging.get(binding.stagingId);
+    const end = (state: StagingState, reason: string): never => {
+      if (record) this.endStaged(record, state, "bunny-host", reason);
+      const step = this.store.step(request.stepId);
+      if (step.state === "waiting_for_approval" && step.pendingRequestId === request.id)
+        this.stepFailed(this.store.mission(request.missionId), this.setStep(step, { state: "running", pendingRequestId: null, pendingPhase: null }), "permission_required", `Promotion refused: ${reason}`);
+      throw new CommandRefusedError(`Promotion refused: ${reason}`);
+    };
+    if (!record || record.missionId !== request.missionId || record.stepId !== request.stepId || record.contentHash !== binding.contentHash || record.destination !== binding.destination || record.contentSize !== binding.contentSize)
+      end("FAILED", "the request does not match the staged change it names.");
+    const staged = record!;
+    const closeWaiting = (reason: string) => {
+      const current = this.store.request(request.id);
+      if (!current.resolvedAt) { this.store.saveRequest({ ...current, resolvedAt: Date.now(), resolution: "deny", resolvedBy: "bunny-host (promotion failed)" }); this.inbox.resolve(request.missionId, { requestId: request.id }); }
+      const step = this.store.step(request.stepId);
+      if (step.state === "waiting_for_approval" && step.pendingRequestId === request.id)
+        this.stepFailed(this.store.mission(request.missionId), this.setStep(step, { state: "running", pendingRequestId: null, pendingPhase: null }), "permission_required", `Promotion failed: ${reason}`);
+    };
+    if (staged.promotionState !== "STAGED") {
+      if (["FAILED", "REJECTED", "WITHDRAWN"].includes(staged.promotionState) || staged.promotionState.startsWith("INVALIDATED")) closeWaiting(`this staged change is ${staged.promotionState}.`);
+      throw new CommandRefusedError(`Promotion refused: this staged change is ${staged.promotionState}.`);
+    }
+    // Temporary conditions: the request stays open and the workstation can answer again.
+    if (staged.contentSize > REVIEW_BYTES && staged.inspectedHash !== staged.contentHash)
+      throw new CommandRefusedError(`Promotion refused: the change is ${staged.contentSize} bytes and only ${REVIEW_BYTES} were shown. Inspect the whole staged content on the Windows Host first (mission.staging.inspect ${staged.id}).`);
+    const live = this.liveCodeExecutions();
+    if (live.length) throw new CommandRefusedError(`Promotion waits: code is running on this computer (${live.slice(0, 4).join(", ")}); promote after it ends so it cannot read the change mid-run.`);
+    if (this.desktopExecutionConflict(staged.destination)) throw new CommandRefusedError("Promotion waits: a trusted-desktop execution is running in this folder.");
+    // Authority: the Mission, its envelope, the Agent consent and the producing device, as they are NOW.
+    const mission = this.store.mission(request.missionId);
+    if (["stopped", "failed", "completed"].includes(mission.state) || this.stopping.has(mission.id)) end("WITHDRAWN", "the Mission is no longer running.");
+    const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
+    if (!envelope || envelope.revokedAt || envelope.id !== staged.envelopeId) end("INVALIDATED_BY_SCOPE_CHANGE", "the Mission authorization the change was staged under has ended or changed.");
+    // A change made under the device's own (remote) envelope depends on that device; under a workstation envelope the
+    // workstation's promotion is the owner's independent decision on the exact bytes.
+    if (staged.envelopeRemote && this.deviceActive && isDeviceActor(staged.deviceId) && !this.deviceActive(staged.deviceId)) end("INVALIDATED_BY_DEVICE_REVOCATION", `${staged.deviceId} is no longer a paired device.`);
+    const step = this.store.step(request.stepId);
+    const cwd = step.workspace ?? mission.root;
+    const params = step.executor.kind === "capability" && step.executor.action === "filesystem.write" ? step.executor.params as Record<string, unknown> : { path: staged.destination };
+    const consent = this.agentic.forMission(mission.id);
+    if (consent) {
+      if (!["ACTIVE", "EXHAUSTED"].includes(consent.current_state) || consent.host_generation !== this.tasks.instanceId || consent.expires_at <= Date.now() || `agentic:${consent.revision}` !== staged.approvalRevision)
+        end("INVALIDATED_BY_SCOPE_CHANGE", "the Agent's permissions changed after the change was staged.");
+      if (agenticScopeViolation(consent, "filesystem.write", params, "WRITE", cwd, undefined, step.id) && !this.reviewedFilesystemOnce(this.capabilityRequest(mission, step, envelope!, "filesystem.write", params, cwd), consent, "WRITE"))
+        end("INVALIDATED_BY_SCOPE_CHANGE", "the Agent no longer has permission to write this file.");
+    } else {
+      // Plain Missions: the envelope's write roots, plus the folder a workstation one-time answer reviewed (never a device's).
+      const once = step.approvedOnce?.action === "filesystem.write" && isTrustedLocalActor(this.onceResolver(step)) ? [dirname(staged.destination)] : [];
+      if (!withinAny([...envelope!.filesystem.write, ...once], staged.destination)) end("INVALIDATED_BY_SCOPE_CHANGE", "the destination is outside the Mission's current write authority.");
+    }
+    // Resource identity: the destination path, its folder chain and its current content are what was staged against.
+    const reclassified = classifyDeviceWrite(staged.destination, { base: staged.destinationRoot, operation: "write", content: null });
+    if (reclassified.classification === "UNKNOWN") end("FAILED", `the destination can no longer be resolved safely (${reclassified.reasons.at(-1)}).`);
+    if (staged.envelopeRemote && !PHONE_SAFE_CLASSES.includes(reclassified.classification)) end("INVALIDATED_BY_SCOPE_CHANGE", `the destination is now ${reclassified.classification} (${reclassified.reasons.at(-1)}).`);
+    if (canonical(staged.destination) !== staged.destination) end("FAILED", "the destination now resolves elsewhere.");
+    if (privateHostPath(this.dataDirectory, staged.destination) || stagingPath(this.dataDirectory, staged.destination)) end("FAILED", "the destination is private Host state.");
+    let now: StagingRecord["destinationBefore"];
+    try { now = destinationState(staged.destination); } catch (error) { return end("FAILED", `the destination changed (${error instanceof Error ? error.message : String(error)}).`); }
+    if (now.existed !== staged.destinationBefore.existed || now.sha256 !== staged.destinationBefore.sha256) end("FAILED", "the destination file was created, replaced or edited after the change was staged.");
+    let bytes: Buffer;
+    try { bytes = this.staging.readVerified(staged); } catch (error) { return end("FAILED", error instanceof Error ? error.message : String(error)); }
+    // Commit: intent first (a crash is reconciled at recovery), then the bounded atomic write, then independent read-back.
+    if (!this.staging.transition(staged.id, ["STAGED"], "PROMOTING", by, `Promotion approved by ${by} (request ${request.id}).`)) throw new CommandRefusedError("Promotion refused: the staged change was ended concurrently.");
+    let written: { sha256: string; size: number };
+    try { written = writePromoted(staged.destination, bytes); }
+    catch (error) {
+      this.promotionFailed(staged, `Write failed: ${error instanceof Error ? error.message : String(error)}`);
+      closeWaiting("the destination write failed; it is listed for review before any code runs.");
+      throw new CommandRefusedError(`Promotion failed while writing: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    if (written.sha256 !== staged.contentHash || written.size !== staged.contentSize) {
+      this.promotionFailed(staged, "Read-back did not match the reviewed bytes.");
+      closeWaiting("the destination read-back did not match the reviewed bytes; it is listed for review before any code runs.");
+      throw new CommandRefusedError("Promotion failed: the destination read-back did not match the reviewed bytes.");
+    }
+    try {
+    this.store.host.transaction(() => {
+      this.staging.transition(staged.id, ["PROMOTING"], "PROMOTED", by, `Promoted by ${by}; read-back sha256 ${written.sha256}.`);
+      // The workstation reviewed exactly these bytes, so the change is recorded as an already reviewed device change.
+      const changeId = this.store.recordRemoteChange({ runId: staged.runId, missionId: staged.missionId, path: staged.destination, root: staged.destinationRoot, actor: staged.deviceId });
+      this.store.acknowledgeRemoteChanges([changeId], by);
+    });
+    } catch (error) {
+      // The project already changed: record it as unreviewed, close the request and fail the step.
+      this.promotionFailed(staged, `Recording the promotion failed: ${error instanceof Error ? error.message : String(error)}`);
+      closeWaiting("the promotion could not be recorded; the destination is listed for review before any code runs.");
+      throw new CommandRefusedError("Promotion failed while recording it; the destination is listed for review.");
+    }
+    this.emit("staging.promoted", `${by} promoted staged paired-device change ${staged.id} into ${JSON.stringify(staged.destination)} (${written.size} bytes, sha256 ${written.sha256}, independently read back).`, staged.missionId);
+  }
+  /**
+   * A promotion that failed after it may have touched the destination: the change is recorded as an UNREVIEWED
+   * paired-device change, so no Bunny code runs over whatever is on disk until the workstation reviews it.
+   */
+  promotionFailed(staged: StagingRecord, reason: string) {
+    this.staging.transition(staged.id, ["PROMOTING"], "FAILED", "bunny-host", reason);
+    this.store.recordRemoteChange({ runId: staged.runId, missionId: staged.missionId, path: staged.destination, root: staged.destinationRoot, actor: staged.deviceId });
+    this.emit("staging.failed", `Promotion of paired-device change ${staged.id} failed (${reason}); the destination is listed for review before any code runs.`, staged.missionId);
+  }
+  onceResolver(step: MissionStep): string | null {
+    try { return step.approvedOnce ? this.store.request(step.approvedOnce.requestId).resolvedBy : null; } catch { return null; }
   }
   /** Workstation-approved code running right now: code-running capability runs and shell-capable provider sessions. */
   liveCodeExecutions(): string[] {
@@ -2670,6 +3011,7 @@ export class MissionManager {
           "agentic-terminal",
           "browser-profile",
           "browser-sessions",
+          "staging",
         ].some((name) => within(canonical(join(this.dataDirectory, name)), canonical(path)));
       if (
         request.action.startsWith("filesystem.") &&
@@ -2769,6 +3111,10 @@ export class MissionManager {
     const step = this.store.step(request.stepId);
     const once = step.approvedOnce ? this.store.request(step.approvedOnce.requestId) : null;
     return !!(
+      // M-A-3 T9R-F02 (D3): only the authenticated workstation's exact-resource decision on the Host extends an Agent's
+      // consent for one resource. A paired-device answer never restores or widens what the owner narrowed.
+      isTrustedLocalActor(once?.resolvedBy) &&
+      !once?.lifecycle &&
       step.missionId === request.missionId &&
       once?.missionId === request.missionId &&
       once.stepId === request.stepId &&
@@ -3258,6 +3604,8 @@ export class MissionManager {
         ? { ...attempt, finishedAt: Date.now(), outcome: "completed" as const, detail: "completed" }
         : attempt,
     );
+    // M-A-3 T9R-F02 (section 12): the one-time answer that carried this step is spent with it.
+    if (step.approvedOnce) this.stampLifecycle(step.approvedOnce.requestId, "CONSUMED", "bunny-host", `${step.role} completed under this one-time answer.`);
     this.setStep(
       step,
       {
@@ -3463,10 +3811,11 @@ export class MissionManager {
     risk: PermissionRequest["risk"],
     reason: string,
     phase: "execute" | "verify",
-    desktop: Pick<PermissionDecision, "desktopRequired" | "desktopOperation" | "remoteReview"> = {},
+    desktop: Pick<PermissionDecision, "desktopRequired" | "desktopOperation" | "remoteReview"> & Pick<PermissionRequest, "promotion"> = {},
   ) {
     const delegation = this.agentic.forMission(mission.id);
-    const params = this.agenticRequestParams(step, action, phase);
+    // M-A-3 T9R-F02: a promotion request is fingerprinted by the staged change it names, never by the executor's params.
+    const params = desktop.promotion ? { stagingId: desktop.promotion.stagingId, contentHash: desktop.promotion.contentHash, path: desktop.promotion.destination } : this.agenticRequestParams(step, action, phase);
     const fingerprint = delegation
       ? agenticFingerprint(action, params, step.workspace ?? mission.root)
       : null;
@@ -3510,6 +3859,7 @@ export class MissionManager {
             desktopRequired: true,
             ...(desktop.desktopOperation ? { desktopOperation: desktop.desktopOperation } : {}),
             ...(desktop.remoteReview?.length ? { remoteReview: desktop.remoteReview } : {}),
+            ...(desktop.promotion ? { promotion: desktop.promotion } : {}),
             desktopBinding: { taskId: this.store.step(step.id).taskId, authorizationId: mission.authorizationId ?? "", planReference: this.agenticPlanReference(mission.id), mutationSequence: this.store.mutationSequence() },
           }
         : {}),
@@ -3686,9 +4036,16 @@ export class MissionManager {
     // Validate and create before answering: a failed validation leaves the request open.
     if (decision === "allow_batch")
       this.createBatchFromOffer(request.missionId, step.id, requestId, by, options);
+    // M-A-3 T9R-F02 (D2): a promotion runs here, synchronously, BEFORE the request is resolved: any failed validation
+    // leaves the project untouched (and either keeps the request open or ends the staged change).
+    if (request.promotion && decision === "allow_once") this.promoteStaged(request, by);
+    if (request.promotion && decision === "deny") {
+      const record = this.staging.get(request.promotion.stagingId);
+      if (record) this.staging.transition(record.id, ["STAGED"], "REJECTED", by, `Promotion denied by ${by} (request ${requestId}).`);
+    }
     let desktopGrant: DesktopGrant | undefined;
     try {
-      desktopGrant = request.desktopRequired && decision === "allow_once" ? this.mintDesktopGrant(request) : undefined;
+      desktopGrant = request.desktopRequired && decision === "allow_once" && !request.promotion ? this.mintDesktopGrant(request) : undefined;
     } catch (error) {
       if (!(error instanceof DesktopRequestStale)) throw error;
       // Superseded (recorded as deny with a "superseded" resolver, not as the user's choice): ask again so the
@@ -3867,6 +4224,7 @@ export class MissionManager {
     if (this.stopping.has(id)) throw new Error("Mission Stop is already in progress.");
     this.stopping.add(id);
     this.revokeDesktopGrants(id, `Mission stopped by ${by}`);
+    this.withdrawStaged(id, by, `Mission stopped by ${by}.`);
     try {
       const delegation = this.agentic.forMission(id);
       if (
@@ -3910,8 +4268,12 @@ export class MissionManager {
             finishedAt: Date.now(),
             attempts,
             failure: { category: "user_stopped", detail: `Stopped by ${by}.` },
+            ...(step.approvedOnce ? { approvedOnce: null } : {}),
           });
         }
+      // M-A-3 T9R-F02 (round 4): a failed step's unused one-time answer ends with the Mission too.
+      for (const step of this.store.steps(id))
+        if (step.state === "failed" && step.approvedOnce) this.setStep(step, { approvedOnce: null });
       for (const request of this.store.requests(id))
         if (!request.resolvedAt)
           this.store.saveRequest({
@@ -3962,16 +4324,24 @@ export class MissionManager {
       throw new Error(
         "The mission authorization expired or was revoked; replan to approve it again.",
       );
-    const steps = this.store.steps(id);
-    const failed = steps.filter((step) => step.state === "failed");
-    if (!failed.length && !steps.some((step) => step.state === "blocked"))
+    // M-A-3 T9R-F02: a step waiting for promotion is retried by staging its change again for a fresh review. Every
+    // refusal below is checked before anything changes, so a refused Retry never withdraws a staged change (round 4).
+    const waitingPromotion = this.store.steps(id).filter((step) => step.state === "waiting_for_approval" && !!step.pendingRequestId && !!this.store.request(step.pendingRequestId).promotion);
+    const before = this.store.steps(id);
+    const retryable = [...before.filter((step) => step.state === "failed"), ...waitingPromotion];
+    if (!retryable.length && !before.some((step) => step.state === "blocked"))
       throw new Error("No failed step to retry.");
-    for (const step of failed) {
+    for (const step of retryable)
       // Explicit retries are still bounded: at most twice the automatic per-step limit plus one.
       if (step.attempts.length > step.maxRetries * 2 + 1)
         throw new Error(
           `${step.role} reached its attempt ceiling (${step.attempts.length}); replan instead.`,
         );
+    for (const step of waitingPromotion)
+      this.setStep(step, { state: "failed", pendingRequestId: null, pendingPhase: null, failure: { category: "permission_required", detail: `Retried by ${by}: the change is staged again for a fresh review.` } });
+    this.withdrawStaged(id, by, `Mission retried by ${by}; the step stages its change again.`);
+    const failed = this.store.steps(id).filter((step) => step.state === "failed");
+    for (const step of failed) {
       this.setStep(
         step,
         { state: "ready", failure: null, taskId: null, approvedOnce: null },
@@ -4041,6 +4411,7 @@ export class MissionManager {
         id,
       );
     this.revokeDesktopGrants(id, `Mission replanned by ${by}`);
+    this.withdrawStaged(id, by, `Mission replanned by ${by}.`);
     this.workspace.releaseMission(id);
     const base = this.setMission(
       mission,
@@ -4227,7 +4598,28 @@ export class MissionManager {
     // A one-time allowance never crosses a Host restart, including on failed Missions a later Retry could revive.
     for (const failed of this.store.missionsIn(["failed"]))
       for (const step of this.store.steps(failed.id))
-        if (step.approvedOnce) this.setStep(step, { approvedOnce: null });
+        if (step.approvedOnce) {
+          this.stampLifecycle(step.approvedOnce.requestId, "INVALIDATED_BY_HOST_RESTART", "bunny-host-restart", "The Host restarted before the answer was used.");
+          this.setStep(step, { approvedOnce: null });
+        }
+    // M-A-3 T9R-F02 (D2): staged content survives a restart intact, but no promotion carries into a new Host epoch. An
+    // interrupted promotion is reconciled from disk: the reviewed bytes either landed (PROMOTED) or did not (FAILED).
+    for (const record of this.staging.inState("PROMOTING")) {
+      let landed = false;
+      try { landed = destinationState(record.destination).sha256 === record.contentHash; } catch { landed = false; }
+      if (landed) {
+        this.staging.transition(record.id, ["PROMOTING"], "PROMOTED", "bunny-host-restart", "Reconciled after restart: the destination holds the reviewed bytes.");
+        const changeId = this.store.recordRemoteChange({ runId: record.runId, missionId: record.missionId, path: record.destination, root: record.destinationRoot, actor: record.deviceId });
+        this.store.acknowledgeRemoteChanges([changeId], record.decidedBy ?? "workstation");
+      } else {
+        this.staging.transition(record.id, ["PROMOTING"], "FAILED", "bunny-host-restart", "Reconciled after restart: the promotion did not complete.");
+        // The rename may have happened before the crash: whatever is on disk is listed for review before code runs.
+        this.store.recordRemoteChange({ runId: record.runId, missionId: record.missionId, path: record.destination, root: record.destinationRoot, actor: record.deviceId });
+      }
+      this.emit("staging.reconciled", `Interrupted promotion of ${record.id} reconciled after restart: ${landed ? "PROMOTED" : "FAILED"}.`, record.missionId);
+    }
+    for (const record of this.staging.inState("STAGED"))
+      this.endStaged(record, "INVALIDATED_BY_HOST_RESTART", "bunny-host-restart", "The Host restarted before promotion; a Retry stages the change again for a fresh review.");
     for (const envelope of this.store.liveAuthorizations())
       if (isRemoteEnvelope(envelope)) {
         this.store.saveAuthorization({ ...envelope, revokedAt: now });
@@ -4281,6 +4673,8 @@ export class MissionManager {
                 resolvedBy: "bunny-host-restart",
               });
           }
+          if (step.approvedOnce)
+            this.stampLifecycle(step.approvedOnce.requestId, "INVALIDATED_BY_HOST_RESTART", "bunny-host-restart", "The Host restarted before the answer was used.");
           this.setStep(
             step,
             {

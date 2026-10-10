@@ -193,6 +193,9 @@ export const READ_ACTIONS = new Set([
   "project.get",
   "project.artifact",
   "operation.status",
+  // M-A-3 T9R-F02: workstation-only staged-change reads (inspection only records that the owner looked).
+  "mission.staging.list",
+  "mission.staging.inspect",
 ]);
 export const isMutating = (action: string) => !READ_ACTIONS.has(action);
 

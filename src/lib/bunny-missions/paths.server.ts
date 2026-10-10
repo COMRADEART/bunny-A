@@ -27,7 +27,7 @@ export function withinAny(roots: string[], path: string): boolean { return roots
 
 /** Private authority/runtime state never becomes an Agent project resource, even under a broad root. */
 export function privateHostPath(dataDirectory: string, path: string): boolean {
-  return ["host.sqlite", "host.sqlite-wal", "host.sqlite-shm", "credentials.json", "remote.json", "state-layout.json", "state-retired.json", "credentials", "settings", "runtime", "sessions", "logs", "agentic-terminal", "browser-profile", "browser-sessions"]
+  return ["host.sqlite", "host.sqlite-wal", "host.sqlite-shm", "credentials.json", "remote.json", "state-layout.json", "state-retired.json", "credentials", "settings", "runtime", "sessions", "logs", "agentic-terminal", "browser-profile", "browser-sessions", "staging"]
     .some(name => within(join(dataDirectory, name), path));
 }
 
@@ -36,4 +36,9 @@ export function scopedPath(base: string, path: string, roots: string[]): string 
   const target = canonical(isAbsolute(path) ? path : join(base, path));
   if (!withinAny(roots, target)) throw new Error(`Path is outside the approved scope: ${target}`);
   return target;
+}
+
+/** M-A-3 T9R-F02: the Host-owned staging folder for paired-device changes; never a Mission resource. */
+export function stagingPath(dataDirectory: string, path: string): boolean {
+  return !!dataDirectory && within(join(dataDirectory, "staging"), path);
 }

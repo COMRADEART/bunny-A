@@ -192,6 +192,8 @@ type Island = Preferences & {
     },
   ) => Promise<void>;
   retryMission: (id: string) => Promise<void>;
+  /** M-A-3 T9R-F02: workstation-only full view of a staged paired-device change (recorded by the Host as inspected). */
+  inspectStaged: (stagingId: string) => Promise<{ content: string; sha256: string; bytes: number } | null>;
   respondMission: (
     requestId: string,
     decision: "allow_once" | "allow_batch" | "deny",
@@ -789,6 +791,13 @@ export const useIsland = create<Island>((set, get) => {
     },
     retryMission: async (id) => {
       await command("mission.retry", { id }, id);
+    },
+    inspectStaged: async (stagingId) => {
+      const result = await command("mission.staging.inspect", { stagingId }, stagingId);
+      const data = result?.data as { content?: unknown; sha256?: unknown; bytes?: unknown } | undefined;
+      return data && typeof data.content === "string" && typeof data.sha256 === "string" && typeof data.bytes === "number"
+        ? { content: data.content, sha256: data.sha256, bytes: data.bytes }
+        : null;
     },
     respondMission: async (requestId, decision) => {
       await get().respondRequest(requestId, decision);

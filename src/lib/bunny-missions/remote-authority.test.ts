@@ -88,6 +88,26 @@ async function waitAsk(env: Env, missionId: string, action: string) {
   return pending(env, missionId)!;
 }
 const claudeTools = (task: OrchTask) => { const args = claudeLaunchArgs(task, "s", "win32"); return args[args.indexOf("--allowedTools") + 1]; };
+/**
+ * M-A-3 T9R-F02: a paired-device write is staged in Host-owned inert storage and reaches the project only when the
+ * workstation promotes the exact staged bytes. A device can never answer that promotion.
+ */
+async function promoteStaged(env: Env, missionId: string) {
+  const ask = await waitAsk(env, missionId, "filesystem.promote");
+  assert.equal(ask.desktopRequired, true, "the promotion is workstation-only");
+  await env.missions.respond(ask.id, "allow_once", "workstation");
+  return ask;
+}
+/**
+ * F02 staging means device writes no longer land unreviewed, so the review gate (Host-wide: code waits for unreviewed
+ * paired-device changes) is exercised as defense in depth: this seeds an UNREVIEWED paired-device change on disk and
+ * records it exactly as a device write used to be recorded.
+ */
+const seedUnreviewed = (env: Env, path: string, content: string, missionId: string | null = null) => {
+  const absolute = join(env.root, path);
+  writeFileSync(absolute, content);
+  return env.missions.store.recordRemoteChange({ runId: "seed", missionId, path: absolute, root: env.root, actor: PHONE });
+};
 
 // ── 1. bounded file operation ────────────────────────────────────────────────
 test("F01-1: a phone-approved bounded file operation runs without any extra prompt", async () => {
@@ -95,9 +115,14 @@ test("F01-1: a phone-approved bounded file operation runs without any extra prom
   try {
     const view = env.missions.create({ objective: "Write a note", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "note.txt", content: "from phone", overwrite: true })] });
     await phoneApprove(env, view.id);
+    // F02: the phone's bounded write is staged; the only prompt is the workstation promotion, never a write prompt.
+    const promotion = await waitAsk(env, view.id, "filesystem.promote");
+    assert.equal(env.missions.store.requests(view.id).length, 1, "no write prompt for bounded non-sensitive work");
+    assert.equal(existsSync(join(env.root, "note.txt")), false, "staged, not written to the project");
+    await assert.rejects(phoneRespond(env, promotion.id, "allow_once"), DESKTOP_ONLY, "a device cannot promote its own staged write");
+    await env.missions.respond(promotion.id, "allow_once", "workstation");
     await until(() => env.missions.mission(view.id).state === "completed", "bounded write completed");
     assert.equal(readFileSync(join(env.root, "note.txt"), "utf8"), "from phone");
-    assert.equal(env.missions.store.requests(view.id).length, 0, "no prompt for bounded non-sensitive work");
     assert.equal(env.missions.get(view.id).authorization!.authority?.kind, "remote");
     assert.equal(env.launched.length, 0);
   } finally { await env.cleanup(); }
@@ -412,13 +437,13 @@ async function hostFixture() {
 }
 const pollUntil = async (check: () => Promise<boolean>, label: string) => { const start = Date.now(); while (!(await check())) { if (Date.now() - start > 15_000) throw new Error(`Timed out waiting for ${label}`); await new Promise((r) => setTimeout(r, 25)); } };
 
-// Self sign-out deliberately keeps the user's approvals (T9R F-02 documented design, open owner decision); a remote
-// envelope kept that way still never runs code and ends at the next Host restart (F01-8).
+// M-A-3 T9R-F02 (D5): self sign-out and workstation revocation both end the device's authority: the envelopes it granted
+// are revoked and the Missions they drive stop. Both variants are asserted (the sign-out variant was disabled before F02).
 test("F01-7: workstation revocation of a device ends every outstanding approval it granted", { timeout: 120_000 }, async () => {
   const f = await hostFixture();
   try {
     const writeStep = [{ role: "Coder", objective: "Edit", access: "write", maxRetries: 0, executor: { kind: "model" } }];
-    for (const signOut of [false]) {
+    for (const signOut of [false, true]) {
       const phone = await f.pair();
       const waiting = await f.mission(writeStep);
       const ready = await f.mission([{ role: "Reader", objective: "Read", access: "read", executor: { kind: "model" } }]);
@@ -688,6 +713,7 @@ test("F01-R5 (MEDIUM): a phone cannot start a workstation-approved Mission that 
     const benign = env.missions.create({ objective: "Note", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "n.txt", content: "x" })] });
     env.missions.approve(benign.id, "workstation", false);
     await missionCommand(env.missions, "mission.start", { id: benign.id }, { local: false, actor: PHONE });
+    await promoteStaged(env, benign.id); // F02: the device's write is staged until the workstation promotes it
     await until(() => env.missions.mission(benign.id).state === "completed", "benign start");
     const remote = env.missions.create({ objective: "Edit", mode: "fast", origin: "workstation", steps: [model("Coder", "Edit", { access: "write" })] });
     await phoneApprove(env, remote.id, false);
@@ -871,10 +897,14 @@ test("F01-R14 (LOW): gateway refuses workstation authentication for any relay ma
 test("F01-R15 (MEDIUM): the workstation prompt for code execution lists files paired-device authority changed in the Mission", async () => {
   const env = await setup();
   try {
-    const view = env.missions.create({ objective: "Edit then run", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "lib.json", content: "{\"v\":1}", overwrite: true }), { ...capability("Run", "terminal.exec", { command: "node", args: ["probe.mjs"] }), dependsOn: [0] }] });
+    // F02: a root .json is CONFIGURATION (refused for a device), so the data example lives in data/ (PHONE_SAFE_DATA).
+    const view = env.missions.create({ objective: "Edit then run", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "data/lib.json", content: "{\"v\":1}", overwrite: true }), { ...capability("Run", "terminal.exec", { command: "node", args: ["probe.mjs"] }), dependsOn: [0] }] });
     await phoneApprove(env, view.id);
+    // F02: the device's write is staged; the workstation promotes it before the dependent code step is asked.
+    await promoteStaged(env, view.id);
     const ask = await waitAsk(env, view.id, "terminal.exec");
-    assert.match(ask.reason, /paired-device authority: "lib\.json"/);
+    // The prompt lists the mission's changed files as absolute, JSON-escaped paths.
+    assert.match(ask.reason, /paired-device authority: "[^"]*lib\.json"/);
   } finally { await env.cleanup(); }
 });
 
@@ -923,18 +953,21 @@ test("F01-R18 (HIGH): a phone's one-time answer never reaches outside the review
     const view = env.missions.create({ objective: "Write outside", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: outside, content: "calc" })] });
     await phoneApprove(env, view.id);
     const ask = await waitAsk(env, view.id, "filesystem.write");
-    assert.match(ask.reason, /outside the approved write scope/);
+    // F02: out-of-root writes are refused with their classification first (UNKNOWN: outside the step's working folder).
+    assert.match(ask.reason, /classified UNKNOWN \(outside the step's working folder\)/);
     for (const decision of ["allow_once", "allow_batch"] as const) await assert.rejects(phoneRespond(env, ask.id, decision), /Windows Host/, decision);
     await settle();
     assert.ok(!existsSync(outside), "nothing written on the phone's answer");
-    // Even a recorded device answer (e.g. from an older build) never extends the request roots.
+    // Even a recorded device answer (e.g. from an older build) never extends the request roots. The device answer is a
+    // separate record: judging it against the live ask would stamp that ask's lifecycle (first stamp wins).
     const mission = env.missions.mission(view.id); const step = env.missions.store.steps(view.id)[0];
     const envelope = env.missions.store.authorization(mission.authorizationId!)!;
-    env.missions.store.saveRequest({ ...env.missions.store.request(ask.id), resolvedBy: PHONE });
-    const byPhone = env.missions.capabilityRequest(mission, { ...step, approvedOnce: { requestId: ask.id, action: "filesystem.write" } }, envelope, "filesystem.write", { path: outside, content: "calc" }, env.root);
+    const deviceAnswerId = "f01-r18-device-answer";
+    env.missions.store.saveRequest({ ...env.missions.store.request(ask.id), id: deviceAnswerId, resolvedAt: Date.now(), resolution: "allow_once", resolvedBy: PHONE });
+    const byPhone = env.missions.capabilityRequest(mission, { ...step, approvedOnce: { requestId: deviceAnswerId, action: "filesystem.write" } }, envelope, "filesystem.write", { path: outside, content: "calc" }, env.root);
     assert.ok(!byPhone.roots.some((root) => outside.startsWith(root)), "a device answer adds no root");
-    env.missions.store.saveRequest({ ...env.missions.store.request(ask.id), resolvedBy: null });
     await env.missions.respond(ask.id, "allow_once", "workstation");
+    await promoteStaged(env, view.id); // F02: the workstation's answer stages the device's write; its promotion lands it
     await until(() => env.missions.mission(view.id).state === "completed", "workstation allow-once completes");
     assert.equal(readFileSync(outside, "utf8"), "calc");
   } finally { await env.cleanup(); rmSync(outsideDir, { recursive: true, force: true }); }
@@ -953,10 +986,9 @@ test("F01-R19 (MEDIUM): an expired remote envelope is never extended by a one-ti
 test("F01-R20 (HIGH): code never runs over unreviewed paired-device changes from another Mission, under any envelope or provider", async () => {
   const env = await setup({ providers: ["claude"] });
   try {
-    // Mission A: a phone-approved, bounded edit of a module the project's script imports.
-    const a = env.missions.create({ objective: "Edit helper", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "helper.json", content: "{\"v\":\"phone\"}", overwrite: true })] });
-    await phoneApprove(env, a.id);
-    await until(() => env.missions.mission(a.id).state === "completed", "phone edit");
+    // Mission A: a phone's unreviewed edit of a module the project's script imports (seeded: F02 stages device writes,
+    // so this is the review gate as defense in depth).
+    seedUnreviewed(env, "helper.json", "{\"v\":\"phone\"}");
     assert.equal(env.missions.store.pendingRemoteChanges().length, 1);
     // Mission B: workstation-approved terminal command in the same project asks the workstation with the list.
     const b = env.missions.create({ objective: "Run", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: ["probe.mjs"] })] });
@@ -975,9 +1007,7 @@ test("F01-R20 (HIGH): code never runs over unreviewed paired-device changes from
     await until(() => env.missions.mission(c.id).state === "completed", "no extra prompt");
     assert.equal(env.missions.store.requests(c.id).length, 0);
     // A shell-capable provider session over a fresh phone change also waits for the workstation.
-    const d = env.missions.create({ objective: "Edit again", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "helper.json", content: "{\"v\":\"again\"}", overwrite: true })] });
-    await phoneApprove(env, d.id);
-    await until(() => env.missions.mission(d.id).state === "completed", "second phone edit");
+    seedUnreviewed(env, "helper.json", "{\"v\":\"again\"}");
     const e = env.missions.create({ objective: "Code", mode: "fast", origin: "workstation", steps: [model("Coder", "Change code", { access: "write", maxRetries: 0 })] });
     env.missions.approve(e.id, "workstation");
     const session = await waitAsk(env, e.id, "provider.execute");
@@ -1078,12 +1108,17 @@ test("F01-R25 (HIGH): a phone batch never covers Agent computer actions outside 
     store: { mission: () => ({ authorizationId: "a", root: "C:/p" }), authorization: () => ({ revokedAt: null, expiresAt: Date.now() + 60_000 }), step: () => ({ executor: { kind: "capability", action: "computer.focus_window", params: { title: "Calculator" } }, verification: [] }), steps: () => [{ executor: { kind: "capability", action: "computer.focus_window", params: { title: "Calculator" } }, verification: [] }] },
     bus: { find: () => ({ manifest: { id: "computer.focus_window", risk: "EXECUTE" } }) },
     agentic: { forMission: () => consent }, deviceResumeRefusal: () => null,
+    // F02 (D3): a device batch for an Agent Mission also needs a CURRENT consent (ACTIVE, this Host generation, unexpired).
+    tasks: { instanceId: "gen-1" },
   });
+  const live = { current_state: "ACTIVE", host_generation: "gen-1", expires_at: Date.now() + 60_000 };
   const request = { missionId: "m", stepId: "s", action: "computer.focus_window", risk: "EXECUTE", batchOffer: { actions: ["computer.focus_window", "computer.invoke_control"] } };
   const refusal = (consent: Record<string, unknown> | null) => MissionManager.prototype.deviceRequestRefusal.call(fake(consent) as never, request as never, "allow_batch");
   assert.match(refusal({ permitted_capabilities: ["filesystem.read"] }) ?? "", /Windows Host/, "no cross-app consent: no phone batch");
   assert.match(refusal({ cross_app: {}, permitted_capabilities: ["computer.focus_window"] }) ?? "", /Windows Host/, "every batch action must be consented");
-  assert.equal(refusal({ cross_app: {}, permitted_capabilities: ["computer.focus_window", "computer.invoke_control"] }), null, "a consented Calculator batch stays phone-approvable");
+  assert.equal(refusal({ ...live, cross_app: {}, permitted_capabilities: ["computer.focus_window", "computer.invoke_control"] }), null, "a consented Calculator batch stays phone-approvable");
+  for (const stale of [{ current_state: "PAUSED" }, { host_generation: "gen-0" }, { expires_at: Date.now() - 1 }])
+    assert.match(refusal({ ...live, ...stale, cross_app: {}, permitted_capabilities: ["computer.focus_window", "computer.invoke_control"] }) ?? "", /Windows Host/, `F02: no phone batch under a non-current consent ${JSON.stringify(stale)}`);
   assert.equal(refusal(null), null, "non-Agent Missions keep the T9 Calculator batch");
 });
 
@@ -1091,9 +1126,7 @@ test("F01-R26 (HIGH): the review gate is Host-wide: code in any folder waits for
   const env = await setup();
   const elsewhere = mkdtempSync(join(tmpdir(), "bunny-t9r-f01-elsewhere-"));
   try {
-    const a = env.missions.create({ objective: "Edit helper", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "helper.json", content: "{\"v\":\"phone\"}", overwrite: true })] });
-    await phoneApprove(env, a.id);
-    await until(() => env.missions.mission(a.id).state === "completed", "phone edit");
+    seedUnreviewed(env, "helper.json", "{\"v\":\"phone\"}"); // F02: seeded unreviewed change (see promoteStaged/seedUnreviewed)
     const b = env.missions.create({ objective: "Run", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: ["probe.mjs"] })] });
     const approved = env.missions.approve(b.id, "workstation", false);
     const envelope = env.missions.store.authorization(approved.authorizationId!)!;
@@ -1108,12 +1141,14 @@ test("F01-R26 (HIGH): the review gate is Host-wide: code in any folder waits for
 test("F01-R27 (HIGH): a paired-device change never lands under workstation-approved code that is already running", async () => {
   const env = await setup();
   try {
-    writeFileSync(join(env.root, "helper.json"), JSON.stringify({ v: "host" }));
-    writeFileSync(join(env.root, "slow.mjs"), "import { readFileSync, writeFileSync } from 'node:fs'; await new Promise((r) => setTimeout(r, 1500)); writeFileSync('ran.txt', JSON.parse(readFileSync('helper.json', 'utf8')).v);");
+    // F02: the helper lives in data/ (PHONE_SAFE_DATA); a root .json is CONFIGURATION and never a device write.
+    mkdirSync(join(env.root, "data"));
+    writeFileSync(join(env.root, "data", "helper.json"), JSON.stringify({ v: "host" }));
+    writeFileSync(join(env.root, "slow.mjs"), "import { readFileSync, writeFileSync } from 'node:fs'; await new Promise((r) => setTimeout(r, 1500)); writeFileSync('ran.txt', JSON.parse(readFileSync('data/helper.json', 'utf8')).v);");
     const run = env.missions.create({ objective: "Run slow", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: ["slow.mjs"] })] });
     env.missions.approve(run.id, "workstation");
     await until(() => env.missions.bus.liveCode.size === 1, "workstation run in flight");
-    const edit = env.missions.create({ objective: "Edit helper", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "helper.json", content: "{\"v\":\"phone\"}", overwrite: true })] });
+    const edit = env.missions.create({ objective: "Edit helper", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "data/helper.json", content: "{\"v\":\"phone\"}", overwrite: true })] });
     await phoneApprove(env, edit.id);
     const held = await waitAsk(env, edit.id, "filesystem.write");
     assert.equal(held.desktopRequired, true); assert.match(held.reason, /is running/);
@@ -1121,20 +1156,28 @@ test("F01-R27 (HIGH): a paired-device change never lands under workstation-appro
     await until(() => env.missions.mission(run.id).state === "completed", "workstation run completes");
     assert.equal(readFileSync(join(env.root, "ran.txt"), "utf8"), "host", "the running program loaded only Host-reviewed content");
     await env.missions.respond(held.id, "allow_once", "workstation");
+    await promoteStaged(env, edit.id); // F02: the held change is staged; the workstation promotes the exact bytes
     await until(() => env.missions.mission(edit.id).state === "completed", "held change lands after the workstation allows it");
-    assert.equal(readFileSync(join(env.root, "helper.json"), "utf8"), "{\"v\":\"phone\"}");
+    assert.equal(readFileSync(join(env.root, "data", "helper.json"), "utf8"), "{\"v\":\"phone\"}");
   } finally { await env.cleanup(); }
 });
 
-test("F01-R28 (MEDIUM): a paired-device change is recorded for review even when the write fails after starting", async () => {
+test("F01-R28 (MEDIUM): a device write onto a non-file destination never starts, so no unrecorded change can exist", async () => {
   const env = await setup();
   try {
     mkdirSync(join(env.root, "folder.txt"));
     const view = env.missions.create({ objective: "Write onto a folder", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "folder.txt", content: "x", overwrite: true }, { maxRetries: 0 })] });
     await phoneApprove(env, view.id);
-    await until(() => ["failed", "waiting_for_user"].includes(env.missions.mission(view.id).state), "write attempted");
-    assert.ok(env.missions.store.runs({ missionId: view.id }).some((run) => run.action === "filesystem.write" && run.status !== "succeeded"));
-    assert.ok(env.missions.store.pendingRemoteChanges().some((change) => change.path === join(env.root, "folder.txt")), "the attempt is held for review");
+    // M-A-3 T9R-F02: the destination is classified before anything starts. A directory is UNKNOWN, so the device write
+    // becomes a workstation-only ask and never runs. The old "failed after starting" case therefore leaves nothing
+    // changed and nothing that needs recording; the new negative regression pins that instead.
+    const ask = await waitAsk(env, view.id, "filesystem.write");
+    assert.equal(ask.desktopRequired, true);
+    assert.match(ask.reason, /classified UNKNOWN \(destination exists and is not a regular file\)/);
+    await assert.rejects(phoneRespond(env, ask.id, "allow_once"), DESKTOP_ONLY);
+    assert.equal(env.missions.store.runs({ missionId: view.id }).filter((run) => run.action === "filesystem.write").length, 0, "nothing started, so nothing changed");
+    assert.ok(existsSync(join(env.root, "folder.txt")), "the destination folder is untouched");
+    assert.ok(!env.missions.store.pendingRemoteChanges().some((change) => change.path === join(env.root, "folder.txt")), "no unrecorded change exists");
   } finally { await env.cleanup(); }
 });
 
@@ -1162,12 +1205,8 @@ test("F01-R30 (HIGH): a phone batch covers only operations a phone could approve
 test("F01-R31 (HIGH): a workstation review acknowledges only the paired-device changes its prompt shows", async () => {
   const env = await setup();
   try {
-    for (const [from, to] of [[0, 7], [7, 13]]) {
-      const writes = Array.from({ length: to - from }, (_, i) => capability(`Write ${from + i}`, "filesystem.write", { path: `f-${String(from + i).padStart(2, "0")}.txt`, content: "x", overwrite: true }));
-      const a = env.missions.create({ objective: "Many edits", mode: "fast", origin: "workstation", steps: writes });
-      await phoneApprove(env, a.id);
-      await until(() => env.missions.mission(a.id).state === "completed", "phone edits");
-    }
+    // F02: device writes are staged, so 13 unreviewed paired-device changes are seeded directly (see seedUnreviewed).
+    for (let i = 0; i < 13; i++) seedUnreviewed(env, `f-${String(i).padStart(2, "0")}.txt`, "x");
     assert.equal(env.missions.store.pendingRemoteChanges().length, 13);
     const b = env.missions.create({ objective: "Run", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: ["probe.mjs"] })] });
     env.missions.approve(b.id, "workstation");
@@ -1264,9 +1303,7 @@ test("F01-R36 (HIGH): descendants of a finished workstation session keep paired-
 test("F01-R37 (MEDIUM): Git reads wait for review of paired-device changes (owner-configured textconv or filters can run them)", async () => {
   const env = await setup({ adapters: [new FilesystemCapability(), new TerminalCapability(), new NotificationsCapability(() => {}), new GitCapability(tmpdir())] });
   try {
-    const a = env.missions.create({ objective: "Edit", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "conv.json", content: "1", overwrite: true })] });
-    await phoneApprove(env, a.id);
-    await until(() => env.missions.mission(a.id).state === "completed", "phone edit");
+    seedUnreviewed(env, "conv.json", "1"); // F02: seeded unreviewed paired-device change (device writes are staged)
     const b = env.missions.create({ objective: "Status", mode: "fast", origin: "workstation", steps: [capability("Status", "git.status", {})] });
     const approved = env.missions.approve(b.id, "workstation", false);
     const envelope = env.missions.store.authorization(approved.authorizationId!)!;
@@ -1281,12 +1318,8 @@ test("F01-R37 (MEDIUM): Git reads wait for review of paired-device changes (owne
 test("F01-R38 (LOW): a provider review with more changes than one prompt lists asks the next page instead of failing", async () => {
   const env = await setup({ providers: ["claude"] });
   try {
-    for (const [from, to] of [[0, 7], [7, 13]]) {
-      const writes = Array.from({ length: to - from }, (_, i) => capability(`Write ${from + i}`, "filesystem.write", { path: `g-${String(from + i).padStart(2, "0")}.txt`, content: "x", overwrite: true }));
-      const a = env.missions.create({ objective: "Many edits", mode: "fast", origin: "workstation", steps: writes });
-      await phoneApprove(env, a.id);
-      await until(() => env.missions.mission(a.id).state === "completed", "phone edits");
-    }
+    // F02: 13 unreviewed paired-device changes are seeded directly (device writes are staged, see seedUnreviewed).
+    for (let i = 0; i < 13; i++) seedUnreviewed(env, `g-${String(i).padStart(2, "0")}.txt`, "x");
     const view = env.missions.create({ objective: "Code", mode: "fast", origin: "workstation", steps: [model("Coder", "Change code", { access: "write", maxRetries: 0 })] });
     env.missions.approve(view.id, "workstation");
     const first = await waitAsk(env, view.id, "provider.execute");
@@ -1305,12 +1338,17 @@ test("F01-R38 (LOW): a provider review with more changes than one prompt lists a
 
 // ── Independent review round 7 closure ───────────────────────────────────────────────────────────────────────
 test("F01-R39 (HIGH): a paired device writes only inert data and documents; code, agent configuration and downloads stay on the workstation", () => {
-  for (const path of ["notes.txt", "README.md", "data/table.csv", "out/result.json", "conf/values.yaml", "a/b.log"])
+  // F02: JSON/YAML is data only inside a recognized data folder; out/result.json is now CONFIGURATION (safer), so the
+  // safe-data example moved to exports/, and conf/ (a configuration folder) is refused below.
+  for (const path of ["notes.txt", "README.md", "data/table.csv", "exports/result.json", "a/b.log"])
     assert.equal(remoteExecutionRefusal("filesystem.write", { path }, "WRITE", "C:/p"), null, path);
-  for (const path of ["helper.mjs", "probe.js", "run.ps1", "start.cmd", "tool.py", "app.ts", "page.html", "image.svg", "noextension", "lib.dll", "x.txt.mjs", "x.txt:evil.mjs", ".claude/settings.json", ".mcp.json", "CLAUDE.md", "AGENTS.md", ".cursor/rules.md"])
+  for (const path of ["helper.mjs", "probe.js", "run.ps1", "start.cmd", "tool.py", "app.ts", "page.html", "image.svg", "noextension", "lib.dll", "x.txt.mjs", "x.txt:evil.mjs", "out/result.json", "conf/values.yaml", ".claude/settings.json", ".mcp.json", "CLAUDE.md", "AGENTS.md", ".cursor/rules.md"])
     assert.match(remoteExecutionRefusal("filesystem.write", { path }, "WRITE", "C:/p") ?? "", DESKTOP_ONLY, path);
   assert.match(remoteExecutionRefusal("browser.download", { url: "https://example.com/x.exe" }, "WRITE", "C:/p") ?? "", DESKTOP_ONLY);
-  assert.equal(remoteExecutionRefusal("filesystem.delete", { path: "old.mjs" }, "DESTRUCTIVE", "C:/p"), null, "removing a file adds no code");
+  assert.equal(remoteExecutionRefusal("filesystem.delete", { path: "old.txt" }, "DESTRUCTIVE", "C:/p"), null, "removing an ordinary document adds no code");
+  // F02: a device delete is classified like a write. Removing a document stays bounded; removing an execution-relevant
+  // file is workstation-only (it can change what runs), so the old "any delete is bounded" premise is narrowed.
+  assert.match(remoteExecutionRefusal("filesystem.delete", { path: "old.mjs" }, "DESTRUCTIVE", "C:/p") ?? "", DESKTOP_ONLY, "deleting code is refused for a device");
 });
 
 test("F01-R40 (HIGH): survivor tracking follows the whole lineage of a finished session, across launcher exits and retries", async () => {
@@ -1337,9 +1375,7 @@ test("F01-R41 (HIGH): the workstation reviews the content of paired-device chang
   const env = await setup();
   try {
     const body = "require('fs').writeFileSync('ran.flag','x')";
-    const a = env.missions.create({ objective: "Note", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path: "notes.txt", content: body, overwrite: true })] });
-    await phoneApprove(env, a.id);
-    await until(() => env.missions.mission(a.id).state === "completed", "phone note");
+    seedUnreviewed(env, "notes.txt", body); // F02: seeded unreviewed paired-device change (device writes are staged)
     const b = env.missions.create({ objective: "Run", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: ["notes.txt"] })] });
     env.missions.approve(b.id, "workstation");
     const ask = await waitAsk(env, b.id, "terminal.exec");
@@ -1365,11 +1401,9 @@ test("F01-R42 (HIGH): a review prompt shows the whole changed file, or says plai
   try {
     const padded = `${"benign note line\n".repeat(60)}require('fs').writeFileSync('ran.flag','x')`;
     const huge = "x".repeat(9000) + "require('fs').writeFileSync('ran2.flag','x')";
-    for (const [path, content] of [["padded.txt", padded], ["huge.txt", huge]]) {
-      const a = env.missions.create({ objective: "Note", mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path, content, overwrite: true })] });
-      await phoneApprove(env, a.id);
-      await until(() => env.missions.mission(a.id).state === "completed", `phone ${path}`);
-    }
+    // F02: seeded unreviewed paired-device changes (device writes are staged, see seedUnreviewed).
+    seedUnreviewed(env, "padded.txt", padded);
+    seedUnreviewed(env, "huge.txt", huge);
     const b = env.missions.create({ objective: "Run", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: ["padded.txt"] })] });
     env.missions.approve(b.id, "workstation");
     const ask = await waitAsk(env, b.id, "terminal.exec");
@@ -1397,8 +1431,10 @@ test("F01-R43 (MEDIUM): a workstation Mission a phone started is a paired-device
     assert.match(held.reason, /is running/);
     await until(() => env.missions.mission(run.id).state === "completed", "run completes");
     await env.missions.respond(held.id, "allow_once", "workstation");
+    await promoteStaged(env, write.id); // F02: the device-started write is staged, then promoted by the workstation
     await until(() => env.missions.mission(write.id).state === "completed", "write completes");
-    assert.ok(env.missions.store.pendingRemoteChanges().some((change) => change.path === join(env.root, "w.txt")), "recorded for review");
+    // The change is recorded for review when it is promoted (the workstation's acknowledgement is the review).
+    assert.ok(env.missions.staging.forMission(write.id).some((record) => record.destination === join(env.root, "w.txt") && record.promotionState === "PROMOTED"), "recorded and promoted");
   } finally { await env.cleanup(); }
 });
 
@@ -1431,21 +1467,19 @@ test("F01-R45 (LOW): revoking a device ends its unexecuted one-time answers", as
 });
 
 // ── Independent review round 10 closure ──────────────────────────────────────────────────────────────────────
-const phoneWrite = async (env: Env, path: string, content: string) => {
-  const view = env.missions.create({ objective: `Write ${path}`, mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path, content, overwrite: true })] });
-  await phoneApprove(env, view.id);
-  await until(() => env.missions.mission(view.id).state === "completed", `phone ${path}`);
-};
-
 test("F01-R46 (BLOCKER): a superseded review re-ask shows every change it acknowledges", async () => {
   const env = await setup();
   try {
-    await phoneWrite(env, "a.txt", "first change");
+    seedUnreviewed(env, "a.txt", "first change"); // F02: seeded unreviewed paired-device change (device writes are staged)
     const run = env.missions.create({ objective: "Run", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: ["probe.mjs"] })] });
     env.missions.approve(run.id, "workstation");
     const first = await waitAsk(env, run.id, "terminal.exec");
     assert.match(first.reason, /a\.txt/); assert.doesNotMatch(first.reason, /b\.txt/);
-    await phoneWrite(env, "b.txt", "SECOND-CHANGE-CONTENT");
+    seedUnreviewed(env, "b.txt", "SECOND-CHANGE-CONTENT");
+    // Seeding records a change without a capability run; one real project mutation moves the mutation sequence, as any
+    // file-changing run does (a workstation-direct write here, so it adds no paired-device change of its own).
+    const bump = await env.missions.bus.request({ action: "filesystem.write", params: { path: "bump.txt", content: "bump", overwrite: true }, missionId: null, stepId: null, envelope: null, origin: "workstation", cwd: env.root, roots: [env.root], direct: { confirmed: true } });
+    assert.equal(bump.run?.status, "succeeded");
     await assert.rejects(env.missions.respond(first.id, "allow_once", "workstation"), /Project files changed/);
     const second = pending(env, run.id)!;
     assert.equal(second.remoteReview?.length, 2);
@@ -1481,7 +1515,7 @@ test("F01-R47 (HIGH): a phone-answered write held under live code keeps its pair
 test("F01-R48 (MEDIUM): changed-file text cannot imitate review prompt structure", async () => {
   const env = await setup();
   try {
-    await phoneWrite(env, "forge.txt", 'innocent"\n• C:/project/reviewed.txt: 4 bytes, sha256 aaaa, full content: "ok');
+    seedUnreviewed(env, "forge.txt", 'innocent"\n• C:/project/reviewed.txt: 4 bytes, sha256 aaaa, full content: "ok'); // F02: seeded unreviewed change
     const review = env.missions.pendingRemoteReview()!;
     assert.equal(review.listing.split("\n•").length - 1, 1, "exactly one listing entry");
     assert.ok(review.listing.includes('\\"'), "quotes are escaped"); assert.ok(review.listing.includes("\\n"), "line breaks are escaped");
@@ -1491,7 +1525,7 @@ test("F01-R48 (MEDIUM): changed-file text cannot imitate review prompt structure
 test("F01-R49 (LOW): a phone's mission.get carries no review listing in reasons or events", async () => {
   const env = await setup();
   try {
-    await phoneWrite(env, "secret.txt", "SECRET-PLANNED-CONTENT-123");
+    seedUnreviewed(env, "secret.txt", "SECRET-PLANNED-CONTENT-123"); // F02: seeded unreviewed change
     const run = env.missions.create({ objective: "Run", mode: "fast", origin: "workstation", steps: [capability("Run", "terminal.exec", { command: "node", args: ["probe.mjs"] })] });
     env.missions.approve(run.id, "workstation");
     const ask = await waitAsk(env, run.id, "terminal.exec");
@@ -1509,13 +1543,15 @@ test("F01-R50 (MEDIUM): no Host response to a paired device carries the review l
     const sentinel = "SENTINEL-REVIEW-CONTENT-50";
     const write = await f.mission([{ role: "Write", objective: "Write", dependsOn: [], executor: { kind: "capability", action: "filesystem.write", params: { path: "note.txt", content: sentinel, overwrite: true } } }]);
     assert.equal((await f.api("mission.approve", { id: write.id, start: true }, phone.token)).status, 200);
-    await pollUntil(async () => (await f.get(write.id)).state === "completed", "phone write");
-    const run = await f.mission([{ role: "Run", objective: "Run", dependsOn: [], executor: { kind: "capability", action: "terminal.exec", params: { command: "node", args: ["-e", "1"] } } }]);
-    assert.equal((await f.api("mission.approve", { id: run.id, start: true })).status, 200);
-    await pollUntil(async () => JSON.stringify((await f.api("mission.get", { id: run.id })).body).includes(sentinel), "workstation review prompt");
+    // F02: the phone's write is staged; the workstation's promotion prompt is the review listing that carries the content.
+    await pollUntil(async () => (await f.get(write.id)).requests.some((r: { resolvedAt: number | null; action: string }) => !r.resolvedAt && r.action === "filesystem.promote"), "promotion review");
+    assert.ok(JSON.stringify((await f.api("mission.get", { id: write.id })).body).includes(sentinel), "the workstation review shows the staged content");
     const state = await (await fetch(`${f.base}/state`, { headers: { authorization: `Bearer ${phone.token}` } })).text();
     assert.ok(!state.includes(sentinel), "device /state (missions, inbox, agents) carries no listing");
-    assert.ok(!JSON.stringify((await f.api("mission.get", { id: run.id }, phone.token)).body).includes(sentinel), "device mission.get carries no listing");
+    // The device's own plan (its step parameters) legitimately names its content; the review listing must not reach it.
+    const device = (await f.api("mission.get", { id: write.id }, phone.token)).body.data as { mission: { requests: Record<string, unknown>[] } };
+    assert.ok(!JSON.stringify(device.mission.requests).includes(sentinel), "device mission.get carries no review listing");
+    assert.ok(device.mission.requests.every((request) => !("promotion" in request)), "device mission.get carries no promotion record");
   } finally { await f.close(); }
 });
 
@@ -1545,12 +1581,6 @@ test("F01-R52 (MEDIUM): revoking a device stops the Missions it started or resum
   } finally { await env.cleanup(); }
 });
 
-const phoneWriteNote = async (env: Env, path: string, content = "phone note") => {
-  const view = env.missions.create({ objective: `Write ${path}`, mode: "fast", origin: "workstation", steps: [capability("Write", "filesystem.write", { path, content, overwrite: true })] });
-  await phoneApprove(env, view.id);
-  await until(() => env.missions.mission(view.id).state === "completed", `phone ${path}`);
-};
-
 // ── Independent review round 12 closure ──────────────────────────────────────────────────────────────────────
 test("F01-R53 (BLOCKER): Python task checks never run on a device's timing or over unreviewed paired-device changes", async () => {
   const env = await setup({ providers: ["ollama"] });
@@ -1562,7 +1592,7 @@ test("F01-R53 (BLOCKER): Python task checks never run on a device's timing or ov
     env.missions.approve(view.id, "workstation", false);
     await assert.rejects(missionCommand(env.missions, "mission.start", { id: view.id }, { local: false, actor: PHONE }), DESKTOP_ONLY);
     // Even on the workstation's timing, a Python check waits while paired-device changes are unreviewed.
-    await phoneWriteNote(env, "phone.txt");
+    seedUnreviewed(env, "phone.txt", "phone note"); // F02: seeded unreviewed paired-device change (device writes are staged)
     assert.match(env.tasks.codeRunGate?.() ?? "", DESKTOP_ONLY);
   } finally { await env.cleanup(); }
 });
@@ -1580,7 +1610,7 @@ test("F01-R54 (HIGH): Git and GitHub CLI reads in a workstation plan are never s
 test("F01-R55 (BLOCKER): a shell-session prompt always shows the review listing, even when another violation also applies", async () => {
   const env = await setup({ providers: ["claude"] });
   try {
-    await phoneWriteNote(env, "cross-mission.md", "CROSS-MISSION-CONTENT-55");
+    seedUnreviewed(env, "cross-mission.md", "CROSS-MISSION-CONTENT-55"); // F02: seeded unreviewed paired-device change
     const view = env.missions.create({ objective: "Edit code", mode: "fast", origin: "workstation", steps: [model("Coder", "Change the code", { access: "write", maxRetries: 0 })] });
     await phoneApprove(env, view.id); // remote envelope: the shell session is also outside the remote ceiling
     const ask = await waitAsk(env, view.id, "provider.execute");

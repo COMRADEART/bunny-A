@@ -60,7 +60,8 @@ async function fixture(filesystem = new FilesystemCapability()) {
   assert.equal((await api("mission.configure", { enabled: true })).status, 200);
   const projectA: string = (await api("project.add", { name: "Project A", path: root })).body.data.id;
   const projectB: string = (await api("project.add", { name: "Project B", path: otherRoot })).body.data.id;
-  const make = async (name: string, projectId = projectA) => {
+  // narrowed = true is the owner's consent narrowing (filesystem.write removed); the default keeps the write in consent.
+  const make = async (name: string, projectId = projectA, narrowed = false) => {
     const step = (action: string, params: Record<string, unknown>, dependsOn: number[] = []) => ({ role: action === "filesystem.read" ? "Inspect" : "Write", objective: "Verify the bounded receipt", access: action === "filesystem.read" ? "read" : "write", executor: { kind: "capability", action, params }, crossApp: true, dependsOn, verification: [{ kind: "capability", action: "filesystem.compare", params: { path: action === "filesystem.read" ? "seed.txt" : "receipt.txt", content: action === "filesystem.read" ? "seed" : name }, expect: { field: "matches", equals: true } }] });
     const created = await api("agent.create", { projectId, name, objective: "Read and verify a bounded receipt", steps: [step("filesystem.read", { path: "seed.txt" }), step("filesystem.write", { path: "receipt.txt", content: name }, [0])] });
     assert.equal(created.status, 200, created.body.error);
@@ -69,9 +70,15 @@ async function fixture(filesystem = new FilesystemCapability()) {
     if (proposed.status !== 200) { record("fixture-diagnostic", host.missions.get(agent.missionId!)); host.missions.proposeAgentAuthorization(agent.id); }
     assert.equal(proposed.status, 200, proposed.body.error);
     let offer = proposed.body.agents.agents.find((a: Agent) => a.id === agent.id).authorization;
-    const adjusted = await api("agent.authorization.adjust", { id: agent.id, revision: offer.revision, patch: { capabilities: offer.capabilities.filter((c: string) => c !== "filesystem.write") } });
-    assert.equal(adjusted.status, 200, adjusted.body.error);
-    offer = adjusted.body.agents.agents.find((a: Agent) => a.id === agent.id).authorization;
+    if (narrowed) {
+      // Owner narrowing: filesystem.write leaves consent, so a device can no longer answer this write (F02 D3).
+      const adjusted = await api("agent.authorization.adjust", { id: agent.id, revision: offer.revision, patch: { capabilities: offer.capabilities.filter((c: string) => c !== "filesystem.write") } });
+      assert.equal(adjusted.status, 200, adjusted.body.error);
+      offer = adjusted.body.agents.agents.find((a: Agent) => a.id === agent.id).authorization;
+    } else {
+      // F02 D3: consent keeps filesystem.write; a standing ask_every_time grant makes each write an ask a device may answer.
+      assert.equal((await api("capability.grant", { action: "filesystem.write", scope: "global", policy: "ask_every_time" })).status, 200);
+    }
     assert.equal((await api("agent.authorization.approve", { id: agent.id, revision: offer.revision })).status, 200);
     const waiting: Agent = await until(async () => (await state()).body.agents.agents.find((a: Agent) => a.id === agent.id && a.authorization?.pending.length), "canonical write request");
     return { agent: waiting, request: waiting.authorization!.pending[0] };
@@ -102,6 +109,7 @@ for (const binding of ["agentId", "missionId", "projectId"] as const) {
       assert.equal(f.host.missions.agentic.rows(f.host.missions.agentic.forMission(a.agent.missionId!)!.id).length, before);
       assert.equal(existsSync(join(f.otherRoot, "receipt.txt")), false);
       assert.equal((await f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }, f.device.token)).status, 200);
+      await promoteStaged(f, a.agent.missionId!);
       await until(async () => existsSync(join(f.root, "receipt.txt")), "authorized A effect");
       assert.equal(readFileSync(join(f.root, "receipt.txt"), "utf8"), "Agent A");
       assert.equal(existsSync(join(f.otherRoot, "receipt.txt")), false, "A consent does not authorize B's resource");
@@ -127,6 +135,7 @@ test("T9R offline approval is refused after reconnect; only the new Host offer c
     assert.equal(replay.status, 400); assert.equal(replay.body.operation.replayed, true);
     assert.equal(existsSync(join(f.root, "receipt.txt")), false);
     assert.equal((await f.api("mission.respond", { requestId: fresh.authorization!.pending[0].id, decision: "allow_once" }, f.device.token)).status, 200);
+    await promoteStaged(f, a.agent.missionId!);
     await until(async () => existsSync(join(f.root, "receipt.txt")), "fresh reviewed approval executes");
     record("offline-replay", { classification: "LIVE canonical admission; SIMULATED offline holding of a client payload", staleCode: stale.body.code, duplicateRejected: replay.body.operation.replayed, oldRequest: a.request.id, newRequest: fresh.authorization!.pending[0].id, automaticReplay: false, verifiedReceipt: readFileSync(join(f.root, "receipt.txt"), "utf8") });
   } finally { await f.close(); }
@@ -147,6 +156,8 @@ test("T9R concurrent desktop and phone approval has one canonical winner and one
   } finally { await f.close(); }
 });
 
+// F02 D2: a device-attributed write is staged by the bus and never reaches the adapter, so the admitted work held here is the
+// step's verification of the promoted receipt (filesystem.compare), which runs only after the workstation promotion.
 class HeldFilesystem extends FilesystemCapability {
   release!: () => void;
   entered: Promise<void>;
@@ -154,7 +165,7 @@ class HeldFilesystem extends FilesystemCapability {
   private barrier: Promise<void>;
   constructor() { super(); this.entered = new Promise(resolve => { this.mark = resolve; }); this.barrier = new Promise(resolve => { this.release = resolve; }); }
   override async execute(action: string, params: Record<string, unknown>, context: ExecutionContext) {
-    if (action === "filesystem.write") { this.mark(); await this.barrier; context.signal.throwIfAborted(); }
+    if (action === "filesystem.compare" && params.path === "receipt.txt") { this.mark(); await this.barrier; context.signal.throwIfAborted(); }
     return super.execute(action, params, context);
   }
 }
@@ -167,7 +178,9 @@ test("T9R client-only connection loss during admitted work leaves the same Host 
     const stream = await fetch(`${f.base}/events`, { headers: { authorization: `Bearer ${f.device.token}` }, signal: controller.signal });
     assert.equal(stream.status, 200);
     assert.equal((await f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }, f.device.token)).status, 200);
-    await fs.entered;
+    await promoteStaged(f, a.agent.missionId!);
+    // Fail fast instead of hanging if the held work never starts.
+    await Promise.race([fs.entered, new Promise((_, reject) => setTimeout(() => reject(new Error("held verification never started")), 15000))]);
     const epoch = (await f.state()).body.hostIdentity.epoch;
     controller.abort(); // Only this paired client's transport is closed; Host stays up.
     fs.release();
@@ -193,6 +206,32 @@ async function plainMission(f: Fixture, objective: string, steps: unknown[]) {
 async function missionRow(f: Fixture, id: string, token?: string): Promise<MissionRow> {
   return (await f.state(token)).body.missions.missions.find((m: MissionRow) => m.id === id);
 }
+/**
+ * M-A-3 T9R-F02 (D2): a paired-device write is staged, never applied. The step then waits for a workstation promotion of
+ * the exact reviewed bytes; a device cannot answer that promotion, and only the workstation's answer reaches the project.
+ */
+async function promoteStaged(f: Fixture, missionId: string) {
+  const promotion = await until(async () => f.host.missions.store.requests(missionId).find((r) => r.promotion && !r.resolvedAt) ?? false, "staged change awaits promotion");
+  const byDevice = await f.api("mission.respond", { requestId: promotion.id, decision: "allow_once" }, f.device.token);
+  assert.equal(byDevice.body.code, "WORKSTATION_REQUIRED", "a device cannot promote its own staged change");
+  const promoted = await f.api("mission.respond", { requestId: promotion.id, decision: "allow_once" });
+  assert.equal(promoted.status, 200, promoted.body.error);
+  return promotion;
+}
+
+test("T9R F-02 narrowed consent: a device answer outside the Agent's current consent is refused and stages nothing", async () => {
+  const f = await fixture();
+  try {
+    const a = await f.make("Narrowed receipt", f.projectA, true);
+    const answered = await f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }, f.device.token);
+    assert.equal(answered.status, 400);
+    assert.equal(answered.body.code, "WORKSTATION_REQUIRED");
+    assert.match(answered.body.error, /outside the Agent's current permissions/);
+    assert.equal(f.host.missions.staging.forMission(a.agent.missionId!).length, 0, "nothing was staged");
+    assert.equal(existsSync(join(f.root, "receipt.txt")), false, "the project file never landed");
+    assert.equal(f.host.missions.store.request(a.request.id)!.resolvedAt, null, "the workstation still owns the answer");
+  } finally { await f.close(); }
+});
 
 test("T9R F-03: after a replan, a device approval must name the reviewed plan; an unrevised plan keeps MA0R semantics", async () => {
   const f = await fixture();
@@ -264,8 +303,12 @@ test("T9R F-02: workstation revocation ends Mission approvals the lost device gr
     assert.equal(envelope(owner).revokedAt, null);
     assert.equal(f.host.missions.store.mission(owner).state, "ready");
     assert.equal((await f.api("device.revoke", {}, other.token)).status, 200, "self sign-out");
-    assert.equal(envelope(signedOut).revokedAt, null, "self sign-out keeps the approvals the user gave (documented design)");
-    assert.equal(f.host.missions.store.mission(signedOut).state, "ready");
+    // F02 D5: self sign-out ends the device's own authority: the envelope THAT device granted is revoked and its Mission stopped.
+    assert.ok(envelope(signedOut).revokedAt, "self sign-out revokes the Mission approval the signing-out device granted");
+    assert.equal(f.host.missions.store.mission(signedOut).state, "stopped");
+    // The workstation's own approval is independent of any device: a device's sign-out never touches it.
+    assert.equal(envelope(owner).revokedAt, null, "a workstation-granted envelope survives a device sign-out");
+    assert.equal(f.host.missions.store.mission(owner).state, "ready");
     assert.equal((await f.state(f.device.token)).status, 401);
     record("f02-revocation-ends-approvals", { classification: "LIVE disposable Host HTTP, SQLite and MissionManager; SIMULATED failed state for the parked Mission (state write only)", lostDeviceMission: f.host.missions.store.mission(lost).state, failedMissionStateBefore: failedState, failedMissionStateAfter: f.host.missions.store.mission(failed).state, retryStatus: retry.status, retryCode: retry.body.code, simulatedFailedMission: { state: f.host.missions.store.mission(parked).state, envelopeRevoked: !!envelope(parked).revokedAt, retryStatus: parkedRetry.status }, workstationMission: f.host.missions.store.mission(owner).state, selfSignOutMission: f.host.missions.store.mission(signedOut).state });
   } finally { await f.close(); }
@@ -287,6 +330,7 @@ test("T9R lost command acknowledgment: applied phone approval and Pause/Stop rep
     const replay = await f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }, f.device.token, { operationId, expect });
     assert.equal(replay.status, 200);
     assert.deepEqual(replay.body.operation, { id: operationId, state: "applied", replayed: true });
+    await promoteStaged(f, a.agent.missionId!);
     await until(async () => (await f.state()).body.agents.agents.find((agent: Agent) => agent.id === a.agent.id && agent.state === "COMPLETED"), "approved Agent completes");
     const writes = f.host.missions.store.runs({ missionId: a.agent.missionId! }).filter(run => run.action === "filesystem.write" && run.status === "succeeded").length;
     assert.equal(writes, 1);
@@ -349,6 +393,7 @@ test("T9R cross-Project artifact: a device reads a verified artifact only throug
   try {
     const a = await f.make("Artifact receipt");
     assert.equal((await f.api("mission.respond", { requestId: a.request.id, decision: "allow_once" }, f.device.token)).status, 200);
+    await promoteStaged(f, a.agent.missionId!);
     await until(async () => (await f.state()).body.agents.agents.find((agent: Agent) => agent.id === a.agent.id && agent.state === "COMPLETED"), "artifact Agent completes");
     const artifact = (await missionRow(f, a.agent.missionId!)).artifacts[0];
     assert.ok(artifact, "the completed Mission produced a verified artifact");
@@ -407,9 +452,13 @@ test("T9R four-way phone/desktop race resolves one request exactly once", async 
     ]);
     const winners = responses.map((r, index) => r.status === 200 ? index : -1).filter(index => index >= 0);
     assert.equal(winners.length, 1, JSON.stringify(responses.map(r => [r.status, r.body.code, r.body.error])));
-    for (const r of responses.filter(r => r.status !== 200)) assert.equal(r.body.code, "REFUSED");
+    // F02: under the ask_every_time grant a device batch is never a winner; it is refused (WORKSTATION_REQUIRED) or loses (REFUSED).
+    assert.notEqual(responses[0].status, 200, "a device batch is never the winner");
+    for (const r of responses.filter(r => r.status !== 200)) assert.ok(["REFUSED", "WORKSTATION_REQUIRED"].includes(r.body.code), String(r.body.code));
     const request = f.host.missions.store.request(a.request.id)!;
     assert.equal(request.resolvedBy, actors[winners[0]], "the canonical resolution belongs to the single winner");
+    // A device's allow_once is staged, and only the workstation promotes it.
+    if (actors[winners[0]].startsWith("device:") && request.resolution === "allow_once") await promoteStaged(f, a.agent.missionId!);
     await until(async () => { const agent: Agent = (await f.state()).body.agents.agents.find((agent: Agent) => agent.id === a.agent.id); return ["COMPLETED", "FAILED", "STOPPED"].includes(agent.state) && agent; }, "four-way race settles");
     const writes = f.host.missions.store.runs({ missionId: a.agent.missionId! }).filter(run => run.action === "filesystem.write" && run.status === "succeeded");
     assert.equal(writes.length, request.resolution === "deny" ? 0 : 1);

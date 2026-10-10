@@ -15,6 +15,7 @@ function object(value: unknown): Record<string, unknown> { if (value === undefin
 
 export const MISSION_ACTIONS = new Set([
   "mission.create", "mission.plan", "mission.replan", "mission.approve", "mission.start", "mission.stop", "mission.retry", "mission.respond", "mission.get", "mission.configure", "mission.revoke_batch",
+  "mission.staging.list", "mission.staging.inspect",
   "inbox.ack", "capability.run", "capability.grant", "capability.revoke_grant", "capability.refresh",
   "skill.run", "skill.versions", "skill.repair", "skill.verify", "skill.record",
   "trigger.create", "trigger.enable", "trigger.disable", "trigger.delete",
@@ -79,6 +80,15 @@ export async function missionCommand(missions: MissionManager, action: string, d
     }
     case "mission.get": { const view = missions.get(id(data.id)); return { data: access.local ? view : missions.deviceMissionData(view) }; }
     case "mission.revoke_batch": return { mission: missions.revokeBatch(id(data.missionId), id(data.batchId), access.actor) };
+    // M-A-3 T9R-F02 (D2): staged paired-device changes are reviewed on the Windows Host only (never in REMOTE).
+    case "mission.staging.list": {
+      if (!access.local) throw new WorkstationRequiredError("Staged paired-device changes are reviewed on the Windows Host.");
+      return { data: missions.staging.forMission(id(data.missionId)).map(({ fileIdentity: _identity, ...record }) => record) };
+    }
+    case "mission.staging.inspect": {
+      if (!access.local) throw new WorkstationRequiredError("Staged paired-device changes are reviewed on the Windows Host.");
+      return { data: missions.inspectStaged(id(data.stagingId), access.actor) };
+    }
     case "mission.configure": return { data: missions.configure(object(data), access.actor) };
     case "inbox.ack": {
       // M-A-3 T9R-F01: a device clears its own view of notices, never the workstation's pending-approval prompts.

@@ -263,6 +263,8 @@ test("A06: pause blocks the next admission while the admitted step finishes; not
 });
 
 // A08 (no restart) — resume reopens the SAME run at the SAME generation and continues.
+// M-A-3 T9R-F02: A08, A31 and A27 start their Agent as the authenticated workstation (as F01 did for A02-A05/A18): any other
+// actor string is a remote grantor, whose file writes are staged for workstation promotion and would never complete here.
 test("A08: resume without restart reuses the same run and generation, then completes", async () => {
   const env = await agentSetup("resume");
   try {
@@ -275,11 +277,11 @@ test("A08: resume without restart reuses the same run and generation, then compl
       ],
     }, "test");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     const runId = await until(() => env.agents.snapshot().agents.find((a) => a.id === id)?.run?.id ?? undefined, "run opened at start");
     await until(() => env.launched.length === 1, "step 1 admitted");
-    env.agents.pause(id, "test");
-    env.agents.resume(id, "test");
+    env.agents.pause(id, "workstation");
+    env.agents.resume(id, "workstation");
     await until(() => env.agents.snapshot().agents.find((a) => a.id === id)?.state === "RUNNING" ? true : undefined, "resumed to RUNNING");
     env.launched[0]!.finish({ ok: true, output: "task one done", exitCode: 0 });
     await until(() => exists(join(env.root, "two.txt")), "admission resumes");
@@ -402,7 +404,7 @@ test("A31/§25: lifecycle rows are the agent's own vocabulary, once each, never 
       steps: [{ role: "Implement", objective: "Write one.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: join(env.root, "one.txt"), content: "one" } }, verification: [{ kind: "file_exists", path: "one.txt", contains: "one" }] }],
     }, "test");
     const { id, missionId } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     await until(() => env.missions.get(missionId).mission.state === "completed", "mission completes", 30_000);
     await until(() => env.agents.snapshot().agents.find((a) => a.id === id)?.state === "COMPLETED" ? true : undefined, "agent completes");
     const rows = lifecycle(env, missionId).filter((e) => {
@@ -440,7 +442,7 @@ test("A27: the agent runs to COMPLETED with zero UI involvement", async () => {
       steps: [{ role: "Implement", objective: "Write one.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: join(env.root, "one.txt"), content: "one" } }, verification: [] }],
     }, "test");
     const { id } = newAgent(env, before);
-    env.agents.start(id, "test");
+    env.agents.start(id, "workstation");
     // No snapshot polls, no UI: just completion observable at the store.
     const row = await until(() => {
       const snapshot = env.agents.snapshot();

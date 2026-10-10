@@ -1,5 +1,5 @@
 import type { ArtifactStore } from "../artifacts.server.ts";
-import { capabilityOperation, decide, isRemoteEnvelope, matches, remoteExecutionRefusal, runsCode } from "../authorization.server.ts";
+import { capabilityOperation, decide, DESKTOP_REQUIRED, isRemoteEnvelope, matches, remoteExecutionRefusal, runsCode } from "../authorization.server.ts";
 import { consultBatch, currentBatchEpoch, extractObservedPid, targetLabelOf } from "../batches.server.ts";
 import { redact, type MissionStore } from "../store.server.ts";
 import { resolveCommand, type Resolved } from "./process.server.ts";
@@ -104,6 +104,15 @@ export class CapabilityBus {
   remoteMutationHeld: ((request: CapabilityRequest) => string | null) | null = null;
   /** M-A-3 T9R-F01: code-running capability executions in flight (run id -> action). */
   liveCode = new Map<string, string>();
+  /**
+   * M-A-3 T9R-F02 (D2): stages a paired-device write instead of executing it (after admission, before the adapter), or
+   * returns null when the write is not device-attributed. Installed by MissionManager.
+   */
+  stageRemoteWrite: ((request: CapabilityRequest, runId: string) => CapabilityResult | null) | null = null;
+  /** M-A-3 T9R-F02 (section 12): records that a step's one-time answer authorized this admitted run. */
+  onceAdmitted: ((request: CapabilityRequest) => void) | null = null;
+  /** M-A-3 T9R-F02: the paired device a Mission change is attributed to, or null. Installed by MissionManager. */
+  deviceAttributed: ((request: CapabilityRequest) => string | null) | null = null;
   /** M-A-3 T9R-F01: records a capability execution running under a trusted-desktop grant. */
   desktopExecutionStarted: ((runId: string, request: CapabilityRequest) => void) | null = null;
   /** M-A-3 T9R-F01: consumes one use of the grant immediately before execution; returns why it cannot, or null. */
@@ -170,10 +179,15 @@ export class CapabilityBus {
     if (review) return { decision: "ask", risk, desktopRequired: true, desktopOperation: capabilityOperation(request.action, request.params, request.cwd, executable), remoteReview: review.ids,
       reason: `Approval required on Windows Host: this runs code over files changed under paired-device authority. Review their content before allowing:${review.listing}${review.more ? `\n${review.more} more changed file(s) are listed for review after these.` : ""}` };
     // M-A-3 T9R-F01: remote authority never runs code; only a trusted-desktop grant for this exact operation lifts it.
-    const remote = !!request.envelope && !request.direct && isRemoteEnvelope(request.envelope) && remoteExecutionRefusal(request.action, request.params, risk, request.cwd) !== null;
+    // M-A-3 T9R-F02 (D2): a delete cannot be staged, so a paired-device-attributed delete always needs the workstation's
+    // exact-operation grant, under any envelope.
+    const attributedDelete = request.action === "filesystem.delete" && !!request.missionId && !request.direct && !!this.deviceAttributed?.(request);
+    const remote = (!!request.envelope && !request.direct && isRemoteEnvelope(request.envelope) && remoteExecutionRefusal(request.action, request.params, risk, request.cwd) !== null) || attributedDelete;
     const grant = remote ? this.desktopGrantFor?.(request, executable) ?? null : null;
     const base = decide({ ...found.manifest, risk }, request.params, { envelope: request.envelope, missionId: request.missionId, grants: this.store.grants(), oneTime: request.oneTime || (!!request.oneTimeAction && request.oneTimeAction === request.action), direct: request.direct, base: request.cwd, executable, agenticViolation: violation, desktopGrant: !!grant });
     if (base.desktopRequired) return { ...base, desktopOperation: capabilityOperation(request.action, request.params, request.cwd, executable) }; // never batch-rescued
+    if (attributedDelete && !grant && base.decision !== "deny")
+      return { decision: "ask", risk, reason: `${DESKTOP_REQUIRED} A paired-device delete cannot be staged for review; the Windows Host approves this exact delete.`, desktopRequired: true, desktopOperation: capabilityOperation(request.action, request.params, request.cwd, executable) };
     if (grant && base.decision === "allow") return { ...base, desktopGrant: { id: grant } };
     if (remote) return base;
     if (violation) return base; // T9 cannot launder an Agent identity, budget or resource mismatch.
@@ -301,8 +315,17 @@ export class CapabilityBus {
       if (refused) { this.emit("authorization.required", `${request.action}: ${refused}`, request.missionId); return { decision: { decision: "ask", risk: decision.risk, reason: refused, desktopRequired: true, desktopOperation: capabilityOperation(request.action, request.params, request.cwd, executable) }, run: null, result: null, artifactIds: [] }; }
     }
     this.emit("authorization.granted", `${request.action}: ${decision.reason}`, request.missionId);
+    if (request.oneTimeAction && request.oneTimeAction === request.action) this.onceAdmitted?.(request);
     this.store.host.transaction(()=>{this.store.saveRun(base);this.emit("capability.started", `${request.action} started.`, request.missionId);});
     if (decision.desktopGrant) this.desktopExecutionStarted?.(base.id, request);
+    // M-A-3 T9R-F02 (D2): a paired-device write goes to Host-owned inert staging; the project is not touched and no
+    // project change is recorded until the workstation promotes the exact staged bytes.
+    if (request.missionId && !request.direct && request.action === "filesystem.write" && this.stageRemoteWrite) {
+      let staged: CapabilityResult | null;
+      try { staged = this.stageRemoteWrite(request, base.id); }
+      catch (error) { const message = safeError(error).message; return finish("failed", message, { ok: false, status: "failed", summary: message, output: null, evidence: [], errorCategory: "capability_failed" }); }
+      if (staged) return finish(staged.status, staged.summary, staged);
+    }
     // Recorded before the adapter runs: a change that fails after touching disk is still reviewed.
     if (request.missionId && MUTATIONS.has(request.action)) this.remoteMutationStarted?.(request, base.id);
     if (runsCode(request.action, request.params, decision.risk) || request.action.startsWith("git.") || request.action.startsWith("github.")) this.liveCode.set(base.id, request.action);

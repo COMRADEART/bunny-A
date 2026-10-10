@@ -34,6 +34,7 @@ export class MissionStore {
     this.host = host;
     host.db.exec(`
       CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS device_staging(id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, state TEXT NOT NULL, created_at INTEGER NOT NULL, record TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS remote_changes(id TEXT PRIMARY KEY, run_id TEXT NOT NULL, mission_id TEXT, path TEXT NOT NULL, root TEXT NOT NULL, actor TEXT NOT NULL, at INTEGER NOT NULL, acknowledged_at INTEGER, acknowledged_by TEXT);
       CREATE TABLE IF NOT EXISTS missions(id TEXT PRIMARY KEY, state TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, record TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS mission_steps(id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, idx INTEGER NOT NULL, state TEXT NOT NULL, task_id TEXT, record TEXT NOT NULL);
@@ -148,12 +149,18 @@ export class MissionStore {
    * trusted-desktop grant records it at approval, so any later change voids the grant.
    */
   mutationSequence(): number {
-    return Number((this.db.prepare("SELECT COUNT(*) AS n FROM capability_runs WHERE action IN ('filesystem.write','filesystem.delete','git.commit','git.merge','git.worktree_add','git.worktree_remove','browser.download','terminal.exec')").get() as { n: number }).n);
+    const runs = Number((this.db.prepare("SELECT COUNT(*) AS n FROM capability_runs WHERE action IN ('filesystem.write','filesystem.delete','git.commit','git.merge','git.worktree_add','git.worktree_remove','browser.download','terminal.exec')").get() as { n: number }).n);
+    // M-A-3 T9R-F02: a promotion of a staged paired-device change writes the project outside capability runs; it voids
+    // any trusted-desktop grant approved before it, exactly like a capability write.
+    const promotions = Number((this.db.prepare("SELECT COUNT(*) AS n FROM device_staging WHERE state IN ('PROMOTING','PROMOTED') OR json_extract(record, '$.promotionStarted') = 1").get() as { n: number }).n);
+    return runs + promotions;
   }
   /** M-A-3 T9R-F01: a project change made under paired-device authority, held for workstation review before code runs over it. */
-  recordRemoteChange(change: { runId: string; missionId: string | null; path: string; root: string; actor: string }) {
+  recordRemoteChange(change: { runId: string; missionId: string | null; path: string; root: string; actor: string }): string {
+    const id = crypto.randomUUID();
     this.db.prepare("INSERT INTO remote_changes(id,run_id,mission_id,path,root,actor,at,acknowledged_at,acknowledged_by) VALUES(?,?,?,?,?,?,?,NULL,NULL)")
-      .run(crypto.randomUUID(), change.runId, change.missionId, change.path, change.root, change.actor, Date.now());
+      .run(id, change.runId, change.missionId, change.path, change.root, change.actor, Date.now());
+    return id;
   }
   pendingRemoteChanges(): { id: string; path: string; root: string; actor: string; missionId: string | null; at: number }[] {
     return this.db.prepare("SELECT id, path, root, actor, mission_id AS missionId, at FROM remote_changes WHERE acknowledged_at IS NULL ORDER BY at").all() as { id: string; path: string; root: string; actor: string; missionId: string | null; at: number }[];

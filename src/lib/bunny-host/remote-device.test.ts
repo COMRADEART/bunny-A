@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -361,7 +361,7 @@ test("T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/
   try {
     assert.equal((await f.api("mission.configure", { enabled: true })).status, 200);
     const device = await f.pair();
-    // Workstation creates and starts the Agent; the plan's write is reduced out of scope, so it will ask.
+    // Workstation creates the Agent. Its write stays inside consent; a standing ask_every_time grant makes that write an ask.
     const projectId = (await f.api("project.add", { name: "Phone supervised Project", path: f.root })).body.data!.id;
     const created = await f.api("agent.create", { projectId, name: "Phone supervised", objective: "Read then write", steps: [{ ...op("Inspect", "filesystem.read", { path: "seed.txt" }), verification: [{ kind: "capability", action: "filesystem.compare", params: { path: "seed.txt", content: "seed" }, expect: { field: "matches", equals: true } }] }, { ...op("Write", "filesystem.write", { path: "result.txt", content: "phone", overwrite: true }, [0]), verification: [{ kind: "capability", action: "filesystem.compare", params: { path: "result.txt", content: "phone" }, expect: { field: "matches", equals: true } }] }].map((step) => ({ ...step, crossApp: true })) });
     assert.equal(created.status, 200, created.body.error);
@@ -375,9 +375,12 @@ test("T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/
     // F12/F13/F14: the device can neither invent nor widen, nor smuggle fields into an approval.
     const widened = await f.api("agent.authorization.approve", { id: agentId, revision: proposed.revision, maximumActions: 999 }, device.token);
     assert.match(widened.body.error!, /exact Host offer/);
-    const reduced = (await f.api("agent.authorization.adjust", { id: agentId, revision: proposed.revision, patch: { capabilities: proposed.capabilities.filter((c) => c !== "filesystem.write") } })).body.agents!.agents.find((a) => a.id === agentId)!.authorization!;
+    // F02 D3: consent keeps filesystem.write; the standing grant (not a narrowed consent) makes the write ask a device may answer.
+    assert.equal((await f.api("capability.grant", { action: "filesystem.write", scope: "global", policy: "ask_every_time" })).status, 200);
+    // A non-narrowing revision bump (a reduced action ceiling) makes the proposed revision stale.
+    const adjusted = (await f.api("agent.authorization.adjust", { id: agentId, revision: proposed.revision, patch: { maximumActions: 10 } })).body.agents!.agents.find((a) => a.id === agentId)!.authorization!;
     assert.equal((await f.api("agent.authorization.approve", { id: agentId, revision: proposed.revision })).status, 400, "F15: a stale revision is refused");
-    assert.equal((await f.api("agent.authorization.approve", { id: agentId, revision: reduced.revision })).status, 200);
+    assert.equal((await f.api("agent.authorization.approve", { id: agentId, revision: adjusted.revision })).status, 200);
     const waiting = await until(async () => (await f.state(device.token)).body.agents.agents.find((a) => a.id === agentId && a.authorization?.pending.length), "write ask");
     const ask = waiting.authorization!.pending[0];
     assert.equal(ask.action, "filesystem.write");
@@ -388,7 +391,10 @@ test("T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/
     const paused = (await f.state()).body.agents.agents.find((a) => a.id === agentId)!;
     assert.equal(paused.state, "PAUSED");
     const whilePaused = await f.api("mission.respond", { requestId: ask.id, decision: "allow_once" }, device.token);
-    assert.match(whilePaused.body.error!, /paused/);
+    // F02 D3: the device consent check runs before the pause message, so a paused Agent's answer is refused as WORKSTATION_REQUIRED.
+    assert.equal(whilePaused.status, 400);
+    assert.equal(whilePaused.body.code, "WORKSTATION_REQUIRED");
+    assert.ok(whilePaused.body.error, "the refusal carries a reason");
     // F22/F50: Resume revalidates and is bound to the revision the device reviewed.
     assert.match((await f.api("agent.resume", { id: agentId }, device.token)).body.error!, /revision/);
     assert.match((await f.api("agent.resume", { id: agentId, revision: waiting.authorization!.revision }, device.token)).body.error!, /revision/);
@@ -399,10 +405,44 @@ test("T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/
     assert.equal(fresh.action, "filesystem.write");
     assert.equal((await f.api("mission.respond", { requestId: ask.id, decision: "allow_once" }, device.token)).body.code, "REFUSED", "the superseded ask can never be answered");
     assert.equal((await f.api("mission.respond", { requestId: fresh.id, decision: "allow_once" }, device.token)).status, 200);
+    // F02 D2: the device's answer stages the bytes; the workstation promotes them, and a device cannot promote.
+    const promotion = await until(async () => { const agent = (await f.state()).body.agents.agents.find((a) => a.id === agentId); return agent?.authorization?.pending.find((p) => p.action === "filesystem.promote") ?? false; }, "staged promotion ask");
+    assert.equal((await f.api("mission.respond", { requestId: promotion.id, decision: "allow_once" }, device.token)).body.code, "WORKSTATION_REQUIRED", "a device cannot promote its own staged change");
+    assert.equal(existsSync(join(f.root, "result.txt")), false, "project untouched while staged");
+    assert.equal((await f.api("mission.respond", { requestId: promotion.id, decision: "allow_once" })).status, 200);
     await until(async () => { try { return readFileSync(join(f.root, "result.txt"), "utf8") === "phone"; } catch { return false; } }, "phone-approved write");
     const done = await until(async () => { const agent = (await f.state()).body.agents.agents.find((a) => a.id === agentId); if (agent?.state === "FAILED") { const mission = await f.api("mission.get", { id: agent.missionId }); throw new Error(JSON.stringify(mission.body)); } return agent?.state === "COMPLETED" ? agent : null; }, "Agent completes on the Host");
     assert.equal(done.id, agentId, "F24: the same Agent identity throughout");
     assert.equal(created.body.agents!.agents.find((a) => a.id === agentId)!.missionId, done.missionId, "F25: the same Mission identity throughout");
+  } finally {
+    await f.close();
+  }
+});
+
+test("T9 F02 D3 (negative regression): a device cannot answer a write that the owner's narrowed Agent consent no longer covers", async () => {
+  const f = await fixture({ agentic: true });
+  try {
+    assert.equal((await f.api("mission.configure", { enabled: true })).status, 200);
+    const device = await f.pair();
+    const projectId = (await f.api("project.add", { name: "Narrowed Project", path: f.root })).body.data!.id;
+    const created = await f.api("agent.create", { projectId, name: "Narrowed phone", objective: "Read then write", steps: [op("Inspect", "filesystem.read", { path: "seed.txt" }), op("Write", "filesystem.write", { path: "result.txt", content: "phone", overwrite: true }, [0])] });
+    assert.equal(created.status, 200, created.body.error);
+    const agentId = created.body.agents!.agents.find((a) => a.name === "Narrowed phone")!.id;
+    const proposed = (await f.api("agent.authorization.propose", { id: agentId })).body.agents!.agents.find((a) => a.id === agentId)!.authorization!;
+    // The owner narrows consent so filesystem.write is no longer in scope; the write then asks, and only the workstation may answer it.
+    const narrowed = (await f.api("agent.authorization.adjust", { id: agentId, revision: proposed.revision, patch: { capabilities: proposed.capabilities.filter((c) => c !== "filesystem.write") } })).body.agents!.agents.find((a) => a.id === agentId)!.authorization!;
+    assert.equal((await f.api("agent.authorization.approve", { id: agentId, revision: narrowed.revision })).status, 200);
+    const waiting = await until(async () => (await f.state(device.token)).body.agents.agents.find((a) => a.id === agentId && a.authorization?.pending.length), "out-of-scope write ask");
+    const ask = waiting.authorization!.pending[0];
+    assert.equal(ask.action, "filesystem.write");
+    assert.equal(ask.remote?.answerable, false, "an out-of-scope write is not answerable by a device");
+    const answered = await f.api("mission.respond", { requestId: ask.id, decision: "allow_once" }, device.token);
+    assert.equal(answered.status, 400);
+    assert.equal(answered.body.code, "WORKSTATION_REQUIRED");
+    assert.match(answered.body.error!, /outside the Agent's current permissions/);
+    const missionId = waiting.missionId!;
+    assert.equal(f.host.missions.staging.forMission(missionId).length, 0, "nothing was staged");
+    assert.equal(existsSync(join(f.root, "result.txt")), false, "the project file never landed");
   } finally {
     await f.close();
   }

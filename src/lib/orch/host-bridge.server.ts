@@ -8,6 +8,12 @@ const LOOPBACK_ADDRESSES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 // A tunnel or reverse proxy on this machine connects over loopback too, so its headers disqualify workstation access.
 /** Header families relays and tunnels add (Cloudflare, Tailscale, Envoy, Fastly, Vercel, AWS, Azure, ngrok, IIS ARR, rewrites). */
 const RELAY_PREFIX = /^(x-forwarded-|x-original-|x-rewrite-|cf-|tailscale-|x-envoy-|fastly-|x-vercel-|x-amzn-|x-azure-|x-arr-|x-ms-|ngrok-|x-ngrok-|x-cluster-client-)/;
+/**
+ * M-A-3 T9R-F02 (D4): x-* headers this application's own local clients send. Any OTHER x-* header (an unknown relay or
+ * proxy family) disqualifies workstation authentication: the denylist above cannot enumerate every relay, so an unknown
+ * marker fails closed to remote handling.
+ */
+const LOCAL_X_HEADER = /^x-(tss-[a-z-]+|tsr-[a-z-]+|requested-with|bunny-pair-client)$/;
 const PROXY_HEADERS = ["cf-connecting-ip", "cf-ray", "x-forwarded-for", "x-real-ip", "forwarded", "via", "cdn-loop", "true-client-ip", "x-client-ip"];
 
 /** The TCP peer address of the current request; undefined (and therefore never "local") when it cannot be determined. */
@@ -37,7 +43,7 @@ export function authorizeBridge(request: Request, remoteAddress: string | undefi
     const forwarded = request.headers.get("x-forwarded-host");
     if (forwarded && forwarded !== url.host) throw new Error("Untrusted forwarded host.");
     // M-A-3 T9R-F01: any forwarding marker (x-forwarded-*, x-original-*, cf-*, ...) means a proxy relayed the request.
-    const relayed = [...request.headers.keys()].some(name => PROXY_HEADERS.includes(name) || RELAY_PREFIX.test(name) || ["front-end-https", "x-url-scheme"].includes(name));
+    const relayed = [...request.headers.keys()].some(name => PROXY_HEADERS.includes(name) || RELAY_PREFIX.test(name) || ["front-end-https", "x-url-scheme"].includes(name) || (name.startsWith("x-") && !LOCAL_X_HEADER.test(name)));
     if (relayed) throw new Error("Remote requests cannot use workstation authentication.");
     // A paired-device credential is only ever set on the remote origin, so a "local" request carrying one (in any
     // spacing) arrived through a proxy that rewrote Host. It is remote and never receives the workstation token.

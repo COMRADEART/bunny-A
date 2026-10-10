@@ -4,7 +4,7 @@ import { useIsland } from "@/store/use-island";
 import type { MissionView } from "@/lib/bunny-missions/types";
 import { NAMES } from "./ui";
 import { openTask } from "./task";
-import { allowVerdict, missionApproveVerdict } from "./remote-view-model";
+import { allowVerdict, isDevice, missionApproveVerdict } from "./remote-view-model";
 import {
   agentDetail,
   agentRows,
@@ -135,6 +135,24 @@ function ApprovalCard({ mission }: { mission: MissionView }) {
   );
 }
 
+/** M-A-3 T9R-F02: the Host shows 8 KB of a staged change; the workstation reads every byte before promoting more. */
+const PROMOTION_PREVIEW_BYTES = 8192;
+function StagedInspection({ stagingId, bytes }: { stagingId: string; bytes: number }) {
+  const store = useIsland();
+  const [shown, setShown] = useState<{ content: string; sha256: string; bytes: number } | null>(null);
+  if (bytes <= PROMOTION_PREVIEW_BYTES || isDevice(store.viewer)) return null;
+  return shown ? (
+    <div className="mission-staged-content" data-testid="staged-content">
+      <p className="caption">All {shown.bytes} bytes, sha256 {shown.sha256}:</p>
+      <pre className="caption">{shown.content}</pre>
+    </div>
+  ) : (
+    <button className="btn secondary" disabled={!store.canAct()} onClick={() => void store.inspectStaged(stagingId).then(setShown)}>
+      Inspect all {bytes} bytes
+    </button>
+  );
+}
+
 function Requests({ mission }: { mission: MissionView }) {
   const store = useIsland();
   const open = mission.requests.filter((request) => !request.resolvedAt);
@@ -150,6 +168,7 @@ function Requests({ mission }: { mission: MissionView }) {
               <code>{request.action}</code> ({request.risk.toLowerCase().replaceAll("_", " ")})
             </p>
             <p className="caption">{request.reason}</p>
+            {request.promotion ? <StagedInspection stagingId={request.promotion.stagingId} bytes={request.promotion.contentSize} /> : null}
             {mission.steps.find((step) => step.id === request.stepId)?.executor.kind === "skill" ? <p className="caption">Allows matching actions throughout this skill run inside the approved folders. Other actions still require their own approval.</p> : null}
             {offer ? (
               <div className="mission-batch-offer">
