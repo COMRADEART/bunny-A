@@ -1,0 +1,49 @@
+{
+  "rows": [
+    {
+      "id": "E35",
+      "title": "Sign-out/admission race serialized",
+      "initialConditions": "pending ask",
+      "operation": "Concurrent answer and sign-out (incl. delayed body)",
+      "expected": "At most one outcome; never a write",
+      "evidenceType": "real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E35:",
+          "names": [
+            "F02-E35: a device answer racing its own sign-out lands at most once and never writes"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T9 revocation race",
+          "names": [
+            "T9 revocation race: a delayed body cannot retain the authority authenticated before revocation"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E36",
+      "title": "Revocation/admission race serialized",
+      "initialConditions": "pending ask",
+      "operation": "Concurrent answer and workstation revoke",
+      "expected": "Never a write",
+      "evidenceType": "real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E36:",
+          "names": [
+            "F02-E36: a device answer racing a workstation revocation never writes"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    }
+  ]
+}

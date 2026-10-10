@@ -1,0 +1,170 @@
+{
+  "gate": "M-A-3 T9R-F02 §18",
+  "classification": "LIVE disposable Host: real HTTP loopback, real pairing, real SQLite, real Agent consent, real fs.watch; no mocked authorization",
+  "instrumentation": "missions.missionPauseGate held only in step 15 to keep one phone answer provably unconsumed at sign-out",
+  "hostEpoch": "af55a46b-200d-4206-b9ac-0d30593c4665",
+  "result": "PASS",
+  "steps": [
+    {
+      "step": 1,
+      "title": "Phone receives valid narrow authority",
+      "requestId": "d14b86af-92b3-40dd-86e8-b48d158c9cfc",
+      "action": "filesystem.write",
+      "phoneAnswerable": true,
+      "desktopRequired": false
+    },
+    {
+      "step": 2,
+      "title": "Phone submits a permitted document change",
+      "status": 200,
+      "resolvedBy": "the paired phone"
+    },
+    {
+      "step": 3,
+      "title": "Host stores it in owned inert staging",
+      "stagingId": "8abfcca5-9396-4f47-89fa-aa38a55afba3",
+      "state": "STAGED",
+      "classification": "PHONE_SAFE_DOCUMENT",
+      "contentHash": "be32a5395174ac580110646134a092674450aa931393480ae893f575a9453687",
+      "stagedUnderHostState": true,
+      "deviceId": "the paired phone"
+    },
+    {
+      "step": 4,
+      "title": "Project watcher observes no premature change",
+      "watcherEventsWhileStaged": 0,
+      "destinationExists": false
+    },
+    {
+      "step": 5,
+      "title": "Windows Host reviews exact staged bytes",
+      "workstationSeesSha256": true,
+      "workstationSeesFullContent": true,
+      "phoneSeesListing": false,
+      "phonePromotionAttempt": {
+        "status": 400,
+        "code": "WORKSTATION_REQUIRED"
+      }
+    },
+    {
+      "step": 6,
+      "title": "Current authorization allows promotion",
+      "workstationStatus": 200,
+      "decidedBy": "workstation"
+    },
+    {
+      "step": 7,
+      "title": "Host verifies source/destination identity",
+      "stagedIdentityRecorded": true,
+      "destinationBefore": {
+        "existed": false,
+        "sha256": null,
+        "size": null
+      }
+    },
+    {
+      "step": 8,
+      "title": "Promotion succeeds",
+      "state": "PROMOTED",
+      "decisionReason": "Promoted by workstation; read-back sha256 be32a5395174ac580110646134a092674450aa931393480ae893f575a9453687."
+    },
+    {
+      "step": 9,
+      "title": "Independent verification confirms the result",
+      "destinationSha256": "be32a5395174ac580110646134a092674450aa931393480ae893f575a9453687",
+      "matchesReviewed": true,
+      "watcherSawChangeOnlyAfterPromotion": true
+    },
+    {
+      "step": 10,
+      "title": "Agent checkpoint records completion",
+      "missionState": "completed",
+      "agentState": "COMPLETED",
+      "checkpointBoundaries": [
+        "after_approval_decision",
+        "before_task_admission",
+        "before_task_admission",
+        "before_waiting_for_user",
+        "before_task_admission",
+        "before_waiting_for_user",
+        "after_verification"
+      ]
+    },
+    {
+      "step": 11,
+      "title": "Phone attempts an out-of-scope configuration modification",
+      "requestId": "9a70510b-1d6a-4679-b311-d16061d780ec",
+      "status": 400,
+      "code": "WORKSTATION_REQUIRED"
+    },
+    {
+      "step": 12,
+      "title": "Modification is refused before mutation",
+      "destinationExists": false,
+      "stagedRecords": 0,
+      "requestStillOpen": true
+    },
+    {
+      "step": 13,
+      "title": "User narrows Agent file permissions",
+      "status": 200,
+      "capabilitiesNow": [
+        "filesystem.compare",
+        "filesystem.exists",
+        "filesystem.list",
+        "filesystem.read"
+      ]
+    },
+    {
+      "step": 14,
+      "title": "Previously offered write is refused",
+      "previouslyOffered": {
+        "requestId": "1b4d36ae-c092-44c1-afe7-14ee3a2f73ce",
+        "status": 400,
+        "code": "REFUSED"
+      },
+      "reissuedAtNewRevision": {
+        "requestId": "972e4c9b-613e-4bb0-8c65-1e52f653c830",
+        "status": 400,
+        "code": "WORKSTATION_REQUIRED"
+      },
+      "written": false,
+      "staged": 0
+    },
+    {
+      "step": 15,
+      "title": "Phone signs out",
+      "status": 200,
+      "signedOut": true,
+      "laterPhoneRequest": 401
+    },
+    {
+      "step": 16,
+      "title": "Unconsumed phone approvals become invalid",
+      "requestId": "a96dc346-8ccc-46a2-baad-73514da0fc57",
+      "lifecycle": "INVALIDATED_BY_SIGNOUT",
+      "stepApprovedOnce": null,
+      "written": false,
+      "staged": 0
+    },
+    {
+      "step": 17,
+      "title": "Independent owner-approved history remains intact",
+      "promotedFileSha256": "be32a5395174ac580110646134a092674450aa931393480ae893f575a9453687",
+      "promotedRecord": "PROMOTED",
+      "stagedContentKept": true,
+      "completedMissionState": "completed",
+      "workstationEnvelopeGrantedBy": "workstation",
+      "workstationEnvelopeRevoked": false,
+      "promotionRequestLifecycle": "CONSUMED",
+      "auditEvents": [
+        "approval.lifecycle",
+        "staging.staged",
+        "staging.promoted",
+        "approval.lifecycle",
+        "approval.lifecycle",
+        "device.revoked"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "rows": [
+    {
+      "id": "E23",
+      "title": "Old Host generation rejected",
+      "initialConditions": "Host restart",
+      "operation": "Answer old offer; held answer",
+      "expected": "Refused; INVALIDATED_BY_HOST_RESTART",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E23a:",
+          "names": [
+            "F02-E23a: a Host restart invalidates a pending device offer; the device cannot answer it afterwards"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-E23b:",
+          "names": [
+            "F02-E23b: a device answer held across a Host restart is stamped INVALIDATED_BY_HOST_RESTART and never executes"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E38",
+      "title": "Host restart cannot revive old approval",
+      "initialConditions": "staged change and answer",
+      "operation": "Real Host close + startHost on same data",
+      "expected": "Invalidated; old approval dead",
+      "evidenceType": "real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E38:",
+          "names": [
+            "F02-E38: a Host restart invalidates staged changes and the old approval stays dead"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-ST1:",
+          "names": [
+            "F02-ST1: a Host restart invalidates a STAGED change (content kept), fails the step; Retry re-stages and promotion works once"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-R2-6:",
+          "names": [
+            "F02-R2-6: a promotion interrupted by a Host restart is reconciled from disk and, if it did not land, listed for review"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E53",
+      "title": "T4 SQLite recovery still prevents duplicate work",
+      "initialConditions": "agent recovery",
+      "operation": "Restart recovery suites",
+      "expected": "Pass; no duplicate write (dedupe)",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "A07/A08:",
+          "names": [
+            "A07/A08: pause survives a real Host restart; nothing resumes by itself; resume completes under the same envelope"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-ST2:",
+          "names": [
+            "F02-ST2: a PROMOTED change plus Retry never writes or stages the same bytes twice"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-R2-6:",
+          "names": [
+            "F02-R2-6: a promotion interrupted by a Host restart is reconciled from disk and, if it did not land, listed for review"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    }
+  ],
+  "additional": [
+    {
+      "prefix": "F02-ST1:",
+      "names": [
+        "F02-ST1: a Host restart invalidates a STAGED change (content kept), fails the step; Retry re-stages and promotion works once"
+      ],
+      "result": "PASS"
+    },
+    {
+      "prefix": "F02-ST2:",
+      "names": [
+        "F02-ST2: a PROMOTED change plus Retry never writes or stages the same bytes twice"
+      ],
+      "result": "PASS"
+    },
+    {
+      "prefix": "F02-R2-6:",
+      "names": [
+        "F02-R2-6: a promotion interrupted by a Host restart is reconciled from disk and, if it did not land, listed for review"
+      ],
+      "result": "PASS"
+    },
+    {
+      "prefix": "T9R Host restart: same Host UUID",
+      "names": [
+        "T9R Host restart: same Host UUID, Agent and Mission; new epoch; pre-restart approval refused; paired device survives"
+      ],
+      "result": "PASS"
+    },
+    {
+      "prefix": "A07/A08: pause survives a real Host restart",
+      "names": [
+        "A07/A08: pause survives a real Host restart; nothing resumes by itself; resume completes under the same envelope"
+      ],
+      "result": "PASS"
+    }
+  ]
+}

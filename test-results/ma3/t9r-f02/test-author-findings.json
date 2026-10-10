@@ -1,0 +1,52 @@
+{
+  "findings": [
+    {
+      "title": "Bearer parsing accepts a raw token with no scheme as the workstation token",
+      "foundBy": "F02 test-writing agent",
+      "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/f02-identity-signout.test.ts",
+      "disposition": "FIXED",
+      "repair": "http.server.ts strict /^Bearer (\\S+)$/",
+      "regression": "F02-E27: forged headers and unpaired or non-bearer credentials never gain workstation authority"
+    },
+    {
+      "title": "Coverage gap: one-time answer invalidation at sign-out is not directly exercised",
+      "foundBy": "F02 test-writing agent",
+      "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/f02-identity-signout.test.ts",
+      "disposition": "FIXED (coverage)",
+      "repair": "endDeviceAnswers stamps INVALIDATED_BY_SIGNOUT",
+      "regression": "F02-E30; F02-R2-4"
+    },
+    {
+      "title": "Paused-Agent device answer reports the generic device refusal, not the pause reason",
+      "foundBy": "F02 test-writing agent",
+      "file": "src/lib/bunny-host/remote-device.test.ts; src/lib/bunny-host/remote-remediation.test.ts",
+      "disposition": "ACCEPTED (LOW, message only)",
+      "repair": "Refusal is correct (fails closed); only the wording is generic.",
+      "regression": "T9 F12-F15/F19-F22/F50 (G2) paused answer"
+    },
+    {
+      "title": "Paired device can answer (deny) a promotion request",
+      "foundBy": "F02 test-writing agent",
+      "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/f02-staging.test.ts",
+      "disposition": "FIXED",
+      "repair": "promotion requests are desktopRequired and WORKSTATION_REQUIRED for every device answer, including deny",
+      "regression": "F02-E14; F02-E28"
+    },
+    {
+      "title": "Retry after Host restart does not re-stage; contract says it does",
+      "foundBy": "F02 test-writing agent",
+      "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/f02-staging.test.ts",
+      "disposition": "FIXED",
+      "repair": "recover() marks STAGED as INVALIDATED_BY_HOST_RESTART and fails the step; Retry stages again",
+      "regression": "F02-ST1"
+    },
+    {
+      "title": "Phone-approved plain Mission under a broad root can read host.sqlite",
+      "foundBy": "F02 test-writing agent",
+      "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/f02-staging.test.ts",
+      "disposition": "FIXED",
+      "repair": "local.server.ts privateScope covers every Mission (missionId), not only bounded delegation",
+      "regression": "F02-E48b; F02-R1-3"
+    }
+  ]
+}

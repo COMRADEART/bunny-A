@@ -1,0 +1,135 @@
+{
+  "rows": [
+    {
+      "id": "E40",
+      "title": "Phone cannot authorize shell through Codex",
+      "initialConditions": "Codex route",
+      "operation": "Phone answer/launch",
+      "expected": "Desktop-only",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E40:",
+          "names": [
+            "F02-E40: a device one-time answer cannot authorize shell through a Claude write, and no Codex route is reachable from it"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F01-3:",
+          "names": [
+            "F01-3: a phone cannot authorize a codex write session (shell); it stays a workstation-only ask",
+            "F01-3: a phone cannot authorize a codex read session (shell); it stays a workstation-only ask"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E41",
+      "title": "Phone cannot authorize code execution through Claude",
+      "initialConditions": "Claude write session; terminal",
+      "operation": "Phone answer",
+      "expected": "Desktop-only",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E41:",
+          "names": [
+            "F02-E41: a device one-time answer to a terminal command or code execution is refused even inside an approved Mission"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F01-2:",
+          "names": [
+            "F01-2: a phone cannot authorize a claude write session (shell); it stays a workstation-only ask"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E42",
+      "title": "Phone cannot authorize arbitrary execution through Ollama",
+      "initialConditions": "tool-free Ollama step; reroute",
+      "operation": "Phone answer for rerouted route",
+      "expected": "Refused",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E42:",
+          "names": [
+            "F02-E42: a tool-free Ollama step cannot be rerouted into shell: the device answer is refused for a Claude route"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F01-4:",
+          "names": [
+            "F01-4: a phone-approved Ollama session cannot reroute or fall back to Claude/Codex tool execution"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T9R DEV-01",
+          "names": [
+            "T9R DEV-01: a device-approved local tool-free task is never rerouted to a tool-capable provider"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E43",
+      "title": "Specialized model cannot increase permissions",
+      "initialConditions": "unknown provider / local model names",
+      "operation": "Authority lookup",
+      "expected": "Fails closed",
+      "evidenceType": "unit (pure function)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E43:",
+          "names": [
+            "F02-E43: a specialized or local model name cannot increase permissions; unknown providers fail closed"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E44",
+      "title": "Provider reroute does not reset scope",
+      "initialConditions": "device-approved read",
+      "operation": "Reroute",
+      "expected": "Answer not carried into a write",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E44:",
+          "names": [
+            "F02-E44: a provider reroute after a device-approved read does not carry that answer into a write"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F01-4b",
+          "names": [
+            "F01-4b: remote routing prefers in-ceiling providers so benign reads need no prompt"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    }
+  ]
+}

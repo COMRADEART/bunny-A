@@ -1,0 +1,84 @@
+[
+ {
+  "lens": "classifier2",
+  "coverage": "Read authorization.server.ts classifier, consumerOf, referenceText, CONSUMER_FILE/CONSUMER_DIR, INSTALLER_DIRECTIVE, CONFIG_LIKE_DATA and classifyDeviceWrite (lines 118-186, 500-729). Built a 15-case probe matrix (scratchpad/review-probes/r5/probe.mjs, probe2.mjs) that imports the repo module via file URL and classifies writes against real project folders. Working bypasses reproduced: 11 spellings returned PHONE_SAFE (globs, quote split, variable indirection, pip glob with plain requirement lines, pytest testpaths doctests, Sphinx conf.py code cell, Dockerfile.dev, compose override, .cirrus.yml, .semaphore, Procfile, UTF-16 csproj). Checked and not bypasses: 8.3 short names, NTFS stream suffix and trailing dot or space in the final segment are refused; a trailing-space or trailing-dot intermediate folder fails with ENOENT on Windows and does not land in docs/ (no write, so no bypass). Not re-reported: arbitrary-script data reads (dispositioned), sibling ../ references (dispositioned), survivor lineage, performance. Severity reflects that all device changes are staged and need workstation promotion of exact bytes: the label affects classification and warnings, not landing. No repository edits, no state-changing git, no npm test run.",
+  "low": [],
+  "verified": [
+   {
+    "title": "Consumer reference matching misses glob, quoted, and variable-indirected spellings (CI shell loops, pip globs)",
+    "severity": "MEDIUM",
+    "boundary": "classifyDeviceWrite -> consumerOf needle matching: authorization.server.ts:574 (needles = destination tail and full relText) and :569 (plain substring test on the lowercased, slash-normalized text at :545-550). A consumer that names the destination through a glob, shell quoting, or a variable is not matched, so the destination falls through to PHONE_SAFE_DOCUMENT or PHONE_SAFE_DATA.",
+    "reproduction": "Project with .github/workflows/ci.yml containing `- run: for f in docs/*.txt; do sh \"$f\"; done`. Classify write docs/evil.txt, content `echo pwned`, base = project. Result PHONE_SAFE_DOCUMENT, reason 'plain document'. Variants that also return PHONE_SAFE: .gitlab-ci.yml with `- sh docs/'evil.txt'` (shell quote split); ci.yml with `env: D: docs` and `- run: sh \"$D/x.txt\"` (variable indirection); ci.yml with `- run: pip install -r docs/*.txt` and dest docs/deps.txt, content `left-pad-evil==1.0` (plain requirement lines pass INSTALLER_DIRECTIVE, which only catches flag lines).",
+    "evidence": "Probe matrix r5/probe.mjs cases P1, P2, P9, P10 (scratchpad/review-probes/r5/). Tools: GitHub Actions and GitLab run their scripts through sh and expand globs and quotes; pip -r with a shell glob installs every matched file. Code: authorization.server.ts:574, 569, 545-550, 627 (INSTALLER_DIRECTIVE only matches flag lines).",
+    "repair": "Treat any consumer that contains a glob metacharacter, a quote, or a $ variable in a path-like token whose literal prefix (the folder part before the first metacharacter) covers the destination as a reference. Simplest safe rule: when a consumer file in the project mentions the destination's folder followed by a glob, quote, or variable, return UNKNOWN. Also flag plain requirement-name lines in .txt files written under any folder a pip -r glob could reach (or classify any .txt in a folder named by a consumer as EXECUTION_RELEVANT).",
+    "short_summary": "Glob, quote and variable spellings bypass consumer matching",
+    "lens": "classifier2",
+    "votes": []
+   },
+   {
+    "title": "Directory-level tool configuration makes whole folders executable without naming the file",
+    "severity": "MEDIUM",
+    "boundary": "consumerOf needle set (authorization.server.ts:574): a consumer that names the folder (not the file) covers every file under it, but the needle is only the full destination path, so the folder reference is invisible. Also, dot-free config files that load a folder of Python/Sphinx code are not in CONSUMER_FILE (line 537).",
+    "reproduction": "(a) pyproject.toml with `[tool.pytest.ini_options]` testpaths = [\"docs\"] and doctest_glob = \"*.md\"; write docs/evil.md with content `# Notes` plus a doctest line `>>> import os; os.system('id')`. Result PHONE_SAFE_DOCUMENT. CI running pytest collects and executes doctests from every .md under docs/. (b) docs/conf.py containing `extensions = ['myst_nb']`; write docs/index.md with a fenced `{code-cell} python` block that calls os.system. Result PHONE_SAFE_DOCUMENT (the content check only trips on import/export lines, and this block has none). Sphinx/MyST-NB executes the code cell on docs build.",
+    "evidence": "Probe cases P3 (docs/evil.md) and P12b/P12c (docs/index.md; the first variant with an ESM import line returns EXECUTION_RELEVANT, so the bypass depends on avoiding the ESM line, which is trivial). conf.py is not in CONSUMER_FILE (authorization.server.ts:537); the folder scan at :574 only matches the file tail and full path.",
+    "repair": "When a consumer names a folder (with or without a trailing slash, or as a glob root), treat every file under that folder as referenced. Add a folder-role rule: any file inside a folder that contains a config-like or code file (conf.py, *.cfg, *.toml, *.ini, conftest.py) which a tool loads as configuration makes the folder EXECUTION_RELEVANT. Add docs/conf.py-style files and tox/pytest/sphinx/mkdocs configs to the consumer list.",
+    "short_summary": "Folder-level tool references and docs/conf.py bypass file matching",
+    "lens": "classifier2",
+    "votes": []
+   },
+   {
+    "title": "Consumer file names missing from CONSUMER_FILE and CONSUMER_DIR",
+    "severity": "MEDIUM",
+    "boundary": "CONSUMER_FILE (authorization.server.ts:537) and CONSUMER_DIR (line 539). Root-level CI, container and deploy inputs with names outside the lists are never read, so a reference in them is never seen.",
+    "reproduction": "Each case below uses a destination docs/x.txt (or docs/start.txt) written with the matching reference in the named consumer file; each returns PHONE_SAFE_DOCUMENT. Dockerfile.dev with `RUN sh docs/install.txt` (the 'dockerfile' pattern is anchored with $, so Dockerfile.dev is missed). docker-compose.override.yml with `command: sh docs/start.txt` (compose auto-loads the override file; pattern is (docker-)?compose\\.ya?ml only). .cirrus.yml with `script: sh docs/x.txt`. .semaphore/semaphore.yml with `- sh docs/x.txt` (.semaphore is not in CONSUMER_DIR). Procfile with `web: sh docs/start.txt` (Heroku/foreman; not in CONSUMER_FILE).",
+    "evidence": "Probe cases P4, P5, P6, P7, P8 (scratchpad/review-probes/r5/probe.mjs). Patterns at authorization.server.ts:537 and :539. The test at src/lib/bunny-missions/f02-staging.test.ts:150-161 covers only the listed names.",
+    "repair": "Add Dockerfile.*, *.dockerfile, docker-compose.*/compose.* (any suffix), .cirrus.yml, .semaphore/, Procfile*, .builds/, .zuul.yaml, .bitrise.yml, .tekton/, Earthfile, Tiltfile, Caddyfile, nginx*.conf, *.mk, Makefile.* to CONSUMER_FILE/CONSUMER_DIR. Better: treat any file in the root whose name is not a known document type as a consumer to scan, and fail closed when such a file is unreadable.",
+    "short_summary": "Dockerfile.dev, compose override, Procfile, cirrus, semaphore not scanned",
+    "lens": "classifier2",
+    "votes": []
+   },
+   {
+    "title": "Consumer read is UTF-8 only, so UTF-16 consumer files are scanned as no match, not UNKNOWN",
+    "severity": "MEDIUM",
+    "boundary": "consumerOf check(): authorization.server.ts:568 reads every consumer with readFileSync(file, \"utf8\") and then referenceText. A UTF-16 (BOM) consumer decodes to NUL-interleaved text, so the needle is never found and the file is treated as no reference. The function's own contract (line 553-554: fails closed) is not met for this encoding.",
+    "reproduction": "Root file app.csproj written as UTF-16LE with BOM containing `<Exec Command=\"sh docs/x.txt\"/>` inside a target that runs before Build. Classify write docs/x.txt, content `echo pwned`. Result PHONE_SAFE_DOCUMENT with no UNKNOWN. MSBuild reads UTF-16 with BOM and runs the Exec on the Linux runner.",
+    "evidence": "Probe case P11 (scratchpad/review-probes/r5/probe.mjs). Read site authorization.server.ts:568; fail-closed comment at :553-554 covers only oversize, unreadable and link cases.",
+    "repair": "Detect a BOM or NUL bytes before decoding. If the consumer is UTF-16 or UTF-32, decode it with the matching encoding (or fail closed as UNKNOWN). Equivalent rule: when the buffer contains NUL bytes, return UNKNOWN instead of a text match.",
+    "short_summary": "UTF-16 consumer files decode to no match, not UNKNOWN",
+    "lens": "classifier2",
+    "votes": []
+   }
+  ]
+ },
+ {
+  "lens": "statemachine2",
+  "coverage": "Read the round-4 changes in authorization.server.ts (lines 1-590 and 590-729 classification, consumerOf, decide, remote refusals) and staging.server.ts in full. Read manager.server.ts paths for capabilityRequest/liveOnce/onceInvalidity, runDeterministic (capability and skill branches), setStep one-time stamp logic, stepFailed retry and terminal branches, stageRemoteWrite, promoteStaged (full), respond (promotion allow_once/deny, verify-phase, desktop grant), endDeviceAnswers, invalidateDeviceStaging, withdrawStaged/endStaged, stop, retry, replan, containMission, Host-restart reconciliation of approvedOnce and PROMOTING/STAGED. Verified: at most one admission per one-time answer beyond skill-run scope (skill branch calls liveOnce; CONSUMED stamp first-wins; onceInvalidity honours lifecycle); Stop, Retry, Replan, restart, sign-out and revocation clear one-time answers and withdraw STAGED records (promotion is refused on any non-STAGED state, on a non-running mission, and on a changed envelope); promotion re-checks mission, envelope, Agent consent, destination class (except content, see finding 1), destination hash, staged file identity and hash, and device activity for remote envelopes. Probe run: classifyDeviceWrite with and without content (scratchpad/review-probes/r5/probe-classify.mts), no repo edits, no npm test, no git state changes. Not probed end to end with the full manager fixture (time budget); the findings are from code reading plus the classifier probe. No BLOCKER or HIGH defect found on the authorization state machine.",
+  "low": [
+   {
+    "title": "Promotion-time reclassification drops content, so content-triggered classes pass the remote PHONE_SAFE gate",
+    "severity": "LOW",
+    "boundary": "src/lib/bunny-missions/manager.server.ts:2672-2674 (promoteStaged). Staging classifies with the new bytes (manager.server.ts:2538 via classifyDeviceWrite with content), but promotion reclassifies with content: null and never compares the result with staged.classification. The remote-envelope guard therefore only sees destination-level classes.",
+    "reproduction": "Probe in scratchpad/review-probes/r5/probe-classify.mts: classifyDeviceWrite('notes/readme.txt', {base, operation:'write', content:'import os\\nprint(1)\\n'}) returns EXECUTION_RELEVANT ('new content starts like a program or script'), while the same call with content:null returns PHONE_SAFE_DOCUMENT. A remote-envelope change staged with such bytes is therefore EXECUTION_RELEVANT at staging, but promoteStaged's line 2674 check (staged.envelopeRemote && !PHONE_SAFE_CLASSES.includes(reclassified.classification)) passes. The admission-time gate (authorization.server.ts remoteExecutionRefusal -> deviceWriteClassRefusal with content) still asks first, so the path needs a workstation trusted-desktop allow_once, then a workstation promotion allow_once. The promotion prompt does print the staged classification.",
+    "evidence": "manager.server.ts:2631 (staged = record), 2672 (reclassify with content null), 2674 (remote PHONE_SAFE check); manager.server.ts:2538-2539 (staged classification from content-aware classify); authorization.server.ts classifyDeviceWrite content checks (program-start, ESM import/export, installer directives) at the lines after the 'existing' branch. Probe output: readme.txt with content -> EXECUTION_RELEVANT; content null -> PHONE_SAFE_DOCUMENT.",
+    "repair": "In promoteStaged, require that the promotion-time class is PHONE_SAFE for remote envelopes using the staged content class: store the content-derived class (or the content hash plus its class) in the record and refuse when staged.classification is not PHONE_SAFE for remote envelopes, or reclassify with readVerified(staged) bytes instead of content null."
+   },
+   {
+    "title": "Retry revokes trusted-desktop grants before its refusal checks",
+    "severity": "LOW",
+    "boundary": "src/lib/bunny-missions/manager.server.ts:4313-4327 (retry). revokeDesktopGrants runs at line 4319, before the envelope-expired/revoked refusal (4321-4327) and before the attempt-ceiling refusal (4336-4339) and the 'No failed step to retry' refusal. A refused Retry therefore still mutates state, which contradicts the round-4 claim that every refusal runs before anything changes.",
+    "reproduction": "Mission with an unused trusted-desktop grant (desktopGrant.revokedAt null, uses < maxUses), envelope expired or revoked, then call retry(id). It throws 'The mission authorization expired or was revoked', but the grant has already been stamped revokedAt by revokeDesktopGrants and an approval.desktop_grant_revoked event has been emitted.",
+    "evidence": "manager.server.ts:4319 (revokeDesktopGrants) precedes 4321 (envelope check throw), 4336 (ceiling throw) and the 'No failed step' throw. Fail-closed direction: it only ends unused grants.",
+    "repair": "Move the revokeDesktopGrants call to after all refusal checks, immediately before the first mutation (the waitingPromotion setStep loop)."
+   },
+   {
+    "title": "Replan replaces steps without stamping their one-time answers",
+    "severity": "LOW",
+    "boundary": "src/lib/bunny-missions/manager.server.ts:769 (plan -> store.replaceSteps keeps only completed steps) and the replan path at 4377-4430, which resolves requests as deny but never calls stampLifecycle WITHDRAWN for a non-completed step's approvedOnce. Audit gap only: the old steps are deleted, so no live authority remains.",
+    "reproduction": "Step with approvedOnce {requestId, action} in ready/pending/blocked state (or a waiting step whose answer is set), then replan(id). The old step rows are deleted by replaceSteps, and the old answered request has lifecycle null, so the audit trail never records that its one-time answer was withdrawn. stepFailed/setStep/Stop/Retry all stamp WITHDRAWN; Replan is the one end-of-answer path without it.",
+    "evidence": "manager.server.ts:769 (replaceSteps), 4377-4430 (replan body: no stampLifecycle call); store.server.ts replaceSteps deletes mission_steps rows for the mission.",
+    "repair": "Before replaceSteps (or in replan before plan()), stamp WITHDRAWN on every non-completed step's approvedOnce request with reason 'Mission replanned'."
+   }
+  ],
+  "verified": []
+ }
+]

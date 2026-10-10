@@ -1,0 +1,354 @@
+{
+ "Mid-run hold fails open when a launcher's intermediate process exits before the tree sampler sees it": {
+  "verdict": "CONFIRMED — DISPOSITIONED MEDIUM (F01 §7.4 residual)",
+  "repair": "Not repaired in F02 (Host process-tracking change outside the authorization-edge scope). Impact reduced: under D2 device writes never land while code runs; they are staged, and promotion is a workstation decision that refuses while liveCodeExecutions() reports code. See previous-review-findings.md.",
+  "regression": "F01 R40 (dedupe) unchanged; lineage gap disclosed as a limitation"
+ },
+ "Agent-instruction files not classified as AGENT_INSTRUCTIONS (CLAUDE.local.md, AGENTS.override.md, QWEN.md, WARP.md)": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "AGENT_INSTRUCTION_FILE extended (CLAUDE.local.md, AGENTS.override.md, GEMINI/QWEN/WARP/CRUSH/OPENCODE/KILOCODE/CODY/CONVENTIONS/SKILL.md, .mcp.json, llms.txt, *.prompt.md, *.instructions.md, *.chatmode.md, *.agent.md, *.mdc)",
+  "regression": "F02-R1-1"
+ },
+ "Promotion review shows destination with unescaped bidi and zero-width characters, so the reviewer can be shown a different filename": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "Invisible/format characters in a path classify UNKNOWN (never staged); review text escapes via escapedText()",
+  "regression": "F02-R1-1; F02-R2-2"
+ },
+ "Staged device writes skip the private Host state refusal, so a device can stage and then promote entries into Host logs or private state": {
+  "verdict": "CONFIRMED (1/2 refuted) — FIXED",
+  "repair": "stageRemoteWrite refuses privateHostPath destinations; promotion re-checks; local.server privateScope covers every Mission",
+  "regression": "F02-R1-3; F02-E48b"
+ },
+ "Skill steps treat a staged write as success: the skill completes and validates with no promotion request and no applied change": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "Only a step's own capability write executor can be staged; staged writes from skills or checks are refused",
+  "regression": "F02-R1-4"
+ },
+ "One-time device answer outlives a workstation-granted envelope's expiry": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "onceInvalidity() checks envelope expiry/revocation, device liveness, TTL, Agent revision and Host generation; liveOnce() drops the answer (EXPIRED)",
+  "regression": "F02-R1-5; F02-E24a/b"
+ },
+ "Device-driven workstation-envelope Missions keep staging device-attributed writes after sign-out, and those staged changes stay promotable": {
+  "verdict": "REFUTED (2/2 skeptics)",
+  "repair": "— (refuted). Sign-out invalidates the device's staged changes via invalidateDeviceStaging (INVALIDATED_BY_SIGNOUT), and promotion refuses non-STAGED records",
+  "regression": "F02-E30"
+ },
+ "authorizeBridge treats loopback-peer requests as workstation unless a hard-coded header list matches; unlisted relay headers grant the workstation token": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "host-bridge LOCAL_X_HEADER allow-list: any other x-* header (and Forwarded/Via etc.) means relayed, never local",
+  "regression": "F02-E27 (gateway)"
+ },
+ "mutationSequence is not monotonic: a promotion that fails after the rename restores the count, so pre-promotion grants validate again and the unrecorded project change is invisible to the code gates": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "mutationSequence counts staging rows that are PROMOTING/PROMOTED or ever had promotionStarted=1; a failed promotion records an unreviewed remote change",
+  "regression": "F02-R1-6"
+ },
+ "Agent instruction folders .augment, .qwen, .warp not in AGENT_INSTRUCTION_DIR; their Markdown classifies PHONE_SAFE_DOCUMENT and passes remote admission": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "AGENT_INSTRUCTION_DIR extended and, structurally, every dot-folder anywhere in the path is CONFIGURATION (never phone-safe)",
+  "regression": "F02-R2-1"
+ },
+ "Promotion review text does not escape several invisible bidi/format characters (U+200E, U+200F, U+061C, U+200B-U+200D, U+FEFF, U+2060), so the workstation can be shown a reordered review of the exact bytes": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "escapedText() escapes every \\p{Cf}\\p{Cc}\\p{Zl}\\p{Zp} code point plus fillers (U+034F, U+115F, U+1160, U+2800, U+3164, U+FFA0), astral-safe",
+  "regression": "F02-R2-2"
+ },
+ "Agent-tool dot-directories are not treated as agent instructions (incomplete repair of round-1 finding)": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "Same as the round-2 dot-folder repair: any dot-folder is CONFIGURATION; known agent folders are AGENT_INSTRUCTIONS",
+  "regression": "F02-R2-1"
+ },
+ "Device answer already in use is stamped INVALIDATED_* on revocation and never CONSUMED": {
+  "verdict": "CONFIRMED (1/2 refuted) — FIXED",
+  "repair": "CONSUMED is stamped at admission (bus.onceAdmitted); first stamp wins, so revocation never relabels a used answer",
+  "regression": "F02-R2-4; F02-R3-2"
+ },
+ "Failed, retried, replanned and stopped steps end one-time answers without a terminal lifecycle": {
+  "verdict": "CONFIRMED (1/2 refuted) — FIXED",
+  "repair": "setStep stamps WITHDRAWN when approvedOnce is cleared/replaced; failure paths and recover() stamp; Stop clears approvedOnce",
+  "regression": "F02-R2-3; F02-R3-5"
+ },
+ "Promotion that fails after its write leaves the promotion request open and the step waiting with no exit except deny or Stop": {
+  "verdict": "CONFIRMED (1/2 refuted) — FIXED",
+  "repair": "promotionFailed() + closeWaiting(): FAILED staging, unreviewed remote change, request closed, step failed",
+  "regression": "F02-R2-5; F02-R1-6"
+ },
+ "8.3 directory alias bypasses the dot-folder, agent, execution and watched-source directory rules": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "Any 8.3 (~digit) component below the step folder classifies UNKNOWN",
+  "regression": "F02-R3-1"
+ },
+ "Lifecycle of an answer that was already used is stamped WITHDRAWN, not CONSUMED, after a verify-phase ask or a step failure": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "CONSUMED at admission (first stamp wins) precedes any later WITHDRAWN",
+  "regression": "F02-R3-2; F02-R2-3"
+ },
+ "Retry strands a waiting promotion step and withdraws the staged change before validating Retry": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "Retry validates the envelope first, fails promotion-waiting steps, withdraws, then re-stages",
+  "regression": "F02-R3-3"
+ },
+ "Full-content staged inspection shows unescaped text, so bidi and invisible characters can reorder what the workstation reviews": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "inspectStaged returns escapedText(bytes); sha256 of the raw bytes is shown alongside",
+  "regression": "F02-R3-4; F02-E15"
+ },
+ "8.3 short alias of a dot agent folder is not recognized as an agent-instruction folder": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "Same as the 8.3 repair above (UNKNOWN)",
+  "regression": "F02-R3-1"
+ },
+ "Manifest mention check is case-sensitive on a case-insensitive filesystem": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "Manifest text and needle are lowercased with separators normalized to '/'",
+  "regression": "F02-R3-1"
+ },
+ "Data and document files consumed by existing project scripts are not scanned; a phone-safe text file can drive commands": {
+  "verdict": "REFUTED (2/2 skeptics) — documented limitation",
+  "repair": "— (refuted as an authority issue). Documented: PHONE_SAFE_DATA is an inertness claim for the data folder itself; arbitrary project code may read promoted files. The change is staged and needs the owner's promotion with a 'Programs may read this data file' warning; running such a script needs workstation code-execution authority.",
+  "regression": "—"
+ },
+ "Startup-only program heuristic lets MDX/notebook-style code in a .md file pass as a plain document": {
+  "verdict": "CONFIRMED (1/2 refuted) — FIXED",
+  "repair": "Any line starting with import/export classifies EXECUTION_RELEVANT (conservative)",
+  "regression": "F02-R3-1"
+ },
+ "F02 staging events and staged-run output reach paired devices unredacted (absolute destination paths and content digests)": {
+  "verdict": "LOW — FIXED",
+  "repair": "Staging event/run text worded 'paired-device change' so the existing device redaction replaces it"
+ },
+ "Classification role is judged relative to the step's cwd for admission and staging, but relative to the project root at promotion": {
+  "verdict": "LOW — ACCEPTED",
+  "repair": "Both checks must pass (promotion re-classifies against the project root); a mismatch can only refuse more, never less"
+ },
+ "Device one-time answers used by a failed or retried attempt get no lifecycle stamp": {
+  "verdict": "LOW — FIXED",
+  "repair": "Covered by the round-2 lifecycle repair (F02-R2-3)"
+ },
+ "Hardening gaps in onceInvalidity: fail-open device liveness check and no Host-generation check": {
+  "verdict": "LOW — FIXED",
+  "repair": "deviceActive fails closed (device row, revoked_at, session idle bound, expiry) and Host generation is checked"
+ },
+ "Device allow_batch branch for Agent consent skips ACTIVE and expiry checks": {
+  "verdict": "LOW — FIXED",
+  "repair": "Batch branch requires a live (ACTIVE, current generation, unexpired) consent"
+ },
+ "Legacy test rewrites: one assertion's specificity reduced, others changed meaning (no security assertion removed)": {
+  "verdict": "LOW — ADDRESSED",
+  "repair": "Every changed assertion documented with original requirement and rationale (changed-assertions-ledger.json, one-time-approval-regression.json); negative regressions added"
+ },
+ "Device expiry is not treated as revocation: deviceActive ignores the idle bound and device-approved Agent consents have no admission liveness check": {
+  "verdict": "LOW — FIXED",
+  "repair": "deviceActive applies DEVICE_SESSION_MS and expiry; device answers are re-validated at admission by liveOnce"
+ },
+ "A write admitted before Stop can be staged after Stop, leaving an orphan STAGED record in a stopped Mission": {
+  "verdict": "LOW — FIXED",
+  "repair": "Stop withdraws staged changes (WITHDRAWN); a late stage on a stopped Mission is withdrawn and never promotable"
+ },
+ "TaskManager.approve defaults its approver to the literal 'workstation'": {
+  "verdict": "LOW — ACCEPTED",
+  "repair": "Internal API only reached from Host-authenticated paths; device paths pass the derived actor. Documented in workstation-identity-audit.md"
+ },
+ "Agentic authorization provenance channel fails open to 'workstation' for any non-device actor": {
+  "verdict": "LOW — ACCEPTED",
+  "repair": "Actors are derived by the Host (actorOf); non-device actors on authenticated channels are the workstation. Documented in workstation-identity-audit.md"
+ },
+ "Hard-coded 'workstation' actor in Agent scope reissue and lifecycle stamping": {
+  "verdict": "LOW — ACCEPTED",
+  "repair": "Host-internal attribution of Host-originated actions; grants no device authority"
+ },
+ "Restart reconciliation falls back to a literal 'workstation' decidedBy": {
+  "verdict": "LOW — ACCEPTED",
+  "repair": "Recovery outcomes are Host decisions; lifecycle now uses 'bunny-host' for Host stamps"
+ },
+ "Every device-attributed staged write voids all outstanding workstation grants (fail-closed; forces re-approval, no boundary break)": {
+  "verdict": "LOW — ACCEPTED (fail closed)",
+  "repair": "Intended: any device-originated mutation advances the sequence"
+ },
+ "Restart reconciliation of an interrupted promotion records no unreviewed remote change when the destination no longer matches, although the rename may already have happened": {
+  "verdict": "LOW — FIXED",
+  "repair": "recover(): PROMOTING not landed → FAILED + unreviewed remote change"
+ },
+ "A promotion that fails after PROMOTING leaves the Mission step waiting on a request that is never closed, and later attempts are refused without closing it": {
+  "verdict": "LOW — FIXED",
+  "repair": "Same as the round-2 MEDIUM repair (closeWaiting)"
+ },
+ "8.3 directory components are labelled CONFIGURATION or unchecked for AGENT_INSTRUCTIONS; the promotion-time base mismatch from round 1 is still present": {
+  "verdict": "LOW — FIXED",
+  "repair": "Round-3 8.3 repair (UNKNOWN)"
+ },
+ "Remote-envelope start and approval skip the Git/GitHub program gate that the code documents": {
+  "verdict": "LOW — ACCEPTED (pre-existing F01 behaviour)",
+  "repair": "Remote envelopes cannot run Git/GitHub programs: execution is DESKTOP_REQUIRED for remote authority"
+ },
+ "Content preview leaves zero-width and bidi-mark characters raw (incomplete repair of round-1 bidi finding)": {
+  "verdict": "LOW — FIXED",
+  "repair": "Round-2 escapedText repair"
+ },
+ "F01-R25 fails in the working tree: batch consent check added without updating the fixture": {
+  "verdict": "LOW — FIXED",
+  "repair": "R25 fixture gained a live consent plus stale-consent negatives (documented in changed-assertions-ledger.json)"
+ },
+ "Device revoke-self after idle or session expiry is refused by authentication, leaving the Devices row unrevoked": {
+  "verdict": "LOW — ACCEPTED",
+  "repair": "An expired/idle device is already inactive: deviceActive() is false, so its answers and staged changes are invalid at admission/promotion; the owner can revoke it from the workstation"
+ },
+ "Mission-wide attribution stages every later owner-approved write once any device allowed anything in that Mission": {
+  "verdict": "LOW — ACCEPTED (fail closed)",
+  "repair": "Conservative attribution; the owner promotes staged changes on the workstation"
+ },
+ "Attributed filesystem.delete now always needs a workstation grant, including in device-driven Missions": {
+  "verdict": "LOW — ACCEPTED (fail closed)",
+  "repair": "Deletes are never staged; a workstation grant is required"
+ },
+ "Host-invalidated promotions and restart-resolved requests are recorded as resolution deny with no lifecycle": {
+  "verdict": "LOW — FIXED",
+  "repair": "Lifecycle stamps (INVALIDATED_BY_HOST_RESTART etc.) added to restart/Host-invalidated paths"
+ },
+ "One-time answers are not consumed per admission and bypass envelope scope checks inside decide()": {
+  "verdict": "LOW — FIXED",
+  "repair": "CONSUMED at admission; onceInvalidity checks envelope state before use; device answers checked against current Agent consent scope"
+ },
+ "Skill steps read the one-time answer without the liveOnce revalidation": {
+  "verdict": "LOW — FIXED",
+  "repair": "capabilityRequest calls liveOnce for every step use"
+ },
+ "childApprovedDirectly resolves a Mission request with an unverifiable actor string and skips respond() checks": {
+  "verdict": "LOW — ACCEPTED",
+  "repair": "Host-internal child-task path; not reachable by a device (workstation-only commands)"
+ },
+ "endDeviceAnswers records CONSUMED for answers that were never exercised on running or verifying steps": {
+  "verdict": "LOW — FIXED",
+  "repair": "endDeviceAnswers stamps INVALIDATED_*; CONSUMED only from admission"
+ },
+ "Promotion request left unresolved and inbox-visible when promoteStaged ends the staged change through end() or device revocation": {
+  "verdict": "LOW — FIXED",
+  "repair": "closeWaiting on every promotion refusal that ends the staged change (F02-R2-5)"
+ },
+ "Stop leaves one-time answers on stopped steps with no lifecycle stamp": {
+  "verdict": "LOW — FIXED",
+  "repair": "Stop clears approvedOnce → WITHDRAWN (F02-R3-5)"
+ },
+ "Successful promotion write has no failure handling around the commit transaction": {
+  "verdict": "LOW — FIXED",
+  "repair": "Commit transaction wrapped; failure → promotionFailed + closeWaiting"
+ },
+ "Review text and classifier do not refuse or escape invisible non-format code points": {
+  "verdict": "LOW — FIXED",
+  "repair": "Fillers U+034F, U+115F, U+1160, U+2800, U+3164, U+FFA0 refused in paths and escaped in text"
+ },
+ "Staged-change queries scan the whole table on every call and the table is never pruned": {
+  "verdict": "LOW — ACCEPTED (performance)",
+  "repair": "Bounded by the device write rate and STAGING_MAX_BYTES; pruning is a future maintenance item"
+ },
+ "Client classifies the inspect command as mutating, so a reconciled or replayed inspect silently returns nothing": {
+  "verdict": "LOW — FIXED",
+  "repair": "mission.staging.list/inspect added to the client READ_ACTIONS (connection-model.ts)"
+ },
+ "Retry withdraws staged change and fails waiting step before its attempt-ceiling check can refuse": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "retry() runs every refusal check (attempt ceiling over failed and promotion-waiting steps, no-failed-step) before failing waiting steps or withdrawing staged changes",
+  "regression": "F02-R4-3"
+ },
+ "Agent-instruction @-imports of docs files classify as PHONE_SAFE_DOCUMENT": {
+  "verdict": "CONFIRMED (skeptics: MEDIUM) — FIXED",
+  "repair": "consumerOf() scans agent instruction files (CLAUDE.md, AGENTS.md, ...) in the root and every ancestor folder; a referenced file is AGENT_INSTRUCTIONS",
+  "regression": "F02-R4-1"
+ },
+ "CI pipeline include of a YAML data file classifies as PHONE_SAFE_DATA": {
+  "verdict": "CONFIRMED (skeptics: LOW/MEDIUM) — FIXED",
+  "repair": "consumerOf() scans CI pipeline roots (.gitlab-ci.yml, Jenkinsfile, azure-pipelines, bitbucket, buildspec, cloudbuild, ...) and root CI folders recursively; config-named structured data is CONFIGURATION anywhere",
+  "regression": "F02-R4-1; F02-R4-2"
+ },
+ "Manifest mention check misses ./ and // spellings, so referenced tool inputs classify as PHONE_SAFE": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "referenceText() normalizes case, separators, ./ and repeated separators in consumer text",
+  "regression": "F02-R4-1"
+ },
+ "Manifests over 256 KiB are silently skipped, so their references are not seen": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "An oversize (>1 MiB), unreadable or linked consumer fails closed (UNKNOWN)",
+  "regression": "F02-R4-1"
+ },
+ "Subdirectory package manifests and configs are never scanned": {
+  "verdict": "CONFIRMED (1/2 refuted) — FIXED",
+  "repair": "Consumers in every folder from the root down to the destination's folder are scanned; references match root-relative and consumer-relative",
+  "regression": "F02-R4-1"
+ },
+ "docs/_config.yml (Jekyll/GitHub Pages site config) classifies as PHONE_SAFE_DATA": {
+  "verdict": "CONFIRMED (1/2 refuted) — FIXED",
+  "repair": "CONFIG_LIKE_DATA names (incl. _config, mkdocs, hugo, pipeline, ...) and underscore site-generator folders are CONFIGURATION",
+  "regression": "F02-R4-2"
+ },
+ "Requirements files with a non-standard prefix classify as PHONE_SAFE_DOCUMENT": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "requirements/constraints anywhere in a .txt name and a requirements/ folder are CONFIGURATION; pip installer directives in content are EXECUTION_RELEVANT",
+  "regression": "F02-R4-2"
+ },
+ "Skill-step one-time grant is reused by a re-run after allow_batch (CONSUMED grant revives)": {
+  "verdict": "CONFIRMED — FIXED",
+  "repair": "The skill branch calls liveOnce(step) before every run, so a CONSUMED/WITHDRAWN/INVALIDATED answer is cleared and the write asks again",
+  "regression": "F02-R4-4"
+ },
+ "Classifier and review escaping miss variation selectors (Mn) in destination paths and content": {
+  "verdict": "LOW — FIXED",
+  "repair": "Variation selectors (U+FE00-FE0F, U+180B-180F, U+E0100-E01EF) refused in paths and escaped in review text",
+  "regression": "F02-R4-2"
+ },
+ "MDX-style ESM line check misses import and export forms without whitespace": {
+  "verdict": "LOW — FIXED",
+  "repair": "ESM check is /^[ \t]*(import|export)\b/m",
+  "regression": "F02-R4-2"
+ },
+ "Stop leaves one-time answers on already-failed steps unstamped": {
+  "verdict": "LOW — FIXED",
+  "repair": "stop() clears approvedOnce on failed steps (WITHDRAWN)",
+  "regression": "F02-R4-5"
+ },
+ "CONSUMED stamp does not end authority for later matching admissions within the same skill run": {
+  "verdict": "LOW — ACCEPTED (documented scope)",
+  "repair": "A one-time answer covers one run of the step (MA0R 'Allow this skill run' contract); CONSUMED records the first admission. A re-run never reuses it (F02-R4-4)."
+ },
+ "Content ESM check only matches an ASCII space or tab after import/export": {
+  "verdict": "LOW — FIXED",
+  "repair": "Word-boundary ESM check",
+  "regression": "F02-R4-2"
+ },
+ "endDeviceAnswers reports already-consumed one-time answers as invalidated": {
+  "verdict": "LOW — ACCEPTED",
+  "repair": "stampLifecycle is first-stamp-wins: a CONSUMED answer keeps CONSUMED; only the event count wording includes it (F02-R2-4 asserts the recorded state)"
+ },
+ "Consumer reference matching misses glob, quoted, and variable-indirected spellings (CI shell loops, pip globs)": {
+  "verdict": "OPEN MEDIUM — DISCLOSED LIMITATION (reviewer-reproduced; skeptic votes did not run because of a session limit; not repaired: the user directed that no further security work be done)",
+  "repair": "Not repaired. Mitigation: the change is still only staged; it reaches the project only when the Windows Host owner promotes the exact reviewed bytes, and the review shows the class and warnings.",
+  "regression": "—"
+ },
+ "Directory-level tool configuration makes whole folders executable without naming the file": {
+  "verdict": "OPEN MEDIUM — DISCLOSED LIMITATION (reviewer-reproduced; skeptic votes did not run because of a session limit; not repaired: the user directed that no further security work be done)",
+  "repair": "Not repaired. Mitigation: the change is still only staged; it reaches the project only when the Windows Host owner promotes the exact reviewed bytes, and the review shows the class and warnings.",
+  "regression": "—"
+ },
+ "Consumer file names missing from CONSUMER_FILE and CONSUMER_DIR": {
+  "verdict": "OPEN MEDIUM — DISCLOSED LIMITATION (reviewer-reproduced; skeptic votes did not run because of a session limit; not repaired: the user directed that no further security work be done)",
+  "repair": "Not repaired. Mitigation: the change is still only staged; it reaches the project only when the Windows Host owner promotes the exact reviewed bytes, and the review shows the class and warnings.",
+  "regression": "—"
+ },
+ "Consumer read is UTF-8 only, so UTF-16 consumer files are scanned as no match, not UNKNOWN": {
+  "verdict": "OPEN MEDIUM — DISCLOSED LIMITATION (reviewer-reproduced; skeptic votes did not run because of a session limit; not repaired: the user directed that no further security work be done)",
+  "repair": "Not repaired. Mitigation: the change is still only staged; it reaches the project only when the Windows Host owner promotes the exact reviewed bytes, and the review shows the class and warnings.",
+  "regression": "—"
+ },
+ "Promotion-time reclassification drops content, so content-triggered classes pass the remote PHONE_SAFE gate": {
+  "verdict": "LOW — OPEN (not repaired, per user direction)",
+  "repair": "Not repaired. Mitigation: the change is still only staged; it reaches the project only when the Windows Host owner promotes the exact reviewed bytes, and the review shows the class and warnings."
+ },
+ "Retry revokes trusted-desktop grants before its refusal checks": {
+  "verdict": "LOW — OPEN (not repaired, per user direction)",
+  "repair": "Not repaired. Mitigation: the change is still only staged; it reaches the project only when the Windows Host owner promotes the exact reviewed bytes, and the review shows the class and warnings."
+ },
+ "Replan replaces steps without stamping their one-time answers": {
+  "verdict": "LOW — OPEN (not repaired, per user direction)",
+  "repair": "Not repaired. Mitigation: the change is still only staged; it reaches the project only when the Windows Host owner promotes the exact reviewed bytes, and the review shows the class and warnings."
+ }
+}
