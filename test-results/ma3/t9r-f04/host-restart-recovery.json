@@ -1,0 +1,362 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "derivedBy": "assemble-evidence.mjs",
+  "rows": [
+    {
+      "id": "J37",
+      "title": "Restart does not revive stale handles",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "records reconciled; no handle API exists"
+    },
+    {
+      "id": "J38",
+      "title": "Restart invalidates old transient consent",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "live staleAuthorization (not ACTIVE)"
+    },
+    {
+      "id": "J39",
+      "title": "Agent identity persists",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "live agentPersisted"
+    },
+    {
+      "id": "J40",
+      "title": "Mission identity persists",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "live missionPersisted"
+    },
+    {
+      "id": "J41",
+      "title": "No duplicate work after recovery",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "effects.log launches unchanged; restartSurvivorRefusal"
+    }
+  ],
+  "tests": [
+    {
+      "test": "F04 J37-J41/J32",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R1-RESTART",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R2-L1",
+      "result": "PASS"
+    }
+  ],
+  "live": [
+    {
+      "round": 1,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "waiting_for_user",
+        "agentMissionPersisted": true,
+        "taskState": "failed",
+        "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.",
+        "providerSessionEvents": [
+          {
+            "type": "provider_session.interrupted",
+            "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation d5e9b713-5d7d-468c-a6ed-7e90bf7673f8, generation a2f8df6a-4ce6-41e7-85fa-5172c9eb4154); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+          },
+          {
+            "type": "provider_session.reconciled",
+            "detail": "Interrupted provider session d5e9b713-5d7d-468c-a6ed-7e90bf7673f8: none of its 38 recorded process identities appears in an independent process-table read (kernel accounting does not exist after the job died with the previous Host; recorded as absent_after_restart, not kernel-verified empty). No process was killed by this Host."
+          }
+        ],
+        "recordReconciled": {
+          "state": "interrupted",
+          "containment": "absent_after_restart"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    },
+    {
+      "round": 2,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "failed",
+        "agentMissionPersisted": true,
+        "taskState": "stopped",
+        "taskError": null,
+        "providerSessionEvents": [],
+        "recordReconciled": {
+          "state": "stopped",
+          "containment": "empty"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    },
+    {
+      "round": 3,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "waiting_for_user",
+        "agentMissionPersisted": true,
+        "taskState": "failed",
+        "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.",
+        "providerSessionEvents": [
+          {
+            "type": "provider_session.interrupted",
+            "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 5cb3efe5-64da-487b-aa4a-9384fdf32a01, generation ee121ef6-4190-4c0c-a765-cbfceb36733c); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+          },
+          {
+            "type": "provider_session.reconciled",
+            "detail": "Interrupted provider session 5cb3efe5-64da-487b-aa4a-9384fdf32a01: none of its 68 recorded process identities appears in an independent process-table read (kernel accounting does not exist after the job died with the previous Host; recorded as absent_after_restart, not kernel-verified empty). No process was killed by this Host."
+          }
+        ],
+        "recordReconciled": {
+          "state": "interrupted",
+          "containment": "absent_after_restart"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    },
+    {
+      "round": 4,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "failed",
+        "agentMissionPersisted": true,
+        "taskState": "stopped",
+        "taskError": null,
+        "providerSessionEvents": [],
+        "recordReconciled": {
+          "state": "stopped",
+          "containment": "empty"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    },
+    {
+      "round": 5,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "waiting_for_user",
+        "agentMissionPersisted": true,
+        "taskState": "failed",
+        "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.",
+        "providerSessionEvents": [
+          {
+            "type": "provider_session.interrupted",
+            "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 023fa127-8323-4e6d-9f33-8be2927f1f16, generation e6cecc87-b4d6-4b9d-82a9-2ed8fc14cbeb); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+          },
+          {
+            "type": "provider_session.reconciled",
+            "detail": "Interrupted provider session 023fa127-8323-4e6d-9f33-8be2927f1f16: none of its 56 recorded process identities appears in an independent process-table read (kernel accounting does not exist after the job died with the previous Host; recorded as absent_after_restart, not kernel-verified empty). No process was killed by this Host."
+          }
+        ],
+        "recordReconciled": {
+          "state": "interrupted",
+          "containment": "absent_after_restart"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    },
+    {
+      "round": 6,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "failed",
+        "agentMissionPersisted": true,
+        "taskState": "stopped",
+        "taskError": null,
+        "providerSessionEvents": [],
+        "recordReconciled": {
+          "state": "stopped",
+          "containment": "empty"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    },
+    {
+      "round": 7,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "waiting_for_user",
+        "agentMissionPersisted": true,
+        "taskState": "failed",
+        "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.",
+        "providerSessionEvents": [
+          {
+            "type": "provider_session.interrupted",
+            "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 6e91ed5b-be71-45b5-b24a-b805ecb48feb, generation 7776e350-f0d9-4fad-b1ba-a35dca75e262); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+          },
+          {
+            "type": "provider_session.reconciled",
+            "detail": "Interrupted provider session 6e91ed5b-be71-45b5-b24a-b805ecb48feb: none of its 68 recorded process identities appears in an independent process-table read (kernel accounting does not exist after the job died with the previous Host; recorded as absent_after_restart, not kernel-verified empty). No process was killed by this Host."
+          }
+        ],
+        "recordReconciled": {
+          "state": "interrupted",
+          "containment": "absent_after_restart"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    },
+    {
+      "round": 8,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "failed",
+        "agentMissionPersisted": true,
+        "taskState": "stopped",
+        "taskError": null,
+        "providerSessionEvents": [],
+        "recordReconciled": {
+          "state": "stopped",
+          "containment": "empty"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    },
+    {
+      "round": 9,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "waiting_for_user",
+        "agentMissionPersisted": true,
+        "taskState": "failed",
+        "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.",
+        "providerSessionEvents": [
+          {
+            "type": "provider_session.interrupted",
+            "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 4604191e-aa61-4a2a-9b8b-6523baf198e0, generation 980b0a10-5c6a-435b-87cb-fe943ba6d341); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+          },
+          {
+            "type": "provider_session.reconciled",
+            "detail": "Interrupted provider session 4604191e-aa61-4a2a-9b8b-6523baf198e0: none of its 61 recorded process identities appears in an independent process-table read (kernel accounting does not exist after the job died with the previous Host; recorded as absent_after_restart, not kernel-verified empty). No process was killed by this Host."
+          }
+        ],
+        "recordReconciled": {
+          "state": "interrupted",
+          "containment": "absent_after_restart"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    },
+    {
+      "round": 10,
+      "result": "PASS",
+      "step": {
+        "step": 7,
+        "title": "recovery on Host B",
+        "agentPersisted": true,
+        "missionPersisted": true,
+        "missionState": "failed",
+        "agentMissionPersisted": true,
+        "taskState": "stopped",
+        "taskError": null,
+        "providerSessionEvents": [],
+        "recordReconciled": {
+          "state": "stopped",
+          "containment": "empty"
+        },
+        "staleAuthorization": {
+          "state": "WAITING_FOR_USER",
+          "revision": 2
+        },
+        "providerLaunchesBeforeRestart": 1,
+        "providerLaunchesAfterRestart": 1,
+        "ownedProcessesAfterRestart": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "derivedBy": "assemble-evidence.mjs",
+  "rows": [
+    {
+      "id": "J31",
+      "title": "Stop cannot kill by stale PID alone",
+      "classification": "STATIC+LIVE",
+      "result": "PASS",
+      "evidence": "termination only via the session's own job handle"
+    },
+    {
+      "id": "J32",
+      "title": "PID reuse does not transfer authority",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "restart reconciliation treats PID-identical, birth-different process as not ours; kills nothing"
+    },
+    {
+      "id": "J37",
+      "title": "Restart does not revive stale handles",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "records reconciled; no handle API exists"
+    }
+  ],
+  "tests": [
+    {
+      "test": "F04 J37-J41/J32",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R1-RESTART",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R2-L1",
+      "result": "PASS"
+    },
+    {
+      "test": "IR-H1",
+      "result": "PASS"
+    }
+  ]
+}

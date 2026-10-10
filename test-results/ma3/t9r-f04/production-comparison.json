@@ -1,0 +1,43 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "classification": "READ-ONLY production comparison",
+  "before": "2026-10-10T16:49:05.837Z",
+  "final": "2026-10-10T22:22:34.511Z",
+  "currentReleaseUnchanged": true,
+  "releaseManifestUnchanged": true,
+  "installJsonUnchanged": true,
+  "listenersUnchanged": true,
+  "startupShortcutUnchanged": true,
+  "tablesChanged": [
+    "events",
+    "providers",
+    "sqlite_sequence"
+  ],
+  "newEvents": [
+    {
+      "sequence": 3694,
+      "type": "provider.status_changed",
+      "at": "2026-10-10T16:54:07.394Z"
+    },
+    {
+      "sequence": 3695,
+      "type": "provider.status_changed",
+      "at": "2026-10-10T17:14:36.052Z"
+    },
+    {
+      "sequence": 3696,
+      "type": "provider.status_changed",
+      "at": "2026-10-10T20:04:47.319Z"
+    },
+    {
+      "sequence": 3697,
+      "type": "provider.status_changed",
+      "at": "2026-10-10T20:05:17.410Z"
+    }
+  ],
+  "newEventTypes": [
+    "provider.status_changed"
+  ],
+  "attribution": "Every new production event is provider.status_changed, written by the running production Host (its own provider-status polling); the providers table and sqlite_sequence change with them. F04 opened the production database read-only only, never started, stopped or signalled production, and wrote nothing to its state.",
+  "result": "PASS"
+}

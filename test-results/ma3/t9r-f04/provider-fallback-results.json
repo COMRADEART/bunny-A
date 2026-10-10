@@ -1,0 +1,64 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "derivedBy": "assemble-evidence.mjs",
+  "rows": [
+    {
+      "id": "J21",
+      "title": "Native helper failure prevents uncontained execution",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "launch failure → refused; integrity failure throws before load (owned-process-group integrity check); no fallback (static test)"
+    },
+    {
+      "id": "J22",
+      "title": "Provider retry cannot bypass containment",
+      "classification": "STATIC+REGRESSION",
+      "result": "PASS",
+      "evidence": "every relaunch is adapter.launch → spawnSession → containedSession; T3 retry tests"
+    },
+    {
+      "id": "J23",
+      "title": "Model reroute cannot bypass containment",
+      "classification": "STATIC+REGRESSION",
+      "result": "PASS",
+      "evidence": "as J22; T3 routing tests"
+    },
+    {
+      "id": "J24",
+      "title": "Shell fallback cannot bypass containment",
+      "classification": "STATIC",
+      "result": "PASS",
+      "evidence": "static test forbids spawn/exec/taskkill in containedSession; no cmd/shell launcher exists"
+    },
+    {
+      "id": "J25",
+      "title": "Provider-default path preserves containment",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "execution-scope tests run real adapter.launch through containedSession"
+    }
+  ],
+  "tests": [
+    {
+      "test": "F04 J05/J21/J44",
+      "result": "PASS"
+    },
+    {
+      "test": "MA0R: actual codex adapter spawn",
+      "result": "PASS"
+    },
+    {
+      "test": "MA0R: actual claude adapter spawn",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R1-BYPASS-2",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R1-LOW-2",
+      "result": "PASS"
+    }
+  ],
+  "note": "Every retry, reroute and escalation relaunches through adapter.launch → spawnSession → containedSession (process-launch-inventory.md); the contained launcher contains no spawn/exec/taskkill (static test)."
+}

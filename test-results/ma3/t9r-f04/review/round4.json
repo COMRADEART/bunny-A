@@ -1,0 +1,170 @@
+{
+  "reviews": [
+    {
+      "lens": "repairs",
+      "summary": "Round-3 repairs were checked against the working tree. Most are correct: systemTool and pathTool are used at every Windows call site, resolveInterpreter uses lstat for alias stubs, the native writer resume precedes the root resume, inspect counts unverified members, readProviderSessions validates shape, and hostCodeRuns entries are removed on every normal close path, so the lens concern about holds sticking was not borne out. Three real defects remain. F04-R3-1 (MEDIUM): the R2-05 repair missed the terminateJob loop, so a persist EPERM rejects the termination chain before accounting reaches zero, and on the stop path it can escalate to HOST_FATAL. F04-R3-2 (LOW): the path-inside predicate misclassifies folders whose first segment starts with '..'. F04-R3-3 (LOW): the hold-check reconcile is unguarded, so a throw becomes an uncaught exception. No direct bypass of the job was found. No files were edited and no tests or processes were run.",
+      "repairVerdicts": [
+        {
+          "finding": "F04-R2-01",
+          "repaired": true,
+          "note": "readProviderSessions (owned-process-group.server.ts ~106-111) now validates launcherPath, launcherPid, launcherCreatedAt, members and each member's pid/createdAt/file inside the try, so malformed parseable records go to unreadable. The constructor reconcile is guarded per record (manager.server.ts ~186-188). Residual: the timer path at manager.server.ts:225 is unguarded (see F04-R3-3)."
+        },
+        {
+          "finding": "F04-R2-02",
+          "repaired": true,
+          "note": "spawn() (owned-process-group.server.ts ~178-181) attaches launched:true to every post-launch inspect failure before the terminate attempt, so containedSession takes the admitted/accounting branch. Residual: if terminate() or persist() throws inside that branch, the termination chain rejects (see F04-R3-1)."
+        },
+        {
+          "finding": "F04-R2-03",
+          "repaired": true,
+          "note": "resolveInterpreter (verification.server.ts:19) uses lstatSync, so a WindowsApps APPEXECLINK alias is accepted and launched by CreateProcess. Not executed. The shared inside() predicate still has the '..' flaw (see F04-R3-2)."
+        },
+        {
+          "finding": "F04-R2-05",
+          "repaired": false,
+          "note": "Incomplete. annotate, close and the zero-branch bookkeeping are guarded, but owned.terminate() in the terminateJob loop (adapters.server.ts:306-307) and hooks.event at lines 319 and 324 are not. A persist EPERM there rejects the chain before markEmpty (see F04-R3-1)."
+        },
+        {
+          "finding": "F04-BYPASS-CWD-1",
+          "repaired": true,
+          "note": "System32 absolute paths for taskkill.exe and powershell.exe are used at every Host call site (process-tree, owned-processes, telemetry, computer, process.server, adapters:211). pathTool excludes the cwd for nvidia-smi. No bare-name Windows launch remains in src. Residual: the '..' predicate flaw (F04-R3-2). Minor note: systemTool uses ?? so an empty SystemRoot yields a relative path; this is not reachable by a provider."
+        },
+        {
+          "finding": "F04-NATIVE-R2-01",
+          "repaired": true,
+          "note": "native/bunny-owned-process.c inspect() counts members that cannot be opened or re-verified as unverifiedMembers (~lines 216-222) and no longer drops them silently. The OwnedSnapshot type matches. Accounting remains authoritative."
+        },
+        {
+          "finding": "F04-NATIVE-R2-02",
+          "repaired": true,
+          "note": "native launch() (lines ~171-178) creates the writer suspended, resumes and checks it before ResumeThread on the root, and every failure precedes the root running. With no payload the writer path is skipped, so resume ordering is unaffected. Note only: a writer ResumeThread failure leaks the payload and the pipe write end. It is practically unreachable and does not affect containment."
+        },
+        {
+          "finding": "F04-TRUTH-1",
+          "repaired": true,
+          "note": "The restart task error (manager.server.ts ~167-170) and the reconcile event now describe the kernel mechanism and say the Host killed nothing. Neither asserts that processes ended before identity verification."
+        },
+        {
+          "finding": "F04-COVERAGE-2",
+          "repaired": true,
+          "note": "spawn() adds action 'provider.probe' to hostCodeRuns (owned-process-group.server.ts spawn), and probe() (adapters.server.ts:89) and containedTransport (codex-probe) both use that action. Entries are deleted in close() on every normal path. Verified that no persist-throw path blocks deletion for probe or verification records, because their recordPath is null."
+        },
+        {
+          "finding": "F04-REVIEW-3",
+          "repaired": true,
+          "note": "The reviewRequired skip was removed from readProviderSessions. A no-identity record with containment 'running' stays recoverable, so it is re-reported on each restart. Records that are closed as empty, absent_after_restart or refused are still skipped, which is correct."
+        },
+        {
+          "finding": "F04-HOLD-4",
+          "repaired": true,
+          "note": "The check at manager.server.ts ~218-228 reconciles a record that becomes readable before releasing the hold. Residual: the reconcile call is unguarded (see F04-R3-3)."
+        }
+      ],
+      "rows": [
+        {
+          "lens": "repairs",
+          "id": "F04-R3-1",
+          "severity": "MEDIUM",
+          "title": "R2-05 repair incomplete: terminateJob calls owned.terminate() and hooks.event outside any guard, so a persist EPERM rejects the termination chain before emptied resolves or the retry is scheduled",
+          "file": "src/lib/bunny-host/adapters.server.ts",
+          "line": 306,
+          "reproduction": "Provider session runs in its job. Stop is requested, or the root exits normally, so terminateJob runs. OwnedProcessGroup.terminate() (owned-process-group.server.ts, terminate()) calls native terminate and then persist(), because provider records always carry containment 'running'. If the rename in persist throws EPERM (Windows AV or indexer lock), the exception leaves the async IIFE at line 306 (`let active = owned.terminate();`) or at the loop on line 307, which has no try. The IIFE rejects before markEmpty(), so `emptied` never resolves and the unconfirmed retry at lines 319-324 is never scheduled. On the normal-end path, `await terminateJob(...)` at line 386 throws, so `await emptied` at line 388 is skipped and done() rejects while kernel accounting is unknown. On the stop path, group.onStop(() => { void stop(); }) at line 346 turns the rejection into an unhandledRejection, which failure.server.ts classifies as HOST_FATAL unless ownedAndSafe (failure.server.ts:152), so the Host exits with code 70. The launched branch at line 354 has the same exposure.",
+          "rootCause": "The round-3 BYPASS/R2-05 repair guarded annotate, close and the zero-branch bookkeeping, but left the terminate() loop (lines 306-307) and the hooks.event call before retry scheduling (line 319) unguarded. OwnedProcessGroup.terminate() persists on every call for provider sessions, so the bookkeeping failure reaches the termination chain.",
+          "repair": "Wrap each owned.terminate() call in terminateJob in try/catch and treat a throw as active=-1 (unconfirmed), so the retry path is always scheduled and markEmpty only runs at kernel zero. Guard hooks.event at lines 319 and 324 so it cannot skip markEmpty. Attach .catch to the onStop stop() call on line 346 and to the stop() call path. Add a test that makes persist throw during terminate and asserts that done does not settle before accounting reaches 0 and that the Host does not receive an unhandled rejection.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "MEDIUM",
+              "reasoning": "Finding F04-R3-1 is real as stated; I did not refute it. Verified by reading the code (read-only, no tests run):\n\n1. src/lib/bunny-host/adapters.server.ts:306-307: terminateJob's async IIFE calls `owned.terminate()` directly, with no try/catch. Lines 319-324 (the retry scheduling and hooks.event calls) are also unguarded in the sense that a throw before them skips them.\n\n2. owned-process-group.server.ts:207-211: terminate() calls `this.native.terminate(...)` and then `persist(...)` whenever `this.record.containment` is truthy. Provider records are created with containment \"running\" (line 160), so every provider-session terminate() persists. persist() (lines 77-80) is a bare writeFileSync + renameSync with no try, so an EPERM from rename on Windows (AV/indexer lock) propagates out of terminate().\n\n3. That rejects the `ending` promise before markEmpty() runs, so `emptied` never resolves and the retry at 319-324 is never scheduled. The native TerminateJobObject has already fired, so the kernel state is unknown to JS.\n\n4. Consumers: adapters.server.ts:386 `await terminateJob(...)` on the normal-end path throws, so `done` rejects (line 388 `await emptied` is skipped). The stop path at line 346 `group.onStop(() => { void stop(); })` produces an unhandled rejection. failure.server.ts:152 classifies an unhandledRejection as HOST_FATAL unless ownedAndSafe is passed, which this call site does not pass, so the Host takes its controlled exit. manager.server.ts:1539 awaits session.done in a loop with no catch.\n\nNot prevented elsewhere: persist has no guard, and the R2-05 repair only guarded annotate/close/zero-branch bookkeeping, as the finding says. The trigger is narrow (a transient Windows file lock on the record), so MEDIUM is a fair severity: it leaves the job handle held and accounting unconfirmed, and on the stop path it can exit the Host. Repair direction (try/catch around terminate treating a throw as unconfirmed, guarded hooks.event, .catch on the onStop stop() call, and a persist-throws test) is appropriate."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "MEDIUM",
+              "reasoning": "Not refuted. I read the code directly (read-only, no tests or processes run).\n\n1. adapters.server.ts terminateJob (about lines 296-330): `let active = owned.terminate();` (line 306) and the `while (active !== 0 ...) { active = owned.terminate(); }` loop (line 307) are both outside any try. The async IIFE that backs `ending` has no outer catch. If terminate() throws, the IIFE rejects before markEmpty() runs and before the retry at lines 319-324 is scheduled, so `emptied` never resolves.\n\n2. owned-process-group.server.ts terminate() (about lines 207-211): it calls native.terminate() and then, when this.record.containment is truthy, calls persist() unguarded. Provider records are created with containment \"running\" (line 160), and persist() does writeFileSync + renameSync (line 77-79), which can throw EPERM or EBUSY on Windows under an AV or indexer lock when a dataDirectory is set. So the throw is reachable. The constructor's own try/catch at line 182 shows the authors already treat terminate() as able to throw.\n\n3. Normal-end path: `await terminateJob(...)` (around line 386) rejects, so `await emptied` is skipped and done() rejects. The caller at manager.server.ts:1539 (`const result = await session.done;`) then gets a rejection while kernel accounting is unknown, and the job handle is never closed.\n\n4. Stop path: group.onStop(() => { void stop(); }) (around line 346) is invoked from the trackOwnedGroup callback (owned-process-group.server.ts:177). The rejection from `void stop()` is an unhandledRejection. failure.server.ts:152 classifies it as HOST_FATAL unless ownedAndSafe is true, and the only call site I found uses the default false. So the Host takes the controlled-exit fatal path. I did not verify the exit code 70 figure.\n\nMitigations checked: native terminate has already been issued before the persist throw, so the kernel job is still being killed, and no process escape was found. The impact is therefore wrong or missing containment accounting, a stuck or unclosed handle, and a Host fatal exit on Stop, not an orphaned process. That supports MEDIUM rather than HIGH. The reproduction depends on a transient Windows file lock, which is environment-dependent but realistic. The repair in the finding (try/catch around terminate in the loop, treat a throw as unconfirmed, guard hooks.event, and attach catch to the stop call) is sound. The test requested in the finding is still missing."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "repairs",
+          "id": "F04-R3-2",
+          "severity": "LOW",
+          "title": "Path-containment predicate treats a PATH folder whose first segment begins with '..' as outside the cwd, so a provider-written tool inside the cwd can still be selected",
+          "file": "src/lib/bunny-host/system-tools.server.ts",
+          "line": 16,
+          "reproduction": "The user's PATH contains C:\\repo\\..cache\\bin (a folder inside the Host cwd C:\\repo whose name starts with two dots). The provider writes nvidia-smi.exe into that folder. pathTool('nvidia-smi') calls inside(root, canonical(folder)) with rel = '..cache\\bin'. rel.startsWith('..') is true, so inside() returns false, the entry is not excluded, and the provider-written binary is returned and executed by Host telemetry outside any job. resolveInterpreter in verification.server.ts:4 has the same predicate and the same flaw.",
+          "rootCause": "inside() tests rel.startsWith('..') without requiring a path separator or an exact '..' match, so it misclassifies legitimate child folders whose names begin with '..'.",
+          "repair": "Use `rel === '..' || rel.startsWith('..' + sep) || isAbsolute(rel)` for the outside test in both system-tools.server.ts and verification.server.ts. Add a unit test with a PATH entry '<root>\\..x' that asserts it is excluded.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The defect is real as stated. system-tools.server.ts:16 defines inside() as `rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel))`. For root C:\\repo and a PATH folder C:\\repo\\..cache\\bin, relative() gives \"..cache\\bin\". startsWith(\"..\") is true, so inside() returns false. The folder is therefore not excluded in pathTool() (line 21), and the candidate C:\\repo\\..cache\\bin\\nvidia-smi.exe also passes the line-24 check because its relative path begins with \"..\". The binary is returned and launched by Host telemetry outside any job. Legal NTFS directory names can begin with two dots, so the name is valid. verification.server.ts:6 has the identical predicate, so resolveInterpreter is affected too. The reported line 4 for resolveInterpreter is wrong (the predicate is at line 6). Nothing elsewhere prevents this: no other check rejects PATH entries under the cwd. Severity stays LOW because it needs a precondition the attacker does not control directly: the user's own PATH must contain a folder under the Host cwd. The provider must also be able to write into that folder, which the threat model already assumes. Separately, verification.server.ts:34 (safeFile) uses the same startsWith(\"..\") test, but there it only causes a fail-closed false positive for files named \"..x\", not a bypass. The proposed repair (rel === \"..\" || rel.startsWith(\"..\") + sep, plus isAbsolute) is correct for both sites."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted. The defect is real as stated. src/lib/bunny-host/system-tools.server.ts:16 defines inside() as rel === \"\" || (!rel.startsWith(\"..\") && !isAbsolute(rel)). For a PATH folder <root>\\..cache\\bin, relative(root, folder) is \"..cache\\bin\", which starts with \"..\" and is wrongly classified as outside the root. pathTool() at line 21 therefore does not skip the folder, and line 24 returns <folder>\\nvidia-smi.exe if it exists. Nothing else prevents this: pathTool has no other exclusion, and the only guard is this predicate. verification.server.ts:6 has the identical predicate, so resolveInterpreter has the same flaw. The repair (rel === \"..\" || rel.startsWith(\"..\" + sep) || isAbsolute(rel)) is correct. Severity is LOW, not higher, because exploitation needs the user's own PATH to contain an absolute folder inside the repo whose name begins with \"..\". PATH is user-controlled, not provider-controlled, so the provider must already be able to write into that folder. The same predicate at verification.server.ts:34 (safeFile) fails closed for \"..x\" names, which is a false positive, not a bypass, so it is not a security defect. I did not run anything; this is from reading the code."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "repairs",
+          "id": "F04-R3-3",
+          "severity": "LOW",
+          "title": "Hold-check timer calls reconcileInterruptedProviderSessions without a guard, so a throw escapes as uncaughtException and triggers a HOST_FATAL exit",
+          "file": "src/lib/bunny-host/manager.server.ts",
+          "line": 225,
+          "reproduction": "Startup finds an unreadable provider-session file, so holdUnreadableProviderSessions schedules check(). Later the file parses and passes shape validation, but reconcileInterruptedProviderSessions throws (for example, db.event throws). check() calls it at line 225 with no try, and the throw escapes the setTimeout callback. The process uncaughtException handler (failure.server.ts:447, classified HOST_FATAL at failure.server.ts:152) then runs a controlled exit with code 70. The constructor path at lines 186-188 is guarded, but this later path is not, so the R2-01 guard does not cover the hold-check path.",
+          "rootCause": "The round-3 HOLD-4 repair reconciles a newly readable record inside the timer but does not apply the same per-record guard used in the constructor.",
+          "repair": "Wrap the reconcile call at line 225 in try/catch. On failure, keep the hold (do not delete the lingering key) and schedule the next check, emitting provider_session.unreadable again.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Confirmed by reading the code. manager.server.ts:225 calls this.reconcileInterruptedProviderSessions(...) inside check() in holdUnreadableProviderSessions with no try/catch. The constructor path (manager.server.ts:186-188) wraps the same call, so the asymmetry is real and the R2-01 guard does not reach this timer path. check() is invoked from setTimeout(...).unref?.() with no handler, so a synchronous throw there escapes as an uncaughtException. failure.server.ts:570 registers process.on(\"uncaughtException\"), and failure.server.ts:152/447 classify that source as HOST_FATAL with a controlled exit code 70.\n\nWhat can throw: the synchronous body of reconcileInterruptedProviderSessions before its first await. That covers this.db.event(...) (a DB write), the lingering/lingeringAttempt/restartSurvivorMission map sets, and the expected-array construction. Shape validation makes the field-access throws unlikely, so the realistic trigger is a DB write failure (closed or locked database, disk error) at the moment a previously unreadable record becomes readable. The disposed guard does not help because it is checked before readProviderSessions. The finding's reproduction is therefore accurate, but it needs a persistence fault.\n\nImpact is bounded. The exit is a controlled Host exit that closes the job handles, and the kernel ends job members on close (KILL_ON_JOB_CLOSE), so this is an availability crash, not a containment bypass. The hold is not released on throw (lingering.delete is never reached), so it stays fail-closed. The proposed repair (try/catch, keep the hold, reschedule check) is sound. Severity LOW is justified."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted. Verified in src/lib/bunny-host/manager.server.ts: the constructor loop (lines 186-188) wraps reconcileInterruptedProviderSessions in try/catch, but the hold-check path does not. In holdUnreadableProviderSessions (lines 214-232), check() is a plain synchronous function, and line 225 calls this.reconcileInterruptedProviderSessions(...) with no try. A synchronous throw inside a setTimeout callback is delivered to process 'uncaughtException'. Reconcile can throw: it calls this.db.event(...) and this.emit(...) outside any try (only markProviderSessionReview is guarded). The readProviderSessions call above it is guarded (line 221), so the throw has to come from reconcile itself, as the finding says. failure.server.ts:152 classifies uncaughtException as HOST_FATAL, and the handler exits with code 70 at line 443. The finding's reproduction holds. Severity is LOW: it needs a DB or event-path failure during a late hold-release, and the consequence is a controlled fatal exit that the next startup re-reconciles. The job's KILL_ON_JOB_CLOSE containment is not weakened by the exit. The proposed repair (try/catch, keep the hold, reschedule) is correct and minimal. Note that the timer also lacks a disposed check before reconcile, which is a related minor race, but it is not a separate defect for this finding."
+            }
+          ],
+          "confirmed": true
+        }
+      ]
+    },
+    {
+      "lens": "sweep",
+      "summary": "Final adversarial sweep of the F04 diff found no way for a provider-started or model-influenced process to escape the Windows job on the paths I traced. Checked: native launch order (CREATE_SUSPENDED plus JOB_LIST, membership verified before resume, writer resumed before root), job access reduction (no SET_ATTRIBUTES, no breakaway, limitFlags strict 0x2000 check), the native close and terminate accounting, every spawn site (adapters probe, containedSession, codex-probe transport, runWindowsOwnedProcess callers, verification runPython, process.server runProcess, git and local capabilities), restart reconciliation (possiblyAlive fail-closed, name plus PID plus birth, absent_after_restart not claimed as empty), and Stop text versus kernel state. Excluded as documented out-of-contract classes: computer.open_app Start-Process of allowlisted GUI apps (AppX or shell hand-off, executable extensions blocked), the Host-run computer PowerShell, and the provider-planted python on a writable PATH folder (already inside the provider's own shell authority, and still job-contained). One LOW robustness defect is reported above; no containment escape was found.",
+      "repairVerdicts": [],
+      "rows": [
+        {
+          "lens": "sweep",
+          "id": "F04-FINAL-1",
+          "severity": "LOW",
+          "title": "containedSession terminate call is unguarded; a throw strands the job handle and never settles 'emptied'",
+          "file": "src/lib/bunny-host/adapters.server.ts",
+          "line": 306,
+          "reproduction": "Inside terminateJob, the first call `let active = owned.terminate();` (line 306) is outside any try block. Only owned.inspect() (line 303) is guarded. If the native terminate throws (for example a napi exception from the terminate export), the async IIFE rejects before markEmpty() runs. `emptied` never resolves, so the session's `done` rejects and never reaches the accounting path. The job handle stays open. `stopContained` then rejects instead of reporting 'unconfirmed' with the retry loop running. Members remain inside the KILL_ON_JOB_CLOSE job, so this does not let a process escape. It does leave the session unsettled and the handle held until Host exit, without the kernel-backed end state the contract describes. Reachability is low because the current native terminate only fails on a closed or invalid group, and the JS handle is nulled together with the job.",
+          "rootCause": "The retry path at lines ~318-330 wraps owned.terminate() in try/catch and treats a throw as active=-1 (unconfirmed). The first call that opens the loop was not given the same treatment, so the 'settle by accounting' invariant depends on native.terminate never throwing.",
+          "repair": "Wrap the first owned.terminate() in try/catch and set active = -1 on a throw, so the existing unconfirmed branch runs (annotate, settle 'unconfirmed', schedule the retry chain). Keep markEmpty for the zero branch only. Add a unit test that stubs the group's terminate to throw once and asserts that containment ends 'unconfirmed' (not a rejected done) and that the retry path eventually reaches 'empty' or stays lingering.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Real as a latent gap, but reachability is effectively nil. The code matches the finding's description. In adapters.server.ts terminateJob (lines 297-332), the first `owned.terminate()` at line 306 is outside any try. The poll loop call at line 307 is also unguarded, and the finding's repair does not cover it. Only the retry closure at line 323 is wrapped. If terminate() throws, the async IIFE rejects, `ending` rejects, and `emptied` never resolves. In the main path, `await terminateJob(...)` at about line 384 then rejects `done`, and `stop()` rejects through `void stop()` in group.onStop (line 346), which is an unhandled rejection.\n\nReachability: OwnedProcessGroup.terminate() (owned-process-group.server.ts:207-215) returns early when `this.handle` is null, so the native closed-group throw cannot be reached through the JS wrapper. In the native code (bunny-owned-process.c:246), terminate_owned throws only when the handle fails to unwrap or `g->job` is NULL. terminate_group (line 67) returns 0 without throwing when the job is NULL, and TerminateJobObject failure does not throw. Native throws are therefore reachable only with a corrupted handle, which the finding itself concedes. The defect is real, but it is a hardening gap and LOW is the justified severity. The repair should also wrap the line 307 loop call, not only the first call.</reasoning>\n"
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted. The unguarded first call is real. adapters.server.ts:306 `let active = owned.terminate();` sits outside any try in the terminateJob async IIFE (line 297 onward). Line 309 `active = owned.terminate()` in the polling loop is also unguarded. Only inspect (line 303) and the retry() closure (line 323, try-wrapped) are guarded.\n\nThe finding's stated trigger is slightly off. Native terminate is not the only throw source. OwnedProcessGroup.terminate() (owned-process-group.server.ts:207-212) calls persist() whenever record.containment is set, and every provider session sets it to \"running\" at construction (line 160). persist() does writeFileSync plus renameSync (line 79) with no catch. On Windows a transient EPERM/EBUSY on rename (antivirus or indexer lock) or a disk-full write therefore throws from the first terminate call.\n\nConsequence: terminateJob rejects. Line 386 `await terminateJob(...)` then rejects, so done rejects and never reaches line 388 or the accounting path. stop() (line 395) rejects too, so stopContained never gets to the 'unconfirmed' branch. No retry is scheduled, and the job handle stays open. Crucially, terminate was never issued, so the provider members keep running until Host exit when kill-on-close fires. This is bounded by the Host lifetime, so it is not an escape, which supports LOW. The proposed repair (wrap both terminate calls, set active=-1, route to the unconfirmed retry chain) is sound, and the retry closure already guards terminate.\n\nRoot-cause note for the repair: it must cover line 309 as well as line 306, and the failure source is JS persist(), not only the native export."
+            }
+          ],
+          "confirmed": true
+        }
+      ]
+    }
+  ]
+}

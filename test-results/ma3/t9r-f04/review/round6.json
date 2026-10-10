@@ -1,0 +1,54 @@
+{
+  "round": 6,
+  "scope": "verification of round-5 repairs",
+  "verdicts": [
+    {
+      "id": "F04-R5-1",
+      "repaired": true,
+      "newIssue": "",
+      "severity": "NONE",
+      "evidence": "src/lib/bunny-host/adapters.server.ts, containedSession terminateJob zero-accounting branch: owned.annotate(...) and owned.close(outcome) are now in separate try/catch blocks, each reporting via quiet(). An annotate throw can no longer skip close, so the native handle is released. Read-only; tests not run.",
+      "disposition": "VERIFIED REPAIRED"
+    },
+    {
+      "id": "F04-R5-2",
+      "repaired": true,
+      "newIssue": "Repair is correct for the stated defect: the folder hold (FOLDER_UNREADABLE) reconciles all found.records, holds still-unreadable files separately, and releases only after the reconcile succeeds. readProviderSessions skips records whose hostGeneration equals this Host's instanceId, and reconcileInterruptedProviderSessions skips ops already in reconciledOperations or with a restart: lingering key, so no double reconcile. Answers to the specific checks: (a) instanceId is HostContainment's options.instanceId ?? randomUUID(), not persisted. Production constructions in manager.server.ts (~line 129), entry.server.ts and http.server.ts pass no instanceId, and TaskManager.instanceId is overwritten from containment. Each Host process therefore gets a fresh UUID, so a prior Host's records cannot be skipped by generation. Only injected test instanceIds could collide. (b) The startup read still marks non-current-generation open records interrupted (the mutation runs after the skip, for every record not closed-terminal). (c) Folder release touches only the unreadable: key and never restart: keys, so it cannot release a restart hold. (e) This Host's own live records are skipped only in re-reads. After this Host crashes, the next Host has a new UUID, so the record is returned and reconciled. Side effect, see NEW-1: adding reconciledOperations makes a failed-after-add startup reconcile permanently skip the op.",
+      "severity": "LOW",
+      "evidence": "manager.server.ts constructor startup block (readProviderSessions(this.dataDirectory, this.instanceId) then reconcile per record, failures pushed to unreadable); holdUnreadableProviderSessions check(): folder case reconciles found.records, then holds found.unreadable not already held, then releases the key; owned-process-group.server.ts readProviderSessions: closed-terminal skip, then currentGeneration skip, then push and mutate (interrupted and persist only if !closed or running); manager reconcileInterruptedProviderSessions: reconciledOperations and lingering guards.",
+      "disposition": "VERIFIED REPAIRED"
+    },
+    {
+      "id": "F04-R5-3",
+      "repaired": true,
+      "newIssue": "",
+      "severity": "NONE",
+      "evidence": "manager.server.ts holdUnreadableProviderSessions: failureReported is a per-hold closure flag, so provider_session.reconcile_failed is emitted at most once per hold and the retry continues silently. The emit is wrapped in try so a DB error does not escape the timer.",
+      "disposition": "VERIFIED REPAIRED"
+    },
+    {
+      "id": "TERM-PERSIST",
+      "repaired": true,
+      "newIssue": "Non-fatal persist in OwnedProcessGroup.terminate() cannot write a false empty to disk. containment becomes empty only in memory before persist; disk shows empty only after a successful write reflecting native accounting 0. If the persist fails, disk keeps running (closed=false), so a restart treats the record as interrupted and corroborates it (fail-closed). Minor LOW: if close()'s persist also fails, the adapter's quiet() swallows it, the record stays closed=false on disk with no review flag in this process, and the restart path corroborates it.",
+      "severity": "LOW",
+      "evidence": "owned-process-group.server.ts terminate(): try { persist(this.path,this.record) } catch {} wrapped; returns native accounting regardless. close() sets containment from native.close accounting and persists, which can throw after the handle and release have already run. adapters.server.ts terminateJob calls close inside try/quiet.",
+      "disposition": "VERIFIED REPAIRED"
+    },
+    {
+      "id": "F04-R6-1",
+      "repaired": false,
+      "newIssue": "reconcileInterruptedProviderSessions adds the op to reconciledOperations and sets lingering restart:<op> before this.emit(provider_session.interrupted) and before starting the check loop. If that emit throws (DB error), the catch in the startup loop or the folder/file hold re-reads push the file to unreadable. The retry then calls reconcile, which now skips the op because it is in reconciledOperations, so no check loop is ever started for restart:<op>. The restart hold stays forever, and restartSurvivorRefusal blocks new provider launches for that mission or task until the Host restarts. Before R5 the retry re-ran the reconcile. This is fail-closed (no fail-open), so LOW.",
+      "severity": "LOW",
+      "evidence": "manager.server.ts reconcileInterruptedProviderSessions: reconciledOperations.add(record.operationId); lingering.set(key,'checking'); restartSurvivorMission.set(...); this.emit(provider_session.interrupted ...) precedes void check(). Retry path: holdUnreadableProviderSessions check() calls reconcileInterruptedProviderSessions(filtered records), which returns early on reconciledOperations.has(op).",
+      "disposition": "ACCEPTED LOW (fail closed) — same class as F04-R5-4: a database write failure mid-reconcile leaves the restart hold in place until Host restart; refuses only the same Mission/Task"
+    },
+    {
+      "id": "F04-R6-2",
+      "repaired": false,
+      "newIssue": "The R5-GEN/SPLIT test that the annotate and close guard is split is a source-text regex, not a behavioral test. The regex /owned\\.annotate\\(\\{ terminatedAtEnd: present \\}\\); owned\\.close/ does not match the current multi-line code shape, so it passes trivially. It would not catch a regression that puts annotate and close back in one try block. The R5-FOLDER test covers the folder hold behaviorally, but nothing exercises a throwing annotate, so the R5-1 repair has no behavioral test.",
+      "severity": "LOW",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts, test 'F04 R5-GEN/SPLIT' final assertions read adapters.server.ts and assert !/owned\\.annotate\\(\\{ terminatedAtEnd: present \\}\\); owned\\.close/.test(...). The actual adapters code has annotate in its own try block followed by a separate close try block on separate lines.",
+      "disposition": "FIXED: replaced the source-text regex with a behavioural test (annotate throws → close still runs, record closed/empty, failure event reported)"
+    }
+  ]
+}

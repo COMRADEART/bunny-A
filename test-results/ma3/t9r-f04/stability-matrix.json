@@ -1,0 +1,219 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "derivedBy": "assemble-evidence.mjs",
+  "liveRounds": {
+    "rounds": 10,
+    "passed": 30,
+    "failed": 0,
+    "byScenario": {
+      "stop": [
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS"
+      ],
+      "abrupt-host-exit": [
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS"
+      ],
+      "graceful-shutdown": [
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS",
+        "PASS"
+      ]
+    },
+    "killedDuringStop": [
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "x53": {
+    "consecutiveClean": 10,
+    "failedAttempts": 0
+  },
+  "nestedJobs": [
+    {
+      "mode": "none",
+      "result": "PASS"
+    },
+    {
+      "mode": "plain",
+      "result": "PASS"
+    },
+    {
+      "mode": "limit1",
+      "result": "PASS"
+    },
+    {
+      "mode": "silent",
+      "result": "PASS"
+    },
+    {
+      "mode": "no-parent-job (WMI broker launch)",
+      "result": "NOT TESTED"
+    }
+  ],
+  "rapidChildCreation": "burst fixture (40 instantly exiting children) inside every live round",
+  "parentBeforeChild": "orphan and chain fixtures inside every live round",
+  "concurrentSessions": [
+    {
+      "test": "F04 J47/J48",
+      "result": "PASS"
+    }
+  ],
+  "helperStartupFailure": [
+    {
+      "test": "F04 J05/J21/J44",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R2-L3/L4",
+      "result": "PASS"
+    }
+  ],
+  "retriesHidden": false,
+  "attemptHistory": {
+    "x53": [
+      {
+        "dir": "x53/attempt1-foreground-drift",
+        "matrix": {
+          "consecutiveClean": 2,
+          "failedAttempts": 1
+        },
+        "cause": "Foreground at failure (after.json foregroundHandle 263302) belonged to the user's own Chrome (C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe, started 12:03:59 local, not started by Bunny or the test). Step 7 computer.invoke_control refused: 'Foreground drift requires a fresh decision.' Not touched by Bunny."
+      },
+      {
+        "dir": "x53/attempt2-foreground-drift",
+        "matrix": {
+          "consecutiveClean": 1,
+          "failedAttempts": 1
+        },
+        "cause": "Step 8 (Enter) computer.invoke_control refused: Foreground drift requires a fresh decision. Foreground (after.json 263302) = user's own Chrome (pid 16856, C:\\Program Files\\Google\\Chrome, started 12:03:59 local). Bunny did not touch it."
+      },
+      {
+        "dir": "x53/attempt3-foreground-drift",
+        "matrix": {
+          "consecutiveClean": 0,
+          "failedAttempts": 1
+        },
+        "cause": "Step 7 (Clear) computer.invoke_control refused: Foreground drift requires a fresh decision. Foreground at failure (after.json 2164502) belonged to the user's Chrome (pid 16856, C:\\Program Files\\Google\\Chrome, started 12:03:59 local); immediately afterwards a transient chrome.exe (pid 16984) dialog (#32770) held the foreground and exited. Bunny touched neither. Run 1 cold had first closed the previous Bunny-owned Calculator target by exact identity (owned-close-receipt.json)."
+      },
+      {
+        "dir": "x53 (attempt 4)",
+        "cause": "stale ledger: recorded target already closed by attempt 3 run 1; tool refused 'Owned native target no longer exists' (x53/attempt4-stale-ledger-run.log, x53/attempt4-stale-ledger.json)"
+      },
+      {
+        "dir": "x53 (attempt 5, final)",
+        "matrix": {
+          "consecutiveClean": 10,
+          "failedAttempts": 0
+        },
+        "condition": "user's Chrome closed by the user on request; no foreground contention"
+      }
+    ],
+    "liveContainment": [
+      {
+        "attempt": 1,
+        "file": "review/final-live-attempt1.json",
+        "passed": 25,
+        "failed": 5,
+        "diagnosis": "review/final-live-attempt1-diagnosis.md"
+      },
+      {
+        "attempt": 2,
+        "file": "live-containment-acceptance.json",
+        "passed": 30,
+        "failed": 0,
+        "restartOutcomes": [
+          {
+            "round": 1,
+            "stopCompletedBeforeDeath": false
+          },
+          {
+            "round": 2,
+            "stopCompletedBeforeDeath": true
+          },
+          {
+            "round": 3,
+            "stopCompletedBeforeDeath": false
+          },
+          {
+            "round": 4,
+            "stopCompletedBeforeDeath": true
+          },
+          {
+            "round": 5,
+            "stopCompletedBeforeDeath": false
+          },
+          {
+            "round": 6,
+            "stopCompletedBeforeDeath": true
+          },
+          {
+            "round": 7,
+            "stopCompletedBeforeDeath": false
+          },
+          {
+            "round": 8,
+            "stopCompletedBeforeDeath": true
+          },
+          {
+            "round": 9,
+            "stopCompletedBeforeDeath": false
+          },
+          {
+            "round": 10,
+            "stopCompletedBeforeDeath": true
+          }
+        ]
+      }
+    ],
+    "fullRegression": [
+      {
+        "attempt": 1,
+        "tests": 1271,
+        "pass": 1270,
+        "fail": 1,
+        "failing": [
+          "T6 X53 DISPOSABLE LIVE VERIFIED: filesystem → Git → owned terminal → fresh Host → isolated browser → real Windows UIA → verified artifact"
+        ]
+      },
+      {
+        "attempt": 2,
+        "tests": 1295,
+        "pass": 1295,
+        "fail": 0,
+        "failing": []
+      }
+    ]
+  }
+}

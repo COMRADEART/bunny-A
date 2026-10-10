@@ -1,0 +1,181 @@
+{
+  "gate": "M-A-3 T9R-F04 §10",
+  "classification": "LIVE",
+  "recordedAt": "2026-10-10T17:10:35.280Z",
+  "environment": {
+    "testShellInsideAJob": true,
+    "note": "The test environment itself runs inside an enclosing job; 'none' asks for breakaway from it, which succeeds only if that job permits breakaway (recorded in wrapper.childInAnyJob)."
+  },
+  "cases": [
+    {
+      "mode": "none",
+      "expectation": "admitted and contained; Stop leaves nothing",
+      "wrapper": {
+        "wrapper": "none",
+        "childPid": 30728,
+        "childInAnyJob": true,
+        "limitFlags": 0
+      },
+      "exitCode": 0,
+      "result": {
+        "during": {
+          "state": "running",
+          "activeProcesses": 15,
+          "detail": "Provider process tree is running inside its Bunny-owned Windows job."
+        },
+        "after": {
+          "mechanism": "windows-job-object",
+          "state": "empty",
+          "admitted": true,
+          "operationId": "5a3d19b1-4871-4345-bcb8-b4573b65335b",
+          "rootPid": 34496,
+          "rootCreatedAt": 1791652229908,
+          "activeProcesses": 0,
+          "totalProcesses": 19,
+          "terminatedAtEnd": 15,
+          "detail": "Stop requested: the provider's Windows job was terminated. Windows job accounting reports 0 active processes; 15 process(es) present at the end were terminated with the job."
+        },
+        "ok": false,
+        "error": "Stopped."
+      },
+      "fixtureProcessesAfter": 0,
+      "result_": "PASS"
+    },
+    {
+      "mode": "plain",
+      "expectation": "admitted and contained; Stop leaves nothing",
+      "wrapper": {
+        "wrapper": "plain",
+        "childPid": 3064,
+        "childInAnyJob": true,
+        "limitFlags": 8192
+      },
+      "exitCode": 0,
+      "result": {
+        "during": {
+          "state": "running",
+          "activeProcesses": 15,
+          "detail": "Provider process tree is running inside its Bunny-owned Windows job."
+        },
+        "after": {
+          "mechanism": "windows-job-object",
+          "state": "empty",
+          "admitted": true,
+          "operationId": "54b05860-8ae0-4d14-9018-45556290aba3",
+          "rootPid": 7604,
+          "rootCreatedAt": 1791652230791,
+          "activeProcesses": 0,
+          "totalProcesses": 19,
+          "terminatedAtEnd": 15,
+          "detail": "Stop requested: the provider's Windows job was terminated. Windows job accounting reports 0 active processes; 15 process(es) present at the end were terminated with the job."
+        },
+        "ok": false,
+        "error": "Stopped."
+      },
+      "fixtureProcessesAfter": 0,
+      "result_": "PASS"
+    },
+    {
+      "mode": "limit1",
+      "expectation": "refused (no room in an incompatible parent job), nothing launched",
+      "wrapper": {
+        "wrapper": "limit1",
+        "childPid": 28772,
+        "childInAnyJob": true,
+        "limitFlags": 8200
+      },
+      "exitCode": 0,
+      "result": {
+        "during": {
+          "state": "refused",
+          "activeProcesses": null,
+          "detail": "Containment unavailable — execution refused: Windows ownership failed closed at CreateProcess in job (Win32 1816)."
+        },
+        "after": {
+          "mechanism": "windows-job-object",
+          "state": "refused",
+          "admitted": false,
+          "operationId": null,
+          "rootPid": null,
+          "rootCreatedAt": null,
+          "activeProcesses": null,
+          "totalProcesses": null,
+          "terminatedAtEnd": null,
+          "detail": "Containment unavailable — execution refused: Windows ownership failed closed at CreateProcess in job (Win32 1816)."
+        },
+        "ok": false,
+        "error": "Containment unavailable — execution refused: Windows ownership failed closed at CreateProcess in job (Win32 1816)."
+      },
+      "fixtureProcessesAfter": 0,
+      "result_": "PASS"
+    },
+    {
+      "mode": "silent",
+      "expectation": "admitted and contained; Stop leaves nothing",
+      "wrapper": {
+        "wrapper": "silent",
+        "childPid": 4776,
+        "childInAnyJob": true,
+        "limitFlags": 14336
+      },
+      "exitCode": 0,
+      "result": {
+        "during": {
+          "state": "running",
+          "activeProcesses": 15,
+          "detail": "Provider process tree is running inside its Bunny-owned Windows job."
+        },
+        "after": {
+          "mechanism": "windows-job-object",
+          "state": "empty",
+          "admitted": true,
+          "operationId": "f9a02f47-9670-483c-a2ba-401cddae77ab",
+          "rootPid": 29464,
+          "rootCreatedAt": 1791652232276,
+          "activeProcesses": 0,
+          "totalProcesses": 19,
+          "terminatedAtEnd": 15,
+          "detail": "Stop requested: the provider's Windows job was terminated. Windows job accounting reports 0 active processes; 15 process(es) present at the end were terminated with the job."
+        },
+        "ok": false,
+        "error": "Stopped."
+      },
+      "fixtureProcessesAfter": 0,
+      "result_": "PASS"
+    },
+    {
+      "mode": "no-parent-job (WMI broker launch)",
+      "expectation": "Host outside every job: admitted and contained; Stop leaves nothing",
+      "wmi": "0|32128",
+      "wrapper": {
+        "wrapper": "direct",
+        "childPid": 6944,
+        "childInAnyJob": true,
+        "limitFlags": 0
+      },
+      "result": {
+        "during": {
+          "state": "running",
+          "activeProcesses": 15,
+          "detail": "Provider process tree is running inside its Bunny-owned Windows job."
+        },
+        "after": {
+          "mechanism": "windows-job-object",
+          "state": "empty",
+          "admitted": true,
+          "operationId": "c09fc149-de48-4317-816d-d86dc7746ecf",
+          "rootPid": 36068,
+          "rootCreatedAt": 1791652233514,
+          "activeProcesses": 0,
+          "totalProcesses": 19,
+          "terminatedAtEnd": 15,
+          "detail": "Stop requested: the provider's Windows job was terminated. Windows job accounting reports 0 active processes; 15 process(es) present at the end were terminated with the job."
+        },
+        "ok": false,
+        "error": "Stopped."
+      },
+      "fixtureProcessesAfter": 0,
+      "result_": "NOT TESTED"
+    }
+  ]
+}

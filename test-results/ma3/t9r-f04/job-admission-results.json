@@ -1,0 +1,199 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "derivedBy": "assemble-evidence.mjs",
+  "rows": [
+    {
+      "id": "J01",
+      "title": "Job Object successfully created",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts J01-J04/J07; live-containment-acceptance.json"
+    },
+    {
+      "id": "J02",
+      "title": "Required Job limits applied (KILL_ON_JOB_CLOSE only)",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts J16/J17 (limitFlags 0x2000), J08/J10"
+    },
+    {
+      "id": "J03",
+      "title": "Provider starts suspended",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "native launch CREATE_SUSPENDED; windows-job-api-contract.md"
+    },
+    {
+      "id": "J04",
+      "title": "Assigned before resume (JOB_LIST at creation, membership verified)",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "native launch; windows-job-api-contract.md"
+    },
+    {
+      "id": "J05",
+      "title": "Failed assignment prevents execution",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts J05; nested-job-validation.json limit1 (Win32 1816)"
+    },
+    {
+      "id": "J06",
+      "title": "Failed membership verification prevents execution",
+      "classification": "STATIC",
+      "result": "PASS",
+      "evidence": "native: IsProcessInJob false/failure → TerminateProcess on suspended root, launch fails (review round 1 C2)"
+    },
+    {
+      "id": "J07",
+      "title": "Root ownership recorded",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts; runtime/provider-sessions record fields"
+    },
+    {
+      "id": "J21",
+      "title": "Native helper failure prevents uncontained execution",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "launch failure → refused; integrity failure throws before load (owned-process-group integrity check); no fallback (static test)"
+    },
+    {
+      "id": "J44",
+      "title": "Insufficient containment returns truthful failure",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "state refused, admitted false; error text"
+    }
+  ],
+  "tests": [
+    {
+      "test": "F04 J01-J04/J07",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 J05/J21/J44",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R2-L3/L4",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R1-STOP-3",
+      "result": "PASS"
+    }
+  ],
+  "live": [
+    {
+      "round": 1,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "4c84c638-1f3a-4b2b-ad32-5077236d2caa",
+        "rootPid": 3972,
+        "provider": "claude"
+      }
+    },
+    {
+      "round": 2,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "53b2d2d3-ae1e-44cd-a838-211c34ec7302",
+        "rootPid": 6980,
+        "provider": "claude"
+      }
+    },
+    {
+      "round": 3,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "5870b9c4-c25b-4e18-84ea-c3c5341a2116",
+        "rootPid": 31976,
+        "provider": "claude"
+      }
+    },
+    {
+      "round": 4,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "3b086841-2b5d-4845-b2fa-a10f5d6109ae",
+        "rootPid": 31048,
+        "provider": "claude"
+      }
+    },
+    {
+      "round": 5,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "6f09ee1b-4db9-4dc1-941b-ad472f356996",
+        "rootPid": 8204,
+        "provider": "claude"
+      }
+    },
+    {
+      "round": 6,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "cdfcb5fc-85c8-4a48-91af-59912defa02c",
+        "rootPid": 24140,
+        "provider": "claude"
+      }
+    },
+    {
+      "round": 7,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "128c17c6-d0c3-4991-8363-b9b9225dfe92",
+        "rootPid": 13024,
+        "provider": "claude"
+      }
+    },
+    {
+      "round": 8,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "c115b860-a2d6-46e2-ab3f-3174a6e50a91",
+        "rootPid": 31980,
+        "provider": "claude"
+      }
+    },
+    {
+      "round": 9,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "70bba68e-e22c-488b-ae03-3ea213a571d3",
+        "rootPid": 13300,
+        "provider": "claude"
+      }
+    },
+    {
+      "round": 10,
+      "result": "PASS",
+      "step": {
+        "step": 3,
+        "title": "provider task admitted and running",
+        "taskId": "6fb67de2-82c1-4f16-828d-7771d1a8a1eb",
+        "rootPid": 35568,
+        "provider": "claude"
+      }
+    }
+  ]
+}
