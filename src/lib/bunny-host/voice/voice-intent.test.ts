@@ -320,3 +320,19 @@ test("R3-intent#4 cancelling the pending pause or proposal is a plain cancel", (
   assert.equal(kind("cancel the pending proposal", true), "cancel");
   assert.equal(kind("cancel the upload"), "sensitive_refused");
 });
+
+test("T10 Part-B a barge-in lead word before a question is dropped; without a question nothing changes", () => {
+  // Live: "Stop what is the capital of France?" was proposed as an agent stop. The barge-in already stopped speech.
+  assert.equal(kind("Stop what is the capital of France?"), "chat");
+  assert.equal(kind("Stop. What is my agent doing?"), "agent_status");
+  assert.equal(kind("Wait, did the tests pass?"), "agent_verification");
+  assert.equal(kind("No, what is the capital of Spain?"), "chat");
+  // Control and cancel phrasing is unchanged.
+  assert.equal(kind("Stop"), "agent_control");
+  assert.equal(kind("Stop the agent"), "agent_control");
+  assert.equal(kind("Stop what you are doing"), "agent_control");
+  assert.equal(kind("no", true), "cancel");
+  assert.equal(kind("Stop, delete the repository"), "sensitive_refused");
+  // A lead word never makes a sensitive question acceptable.
+  assert.equal(kind("Wait, what is my password?"), kind("what is my password?"));
+});

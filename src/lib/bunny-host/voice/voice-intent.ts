@@ -19,11 +19,25 @@ export type VoiceIntent = {
 const WAKE = /^(?:(?:hey|ok|okay)\s+)?(?:bunny|bunnie|bunni|honey bunny)\b[\s,.!?:]*/;
 const FILLER = /^(?:(?:um+|uh+|hmm+|er+|ah+|like|so|well|please|hey|ok|okay)\b[\s,.!?:]*)+/;
 
+/**
+ * Live finding (Part B): a spoken barge-in often starts with an interruption word ("Stop. What is the capital of France?").
+ * The barge-in itself already stopped the speech, so that lead word is dropped when a question follows it. Without a
+ * following question ("stop", "stop the agent", "stop what you are doing") nothing is stripped and the phrase is
+ * classified as before. Dropping the lead can only turn a control proposal into a question, never the reverse.
+ */
+const INTERRUPT_LEAD = /^(?:stop|wait|hold on|hang on|sorry|actually|no|nope)\b[\s,.!?:;-]*/;
+const NOT_A_QUESTION_AFTER_LEAD = /^what (?:you(?:'re| are)?|u)\b/;
+
 export function normalizeTranscript(text: string): string {
   let t = text.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim();
   for (let i = 0; i < 3; i++) {
     const before = t;
     t = t.replace(WAKE, "").replace(FILLER, "").trim();
+    const lead = INTERRUPT_LEAD.exec(t);
+    if (lead) {
+      const rest = t.slice(lead[0].length).trim();
+      if (rest && QUESTION.test(rest) && !NOT_A_QUESTION_AFTER_LEAD.test(rest)) t = rest;
+    }
     if (t === before) break;
   }
   return t.replace(/[\s.!?,;:]+$/, "").trim();
