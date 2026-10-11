@@ -81,7 +81,7 @@ function runBatch() {
     writeFileSync(runnerPath, runnerSource, 'utf8');
     const run = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', runnerPath, '-Placement', placementPath, '-Cases', casesPath, '-Out', outPath], { encoding: 'utf8', timeout: 120000 });
     assert.equal(run.status, 0, 'powershell placement run failed: ' + (run.stderr || run.stdout));
-    placements = JSON.parse(readFileSync(outPath, 'utf8').replace(/^﻿/, ''));
+    placements = JSON.parse(readFileSync(outPath, 'utf8').replace(/^\uFEFF/, ''));
     assert.equal(placements.length, cases.length);
     return placements;
   } finally {

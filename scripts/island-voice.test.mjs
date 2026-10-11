@@ -39,7 +39,7 @@ Get-ChildItem -LiteralPath $Dir -Filter 'Bunny-Island*.ps1' | ForEach-Object {
 `, 'utf8');
     const run = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Dir', installDir, '-Out', out], { encoding: 'utf8', timeout: 120000 });
     assert.equal(run.status, 0, run.stderr || run.stdout);
-    const parsed = JSON.parse(read(out).replace(/^﻿/, ''));
+    const parsed = JSON.parse(read(out).replace(/^\uFEFF/, ''));
     assert.ok(parsed.some((entry) => entry.file === 'Bunny-Island.Voice.ps1'), 'voice file parsed');
     assert.ok(parsed.some((entry) => entry.file === 'Bunny-Island.Placement.ps1'), 'placement file parsed');
     for (const entry of parsed) assert.deepEqual(entry.errors, [], `${entry.file} parse errors`);
@@ -51,7 +51,7 @@ Get-ChildItem -LiteralPath $Dir -Filter 'Bunny-Island*.ps1' | ForEach-Object {
 test('island PowerShell sources are ASCII-only so PowerShell 5.1 reads them without a BOM', () => {
   for (const name of ['Bunny-Island.Voice.ps1', 'Bunny-Island.Placement.ps1', 'Bunny-Island.Visual.ps1', 'Bunny-Island.Motion.ps1']) {
     const text = read(join(installDir, name));
-    assert.doesNotMatch(text, /[^\x00-\x7F]/, `${name} contains non-ASCII characters`);
+    assert.doesNotMatch(text, /[\u0080-\uFFFF]/, `${name} contains non-ASCII characters`);
   }
 });
 
@@ -457,7 +457,7 @@ function runVoiceHarness() {
     writeFileSync(script, buildVoiceHarness(read(voicePath)), 'utf8');
     const run = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Out', out], { encoding: 'utf8', timeout: 120000 });
     assert.equal(run.status, 0, run.stderr || run.stdout);
-    voiceHarnessResult = JSON.parse(read(out).replace(/^﻿/, ''));
+    voiceHarnessResult = JSON.parse(read(out).replace(/^\uFEFF/, ''));
     return voiceHarnessResult;
   } finally {
     rmSync(dir, { recursive: true, force: true });
