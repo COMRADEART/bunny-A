@@ -39,12 +39,15 @@ import {
 import {
   PRESS_IDLE,
   pressDown,
+  pressEnded,
+  pressListenPayload,
   pressOpened,
   pressReset,
   pressStarted,
   pressUp,
   type PressState,
   type PressStep,
+  type StartOutcome,
 } from "@/components/island/voice-press";
 import type { OperationalHealth } from "@/lib/bunny-host/failure.server";
 import type { PublicActivity } from "@/lib/bunny-host/presentation";
@@ -463,24 +466,35 @@ export const useIsland = create<Island>((set, get) => {
         await runPress(pressOpened(press, !!get().voice?.open));
       } else if (effect.type === "listen_start") {
         ensureVoicePolling();
-        const started = await voiceCall("voice.listen.start");
-        pressTurn = started?.turnId ?? null;
-        await runPress(pressStarted(press, started !== null));
+        const { snapshot, outcome } = await voiceCallOutcome("voice.listen.start", pressListenPayload());
+        // The release is bound to the turn this start was answered with, never to an earlier snapshot.
+        pressTurn = snapshot?.turnId ?? null;
+        const started: StartOutcome = snapshot ? "started" : outcome === "refused" ? "refused" : "unknown";
+        await runPress(pressStarted(press, started));
       } else {
-        // Bound to the turn this press started: the Host ignores a late release for an older turn.
+        // Bound to the turn this press started: the Host ignores a late release for an older turn. An unknown start
+        // has no turn, so its defensive end is unbound and ends whatever capture the Host holds.
         await voiceCall("voice.listen.end", pressTurn ? { turnId: pressTurn } : {});
         pressTurn = null;
+        await runPress(pressEnded(press));
       }
     }
   };
-  const voiceCall = async (action: string, data: Record<string, unknown> = {}): Promise<VoiceSnapshot | null> => {
+  const voiceCall = async (action: string, data: Record<string, unknown> = {}): Promise<VoiceSnapshot | null> =>
+    (await voiceCallOutcome(action, data)).snapshot;
+  /** A transport failure or timeout is "unknown": the Host may have acted. A Host answer that is not ok is "refused". */
+  const voiceCallOutcome = async (
+    action: string,
+    data: Record<string, unknown> = {},
+  ): Promise<{ snapshot: VoiceSnapshot | null; outcome: StartOutcome }> => {
     let result: HostCommandResult;
     try {
       result = await withTimeout(commandBunnyHost({ data: { action, data } }), COMMAND_TIMEOUT_MS);
     } catch {
+      // No answer at all (timeout or transport): the Host may still have acted on the request.
       result = {
         ok: false,
-        outcome: "refused",
+        outcome: "unknown",
         code: "HOST_UNREACHABLE",
         message: "Bunny-A Host did not answer.",
         status: 0,
@@ -492,21 +506,22 @@ export const useIsland = create<Island>((set, get) => {
       // An answer without the voice contract means the Host predates voice: say so, never fake a session.
       if (!next) {
         set({ voiceSupported: false, voiceNotice: "Voice needs the updated Bunny Host." });
-        return null;
+        return { snapshot: null, outcome: "refused" };
       }
       acceptVoice(next);
-      return next;
+      return { snapshot: next, outcome: "started" };
     }
+    const outcome: StartOutcome = result.outcome === "unknown" ? "unknown" : "refused";
     if (result.pairing) {
       enterPairing(result.code);
-      return null;
+      return { snapshot: null, outcome };
     }
     if (result.status === 404 || /UNKNOWN|NOT_FOUND|UNSUPPORTED/i.test(result.code)) {
       set({ voiceSupported: false, voiceNotice: "Voice needs the updated Bunny Host." });
-      return null;
+      return { snapshot: null, outcome };
     }
     set({ voiceNotice: result.message });
-    return null;
+    return { snapshot: null, outcome };
   };
   const refreshVoice = async () => {
     if (voiceBusy) return;

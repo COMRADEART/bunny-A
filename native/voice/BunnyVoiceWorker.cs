@@ -224,6 +224,15 @@ internal static class Out
 
     public static void Open() { stream = Console.OpenStandardOutput(); }
 
+    // Test-only seam (selftest): swaps the protocol stream and returns the previous one, so a closed-pipe write can be
+    // simulated in-process without killing the test runner.
+    internal static Stream SwapStreamForTest(Stream s)
+    {
+        Stream previous = stream;
+        stream = s;
+        return previous;
+    }
+
     public static void Emit(Dictionary<string, object> d)
     {
         d["t"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -320,6 +329,8 @@ internal static class Native
     public const uint WHDR_DONE = 0x1;
     public const uint MMSYSERR_ALLOCATED = 4;
     public const uint WAVERR_BADFORMAT = 32;
+    // waveOutUnprepareHeader result while the driver still owns the header's buffer.
+    public const uint WAVERR_STILLPLAYING = 33;
 
     [DllImport("winmm.dll")] public static extern uint waveInGetNumDevs();
     [DllImport("winmm.dll", CharSet = CharSet.Unicode)] public static extern uint waveInGetDevCapsW(UIntPtr id, ref WaveCaps caps, uint size);
@@ -363,6 +374,13 @@ internal static class Native
     {
         if (hdr == IntPtr.Zero) return true;
         return ((uint)Marshal.ReadInt32(hdr, OffFlags) & WHDR_DONE) != 0;
+    }
+
+    // Overwrites unmanaged audio with zeros before it is freed, so raw microphone samples do not linger in freed heap.
+    public static void WipeNative(IntPtr p, int count)
+    {
+        if (p == IntPtr.Zero || count <= 0) return;
+        Marshal.Copy(new byte[count], 0, p, count);
     }
 
     public static string MmErrorName(uint r) { return "MMRESULT " + r.ToString(CultureInfo.InvariantCulture); }
@@ -674,10 +692,16 @@ internal sealed class WaveInSource : IFrameSource
             Native.waveInClose(handle);
             handle = IntPtr.Zero;
         }
+        // The device is reset and the headers unprepared above, so no driver write can race the wipe.
         for (int i = 0; i < Buffers; i++)
         {
             if (headers[i] != IntPtr.Zero) { Marshal.FreeHGlobal(headers[i]); headers[i] = IntPtr.Zero; }
-            if (data[i] != IntPtr.Zero) { Marshal.FreeHGlobal(data[i]); data[i] = IntPtr.Zero; }
+            if (data[i] != IntPtr.Zero)
+            {
+                Native.WipeNative(data[i], Consts.FrameBytes);
+                Marshal.FreeHGlobal(data[i]);
+                data[i] = IntPtr.Zero;
+            }
         }
     }
 }
@@ -747,6 +771,8 @@ internal sealed class WaveOut : IWaveOut
 {
     IntPtr handle;
     readonly uint device;
+    // Chunks submitted to the driver and not yet released. Close() reclaims them after a reset.
+    readonly List<Chunk> submitted = new List<Chunk>();
 
     public uint Device { get { return device; } }
 
@@ -796,12 +822,19 @@ internal sealed class WaveOut : IWaveOut
             FreeChunk(c);
             throw new VoiceFault("DEVICE_LOST", "waveOutWrite failed: " + Native.MmErrorName(r));
         }
+        submitted.Add(c);
     }
 
-    // Caller guarantees the header is done (WHDR_DONE) before release.
+    // Releases a chunk the driver has returned. The buffer is freed only when unprepare succeeds: a header the driver
+    // still owns is kept (a bounded leak) rather than freed under a live DMA read.
     public void Release(Chunk c)
     {
-        if (handle != IntPtr.Zero && c.Header != IntPtr.Zero) Native.waveOutUnprepareHeader(handle, c.Header, (uint)Native.HdrSize);
+        if (handle != IntPtr.Zero && c.Header != IntPtr.Zero)
+        {
+            uint r = Native.waveOutUnprepareHeader(handle, c.Header, (uint)Native.HdrSize);
+            if (r == Native.WAVERR_STILLPLAYING) return;
+        }
+        submitted.Remove(c);
         FreeChunk(c);
     }
 
@@ -816,14 +849,26 @@ internal sealed class WaveOut : IWaveOut
         if (handle != IntPtr.Zero) Native.waveOutReset(handle);
     }
 
+    // waveOutReset returns every pending header to the application before it returns, so after the reset the driver
+    // owns no chunk. Those chunks are unprepared and freed here, and the handle is closed even if the first
+    // waveOutClose fails (it fails with still-playing while headers are prepared): one reset and one retry.
     public void Close()
     {
-        if (handle != IntPtr.Zero)
+        if (handle == IntPtr.Zero) return;
+        Native.waveOutReset(handle);
+        foreach (Chunk c in submitted)
+        {
+            if (c.Header != IntPtr.Zero && Native.waveOutUnprepareHeader(handle, c.Header, (uint)Native.HdrSize) == Native.WAVERR_STILLPLAYING) continue;
+            FreeChunk(c);
+        }
+        submitted.Clear();
+        uint closed = Native.waveOutClose(handle);
+        if (closed != 0)
         {
             Native.waveOutReset(handle);
             Native.waveOutClose(handle);
-            handle = IntPtr.Zero;
         }
+        handle = IntPtr.Zero;
     }
 }
 
@@ -1124,30 +1169,59 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         MaxBytes = maxBytes;
     }
 
+    // Test seam (selftest only): runs on the new engine before the grammar loads, so a fault here exercises the teardown.
+    internal Action<SpeechRecognitionEngine> FaultInjectForTest;
+
+    // Caller is the command loop under Program.Gate. A failure at any step disposes the engine before rethrowing: a
+    // recognizer that never started holds no completion the abandon ledger could wait for, so it cannot be ledgered.
     public void StartRecognizer(RecognizerInfo info)
     {
         engine = info != null ? new SpeechRecognitionEngine(info) : new SpeechRecognitionEngine(new CultureInfo("en-US"));
-        engine.LoadGrammar(new DictationGrammar());
-        engine.SpeechDetected += (s, e) => MarkEvidence();
-        engine.SpeechHypothesized += (s, e) => OnHypothesis(e.Result == null ? null : e.Result.Text);
-        engine.SpeechRecognized += (s, e) => { if (e.Result != null) OnRecognized(e.Result.Text, e.Result.Confidence); };
-        engine.SpeechRecognitionRejected += (s, e) =>
+        try
         {
-            if (e.Result != null && !string.IsNullOrWhiteSpace(e.Result.Text))
+            if (FaultInjectForTest != null) FaultInjectForTest(engine);
+            engine.LoadGrammar(new DictationGrammar());
+            engine.SpeechDetected += (s, e) => MarkEvidence();
+            engine.SpeechHypothesized += (s, e) => OnHypothesis(e.Result == null ? null : e.Result.Text);
+            engine.SpeechRecognized += (s, e) => { if (e.Result != null) OnRecognized(e.Result.Text, e.Result.Confidence); };
+            engine.SpeechRecognitionRejected += (s, e) =>
             {
-                lock (gate) { rejectedSeen = true; }
-            }
-        };
-        engine.RecognizeCompleted += (s, e) => completed.Set();
-        engine.SetInputToAudioStream(Pipe, new SpeechAudioFormatInfo(Consts.SampleRate, AudioBitsPerSample.Sixteen, AudioChannel.Mono));
-        engine.RecognizeAsync(RecognizeMode.Multiple);
+                if (e.Result != null && !string.IsNullOrWhiteSpace(e.Result.Text))
+                {
+                    lock (gate) { rejectedSeen = true; }
+                }
+            };
+            engine.RecognizeCompleted += (s, e) => completed.Set();
+            engine.SetInputToAudioStream(Pipe, new SpeechAudioFormatInfo(Consts.SampleRate, AudioBitsPerSample.Sixteen, AudioChannel.Mono));
+            engine.RecognizeAsync(RecognizeMode.Multiple);
+        }
+        catch (Exception)
+        {
+            ReleaseEngine();
+            throw;
+        }
     }
+
+    // Test-only: whether this turn still holds a recognizer engine.
+    internal bool EngineHeldForTest { get { return engine != null; } }
+
+    // Test-only: whether the capture thread is still running.
+    internal bool CaptureAliveForTest { get { Thread c = captureThread; return c != null && c.IsAlive; } }
 
     public void StartCapture(IFrameSource source)
     {
-        captureThread = new Thread(() => CaptureLoop(source));
+        // The whole body is guarded: an exception raised outside the loop's own handlers (for example a failed protocol
+        // write) ends this turn as an error and never escapes the thread, which would terminate the worker.
+        captureThread = new Thread(() => Guard.Run(() => CaptureLoop(source), FaultCapture));
         captureThread.IsBackground = true;
         captureThread.Start();
+    }
+
+    void FaultCapture(Exception e)
+    {
+        Guard.Emit(Out.Ev("capture.error", "turn", Turn, "gen", Gen, "code", "INTERNAL", "message", "capture fault: " + e.GetType().Name));
+        try { Finish("error"); }
+        catch (Exception) { }
     }
 
     public void Join(int ms)
@@ -1173,9 +1247,10 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         finalThread.Start();
     }
 
+    // Never throws: this runs on the fault paths of the capture thread, where a closed host pipe must not escape.
     void EmitCaptureError(string code, string message)
     {
-        Out.Emit(Out.Ev("capture.error", "turn", Turn, "gen", Gen, "code", code, "message", Out.Trunc(message, 300)));
+        Guard.Emit(Out.Ev("capture.error", "turn", Turn, "gen", Gen, "code", code, "message", Out.Trunc(message, 300)));
     }
 
     void CaptureLoop(IFrameSource source)
@@ -1267,6 +1342,9 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         }
         finally
         {
+            // Raw microphone samples do not outlive the turn in this thread's buffers.
+            Array.Clear(frame, 0, frame.Length);
+            Array.Clear(fed, 0, fed.Length);
             try { source.Close(); } catch (Exception) { }
             PublishOnset(vad);
             lock (Program.Gate)
@@ -1275,7 +1353,7 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
             }
             string reason;
             lock (gate) { reason = stopReason ?? "error"; }
-            Out.Emit(Out.Ev("capture.stopped", "turn", Turn, "gen", Gen, "reason", reason, "bufferedPeakBytes", Pipe.PeakUnread));
+            Guard.Emit(Out.Ev("capture.stopped", "turn", Turn, "gen", Gen, "reason", reason, "bufferedPeakBytes", Pipe.PeakUnread));
         }
     }
 
@@ -1985,7 +2063,9 @@ internal sealed class Speaker
             if (h != null) h.Reset();
             Stopwatch wait = Stopwatch.StartNew();
             while (!DeviceDone(c) && wait.ElapsedMilliseconds < 1000) Thread.Sleep(3);
-            ReleaseDone(c);
+            // The reset above has returned the chunk to this thread, so its buffers are released here, not leaked
+            // when the driver never marks the header done. Release frees nothing the driver still owns.
+            if (h != null) h.Release(c);
             CloseDevice();
             lock (gate) { FailAndDrop(c, "DEVICE_LOST", "playback did not complete"); }
             return false;
@@ -2176,6 +2256,42 @@ internal static class SelfTest
         public void Close() { }
     }
 
+    // A driver whose header never completes on its own. Only a reset completes it, and Release is recorded.
+    sealed class SilentWaveOut : IWaveOut
+    {
+        volatile bool reset;
+        public int Released;
+        public int Closed;
+        public uint Device { get { return 0u; } }
+        public void Submit(Chunk c) { }
+        public bool IsDone(Chunk c) { return reset; }
+        public void Release(Chunk c) { Released++; }
+        public void Reset() { reset = true; }
+        public void Close() { Closed++; }
+    }
+
+    // A stream standing in for a closed host pipe: every write fails the way a broken stdout does.
+    sealed class BrokenStream : Stream
+    {
+        public override bool CanRead { get { return false; } }
+        public override bool CanSeek { get { return false; } }
+        public override bool CanWrite { get { return true; } }
+        public override long Length { get { throw new NotSupportedException(); } }
+        public override long Position { get { throw new NotSupportedException(); } set { throw new NotSupportedException(); } }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+        public override long Seek(long offset, SeekOrigin origin) { throw new NotSupportedException(); }
+        public override void SetLength(long value) { throw new NotSupportedException(); }
+        public override void Write(byte[] buffer, int offset, int count) { throw new IOException("host pipe closed"); }
+    }
+
+    // A frame source that reports the device lost on its first read, so the loop's fault path emits a capture error.
+    sealed class LostSource : IFrameSource
+    {
+        public int Read(byte[] frame) { return -1; }
+        public void Close() { }
+    }
+
     sealed class FakeRecognizer : IAbandonedRecognizer
     {
         public volatile bool Finished;
@@ -2224,6 +2340,51 @@ internal static class SelfTest
         r["abandonReleasedWhenFinished"] = AbandonLedger.HasRoom() && a.Released == 1 && AbandonLedger.Count == 1;
         AbandonLedger.Add(c);
         r["abandonRefusedAgain"] = !AbandonLedger.HasRoom() && b.Released == 0 && c.Released == 0;
+    }
+
+    static void ContainmentCheck(Dictionary<string, object> r)
+    {
+        // A recognizer whose start throws releases its engine (the turn no longer holds one) and rethrows.
+        CaptureTurn rt = new CaptureTurn("selftest-rec", 1, null, false, 0);
+        rt.FaultInjectForTest = e => { throw new InvalidOperationException("injected recognizer fault"); };
+        bool recThrew = false;
+        try { rt.StartRecognizer(null); }
+        catch (InvalidOperationException) { recThrew = true; }
+        r["recognizerFaultThrew"] = recThrew;
+        r["recognizerFaultReleased"] = recThrew && !rt.EngineHeldForTest;
+
+        // A capture body whose protocol writes all fail still ends its thread: the process is not terminated.
+        Stream previous = Out.SwapStreamForTest(new BrokenStream());
+        CaptureTurn bt = new CaptureTurn("selftest-broken", 2, null, false, 1000000);
+        bt.StartCapture(new LostSource());
+        bt.Join(5000);
+        bool bodyEnded = !bt.CaptureAliveForTest;
+        Out.SwapStreamForTest(previous);
+        r["captureBodyContained"] = bodyEnded;
+
+        // A playback chunk whose header never completes: after the reset it is released, and the handle is closed.
+        SilentWaveOut silent = new SilentWaveOut();
+        Speaker timed = new Speaker(null, false, 1.0, new string[0], d => silent);
+        timed.AddRenderedForTest("selftest-timeout", 9, 0, new byte[320], 0u);
+        timed.Start();
+        Stopwatch tw = Stopwatch.StartNew();
+        while (silent.Closed == 0 && tw.ElapsedMilliseconds < 9000) Thread.Sleep(20);
+        timed.Shutdown();
+        r["timedOutChunkReleased"] = silent.Released == 1;
+        r["timedOutHandleClosed"] = silent.Closed >= 1;
+
+        // Unmanaged audio is overwritten with zeros before it is freed.
+        IntPtr probe = Marshal.AllocHGlobal(64);
+        byte[] filled = new byte[64];
+        for (int i = 0; i < filled.Length; i++) filled[i] = 0xAB;
+        Marshal.Copy(filled, 0, probe, filled.Length);
+        Native.WipeNative(probe, 64);
+        byte[] after = new byte[64];
+        Marshal.Copy(probe, after, 0, after.Length);
+        Marshal.FreeHGlobal(probe);
+        bool allZero = true;
+        foreach (byte b in after) if (b != 0) allZero = false;
+        r["nativeWipeZero"] = allZero;
     }
 
     // One worker serves every receipt. A full queue is refused without starting anything.
@@ -2372,6 +2533,10 @@ internal static class SelfTest
 
         // Cancel meter: one worker for any number of receipts; a full queue is refused, never a new thread.
         MeterCheck(r);
+
+        // Containment: a failed recognizer start, a capture body whose protocol write fails, a timed-out chunk, and the
+        // wipe of unmanaged audio. Each runs against fakes or a broken stream; no device or recognizer audio is used.
+        ContainmentCheck(r);
 
         Out.Emit(Out.Ev("selftest", "results", r));
         return 0;

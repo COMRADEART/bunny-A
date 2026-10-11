@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { VoiceSessionManager, REFUSAL_TEXT, REDIRECT_TEXT, TOOLS_TEXT, pickCandidate, type VoiceAgentRow, type VoiceChatTask, type VoiceTaskEvent } from "./voice-session.server.ts";
+import { VoiceSessionManager, REFUSAL_TEXT, REDIRECT_TEXT, TOOLS_TEXT, pickCandidate, SPOKEN_CHAT_INSTRUCTION, type VoiceAgentRow, type VoiceChatTask, type VoiceTaskEvent } from "./voice-session.server.ts";
 import { deviceTask, VOICE_TURN_DEVICE_LABEL } from "../device-authority.server.ts";
 import type { VoiceWorkerPort } from "./voice-worker.server.ts";
 import { VOICE_LIMITS, VOICE_PROTOCOL, type WorkerCommand, type WorkerEvent, type VoiceMode } from "./voice-protocol.ts";
@@ -1243,4 +1243,132 @@ test("R1-containment#0 a worker that exits on its own is settled (its job group 
   await h.open();
   assert.equal(h.workers.length, 2, "one fresh worker after the settled one");
   assert.equal(h.workers[1].closed, false);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// M-A-3 T10 review round 2 regressions (session)
+// ---------------------------------------------------------------------------------------------------------------------
+
+test("R2-truth#4 a screen Cancel clears the model route and speaks a host fact that carries no route", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "pause the agent", confidence: 0.9 });
+  await h.flush();
+  assert.equal(h.session.snapshot().proposal?.action, "agent.pause");
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "What is the capital of France?", confidence: 0.9 });
+  await h.flush();
+  h.chat.text("task-1", "Paris. ");
+  h.chat.done("task-1");
+  await h.flush();
+  assert.equal(h.session.snapshot().route?.provider, "ollama");
+  assert.ok(h.session.snapshot().proposal, "the proposal is still pending when Cancel is pressed");
+  h.session.controlCancel();
+  const snap = h.session.snapshot();
+  assert.equal(snap.answer, "Cancelled.");
+  assert.equal(snap.answerSource, "host_facts");
+  assert.equal(snap.route, null, "the host fact is not attributed to the model route");
+});
+
+test("R2-races#3 closing cuts speech before the turn's inference is stopped, and a new voice command is refused while closing", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "What is the capital of France?", confidence: 0.9 });
+  await h.flush();
+  h.chat.text("task-1", "Paris is the capital and the largest city of France, on the banks of the Seine river. ");
+  await h.flush();
+  assert.ok(h.worker.ofOp("speak").length > 0, "a chunk is queued for speech");
+  const chat = h.chat;
+  const stop = chat.stop.bind(chat);
+  let speechCancelledWhenStopped = false;
+  chat.stop = (taskId: string) => {
+    speechCancelledWhenStopped = h.worker.ofOp("speak.cancel").length > 0;
+    return stop(taskId);
+  };
+  const closing = h.session.close();
+  assert.equal(h.worker.ofOp("speak.cancel").length, 1, "speech is cancelled before anything is awaited");
+  await h.session.text("What is the weather?");
+  assert.equal(h.chat.submits.length, 1, "no new model task is submitted while the session closes");
+  await closing;
+  assert.equal(speechCancelledWhenStopped, true, "the inference stop came after the speech cancel");
+  assert.equal(h.session.snapshot().open, false);
+  assert.deepEqual(h.chat.stops, ["task-1"]);
+});
+
+test("R2-races#4 a worker that exits mid-answer stops the voice turn's inference and settles the turn to ERROR", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "What is the capital of France?", confidence: 0.9 });
+  await h.flush();
+  h.chat.text("task-1", "Paris is the capital and the largest city of France, on the banks of the Seine river. ");
+  await h.flush();
+  const worker = h.worker;
+  worker.exit(1);
+  await h.flush();
+  assert.deepEqual(h.chat.stops, ["task-1"], "the voice turn's own task is stopped when the worker is gone");
+  assert.equal(h.session.snapshot().error?.code, "WORKER_EXITED");
+  assert.equal(h.session.snapshot().state, "ERROR");
+  const sentBefore = worker.sent.length;
+  h.chat.text("task-1", "More words. ");
+  await h.flush();
+  assert.equal(worker.sent.length, sentBefore, "no late model output reaches the dead worker");
+});
+
+test("R2-authz#2 'cancel the agent' proposes a stop for screen confirmation and runs nothing; a bare cancel is truthful", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "cancel the agent", confidence: 0.9 });
+  await h.flush();
+  const proposal = h.session.snapshot().proposal;
+  assert.equal(proposal?.action, "agent.stop");
+  assert.equal(proposal?.confirmVia, "screen");
+  assert.deepEqual(h.commands, [], "no canonical command ran");
+  assert.doesNotMatch(h.session.snapshot().answer ?? "", /Okay, cancelled/);
+  assert.match(h.session.snapshot().answer ?? "", /Confirm on the Windows Host screen to stop Builder/);
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "cancel", confidence: 0.9 });
+  await h.flush();
+  assert.equal(h.session.snapshot().proposal, null, "a bare cancel clears the pending stop proposal");
+  assert.equal(h.session.snapshot().answer, "Okay, cancelled.");
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "cancel", confidence: 0.9 });
+  await h.flush();
+  assert.equal(h.session.snapshot().answer, "Nothing is waiting to be cancelled.", "nothing pending is not reported as cancelled");
+  assert.deepEqual(h.commands, []);
+});
+
+test("R2-authz#3 a spoken name that disagrees with the position asks which agent; a name that agrees is honored", async () => {
+  const h = setup({ agents: [
+    { id: "a1", name: "Alpha", state: "RUNNING", revision: 1 },
+    { id: "a2", name: "Beta", state: "RUNNING", revision: 2 },
+  ] });
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "pause the second agent named alpha", confidence: 0.9 });
+  await h.flush();
+  assert.equal(h.session.snapshot().proposal, null, "no proposal is made from the position");
+  assert.equal(h.session.snapshot().clarification?.candidates.length, 2, "the speaker is asked which agent");
+  assert.deepEqual(h.commands, []);
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "pause the second agent named beta", confidence: 0.9 });
+  await h.flush();
+  assert.equal(h.session.snapshot().proposal?.agentName, "Beta", "a name that matches the position is honored");
+});
+
+test("R2-defense#0 the spoken-chat prompt tells the tool-free model it cannot act and must point to the Windows Host screen", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "What is the capital of France?", confidence: 0.9 });
+  await h.flush();
+  const prompt = h.chat.submits[0];
+  assert.ok(prompt.includes(SPOKEN_CHAT_INSTRUCTION), "the composed prompt carries the instruction");
+  assert.match(prompt, /cannot take any action/);
+  assert.match(prompt, /cannot approve or deny anything/);
+  assert.match(prompt, /never say that something was approved/i);
+  assert.match(prompt, /Windows Host screen/);
 });

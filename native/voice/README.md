@@ -87,6 +87,18 @@ All of its threads are background threads, and it holds only the `winmm` and COM
   the worker must be restarted if the recognizer never completes.
 - Thread faults: a fault on the playback, synthesis or finalize thread is reported as one `playback.error` (`INTERNAL`)
   or `stt.none` (`aborted`) and ends the affected chunk or turn. It never terminates the process.
+- Capture thread faults: the capture body runs under the same guard. A fault there, including a protocol write that fails
+  because the Host pipe closed, ends the turn with `capture.error`. Error and stop events on those paths never throw.
+- Recognizer start failure: a recognizer whose start throws is disposed before the error is reported as `STT_UNAVAILABLE`.
+- Playback timeout: a chunk whose header never completes is released only after `waveOutReset` returns it. The handle
+  closes even when the first `waveOutClose` fails (one reset and one retry). A header the driver still reports as playing
+  is never freed; it is kept for the process lifetime.
+- Raw audio: capture buffers are overwritten with zeros before they are freed, and the capture frame and feed buffers are
+  cleared when the turn ends. The recognizer pipe is wiped at finalize.
+- Known, not fixed: protocol events are written while `Speaker.gate` or `Program.Gate` is held. If the Host stops reading
+  stdout for a long time, a blocked write stalls the command loop (speak.cancel and barge-in wait behind it). A closed
+  pipe does not block, it throws. Moving writes out of the locks would reorder `playback.started` against cancel receipts,
+  which the Host protocol relies on, so this needs a protocol-level change.
 - Stale `speak` commands (gen at or below the highest cancelled gen) are dropped without playback. `speak.cancelled`
   reports `staleDropped`: the count since the previous cancel receipt.
 - Live loopback (synthetic SAPI voice through the laptop speakers into the real microphone, user's volume): the VAD and

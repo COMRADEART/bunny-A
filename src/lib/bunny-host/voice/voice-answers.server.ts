@@ -128,12 +128,26 @@ export function hostFactsFrom(input: {
  */
 export function pendingApprovalFacts(input: {
   tasks: { state: string; provider: string; mission?: unknown }[];
-  missions: { title: string; requests: { resolvedAt?: number | null }[] }[];
-  agents: { name: string; state: string }[];
+  missions: { id?: string; title: string; requests: { resolvedAt?: number | null }[] }[];
+  /** truth#2: an agent waits on the user when its runtime state says so OR its canonical consent offer does (the screen's rule). */
+  agents: { name: string; state: string; missionId?: string | null; authorization?: { state: string } | null }[];
 }): ApprovalFact[] {
   const facts: ApprovalFact[] = [];
   for (const task of input.tasks) if (task.state === "waiting_for_approval" && !task.mission) facts.push({ name: `${task.provider} task`, kind: "task" });
-  for (const mission of input.missions) for (const request of mission.requests) if (!request.resolvedAt) facts.push({ name: `${mission.title} permission`, kind: "mission_request" });
-  for (const agent of input.agents) if (agent.state === "WAITING_FOR_USER") facts.push({ name: `${agent.name} agent`, kind: "mission_request" });
+  // T10-SUP#3: one underlying ask is one item. An agent whose Mission already lists an unresolved request is that same ask.
+  const missionsAsking = new Set<string>();
+  for (const mission of input.missions)
+    for (const request of mission.requests)
+      if (!request.resolvedAt) {
+        facts.push({ name: `${mission.title} permission`, kind: "mission_request" });
+        if (mission.id) missionsAsking.add(mission.id);
+      }
+  // truth#2: the AgenticProjection state WAITING_FOR_USER is the canonical consent offer (agentic-store.server.ts). The agent
+  // state alone can read RUNNING while consent is pending, which the Windows screen already reports as "Needs approval".
+  for (const agent of input.agents) {
+    const consentPending = agent.authorization?.state === "WAITING_FOR_USER";
+    if (agent.missionId && missionsAsking.has(agent.missionId)) continue;
+    if (agent.state === "WAITING_FOR_USER" || consentPending) facts.push({ name: `${agent.name} agent`, kind: "mission_request" });
+  }
   return facts;
 }

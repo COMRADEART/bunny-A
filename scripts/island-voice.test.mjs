@@ -116,8 +116,10 @@ test('V45: closing the Island releases voice (voice.session.close) and never cal
   const visual = read(visualPath);
   const voice = read(voicePath);
   const closing = voice.slice(voice.indexOf('$bunnyWindow.Add_Closing'), voice.indexOf('$bunnyWindow.Add_Closed'));
-  assert.match(closing, /voice\.session\.close/);
-  assert.doesNotMatch(closing, /agent\.|mission\./);
+  assert.match(closing, /Invoke-BunnyVoiceCloseNow/);
+  const closeNow = voice.slice(voice.indexOf('function Invoke-BunnyVoiceCloseNow'), voice.indexOf('function Set-BunnyHandsFree'));
+  assert.match(closeNow, /'voice\.session\.close'/);
+  assert.doesNotMatch(closing + closeNow, /agent\.|mission\./);
   // Closed handlers in the Visual and Voice layers must not reach an agent or mission command either.
   for (const text of [visual, voice]) {
     for (const m of text.matchAll(/Add_Closed\(\{([\s\S]*?)\}\)\)?/g)) assert.doesNotMatch(m[1], /'(agent|mission)\./);
@@ -252,4 +254,293 @@ test('R1-truth#5 the desktop level meter and the WPF level meter both read snaps
   assert.match(model, /now - level\.at >= VOICE_FRESH_MS/);
   const voice = read(voicePath);
   assert.match(voice, /\(\$now - \[double\]\$snap\.level\.at\) -lt \$bunnyVoiceFreshMs/);
+});
+
+// Round-2 review fixes (M-A-3 T10). The behaviour checks run the real WPF functions, extracted by name from the Voice
+// file, under Windows PowerShell 5.1 with a fake clock and a fake HttpClient. The Host is never contacted.
+function extractPsFunction(text, name) {
+  const marker = text.includes(`function ${name} `) ? `function ${name} ` : `function ${name}(`;
+  const start = text.indexOf(marker);
+  assert.ok(start >= 0, `${name} exists`);
+  // Skip the parameter list by matching its parentheses (defaults such as @{} sit inside it); the body opens at the next brace.
+  let cursor = start + `function ${name}`.length;
+  while (text[cursor] === ' ') cursor += 1;
+  if (text[cursor] === '(') {
+    let parens = 0;
+    for (; cursor < text.length; cursor += 1) {
+      if (text[cursor] === '(') parens += 1;
+      else if (text[cursor] === ')') {
+        parens -= 1;
+        if (parens === 0) break;
+      }
+    }
+  }
+  const open = text.indexOf('{', cursor);
+  let depth = 0;
+  for (let i = open; i < text.length; i += 1) {
+    if (text[i] === '{') depth += 1;
+    else if (text[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  throw new Error(`${name} is not closed`);
+}
+
+const HARNESS_FUNCTIONS = [
+  'Add-BunnyVoiceRequest', 'Start-BunnyVoiceFlight', 'Set-BunnyVoiceStartOutcome', 'Set-BunnyVoiceFlightLost',
+  'Complete-BunnyVoiceResponse', 'Invoke-BunnyVoicePump', 'Invoke-BunnyVoicePumpCore', 'Get-BunnyVoiceSource',
+  'Invoke-BunnyVoiceIntent', 'Set-BunnyVoiceSnapshot', 'Test-BunnyVoiceQueued', 'Start-BunnyVoiceListen',
+  'Stop-BunnyVoiceListen', 'Invoke-BunnyVoiceClick', 'Start-BunnyVoicePointer', 'Stop-BunnyVoicePointer',
+  'Clear-BunnyVoiceOpening', 'Invoke-BunnyVoiceCloseNow', 'Get-BunnyVoiceLiveProposal', 'Get-BunnyVoiceLabel',
+];
+
+// Test doubles: the clock, the Host (a fake HttpClient that answers every request with a new turn for listen.start),
+// and the Island's UI hooks. They are defined after the extracted functions, so they replace nothing real.
+const HARNESS_DOUBLES = `
+function Get-BunnyNowMs { [double]$script:fakeNow }
+function Open-BunnyDashboard([string]$Query) { [void]$script:dashboardCalls.Add($Query) }
+function Set-BunnyView([string]$View) { }
+function Resize-Bunny { }
+function New-BunnyVoiceRequestMessage([string]$Action, $Data) { [pscustomobject]@{ action = $Action; data = $Data } }
+function Get-BunnyVoiceClient { $script:client }
+function New-FakeTask([bool]$Done, [bool]$Faulted, $Result) {
+  $task = [pscustomobject]@{ IsCompleted = $Done; IsFaulted = $Faulted; IsCanceled = $false; Result = $Result }
+  $task | Add-Member -MemberType ScriptMethod -Name Wait -Value { param($ms) $true }
+  return $task
+}
+$script:client = [pscustomobject]@{}
+$script:client | Add-Member -MemberType ScriptMethod -Name SendAsync -Value {
+  param($req)
+  [void]$script:wire.Add($req)
+  if ($script:loseNext) { $script:loseNext = $false; return New-FakeTask $false $false $null }
+  if ($req.action -eq 'voice.listen.start') { $script:turnN++; $script:curTurn = 'T' + [string]$script:turnN }
+  $script:lastBody = '{"data":{"protocol":"bunny-voice/1","open":true,"turnId":"' + $script:curTurn + '","hostEpoch":"e1","state":"LISTENING","devices":{}}}'
+  $content = [pscustomobject]@{}
+  $content | Add-Member -MemberType ScriptMethod -Name ReadAsStringAsync -Value { New-FakeTask $true $false $script:lastBody }
+  return New-FakeTask $true $false ([pscustomobject]@{ StatusCode = 200; Content = $content })
+}
+$bunnyOnline = $true
+$bunnyEllipsis = '...'
+$bunnyDot = '-'
+$bunnySnapshot = $null
+function Reset-Harness {
+  $script:fakeNow = 1000000
+  $script:wire = New-Object System.Collections.ArrayList
+  $script:dashboardCalls = New-Object System.Collections.ArrayList
+  $script:loseNext = $false
+  $script:turnN = 0
+  $script:curTurn = 'T0'
+  $script:bunnyVoiceQueue = New-Object System.Collections.ArrayList
+  $script:bunnyVoiceFlight = $null
+  $script:bunnyVoiceSnapshot = $null
+  $script:bunnyVoiceListening = $false
+  $script:bunnyVoiceTapLatched = $false
+  $script:bunnyVoiceOpenSent = $false
+  $script:bunnyVoicePointerClick = $false
+  $script:bunnyVoicePointerUpAt = 0
+  $script:bunnyVoiceStartState = 'none'
+  $script:bunnyVoiceStartTurn = $null
+  $script:bunnyVoiceUiSeen = $null
+  $script:bunnyVoiceUiEpoch = $null
+  $script:bunnyVoiceError = $null
+  $script:bunnyVoiceOkAt = 0
+  $script:bunnyVoiceMouseAt = 0
+  $script:bunnyVoiceListenAt = 0
+  $script:bunnyVoiceLastPoll = 0
+}
+function Drain { for ($i = 0; $i -lt 40; $i++) { Invoke-BunnyVoicePump } }
+function Wire-Lines {
+  @($script:wire | ForEach-Object {
+    $line = [string]$_.action
+    if ($_.data -and $_.data.source) { $line += ':' + [string]$_.data.source }
+    if ($_.data -and $_.data.turnId) { $line += '@' + [string]$_.data.turnId }
+    $line
+  })
+}
+function Intent($seq, $kind) {
+  $intent = $null
+  if ($null -ne $seq) { $intent = [pscustomobject]@{ seq = $seq; kind = $kind; agentId = $null } }
+  [pscustomobject]@{ hostEpoch = 'e1'; uiIntent = $intent }
+}
+`;
+
+const HARNESS_SCENARIOS = `
+Reset-Harness
+Start-BunnyVoicePointer; $script:fakeNow += 600; Stop-BunnyVoicePointer; Invoke-BunnyVoiceClick; Drain
+$r['hold600'] = Wire-Lines
+
+Reset-Harness
+Start-BunnyVoicePointer; $script:fakeNow += 100; Stop-BunnyVoicePointer; Invoke-BunnyVoiceClick; Drain
+$script:fakeNow += 2000
+Start-BunnyVoicePointer; $script:fakeNow += 600; Stop-BunnyVoicePointer; Invoke-BunnyVoiceClick; Drain
+$r['tapThenHeldSecondTap'] = Wire-Lines
+$r['tapLatched'] = [bool]$script:bunnyVoiceTapLatched
+
+Reset-Harness
+Invoke-BunnyVoiceClick; Drain; Invoke-BunnyVoiceClick; Drain
+$r['keyboardToggle'] = Wire-Lines
+
+Reset-Harness
+Start-BunnyVoiceListen 'push_to_talk'; Stop-BunnyVoiceListen; Drain
+$r['releaseQueuedBeforeAck'] = Wire-Lines
+
+Reset-Harness
+Start-BunnyVoiceListen 'push_to_talk'; Drain
+Stop-BunnyVoiceListen; Drain
+$script:loseNext = $true
+Start-BunnyVoiceListen 'push_to_talk'; Drain
+$script:fakeNow += 13000; Drain
+$r['lostStartStateBeforeRelease'] = [string]$script:bunnyVoiceStartState
+Stop-BunnyVoiceListen; Drain
+$r['lostStartRelease'] = Wire-Lines
+
+Reset-Harness
+$script:loseNext = $true
+Start-BunnyVoiceListen 'hotkey'
+Invoke-BunnyVoiceCloseNow
+$r['closeOrdering'] = Wire-Lines
+$r['closeQueueLeft'] = @($script:bunnyVoiceQueue | ForEach-Object { [string]$_.action })
+$r['closeOpenSent'] = [bool]$script:bunnyVoiceOpenSent
+
+Reset-Harness
+Invoke-BunnyVoiceIntent (Intent $null $null)
+Invoke-BunnyVoiceIntent (Intent 1 'open_workspace')
+Invoke-BunnyVoiceIntent (Intent 1 'open_workspace')
+$r['intentFirstNull'] = @($script:dashboardCalls | ForEach-Object { [string]$_ })
+
+Reset-Harness
+Invoke-BunnyVoiceIntent (Intent 4 'open_workspace')
+Invoke-BunnyVoiceIntent (Intent 4 'open_workspace')
+$r['intentPreexisting'] = @($script:dashboardCalls | ForEach-Object { [string]$_ })
+
+Reset-Harness
+$now = [double]$script:fakeNow
+$expired = [pscustomobject]@{ open = $true; muted = $false; capturing = $false; playing = $false; state = 'LISTENING'; proposal = [pscustomobject]@{ agentName = 'Alpha'; expiresAt = ($now - 1) } }
+$live = [pscustomobject]@{ open = $true; muted = $false; capturing = $false; playing = $false; state = 'LISTENING'; proposal = [pscustomobject]@{ agentName = 'Alpha'; expiresAt = ($now + 30000) } }
+$pExpired = Get-BunnyVoiceLiveProposal $expired $now
+$pLive = Get-BunnyVoiceLiveProposal $live $now
+$r['expiredProposalIsNull'] = ($null -eq $pExpired)
+$r['expiredLabel'] = [string](Get-BunnyVoiceLabel $expired $true $true 'LISTENING' @() ([bool]$pExpired))
+$r['liveLabel'] = [string](Get-BunnyVoiceLabel $live $true $true 'LISTENING' @() ([bool]$pLive))
+`;
+
+function buildVoiceHarness(text) {
+  const constantsStart = text.indexOf('$bunnyVoicePollMs = 200');
+  const constantsEnd = text.indexOf('$bunnyNativeKeysDefinition');
+  const stateStart = text.indexOf('$script:bunnyVoiceSnapshot = $null');
+  const stateEnd = text.indexOf('function Get-BunnyNowMs');
+  assert.ok(constantsStart > 0 && constantsEnd > constantsStart && stateStart > 0 && stateEnd > stateStart, 'harness anchors');
+  const functions = HARNESS_FUNCTIONS.map((name) => extractPsFunction(text, name)).join('\n\n');
+  return [
+    'param([string]$Out)',
+    "$ErrorActionPreference = 'Stop'",
+    '$script:fakeNow = 1000000',
+    text.slice(constantsStart, constantsEnd),
+    text.slice(stateStart, stateEnd),
+    functions,
+    HARNESS_DOUBLES,
+    '$r = [ordered]@{}',
+    HARNESS_SCENARIOS,
+    '[IO.File]::WriteAllText($Out, (ConvertTo-Json -InputObject $r -Depth 5), (New-Object Text.UTF8Encoding $false))',
+    '',
+  ].join('\n');
+}
+
+let voiceHarnessResult = null;
+function runVoiceHarness() {
+  if (voiceHarnessResult) return voiceHarnessResult;
+  const dir = mkdtempSync(join(tmpdir(), 'island-voice-r2-'));
+  try {
+    const script = join(dir, 'harness.ps1');
+    const out = join(dir, 'out.json');
+    writeFileSync(script, buildVoiceHarness(read(voicePath)), 'utf8');
+    const run = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Out', out], { encoding: 'utf8', timeout: 120000 });
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    voiceHarnessResult = JSON.parse(read(out).replace(/^﻿/, ''));
+    return voiceHarnessResult;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('R2-races#0 holding the mic 600 ms sends one listen.start and one listen.end, and the release Click restarts nothing', { skip }, () => {
+  assert.deepEqual(runVoiceHarness().hold600, ['voice.session.open', 'voice.listen.start:push_to_talk', 'voice.listen.end@T1']);
+});
+
+test('R2-races#0 a second tap held 600 ms ends the latched turn and its release Click starts nothing new', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.deepEqual(r.tapThenHeldSecondTap, ['voice.session.open', 'voice.listen.start:push_to_talk', 'voice.listen.end@T1']);
+  assert.equal(r.tapLatched, false);
+});
+
+test('R2-races#0 keyboard activation still toggles (no pointer Click pending)', { skip }, () => {
+  assert.deepEqual(runVoiceHarness().keyboardToggle, ['voice.session.open', 'voice.listen.start:button', 'voice.listen.end@T1']);
+});
+
+test('R2-races#0 static: the pointer Click is consumed by a flag set on release, not by the mouse-down timestamp', () => {
+  const voice = read(voicePath);
+  const click = voice.slice(voice.indexOf('function Invoke-BunnyVoiceClick'), voice.indexOf('function Start-BunnyVoicePointer'));
+  assert.match(click, /\$script:bunnyVoicePointerClick = \$false/);
+  assert.doesNotMatch(click, /bunnyVoiceMouseAt/);
+  const up = voice.slice(voice.indexOf('function Stop-BunnyVoicePointer'), voice.indexOf('# Opens and listens that were queued'));
+  assert.match(up, /\$script:bunnyVoicePointerClick = \$true/);
+});
+
+test('R2-races#1 a release queued before the listen.start is acknowledged binds to that start turn', { skip }, () => {
+  assert.deepEqual(runVoiceHarness().releaseQueuedBeforeAck, ['voice.session.open', 'voice.listen.start:push_to_talk', 'voice.listen.end@T1']);
+});
+
+test('R2-races#1 a lost listen.start leaves the later release unbound, so it ends whatever capture the Host holds', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.equal(r.lostStartStateBeforeRelease, 'unknown');
+  assert.deepEqual(r.lostStartRelease, [
+    'voice.session.open',
+    'voice.listen.start:push_to_talk',
+    'voice.listen.end@T1',
+    'voice.listen.start:push_to_talk',
+    'voice.listen.end',
+  ]);
+});
+
+test('R2-races#5 closing sends no queued-but-unsent open or listen, and the close lands after the open in flight', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.deepEqual(r.closeOrdering, ['voice.session.open', 'voice.session.close']);
+  assert.deepEqual(r.closeQueueLeft, []);
+  assert.equal(r.closeOpenSent, false);
+});
+
+test('R2-races#5 static: the window close sends the session close whenever an open or listen was sent or queued', () => {
+  const voice = read(voicePath);
+  const closing = voice.slice(voice.indexOf('$bunnyWindow.Add_Closing'), voice.indexOf('$bunnyWindow.Add_Closed'));
+  assert.match(closing, /if \(\$script:bunnyVoiceOpenPolling -or \$script:bunnyVoiceOpenSent\)/);
+});
+
+test('R2-truth#0 the first snapshot without an intent seeds the floor, so the first intent after start opens the workspace once', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.deepEqual(r.intentFirstNull, ['?view=agentic']);
+  assert.deepEqual(r.intentPreexisting, [], 'an intent already present when the Island starts is not replayed');
+});
+
+test('R2-truth#1 an expired proposal shows neither Needs approval nor a Confirm target', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.equal(r.expiredProposalIsNull, true);
+  assert.equal(r.expiredLabel, 'Ready');
+  assert.equal(r.liveLabel, 'Needs approval');
+  const voice = read(voicePath);
+  assert.match(voice, /\$proposal = Get-BunnyVoiceLiveProposal \$snap \$now/);
+  assert.match(voice, /\$bunnyControls\.VoiceConfirm\.IsEnabled = \$online -and \[bool\]\$proposal/);
+});
+
+test('R2-fixcheck#1 the desktop hold-to-talk listen.start sends source push_to_talk through the store', () => {
+  const store = read(storePath);
+  assert.match(store, /voiceCallOutcome\("voice\.listen\.start", pressListenPayload\(\)\)/);
+  assert.doesNotMatch(store, /voiceCall\("voice\.listen\.start"\)/);
+});
+
+test('R2-races#2 the desktop press maps a transport failure to unknown (defensive end) and a Host refusal to refused', () => {
+  const store = read(storePath);
+  assert.match(store, /outcome: "unknown",\r?\n\s+code: "HOST_UNREACHABLE"/);
+  assert.match(store, /const started: StartOutcome = snapshot \? "started" : outcome === "refused" \? "refused" : "unknown";/);
+  assert.match(store, /await runPress\(pressEnded\(press\)\)/);
 });

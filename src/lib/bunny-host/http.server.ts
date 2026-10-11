@@ -395,7 +395,7 @@ export async function startHost(
         const tasks = manager.snapshot(0).tasks;
         const agentRows = agents.snapshot().agents;
         // H7: tasks waiting for approval, plus the canonical pending mission requests and agent authorizations.
-        let missionViews: { title: string; requests: { resolvedAt?: number | null }[] }[] = [];
+        let missionViews: { id?: string; title: string; requests: { resolvedAt?: number | null }[] }[] = [];
         try {
           missionViews = missions.snapshot().missions;
         } catch {

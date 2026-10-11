@@ -43,6 +43,14 @@ $script:bunnyVoiceListenAt = 0
 $script:bunnyVoiceHeld = $false
 $script:bunnyVoiceHeldAt = 0
 $script:bunnyVoiceMouseAt = 0
+# Pointer activation that Click will report: the Click that follows a mouse release is the pointer's own, never a toggle.
+$script:bunnyVoicePointerClick = $false
+$script:bunnyVoicePointerUpAt = 0
+# Outcome of the last listen.start: known (the Host answered with its turn), none (refused or never sent), unknown (lost).
+$script:bunnyVoiceStartState = 'none'
+$script:bunnyVoiceStartTurn = $null
+# True while the Host may hold this Island's session (an open or listen was sent or queued and no close has been).
+$script:bunnyVoiceOpenSent = $false
 $script:bunnyVoiceUpdating = $false
 $script:bunnyVoiceLayoutKey = ''
 $script:bunnyVoiceRegistered = $false
@@ -71,6 +79,8 @@ function New-BunnyVoiceRequestMessage([string]$Action, $Data) {
 function Add-BunnyVoiceRequest([string]$Action, $Data = @{}, [bool]$Urgent = $false) {
   if ($Action -eq 'voice.state' -and $script:bunnyVoiceQueue.Count -gt 0) { return }
   $item = @{ action = $Action; data = $Data }
+  if ($Action -eq 'voice.session.open' -or $Action -eq 'voice.listen.start') { $script:bunnyVoiceOpenSent = $true }
+  if ($Action -eq 'voice.session.close') { $script:bunnyVoiceOpenSent = $false }
   if ($Urgent) { $script:bunnyVoiceQueue.Insert(0, $item) } else { [void]$script:bunnyVoiceQueue.Add($item) }
   Invoke-BunnyVoicePump
 }
@@ -78,23 +88,43 @@ function Add-BunnyVoiceRequest([string]$Action, $Data = @{}, [bool]$Urgent = $fa
 function Start-BunnyVoiceFlight {
   $item = $script:bunnyVoiceQueue[0]
   $script:bunnyVoiceQueue.RemoveAt(0)
-  # The queue is single-flight FIFO, so a release is sent only after its listen.start answered: bind it to that turn.
-  # The Host ignores a release whose turn is not current, so a late release never ends a newer capture.
-  if ([string]$item.action -eq 'voice.listen.end' -and -not $item.data.turnId -and $script:bunnyVoiceSnapshot -and $script:bunnyVoiceSnapshot.turnId) {
-    $item.data = @{ turnId = [string]$script:bunnyVoiceSnapshot.turnId }
+  # The queue is single-flight FIFO, so a release is dequeued only after the listen.start before it has settled. Bind it to
+  # the turn that start was answered with (never to an older snapshot). A start whose answer was lost has no known turn:
+  # the release then goes unbound and ends whatever capture the Host holds. The Host ignores a release whose turn is stale.
+  if ([string]$item.action -eq 'voice.listen.end' -and -not $item.data.turnId -and $script:bunnyVoiceStartState -eq 'known' -and $script:bunnyVoiceStartTurn) {
+    $item.data = @{ turnId = [string]$script:bunnyVoiceStartTurn }
   }
   try {
     $request = New-BunnyVoiceRequestMessage ([string]$item.action) $item.data
     $script:bunnyVoiceFlight = @{ action = [string]$item.action; send = (Get-BunnyVoiceClient).SendAsync($request); read = $null; response = $null; stage = 'send'; at = Get-BunnyNowMs }
   } catch {
+    # The request was never sent, so the Host holds no capture from it.
+    Set-BunnyVoiceStartOutcome ([string]$item.action) 'none' $null
     $script:bunnyVoiceError = 'Voice request could not be sent'
   }
 }
 
-function Complete-BunnyVoiceResponse([int]$Status, [string]$Text) {
+function Set-BunnyVoiceStartOutcome([string]$Action, [string]$Outcome, $Turn) {
+  if ($Action -ne 'voice.listen.start') { return }
+  $script:bunnyVoiceStartState = $Outcome
+  $script:bunnyVoiceStartTurn = if ($Outcome -eq 'known' -and $Turn) { [string]$Turn } else { $null }
+}
+
+function Set-BunnyVoiceFlightLost($Flight) {
+  # No answer arrived (timeout, unreachable, unreadable): a listen.start may still have opened a capture on the Host.
+  Set-BunnyVoiceStartOutcome ([string]$Flight.action) 'unknown' $null
+}
+
+function Complete-BunnyVoiceResponse([int]$Status, [string]$Text, [string]$Action = '') {
   $body = $null
   try { $body = $Text | ConvertFrom-Json } catch { $body = $null }
-  if ($Status -ge 200 -and $Status -lt 300 -and $body -and $body.data) { Set-BunnyVoiceSnapshot $body.data; return }
+  if ($Status -ge 200 -and $Status -lt 300 -and $body -and $body.data) {
+    Set-BunnyVoiceSnapshot $body.data
+    Set-BunnyVoiceStartOutcome $Action 'known' $body.data.turnId
+    return
+  }
+  # The Host answered and refused (or failed) before it captured anything.
+  Set-BunnyVoiceStartOutcome $Action 'none' $null
   $script:bunnyVoiceError = if ($body -and $body.error) { [string]$body.error } else { 'Voice request failed (HTTP ' + $Status + ')' }
 }
 
@@ -108,10 +138,12 @@ function Invoke-BunnyVoicePumpCore {
     if ((Get-BunnyNowMs) - [double]$flight.at -gt $bunnyVoiceFlightTimeoutMs) {
       # The late HTTP result is dropped with the reference; it can never reach the snapshot.
       $script:bunnyVoiceFlight = $null
+      Set-BunnyVoiceFlightLost $flight
       $script:bunnyVoiceError = 'Voice request timed out'
     } elseif ($flight.stage -eq 'send') {
       if ($flight.send.IsFaulted -or $flight.send.IsCanceled) {
         $script:bunnyVoiceFlight = $null
+        Set-BunnyVoiceFlightLost $flight
         $script:bunnyVoiceError = 'Host unreachable for voice'
       } elseif ($flight.send.IsCompleted) {
         $flight.response = $flight.send.Result
@@ -122,8 +154,8 @@ function Invoke-BunnyVoicePumpCore {
     $flight = $script:bunnyVoiceFlight
     if ($flight -and $flight.stage -eq 'read' -and $flight.read.IsCompleted) {
       $script:bunnyVoiceFlight = $null
-      if ($flight.read.IsFaulted) { $script:bunnyVoiceError = 'Voice response could not be read' }
-      else { Complete-BunnyVoiceResponse ([int]$flight.response.StatusCode) $flight.read.Result }
+      if ($flight.read.IsFaulted) { Set-BunnyVoiceFlightLost $flight; $script:bunnyVoiceError = 'Voice response could not be read' }
+      else { Complete-BunnyVoiceResponse ([int]$flight.response.StatusCode) $flight.read.Result ([string]$flight.action) }
     }
   }
   if (-not $script:bunnyVoiceFlight -and $script:bunnyVoiceQueue.Count -gt 0) { Start-BunnyVoiceFlight }
@@ -150,10 +182,12 @@ function Invoke-BunnyVoiceIntent($Snap) {
     $script:bunnyVoiceUiEpoch = $epoch
   }
   $intent = $Snap.uiIntent
-  if (-not $intent -or $null -eq $intent.seq) { return }
-  $seq = [double]$intent.seq
+  # The first snapshot seeds the floor even when it carries no intent (seq 0, as planUiIntent does), so the first intent
+  # produced after this Island started is never swallowed. An intent already present at start seeds its own seq.
+  $hasIntent = [bool]($intent -and $null -ne $intent.seq)
+  $seq = if ($hasIntent) { [double]$intent.seq } else { 0.0 }
   if ($null -eq $script:bunnyVoiceUiSeen) { $script:bunnyVoiceUiSeen = $seq; return }
-  if ($seq -le $script:bunnyVoiceUiSeen) { return }
+  if (-not $hasIntent -or $seq -le $script:bunnyVoiceUiSeen) { return }
   $script:bunnyVoiceUiSeen = $seq
   $query = if ([string]$intent.kind -eq 'open_agent' -and $intent.agentId) { '?view=agentic&agent=' + [Uri]::EscapeDataString([string]$intent.agentId) } else { '?view=agentic' }
   try { Open-BunnyDashboard $query } catch { $script:bunnyVoiceError = 'Could not open the workspace' }
@@ -196,9 +230,12 @@ function Request-BunnyVoiceInterrupt([string]$Source) {
 }
 
 function Invoke-BunnyVoiceClick {
-  # Keyboard activation (Space or Enter) toggles. Mouse activation is handled by the press and release pair.
+  # Keyboard activation (Space or Enter) toggles. Mouse activation is handled by the press and release pair: the Click
+  # that a mouse release raises is the pointer's own and is consumed here, however long the button was held.
   # The mic never refuses to listen while SPEAKING: voice.listen.start is sent and the Host performs the barge-in.
-  if ((Get-BunnyNowMs) - [double]$script:bunnyVoiceMouseAt -lt 500) { return }
+  $pointerClick = [bool]$script:bunnyVoicePointerClick
+  $script:bunnyVoicePointerClick = $false
+  if ($pointerClick -and ((Get-BunnyNowMs) - [double]$script:bunnyVoicePointerUpAt) -lt 500) { return }
   if ($script:bunnyVoiceListening) { Stop-BunnyVoiceListen; return }
   Start-BunnyVoiceListen 'button'
 }
@@ -214,8 +251,32 @@ function Start-BunnyVoicePointer {
 function Stop-BunnyVoicePointer {
   # A hold of at least the hold threshold ends the turn. A quick tap is tap-to-talk: the turn stays open, the view says
   # "Listening - tap to finish", and it ends on the next tap, the latch deadline, or the Host's own cap.
+  # The Click that this release raises is the pointer's own (Invoke-BunnyVoiceClick consumes it), so it never restarts.
+  $script:bunnyVoicePointerClick = $true
+  $script:bunnyVoicePointerUpAt = Get-BunnyNowMs
   if (((Get-BunnyNowMs) - [double]$script:bunnyVoiceMouseAt) -ge $bunnyVoiceHoldMs) { Stop-BunnyVoiceListen; return }
   if ($script:bunnyVoiceListening) { $script:bunnyVoiceTapLatched = $true; $script:bunnyVoiceTapAt = Get-BunnyNowMs }
+}
+
+# Opens and listens that were queued but not yet sent never reach the Host once the Island closes.
+function Clear-BunnyVoiceOpening {
+  $kept = New-Object System.Collections.ArrayList
+  foreach ($item in $script:bunnyVoiceQueue) {
+    if ([string]$item.action -ne 'voice.session.open' -and [string]$item.action -ne 'voice.listen.start') { [void]$kept.Add($item) }
+  }
+  $script:bunnyVoiceQueue = $kept
+}
+
+function Invoke-BunnyVoiceCloseNow {
+  # The close is ordered after a request already in flight (bounded wait), so an open that is in flight cannot land after it.
+  Clear-BunnyVoiceOpening
+  $flight = $script:bunnyVoiceFlight
+  if ($flight -and $flight.send) { try { [void]$flight.send.Wait(1500) } catch { } }
+  $script:bunnyVoiceFlight = $null
+  $script:bunnyVoiceListening = $false
+  $script:bunnyVoiceTapLatched = $false
+  $script:bunnyVoiceOpenSent = $false
+  [void](Get-BunnyVoiceClient).SendAsync((New-BunnyVoiceRequestMessage 'voice.session.close' @{})).Wait(1500)
 }
 
 function Set-BunnyHandsFree([bool]$Want) {
@@ -232,14 +293,21 @@ function Set-BunnyHandsFree([bool]$Want) {
   Set-BunnyView 'voice'
 }
 
-function Get-BunnyVoiceLabel($Snap, [bool]$Open, [bool]$Fresh, [string]$State, $Waiting) {
+# A proposal the Host has not expired yet. The Host keeps an unanswered proposal until a later turn, so the expiry is checked here.
+function Get-BunnyVoiceLiveProposal($Snap, [double]$Now) {
+  if (-not $Snap -or -not $Snap.proposal) { return $null }
+  if ($Now -ge [double]$Snap.proposal.expiresAt) { return $null }
+  return $Snap.proposal
+}
+
+function Get-BunnyVoiceLabel($Snap, [bool]$Open, [bool]$Fresh, [string]$State, $Waiting, [bool]$Proposal) {
   if (-not $bunnyOnline) { return 'Host offline - voice unavailable' }
   if (-not $Open) { return 'Voice is off' }
   if (-not $Fresh) { return 'Reconnecting' + $bunnyEllipsis }
   if ($Snap.muted -or $State -eq 'MUTED') { return 'Microphone muted' }
   if ($Snap.capturing) { return 'Listening' }
   if ($Snap.playing) { return 'Speaking' }
-  if ($Snap.proposal -or @($Waiting).Count -gt 0) { return 'Needs approval' }
+  if ($Proposal -or @($Waiting).Count -gt 0) { return 'Needs approval' }
   if ($State -eq 'TRANSCRIBING' -or $State -eq 'PROCESSING') { return 'Processing' }
   if ($State -eq 'INTERRUPTED') { return 'Interrupted' }
   if ($State -eq 'ERROR' -or $State -eq 'DEVICE_UNAVAILABLE') { return 'Voice needs attention' }
@@ -282,9 +350,10 @@ function Update-BunnyVoiceView {
   $fresh = ($now - [double]$script:bunnyVoiceOkAt) -lt $bunnyVoiceFreshMs
   $state = if ($snap) { [string]$snap.state } else { '' }
   $waiting = @($bunnySnapshot.agents.agents | Where-Object { $_.authorization -and $_.authorization.state -eq 'WAITING_FOR_USER' })
-  $label = Get-BunnyVoiceLabel $snap $open $fresh $state $waiting
+  $proposal = Get-BunnyVoiceLiveProposal $snap $now
+  $label = Get-BunnyVoiceLabel $snap $open $fresh $state $waiting ([bool]$proposal)
   if ($label -eq 'Needs approval') {
-    $who = if ($snap.proposal) { [string]$snap.proposal.agentName } elseif ($waiting.Count) { [string]$waiting[0].name } else { '' }
+    $who = if ($proposal) { [string]$proposal.agentName } elseif ($waiting.Count) { [string]$waiting[0].name } else { '' }
     if ($who) { $label = 'Needs approval for ' + $who }
   }
   # A tap-latched turn the user never finished ends at the latch deadline, so the mic is never open unannounced.
@@ -308,7 +377,6 @@ function Update-BunnyVoiceView {
 
   $device = Get-BunnyVoiceDeviceLine $snap
   $deviceLine = (@($device, $script:bunnyVoiceShortcutNote) | Where-Object { $_ }) -join ' '
-  $proposal = if ($snap) { $snap.proposal } else { $null }
   $showCompact = [bool]($open -or $script:bunnyVoiceError)
   $bunnyControls.CompactVoice.Visibility = if ($showCompact -and -not $script:bunnyColumn) { 'Visible' } else { 'Collapsed' }
   $bunnyControls.CompactVoice.Text = if ($deviceLine) { $headline + ' ' + $bunnyDot + ' ' + $deviceLine } else { $headline }
@@ -469,8 +537,8 @@ $bunnyWindow.Add_SourceInitialized({ Register-BunnyVoiceHotkey })
 # mission.* actions: Host-owned work keeps running after the Island closes.
 $bunnyWindow.Add_Closing({
   Stop-BunnyVoiceHotkey
-  if ($script:bunnyVoiceOpenPolling) {
-    try { [void](Get-BunnyVoiceClient).SendAsync((New-BunnyVoiceRequestMessage 'voice.session.close' @{})).Wait(1500) } catch { }
+  if ($script:bunnyVoiceOpenPolling -or $script:bunnyVoiceOpenSent) {
+    try { Invoke-BunnyVoiceCloseNow } catch { }
   }
 })
 $bunnyWindow.Add_Closed({

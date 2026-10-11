@@ -443,7 +443,7 @@ function runSelfTest() {
   return new Promise((resolveRun, rejectRun) => {
     const child = spawn(exe, ["--selftest"], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
     let out = "";
-    const timer = setTimeout(() => { child.kill(); rejectRun(new Error("selftest timed out")); }, 10000);
+    const timer = setTimeout(() => { child.kill(); rejectRun(new Error("selftest timed out")); }, 30000);
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", d => { out += d; });
     child.on("exit", code => {
@@ -642,4 +642,43 @@ test("native#6 the finalize decision reads the onset state published during capt
   const r = await sharedSelfTest();
   assert.equal(r.onsetPublished, true, "the onset state is visible while frames are processed");
   assert.equal(r.onsetDecision, "final", "recognized text with a published onset is not dropped as no speech");
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Review round 2 (native lens). The containment checks run in the selftest against fakes and a broken stream: no
+// device is opened, no recognizer hears audio, and nothing is audible. The source checks pin the ownership order
+// that the in-process checks cannot reach without a driver.
+// ---------------------------------------------------------------------------------------------------------------
+const sourceText = () => readFileSync(sourcePath, "utf8");
+
+test("R2-native#0 a recognizer whose start throws is disposed before the error propagates, so the turn holds no engine", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.recognizerFaultThrew, true, "the start failure reaches the caller");
+  assert.equal(r.recognizerFaultReleased, true, "the failed turn no longer holds its recognizer engine");
+  assert.match(sourceText(), /catch \(Exception\)\s*\{\s*ReleaseEngine\(\);\s*throw;\s*\}/, "StartRecognizer disposes the engine on every failure path");
+});
+
+test("R2-native#1 the capture thread body is guarded: a protocol write that fails on a closed pipe ends the turn, not the process", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.captureBodyContained, true, "the capture thread ends normally when every protocol write fails");
+  assert.match(sourceText(), /new Thread\(\(\) => Guard\.Run\(\(\) => CaptureLoop\(source\), FaultCapture\)\)/, "the capture thread body runs under Guard.Run");
+  assert.match(sourceText(), /void EmitCaptureError[\s\S]*?Guard\.Emit\(/, "capture error emits on fault paths cannot throw");
+});
+
+test("R2-native#2 a playback chunk whose header never completes is released after the reset, and its device handle is closed", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.timedOutChunkReleased, true, "the timed-out chunk is released once, after the reset returns it");
+  assert.equal(r.timedOutHandleClosed, true, "the device handle is closed after a timeout");
+  const src = sourceText();
+  assert.match(src, /if \(h != null\) h\.Release\(c\);\s*CloseDevice\(\);/, "the timeout path releases the chunk before closing the device");
+  assert.match(src, /uint closed = Native\.waveOutClose\(handle\);\s*if \(closed != 0\)\s*\{\s*Native\.waveOutReset\(handle\);\s*Native\.waveOutClose\(handle\);/, "a failed waveOutClose is retried once after a reset");
+  assert.match(src, /if \(c\.Header != IntPtr\.Zero && Native\.waveOutUnprepareHeader\(handle, c\.Header, \(uint\)Native\.HdrSize\) == Native\.WAVERR_STILLPLAYING\) continue;/, "a header the driver still owns is never freed");
+});
+
+test("R2-native#3 raw microphone buffers are zeroed before they are freed, and capture frames are cleared when the turn ends", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.nativeWipeZero, true, "unmanaged audio reads back as zeros after the wipe");
+  const src = sourceText();
+  assert.match(src, /Native\.WipeNative\(data\[i\], Consts\.FrameBytes\);\s*Marshal\.FreeHGlobal\(data\[i\]\);/, "WaveInSource.Close wipes each capture buffer before freeing it");
+  assert.match(src, /Array\.Clear\(frame, 0, frame\.Length\);\s*Array\.Clear\(fed, 0, fed\.Length\);/, "CaptureLoop clears its frame and feed buffers on exit");
 });

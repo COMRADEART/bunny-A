@@ -56,6 +56,10 @@ export function verifyWorkerIntegrity(root: string = repoRoot): { exePath: strin
   if (typeof record.sourceSha256 !== "string" || !existsSync(sourcePath) || record.sourceSha256.toLowerCase() !== sha256(sourcePath)) {
     throw refuse("worker source differs from build record");
   }
+  // containment#0: a release folder carries release-manifest.json next to the Host root, and then the manifest entry is
+  // checked as well. Dev layouts have no manifest: there the build record and the source hash are the only bind, and
+  // this check says so instead of implying a release guarantee. Packaging (scripts/package-bunny-desktop.ps1) writes the
+  // manifest; a release folder whose manifest was deleted is not refused here (it is a same-user write, out of F04 scope).
   const manifestPath = join(root, "release-manifest.json");
   if (existsSync(manifestPath)) {
     let manifest: { files?: { path: string; sha256: string }[] };

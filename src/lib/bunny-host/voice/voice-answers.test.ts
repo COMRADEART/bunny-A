@@ -126,3 +126,37 @@ test("T10 H7 the approvals answer counts every pending kind and still refuses ap
   assert.match(text, /Builder agent/);
   assert.match(text, /can't approve anything by voice/);
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// M-A-3 T10 review round 2 regressions (approvals facts)
+// ---------------------------------------------------------------------------------------------------------------------
+
+test("R2-truth#2 an agent running while its consent offer is pending is named in the approvals answer, as the screen shows it", () => {
+  const facts = pendingApprovalFacts({
+    tasks: [],
+    missions: [],
+    agents: [{ name: "Scout", state: "RUNNING", authorization: { state: "WAITING_FOR_USER" } }, { name: "Quiet", state: "RUNNING", authorization: { state: "ACTIVE" } }],
+  });
+  assert.deepEqual(facts, [{ name: "Scout agent", kind: "mission_request" }]);
+  const text = answerApprovals(facts);
+  assert.match(text, /Scout agent/);
+  assert.doesNotMatch(text, /Nothing is waiting/);
+});
+
+test("R2-truth#2 an agent in both WAITING_FOR_USER forms is listed once", () => {
+  const facts = pendingApprovalFacts({ tasks: [], missions: [], agents: [{ name: "Builder", state: "WAITING_FOR_USER", authorization: { state: "WAITING_FOR_USER" } }] });
+  assert.deepEqual(facts, [{ name: "Builder agent", kind: "mission_request" }]);
+});
+
+test("V31 T10-SUP#3 one pending ask is one item: an agent waiting on its Mission's unresolved request is not counted twice", () => {
+  const facts = pendingApprovalFacts({
+    tasks: [],
+    missions: [{ id: "m-bravo", title: "Bravo mission", requests: [{ resolvedAt: null }] }],
+    agents: [
+      { name: "Bravo", state: "WAITING_FOR_USER", missionId: "m-bravo" },
+      { name: "Charlie", state: "WAITING_FOR_USER", missionId: "m-charlie" },
+    ],
+  });
+  assert.deepEqual(facts.map((f) => f.name), ["Bravo mission permission", "Charlie agent"]);
+  assert.match(answerApprovals(facts), /2 items are waiting/);
+});

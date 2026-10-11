@@ -31,6 +31,17 @@ export type ListenSource = "button" | "hotkey" | "push_to_talk" | "hands_free";
 export type InterruptSource = VoiceInterruptReceipt["source"];
 type AnswerSource = "model" | "host_facts" | "refusal";
 
+/**
+ * Defense in depth (round 2): the spoken-chat model is tool-free and cannot act. It is told so, so it never claims that an
+ * approval, a command, a settings change or an agent control was done. The Host decides and acts, on its own screen.
+ */
+export const SPOKEN_CHAT_INSTRUCTION = [
+  "You are Bunny, a voice assistant. Answer in one to three short spoken sentences without markdown.",
+  "You cannot take any action. You cannot approve or deny anything, grant permissions, run commands, change settings, or pause, resume, stop or control agents or missions.",
+  "Never say that you did any of those things, and never say that something was approved, cancelled, run, changed or stopped.",
+  "If the user asks for one of those things, tell them it is done on the Windows Host screen.",
+].join(" ");
+
 export const REFUSAL_TEXT = "I can't do that by voice. Approvals, permissions and commands are reviewed on the Windows Host screen.";
 export const REDIRECT_TEXT = "Redirecting a running agent isn't supported in this version. You can stop it and start a new Mission in the Agentic workspace.";
 export const TOOLS_TEXT = "That question needs tools or a hosted model, so it is waiting for approval on the Windows Host screen.";
@@ -303,14 +314,15 @@ export class VoiceSessionManager {
     const wasSpeaking = this.snap.playing || hasSpeechInFlight(this.fsm.state);
     const turn = this.snap.turnId ?? "none";
     const gen = this.snap.generation;
+    // races#3: capture and speech are cut first, before anything is awaited, so queued chunks stop at once. The worker
+    // handle is then dropped, so no event or command reaches the closing session.
     if (this.snap.capturing || this.fsm.state === "ARMING" || this.fsm.state === "LISTENING") this.tryWorker({ op: "capture.abort", gen });
-    const inferenceStopped = this.inference ? await this.stopInference() : null;
-    if (wasSpeaking) {
-      this.tryWorker({ op: "speak.cancel", gen });
-      this.recordInterrupt("session_close", inferenceStopped, true, turn, gen);
-    }
+    if (wasSpeaking) this.tryWorker({ op: "speak.cancel", gen });
     const worker = this.worker;
     this.worker = null;
+    // Only then the voice turn's own inference is stopped (its timer and output listener are released synchronously).
+    const inferenceStopped = this.inference ? await this.stopInference() : null;
+    if (wasSpeaking) this.recordInterrupt("session_close", inferenceStopped, true, turn, gen);
     if (worker) await worker.close();
     this.resetAfterClose();
     this.closing = false;
@@ -327,7 +339,9 @@ export class VoiceSessionManager {
     this.finalized.clear();
     this.clarification = null;
     this.outstanding = 0;
-    this.inference = null;
+    // races#3: a stale inference releases its output listener and timer, not only its reference.
+    const stale = this.inference;
+    if (stale) this.releaseInference(stale);
     this.snap = {
       ...this.snap,
       open: false,
@@ -358,6 +372,8 @@ export class VoiceSessionManager {
 
   /** Starts one capture turn. Barge-in when speech is in flight: the generation advances and old speech is cancelled. */
   async listenStart(source: ListenSource = "button"): Promise<VoiceSnapshot> {
+    // races#3: a session that is closing takes no new turn.
+    if (this.closing) return this.refuse("INTERNAL", "Voice is closing.");
     // H5: an in-flight or due relaunch completes before the turn is judged (the worker handle is absent while it runs).
     if (this.relaunching || this.needsRelaunch()) await this.relaunchIfIdle();
     if (!this.snap.open || !this.worker) return this.refuse("INTERNAL", "Voice is not open.");
@@ -447,6 +463,7 @@ export class VoiceSessionManager {
 
   /** Typed fallback for an unavailable recognizer. Enters the same final-turn path, flagged typed. */
   async text(text: string): Promise<VoiceSnapshot> {
+    if (this.closing) return this.refuse("INTERNAL", "Voice is closing.");
     if (!this.snap.open) return this.refuse("INTERNAL", "Voice is not open.");
     const trimmed = text.trim();
     if (!trimmed) return this.snapshot();
@@ -493,6 +510,7 @@ export class VoiceSessionManager {
 
   /** On-screen confirmation: executes either a voice_or_screen or a screen-only proposal (V32, V33). */
   controlConfirm(proposalId: string): VoiceSnapshot {
+    if (this.closing) return this.refuseControl("Voice is closing; nothing was changed.");
     const proposal = this.snap.proposal;
     if (!proposal || proposal.id !== proposalId) return this.refuseControl("Nothing matching that confirmation is waiting.");
     // truth#4: a control confirmation starts a new turn; the previous turn's route no longer describes this answer.
@@ -503,7 +521,11 @@ export class VoiceSessionManager {
   }
 
   controlCancel(): VoiceSnapshot {
+    // races#3: nothing is spoken or changed by a control while the session is closing.
+    if (this.closing) return this.snapshot();
     if (this.snap.proposal || this.snap.clarification) {
+      // truth#4: "Cancelled." is a host fact with no model route, even when a model answer came after the proposal.
+      this.snap.route = null;
       this.snap.proposal = null;
       this.clarification = null;
       this.snap.clarification = null;
@@ -578,7 +600,8 @@ export class VoiceSessionManager {
 
   /** Stt final from the worker. Only the first final for a turn counts (V09, V10). */
   private onFinal(turn: string, text: string, confidence: number) {
-    if (this.finalized.has(turn)) {
+    // races#3: a final that arrives while the session closes never starts a turn.
+    if (this.closing || this.finalized.has(turn)) {
       this.lateEventsDropped += 1;
       return;
     }
@@ -631,12 +654,15 @@ export class VoiceSessionManager {
       case "redirect_unsupported":
         this.speakAnswer(REDIRECT_TEXT, "refusal", turn);
         return;
-      case "cancel":
+      case "cancel": {
+        // authz#2: "Okay, cancelled." is spoken only when something was pending; a bare cancel with nothing pending says so.
+        const pending = !!this.snap.proposal || !!this.snap.clarification;
         this.snap.proposal = null;
         this.clarification = null;
         this.snap.clarification = null;
-        this.speakAnswer("Okay, cancelled.", "host_facts", turn);
+        this.speakAnswer(pending ? "Okay, cancelled." : "Nothing is waiting to be cancelled.", "host_facts", turn);
         return;
+      }
       case "confirm": {
         const proposal = this.snap.proposal;
         if (proposal && this.voiceConfirmable()) this.executeProposal(proposal, "voice", turn);
@@ -690,14 +716,19 @@ export class VoiceSessionManager {
     if (!action) return this.speakAnswer("I didn't understand which control you meant.", "refusal", turn);
     const active = this.deps.agents.rows().filter((row) => !isTerminalAgent(row.state));
     if (active.length === 0) return this.speakAnswer("No agent is running right now.", "host_facts", turn);
+    // authz#3: a spoken name is honored. The ordinal picks by position only when no name matches; when the name and the
+    // position point at different agents, the speaker is asked which one (never silently the position).
+    const named = intent.target ? active.filter((row) => row.name.toLowerCase() === intent.target.toLowerCase()) : [];
+    const byPosition = intent.ordinal !== null ? active[intent.ordinal - 1] : undefined;
+    if (intent.ordinal !== null && !byPosition) return this.speakAnswer("There is no agent with that number.", "host_facts", turn);
     let candidates: Candidate[] = active;
-    if (intent.ordinal !== null) {
-      if (intent.ordinal > active.length) return this.speakAnswer("There is no agent with that number.", "host_facts", turn);
-      candidates = [active[intent.ordinal - 1]];
-    } else if (intent.target) {
-      const named = active.filter((row) => row.name.toLowerCase() === intent.target.toLowerCase());
-      if (named.length === 0) return this.speakAnswer(`I can't find an agent named ${intent.target}.`, "host_facts", turn);
-      candidates = named;
+    if (intent.target && named.length === 0) {
+      if (!byPosition) return this.speakAnswer(`I can't find an agent named ${intent.target}.`, "host_facts", turn);
+      candidates = [byPosition];
+    } else if (named.length > 0) {
+      candidates = byPosition ? uniqueById([...named, byPosition]) : named;
+    } else if (byPosition) {
+      candidates = [byPosition];
     }
     if (candidates.length > 1) {
       const expiresAt = this.now() + VOICE_LIMITS.clarificationTtlMs;
@@ -807,12 +838,17 @@ export class VoiceSessionManager {
   // -------------------------------------------------------------------------------------------------------------
 
   private async chat(transcript: string, turn: string) {
+    // races#3: no model task is submitted or admitted once the session is closing.
+    if (this.closing) {
+      this.lateEventsDropped += 1;
+      return;
+    }
     const history = this.history
       .slice(-VOICE_LIMITS.maxHistoryTurns)
       .map((item) => `User: ${item.user}\nAssistant: ${item.assistant}`)
       .join("\n");
     const prompt = [
-      "You are Bunny, a voice assistant. Answer in one to three short spoken sentences without markdown.",
+      SPOKEN_CHAT_INSTRUCTION,
       history,
       `User: ${transcript}`,
     ].filter(Boolean).join("\n\n");
@@ -946,6 +982,8 @@ export class VoiceSessionManager {
       return;
     }
     this.setAnswer(text, source);
+    // truth#4: a host-authored answer is not attributed to a model route that an earlier turn left behind.
+    if (source !== "model") this.snap.route = null;
     // H2: host-authored text is complete as soon as it is set.
     if (this.snap.timing) this.snap.timing = { ...this.snap.timing, inferenceCompletedAt: this.snap.timing.inferenceCompletedAt ?? this.now() };
     if (!this.worker || !this.snap.open) {
@@ -1152,6 +1190,9 @@ export class VoiceSessionManager {
     this.snap.capturing = false;
     this.snap.playing = false;
     this.snap.level = null;
+    // races#4: the voice turn's inference has no worker to speak into. Stop it now, so it cannot keep generating, and its
+    // chunks are no longer counted as outstanding. The turn then settles to ERROR through setError below.
+    if (this.inference) void this.stopInference();
     this.outstanding = 0;
     // containment#0: the job group of the exited worker is settled (terminated and closed) before any reopen can start.
     const settle = worker.close().catch(() => undefined);
@@ -1385,6 +1426,10 @@ export function pickCandidate(text: string, candidates: Candidate[]): Candidate 
   if (byName.length === 1) return byName[0];
   for (const [re, index] of ORDINAL_ANSWERS) if (re.test(normalized)) return candidates[index] ?? null;
   return null;
+}
+
+function uniqueById(rows: Candidate[]): Candidate[] {
+  return rows.filter((row, index) => rows.findIndex((other) => other.id === row.id) === index);
 }
 
 function clamp01(value: number): number {
