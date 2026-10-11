@@ -838,7 +838,7 @@ export const useIsland = create<Island>((set, get) => {
     closeVoice: async () => {
       press = pressReset();
       set({ voicePressing: false });
-      await voiceCall("voice.session.close");
+      await voiceCall("voice.session.close", { source: "desktop_button" });
     },
     setVoiceMode: async (mode) => {
       await voiceCall("voice.session.open", { mode });

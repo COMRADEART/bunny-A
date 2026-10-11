@@ -499,6 +499,14 @@ test("T10 endpointing: recognizer evidence keeps no_speech from firing and bound
   assert.equal(r.speechEndFrame, 135);
 });
 
+test("T10 Part-B endpointing: room noise above the calibrated floor still ends the turn; one loud click does not", { skip }, async () => {
+  const r = await runSelfTest();
+  // Onset at frame 35, speech through frame 104, noise at 0.0012 from frame 105: below 8% of the 0.02 speech peak
+  // (0.0016), so 900 ms of "silence" completes at frame 149. Before the fix this never ended (-1, the 30 s cap live).
+  assert.equal(r.noisyTailEndFrame, 149);
+  assert.equal(r.clickEndFrame, -1, "a single transient must not raise the end threshold above soft speech");
+});
+
 test("T10 stop decision: rejected-only recognizer text is stt.none rejected, never a final", { skip }, async () => {
   const r = await runSelfTest();
   assert.equal(r.rejectedOnly, "rejected");

@@ -58,6 +58,7 @@ function snap(overrides: Partial<VoiceSnapshot> = {}): VoiceSnapshot {
     engines: { stt: "windows", tts: "windows", local: true },
     error: null,
     lastInterrupt: null,
+    lastClose: null,
     timing: null,
     createdAt: NOW,
     updatedAt: NOW,

@@ -51,6 +51,7 @@ export type VoiceErrorCode =
   | "STT_UNAVAILABLE"
   | "TTS_UNAVAILABLE"
   | "BUSY_PLAYBACK" // capture.start while playback active
+  | "BUSY_TRANSCRIBING" // listen.start while the previous turn was still being transcribed past the wait bound
   | "MUTED" // capture.start while worker mute is on
   | "BUFFER_LIMIT"
   | "TIMEOUT"
@@ -139,6 +140,11 @@ export type VoiceProposal = {
 
 export type VoiceTiming = {
   turnId: string;
+  /** What started the turn ("typed" for a text turn) and how its capture ends: a receipt for live diagnosis, never authority. */
+  source?: string;
+  endpointing?: "manual" | "vad" | null;
+  /** The worker's capture.stopped reason for this turn: "end" (listen.end), "vad", "max" (the cap), "abort", "mute". */
+  captureStopReason?: string | null;
   activatedAt: number | null;
   captureStartedAt: number | null;
   firstAudioAt: number | null;
@@ -206,6 +212,8 @@ export type VoiceSnapshot = {
   engines: { stt: string | null; tts: string | null; local: true };
   error: { code: VoiceErrorCode | "WORKER_EXITED" | "WORKER_INTEGRITY" | "NOT_WINDOWS"; message: string } | null;
   lastInterrupt: VoiceInterruptReceipt | null;
+  /** Who ended the last session (a client-declared label such as "button" or "island_exit"); a receipt, never authority. */
+  lastClose: { source: string; at: number } | null;
   timing: VoiceTiming | null;
   createdAt: number | null;
   updatedAt: number;
@@ -232,6 +240,8 @@ export const VOICE_SAFE_ACTIONS = ["voice.state", "voice.interrupt", "voice.mute
 export const VOICE_LIMITS = {
   maxSessions: 1,
   maxTurnCaptureMs: 30_000,
+  /** A listen.start during TRANSCRIBING waits this long for the previous final before it is refused (never a DEVICE_BUSY). */
+  transcribeWaitMs: 8_000,
   maxTranscriptChars: 2_000,
   maxSpokenChunkChars: 400,
   maxQueuedChunks: 24,

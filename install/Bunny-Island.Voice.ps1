@@ -276,7 +276,7 @@ function Invoke-BunnyVoiceCloseNow {
   $script:bunnyVoiceListening = $false
   $script:bunnyVoiceTapLatched = $false
   $script:bunnyVoiceOpenSent = $false
-  [void](Get-BunnyVoiceClient).SendAsync((New-BunnyVoiceRequestMessage 'voice.session.close' @{})).Wait(1500)
+  [void](Get-BunnyVoiceClient).SendAsync((New-BunnyVoiceRequestMessage 'voice.session.close' @{ source = 'island_exit' })).Wait(1500)
 }
 
 function Set-BunnyHandsFree([bool]$Want) {
@@ -285,7 +285,7 @@ function Set-BunnyHandsFree([bool]$Want) {
   $mode = if ($Want) { 'hands_free' } else { 'push_to_talk' }
   if ($snap -and $snap.open) {
     if ([string]$snap.mode -eq $mode) { return }
-    Add-BunnyVoiceRequest 'voice.session.close' @{} $true
+    Add-BunnyVoiceRequest 'voice.session.close' @{ source = 'island_hands_free' } $true
     Add-BunnyVoiceRequest 'voice.session.open' @{ mode = $mode } $false
   } elseif ($Want) {
     Add-BunnyVoiceRequest 'voice.session.open' @{ mode = $mode } $false
@@ -515,7 +515,7 @@ $bunnyControls.VoiceMute.Add_Click({
   $snap = Get-BunnyVoiceSource
   if ($snap -and $snap.open) { Add-BunnyVoiceRequest 'voice.mute' @{ on = (-not [bool]$snap.muted) } $true }
 })
-$bunnyControls.VoiceClose.Add_Click({ $script:bunnyVoiceListening = $false; $script:bunnyVoiceTapLatched = $false; Add-BunnyVoiceRequest 'voice.session.close' @{} $true })
+$bunnyControls.VoiceClose.Add_Click({ $script:bunnyVoiceListening = $false; $script:bunnyVoiceTapLatched = $false; Add-BunnyVoiceRequest 'voice.session.close' @{ source = 'island_button' } $true })
 $bunnyControls.VoiceHandsFree.Add_Click({ Set-BunnyHandsFree ([bool]$bunnyControls.VoiceHandsFree.IsChecked) })
 $bunnyControls.VoiceConfirm.Add_Click({
   $snap = Get-BunnyVoiceSource

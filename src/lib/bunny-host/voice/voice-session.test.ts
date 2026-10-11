@@ -1444,3 +1444,65 @@ test("V25 R3-session#2 concurrent closes join one close; an open after them gets
   assert.ok(live.length <= 1, "never two live workers");
   assert.equal(snap.open, live.length === 1, "the snapshot's open truth matches the live worker count");
 });
+
+test("T10 Part-B a press during TRANSCRIBING waits for the previous final, then starts its own turn (never DEVICE_BUSY)", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart("hotkey");
+  const first = h.session.snapshot().turnId!;
+  await h.flush();
+  h.session.listenEnd(first);
+  assert.equal(h.session.snapshot().state, "TRANSCRIBING");
+  const starts = h.worker.ofOp("capture.start").length;
+  const pending = h.session.listenStart("hotkey");
+  await h.flush();
+  assert.equal(h.worker.ofOp("capture.start").length, starts, "no capture.start while the previous turn transcribes");
+  h.worker.emit({ ev: "stt.none", turn: first, gen: h.session.snapshot().generation, reason: "no_speech" });
+  const snap = await pending;
+  assert.notEqual(snap.error?.code, "DEVICE_BUSY");
+  assert.equal(h.worker.ofOp("capture.start").length, starts + 1, "the waiting press starts its turn once the final settles");
+  assert.notEqual(snap.turnId, first);
+  assert.equal(snap.state, "ARMING");
+});
+
+test("T10 Part-B a transcription that outlasts the wait bound is refused truthfully as BUSY_TRANSCRIBING", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart("hotkey");
+  const first = h.session.snapshot().turnId!;
+  await h.flush();
+  h.session.listenEnd(first);
+  const pending = h.session.listenStart("hotkey");
+  await h.flush();
+  h.advance(VOICE_LIMITS.transcribeWaitMs + 1);
+  const snap = await pending;
+  assert.equal(snap.error?.code, "BUSY_TRANSCRIBING");
+  assert.equal(snap.turnId, first, "the transcribing turn is left intact");
+});
+
+test("T10 Part-B a press waiting on transcription finds the session closed and starts nothing", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart("hotkey");
+  const first = h.session.snapshot().turnId!;
+  await h.flush();
+  h.session.listenEnd(first);
+  const worker = h.worker;
+  const starts = worker.ofOp("capture.start").length;
+  const pending = h.session.listenStart("hotkey");
+  await h.session.close("island_button");
+  const snap = await pending;
+  assert.equal(snap.open, false);
+  assert.equal(worker.ofOp("capture.start").length, starts);
+});
+
+test("T10 Part-B the close receipt names who ended the session; unknown labels become 'client'", async () => {
+  const h = setup();
+  await h.open();
+  const closed = await h.session.close("island_button");
+  assert.equal(closed.lastClose?.source, "island_button");
+  assert.ok(h.journal.some(([type, detail]) => type === "voice.session_closed" && detail.includes("island_button")));
+  await h.open();
+  const odd = await h.session.close("<script>");
+  assert.equal(odd.lastClose?.source, "client");
+});

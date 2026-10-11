@@ -505,7 +505,7 @@ test('R2-races#1 a lost listen.start leaves the later release unbound, so it end
 
 test('R2-races#5 closing sends no queued-but-unsent open or listen, and the close lands after the open in flight', { skip }, () => {
   const r = runVoiceHarness();
-  assert.deepEqual(r.closeOrdering, ['voice.session.open', 'voice.session.close']);
+  assert.deepEqual(r.closeOrdering, ['voice.session.open', 'voice.session.close:island_exit'], 'the exit close names its source');
   assert.deepEqual(r.closeQueueLeft, []);
   assert.equal(r.closeOpenSent, false);
 });

@@ -125,6 +125,8 @@ export class VoiceSessionManager {
   private pendingAtTurn = false;
   private readonly now: () => number;
   private readonly schedule: (fn: () => void, ms: number) => () => void;
+  /** listen.start presses waiting for the previous turn's final (Part B live finding). */
+  private readonly transcribedWaiters = new Set<() => void>();
   private readonly softBudget: number;
   private readonly hardBudget: number;
   private readonly finalized = new Set<string>();
@@ -177,6 +179,7 @@ export class VoiceSessionManager {
       engines: { stt: null, tts: null, local: true },
       error: null,
       lastInterrupt: null,
+      lastClose: null,
       timing: null,
       createdAt: null,
       updatedAt: this.now(),
@@ -323,16 +326,16 @@ export class VoiceSessionManager {
   }
 
   /** Closes the session: abort capture, cancel speech, stop the voice turn's own inference, shut the worker down. */
-  close(): Promise<VoiceSnapshot> {
+  close(source = "client"): Promise<VoiceSnapshot> {
     if (this.closingPromise) return this.closingPromise;
-    const closing = this.doClose().finally(() => {
+    const closing = this.doClose(/^[a-z_]{1,24}$/.test(source) ? source : "client").finally(() => {
       if (this.closingPromise === closing) this.closingPromise = null;
     });
     this.closingPromise = closing;
     return closing;
   }
 
-  private async doClose(): Promise<VoiceSnapshot> {
+  private async doClose(source: string): Promise<VoiceSnapshot> {
     if (this.relaunching) await this.relaunching;
     if (this.settling) await this.settling;
     if (!this.worker && !this.snap.open) return this.snapshot();
@@ -358,7 +361,8 @@ export class VoiceSessionManager {
     if (worker) await worker.close();
     this.resetAfterClose();
     this.closing = false;
-    this.deps.journal("voice.session_closed", "Voice session closed; microphone and speaker released.");
+    this.snap.lastClose = { source, at: this.now() };
+    this.deps.journal("voice.session_closed", `Voice session closed (${source}); microphone and speaker released.`);
     return this.snapshot();
   }
 
@@ -368,6 +372,8 @@ export class VoiceSessionManager {
     this.cancelRearmTimer();
     this.clearIdle();
     this.fsm = createFsm("IDLE");
+    // A press waiting on the closed session's transcription wakes now and finds the session closed.
+    for (const wake of [...this.transcribedWaiters]) wake();
     this.finalized.clear();
     this.clarification = null;
     this.outstanding = 0;
@@ -410,13 +416,24 @@ export class VoiceSessionManager {
     if (this.relaunching || this.needsRelaunch()) await this.relaunchIfIdle();
     if (!this.snap.open || !this.worker) return this.refuse("INTERNAL", "Voice is not open.");
     if (this.snap.muted) return this.refuse("MUTED", "Microphone is muted; capture was not started.");
-    if (this.fsm.state === "TRANSCRIBING") return this.refuse("DEVICE_BUSY", "The previous turn is still being transcribed.");
+    // Live finding (Part B): a press during TRANSCRIBING was refused as DEVICE_BUSY, which the clients show as "microphone in
+    // use by another app". The press now waits (bounded) for the previous final, then starts its turn, barging in on any
+    // answer that final began. Only a transcription that outlasts the bound is refused, with its own truthful code.
+    if (this.fsm.state === "TRANSCRIBING") {
+      const epoch = this.sessionEpoch;
+      await this.waitTranscribed(VOICE_LIMITS.transcribeWaitMs);
+      if (this.closing || epoch !== this.sessionEpoch || !this.snap.open || !this.worker) return this.refuse("INTERNAL", "Voice is not open.");
+      if (this.snap.muted) return this.refuse("MUTED", "Microphone is muted; capture was not started.");
+      if (this.fsm.state === "TRANSCRIBING") return this.refuse("BUSY_TRANSCRIBING", "The previous turn is still being transcribed. Try again in a moment.");
+      // A turn another press started while this one waited is left alone; this press joins it.
+      if (this.fsm.state === "ARMING" || this.fsm.state === "LISTENING") return this.snapshot();
+    }
     if (hasSpeechInFlight(this.fsm.state) || this.snap.playing) this.bargeIn(source === "push_to_talk" ? "push_to_talk" : "button");
     if (this.snap.capturing || this.fsm.state === "LISTENING" || this.fsm.state === "ARMING") this.tryWorker({ op: "capture.abort", gen: this.snap.generation });
     this.cancelRearmTimer();
     this.clearIdle();
     const turn = this.newTurn();
-    this.snap.timing = emptyTiming(turn, this.now());
+    this.snap.timing = { ...emptyTiming(turn, this.now()), source, endpointing: source === "push_to_talk" ? "manual" : "vad" };
     this.snap.partial = null;
     this.snap.finalTranscript = null;
     this.snap.turnKind = null;
@@ -508,7 +525,7 @@ export class VoiceSessionManager {
     this.cancelRearmTimer();
     this.clearIdle();
     const turn = this.newTurn("typed");
-    this.snap.timing = emptyTiming(turn, this.now());
+    this.snap.timing = { ...emptyTiming(turn, this.now()), source: "typed", endpointing: null };
     this.snap.partial = null;
     this.snap.error = this.standingNotice();
     this.rememberFinal(turn);
@@ -1147,6 +1164,7 @@ export class VoiceSessionManager {
       case "capture.stopped":
         this.snap.capturing = false;
         this.snap.level = null;
+        if (this.snap.timing && event.turn === this.snap.timing.turnId) this.snap.timing = { ...this.snap.timing, captureStopReason: String(event.reason ?? "").slice(0, 16) || null };
         if (this.fsm.state === "LISTENING") this.setState("TRANSCRIBING");
         break;
       case "capture.error":
@@ -1325,10 +1343,26 @@ export class VoiceSessionManager {
     return turn;
   }
 
+  /** Resolves when the FSM leaves TRANSCRIBING, or after `ms` (the caller re-checks the state either way). */
+  private waitTranscribed(ms: number): Promise<void> {
+    if (this.fsm.state !== "TRANSCRIBING") return Promise.resolve();
+    return new Promise((resolve) => {
+      let cancel: () => void = () => undefined;
+      const done = () => {
+        cancel();
+        this.transcribedWaiters.delete(done);
+        resolve();
+      };
+      this.transcribedWaiters.add(done);
+      cancel = this.schedule(done, ms);
+    });
+  }
+
   private setState(to: VoiceState) {
     if (this.fsm.state === to) return;
     if (!tryTransition(this.fsm, to)) return;
     this.snap.state = to;
+    if (to !== "TRANSCRIBING" && this.transcribedWaiters.size) for (const wake of [...this.transcribedWaiters]) wake();
     // Truth flags are cleared by any state that is not the confirmed one.
     if (to !== "LISTENING") this.snap.capturing = false;
     if (to !== "SPEAKING") this.snap.playing = false;

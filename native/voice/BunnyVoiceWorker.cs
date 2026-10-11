@@ -995,6 +995,10 @@ internal sealed class Vad
     public const int None = 0, SpeechStart = 1, SpeechEnd = 2, NoSpeech = 3, NoiseOnly = 4;
     public const int OnsetMs = 120, SilenceEndMs = 900, HypothesisHoldMs = 700, NoSpeechMs = 8000, EvidenceMs = 1500;
     public const double MinThreshold = 0.0006;
+    // Live finding (Part B, whisper mode): room noise that rose after the 400 ms calibration stayed above floor*3 between
+    // words, so no end of speech was ever seen and turns ran to the 30 s cap. Inside speech, a frame is also silent when it
+    // is below EndPeakFraction of the utterance's smoothed speech peak (capped, so one loud transient cannot end a turn).
+    public const double EndPeakFraction = 0.08, EndPeakCap = 0.004;
     const int CalibrationFrames = 20;
     int frames;
     double floor;
@@ -1008,6 +1012,8 @@ internal sealed class Vad
     long highMs;
     bool noSpeechSent;
     bool noiseSent;
+    double smooth;
+    double speechPeak;
 
     public bool InSpeech { get { return inSpeech; } }
     public bool SawOnset { get { return onset; } }
@@ -1040,6 +1046,8 @@ internal sealed class Vad
                     speechMs = aboveMs;
                     silenceMs = 0;
                     quietMs = 0;
+                    smooth = rms;
+                    speechPeak = rms;
                     return SpeechStart;
                 }
             }
@@ -1063,7 +1071,11 @@ internal sealed class Vad
             }
             return None;
         }
-        if (rms > threshold)
+        // ~100 ms exponential smoothing: the peak follows syllables, not single-frame clicks.
+        smooth = smooth * 0.8 + rms * 0.2;
+        if (smooth > speechPeak) speechPeak = smooth;
+        double endThreshold = Math.Max(threshold, Math.Min(speechPeak * EndPeakFraction, EndPeakCap));
+        if (rms > endThreshold)
         {
             speechMs += Consts.FrameMs;
             silenceMs = 0;
@@ -1473,7 +1485,10 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
                 agc.Apply(frame, fed, rms, vad.InSpeech);
                 if (whisper != null)
                 {
-                    AppendWhisper(fed);
+                    // Live finding: the time-varying AGC (1x before onset, ramping to 24x in speech) made whisper hear only
+                    // the amplified tail of each utterance. Whisper normalizes levels itself (log-mel), so it gets the raw,
+                    // uniformly scaled frames; the AGC stays only for the SAPI feed.
+                    AppendWhisper(frame);
                     MaybeStartPartial(vad);
                 }
                 else
@@ -2785,6 +2800,28 @@ internal static class SelfTest
         }
         r["speechStartFrame"] = startFrame;
         r["speechEndFrame"] = endFrame;
+
+        // Part B: calibration in a quiet room (0.0002), then 1.5 s of speech at 0.02, then room noise at 0.0012 (above the
+        // calibrated floor*3 = 0.0006, below 8% of the speech peak). The turn must still end ~900 ms after the speech.
+        Vad noisy = new Vad();
+        int noisyEnd = -1;
+        for (int f = 0; f < 400; f++)
+        {
+            double rms = f < 30 ? 0.0002 : (f < 105 ? 0.02 : 0.0012);
+            if (noisy.Feed(rms, int.MaxValue) == Vad.SpeechEnd && noisyEnd < 0) noisyEnd = f;
+        }
+        r["noisyTailEndFrame"] = noisyEnd;
+
+        // A single loud click (0.5 for one frame) inside steady soft speech at 0.006 must not end the turn: uncapped, 8% of
+        // the clicked smoothed peak would be ~0.0084; the cap holds the end threshold at 0.004, below the speech.
+        Vad click = new Vad();
+        int clickEnd = -1;
+        for (int f = 0; f < 200; f++)
+        {
+            double rms = f < 25 ? 0.0002 : (f == 60 ? 0.5 : 0.006);
+            if (click.Feed(rms, int.MaxValue) == Vad.SpeechEnd && clickEnd < 0) clickEnd = f;
+        }
+        r["clickEndFrame"] = clickEnd;
 
         // Terminal decisions.
         r["rejectedOnly"] = StopDecision.Terminal(false, true, false, 0, true, false);

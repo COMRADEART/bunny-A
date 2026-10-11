@@ -1148,7 +1148,7 @@ async function voiceCommand(voice: VoiceSessionManager, action: string, data: Re
     case "voice.session.open":
       return voice.open(data.mode === "hands_free" ? "hands_free" : "push_to_talk");
     case "voice.session.close":
-      return voice.close();
+      return voice.close(typeof data.source === "string" ? data.source : "client");
     case "voice.listen.start":
       return voice.listenStart(source(data.source));
     case "voice.listen.end":
