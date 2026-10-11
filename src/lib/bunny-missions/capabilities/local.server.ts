@@ -36,7 +36,7 @@ export class FilesystemCapability implements CapabilityAdapter {
       { id: "filesystem.read", description: "Read a UTF-8 text file (up to 1 MB).", risk: "READ", inputs: [input("path", "string", true, "File path, relative to the step's working folder.")], outputs: "{ path, bytes, text, sha256 }", evidence: "Absolute path and byte count read from disk.", timeoutMs: 10_000, implemented: true },
       { id: "filesystem.list", description: "List a folder (up to 500 entries).", risk: "READ", inputs: [input("path", "string", false, "Folder path; defaults to the working folder.")], outputs: "{ path, entries: { name, kind, bytes }[] }", evidence: "Folder path and entry count.", timeoutMs: 10_000, implemented: true },
       { id: "filesystem.exists", description: "Check whether a path exists.", risk: "READ", inputs: [input("path", "string", true, "Path to check.")], outputs: "{ path, exists, kind }", evidence: "Path checked on disk.", timeoutMs: 5_000, implemented: true },
-      { id: "filesystem.write", description: "Write a UTF-8 text file atomically (temporary file + rename).", risk: "WRITE", inputs: [input("path", "string", true, "File path."), input("content", "string", true, "Full file contents."), input("overwrite", "boolean", false, "Allow replacing an existing file (default false).")], outputs: "{ path, bytes, created }", evidence: "Path and bytes written, read back from disk.", timeoutMs: 10_000, implemented: true },
+      { id: "filesystem.write", description: "Write a UTF-8 text file atomically (temporary file + rename).", risk: "WRITE", inputs: [input("path", "string", true, "File path."), input("content", "string", true, "Full file contents."), input("overwrite", "boolean", false, "Allow replacing an existing file (default false)."), input("expectBeforeSha256", "string", false, "Optional pre-image guard: \"absent\" or the exact SHA-256 the file must have immediately before the write.")], outputs: "{ path, bytes, created }", evidence: "Path and bytes written, read back from disk.", timeoutMs: 10_000, implemented: true },
       { id: "filesystem.delete", description: "Delete one file (never a folder).", risk: "DESTRUCTIVE", inputs: [input("path", "string", true, "File to delete.")], outputs: "{ path, deleted }", evidence: "Path no longer exists on disk.", timeoutMs: 5_000, implemented: true },
       ...["hash", "metadata", "compare", "search"].map(operation => ({ id: `filesystem.${operation}`, description: `Bounded scoped file ${operation}.`, risk: "READ" as const, inputs: [input("path", "string", true, "Approved file or search folder."), ...(operation === "compare" ? [input("content", "string", true, "Expected exact UTF-8 text.")] : operation === "search" ? [input("query", "string", true, "Literal text to find.")] : operation === "hash" ? [input("expectedSha256", "string", false, "Optional expected SHA-256.")] : [])], outputs: "Bounded current disk facts.", evidence: "Current resource identity and disk observation.", timeoutMs: 10_000, implemented: true })),
     ] satisfies ActionManifest[],
@@ -114,9 +114,21 @@ export class FilesystemCapability implements CapabilityAdapter {
       if (existed && statSync(path).isDirectory()) return fail(`${path} is a folder.`);
       if (existed && statSync(path).size > READ_LIMIT) return fail("Existing file exceeds the bounded text size.");
       const beforeSha256 = existed ? sha256(readFileSync(path)) : null;
+      // M-A-3 T11: optional pre-image guard, checked against the bytes on disk immediately before the atomic rename.
+      // A mismatch never overwrites: another writer's (or the user's) change is preserved for review.
+      const expected = params.expectBeforeSha256;
+      if (expected !== undefined && (typeof expected !== "string" || (expected === "absent" ? existed : beforeSha256 !== expected)))
+        return fail(`FILE_CONFLICT: ${path} is ${existed ? `sha256 ${beforeSha256}` : "absent"}, not the expected pre-image ${String(expected).slice(0, 80)}; nothing was written.`);
       mkdirSync(dirname(path), { recursive: true });
       const temporary = join(dirname(path), `.${basename(path)}.bunny-${crypto.randomUUID()}.tmp`);
-      try { writeFileSync(temporary, content, { encoding: "utf8", flag: "wx" }); renameSync(temporary, path); } finally { if (existsSync(temporary)) rmSync(temporary); }
+      try {
+        writeFileSync(temporary, content, { encoding: "utf8", flag: "wx" });
+        if (expected !== undefined) {
+          const now = existsSync(path) ? sha256(readFileSync(path)) : "absent";
+          if (now !== (expected === "absent" ? "absent" : expected)) return fail(`FILE_CONFLICT: ${path} changed while the write was prepared; nothing was written.`);
+        }
+        renameSync(temporary, path);
+      } finally { if (existsSync(temporary)) rmSync(temporary); }
       const back = readFileSync(path, "utf8");
       if (back !== content) return fail(`Read-back of ${path} did not match what was written.`);
       return ok(`Wrote ${Buffer.byteLength(content)} bytes to ${path}.`, { path, bytes: Buffer.byteLength(content), created: !existed, sha256: sha256(back), beforeSha256 }, [`Wrote and read back ${path}; before ${beforeSha256 ?? "absent"}; after ${sha256(back)}`], { artifacts: [{ type: "source_file", title: relative(context.cwd, path) || basename(path), path, mediaType: "text/plain" }], before: { sha256: beforeSha256 }, after: { sha256: sha256(back) } });
@@ -173,7 +185,7 @@ export class TerminalCapability implements CapabilityAdapter {
       launchCwd = snapshotBoundedTest(script, resources, cwd, join(context.dataDirectory, "agentic-terminal", context.capabilityRunId!), context.boundedScriptHash);
       launchIdentity = { ...identity, prefix: ["--permission", `--allow-fs-read=${launchCwd}`] };
     }
-    const result = await runProcess(launchIdentity, args, { cwd: launchCwd, signal: context.signal, timeoutMs, env: context.boundedEnvironment, owned:true, owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:"terminal.exec"} });
+    const result = await runProcess(launchIdentity, args, { cwd: launchCwd, signal: context.signal, timeoutMs, env: context.boundedEnvironment, owned:true, owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,...(context.agentId ? {agentId:context.agentId} : {}),dataDirectory:context.dataDirectory,records:context.processOwnership,action:"terminal.exec"} });
     const line = `${command} ${args.join(" ")}`.trim();
     const output = { command, args, cwd, ...(context.boundedEnvironment ? { executionBoundary: "pure-read-check-v1", executionCwd: launchCwd } : {}), exitCode: result.exitCode, stdout: tail(result.stdout, 20_000), stderr: tail(result.stderr, 8_000), durationMs: result.durationMs, timedOut: result.timedOut };
     const evidence = [`${line} in ${cwd} → exit ${result.exitCode ?? "none"} after ${result.durationMs} ms`];
@@ -211,11 +223,11 @@ export class GitCapability implements CapabilityAdapter {
       const env: NodeJS.ProcessEnv = Object.fromEntries(["SystemRoot", "WINDIR", "TEMP", "TMP", "PATH"].flatMap(k => process.env[k] ? [[k, process.env[k]!]] : []));
       Object.assign(env, { GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_ATTR_NOSYSTEM: "1" });
       const safeArgs = args[0] === "diff" ? [args[0], "--no-ext-diff", "--no-textconv", ...args.slice(1)] : args;
-      return runCommand("git", ["--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + join(context.dataDirectory, "disabled-hooks"), "-c", "diff.external=", ...safeArgs], { cwd, signal: context.signal, env, timeoutMs: Math.min(timeoutMs, context.timeoutMs), owner: { missionId: context.missionId, stepId: context.stepId, capabilityRunId: context.capabilityRunId, dataDirectory: context.dataDirectory, records: context.processOwnership, action: `git.${args[0]}` } });
+      return runCommand("git", ["--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + join(context.dataDirectory, "disabled-hooks"), "-c", "diff.external=", ...safeArgs], { cwd, signal: context.signal, env, timeoutMs: Math.min(timeoutMs, context.timeoutMs), owner: { missionId: context.missionId, stepId: context.stepId, capabilityRunId: context.capabilityRunId, ...(context.agentId ? { agentId: context.agentId } : {}), dataDirectory: context.dataDirectory, records: context.processOwnership, action: `git.${args[0]}` } });
     }
     // M-A-3 T9R-F01: under remote authority Git never runs repo-configured programs (hooks, fsmonitor, external diff or textconv).
     const hardened = context.remoteAuthority ? ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + join(context.dataDirectory, "disabled-hooks"), "-c", "diff.external=", ...(args[0] === "diff" ? [args[0], "--no-ext-diff", "--no-textconv", ...args.slice(1)] : args)] : args;
-    return runCommand("git", hardened, { cwd, signal, timeoutMs: Math.min(timeoutMs, context.timeoutMs),owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:`git.${args[0]}`} });
+    return runCommand("git", hardened, { cwd, signal, timeoutMs: Math.min(timeoutMs, context.timeoutMs),owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,...(context.agentId ? {agentId:context.agentId} : {}),dataDirectory:context.dataDirectory,records:context.processOwnership,action:`git.${args[0]}`} });
   }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     const cwd = cwdOf(params, context);

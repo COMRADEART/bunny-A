@@ -26,6 +26,8 @@ export type OwnedProcessRecord = {
   reviewRequired?: boolean;
 };
 export type ProcessOwner = { missionId?: string | null; stepId?: string | null; capabilityRunId?: string | null; dataDirectory?: string; action?: string; records?: OwnedProcessRecord[];
+  /** M-A-3 T11: the team Agent that owns the step this process runs for (attribution only; confers no authority). */
+  agentId?: string | null;
   /** T9R-F04: provider-session identity. Records go to runtime/provider-sessions instead of runtime/git-operations. */
   provider?: { taskId: string | null; agentId?: string | null; sessionId: string | null; provider: string; hostGeneration: string | null } };
 export type OwnedSnapshot = { launcherPid: number; launcherCreatedAt: number; exitCode: number | null; limitFlags: number; members: OwnedProcessIdentity[]; activeProcesses: number; totalProcesses: number; totalTerminatedProcesses: number; /** Listed members that could not be opened or re-verified (diagnostic; accounting is authoritative). */ unverifiedMembers?: number };
@@ -159,6 +161,7 @@ export class OwnedProcessGroup {
   constructor(file: string,cwd: string,owner: ProcessOwner={}) {
     this.native=windowsOwnershipModule();const operationId=randomUUID();
     this.record={schema:"bunny-owned-operation/1",operationId,containerId:operationId,mechanism:"windows-job-object",missionId:owner.missionId??null,stepId:owner.stepId??null,capabilityRunId:owner.capabilityRunId??null,launcherPath:file,launcherPid:0,launcherCreatedAt:0,members:[],startedAt:Date.now(),endedAt:null,repo:cwd,cwd,action:owner.action??"git",state:"running",exitCode:null,killOnClose:true,breakaway:false,closed:false,
+      ...(owner.agentId ? {agentId:owner.agentId} : {}),
       ...(owner.provider ? {...owner.provider,agentId:owner.provider.agentId??null,activeProcesses:null,totalProcesses:null,terminatedAtEnd:null,containment:"running" as const} : {})};
     this.path=recordPath(owner,operationId);owner.records?.push(this.record);
     persist(this.path,this.record);

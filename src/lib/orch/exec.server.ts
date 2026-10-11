@@ -1,4 +1,4 @@
-import type { ExecRequest, ExecResult } from "./types";
+import type { ExecRequest, ExecResult, OllamaReceipt } from "./types";
 
 const inflight = new Map<string, AbortController>();
 
@@ -32,6 +32,21 @@ export async function probeOllama(): Promise<{ up: boolean; models: string[]; re
   }
 }
 
+/** The final `done` message of /api/generate: Ollama's own counts and durations. */
+type DonePart = { done?: boolean; model?: string; done_reason?: string; prompt_eval_count?: number; eval_count?: number; total_duration?: number; load_duration?: number; prompt_eval_duration?: number; eval_duration?: number };
+const count = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+/** M-A-3 T11: a provider receipt taken from the provider's own final message; nothing here is estimated. */
+function receiptOf(part: DonePart, requested: string, requestedAt: number, firstTokenAt: number | null): OllamaReceipt {
+  return {
+    model: typeof part.model === "string" && part.model ? part.model.slice(0, 200) : requested,
+    doneReason: typeof part.done_reason === "string" ? part.done_reason.slice(0, 40) : null,
+    promptEvalCount: count(part.prompt_eval_count), evalCount: count(part.eval_count),
+    totalDurationNs: count(part.total_duration), loadDurationNs: count(part.load_duration),
+    promptEvalDurationNs: count(part.prompt_eval_duration), evalDurationNs: count(part.eval_duration),
+    requestedAt, firstTokenAt, finishedAt: Date.now(),
+  };
+}
+
 export async function stopTask(taskId: string) {
   const controller = inflight.get(taskId);
   if (!controller) return { stopped: false };
@@ -62,11 +77,12 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
   inflight.set(request.taskId, controller);
   const timeoutMs = options.timeoutMs ?? 120_000;
   const timeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
+  const requestedAt = Date.now();
   try {
     const response = await fetch("http://127.0.0.1:11434/api/generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model, prompt: request.prompt, stream: !!options.stream }),
+      body: JSON.stringify({ model, prompt: request.prompt, stream: !!options.stream, ...(request.format ? { format: request.format } : {}), ...(request.numCtx ? { options: { num_ctx: request.numCtx } } : {}) }),
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -74,13 +90,15 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
     }
     if (options.stream && response.body) {
       const reader=response.body.getReader();const decoder=new TextDecoder();let buffer="",output="";
-      const consume=(line:string)=>{if(!line.trim()) return;const part=JSON.parse(line) as {response?:string;error?:string};if(part.error) throw new Error(part.error);if(part.response) {output+=part.response;options.stream!(part.response);if(output.length>2_000_000) throw new Error("Model output exceeds the log limit.");}};
+      let firstTokenAt:number|null=null;let done:DonePart|null=null;
+      const consume=(line:string)=>{if(!line.trim()) return;const part=JSON.parse(line) as {response?:string;error?:string}&DonePart;if(part.error) throw new Error(part.error);if(part.response) {firstTokenAt??=Date.now();output+=part.response;options.stream!(part.response);if(output.length>2_000_000) throw new Error("Model output exceeds the log limit.");}if(part.done===true) done=part;};
       try {while(true) {const chunk=await reader.read();if(chunk.done) break;buffer+=decoder.decode(chunk.value,{stream:true});let index:number;while((index=buffer.indexOf("\n"))>=0) {consume(buffer.slice(0,index));buffer=buffer.slice(index+1);}}buffer+=decoder.decode();consume(buffer);}
       finally {await reader.cancel().catch(()=>{});}
-      return {ok:true,output,log:`Ollama ${model} finished.`};
+      const receipt=done?receiptOf(done,model,requestedAt,firstTokenAt):null;
+      return {ok:true,output,log:`Ollama ${model} finished.`,...(receipt?{receipt}:{})};
     }
-    const body = (await response.json()) as { response?: string };
-    return { ok: true, output: body.response ?? "", log: `Ollama ${model} finished.` };
+    const body = (await response.json()) as { response?: string } & DonePart;
+    return { ok: true, output: body.response ?? "", log: `Ollama ${model} finished.`, ...(body.done === true ? { receipt: receiptOf(body, model, requestedAt, null) } : {}) };
   } catch (error) {
     if (controller.signal.reason === "timeout") return { ok: false, error: `The model did not finish within ${formatDuration(timeoutMs)}. Try a shorter task or a faster model.`, log: "Execution timed out." };
     if (controller.signal.aborted) return { ok: false, stopped: true, error: "Stopped.", log: "Abort." };

@@ -160,6 +160,14 @@ const LABELS: Record<string, string> = {
   "host.fatal": "Host recovery required",
   "host.draining": "Host stopping",
   "thermal.warning": "Temperature warning",
+  // M-A-3 T11 team Missions.
+  "mission.team.plan_proposed": "Team plan proposed",
+  "mission.team.plan_rejected": "Team plan rejected by Bunny",
+  "mission.team.handoff": "Verified handoff between Agents",
+  "mission.team.handoff_refused": "Handoff refused",
+  "mission.team.rework": "Bounded rework started",
+  "mission.team.agent_stopped": "Team member stopped",
+  "mission.team.seeded": "Test fault injected (recorded)",
 };
 export const publicEventLabel = (type: string) => LABELS[type] ?? "Activity recorded";
 /**
@@ -520,8 +528,11 @@ export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
                   summary: `${mission.result.verifiedSteps} verified steps · ${mission.result.unverifiedSteps} steps without independent verification`,
                 }
               : null,
+            ...(mission.team ? { team: publicTeam(mission.team) } : {}),
+            ...(mission.teamView ? { teamView: publicTeamView(mission.teamView) } : {}),
             steps: mission.steps.map((step) => ({
               ...step,
+              ...(step.team ? { team: publicStepTeam(step.team) } : {}),
               evidence: [],
               verification: [],
               attempts: step.attempts.map((attempt) => ({
@@ -575,6 +586,28 @@ export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
           })),
         }
       : undefined,
+  };
+}
+
+/**
+ * M-A-3 T11: team facts that cross into the browser. Identities, roles, kinds, dependencies, file names and Host
+ * verdicts stay; project file listings, repair evidence and handed-off content stay on the Host.
+ */
+const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max)}…` : text);
+export function publicTeam(team: NonNullable<MissionView["team"]>): NonNullable<MissionView["team"]> {
+  return { ...team, offerFiles: [], rejected: team.rejected.slice(-5).map((entry) => ({ at: entry.at, reasons: entry.reasons.slice(0, 15).map((reason) => clip(reason, 240)) })) };
+}
+export function publicStepTeam(team: NonNullable<MissionStep["team"]>): NonNullable<MissionStep["team"]> {
+  const { repair, reviewerFindings, ...rest } = team;
+  return { ...rest, ...(repair ? { repair: "Rework of a delivery that failed Bunny's check; see the requirement results." } : {}), ...(reviewerFindings ? { reviewerFindings: "Advisory Reviewer findings were handed to this rework step." } : {}) };
+}
+export function publicTeamView(view: NonNullable<MissionView["teamView"]>): NonNullable<MissionView["teamView"]> {
+  return {
+    ...view,
+    rejected: view.rejected.map((entry) => ({ at: entry.at, reasons: entry.reasons.slice(0, 15).map((reason) => clip(reason, 240)) })),
+    handoffs: view.handoffs.map((handoff) => ({ ...handoff, reason: handoff.reason ? clip(handoff.reason, 200) : null })),
+    findings: view.findings.map((review) => ({ ...review, findings: review.findings.slice(0, 12).map((finding) => ({ ...finding, summary: clip(finding.summary, 300) })) })),
+    requirementResults: view.requirementResults.map((result) => ({ ...result, detail: result.detail ? clip(result.detail, 240) : null })),
   };
 }
 

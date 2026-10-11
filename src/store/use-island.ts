@@ -222,6 +222,10 @@ type Island = Preferences & {
   pauseAgent: (id: string) => Promise<void>;
   resumeAgent: (id: string) => Promise<void>;
   stopAgent: (id: string) => Promise<void>;
+  /** M-A-3 T11: the Coordinator approves the reviewed team plan by its exact reference, or asks the Planner to revise it. */
+  approveTeamPlan: (coordinatorId: string, planReference: string | null) => Promise<void>;
+  reviseTeamPlan: (coordinatorId: string, note: string) => Promise<void>;
+  createTeam: (input: { objective: string; name?: string; projectId?: string | null; requirements: unknown[]; outputDir?: string }) => Promise<void>;
   agentAuthorization: (
     id: string,
     action: "propose" | "approve" | "adjust" | "deny" | "revoke",
@@ -1001,6 +1005,16 @@ export const useIsland = create<Island>((set, get) => {
     },
     stopAgent: async (id) => {
       await command("agent.stop", { id }, id);
+    },
+    approveTeamPlan: async (id, planReference) => {
+      await command("agent.team.approve", { id, ...(planReference ? { planReference } : {}) }, id);
+    },
+    reviseTeamPlan: async (id, note) => {
+      await command("agent.team.revise", { id, ...(note.trim() ? { note: note.trim().slice(0, 600) } : {}) }, id);
+    },
+    createTeam: async (input) => {
+      await command("agent.create", { objective: input.objective, ...(input.name ? { name: input.name } : {}), ...(input.projectId ? { projectId: input.projectId } : {}),
+        team: { requirements: input.requirements, ...(input.outputDir ? { outputDir: input.outputDir } : {}) } });
     },
     agentAuthorization: async (id, action, revision, patch) => {
       await command(

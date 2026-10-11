@@ -291,7 +291,14 @@ export type TaskConstraints = {
   /** Must run in exactly this approved folder. */
   workingDirectory?: string;
   maxRuntimeMs?: number;
+  /** M-A-3 T11 Host-owned (never from HTTP): context window to load for a tool-free local generation (Ollama num_ctx). */
+  contextTokens?: number;
+  /** M-A-3 T11 Host-owned (never from HTTP): structured-output grammar for a tool-free local generation (Ollama format). */
+  responseFormat?: { [key: string]: SchemaJson };
 };
+
+/** M-A-3 T11: plain JSON for Host-built output schemas (serializable across the Host boundary). */
+export type SchemaJson = string | number | boolean | null | SchemaJson[] | { [key: string]: SchemaJson };
 
 export type GpuSample = {
   name: string;
@@ -320,6 +327,10 @@ export type ExecRequest = {
   provider: ProviderId;
   model: string;
   prompt: string;
+  /** M-A-3 T11: Ollama num_ctx; absent leaves the request body unchanged. */
+  numCtx?: number;
+  /** M-A-3 T11: Ollama structured-output JSON schema; absent leaves the request body unchanged. */
+  format?: { [key: string]: SchemaJson };
   /** Provider-native effort/reasoning override Bunny selected; null when the provider does not expose one. */
   effort?: string | null;
 };
@@ -330,4 +341,20 @@ export type ExecResult = {
   output?: string;
   error?: string;
   log: string;
+  /** M-A-3 T11: the provider's own final-chunk receipt (Ollama `done` message); absent when the provider sent none. */
+  receipt?: OllamaReceipt;
+};
+/** Provider-reported numbers only; durations are Ollama's nanoseconds, timestamps are Host-observed wall clock. */
+export type OllamaReceipt = {
+  model: string;
+  doneReason: string | null;
+  promptEvalCount: number | null;
+  evalCount: number | null;
+  totalDurationNs: number | null;
+  loadDurationNs: number | null;
+  promptEvalDurationNs: number | null;
+  evalDurationNs: number | null;
+  requestedAt: number;
+  firstTokenAt: number | null;
+  finishedAt: number;
 };

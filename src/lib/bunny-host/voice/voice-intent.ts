@@ -78,6 +78,8 @@ const SENSITIVE: RegExp[] = [
   /\bon behalf of\b/,
   // authz#0: "let it through" and "let it go through" are approvals with or without a target.
   /\blet (?:it |that |this |them )?(?:go )?through\b/,
+  // M-A-3 T11: "let the tester agent through", "let my request go through" name what they approve.
+  /\blet (?:the|my|this|that|these|those|our) (?:[\w'-]+ ){0,3}(?:go )?through\b/,
 ];
 
 // Approval SYNONYMS (fixcheck#0, truth#3, authz#0). Each counts only with an approval-like target within 30 characters,
@@ -161,6 +163,33 @@ const VERIFY = [
   /\b(failing|failed) (tests?|checks?)\b/,
   /\bare there (any )?(failing|failed)\b/,
 ];
+/**
+ * M-A-3 T11: questions about an Agent team. The answer's subject travels in the intent target: "count", "finished",
+ * "failed" or "role:<role>". Every answer is built from canonical Host facts and Host labels, never model prose.
+ */
+const ROLE_VERB: [RegExp, string][] = [
+  [/\b(testing|verifying|tester|test)\b/, "tester"], [/\b(reviewing|reviewer|review)\b/, "reviewer"], [/\b(planning|planner)\b/, "planner"],
+  [/\b(researching|researcher|research)\b/, "researcher"], [/\b(implementing|implementer|implementation|building)\b/, "implementer"],
+  [/\b(documenting|documenter|documentation|writing)\b/, "documenter"], [/\b(coordinating|coordinator)\b/, "coordinator"],
+];
+const TEAM_COUNT = /\bhow many (?:agents?|team members?|members)\b.{0,24}\b(?:working|running|active|busy|going)\b/;
+const TEAM_ROLE_WHO = /\b(?:which|who|what) (?:agent|team member|member|one)\b.{0,12}\b(?:testing|verifying|reviewing|planning|researching|implementing|building|documenting|writing|coordinating)\b|^who(?:'s| is) (?:testing|verifying|reviewing|planning|researching|implementing|documenting|coordinating)\b/;
+const TEAM_ROLE_WHAT = /\bwhat(?: is|'s| are) (?:the |my )?(?:planning|planner|research|researcher|review|reviewer|test|tester|testing|implementer|implementation|documenter|documentation|coordinator) agents?\b.{0,24}\b(?:doing|working on|up to)\b/;
+// "is the mission done" stays the T10 status answer; only has/did forms and questions naming the team come here.
+const TEAM_FINISHED = /\b(?:has|have|did) (?:the |my )?(?:team|mission|agents|team mission)\b.{0,12}\b(?:finish|finished|complete|completed|end|ended|done)\b|\bis (?:the |my )?team\b.{0,12}\b(?:finished|done|complete|completed)\b/;
+const TEAM_FAILED = [/\b(?:which|what|any) (?:tasks?|steps?)\b.{0,12}\b(?:failed|fail|failing)\b/, /\bdid (?:any|the) (?:tasks?|steps?) fail\b/];
+function teamQuestion(normalized: string): string | null {
+  if (TEAM_COUNT.test(normalized)) return "count";
+  if (TEAM_ROLE_WHO.test(normalized) || TEAM_ROLE_WHAT.test(normalized)) {
+    const tail = normalized.replace(/^.*?\b(?:agent|member|one|who)s?\b/, "") || normalized;
+    const role = ROLE_VERB.find(([re]) => re.test(TEAM_ROLE_WHAT.test(normalized) ? normalized : tail))?.[1];
+    return role ? `role:${role}` : null;
+  }
+  if (TEAM_FAILED.some((re) => re.test(normalized))) return "failed";
+  if (TEAM_FINISHED.test(normalized)) return "finished";
+  return null;
+}
+
 const MODEL = [/\bwhich model\b/, /\bwhat model\b/, /\bmodel (is|are) (it|being used|working|running|active)\b/];
 const APPROVALS = [/\bwhat needs my approval\b/, /\bpending approvals?\b/, /\bwhat('s| is| are) waiting\b/, /\bdo i have (any )?(pending )?approvals?\b/, /\b(any|my) approvals?\b/];
 const LAST_MISSION = [/\b(last|previous|latest|most recent) mission\b/, /\bwhat happened (in|during|on) (my |the )?(last |previous )?mission\b/];
@@ -191,6 +220,7 @@ const AUTHORITY: RegExp[] = [
   /\bignore (all |any )?(previous|prior|earlier|your|the above)\b/,
   /\b(you are now|pretend|act as|jailbreak|developer mode|unrestricted)\b/,
   /\bon behalf of\b/,
+  /\blet (?:the|my|this|that|these|those|our) (?:[\w'-]+ ){0,3}(?:go )?through\b/,
 ];
 
 /** A confirm lead-in ("yes", "confirm") counts only when nothing contradicting follows it ("yes, but not that one" does not). */
@@ -258,6 +288,8 @@ export function classifyTranscript(
   if (CANCEL.test(normalized)) return make("cancel");
   if (CONFIRM.test(normalized) && !options.proposalPending) return make("confirm");
   if (OPEN_UI.some((re) => re.test(normalized))) return make("open_ui");
+  const team = teamQuestion(normalized);
+  if (team) return make("agent_team", team);
   if (STATUS.some((re) => re.test(normalized))) return make("agent_status");
   if (VERIFY.some((re) => re.test(normalized))) return make("agent_verification");
   if (MODEL.some((re) => re.test(normalized))) return make("agent_model");

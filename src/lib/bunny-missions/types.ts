@@ -1,4 +1,5 @@
 import type { Mode, ProviderId, ProviderExecutionScope, TaskProgress, VerifySpec } from "../orch/types.ts";
+import type { MissionTeam, StepTeam, TeamOutputContract, TeamRole } from "./team.ts";
 
 /**
  * Bunny-A M-A-0 mission contracts. A mission sits above TaskManager: it owns a bounded step graph,
@@ -186,7 +187,13 @@ export type VerificationCriterion =
   | { kind: "file_exists"; path: string; contains?: string }
   | { kind: "command"; command: string; args: string[]; expectExit: number; timeoutMs?: number }
   | { kind: "artifact"; type: ArtifactType }
-  | { kind: "git_diff_nonempty" };
+  | { kind: "git_diff_nonempty" }
+  /** M-A-3 T11: Host extraction + check of a team model step's canonical output. */
+  | { kind: "team_output"; contract: TeamOutputContract }
+  /** M-A-3 T11: the file on disk carries exactly the bytes of the verified source step's canonical artifact. */
+  | { kind: "team_file"; path: string; fromStep: string }
+  /** M-A-3 T11: the user's requirements, checked by the Host on the real delivered file. */
+  | { kind: "team_requirements"; path: string; requirements: string[]; datasetStep: string | null };
 
 /** Plain JSON, so mission records cross the Host → UI server-function boundary unchanged. */
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -220,6 +227,8 @@ export type StepAccounting = {
 
 export type MissionStep = {
   crossApp?: import("./cross-app.ts").CrossAppMetadata;
+  /** M-A-3 T11: owning Agent, role, task kind, handoff inputs and rework lineage of a team step. */
+  team?: StepTeam;
   id: string;
   missionId: string;
   index: number;
@@ -389,6 +398,8 @@ export type MissionAccounting = {
 export type Mission = {
   /** M-A-3 T9R-F01: the paired device that started or resumed this Mission (its changes are reviewed as such). */
   deviceDriven?: string;
+  /** M-A-3 T11: present on a multi-Agent Team Mission. */
+  team?: MissionTeam;
   id: string;
   title: string;
   objective: string;
@@ -421,6 +432,47 @@ export type MissionView = Mission & { steps: MissionStep[]; progress: MissionPro
   planReference?: string;
   /** M-A-3 T9: whether a paired device may approve this pending plan (Host verdict). */
   remote?: RemoteAnswer;
+  /** M-A-3 T11: Team projection (members, handoffs, findings) from canonical rows. */
+  teamView?: TeamView;
+};
+
+/**
+ * M-A-3 T11: one cross-Agent transfer of a verified artifact reference. A record of data movement only: it never
+ * carries a grant, credential, path authority or executable permission.
+ */
+export type Handoff = {
+  id: string;
+  missionId: string;
+  sourceAgentId: string | null;
+  destinationAgentId: string | null;
+  sourceStepId: string;
+  destinationStepId: string;
+  destinationAttempt: number;
+  artifactId: string;
+  artifactSha256: string;
+  artifactType: ArtifactType;
+  purpose: "context" | "content" | "review_subject";
+  state: "DELIVERED" | "REFUSED";
+  reason: string | null;
+  createdAt: number;
+};
+export type TeamView = {
+  coordinatorAgentId: string;
+  phase: "planning" | "review" | "executing" | "ended";
+  outputDir: string;
+  limits: MissionTeam["limits"];
+  requirements: { id: string; text: string; target: "html" | "markdown" }[];
+  members: { agentId: string; role: TeamRole }[];
+  planRevisions: number;
+  reworkRounds: number;
+  proposal: MissionTeam["proposal"];
+  rejected: MissionTeam["rejected"];
+  handoffs: Handoff[];
+  findings: { stepId: string; agentId: string | null; verdict: string; findings: { requirement: string | null; severity: string; summary: string; confirmedByHost: boolean | null }[] }[];
+  /** Bunny's own verdict per user requirement, from the latest Tester check that covered it (null: not checked yet). */
+  requirementResults: { id: string; text: string; passed: boolean | null; detail: string | null; stepId: string | null; round: number | null }[];
+  /** The exact reference the Coordinator approves the reviewed execution plan by (review phase only). */
+  planReference: string | null;
 };
 
 export type ArtifactType =

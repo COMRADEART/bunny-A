@@ -43,12 +43,14 @@ export class ProjectContextResolver {
     path: string,
     envelope: AgenticAuthorizationEnvelope | null,
     additionalBytes = 0,
+    agentId: string | null = null,
   ): void {
     noLinks(path);
     if (existsSync(path) && statSync(path).isFile() && statSync(path).nlink !== 1) throw new Error("File links cannot be Project resources.");
     if (privateHostPath(this.dataDirectory, path) || sensitive.test(path))
       throw new Error("Private or secret-bearing resource is not Project context.");
-    this.workspaces.assertResource(missionId, path, additionalBytes);
+    // M-A-3 T11: a team step may use only its own Agent's scratch; another member's scratch is refused like any Agent's.
+    this.workspaces.assertResource(missionId, path, additionalBytes, agentId);
     if (projectId) this.projects.forExecution(projectId);
     const ancestors: string[] = []; for (let p = path; ; p = dirname(p)) { ancestors.push(p.toLowerCase()); if (dirname(p) === p) break; if (ancestors.length > 128) throw new Error("Path depth bound exceeded."); }
     const rows = this.host.db.prepare(`SELECT id,record FROM projects WHERE json_valid(record) AND display_name<>'' AND lower(json_extract(record,'$.path')) IN (${ancestors.map(() => "?").join(",")}) LIMIT 101`).all(...ancestors) as { id: string; record: string }[];
@@ -71,8 +73,9 @@ export class ProjectContextResolver {
     missionId: string,
     path: string,
     envelope: AgenticAuthorizationEnvelope | null,
+    agentId: string | null = null,
   ): void {
-    this.assertResource(projectId, missionId, path, envelope);
+    this.assertResource(projectId, missionId, path, envelope, 0, agentId);
     if (
       contained(path, this.dataDirectory) ||
       contained(path, join(this.workspaces.base, "agents"))
@@ -117,8 +120,15 @@ export class ProjectContextResolver {
       envelope.expires_at <= Date.now()
     )
       throw new Error("Current T5 Project context scope is required.");
-    const workspace = this.workspaces.getForMission(missionId);
-    if (!workspace || workspace.agentId !== envelope.agent_id || workspace.projectId !== projectId)
+    // M-A-3 T11: a team step binds to its owning member's workspace; that member must belong to the consenting
+    // Coordinator's team. Without a team the Mission's single Agent workspace is used, as before.
+    const owner = step.team?.agentId ?? null;
+    const workspace = owner ? this.workspaces.getFor(owner, missionId) : this.workspaces.getForMission(missionId);
+    const member = owner && owner !== envelope.agent_id
+      ? (() => { const row = this.host.db.prepare("SELECT mission_id,record FROM agents WHERE id=?").get(owner) as { mission_id: string; record: string } | undefined; return row ? { missionId: row.mission_id, team: (JSON.parse(row.record) as { team?: { coordinatorId?: string | null } }).team } : null; })()
+      : null;
+    if (!workspace || workspace.agentId !== (owner ?? envelope.agent_id) || workspace.projectId !== projectId ||
+        (owner && owner !== envelope.agent_id && (!member || member.missionId !== missionId || member.team?.coordinatorId !== envelope.agent_id)))
       throw new Error("Project Agent workspace binding mismatch.");
     this.workspaces.validate(workspace);
     let bytes = 0;
@@ -126,7 +136,7 @@ export class ProjectContextResolver {
       const path = noLinks(join(project.path, file));
       if (!contained(project.path, path) || sensitive.test(file))
         throw new Error("Selected context file is outside its Project or sensitive.");
-      this.assertResource(projectId, missionId, path, envelope);
+      this.assertResource(projectId, missionId, path, envelope, 0, owner);
       if (
         !envelope.permitted_resource_scopes.some(
           (scope) => contained(scope.root, path) && scope.operations.includes("filesystem.read"),

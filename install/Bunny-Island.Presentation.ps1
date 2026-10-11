@@ -70,18 +70,17 @@ function Get-BunnyActiveAgents {
 }
 function New-BunnyAgentChip($Agent) {
  $ink = if (Test-BunnyAgentWaiting $Agent) { 'BunnyWarning' } elseif ($Agent.state -eq 'RUNNING') { 'BunnyAccent' } else { 'BunnyMuted' }
- $label = ([string]$Agent.state).Replace('_', ' ').ToLower()
- $name = [string]$Agent.name
+ $facts = Get-BunnyAgentChipFacts $Agent
  $chip = [Windows.Controls.Border]::new()
  $chip.Width = 16; $chip.Height = 16; $chip.CornerRadius = [Windows.CornerRadius]::new(8); $chip.BorderThickness = [Windows.Thickness]::new(1.5); $chip.Margin = [Windows.Thickness]::new(2)
  Set-BunnyRef $chip ([Windows.Controls.Border]::BackgroundProperty) 'BunnyField'
  $chip.SetResourceReference([Windows.Controls.Border]::BorderBrushProperty, $ink)
  $letter = [Windows.Controls.TextBlock]::new()
- $letter.Text = if ($name.Length -gt 0) { $name.Substring(0, 1).ToUpper() } else { '?' }
+ $letter.Text = $facts.Letter
  $letter.FontSize = 8.5; $letter.FontWeight = 'SemiBold'; $letter.HorizontalAlignment = 'Center'; $letter.VerticalAlignment = 'Center'
  Set-BunnyRef $letter ([Windows.Controls.TextBlock]::ForegroundProperty) 'BunnyText'
  $chip.Child = $letter
- $chip.ToolTip = $name + ' ' + $bunnyDot + ' ' + $label
+ $chip.ToolTip = $facts.ToolTip
  [Windows.Automation.AutomationProperties]::SetName($chip, [string]$chip.ToolTip)
  $chip.Cursor = [Windows.Input.Cursors]::Hand
  $chip.Tag = [string]$Agent.id

@@ -114,6 +114,8 @@ export class TaskManager {
    * check on the exact provider/model that will start (after any launch-time reroute) and spends a single-use grant.
    */
   missionScopeCheck: ((task: OrchTask, phase?: "check" | "launch") => string | null) | null = null;
+  /** M-A-3 T11: the team Agent owning a Mission child task (attribution of contained sessions); null outside teams. */
+  missionTaskAgent: ((task: OrchTask) => string | null) | null = null;
   missionAttemptAdmission:
     ((task: OrchTask, kind: "action" | "retry" | "reroute") => string | null) | null = null;
   missionAttemptSettled: ((task: OrchTask, ok: boolean) => void) | null = null;
@@ -1393,7 +1395,7 @@ export class TaskManager {
     // M-A-3 T3 §22: one hooks object shared by the initial launch and every relaunch; each
     // handler re-reads the live task record, so provider/model reroutes flow through unrebound.
     const adapterHooks: AdapterHooks = {
-      owner: { dataDirectory: this.dataDirectory, hostGeneration: this.instanceId, taskId: id, missionId: task.mission?.missionId ?? null, agentId: this.agentForMission(task.mission?.missionId ?? null) },
+      owner: { dataDirectory: this.dataDirectory, hostGeneration: this.instanceId, taskId: id, missionId: task.mission?.missionId ?? null, agentId: this.missionTaskAgent?.(task) ?? this.agentForMission(task.mission?.missionId ?? null) },
       event: (type, detail) => {
         // Output that arrived first is written first, so the latest activity is really the latest.
         flush();

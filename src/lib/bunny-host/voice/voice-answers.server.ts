@@ -9,9 +9,9 @@ import type { AgentSnapshot } from "../agent-types.ts";
 import type { Mission, MissionStep } from "../../bunny-missions/types.ts";
 
 export type CheckFact = { name: string; outcome: "passed" | "failed" };
-export type StepFact = { title: string; status: string; model: string | null; checks: CheckFact[] };
+export type StepFact = { title: string; status: string; model: string | null; checks: CheckFact[]; /** M-A-3 T11: Host label of a team step (role and kind), its owner, and whether a rework replaced it. */ team?: { label: string; agentId: string | null; superseded: boolean; dormant: boolean } };
 export type MissionFact = { id: string; title: string; status: string; updatedAt: number; steps: StepFact[] };
-export type AgentFact = { id: string; name: string; state: string; missionId: string | null; updatedAt: number };
+export type AgentFact = { id: string; name: string; state: string; missionId: string | null; updatedAt: number; role?: string | null; task?: { kind: string; state: string } | null };
 export type ApprovalFact = { name: string; kind: "task" | "mission_request" };
 
 export const TERMINAL_AGENT_STATES = ["COMPLETED", "FAILED", "STOPPED"] as const;
@@ -87,13 +87,53 @@ export function answerLastMission(mission: MissionFact | null): string {
   return sentences.join(" ");
 }
 
+const ROLE_WORD: Record<string, string> = { coordinator: "Coordinator", planner: "Planner", researcher: "Researcher", implementer: "Implementer", documenter: "Documenter", reviewer: "Reviewer", tester: "Tester" };
+const KIND_WORD: Record<string, string> = { plan: "planning", observe: "reading a project file", generate_json: "building the dataset", generate_markdown: "writing Markdown", generate_html: "building the page", review: "reviewing, advisory only", write_file: "saving a file", verify_output: "having Bunny check the requirements" };
 /** Maps one recorded mission step to its spoken facts. Only `verified` true/false counts as a check. */
-export function stepFact(step: Pick<MissionStep, "objective" | "state" | "result">, model: string | null): StepFact {
+export function stepFact(step: Pick<MissionStep, "objective" | "state" | "result"> & Partial<Pick<MissionStep, "team">>, model: string | null): StepFact {
   const checks: CheckFact[] = [];
+  // A team step is named by its Host label (role and kind), never by the planner's free-text objective.
+  const title = step.team ? `${ROLE_WORD[step.team.role] ?? step.team.role} ${KIND_WORD[step.team.kind] ?? step.team.kind}${step.team.target ? ` ${step.team.target}` : ""}` : step.objective.slice(0, 80);
   if (step.result && typeof step.result.verified === "boolean") {
-    checks.push({ name: step.objective.slice(0, 80), outcome: step.result.verified ? "passed" : "failed" });
+    checks.push({ name: title, outcome: step.result.verified ? "passed" : "failed" });
   }
-  return { title: step.objective.slice(0, 80), status: step.state, model, checks };
+  return { title, status: step.state, model, checks, ...(step.team ? { team: { label: title, agentId: step.team.agentId, superseded: !!step.team.supersededBy, dormant: !!step.team.dormant } } : {}) };
+}
+
+/** M-A-3 T11: answers about an Agent team, from Agent runtime rows and Mission step records only. */
+export function answerTeam(question: string, agents: AgentFact[], missions: MissionFact[]): string {
+  const team = agents.filter((agent) => agent.role && agent.role !== "coordinator");
+  const working = (agent: AgentFact) => agent.state === "RUNNING" || agent.state === "VERIFYING";
+  const doing = (agent: AgentFact) => (agent.task ? KIND_WORD[agent.task.kind] ?? agent.task.kind : "no task right now");
+  const named = (agent: AgentFact) => (agent.role ? `the ${ROLE_WORD[agent.role] ?? agent.role} agent` : agent.name);
+  if (question === "count") {
+    const active = agents.filter((agent) => !isTerminalAgent(agent.state));
+    // The Coordinator represents the team and owns no task of its own, so it is never counted as working.
+    const busy = active.filter((agent) => working(agent) && agent.role !== "coordinator");
+    if (!active.length) return "No agent is active right now.";
+    if (!busy.length) return `${active.length} ${active.length === 1 ? "agent is" : "agents are"} active, but none is working at this moment.`;
+    return `${busy.length} ${busy.length === 1 ? "agent is" : "agents are"} working: ${busy.map((agent) => `${named(agent)}, ${doing(agent)}`).join("; ")}.`;
+  }
+  if (question.startsWith("role:")) {
+    const role = question.slice(5);
+    const members = team.filter((agent) => agent.role === role && !isTerminalAgent(agent.state));
+    if (!members.length) return `No ${ROLE_WORD[role] ?? role} agent is active right now.`;
+    return members.map((agent) => `${named(agent)} is ${humanState(agent.state)}${agent.task ? `, ${doing(agent)}` : ""}.`).join(" ");
+  }
+  const teamMissions = missions.filter((mission) => mission.steps.some((step) => step.team));
+  const mission = [...teamMissions].sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+  if (!mission) return "No agent team mission is recorded.";
+  const live = mission.steps.filter((step) => step.team && !step.team.dormant);
+  if (question === "failed") {
+    const failed = live.filter((step) => step.status === "failed");
+    if (!failed.length) return `No task of ${mission.title} has failed.`;
+    const reworked = failed.filter((step) => step.team?.superseded).length;
+    return `${failed.length} ${failed.length === 1 ? "task" : "tasks"} failed: ${failed.map((step) => step.title).join("; ")}.${reworked ? ` Bunny started a bounded rework for ${reworked} of them.` : ""}`;
+  }
+  const counted = live.filter((step) => !step.team?.superseded);
+  const done = counted.filter((step) => step.status === "completed").length;
+  if (["completed", "failed", "stopped"].includes(mission.status)) return `The team mission ${mission.title} has ${mission.status === "completed" ? "finished and Bunny verified it" : humanState(mission.status)}. ${done} of ${counted.length} tasks completed.`;
+  return `The team mission ${mission.title} has not finished. It is ${humanState(mission.status)}, with ${done} of ${counted.length} tasks completed.`;
 }
 
 /** Adapter: canonical AgentRuntime rows and MissionManager records to voice facts. Read-only. */
@@ -104,10 +144,13 @@ export function hostFactsFrom(input: {
   /** Recorded model of a task (null when unknown). */
   taskModel?: (taskId: string) => string | null;
 }): { agents: AgentFact[]; missions: MissionFact[]; approvals: ApprovalFact[] } {
-  const agents: AgentFact[] = input.agents.map((row) => ({ id: row.id, name: row.name, state: row.state, missionId: row.missionId, updatedAt: row.updatedAt }));
+  const agents: AgentFact[] = input.agents.map((row) => ({ id: row.id, name: row.name, state: row.state, missionId: row.missionId, updatedAt: row.updatedAt,
+    ...(row.team ? { role: row.team.role, task: row.current ? { kind: row.current.kind, state: row.current.state } : null } : {}) }));
   const missions: MissionFact[] = [];
+  const seen = new Set<string>();
   for (const agent of agents) {
-    if (!agent.missionId) continue;
+    if (!agent.missionId || seen.has(agent.missionId)) continue;
+    seen.add(agent.missionId);
     const mission = input.mission(agent.missionId);
     if (!mission) continue;
     missions.push({

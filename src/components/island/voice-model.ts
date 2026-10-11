@@ -206,6 +206,7 @@ export const TURN_KIND_LABEL: Record<VoiceTurnKind, string> = {
   agent_model: "Agent model",
   agent_approvals: "Approvals",
   agent_last_mission: "Last mission",
+  agent_team: "Agent team",
   agent_control: "Agent control",
   open_ui: "Open view",
   confirm: "Confirmation",

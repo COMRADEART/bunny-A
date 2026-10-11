@@ -11,8 +11,9 @@ import { classifyReplay, type ReplayFacts } from "./agent-replay.ts";
 import { operationContract } from "../bunny-missions/cross-app.ts";
 import { AgentWorkspaceStore } from "./agent-workspace.server.ts";
 import { ProjectContextResolver } from "./project-context.server.ts";
+import { roleLabel, type TeamRole } from "../bunny-missions/team.ts";
 import {
-  agentCanTransition, deriveAgentState, mapFailure, routingExhausted, type AgentFailure, type AgentProfile, type AgentRun, type AgentSnapshot, type AgentState, type CheckpointBoundary ,
+  agentCanTransition, deriveAgentState, deriveMemberState, mapFailure, routingExhausted, type AgentFailure, type AgentProfile, type AgentRun, type AgentSnapshot, type AgentState, type CheckpointBoundary ,
 } from "./agent-types.ts";
 
 /**
@@ -47,8 +48,10 @@ export class AgentRuntime {
       missions.dataDirectory,
     );
     missions.projectContext = this.context;
-    for (const row of this.store.agentsIn(["CREATED", "PLANNING", "RUNNING", "WAITING_FOR_USER", "WAITING_FOR_DEPENDENCY", "PAUSED", "VERIFYING", "COMPLETED", "FAILED", "STOPPED",
+    for (const row of this.store.agentsIn(["CREATED", "PLANNING", "RUNNING", "WAITING_FOR_USER", "WAITING_FOR_DEPENDENCY", "PAUSED", "VERIFYING", "COMPLETED", "FAILED", "STOPPED", "INTERRUPTED",
     ])) this.profiles.set(row.record.id, row.record);
+    // M-A-3 T11: member identities of a Team Mission are allocated here, never by MissionManager or the planner.
+    missions.teamAllocator = (missionId, roles) => this.allocateTeam(missionId, roles);
     this.listener = (event) => { try { this.onEvent(event); } catch (error) { this.contain(error, "agent-runtime", event.missionId ?? undefined); } };
     missions.tasks.bus.on("event", this.listener);
     // The walk runs once at construction, strictly AFTER MissionManager.recover() landed the mission rows.
@@ -72,7 +75,7 @@ export class AgentRuntime {
 
   /** Additive admission gate wired onto MissionManager by the Host: admission holds while the owning agent is paused. */
   blockedForMission(missionId: string): boolean {
-    const agent = [...this.profiles.values()].find((profile) => profile.missionId === missionId);
+    const agent = this.coordinatorFor(missionId);
     if (!agent) return false;
     try { return this.store.agentFlags(agent.id).paused; } catch { return false; }
   }
@@ -86,7 +89,10 @@ export class AgentRuntime {
         const current = mission?.steps.find((step ) => ["running", "verifying", "waiting_for_approval"].includes(step.state),
             ) ?? mission?.steps.find((step ) => step.failure) ?? mission?.steps.find((step ) => step.state !== "completed") ?? mission?.steps.at(-1);
         const action = current?.executor.kind === "capability" ? current.executor.action : null;
-        return { ...agent, authorization: agent.missionId ? this.missions.agentic.projection(agent.missionId) : null,
+        const profile = this.profiles.get(agent.id);
+        const teamFacts = profile?.team && mission ? { team: { role: profile.team.role, coordinatorId: profile.team.coordinatorId, missionId: profile.team.missionId },
+          ...(profile.team.role === "coordinator" ? {} : this.memberFacts(agent.id, mission)) } : {};
+        return { ...agent, ...teamFacts, authorization: agent.missionId ? this.missions.agentic.projection(agent.missionId) : null,
           ...(crossApp && mission ? { activity: { application: action?.startsWith("computer.") ? "Microsoft Calculator" : action?.startsWith("browser.") ? "Mission browser" : (action?.split(".")[0] ?? null), action, step: current?.role ?? null, completed: mission.steps.filter((step ) => step.state === "completed").length, total: mission.steps.length, verification: current?.failure?.category === "verification_failed" ? "Verification failed" : current?.state === "verifying" ? "Checking postconditions" : current?.result?.verified ? "Verified" : "Pending verification", artifacts: this.missions.store.artifacts(mission.id).filter((artifact ) => artifact.verification === "verified").slice(-6).map((artifact ) => ({ id: artifact.id, title: artifact.title, verified: true ,
                       })), history: mission.steps.slice(-12).map((step ) => ({ step: step.role, action: step.executor.kind === "capability" ? step.executor.action : "provider", state: step.state ,
                       })) ,
@@ -107,6 +113,7 @@ export class AgentRuntime {
     this.missions.requireEnabled();
     if (typeof input.objective !== "string" || !input.objective.trim() || input.objective.length > 4000) throw new CommandRefusedError("An agent needs a non-empty objective of at most 4000 characters.",
       );
+    if ((input as { team?: unknown }).team !== undefined && (input as { team?: unknown }).team !== null) return this.createTeam(input as Parameters<AgentRuntime["createTeam"]>[0], actor);
     if (this.store.countActive() >= AGENT_LIMITS.maxActiveAgents) throw new CommandRefusedError(`Only ${AGENT_LIMITS.maxActiveAgents} agents may be active at once.`,
       );
     const now = Date.now();
@@ -149,9 +156,10 @@ export class AgentRuntime {
     return this.snapshot();
   }
 
-  start(agentId: string, actor: string, revision?: number): AgentSnapshot {
+  start(agentId: string, actor: string, revision?: number, planReference?: string): AgentSnapshot {
     this.missions.requireEnabled();
     const agent = this.require(agentId);
+    if (this.isMember(agent)) throw new CommandRefusedError("Start the team through its Coordinator; member Agents follow the reviewed plan.");
     this.validateWorkspace(agent);
     if (agent.stoppedAt) throw new CommandRefusedError("A stopped agent cannot be started again.");
     const view = this.missions.mission(agent.missionId!);
@@ -165,7 +173,7 @@ export class AgentRuntime {
     const run = this.openRun(agent.id, null, null);
     const prior = this.rowState(agent.id);
     if (prior && agentCanTransition(prior, "RUNNING")) this.transition(agent, "RUNNING", run);
-    this.missions.approve(agent.missionId!, actor, true, revision);
+    this.missions.approve(agent.missionId!, actor, true, revision, planReference);
     this.emitLifecycle("agent.started", agent, null, run.id);
     return this.snapshot();
   }
@@ -177,6 +185,15 @@ export class AgentRuntime {
     if (agent.stoppedAt || agent.completedAt) throw new CommandRefusedError("A finished agent cannot be paused.");
     const mission = this.mission(agent);
     if (["completed", "failed", "stopped"].includes(mission.state)) throw new CommandRefusedError("A finished agent cannot be paused.");
+    if (this.isMember(agent)) {
+      // M-A-3 T11: a member pause holds only this member's new admissions; the team's consent is the Coordinator's.
+      const at = Date.now();
+      this.saveProfile({ ...agent, pausedAt: at, updatedAt: at }, "PAUSED", { ...flags, paused: true });
+      const open = this.store.latestRun(agent.id);
+      this.emitLifecycle("agent.paused", agent, null, open?.id ?? null, { scope: "member" });
+      if (open && open.endedAt === null) this.store.closeRun(open.id, "PAUSED", `Paused by ${actor}; this member's new admissions hold, its admitted step finishes.`, at);
+      return this.snapshot();
+    }
     const delegation = this.missions.agentic.forMission(agent.missionId!);
     if (delegation && delegation.current_state !== "ACTIVE") throw new CommandRefusedError("Pause requires current active Agentic consent; review pending access first.",
       );
@@ -212,6 +229,19 @@ export class AgentRuntime {
       const refusal = this.missions.safeRefusal(() => this.missions.deviceResumeRefusal(agent.missionId!));
       if (refusal) throw new WorkstationRequiredError(refusal);
       this.missions.markDeviceDriven(agent.missionId!, actor);
+    }
+    if (this.isMember(agent)) {
+      if (agent.stoppedAt) throw new CommandRefusedError("A stopped agent cannot be resumed.");
+      const view = this.mission(agent);
+      if (view.state === "stopped" || view.state === "failed") throw new CommandRefusedError(`The agent's mission already ${view.state}; nothing to resume.`);
+      const at = Date.now();
+      this.saveProfile({ ...agent, pausedAt: null, updatedAt: at }, this.rowState(agent.id) ?? "PAUSED", { ...flags, paused: false });
+      const last = this.store.latestRun(agent.id);
+      if (last && last.endedAt !== null && last.state === "PAUSED") this.store.openRun({ ...last, state: "RUNNING", endedAt: null, endReason: null });
+      this.deriveMemberTransition(agent);
+      this.missions.schedule(agent.missionId!);
+      this.emitLifecycle("agent.resumed", agent, null, last?.id ?? null, { scope: "member" });
+      return this.snapshot();
     }
     const delegation = this.missions.agentic.forMission(agent.missionId!);
     if (delegation) {
@@ -259,6 +289,23 @@ export class AgentRuntime {
     });
     const run = this.store.latestRun(agent.id);
     if (run && run.endedAt === null) this.store.closeRun(run.id, "STOPPED", `Stopped by ${actor}.`, now);
+    if (this.isMember(agent)) {
+      // M-A-3 T11: only this member's open work stops; the Mission holds for the user if it needed that work.
+      try { await this.missions.stopTeamAgent(agent.missionId!, agent.id, actor); }
+      catch (error) { if (!(error instanceof CommandRefusedError)) this.contain(error, "agent-runtime-member-stop", agent.missionId ?? undefined); }
+      this.emitLifecycle("agent.stopped", agent, "STOP_REQUESTED", run?.id ?? null, { scope: "member" });
+      return this.snapshot();
+    }
+    // A Coordinator stop is the whole team's: every member is durably stopped before the Mission stop runs.
+    if (agent.team?.role === "coordinator")
+      for (const member of this.membersOf(agent.missionId!)) {
+        const memberFlags = this.store.agentFlags(member.id);
+        if (memberFlags.stopped || member.completedAt) continue;
+        this.saveProfile({ ...member, stoppedAt: now, updatedAt: now }, "STOPPED", { ...memberFlags, stopped: true });
+        const memberRun = this.store.latestRun(member.id);
+        if (memberRun && memberRun.endedAt === null) this.store.closeRun(memberRun.id, "STOPPED", `Team stopped by ${actor}.`, now);
+        this.emitLifecycle("agent.stopped", member, "STOP_REQUESTED", memberRun?.id ?? null, { scope: "team" });
+      }
     try {
       await this.missions.stop(agent.missionId!, actor);
     } catch {
@@ -271,6 +318,184 @@ export class AgentRuntime {
       this.store.latestRun(agent.id)?.id ?? null,
     );
     return this.snapshot();
+  }
+
+
+  // ── M-A-3 T11 team identities ─────────────────────────────────────────────
+  /** The Agent that answers for the whole Mission: the team Coordinator, or the single T4 Agent. */
+  coordinatorFor(missionId: string): AgentProfile | null {
+    const bound = [...this.profiles.values()].filter((profile) => profile.missionId === missionId);
+    return bound.find((profile) => !profile.team || profile.team.role === "coordinator") ?? null;
+  }
+  /** Member Agents (Planner and allocated roles) of a team Mission, oldest first. */
+  membersOf(missionId: string): AgentProfile[] {
+    return [...this.profiles.values()].filter((profile) => profile.missionId === missionId && !!profile.team && profile.team.role !== "coordinator")
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }
+  private isMember(agent: AgentProfile): boolean { return !!agent.team && agent.team.role !== "coordinator"; }
+
+  /**
+   * One user objective, one Team Mission: a Coordinator (the user's Agent, holder of the one consent and the
+   * Mission-wide controls) and a Planner Agent whose model call proposes the plan. Member roles are allocated by
+   * {@link allocateTeam} only after Bunny validated that plan.
+   */
+  createTeam(input: { objective: string; name?: unknown; title?: unknown; projectId?: unknown; team: unknown }, actor: string): AgentSnapshot {
+    const team = input.team;
+    if (!team || typeof team !== "object" || Array.isArray(team)) throw new CommandRefusedError("A team needs its requirements object.");
+    const spec = team as { requirements?: unknown; outputDir?: unknown; limits?: unknown };
+    if (this.store.countActive() + 2 > AGENT_LIMITS.maxActiveAgents) throw new CommandRefusedError(`Only ${AGENT_LIMITS.maxActiveAgents} agents may be active at once; a team needs at least 2.`);
+    const now = Date.now();
+    const name = typeof input.name === "string" && input.name.trim() && input.name.trim().length <= 100 ? input.name.trim() : `Team ${new Date(now).toISOString().slice(0, 16).replace("T", " ")}`;
+    const coordinatorId = randomUUID();
+    const plannerId = randomUUID();
+    const mission = this.missions.create({
+      objective: input.objective, title: input.title === undefined ? undefined : String(input.title).slice(0, 200), mode: "balanced",
+      projectId: input.projectId == null ? null : String(input.projectId), localOnly: true, providers: ["ollama"], origin: `agent:${actor}`,
+      team: { coordinatorAgentId: coordinatorId, plannerAgentId: plannerId, requirements: spec.requirements, outputDir: spec.outputDir, limits: spec.limits },
+    });
+    const base = { missionId: mission.id, createdBy: actor, pausedAt: null, stoppedAt: null, failure: null, completedAt: null };
+    const coordinator: AgentProfile = { ...base, id: coordinatorId, name, createdAt: now, updatedAt: now, team: { missionId: mission.id, role: "coordinator", coordinatorId: null } };
+    const planner: AgentProfile = { ...base, id: plannerId, name: `${name} · ${roleLabel("planner")}`, createdAt: now + 1, updatedAt: now + 1, team: { missionId: mission.id, role: "planner", coordinatorId } };
+    this.store.saveAgent(coordinator, "CREATED", { paused: false, stopped: false });
+    this.store.saveAgent(planner, "CREATED", { paused: false, stopped: false });
+    try {
+      this.workspaces.acquire(coordinator.id, mission.id, mission.projectId);
+      this.workspaces.acquire(planner.id, mission.id, mission.projectId);
+    } catch (error) {
+      for (const profile of [coordinator, planner])
+        this.store.saveAgent({ ...profile, failure: { category: "RECOVERY_AMBIGUOUS", detail: "Workspace allocation requires review; no work was admitted." } }, "INTERRUPTED", { paused: false, stopped: false });
+      throw new CommandRefusedError(error instanceof Error ? error.message : "Workspace allocation failed closed.");
+    }
+    this.profiles.set(coordinator.id, coordinator);
+    this.profiles.set(planner.id, planner);
+    this.emitLifecycle("agent.created", coordinator, null, null, { role: "coordinator" });
+    this.emitLifecycle("agent.created", planner, null, null, { role: "planner" });
+    return this.snapshot();
+  }
+
+  /**
+   * Durable identities for the roles of a validated team plan. A live member of the same role is reused (a revised
+   * plan never multiplies Agents); a stopped one is never resurrected. All-or-nothing on the active-Agent cap.
+   */
+  allocateTeam(missionId: string, roles: TeamRole[]): Partial<Record<TeamRole, string>> {
+    const coordinator = this.coordinatorFor(missionId);
+    if (!coordinator?.team || coordinator.team.role !== "coordinator") throw new Error("Only a team Coordinator's Mission receives member Agents.");
+    if (this.store.agentFlags(coordinator.id).stopped) throw new Error("The team Coordinator was stopped; no member Agents are created.");
+    const live = (role: TeamRole) => this.membersOf(missionId).find((member) => member.team!.role === role && !this.store.agentFlags(member.id).stopped);
+    const wanted = [...new Set(roles)].filter((role) => role !== "coordinator" && role !== "planner");
+    const missing = wanted.filter((role) => !live(role));
+    if (this.store.countActive() + missing.length > AGENT_LIMITS.maxActiveAgents)
+      throw new Error(`The plan needs ${missing.length} new Agent(s), above the ${AGENT_LIMITS.maxActiveAgents} active-Agent limit.`);
+    const mission = this.missions.store.mission(missionId);
+    const out: Partial<Record<TeamRole, string>> = {};
+    let at = Date.now();
+    for (const role of wanted) {
+      const existing = live(role);
+      if (existing) { out[role] = existing.id; continue; }
+      at = Math.max(at + 1, Date.now());
+      const profile: AgentProfile = { id: randomUUID(), name: `${coordinator.name} · ${roleLabel(role)}`, missionId, createdAt: at, createdBy: coordinator.createdBy,
+        pausedAt: null, stoppedAt: null, failure: null, completedAt: null, updatedAt: at, team: { missionId, role, coordinatorId: coordinator.id } };
+      this.store.saveAgent(profile, "CREATED", { paused: false, stopped: false });
+      try { this.workspaces.acquire(profile.id, missionId, mission.projectId); }
+      catch (error) {
+        this.store.saveAgent({ ...profile, failure: { category: "RECOVERY_AMBIGUOUS", detail: "Workspace allocation requires review; no work was admitted." } }, "INTERRUPTED", { paused: false, stopped: false });
+        throw error;
+      }
+      this.profiles.set(profile.id, profile);
+      this.emitLifecycle("agent.created", profile, null, null, { role });
+      out[role] = profile.id;
+    }
+    return out;
+  }
+
+  /** The Coordinator approves the reviewed team execution plan by its exact reference (never unseen). */
+  approveTeamPlan(agentId: string, actor: string, planReference: string | undefined, revision?: number): AgentSnapshot {
+    this.missions.requireEnabled();
+    const agent = this.require(agentId);
+    if (agent.team?.role !== "coordinator") throw new CommandRefusedError("Only the team Coordinator approves the team plan.");
+    if (agent.stoppedAt) throw new CommandRefusedError("A stopped team cannot be approved.");
+    this.validateWorkspace(agent);
+    const run = this.store.latestRun(agent.id);
+    if (!run || run.endedAt !== null) return this.start(agentId, actor, revision, planReference);
+    this.missions.approve(agent.missionId!, actor, true, revision, planReference);
+    this.emitLifecycle("agent.started", agent, null, run.id, { approved: "team-plan" });
+    return this.snapshot();
+  }
+
+  /** The Coordinator asks the Planner Agent for a revised plan (the note is data for the Planner, never authority). */
+  async reviseTeamPlan(agentId: string, actor: string, note: unknown): Promise<AgentSnapshot> {
+    this.missions.requireEnabled();
+    const agent = this.require(agentId);
+    if (agent.team?.role !== "coordinator") throw new CommandRefusedError("Only the team Coordinator asks for a revised plan.");
+    if (agent.stoppedAt) throw new CommandRefusedError("A stopped team cannot be replanned.");
+    if (note !== undefined && (typeof note !== "string" || note.length > 600)) throw new CommandRefusedError("A revision note is text of at most 600 characters.");
+    await this.missions.replan(agent.missionId!, actor, undefined, typeof note === "string" ? note : undefined);
+    this.deriveTransition(agent);
+    return this.snapshot();
+  }
+
+  /** Member continuity: run, task lifecycle and state come only from the steps this member owns. */
+  private seenSteps = new Map<string, string>();
+  private ownedSteps(agent: AgentProfile): MissionStep[] {
+    return this.mission(agent).steps.filter((step) => step.team?.agentId === agent.id);
+  }
+  private memberEvent(member: AgentProfile, event: HostEventLike): void {
+    const flags = this.store.agentFlags(member.id);
+    if (flags.stopped) return;
+    let run = this.store.latestRun(member.id);
+    if (!run) {
+      if (flags.paused) return;
+      run = this.openRun(member.id, null, null);
+    }
+    if (run.endedAt !== null) return;
+    if (event.type.startsWith("mission.step.") || event.type === "mission.team.rework" || event.type === "mission.team.plan_proposed") {
+      for (const step of this.ownedSteps(member)) {
+        const prior = this.seenSteps.get(step.id) ?? "pending";
+        if (prior === step.state) continue;
+        this.seenSteps.set(step.id, step.state);
+        const taskId = step.taskId ?? step.attempts.at(-1)?.taskId ?? null;
+        const extra = { stepId: step.id, kind: step.team?.kind ?? null, ...(taskId ? { taskId } : {}) };
+        if (step.state === "running" && prior !== "verifying") {
+          this.checkpoint(member, run, "before_task_admission", refsForStep([step]), "Child admitted for a step owned by this Agent.");
+          this.emitLifecycle("agent.task_started", member, null, run.id, extra);
+        } else if (step.state === "completed") {
+          this.checkpoint(member, run, step.result?.verified ? "after_verification" : "after_task_completion", refsForStep([step]),
+            step.result?.verified ? "Bunny independently verified this Agent's result." : "Task finished; nothing was independently verified at this point.");
+          if (step.result?.verified) this.emitLifecycle("agent.task_completed", member, null, run.id, extra);
+        } else if (step.state === "failed") {
+          this.checkpoint(member, run, "after_task_completion", refsForStep([step]), "An attempt failed; retry verdict follows canonical truth.");
+          this.emitLifecycle("agent.task_failed", member, step.failure ? mapFailure(step.failure.category, "").category : null, run.id, extra);
+        }
+      }
+    }
+    this.deriveMemberTransition(member);
+  }
+  private deriveMemberTransition(member: AgentProfile): void {
+    try {
+      const mission = this.mission(member);
+      const flags = this.store.agentFlags(member.id);
+      const owned = this.ownedSteps(member).map((step) => ({ state: step.state, attempts: step.attempts, dormant: !!step.team?.dormant, superseded: !!step.team?.supersededBy }));
+      const next = deriveMemberState(mission, owned, flags);
+      const run = this.store.latestRun(member.id);
+      if (run && run.endedAt === null) this.transition(member, next, run);
+    } catch { /* mission unreadable: recovery's fail-closed landing covers it */ }
+  }
+  private seedSeen(agent: AgentProfile): void {
+    try { for (const step of this.ownedSteps(agent)) this.seenSteps.set(step.id, step.state); } catch { /* nothing to seed */ }
+  }
+  /** Per-member snapshot facts: the member's own current Task and counts, from canonical step rows. */
+  private memberFacts(agentId: string, mission: { steps: MissionStep[] }): Pick<AgentSnapshot["agents"][number], "current" | "owned"> {
+    const owned = mission.steps.filter((step) => step.team?.agentId === agentId && !step.team.dormant && !step.team.supersededBy);
+    const pick = owned.find((step) => ["running", "verifying", "waiting_for_approval"].includes(step.state)) ?? owned.find((step) => step.state === "failed")
+      ?? owned.find((step) => step.state !== "completed") ?? owned.at(-1);
+    let provider: string | null = null, model: string | null = null;
+    const taskId = pick?.taskId ?? pick?.attempts.at(-1)?.taskId ?? null;
+    if (taskId) try { const task = this.missions.tasks.db.get(taskId); provider = task?.provider ?? null; model = task?.model ?? null; } catch { /* no task row */ }
+    return {
+      current: pick ? { stepId: pick.id, role: pick.role, kind: pick.team?.kind ?? "step", state: pick.state, provider, model, taskId } : null,
+      owned: { total: owned.length, completed: owned.filter((step) => step.state === "completed").length, running: owned.filter((step) => step.state === "running" || step.state === "verifying").length,
+        failed: owned.filter((step) => step.state === "failed").length, verified: owned.filter((step) => step.result?.verified === true).length },
+    };
   }
 
   // ── derivation ────────────────────────────────────────────────────────────
@@ -310,7 +535,11 @@ export class AgentRuntime {
       /* attribution by missionId only */
     }
     if (!missionId) return;
-    const agent = [...this.profiles.values()].find((profile) => profile.missionId === missionId);
+    // M-A-3 T11: members derive from their own steps; the Coordinator (or a single Agent) keeps the T4 behaviour.
+    for (const member of this.membersOf(missionId)) {
+      try { this.memberEvent(member, event); } catch (error) { this.contain(error, "agent-runtime-member", missionId); }
+    }
+    const agent = this.coordinatorFor(missionId);
     if (!agent) return;
     if (this.store.agentFlags(agent.id).stopped) return;
     const run = this.store.latestRun(agent.id);
@@ -385,7 +614,7 @@ export class AgentRuntime {
         { ...refsForStep(started), ...(taskId ? { taskId } : {}) },
         "Child admitted for a step.",
       );
-      for (const step of started)
+      if (!agent.team) for (const step of started)
         this.emitLifecycle("agent.task_started", agent, null, run.id, {
           stepId: step.id,
           ...(taskId ? { taskId } : {}),
@@ -402,7 +631,7 @@ export class AgentRuntime {
           ? "Bunny independently verified the result."
           : "Task finished; nothing was independently verified at this point.",
       );
-      if (verified)
+      if (verified && !agent.team)
         for (const step of done)
           this.emitLifecycle("agent.task_completed", agent, null, run.id, {
             stepId: step.id,
@@ -417,7 +646,7 @@ export class AgentRuntime {
         refsForStep(failed),
         "An attempt failed; retry verdict follows canonical truth.",
       );
-      for (const step of failed)
+      if (!agent.team) for (const step of failed)
         this.emitLifecycle("agent.task_failed", agent, null, run.id, {
           stepId: step.id,
           ...(taskId ? { taskId } : {}),
@@ -619,6 +848,21 @@ export class AgentRuntime {
         continue;
       }
       if (flags.stopped) continue;
+      if (this.isMember(agent)) {
+        // M-A-3 T11: members never reconcile; the Coordinator's one walk reconciles every interrupted team step.
+        this.seedSeen(agent);
+        const prior = this.store.latestRun(agent.id);
+        if (prior && prior.endedAt === null) {
+          this.store.closeRun(prior.id, "INTERRUPTED", `Host restarted during generation ${prior.generation}.`, Date.now());
+          this.emitLifecycle("agent.interrupted", agent, "HOST_INTERRUPTED", prior.id);
+        }
+        if (prior) {
+          const next = this.openRun(agent.id, prior.id, null);
+          this.deriveMemberTransition(agent);
+          this.emitLifecycle("agent.recovered", agent, null, next.id, { generation: next.generation, resumedFromRunId: prior.id, scope: "member" });
+        }
+        continue;
+      }
       const claim = randomUUID();
       const claimed = this.store.claimRecovery(
         agent.id,
@@ -682,6 +926,8 @@ export class AgentRuntime {
           (error) => {
             // Fail closed: reconciliation never improvises — the agent lands interrupted for the user (A19).
             const reason = error instanceof Error ? error.message : String(error);
+            // The flags are re-read: a Stop or Pause recorded while reconciliation ran is never clobbered.
+            const current = this.store.agentFlags(agent.id);
             this.saveProfile(
               {
                 ...agent,
@@ -692,8 +938,8 @@ export class AgentRuntime {
                 },
                 updatedAt: Date.now(),
               },
-              "INTERRUPTED",
-              { paused: false, stopped: false },
+              current.stopped ? "STOPPED" : "INTERRUPTED",
+              current,
             );
             this.emitLifecycle("agent.interrupted", agent, "RECOVERY_AMBIGUOUS", nextRun.id, {
               reason: reason.slice(0, 300),
@@ -798,6 +1044,12 @@ export class AgentRuntime {
         maxAttempts: step.maxRetries * 2 + 2,
       };
       const decision = classifyReplay(facts);
+      // M-A-3 T11: a team step is reconciled by MissionManager's team arms (disk truth for writes, one requeue for
+      // reads and tool-free model calls); the stopped-owner and ambiguity holds live there too.
+      if (step.team) {
+        out.push({ stepId: step.id, decision: { ...decision, action: "requeue_once", reason: "Team step: Bunny reconciles it from canonical and on-disk truth." } as ReturnType<typeof classifyReplay>, instruction: { stepId: step.id, mode: "resubmit" } });
+        continue;
+      }
       out.push({
         stepId: step.id,
         decision,
@@ -859,6 +1111,8 @@ for (const action of [
   "agent.authorization.adjust",
   "agent.authorization.deny",
   "agent.authorization.revoke",
+  "agent.team.approve",
+  "agent.team.revise",
 ])
   AGENT_ACTIONS.add(action);
 
@@ -872,13 +1126,17 @@ export async function agentCommand(
   if (!AGENT_ACTIONS.has(action)) throw new Error("Unknown agent action.");
   const agentId = typeof data.id === "string" ? data.id.slice(0, 200) : "";
   // M-A-3 T9: paired devices supervise existing Agents; creating or first starting one stays on the workstation.
-  if (isDeviceActor(actor) && (action === "agent.create" || action === "agent.start"))
+  if (isDeviceActor(actor) && (action === "agent.create" || action === "agent.start" || action === "agent.team.approve" || action === "agent.team.revise"))
     throw new WorkstationRequiredError(`${action} requires workstation access on the Windows Host.`);
   switch (action) {
     case "agent.create":
       return { agents: agents.create(data, actor) };
     case "agent.start":
       return { agents: agents.start(agentId, actor, Number(data.revision)) };
+    case "agent.team.approve":
+      return { agents: agents.approveTeamPlan(agentId, actor, typeof data.planReference === "string" ? data.planReference.slice(0, 200) : undefined, data.revision === undefined ? undefined : Number(data.revision)) };
+    case "agent.team.revise":
+      return { agents: await agents.reviseTeamPlan(agentId, actor, data.note) };
     case "agent.authorization.propose": {
       if (actor.startsWith("device:"))
         throw new CommandRefusedError("A remote device cannot invent Agentic scope.");
@@ -895,6 +1153,12 @@ export async function agentCommand(
         if (refusal) throw new WorkstationRequiredError(refusal);
       }
       const mission = agents.missions.mission(profile.missionId);
+      // M-A-3 T11: approving a team's consent approves exactly the execution plan that consent was offered for.
+      if (mission.state === "waiting_for_approval" && profile.team?.role === "coordinator") {
+        const consent = agents.missions.agentic.forMission(profile.missionId);
+        if (!consent) throw new CommandRefusedError("No Agentic consent offer to approve.");
+        return { agents: agents.approveTeamPlan(agentId, actor, consent.plan_reference, Number(data.revision)) };
+      }
       if (mission.state === "waiting_for_approval")
         return { agents: agents.start(agentId, actor, Number(data.revision)) };
       agents.missions.reauthorizeAgent(profile.missionId, Number(data.revision), actor);

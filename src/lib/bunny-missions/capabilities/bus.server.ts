@@ -25,6 +25,8 @@ export type ExecutionContext = {
   remoteAuthority?: boolean;
   missionId: string | null;
   stepId: string | null;
+  /** M-A-3 T11: owning team Agent of the step (process attribution only). */
+  agentId?: string | null;
   capabilityRunId?: string;
   processOwnership?: OwnedProcessRecord[];
   /** Folder relative paths resolve against. */
@@ -65,6 +67,8 @@ export type CapabilityRequest = {
   oneTimeAction?: string | null;
   direct?: { confirmed: boolean };
   timeoutMs?: number;
+  /** M-A-3 T11: Host-set owner of the step (never from parameters); attribution for owned processes only. */
+  agentId?: string | null;
 };
 export type CapabilityOutcome = { decision: PermissionDecision; run: CapabilityRun | null; result: CapabilityResult | null; artifactIds: string[] };
 
@@ -90,6 +94,8 @@ export class CapabilityBus {
   containment: HostContainment;
   /** T5 adjuncts are installed by MissionManager; neither comes from request parameters. */
   agenticCheck: ((request: CapabilityRequest, risk: RiskClass, executable?: Resolved | null) => string | null) | null = null;
+  /** M-A-3 T11: hard refusal of a team step operation outside its Host-planned scope (wired by MissionManager). */
+  teamDeny: ((request: CapabilityRequest) => string | null) | null = null;
   agenticAdmit: ((request: CapabilityRequest, runId: string, executable?: Resolved | null) => { id?: string; reason?: string; timeoutMs?: number; scriptHash?: string }) | null = null;
   agenticFinish: ((id: string, ok: boolean) => void) | null = null;
   /** M-A-3 T9R-F01: the valid trusted-desktop grant (request id) for this exact request, installed by MissionManager. */
@@ -165,6 +171,10 @@ export class CapabilityBus {
     const found = this.find(request.action);
     if (!found) return { decision: "deny", reason: `Unknown capability action ${request.action}.`, risk: "READ" };
     const risk = this.riskOf(request.action, request.params) ?? found.manifest.risk;
+    // M-A-3 T11: a team step may perform only the exact Host-planned operation its owning Agent's role allows. This is a
+    // deny, never an ask: no one-time answer, batch, grant or device answer can widen an Agent's planned scope.
+    const team = request.missionId && request.stepId ? this.teamDeny?.(request) ?? null : null;
+    if (team) return { decision: "deny", reason: team, risk };
     const violation = this.agenticCheck?.(request, risk, executable);
     // M-A-3 T9R-F01: while a trusted-desktop execution runs in a folder, Mission changes there wait, so the code the
     // workstation approved cannot be rewritten underneath it (scripts and the modules they load at run time).
@@ -342,7 +352,7 @@ export class CapabilityBus {
       const delegated = agenticAdmission.id ? this.agenticExecutionContext?.(request, agenticAdmission.id, executable) ?? {} : {};
       const currentViolation = delegated.revalidate?.();
       if (currentViolation) throw new Error(currentViolation);
-      result = await found.adapter.execute(request.action, request.params, { ...delegated, resourceValidation: path => this.resourceValidation?.(request,path) ?? null, missionId: request.missionId, stepId: request.stepId, capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch: delegated.desktopBatch ?? desktopBatch, boundedEnvironment, boundedDelegation: !!agenticAdmission.id, boundedScriptHash: admitted?.scriptHash, remoteAuthority: !!request.envelope && isRemoteEnvelope(request.envelope) });
+      result = await found.adapter.execute(request.action, request.params, { ...delegated, resourceValidation: path => this.resourceValidation?.(request,path) ?? null, missionId: request.missionId, stepId: request.stepId, ...(request.agentId ? { agentId: request.agentId } : {}), capabilityRunId:base.id, processOwnership, cwd: request.cwd, roots: request.roots, dataDirectory: this.dataDirectory, signal: controller.signal, timeoutMs, executable, desktopBatch: delegated.desktopBatch ?? desktopBatch, boundedEnvironment, boundedDelegation: !!agenticAdmission.id, boundedScriptHash: admitted?.scriptHash, remoteAuthority: !!request.envelope && isRemoteEnvelope(request.envelope) });
       if(processOwnership.length) result={...result,output:{...(result.output && typeof result.output === "object" ? result.output : {value:result.output}),processOwnership}};
     } catch (error) {
       const message = safeError(error).message;
@@ -353,7 +363,7 @@ export class CapabilityBus {
     if(controller.signal.aborted && result.ok) result={ok:false,status:"failed",summary:"Execution was cancelled; late success was discarded.",output:null,evidence:[],errorCategory:"user_stopped",cleanup:result.cleanup};
     if(controller.signal.aborted && /timed out/i.test(String(controller.signal.reason))) result={...result,ok:false,status:"timeout",summary:`Execution timed out after ${timeoutMs} ms. ${result.cleanup?.detail??"Owned process group terminated."}`,errorCategory:"timeout"};
     const artifactIds: string[] = [];
-    if (request.missionId && request.stepId && this.store.step(request.stepId).crossApp && result.ok) {
+    if (request.missionId && request.stepId && (() => { const step = this.store.step(request.stepId!); return !!(step.crossApp || step.team); })() && result.ok) {
       const artifact = await this.artifacts.create({ missionId: request.missionId, stepId: request.stepId, type: "structured_result", title: `${request.action} observation`, inline: JSON.stringify(semanticOutput(request.action, result.output)), mediaType: "application/json", provenance: `bunny:capability:${base.id}`, verification: "unverified" });
       outputRef = artifact.id; artifactIds.push(artifact.id);
     }

@@ -2,6 +2,7 @@ import { Pause, Play, Square } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useIsland } from "@/store/use-island";
 import { agentPanelRows, CHECKPOINT_LABEL } from "./agent-model";
+import { teamAgentIds, teamPanels, type TeamPanel } from "./team-model";
 import { useState } from "react";
 import type { AgenticProjection } from "../../lib/bunny-missions/agentic-types";
 import { controlCaption, isDevice, offerVerdict, WORKSTATION_CAPTION } from "./remote-view-model";
@@ -231,9 +232,14 @@ export function AuthorizationCard({
  */
 export function AgentsSection() {
   const store = useIsland();
-  const { rows, more } = agentPanelRows(store.agents);
-  if (!rows.length) return null;
+  const inTeams = teamAgentIds(store.agents);
+  const { rows, more } = agentPanelRows(store.agents ? { ...store.agents, agents: store.agents.agents.filter((agent) => !inTeams.has(agent.id)) } : store.agents);
+  const teams = teamPanels(store.agents, store.missions?.missions);
+  if (!rows.length && !teams.length) return null;
+  if (!rows.length) return <TeamsSection teams={teams} />;
   return (
+    <>
+    {teams.length ? <TeamsSection teams={teams} /> : null}
     <section className="today-section agents-section" data-testid="agents-section">
       <div className="section-heading">
         <h2 className="eyebrow">Persistent agents</h2>
@@ -361,5 +367,124 @@ export function AgentsSection() {
       </ul>
       {more ? <p className="caption">+{more} more in Host history.</p> : null}
     </section>
+    </>
   );
 }
+
+/**
+ * M-A-3 T11 — Agent teams: who is working on what, the reviewed plan graph, verified handoffs, Bunny's verdict per
+ * requirement and the advisory Reviewer findings. Approve binds to the exact reviewed plan reference.
+ */
+export function TeamsSection({ teams }: { teams: TeamPanel[] }) {
+  return (
+    <section className="today-section agents-section" data-testid="teams-section">
+      <div className="section-heading">
+        <h2 className="eyebrow">Agent teams</h2>
+        <span className="caption">{teams.length}</span>
+      </div>
+      {teams.map((team) => <TeamCard key={team.missionId} team={team} />)}
+    </section>
+  );
+}
+
+function TeamCard({ team }: { team: TeamPanel }) {
+  const store = useIsland();
+  const [note, setNote] = useState("");
+  const working = team.members.filter((member) => member.state === "RUNNING" || member.state === "VERIFYING").length;
+  return (
+    <article className="glass team-card" data-testid={`team-${team.missionId}`} data-phase={team.phase}>
+      <div className="agent-run-title">
+        <strong>{team.name}</strong>
+        <small>
+          {team.phase === "planning" ? "Planner Agent is proposing a plan" : team.phase === "review" ? "Plan ready for your review" : team.phase === "ended" ? `Mission ${team.missionState}` : `${working} of ${team.members.length} Agents working`}
+          {` · ${team.progress.done} of ${team.progress.total} tasks done`}
+          {team.reworkRounds ? ` · ${team.reworkRounds} rework round${team.reworkRounds === 1 ? "" : "s"}` : ""}
+          {team.approvals ? ` · ${team.approvals} awaiting you` : ""}
+        </small>
+      </div>
+      <ul className="agent-run-list" aria-label="Team members">
+        {team.members.map((member) => (
+          <li key={member.id} data-state={member.state} data-role={member.role}>
+            <div className="agent-run-title">
+              <strong>{member.roleLabel}</strong>
+              <small>
+                {member.stateLabel}
+                {member.task ? ` · ${member.task}${member.taskState ? ` (${member.taskState})` : ""}` : ""}
+                {member.owned ? ` · ${member.owned.verified}/${member.owned.total} verified` : ""}
+              </small>
+            </div>
+            {member.model ? <p className="caption">{member.model}</p> : null}
+            <div className="actions">
+              <button className="btn quiet" disabled={!member.controllable || member.paused} aria-label={`Pause ${member.roleLabel} agent`} title="Pause this Agent only: its admitted step finishes, nothing new of its own starts." onClick={() => void store.pauseAgent(member.id)}><Pause size={13} /> Pause</button>
+              <button className="btn secondary" disabled={!member.paused} aria-label={`Resume ${member.roleLabel} agent`} onClick={() => void store.resumeAgent(member.id)}><Play size={13} /> Resume</button>
+              <button className="btn danger" disabled={!member.controllable} aria-label={`Stop ${member.roleLabel} agent`} title="Stop this Agent only; the team waits for you if its work was needed." onClick={() => void store.stopAgent(member.id)}><Square size={12} /> Stop</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {team.graph.length ? (
+        <details open={team.phase === "review"}>
+          <summary>Plan · {team.graph.length} tasks{team.reserved ? ` · ${team.reserved} reserved rework step${team.reserved === 1 ? "" : "s"}` : ""}</summary>
+          <ol className="team-graph" aria-label="Task graph">
+            {team.graph.map((node) => (
+              <li key={node.id} data-state={node.state}>
+                <strong>{node.key}</strong> · {node.label} · {node.stateLabel}{node.verified ? " · verified by Bunny" : ""}{node.rework ? ` · rework round ${node.round}` : ""}
+                <br />
+                <small>{node.objective}{node.dependsOn.length ? ` — after ${node.dependsOn.join(", ")}` : ""}</small>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
+      {team.rejected.length ? (
+        <details>
+          <summary>Bunny rejected {team.planRevisions} plan proposal{team.planRevisions === 1 ? "" : "s"}</summary>
+          <ul>{team.rejected.map((reason, index) => <li key={index} className="caption">{reason}</li>)}</ul>
+        </details>
+      ) : null}
+      <div aria-label="Requirements">
+        <p className="eyebrow">Requirements · checked by Bunny</p>
+        <ul>
+          {team.requirements.map((requirement) => (
+            <li key={requirement.id} data-state={requirement.state}>
+              {requirement.id} · {requirement.text} — {requirement.state === "passed" ? "passed" : requirement.state === "failed" ? "failed" : "not checked yet"}
+              {requirement.detail ? <small> ({requirement.detail})</small> : null}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {team.findings.length ? (
+        <details>
+          <summary>Reviewer findings (advisory; Bunny&apos;s checks decide)</summary>
+          {team.findings.map((review, index) => (
+            <ul key={index}>
+              {review.items.map((item, at) => <li key={at} className="caption">{item.requirement ?? "General"} · {item.severity} · {item.summary} · Bunny {item.host}</li>)}
+            </ul>
+          ))}
+        </details>
+      ) : null}
+      {team.handoffs.length ? (
+        <details>
+          <summary>Verified handoffs · {team.handoffs.length}</summary>
+          <ul>{team.handoffs.map((handoff) => <li key={handoff.id} className="caption">{handoff.from} → {handoff.to} · {handoff.type} · sha256 {handoff.sha}… · {handoff.state === "DELIVERED" ? "delivered" : "refused"}</li>)}</ul>
+        </details>
+      ) : null}
+      <div className="actions" data-testid={`team-actions-${team.missionId}`}>
+        {team.phase === "review" ? (
+          <>
+            <button className="btn primary" disabled={!team.planReference} title="Approve exactly the plan shown here." onClick={() => void store.approveTeamPlan(team.coordinatorId, team.planReference)}>Approve plan</button>
+            <input className="input" value={note} maxLength={600} placeholder="Optional note for a revised plan" aria-label="Revision note" onChange={(event) => setNote(event.target.value)} />
+            <button className="btn secondary" onClick={() => void store.reviseTeamPlan(team.coordinatorId, note)}>Ask for a revised plan</button>
+          </>
+        ) : team.phase === "planning" && team.missionState === "waiting_for_approval" ? (
+          <button className="btn primary" onClick={() => void store.approveTeamPlan(team.coordinatorId, null)}>Start planning</button>
+        ) : null}
+        <button className="btn quiet" onClick={() => store.openMission(team.missionId)}>Open Mission</button>
+        <button className="btn quiet" disabled={!team.controllable || team.paused} onClick={() => void store.pauseAgent(team.coordinatorId)}><Pause size={13} /> Pause team</button>
+        <button className="btn secondary" disabled={!team.paused} onClick={() => void store.resumeAgent(team.coordinatorId)}><Play size={13} /> Resume team</button>
+        <button className="btn danger" disabled={!team.controllable} title="Stops every Agent of this team." onClick={() => void store.stopAgent(team.coordinatorId)}><Square size={12} /> Stop team</button>
+      </div>
+    </article>
+  );
+}
+

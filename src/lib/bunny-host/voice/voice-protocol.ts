@@ -117,6 +117,7 @@ export type VoiceTurnKind =
   | "agent_model"
   | "agent_approvals"
   | "agent_last_mission"
+  | "agent_team" // M-A-3 T11: team questions (how many working, which agent is testing, what is the planner doing, failures, finished)
   | "agent_control" // pause / resume / stop -> proposal, then canonical agent.* command
   | "open_ui" // open Agentic workspace / show results
   | "confirm" // spoken confirmation of a pending voice proposal (pause only)

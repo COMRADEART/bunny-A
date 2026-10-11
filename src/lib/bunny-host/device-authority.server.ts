@@ -390,6 +390,12 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
     presentation: snapshot.presentation
       ? { ...snapshot.presentation, tasks: snapshot.presentation.tasks?.filter((task) => kept.has(task.id)) }
       : snapshot.presentation,
+    // M-A-3 T11: a paired device sees team structure and Host verdicts; Reviewer model text stays on the workstation.
+    missions: snapshot.missions
+      ? { ...snapshot.missions, missions: snapshot.missions.missions.map((mission) => mission.teamView
+          ? { ...mission, teamView: { ...mission.teamView, findings: mission.teamView.findings.map((review) => ({ ...review, findings: review.findings.map((finding) => ({ ...finding, summary: "Advisory Reviewer finding (full text on the Windows Host)." })) })) } }
+          : mission) }
+      : snapshot.missions,
     agents: snapshot.agents
       ? {
           ...snapshot.agents,

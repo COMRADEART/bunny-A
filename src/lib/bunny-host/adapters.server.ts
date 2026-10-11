@@ -172,7 +172,14 @@ export class OllamaAdapter implements ProviderAdapter {
   launch(task: OrchTask, hooks: AdapterHooks): RunningSession {
     const controller = new AbortController();
     hooks.event("agent.started", `Ollama generation requested · ${task.model}.`);
-    const done = execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt, localOnly: !!(task.constraints?.localOnly || task.constraints?.offlineOnly) }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs }).then((result) => {
+    const done = execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt, localOnly: !!(task.constraints?.localOnly || task.constraints?.offlineOnly), ...(task.constraints?.contextTokens ? { numCtx: task.constraints.contextTokens } : {}), ...(task.constraints?.responseFormat ? { format: task.constraints.responseFormat } : {}) }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs }).then((result) => {
+      // M-A-3 T11: Ollama's own final message is the receipt: served model, token counts and durations. Counts are
+      // provider-reported, never estimated; when the provider sends no final message nothing is recorded.
+      if (result.ok && result.receipt) {
+        hooks.event("provider.receipt", JSON.stringify({ kind: "ollama-generate", ...result.receipt }));
+        if (result.receipt.promptEvalCount !== null && result.receipt.evalCount !== null)
+          hooks.usage?.({ inputTokens: result.receipt.promptEvalCount, outputTokens: result.receipt.evalCount, cachedInputTokens: 0, source: "ollama /api/generate final message (provider-reported counts; no cost)" });
+      }
       if (result.ok) hooks.event("agent.completed", result.log); else if (!result.stopped) hooks.event("agent.error", result.error ?? result.log);
       return { ...result, output: result.output ?? "" };
     });

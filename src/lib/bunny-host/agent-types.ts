@@ -10,8 +10,9 @@ export const AGENT_STATES = ["CREATED", "PLANNING", "RUNNING", "WAITING_FOR_USER
 export type AgentState = (typeof AGENT_STATES)[number];
 /** COMPLETED, FAILED and STOPPED never exit: no host restart, recovery walk or resume revives them (§12, A09/A22). */
 export const AGENT_NEXT: Record<AgentState, AgentState[]> = {
-  CREATED: ["PLANNING", "RUNNING", "WAITING_FOR_USER", "PAUSED", "FAILED", "STOPPED", "INTERRUPTED"],
-  PLANNING: ["RUNNING", "WAITING_FOR_USER", "PAUSED", "FAILED", "STOPPED", "INTERRUPTED"],
+  // M-A-3 T11: a team member can wait on other Agents straight from creation or plan review.
+  CREATED: ["PLANNING", "RUNNING", "WAITING_FOR_USER", "WAITING_FOR_DEPENDENCY", "PAUSED", "FAILED", "STOPPED", "INTERRUPTED"],
+  PLANNING: ["RUNNING", "WAITING_FOR_USER", "WAITING_FOR_DEPENDENCY", "VERIFYING", "PAUSED", "FAILED", "STOPPED", "INTERRUPTED"],
   RUNNING: ["VERIFYING", "WAITING_FOR_DEPENDENCY", "WAITING_FOR_USER", "PAUSED", "COMPLETED", "FAILED", "STOPPED", "INTERRUPTED"],
   WAITING_FOR_DEPENDENCY: ["RUNNING", "VERIFYING", "WAITING_FOR_USER", "PAUSED", "COMPLETED", "FAILED", "STOPPED", "INTERRUPTED"],
   VERIFYING: ["RUNNING", "WAITING_FOR_DEPENDENCY", "WAITING_FOR_USER", "PAUSED", "COMPLETED", "FAILED", "STOPPED", "INTERRUPTED"],
@@ -75,6 +76,8 @@ export type AgentProfile = {
   failure: { category: AgentFailure; detail: string } | null;
   completedAt: number | null;
   updatedAt: number;
+  /** M-A-3 T11: membership of a Team Mission. The Coordinator has role "coordinator" and coordinatorId null. */
+  team?: { missionId: string; role: import("../bunny-missions/team.ts").TeamRole; coordinatorId: string | null };
 };
 
 export type AgentRun = {
@@ -121,6 +124,10 @@ export type AgentSnapshot = {
     lastCheckpoint: { boundary: CheckpointBoundary; at: number; replaySafety: ReplaySafety } | null;
     pausedAt: number | null; stoppedAt: number | null;
     note: string | null;
+    /** M-A-3 T11: team role, owning Coordinator, and the Agent's own current Task (never the whole Mission's). */
+    team?: { role: string; coordinatorId: string | null; missionId: string };
+    current?: { stepId: string; role: string; kind: string; state: string; provider: string | null; model: string | null; taskId: string | null } | null;
+    owned?: { total: number; completed: number; running: number; failed: number; verified: number };
   }[];
   cursor: number;
 };
@@ -159,6 +166,26 @@ export function deriveAgentState(mission: { state: MissionState } | null, steps:
   }
   if (mission.state === "ready") return "WAITING_FOR_USER";
   return "WAITING_FOR_USER";
+}
+
+/**
+ * M-A-3 T11: a team member's state from the Mission's state and ONLY the steps it owns. A member becomes COMPLETED only
+ * with its Mission and never FAILED while its Mission may still be retried or replanned (terminal states have no exit).
+ */
+export function deriveMemberState(mission: { state: MissionState } | null, owned: (AgentStepFacts & { dormant?: boolean; superseded?: boolean })[], flags: AgentFlags): AgentState {
+  if (!mission) return "CREATED";
+  const live = owned.filter((step) => !step.dormant && !step.superseded);
+  if (flags.stopped) return "STOPPED";
+  if (mission.state === "completed") return "COMPLETED";
+  if (mission.state === "stopped") return "STOPPED";
+  if (flags.paused) return "PAUSED";
+  if (["draft", "planning", "waiting_for_approval", "ready"].includes(mission.state)) return "PLANNING";
+  if (live.some((step) => step.state === "waiting_for_approval")) return "WAITING_FOR_USER";
+  if (live.some((step) => step.state === "verifying")) return "VERIFYING";
+  if (live.some((step) => step.state === "running")) return "RUNNING";
+  if (mission.state === "failed" || live.some((step) => step.state === "failed")) return "WAITING_FOR_USER";
+  // Ready, pending, blocked or finished owned work: the member waits on other Agents or on the Mission.
+  return "WAITING_FOR_DEPENDENCY";
 }
 
 const MISSION_TO_AGENT: Partial<Record<string, AgentFailure>> = {

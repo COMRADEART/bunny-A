@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { liveHostCodeRuns } from "../bunny-host/owned-process-group.server.ts";
 import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
@@ -51,6 +51,13 @@ import { WorkspaceCoordinator } from "./workspace.server.ts";
 import { CommandRefusedError, safeError, supervisedLoop, type SafeError ,
 } from "../bunny-host/failure.server.ts";
 import type { ProjectContextResolver } from "../bunny-host/project-context.server.ts";
+import { plannerDraft, teamLimits, TEAM_PLANNER_ID, TEAM_VERSION, validateOutputDir, validateRequirements, type TeamRole } from "./team.ts";
+import {
+  activateRework, canonicalOutput, installTeamPlan, isTeam, liveTeamSteps, observableFiles, ownerHold, ownerRow, planningPhase, recordHandoff, stopTeamAgentSteps,
+  teamConstraints, teamOffer, teamOperationDeny, teamPlanReference, teamPrompt, teamProviderViolation, teamView, teamWrite, verifyTeamCriterion, TEAM_ROUTING_PROMPT,
+  type TeamFaults,
+} from "./team-coordination.server.ts";
+import type { Plan } from "./planner.server.ts";
 
 const TASK_END = /^task\.(completed|failed|stopped)$/;
 const STEP_LIVE: StepState[] = ["running", "verifying"];
@@ -62,8 +69,12 @@ export type MissionManagerOptions = {
   /** Replaces the built-in capability set (tests). */
   adapters?: CapabilityAdapter[];
   browser?: { allowLoopback?: boolean };
+  /** M-A-3 T11: test-only fault seeding constructed in-process by an acceptance harness (never from HTTP/env/config). */
+  teamFaults?: TeamFaults;
 };
 export type CreateMission = { objective: string; title?: string; mode: Mode; projectId?: string | null; steps?: unknown; localOnly?: boolean; providers?: ProviderId[] | null; origin: string ;
+  /** M-A-3 T11: a multi-Agent Team Mission; identities come from AgentRuntime, requirements from the user. */
+  team?: { coordinatorAgentId: string; plannerAgentId: string; requirements?: unknown; outputDir?: unknown; limits?: unknown };
 };
 
 /**
@@ -112,6 +123,9 @@ export class MissionManager {
   containing = new Set<string>();
   /** M-A-3 T4 additive: admission gate the Agent runtime wires in. Undefined → byte-identical behavior. */
   missionPauseGate: ((missionId: string) => boolean) | null = null;
+  /** M-A-3 T11: AgentRuntime allocates (or reuses) one durable member identity per role; MissionManager records owners. */
+  teamAllocator: ((missionId: string, roles: TeamRole[]) => Partial<Record<TeamRole, string>>) | null = null;
+  teamFaults: TeamFaults | null = null;
   /** M-A-3 T9R-F02 (D2): Host-owned inert staging of paired-device file changes. */
   staging: DeviceStaging;
   /**
@@ -136,6 +150,8 @@ export class MissionManager {
       const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
       if (!envelope) return "no approved mission envelope";
       if (envelope.revokedAt) return "authorization revoked";
+      const team = teamProviderViolation(this, task);
+      if (team) return team;
       // M-A-3 T9R-F01: no shell-capable session starts while paired-device changes await workstation review.
       if (!["tool_free", "read_tools"].includes(providerSessionAuthority(task.provider, task.executionScope?.access) ?? "") && this.pendingRemoteReview())
         return `${DESKTOP_REQUIRED} Files were changed under paired-device authority and need review on the Windows Host first.`;
@@ -164,19 +180,23 @@ export class MissionManager {
       return null;
     };
     this.cached = this.store.config();
+    this.teamFaults = options.teamFaults ?? null;
+    // M-A-3 T11: team model work is tool-free local generation owned by a live member, at check and at launch.
+    tasks.missionTaskAgent = (task) => { try { return task.mission ? this.store.step(task.mission.stepId).team?.agentId ?? null : null; } catch { return null; } };
     this.artifacts = new ArtifactStore(this.store, options.dataDirectory);
     this.memory = new MissionMemory(this.store);
     this.inbox = new Inbox(this.store);
     this.bus = new CapabilityBus(this.store, this.artifacts, options.dataDirectory, (type, detail, missionId) => this.emit(type, detail, missionId),tasks.containment,
     );
     this.bus.agenticCheck = (request, risk, executable) => this.agenticCheck(request, risk, executable);
+    this.bus.teamDeny = (request) => teamOperationDeny(this, request);
     this.bus.resourceValidation = (request,path) => this.projectResourceCheck({ ...request, action: "filesystem.read", params: { path } });
     this.bus.agenticAdmit = (request, _runId, executable) => {
       if (!request.missionId || !this.agentic.exists(request.missionId)) return {};
       try {
         const e = this.agentic.forMission(request.missionId)!;
         const result = this.agentic.admit(e.id, request.envelope?.agentic?.revision ?? -1,
-          { agent_id: e.agent_id, mission_id: request.missionId, task_id: null, step_id: request.stepId ?? "", capability: request.action,
+          { agent_id: this.stepOwner(request.stepId) ?? e.agent_id, mission_id: request.missionId, task_id: null, step_id: request.stepId ?? "", capability: request.action,
             resource_reference: agenticFingerprint(request.action, request.params, request.cwd), attempt_kind: request.stepId && this.store.step(request.stepId).attempts.length > 1? "retry" : "action" ,
           },
           () => { const decision = this.bus.decision(request, executable); return decision.decision === "allow" ? null : decision.reason; },
@@ -557,8 +577,9 @@ export class MissionManager {
     const active = this.store.batches(mission.id).find((batch) => batch.status === "active");
     return {
       ...mission,
+      ...(isTeam(mission) ? { teamView: teamView(this, mission, this.store.steps(mission.id)) } : {}),
       steps,
-      progress: missionProgress(steps),
+      progress: missionProgress(mission.team ? liveTeamSteps(steps) : steps),
       requests,
       artifacts,
       batch: active ? batchView(active, Date.now()) : null,
@@ -617,7 +638,22 @@ export class MissionManager {
     const project = input.projectId ? this.tasks.projects.forExecution(input.projectId) : null;
     if (input.projectId && !project) throw new Error("Project is not registered on this Host.");
     const now = Date.now();
+    // M-A-3 T11: a Team Mission's success is defined by the user's requirements; its writes land only in a fresh
+    // output folder (existing project files are never targets) and its model work is tool-free local generation.
+    let team: Mission["team"];
+    if (input.team) {
+      if (input.steps !== undefined) throw new CommandRefusedError("A team Mission is planned by its Planner Agent; explicit steps are refused.");
+      const root = project?.path ?? this.tasks.defaultRoot;
+      const outputDir = validateOutputDir(input.team.outputDir, `bunny-team-${now.toString(36)}`);
+      const folder = join(root, outputDir);
+      if (existsSync(folder) && (!statSync(folder).isDirectory() || readdirSync(folder).length)) throw new CommandRefusedError(`The output folder ${outputDir} already exists in the project; team writes never land among existing files.`);
+      const limits = teamLimits(input.team.limits);
+      team = { version: TEAM_VERSION, coordinatorAgentId: input.team.coordinatorAgentId, plannerAgentId: input.team.plannerAgentId, plannerStepId: null, revisionNote: null,
+        planRevisions: 0, outputDir, limits, requirements: validateRequirements(input.team.requirements), members: [{ agentId: input.team.plannerAgentId, role: "planner" }],
+        reworkRounds: 0, proposal: null, rejected: [], offerFiles: observableFiles(root, outputDir), git: existsSync(join(root, ".git")), browserFixture: null };
+    }
     const mission: Mission = {
+      ...(team ? { team } : {}),
       id: crypto.randomUUID(),
       title: (input.title?.trim() || objective.split("\n")[0]).slice(0, 80),
       objective,
@@ -641,7 +677,7 @@ export class MissionManager {
       requestedScope: null,
       authorizationId: null,
       capabilityRequirements: [],
-      providerConstraints: { allow: input.providers ?? undefined, localOnly: !!input.localOnly },
+      providerConstraints: team ? { allow: ["ollama"], localOnly: true } : { allow: input.providers ?? undefined, localOnly: !!input.localOnly },
       budget: MODE_BUDGET[input.mode],
       retryPolicy: { maxRetriesPerStep: this.cached.limits.maxRetriesPerStep },
       verificationRequired: false,
@@ -656,17 +692,24 @@ export class MissionManager {
       `Mission "${mission.title}" created by ${input.origin} (${mission.mode}).`,
       mission.id,
     );
-    return this.view(this.plan(mission, input.steps));
+    return this.view(this.plan(mission, input.steps, team ? this.teamPlanningPlan(mission) : undefined));
   }
-  plan(mission: Mission, explicit?: unknown): Mission {
+  /** M-A-3 T11: the planning phase of a team Mission is one Planner Agent step (a real tool-free model call). */
+  teamPlanningPlan(mission: Mission): Plan {
+    const draft = plannerDraft(mission.team!.limits.maxPlanRevisions);
+    draft.team = { ...draft.team!, agentId: mission.team!.plannerAgentId };
+    return { complexity: "medium", rationale: ["Team Mission: a Planner Agent proposes the plan with a real local model; Bunny validates it before anything else is reviewed."], steps: [draft] };
+  }
+  plan(mission: Mission, explicit?: unknown, teamPlan?: Plan): Mission {
+    if (mission.team && explicit !== undefined) throw new CommandRefusedError("A team Mission is planned by its Planner Agent; explicit steps are refused.");
     let current = this.setMission(
       mission,
       { state: "planning" },
       "mission.planning",
-      `Planning with ${PLANNER_ID}.`,
+      `Planning with ${mission.team ? TEAM_PLANNER_ID : PLANNER_ID}.`,
     );
     try {
-      const plan = planMission({
+      const plan = teamPlan ?? planMission({
         objective: current.objective,
         mode: current.mode,
         root: current.root,
@@ -677,7 +720,11 @@ export class MissionManager {
       });
       const ids = new Map(plan.steps.map((step) => [step.key, crypto.randomUUID()]));
       const kept = this.store.steps(current.id).filter((step) => step.state === "completed");
+      const remap = (key: string | undefined) => key === undefined ? undefined : ids.get(key) ?? (() => { throw new Error(`Team step reference ${key} is unknown.`); })();
       const steps: MissionStep[] = plan.steps.map((draft, index) => ({
+        ...(draft.team ? { team: { ...draft.team, inputs: draft.team.inputs.map((input) => ({ ...input, stepId: remap(input.stepId)! })),
+          ...(draft.team.content ? { content: remap(draft.team.content) } : {}), ...(draft.team.subject ? { subject: remap(draft.team.subject) } : {}),
+          ...(draft.team.dataset ? { dataset: remap(draft.team.dataset) } : {}), ...(draft.team.reworkOf ? { reworkOf: remap(draft.team.reworkOf) } : {}) } } : {}),
         ...(draft.crossApp
           ? {
               crossApp: {
@@ -708,7 +755,7 @@ export class MissionManager {
         modelConstraint: draft.modelConstraint,
         executor: draft.executor,
         expectedArtifacts: draft.expectedArtifacts,
-        verification: draft.verification,
+        verification: draft.verification.map((check) => check.kind === "team_file" ? { ...check, fromStep: remap(check.fromStep)! } : check.kind === "team_requirements" ? { ...check, datasetStep: check.datasetStep ? remap(check.datasetStep)! : null } : check),
         maxRetries:
           draft.crossApp &&
           draft.executor.kind === "capability" &&
@@ -811,6 +858,17 @@ export class MissionManager {
     // M-A-3 T9: a client that reviewed a plan binds its approval to it; a replanned scope is never approved unseen.
     if (planReference !== undefined && planReference !== this.agenticPlanReference(id))
       throw new CommandRefusedError("The plan changed after it was reviewed; review the current plan before approving.");
+    // M-A-3 T11: a team execution plan is approved only by name (its exact reviewed reference), and only once every
+    // step has a durable owning Agent of this Mission.
+    if (mission.team) {
+      const steps = this.store.steps(id);
+      if (!planningPhase(steps) && planReference === undefined)
+        throw new CommandRefusedError("Approve the reviewed team plan by its reference.");
+      for (const step of steps.filter((item) => item.state !== "completed")) {
+        const owner = ownerRow(this, step.team?.agentId);
+        if (!step.team || !owner || owner.missionId !== id || owner.stopped) throw new CommandRefusedError("Every team step needs a live owning Agent of this Mission before approval.");
+      }
+    }
     if (isDeviceActor(by)) {
       const refusal = this.deviceMissionRefusal(mission);
       if (refusal) throw new WorkstationRequiredError(refusal);
@@ -973,15 +1031,26 @@ export class MissionManager {
       return;
     }
     let steps = this.store.steps(id);
+    // M-A-3 T11: a reserved rework replica stays pending (dormant) until a Host-observed failure activates it.
     for (const step of readySteps(steps))
-      if (step.state === "pending")
+      if (step.state === "pending" && !step.team?.dormant)
         this.setStep(step, { state: "ready" }, "mission.step.ready", `${step.role} is ready.`);
     steps = this.store.steps(id);
     let busy = steps.filter((step) => STEP_LIVE.includes(step.state)).length;
+    const team = mission.team;
+    const slots = team ? Math.min(this.cached.limits.maxConcurrentAgents, team.limits.maxConcurrentSteps) : this.cached.limits.maxConcurrentAgents;
+    // Model generations in flight, including routed children still waiting for a launch decision.
+    let models = team ? steps.filter((step) => step.executor.kind === "model" && (STEP_LIVE.includes(step.state) || (step.state === "waiting_for_approval" && !!step.taskId))).length : 0;
     for (const step of steps.filter((item) => item.state === "ready")) {
-      if (busy >= this.cached.limits.maxConcurrentAgents) break;
+      if (busy >= slots) break;
+      if (team) {
+        // Per-step owner gate against fresh rows: a paused member admits nothing new, a stopped one never again.
+        const fresh = this.store.step(step.id);
+        if (fresh.state !== "ready" || ownerHold(this, fresh)) continue;
+        if (fresh.executor.kind === "model" && models >= team.limits.maxConcurrentModelSteps) continue;
+      }
       try {
-        if (await this.launch(mission, this.store.step(step.id), envelope)) busy++;
+        if (await this.launch(mission, this.store.step(step.id), envelope)) { busy++; if (step.executor.kind === "model") models++; }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (!/CONTEXT_CHANGED|relink|workspace.*(replaced|identity|unavailable)/i.test(message)) throw error;
@@ -996,6 +1065,7 @@ export class MissionManager {
   /** Decides whether the mission is finished, failed or waiting, from graph state only. */
   evaluate(mission: Mission) {
     if (mission.state !== "running") return;
+    if (mission.team) { this.evaluateTeam(mission); return; }
     const steps = this.store.steps(mission.id);
     if (steps.every((step) => STEP_DONE.includes(step.state))) {
       this.completeMission(mission, steps);
@@ -1031,7 +1101,38 @@ export class MissionManager {
       (error) => this.containMission(mission.id, error),
     );
   }
+  /**
+   * M-A-3 T11: team completion counts live steps only (a superseded original keeps its failure as history; an unused
+   * reserved replica is skipped). A member Agent's Stop holds the Mission for the user instead of failing other Agents.
+   */
+  evaluateTeam(mission: Mission) {
+    const steps = this.store.steps(mission.id);
+    // The planner's completion is handled by plan installation, never by Mission completion.
+    if (planningPhase(steps) && steps.every((step) => step.state === "completed")) return;
+    const live = liveTeamSteps(steps);
+    if (live.every((step) => STEP_DONE.includes(step.state))) {
+      for (const step of steps) if (step.team?.dormant && step.state === "pending")
+        this.setStep(step, { state: "skipped" }, "mission.step.skipped", `${step.role}: reserved rework was not needed.`);
+      this.completeMission(this.store.mission(mission.id), this.store.steps(mission.id));
+      return;
+    }
+    if (live.some((step) => STEP_LIVE.includes(step.state) || step.state === "ready")) return;
+    const waiting = live.filter((step) => step.state === "waiting_for_approval");
+    const held = live.filter((step) => step.state === "stopped" || (step.state === "blocked" && step.failure?.category === "dependency_failed" && /Agent was stopped/.test(step.failure.detail)));
+    if (waiting.length || held.length) {
+      this.setMission(mission, { state: "waiting_for_user" }, "mission.waiting_for_user",
+        waiting.length ? `Mission ${mission.id} is waiting for ${waiting.length} permission decision(s).` : `Mission ${mission.id}: a member Agent was stopped; its dependents cannot run. Replan or stop the Mission.`);
+      return;
+    }
+    const failed = live.find((step) => step.state === "failed");
+    this.tasks.containment.background(
+      { subsystem: "missions", missionId: mission.id },
+      () => this.failMission(mission, failed?.failure?.category ?? "dependency_failed", failed ? `${failed.role} failed: ${failed.failure?.detail ?? "unknown"}` : "No step can run.", failed?.id ?? null),
+      (error) => this.containMission(mission.id, error),
+    );
+  }
   completeMission(mission: Mission, steps: MissionStep[]) {
+    if (mission.team) steps = liveTeamSteps(steps);
     const delegation = this.agentic.forMission(mission.id);
     if (delegation && !["REVOKED", "EXPIRED", "COMPLETED"].includes(delegation.current_state))
       this.agentic.state(delegation.id, "COMPLETED");
@@ -1184,6 +1285,10 @@ export class MissionManager {
     envelope: AuthorizationEnvelope,
   ): Promise<boolean> {
     this.tasks.containment.assertAccepting("missions");
+    if (step.team) {
+      step = this.store.step(step.id);
+      if (step.state !== "ready" || ownerHold(this, step)) return false;
+    }
     if (mission.projectId) {
       const project = this.tasks.projects.forExecution(mission.projectId);
       if (project.path !== mission.root)
@@ -1241,10 +1346,17 @@ export class MissionManager {
         );
       }
     }
-    const lock = this.workspace.acquire(
+    // M-A-3 T11: tool-free team generations touch no files and hold no lock; team writes hold the whole output folder
+    // exclusively (shared-root mutation is serialized); team reads share the folder or the observed file.
+    const teamLock = step.team && mission.team
+      ? step.executor.kind === "model" ? null
+        : step.team.kind === "observe" ? (step.team.source && "path" in step.team.source ? resolve(mission.root, step.team.source.path) : mission.root)
+          : join(mission.root, mission.team.outputDir)
+      : workspace;
+    const lock = teamLock === null ? { ok: true as const, id: "" } : this.workspace.acquire(
       mission.id,
       step.id,
-      workspace,
+      teamLock,
       step.scope.access === "write" ? "exclusive" : "shared",
     );
     if (!lock.ok) {
@@ -1257,7 +1369,7 @@ export class MissionManager {
         );
       return false;
     }
-    if (step.executor.kind === "model") return this.launchModel(mission, step, envelope, workspace);
+    if (step.executor.kind === "model") return step.team ? this.launchTeamModel(mission, step, envelope, workspace) : this.launchModel(mission, step, envelope, workspace);
     const running = this.markRunning(step, null, null, workspace);
     this.tasks.containment.background(
       { subsystem: "missions", missionId: mission.id, stepId: running.id },
@@ -1536,6 +1648,58 @@ export class MissionManager {
     this.markRunning(step, task.id, task.provider, workspace);
     return true;
   }
+  /**
+   * M-A-3 T11: a team model step. Inputs arrive only as verified, hash-rechecked handoffs; routing gets Host constraints
+   * (tool-free, local, no workspace tools) and a neutral routing text; a route outside them fails, never asks.
+   */
+  async launchTeamModel(mission: Mission, step: MissionStep, envelope: AuthorizationEnvelope, workspace: string): Promise<boolean> {
+    if (!isTeam(mission)) return false;
+    const built = await teamPrompt(this, mission, step, envelope);
+    if (this.stopping.has(mission.id) || this.store.mission(mission.id).state !== "running") return false;
+    step = this.store.step(step.id);
+    if (step.state !== "ready" || ownerHold(this, step)) return false;
+    if ("refused" in built) {
+      this.stepFailed(mission, this.markRunning(step, null, null, workspace), "dependency_failed", built.refused);
+      return false;
+    }
+    const usedExternal = mission.accounting.externalModelCalls;
+    const sessionsUsed = mission.accounting.externalModelCalls + mission.accounting.localModelCalls;
+    let task: OrchTask;
+    try {
+      task = this.tasks.submit(
+        { prompt: built.prompt, routingPrompt: TEAM_ROUTING_PROMPT, mode: mission.mode, projectId: mission.projectId, override: "auto", constraints: teamConstraints(step, step.team?.kind === "plan" ? teamOffer(this, mission) : null), verify: null },
+        { missionId: mission.id, stepId: step.id, cwd: workspace, executionScope: { access: "read" } },
+      );
+    } catch (error) {
+      this.stepFailed(mission, this.markRunning(step, null, null, workspace), "provider_unavailable", `TEAM_TOOL_FREE: no eligible local tool-free model: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+    const local = runsLocally(this.tasks.live().find((provider) => provider.id === task.provider), task.model);
+    const team = teamProviderViolation(this, task);
+    if (team) {
+      this.tasks.stopInBackground(task.id, team);
+      this.stepFailed(mission, this.markRunning(step, task.id, task.provider, workspace), "provider_unavailable", team);
+      return false;
+    }
+    const violation = taskViolation(task, envelope, local, usedExternal, Date.now(), step, sessionsUsed) ?? this.agenticProviderCheck(task);
+    if (violation) {
+      this.setStep(step, { taskId: task.id, workspace }, "mission.step.child_created", `${step.role} child task ${task.id} routed to ${task.provider}.`);
+      this.askPermission(mission, this.store.step(step.id), "provider.execute", "EXECUTE", `${task.provider} for ${step.role}: ${violation}`, "execute", {});
+      return false;
+    }
+    try {
+      this.tasks.approveDelegated(task.id, {
+        missionId: mission.id, stepId: step.id, authorizationId: envelope.id,
+        check: (child) => teamProviderViolation(this, child) ?? taskViolation(child, envelope, runsLocally(this.tasks.live().find((provider) => provider.id === child.provider), child.model), usedExternal, Date.now(), this.store.step(step.id), sessionsUsed),
+      });
+    } catch (error) {
+      this.stepFailed(mission, this.markRunning(step, task.id, task.provider, workspace), "provider_unavailable", error instanceof Error ? error.message : String(error));
+      return false;
+    }
+    this.countModelCall(mission.id, local);
+    this.markRunning(step, task.id, task.provider, workspace);
+    return true;
+  }
   countModelCall(missionId: string, local: boolean) {
     const mission = this.store.mission(missionId);
     this.setMission(mission, {
@@ -1577,6 +1741,7 @@ export class MissionManager {
       roots,
       oneTimeAction: step.approvedOnce?.action === action ? action : null,
       timeoutMs: step.timeoutMs,
+      ...(step.team?.agentId ? { agentId: step.team.agentId } : {}),
     };
   }
   async runDeterministic(
@@ -1600,8 +1765,19 @@ export class MissionManager {
         /** M-A-3 T9R-F02 (D2): the executor's write was staged, not applied; the step waits for workstation promotion. */
         staged?: string | null;
       };
-      if (step.executor.kind === "capability") {
-        const params = this.crossAppInputs(step);
+      // M-A-3 T11: a team write takes its content from the producer's verified handoff and its pre-image guard from
+      // what this Mission last wrote there; a destination already holding these exact bytes is not written again.
+      const write = step.team?.kind === "write_file" && isTeam(mission) ? teamWrite(this, mission, step) : null;
+      if (write && !("params" in write)) {
+        if ("already" in write) {
+          result = { ok: true, summary: "The destination already holds exactly the verified content; nothing was written again.", artifactIds: [], runId: null, output: null, permission: null, category: null };
+        } else {
+          this.workspace.release(stepId);
+          this.stepFailed(mission, step, "conflict" in write ? "workspace_conflict" : "dependency_failed", "conflict" in write ? write.conflict : write.refused);
+          return;
+        }
+      } else if (step.executor.kind === "capability") {
+        const params = write && "params" in write ? write.params : this.crossAppInputs(step);
         const prior = this.store
           .steps(missionId)
           .filter((previous) => step.dependsOn.includes(previous.id))
@@ -1834,6 +2010,9 @@ export class MissionManager {
 
   // T5: consent and accounting are adjuncts of this Mission authority, never a new executor.
   agenticPlanReference(id: string): string {
+    // M-A-3 T11: a team plan's reference covers every execution-relevant field, owners and edges included. Non-team
+    // Missions keep their existing digest byte for byte.
+    if (this.store.mission(id).team) return teamPlanReference(this.store.steps(id));
     return digest(
       this.store
         .steps(id)
@@ -1846,6 +2025,34 @@ export class MissionManager {
           ...(s.crossApp ? { crossApp: s.crossApp, dependsOn: s.dependsOn } : {}),
         })),
     );
+  }
+  /** M-A-3 T11: the owning team Agent of a step (null outside teams). */
+  stepOwner(stepId: string | null | undefined): string | null {
+    if (!stepId) return null;
+    try { return this.store.step(stepId).team?.agentId ?? null; } catch { return null; }
+  }
+  /** M-A-3 T11: the revocations a replan performs (shared by team plan install), without replanning. */
+  revokeForReplan(id: string, by: string, reason: string) {
+    for (const step of this.store.steps(id))
+      if (step.approvedOnce && step.state !== "completed") this.setStep(step, { approvedOnce: null });
+    const mission = this.store.mission(id);
+    if (mission.authorizationId) {
+      const envelope = this.store.authorization(mission.authorizationId);
+      if (envelope && !envelope.revokedAt) this.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });
+    }
+    for (const request of this.store.requests(id))
+      if (!request.resolvedAt) this.store.saveRequest({ ...request, resolvedAt: Date.now(), resolution: "deny", resolvedBy: `${by} (${reason})` });
+    for (const batch of this.store.endMissionBatches(id, "revoked", by))
+      this.emit("approval.batch_ended", `Small approval batch revoked (${batch.usedCount} / ${batch.maxActions} actions used): ${reason}`, id);
+    this.revokeDesktopGrants(id, reason);
+    this.withdrawStaged(id, by, reason);
+    this.workspace.releaseMission(id);
+  }
+  /** M-A-3 T11: Stop one member Agent's open work only (AgentRuntime persisted the durable stop flag first). */
+  async stopTeamAgent(missionId: string, agentId: string, by: string): Promise<number> {
+    const mission = this.store.mission(missionId);
+    if (!mission.team || mission.team.coordinatorAgentId === agentId) throw new CommandRefusedError("Only a team member Agent is stopped individually.");
+    return stopTeamAgentSteps(this, missionId, agentId, by);
   }
   currentAgenticCanonical(id: string): AuthorizationEnvelope | null {
     const m = this.store.mission(id);
@@ -1870,6 +2077,10 @@ export class MissionManager {
     const mission = this.store.mission(row.mission_id);
     if (mission.state !== "waiting_for_approval" || !mission.requestedScope)
       throw new Error("Review the planned Mission before proposing delegation.");
+    // M-A-3 T11: a team's one consent belongs to its Coordinator and covers the reviewed EXECUTION plan, never the
+    // planner-only phase (whose plan is replaced) and never a member Agent's slice of it.
+    if (mission.team && (mission.team.coordinatorAgentId !== agentId || planningPhase(this.store.steps(mission.id))))
+      throw new CommandRefusedError("A team's Agentic consent is proposed by its Coordinator for the reviewed execution plan.");
     const scope = structuredClone(mission.requestedScope);
     const roots = scope.projectRoots.map((root) => canonical(root));
     const commands: CommandBinding[] = [];
@@ -2957,6 +3168,13 @@ export class MissionManager {
       )
     )
       return "No current Task/step authority for this Mission.";
+    // M-A-3 T11: the step's own Agent must be a live member of this team (consent belongs to the Coordinator).
+    const teamStep = this.store.step(stepId);
+    if (teamStep.team) {
+      const owner = ownerRow(this, teamStep.team.agentId);
+      if (!owner || owner.missionId !== missionId || owner.stopped || (owner.id !== e.agent_id && owner.coordinatorId !== e.agent_id) || ["COMPLETED", "FAILED", "STOPPED"].includes(owner.state))
+        return "Current team Agent identity or Stop blocks admission.";
+    }
     if (
       e.current_state !== "ACTIVE" ||
       e.host_generation !== this.tasks.instanceId ||
@@ -3163,7 +3381,7 @@ export class MissionManager {
           ["filesystem.search", "filesystem.list"].includes(request.action) ||
           request.action.startsWith("git.")
         )
-          this.projectContext.assertScan(mission.projectId, mission.id, path, e);
+          this.projectContext.assertScan(mission.projectId, mission.id, path, e, this.stepOwner(request.stepId));
         else
           this.projectContext.assertResource(
             mission.projectId,
@@ -3173,6 +3391,7 @@ export class MissionManager {
             request.action === "filesystem.write" && typeof params.content === "string"
               ? Buffer.byteLength(params.content)
               : 0,
+            this.stepOwner(request.stepId),
           );
       }
       return null;
@@ -3220,7 +3439,7 @@ export class MissionManager {
         e.id,
         this.currentAgenticCanonical(e.mission_id)?.agentic?.revision ?? -1,
         {
-          agent_id: e.agent_id,
+          agent_id: this.stepOwner(task.mission.stepId) ?? e.agent_id,
           mission_id: e.mission_id,
           task_id: task.id,
           step_id: task.mission.stepId,
@@ -3279,6 +3498,9 @@ export class MissionManager {
     if (step.state !== "waiting_for_approval" || step.taskId !== taskId) return;
     const task = this.tasks.db.get(taskId);
     if (task.approval?.kind === "mission") return;
+    // M-A-3 T11: a direct approval never starts work for a stopped team member; its child is stopped instead.
+    const hold = step.team ? ownerHold(this, step, false) : null;
+    if (hold) { this.tasks.stopInBackground(taskId, hold); return; }
     if (step.pendingRequestId) {
       const request = this.store.request(step.pendingRequestId);
       if (!request.resolvedAt)
@@ -3371,16 +3593,21 @@ export class MissionManager {
       return;
     }
     const output = task.output.trim();
+    // M-A-3 T11: a team step keeps the canonical content extracted from the reply (one JSON value, Markdown body or
+    // HTML document), still unverified; raw and canonical hashes are recorded so seeding or extraction is visible.
+    const canonical = step.team ? canonicalOutput(this, mission, step, task.output) : null;
     const artifact = await this.artifacts.create({
       missionId: mission.id,
       stepId: step.id,
       type: step.expectedArtifacts[0] ?? "text",
       title: `${step.role} output`,
-      inline: output || "(no output)",
-      mediaType: "text/plain",
+      inline: canonical ? canonical.text : output || "(no output)",
+      mediaType: canonical ? (step.expectedArtifacts[0] === "source_file" ? "text/html" : step.expectedArtifacts[0] === "text" ? "text/markdown" : "application/json") : "text/plain",
       provenance: `provider:${task.provider}:${task.id}`,
       verification: "unverified",
     });
+    if (canonical)
+      this.setStep(this.store.step(step.id), { evidence: [...this.store.step(step.id).evidence, `attempt ${step.attempts.length}: raw output sha256 ${canonical.rawSha256}; canonical sha256 ${artifact.sha256}${canonical.seeded ? " (SEEDED by the acceptance harness)" : ""}; model ${task.model}`].slice(-20) });
     this.memory.record(
       mission.id,
       "agent_conclusion",
@@ -3550,6 +3777,13 @@ export class MissionManager {
             ? `${check.command} ${check.args.join(" ")}: exit ${(outcome.result?.output as { exitCode?: number } | null)?.exitCode ?? outcome.run?.status ?? "none"} (expected ${check.expectExit})`
             : `git diff: ${ok ? "changes present" : "no changes"}`,
         );
+      } else if (check.kind === "team_output" || check.kind === "team_file" || check.kind === "team_requirements") {
+        const outcome = await verifyTeamCriterion(this, mission, step, envelope, check, [...result.artifactIds]);
+        if (interrupted()) return;
+        if (outcome.ask) { this.askPermission(mission, this.store.step(step.id), outcome.ask.action, outcome.ask.risk as PermissionRequest["risk"], outcome.ask.reason, "verify", outcome.ask.decision); return; }
+        passed &&= outcome.ok;
+        result.artifactIds.push(...outcome.artifactIds);
+        checks.push(...outcome.lines);
       } else if (check.kind === "artifact") {
         const ok = this.store
           .artifacts(mission.id)
@@ -3622,7 +3856,9 @@ export class MissionManager {
           verification: checks,
           ...(executionRun?.outputRef
             ? { outputRef: executionRun.outputRef, verificationRunIds }
-            : {}),
+            : step.team && step.executor.kind === "model" && result.artifactIds[0]
+              ? { outputRef: result.artifactIds[0] }
+              : {}),
         },
         failure: null,
         approvedOnce: null,
@@ -3639,6 +3875,17 @@ export class MissionManager {
       artifactCount: result.artifactIds.length,
     });
     this.workspace.release(step.id);
+    // M-A-3 T11: a verified plan is installed for review; nothing runs until the user approves it by name.
+    if (step.team?.kind === "plan" && isTeam(mission)) {
+      try { await installTeamPlan(this, this.store.mission(mission.id) as Mission & { team: NonNullable<Mission["team"]> }, this.store.step(step.id)); }
+      catch (error) {
+        const current = this.store.mission(mission.id);
+        const detail = error instanceof Error ? error.message : String(error);
+        if (["running", "waiting_for_user"].includes(current.state))
+          this.setMission(current, { state: "waiting_for_user", team: { ...current.team!, rejected: [...current.team!.rejected, { at: Date.now(), reasons: [detail.slice(0, 500)] }].slice(-10) } }, "mission.waiting_for_user", `The team plan could not be installed: ${detail.slice(0, 400)}`);
+      }
+      return;
+    }
     this.schedule(mission.id);
   }
   stepFailed(mission: Mission, step: MissionStep, category: FailureCategory, detail: string) {
@@ -3652,6 +3899,7 @@ export class MissionManager {
       return;
     step = owned;
     this.workspace.release(step.id);
+    if (owned.team && mission.team && this.teamFailure(mission, owned, category, detail)) return;
     const attempts = step.attempts.length
       ? step.attempts.map((attempt, index) =>
           index === step.attempts.length - 1
@@ -3752,6 +4000,27 @@ export class MissionManager {
         );
     }
     this.schedule(mission.id);
+  }
+
+  /**
+   * M-A-3 T11 team failure policy, applied before the generic retry verdict. A failed Host postcondition on a delivery
+   * activates the reviewed rework replica; conflicts, refused handoffs and scope refusals hold for the user (retrying
+   * cannot change them); a rejected plan is recorded and retried by the bounded planner budget.
+   */
+  teamFailure(mission: Mission, step: MissionStep, category: FailureCategory, detail: string): boolean {
+    if (!isTeam(mission)) return false;
+    if (step.team?.kind === "plan" && category === "verification_failed") {
+      const current = this.store.mission(mission.id);
+      this.setMission(current, { team: { ...current.team!, planRevisions: current.team!.planRevisions + 1, rejected: [...current.team!.rejected, { at: Date.now(), reasons: detail.split("; ").slice(0, 15) }].slice(-10) } }, "mission.team.plan_rejected", `Bunny rejected the Planner Agent's proposal (${detail.split("; ").length} reason(s)).`);
+      return false;
+    }
+    if (step.team?.kind === "verify_output" && category === "verification_failed" && activateRework(this, mission, step, detail)) return true;
+    if (!/^(HANDOFF_REFUSED|FILE_CONFLICT|CONTEXT_BOUND|TEAM_[A-Z_]+):/.test(detail)) return false;
+    const attempts = step.attempts.map((attempt, index) => index === step.attempts.length - 1 ? { ...attempt, finishedAt: Date.now(), outcome: "failed" as const, category, detail: detail.slice(0, 1500) } : attempt);
+    this.setStep(step, { state: "failed", finishedAt: Date.now(), attempts, failure: { category, detail: detail.slice(0, 2000) }, approvedOnce: null }, "mission.step.failed", `${step.role} held: ${detail.slice(0, 400)}`);
+    const current = this.store.mission(mission.id);
+    if (current.state === "running") this.setMission(current, { state: "waiting_for_user" }, "mission.waiting_for_user", `Mission ${mission.id}: ${step.role} needs you — ${detail.slice(0, 300)}`);
+    return true;
   }
 
   // ── permission requests ───────────────────────────────────────────────────
@@ -4329,7 +4598,8 @@ export class MissionManager {
     // refusal below is checked before anything changes, so a refused Retry never withdraws a staged change (round 4).
     const waitingPromotion = this.store.steps(id).filter((step) => step.state === "waiting_for_approval" && !!step.pendingRequestId && !!this.store.request(step.pendingRequestId).promotion);
     const before = this.store.steps(id);
-    const retryable = [...before.filter((step) => step.state === "failed"), ...waitingPromotion];
+    // M-A-3 T11: a superseded original keeps its failure as history; only live steps are retried.
+    const retryable = [...before.filter((step) => step.state === "failed" && !step.team?.supersededBy), ...waitingPromotion];
     if (!retryable.length && !before.some((step) => step.state === "blocked"))
       throw new Error("No failed step to retry.");
     for (const step of retryable)
@@ -4351,7 +4621,7 @@ export class MissionManager {
       this.setStep(step, { state: "failed", attempts, pendingRequestId: null, pendingPhase: null, failure: { category: "permission_required", detail } });
     }
     this.withdrawStaged(id, by, `Mission retried by ${by}; the step stages its change again.`);
-    const failed = this.store.steps(id).filter((step) => step.state === "failed");
+    const failed = this.store.steps(id).filter((step) => step.state === "failed" && !step.team?.supersededBy);
     for (const step of failed) {
       this.setStep(
         step,
@@ -4401,6 +4671,12 @@ export class MissionManager {
       throw new Error("Steps are still running; stop them first.");
     if (mission.planning.replans >= this.cached.limits.maxReplans)
       throw new Error(`Replan limit (${this.cached.limits.maxReplans}) reached.`);
+    // M-A-3 T11: a team Mission is replanned only by its Planner Agent, and only before any execution step completed.
+    if (mission.team) {
+      if (explicit !== undefined) throw new CommandRefusedError("A team Mission is planned by its Planner Agent; explicit steps are refused.");
+      if (this.agentic.exists(id)) throw new CommandRefusedError("This team already holds Agentic consent; stop it and create a new team Mission to change the plan.");
+      if (this.store.steps(id).some((step) => step.state === "completed" && step.team?.kind !== "plan")) throw new CommandRefusedError("Team work already completed; stop this Mission and create a new one instead of replanning.");
+    }
     await this.cancelChildren(id, "Mission is being replanned.");
     // M-A-3 T9R-F02 (round 5): the replaced steps' one-time answers end with them (WITHDRAWN), never silently.
     for (const step of this.store.steps(id))
@@ -4427,6 +4703,13 @@ export class MissionManager {
     this.revokeDesktopGrants(id, `Mission replanned by ${by}`);
     this.withdrawStaged(id, by, `Mission replanned by ${by}.`);
     this.workspace.releaseMission(id);
+    if (mission.team) {
+      // The narrowing note is data for the Planner Agent; the objective and the user's requirements stay as approved.
+      const base = this.setMission(mission, { authorizationId: null, failure: null, finishedAt: null, planning: { ...mission.planning, replans: mission.planning.replans + 1 },
+        team: { ...mission.team, revisionNote: objective?.trim().slice(0, 600) || null, proposal: null } }, "mission.replanning", `${by} asked the Planner Agent for a revised plan; the previous authorization was revoked.`);
+      // plan() keeps only completed steps (the earlier planner runs); the plan drafted for review is replaced.
+      return this.view(this.plan(base, undefined, this.teamPlanningPlan(base)));
+    }
     const base = this.setMission(
       mission,
       {
@@ -4477,6 +4760,31 @@ export class MissionManager {
           applied: false,
           reason: `Step is ${step.state}; not an unreconciled Host-restart interruption.`,
         });
+        continue;
+      }
+      // M-A-3 T11: team steps reconcile from disk and canonical truth. A stopped owner's work is never revived; a
+      // write whose exact bytes already landed is verified, not repeated; an absent one is admitted once; anything
+      // else stays held. Tool-free generations and reads have no side effect and are re-admitted once.
+      if (step.team) {
+        const mission = this.store.mission(missionId);
+        if (ownerHold(this, step, false)) { results.push({ stepId: step.id, applied: false, reason: "The owning Agent was stopped; its work is not revived." }); continue; }
+        if (step.team.kind === "write_file" && isTeam(mission)) {
+          const write = teamWrite(this, mission, step, false);
+          if ("already" in write) {
+            this.setStep(step, { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role}: the verified bytes already landed before the restart; only Bunny's check is repeated.`);
+            const running = this.markRunning(this.store.step(step.id), null, null);
+            const live = this.setMission(this.store.mission(missionId), { state: "running", recovery: null }, "mission.recovered", "Team write reconciled from disk without writing again.");
+            await this.verifyAndComplete(live, running, { summary: "Write reconciled from disk after a Host restart (not repeated).", artifactIds: [], output: null, task: null });
+            results.push({ stepId: step.id, applied: true, replay: "verify_then_consume" });
+          } else if ("params" in write) {
+            this.setStep(step, { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role}: the destination still has its pre-image; the write is admitted once more under its guard.`);
+            results.push({ stepId: step.id, applied: true, replay: "requeue_once" });
+          } else results.push({ stepId: step.id, applied: false, reason: "conflict" in write ? write.conflict : write.refused });
+          continue;
+        }
+        if (step.state === "blocked") this.setStep(step, { state: "pending", finishedAt: null, failure: null });
+        this.setStep(this.store.step(step.id), { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role} re-admitted once after the Host restart (no side effect: ${step.executor.kind === "model" ? "tool-free generation" : "read-only observation"}).`);
+        results.push({ stepId: step.id, applied: true, replay: "requeue_once" });
         continue;
       }
       if (instruction.mode === "resubmit") {
@@ -4569,7 +4877,7 @@ export class MissionManager {
     }
     // The mission lands running only when nothing else needs the user; missions disabled keeps it parked.
     const current = this.store.mission(missionId);
-    const pending = this.store.steps(missionId);
+    const pending = current.team ? liveTeamSteps(this.store.steps(missionId)) : this.store.steps(missionId);
     const needsUser =
       pending.some((step) => step.state === "waiting_for_approval") ||
       pending.some((step) => ["failed", "blocked"].includes(step.state));

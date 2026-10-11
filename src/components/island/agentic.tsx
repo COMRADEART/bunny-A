@@ -17,7 +17,8 @@ import {
   X,
 } from "lucide-react";
 import { useIsland } from "@/store/use-island";
-import { AuthorizationCard } from "./agent";
+import { AuthorizationCard, TeamsSection } from "./agent";
+import { parseRequirementLines, teamPanels } from "./team-model";
 import { AGENT_STATE_LABEL, CHECKPOINT_LABEL } from "./agent-model";
 import {
   agentControls,
@@ -267,7 +268,14 @@ export function AgenticWorkspace() {
   const [objective, setObjective] = useState("");
   const [projectId, setProjectId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [teamForm, setTeamForm] = useState(false);
+  const [teamObjective, setTeamObjective] = useState("");
+  const [teamProject, setTeamProject] = useState("");
+  const [teamOutput, setTeamOutput] = useState("");
+  const [teamLines, setTeamLines] = useState("");
   const agents = store.agents?.agents ?? [];
+  const teams = teamPanels(store.agents, store.missions?.missions);
+  const parsedLines = parseRequirementLines(teamLines);
   const missions = store.missions?.missions ?? [];
   const selected =
     agents.find((row) => row.id === store.agentFocus) ??
@@ -311,6 +319,12 @@ export function AgenticWorkspace() {
           >
             <Plus size={16} />
             New Agent
+          </button>
+        )}
+        {isDevice(store.viewer) ? null : (
+          <button className="btn secondary" disabled={!store.canAct() || !store.missions?.enabled} onClick={() => setTeamForm(!teamForm)}>
+            <Plus size={16} />
+            New Agent team
           </button>
         )}
       </div>
@@ -403,6 +417,73 @@ export function AgenticWorkspace() {
           </div>
         </form>
       )}
+      {teamForm && !isDevice(store.viewer) && (
+        <form
+          className="t8-surface new-agent-form"
+          data-testid="new-team-form"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (busy || parsedLines.errors.length) return;
+            setBusy(true);
+            try {
+              await store.createTeam({ objective: teamObjective, projectId: teamProject || null, requirements: parsedLines.requirements, ...(teamOutput.trim() ? { outputDir: teamOutput.trim() } : {}) });
+              setTeamForm(false);
+              setTeamObjective("");
+              setTeamLines("");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <h2>Create an Agent team</h2>
+          <p className="caption">
+            A Planner Agent proposes a plan; Bunny validates it, you review it, and member Agents work only inside it.
+            Model work stays on this machine (local Ollama, no tools). Files land only in a new output folder.
+          </p>
+          <label>
+            Project
+            <select value={teamProject} required onChange={(event) => setTeamProject(event.target.value)}>
+              <option value="">Choose a registered Project</option>
+              {store.projects.map((row) => (
+                <option value={row.id} key={row.id}>
+                  {row.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Objective
+            <textarea value={teamObjective} maxLength={4000} required rows={3} onChange={(event) => setTeamObjective(event.target.value)} />
+          </label>
+          <label>
+            Output folder (new)
+            <input value={teamOutput} maxLength={40} placeholder="bunny-team-…" onChange={(event) => setTeamOutput(event.target.value)} />
+          </label>
+          <label>
+            Requirements Bunny will check, one per line: check [value] | description
+            <textarea
+              value={teamLines}
+              rows={4}
+              placeholder={"html_id summary | The page has a summary section\nno_external_resources | Works offline\nmarkdown_heading Usage | The README explains usage"}
+              onChange={(event) => setTeamLines(event.target.value)}
+            />
+          </label>
+          {parsedLines.errors.length ? (
+            <ul role="alert">{parsedLines.errors.map((error) => <li key={error} className="caption">{error}</li>)}</ul>
+          ) : (
+            <p className="caption">{parsedLines.requirements.length} requirement(s) ready.</p>
+          )}
+          <div className="actions">
+            <button className="btn primary" disabled={busy || store.host !== "online" || !!parsedLines.errors.length}>
+              Create team for review
+            </button>
+            <button type="button" className="btn secondary" onClick={() => setTeamForm(false)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+      {teams.length ? <TeamsSection teams={teams} /> : null}
       <div className="workspace-tools">
         <label className="search-field">
           <Search size={17} />

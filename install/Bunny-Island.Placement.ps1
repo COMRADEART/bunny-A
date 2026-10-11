@@ -81,3 +81,20 @@ function Get-BunnyIndicatorLayout {
     Slots = $visible + [Math]::Min(1, $overflow)
   }
 }
+
+# M-A-3 T11: the facts one agent chip shows. A team member's chip is lettered by its ROLE (two members of one team
+# never share a letter) and its tooltip names the role, the state and the member's own current task. Pure: snapshot in, facts out.
+$script:BunnyRoleLetter = @{ coordinator = 'C'; planner = 'P'; researcher = 'R'; implementer = 'I'; documenter = 'D'; reviewer = 'V'; tester = 'T' }
+$script:BunnyRoleName = @{ coordinator = 'Coordinator'; planner = 'Planner'; researcher = 'Researcher'; implementer = 'Implementer'; documenter = 'Documenter'; reviewer = 'Reviewer'; tester = 'Tester' }
+$script:BunnyKindName = @{ plan = 'planning'; observe = 'reading a project file'; generate_json = 'building the dataset'; generate_markdown = 'writing Markdown'; generate_html = 'building the page'; review = 'reviewing (advisory)'; write_file = 'saving a file'; verify_output = 'Bunny checking requirements' }
+function Get-BunnyAgentChipFacts($Agent) {
+  $name = [string]$Agent.name
+  $state = ([string]$Agent.state).Replace('_', ' ').ToLower()
+  $role = if ($Agent.team) { [string]$Agent.team.role } else { '' }
+  $letter = if ($role -and $script:BunnyRoleLetter.ContainsKey($role)) { $script:BunnyRoleLetter[$role] } elseif ($name.Length -gt 0) { $name.Substring(0, 1).ToUpper() } else { '?' }
+  $parts = @($name)
+  if ($role -and $script:BunnyRoleName.ContainsKey($role)) { $parts += ($script:BunnyRoleName[$role] + ' agent') }
+  $parts += $state
+  if ($Agent.current -and $Agent.current.kind -and $script:BunnyKindName.ContainsKey([string]$Agent.current.kind)) { $parts += $script:BunnyKindName[[string]$Agent.current.kind] }
+  return @{ Letter = $letter; ToolTip = ($parts -join ' - '); Role = $role; MissionId = [string]$Agent.missionId }
+}

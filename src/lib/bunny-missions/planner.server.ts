@@ -10,6 +10,8 @@ import type { ArtifactType, JsonValue, MissionLimits, MissionStep, StepExecutor,
 export const PLANNER_ID = "bunny-planner-deterministic-v1";
 export type StepDraft = {
   crossApp?: import("./cross-app.ts").CrossAppMetadata;
+  /** M-A-3 T11: Host-built team metadata; step references inside it use draft keys until plan() assigns ids. */
+  team?: import("./team.ts").StepTeam;
   key: string; role: string; objective: string; dependsOn: string[]; executor: StepExecutor; requiredCapabilities: string[];
   reasoning: MissionStep["reasoning"]; access: "read" | "write"; isolation: "shared" | "worktree"; preferences: MissionStep["preferences"];
   providerConstraints: MissionStep["providerConstraints"]; verification: VerificationCriterion[]; expectedArtifacts: ArtifactType[];

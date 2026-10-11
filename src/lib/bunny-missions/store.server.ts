@@ -2,12 +2,13 @@ import type { HostDatabase } from "../bunny-host/persistence.server.ts";
 import type { HostEvent } from "../bunny-host/contracts.ts";
 import type { CalculatorTarget } from "./capabilities/calculator-targets.server.ts";
 import type {
-  ApprovalBatch, Artifact, AuthorizationEnvelope, CapabilityRun, GrantPolicy, InboxEvent, MemoryEntry, Mission, MissionConfig, MissionStep,
+  ApprovalBatch, Artifact, AuthorizationEnvelope, CapabilityRun, GrantPolicy, Handoff, InboxEvent, MemoryEntry, Mission, MissionConfig, MissionStep,
   PermissionRequest, Skill, Trigger,
 } from "./types.ts";
 
 export const MISSION_SCHEMA = "ma0.missions.v1";
 export const APPROVAL_BATCHES_SCHEMA = "ma2.approval-batches.v1";
+export const TEAM_HANDOFFS_SCHEMA = "ma3.t11.team-handoffs.v1";
 export const DEFAULT_CONFIG: MissionConfig = {
   enabled: false,
   limits: { maxConcurrentAgents: 3, maxSteps: 12, maxRetriesPerStep: 2, maxReplans: 2, maxMissionRuntimeMs: 2 * 60 * 60_000, maxActiveMissions: 3 },
@@ -64,6 +65,11 @@ export class MissionStore {
       CREATE INDEX IF NOT EXISTS memory_mission ON mission_memory(mission_id, created_at);
       INSERT OR IGNORE INTO migrations(key) VALUES('${MISSION_SCHEMA}');
       INSERT OR IGNORE INTO migrations(key) VALUES('${APPROVAL_BATCHES_SCHEMA}');`);
+    // M-A-3 T11: immutable cross-Agent handoff records (data movement only; never authority).
+    host.db.exec(`
+      CREATE TABLE IF NOT EXISTS mission_handoffs(id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, step_id TEXT NOT NULL, created_at INTEGER NOT NULL, record TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS mission_handoffs_mission ON mission_handoffs(mission_id, created_at);
+      INSERT OR IGNORE INTO migrations(key) VALUES('${TEAM_HANDOFFS_SCHEMA}');`);
   }
   get db() { return this.host.db; }
 
@@ -132,6 +138,13 @@ export class MissionStore {
   stepForTask(taskId: string): MissionStep | null {
     const row = this.db.prepare("SELECT record FROM mission_steps WHERE task_id=?").get(taskId) as { record: string } | undefined;
     return row ? JSON.parse(row.record) as MissionStep : null;
+  }
+  /** M-A-3 T11: handoff rows are append-only; a refusal is recorded, never rewritten into a delivery. */
+  addHandoff(handoff: Handoff) {
+    this.db.prepare("INSERT INTO mission_handoffs(id,mission_id,step_id,created_at,record) VALUES(?,?,?,?,?)").run(handoff.id, handoff.missionId, handoff.destinationStepId, handoff.createdAt, JSON.stringify(handoff));
+  }
+  handoffs(missionId: string, limit = 200): Handoff[] {
+    return (this.db.prepare("SELECT record FROM mission_handoffs WHERE mission_id=? ORDER BY created_at DESC, rowid DESC LIMIT ?").all(missionId, limit) as { record: string }[]).map((row) => JSON.parse(row.record) as Handoff).reverse();
   }
   dependencies(missionId: string): { stepId: string; dependsOn: string }[] { return this.db.prepare("SELECT step_id AS stepId,depends_on AS dependsOn FROM mission_dependencies WHERE mission_id=?").all(missionId) as { stepId: string; dependsOn: string }[]; }
 

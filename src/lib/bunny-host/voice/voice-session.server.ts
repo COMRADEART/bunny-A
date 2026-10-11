@@ -25,7 +25,7 @@ import {
 import { canTransition, createFsm, hasSpeechInFlight, tryTransition, type VoiceFsm } from "./voice-fsm.ts";
 import { VoiceChunker, chunkAnswer, type SpokenChunk } from "./voice-chunker.ts";
 import { classifyTranscript, controlAction, type VoiceIntent } from "./voice-intent.ts";
-import { answerApprovals, answerLastMission, answerModel, answerStatus, answerVerification, isTerminalAgent, type AgentFact, type ApprovalFact, type MissionFact } from "./voice-answers.server.ts";
+import { answerApprovals, answerTeam, answerLastMission, answerModel, answerStatus, answerVerification, isTerminalAgent, type AgentFact, type ApprovalFact, type MissionFact } from "./voice-answers.server.ts";
 
 export type ListenSource = "button" | "hotkey" | "push_to_talk" | "hands_free";
 export type InterruptSource = VoiceInterruptReceipt["source"];
@@ -744,6 +744,11 @@ export class VoiceSessionManager {
       case "agent_last_mission":
         this.speakAnswer(this.hostAnswer(intent.kind), "host_facts", turn);
         return;
+      case "agent_team": {
+        const facts = this.deps.agents.facts();
+        this.speakAnswer(answerTeam(intent.target, facts.agents, facts.missions), "host_facts", turn);
+        return;
+      }
       case "chat":
         await this.chat(transcript, turn);
         return;

@@ -45,9 +45,17 @@ export class AgentWorkspaceStore {
     );
   }
   getForMission(missionId: string): AgentWorkspace | null {
+    // M-A-3 T11: a team Mission has one workspace per Agent; the Mission's own (first, Coordinator) one is returned here.
     const row = this.host.db
-      .prepare("SELECT record FROM agent_workspaces WHERE mission_id=?")
+      .prepare("SELECT w.record FROM agent_workspaces w LEFT JOIN agents a ON a.id=w.agent_id WHERE w.mission_id=? ORDER BY a.created_at, w.rowid LIMIT 1")
       .get(missionId) as { record: string } | undefined;
+    return row ? (JSON.parse(row.record) as AgentWorkspace) : null;
+  }
+  /** M-A-3 T11: the workspace of exactly this Agent in this Mission (UNIQUE(agent_id, mission_id)). */
+  getFor(agentId: string, missionId: string): AgentWorkspace | null {
+    const row = this.host.db
+      .prepare("SELECT record FROM agent_workspaces WHERE agent_id=? AND mission_id=?")
+      .get(agentId, missionId) as { record: string } | undefined;
     return row ? (JSON.parse(row.record) as AgentWorkspace) : null;
   }
   list(projectId: string, limit = 100): AgentWorkspace[] {
@@ -72,12 +80,20 @@ export class AgentWorkspaceStore {
         JSON.parse(mission.record).projectId !== projectId
       )
         throw new Error("Workspace Agent/Mission/Project binding mismatch.");
-      const existing = this.getForMission(missionId);
+      const existing = this.getFor(agentId, missionId);
       if (existing) {
         if (existing.agentId !== agentId || existing.projectId !== projectId)
           throw new Error("Workspace belongs to another Agent or Project.");
         this.validate(existing);
         return existing;
+      }
+      // M-A-3 T11: a second Agent may hold a workspace in the same Mission only as a declared member of its team.
+      const holder = this.getForMission(missionId);
+      if (holder && holder.agentId !== agentId) {
+        const record = JSON.parse(String((this.host.db.prepare("SELECT record FROM agents WHERE id=?").get(agentId) as { record: string }).record)) as { team?: { missionId?: string; coordinatorId?: string | null } };
+        if (record.team?.missionId !== missionId || !record.team.coordinatorId || record.team.coordinatorId !== holder.agentId)
+          throw new Error("Workspace belongs to another Agent or Project.");
+        if (holder.projectId !== projectId) throw new Error("Workspace belongs to another Agent or Project.");
       }
       const base = inspectRoot(this.base);
       const parent = join(base.path, "agents");
@@ -201,9 +217,10 @@ export class AgentWorkspaceStore {
       throw error;
     }
   }
-  assertResource(missionId: string, path: string, additionalBytes = 0): void {
+  assertResource(missionId: string, path: string, additionalBytes = 0, agentId: string | null = null): void {
     noLinks(path);
-    const current = this.getForMission(missionId);
+    // M-A-3 T11: in a team Mission the requesting step's own Agent workspace is the only scratch it may use.
+    const current = agentId ? this.getFor(agentId, missionId) : this.getForMission(missionId);
     if (current)
       this.validate(current, contained(current.scratch.path, path) ? additionalBytes : 0);
     if (
