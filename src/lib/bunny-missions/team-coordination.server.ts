@@ -22,6 +22,8 @@ import {
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 /** Context window loaded for team generations (Ollama num_ctx) and the prompt bound checked against it. */
 export const TEAM_CONTEXT_TOKENS = 8192;
+/** Generated-token ceilings per kind: generous for real output, finite so a runaway constrained generation ends. */
+export const TEAM_OUTPUT_TOKENS: Partial<Record<string, number>> = { plan: 2048, generate_json: 1536, generate_markdown: 1536, generate_html: 3072, review: 1024 };
 const PROMPT_TOKEN_BOUND = 5200;
 const estimateTokens = (text: string) => Math.ceil(text.length / 3.2);
 const SENSITIVE_NAME = /(^|[\\/])(\.|node_modules$|credentials?|secrets?|id_rsa|id_ed25519|.*\.(?:pem|key|pfx|sqlite|db)$)/i;
@@ -90,6 +92,7 @@ export function teamConstraints(step: MissionStep, offer: TeamOffer | null): Tas
     missionAccess: "read", localOnly: true, offlineOnly: true, providerAllowlist: ["ollama"],
     requiresFilesystem: false, requiresTerminal: false, requiresGit: false,
     maxRuntimeMs: Math.max(1000, Math.min(step.timeoutMs, 3_600_000)), contextTokens: TEAM_CONTEXT_TOKENS,
+    outputTokens: TEAM_OUTPUT_TOKENS[step.team?.kind ?? "plan"] ?? 2048,
     ...(grammar ? { responseFormat: grammar } : {}),
   };
 }
@@ -189,10 +192,11 @@ export async function teamPrompt(m: MissionManager, mission: Mission & { team: M
     const label = source.step.team ? `${roleLabel(source.step.team.role)} ${source.step.team.kind}${source.step.team.source && "path" in source.step.team.source ? ` of ${source.step.team.source.path}` : ""}` : source.step.role;
     data.push(dataBlock(label, source.sha256, source.body, 7000));
   }
-  const requirements = mission.team.requirements.filter((requirement) => !team.requirements || team.requirements.includes(requirement.id));
+  // Every user requirement for the file type is stated: the planner's subset never hides an acceptance check.
+  const markdown = team.kind === "generate_markdown" || (team.kind === "review" && !!team.target?.toLowerCase().endsWith(".md"));
   const prompt = taskPrompt({
     role: team.role, kind: team.kind, objective: step.objective, missionObjective: mission.objective, schema: team.schema,
-    requirements: team.kind === "generate_markdown" ? requirements.filter((item) => item.target === "markdown") : requirements.filter((item) => item.target === "html"),
+    requirements: team.kind === "generate_json" ? [] : mission.team.requirements.filter((item) => item.target === (markdown ? "markdown" : "html")),
     data, repair: step.attempts.at(-1)?.category === "verification_failed" ? step.attempts.at(-1)!.detail : team.repair ?? null,
     reviewerFindings: team.reviewerFindings ?? null, outputDir: mission.team.outputDir,
   });

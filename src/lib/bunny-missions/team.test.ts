@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  TEAM_DEFAULT_LIMITS, checkRequirements, checkTeamOutput, extractOutput, htmlProblems, outputGrammar, plannerPrompt, schemaProblems,
+  TEAM_DEFAULT_LIMITS, checkRequirements, exampleFor, checkTeamOutput, extractOutput, htmlProblems, outputGrammar, plannerPrompt, schemaProblems,
   taskPrompt, teamDrafts, teamLimits, validateOutputDir, validateRequirements, validateTeamPlan, type TeamOffer, type TeamPlan,
 } from "./team.ts";
 
@@ -92,6 +92,8 @@ test("M37/M39: one writer per file; content must come from a matching generator;
   assert.ok(errorsOf(mismatched).some((error) => /content must come from a generate_markdown/.test(error)));
   const uncovered = plan(); uncovered.tasks[8].requirements = [];
   assert.ok(errorsOf(uncovered).some((error) => /Requirement R4 is not verified/.test(error)));
+  const direct = plan(); direct.tasks[3].dependsOn = ["t1"];
+  assert.ok(errorsOf(direct).some((error) => /t4 must depend on a generate_json task: R2/.test(error)), "a dataset requirement needs a verified dataset");
   const nothing = plan(); nothing.tasks = nothing.tasks.filter((task) => task.kind !== "write_file" && task.kind !== "verify_output" && task.kind !== "review");
   assert.ok(errorsOf(nothing).some((error) => /delivers nothing/.test(error)));
 });
@@ -154,4 +156,21 @@ test("prompts: handed-off data is fenced as data; the planner prompt names no au
   assert.match(planner, /REJECTED by Bunny/);
   assert.match(planner, /never name providers, models, commands, URLs, permissions or credentials/);
   assert.ok(checkTeamOutput({ format: "plan" }, JSON.stringify(plan()), offer).ok);
+});
+
+test("the planner's example is shaped by the offer and is itself a valid plan for it", () => {
+  const offers: TeamOffer[] = [
+    offer,
+    { ...offer, requirements: requirements.filter((requirement) => requirement.target === "markdown") },
+    { ...offer, files: [], requirements: requirements.filter((requirement) => requirement.check.kind !== "dataset_values") },
+    { ...offer, git: false, requirements: requirements.filter((requirement) => requirement.target === "html") },
+    { ...offer, limits: { ...offer.limits, maxAgents: 4 } },
+    { ...offer, limits: { ...offer.limits, maxAgents: 3 } },
+  ];
+  for (const candidate of offers) {
+    const example = exampleFor(candidate);
+    const result = validateTeamPlan(example, candidate);
+    assert.ok(result.ok, JSON.stringify(result));
+  }
+  assert.ok(!exampleFor({ ...offer, requirements: requirements.filter((requirement) => requirement.target === "markdown") }).tasks.some((task) => task.kind === "generate_json"), "no dataset step without a dataset requirement");
 });

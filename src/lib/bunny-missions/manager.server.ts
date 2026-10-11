@@ -126,6 +126,8 @@ export class MissionManager {
   /** M-A-3 T11: AgentRuntime allocates (or reuses) one durable member identity per role; MissionManager records owners. */
   teamAllocator: ((missionId: string, roles: TeamRole[]) => Partial<Record<TeamRole, string>>) | null = null;
   teamFaults: TeamFaults | null = null;
+  /** M-A-3 T11: Missions waiting for the first local-provider probe before admitting team model work. */
+  private discoveryWaits = new Set<string>();
   /** M-A-3 T9R-F02 (D2): Host-owned inert staging of paired-device file changes. */
   staging: DeviceStaging;
   /**
@@ -1654,6 +1656,16 @@ export class MissionManager {
    */
   async launchTeamModel(mission: Mission, step: MissionStep, envelope: AuthorizationEnvelope, workspace: string): Promise<boolean> {
     if (!isTeam(mission)) return false;
+    // Right after a Host start the local provider is not probed yet: the step stays ready and is re-checked shortly,
+    // instead of spending an attempt (or holding the team) on a provider state nobody has observed.
+    const ollama = this.tasks.live().find((provider) => provider.id === "ollama");
+    if (!ollama || ollama.availability === "unknown") {
+      if (!this.discoveryWaits.has(mission.id)) {
+        this.discoveryWaits.add(mission.id);
+        setTimeout(() => { this.discoveryWaits.delete(mission.id); if (!this.closed) this.schedule(mission.id); }, 2000).unref?.();
+      }
+      return false;
+    }
     const built = await teamPrompt(this, mission, step, envelope);
     if (this.stopping.has(mission.id) || this.store.mission(mission.id).state !== "running") return false;
     step = this.store.step(step.id);
@@ -1671,7 +1683,7 @@ export class MissionManager {
         { missionId: mission.id, stepId: step.id, cwd: workspace, executionScope: { access: "read" } },
       );
     } catch (error) {
-      this.stepFailed(mission, this.markRunning(step, null, null, workspace), "provider_unavailable", `TEAM_TOOL_FREE: no eligible local tool-free model: ${error instanceof Error ? error.message : String(error)}`);
+      this.stepFailed(mission, this.markRunning(step, null, null, workspace), "provider_unavailable", `No eligible local tool-free model right now: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
     const local = runsLocally(this.tasks.live().find((provider) => provider.id === task.provider), task.model);

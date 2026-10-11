@@ -293,6 +293,8 @@ export type TaskConstraints = {
   maxRuntimeMs?: number;
   /** M-A-3 T11 Host-owned (never from HTTP): context window to load for a tool-free local generation (Ollama num_ctx). */
   contextTokens?: number;
+  /** M-A-3 T11: upper bound on generated tokens (Ollama num_predict); a runaway constrained generation ends. */
+  outputTokens?: number;
   /** M-A-3 T11 Host-owned (never from HTTP): structured-output grammar for a tool-free local generation (Ollama format). */
   responseFormat?: { [key: string]: SchemaJson };
 };
@@ -329,6 +331,7 @@ export type ExecRequest = {
   prompt: string;
   /** M-A-3 T11: Ollama num_ctx; absent leaves the request body unchanged. */
   numCtx?: number;
+  numPredict?: number;
   /** M-A-3 T11: Ollama structured-output JSON schema; absent leaves the request body unchanged. */
   format?: { [key: string]: SchemaJson };
   /** Provider-native effort/reasoning override Bunny selected; null when the provider does not expose one. */

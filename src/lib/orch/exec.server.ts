@@ -54,6 +54,17 @@ export async function stopTask(taskId: string) {
   return { stopped: true };
 }
 
+/**
+ * M-A-3 T11 fault injection, reachable only from an in-process test fixture (never from HTTP or a device): aborts one
+ * in-flight local generation the way a dropped provider stream fails, so the Host's ordinary failure path handles it.
+ */
+export function interruptTask(taskId: string) {
+  const controller = inflight.get(taskId);
+  if (!controller) return { interrupted: false };
+  controller.abort("interrupted");
+  return { interrupted: true };
+}
+
 export async function execute(request: ExecRequest, options: { stream?: (text: string) => void; signal?: AbortSignal; timeoutMs?: number } = {}): Promise<ExecResult> {
   if (request.provider !== "ollama") {
     return { ok: false, error: NOT_CONFIGURED[request.provider] ?? "Provider adapter is not installed.", log: "Launch refused." };
@@ -82,7 +93,7 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
     const response = await fetch("http://127.0.0.1:11434/api/generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model, prompt: request.prompt, stream: !!options.stream, ...(request.format ? { format: request.format } : {}), ...(request.numCtx ? { options: { num_ctx: request.numCtx } } : {}) }),
+      body: JSON.stringify({ model, prompt: request.prompt, stream: !!options.stream, ...(request.format ? { format: request.format } : {}), ...(request.numCtx || request.numPredict ? { options: { ...(request.numCtx ? { num_ctx: request.numCtx } : {}), ...(request.numPredict ? { num_predict: request.numPredict } : {}) } } : {}) }),
       signal: controller.signal,
     });
     if (!response.ok) {
@@ -100,6 +111,7 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
     const body = (await response.json()) as { response?: string } & DonePart;
     return { ok: true, output: body.response ?? "", log: `Ollama ${model} finished.`, ...(body.done === true ? { receipt: receiptOf(body, model, requestedAt, null) } : {}) };
   } catch (error) {
+    if (controller.signal.reason === "interrupted") return { ok: false, error: "The local model stream was interrupted before it finished.", log: "Stream interrupted." };
     if (controller.signal.reason === "timeout") return { ok: false, error: `The model did not finish within ${formatDuration(timeoutMs)}. Try a shorter task or a faster model.`, log: "Execution timed out." };
     if (controller.signal.aborted) return { ok: false, stopped: true, error: "Stopped.", log: "Abort." };
     const message = error instanceof Error ? error.message : "Ollama request failed.";

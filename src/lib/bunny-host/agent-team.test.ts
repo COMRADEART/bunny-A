@@ -75,10 +75,10 @@ export const scripted: Responder = (step) => {
   return "";
 };
 
-function localModel(launched: Launch[], env: { missions?: MissionManager; responder: Responder; attempts: Map<string, number>; hold: boolean }): ProviderAdapter {
+function localModel(launched: Launch[], env: { missions?: MissionManager; responder: Responder; attempts: Map<string, number>; hold: boolean; unknown?: boolean }): ProviderAdapter {
   return {
     id: "ollama",
-    detect: async (): Promise<ProviderLive> => ({ ...providerBase("ollama"), installed: true, authenticated: true, availability: "ready", capabilities: ["text"], current_model: "test-local:7b", models: ["test-local:7b"] }),
+    detect: async (): Promise<ProviderLive> => ({ ...providerBase("ollama"), installed: true, authenticated: true, availability: env.unknown ? "unknown" : "ready", capabilities: ["text"], current_model: "test-local:7b", models: ["test-local:7b"] }),
     launch: (task, hooks) => {
       let finish!: (result: AdapterResult) => void;
       const done = new Promise<AdapterResult>((resolve) => (finish = resolve));
@@ -103,11 +103,11 @@ function localModel(launched: Launch[], env: { missions?: MissionManager; respon
 
 export type TeamEnv = {
   dir: string; root: string; db: HostDatabase; tasks: TaskManager; missions: MissionManager; agents: AgentRuntime; launched: Launch[];
-  control: { responder: Responder; attempts: Map<string, number>; hold: boolean; missions?: MissionManager };
-  cleanup: () => Promise<void>; reopen: () => Promise<TeamEnv>;
+  control: { responder: Responder; attempts: Map<string, number>; hold: boolean; unknown?: boolean; missions?: MissionManager };
+  cleanup: () => Promise<void>; reopen: (extra?: { startUnknown?: boolean }) => Promise<TeamEnv>;
 };
 
-export async function teamSetup(label: string, options: { faults?: TeamFaults; responder?: Responder; dir?: string; providers?: ProviderAdapter[] } = {}): Promise<TeamEnv> {
+export async function teamSetup(label: string, options: { faults?: TeamFaults; responder?: Responder; dir?: string; providers?: ProviderAdapter[]; startUnknown?: boolean } = {}): Promise<TeamEnv> {
   const dir = options.dir ?? mkdtempSync(join(tmpdir(), `bunny-t11-${label}-`));
   const root = join(dir, "project");
   if (!options.dir) {
@@ -117,7 +117,7 @@ export async function teamSetup(label: string, options: { faults?: TeamFaults; r
   }
   const db = new HostDatabase(join(dir, "host.sqlite"));
   const launched: Launch[] = [];
-  const control = { responder: options.responder ?? scripted, attempts: new Map<string, number>(), hold: false } as TeamEnv["control"];
+  const control = { responder: options.responder ?? scripted, attempts: new Map<string, number>(), hold: false, unknown: options.startUnknown === true } as TeamEnv["control"];
   const factLess = new ModelCapabilityRegistry(db, { availableProviders: () => [] });
   const tasks = new TaskManager(db, root, [localModel(launched, control), ...(options.providers ?? [])], { modelRegistry: factLess });
   await tasks.discover();
@@ -136,7 +136,7 @@ export async function teamSetup(label: string, options: { faults?: TeamFaults; r
   const env: TeamEnv = {
     dir, root, db, tasks, missions, agents, launched, control,
     cleanup: async () => { await close(); try { rmSync(dir, { recursive: true, force: true }); } catch { /* Windows locks settle late */ } },
-    reopen: async () => { await close(); return teamSetup(label, { ...options, dir }); },
+    reopen: async (extra: { startUnknown?: boolean } = {}) => { await close(); return teamSetup(label, { ...options, ...extra, dir }); },
   };
   return env;
 }
@@ -325,5 +325,26 @@ test("T11-I06: one Coordinator consent covers the reviewed execution plan; a mid
     assert.ok(owners.size >= 3 && !owners.has(coordinatorId), "consent admissions are attributed to the member Agents that used them");
     await env.agents.stop(coordinatorId, "workstation");
     await until(() => missionOf(env, missionId).state === "stopped", "team stopped");
+  } finally { await env.cleanup(); }
+});
+
+test("T11-I07: after a restart, requeued team work waits for the first provider probe instead of failing or holding", async () => {
+  let env = await teamSetup("i07");
+  try {
+    const { coordinatorId, missionId } = createTeam(env);
+    await reachReview(env, coordinatorId, missionId);
+    env.control.hold = true;
+    await approvePlan(env, coordinatorId, missionId);
+    await until(() => env.launched.some((launch) => launch.step?.team?.kind === "generate_markdown"), "a model step in flight");
+    env = await env.reopen({ startUnknown: true });
+    await new Promise((r) => setTimeout(r, 2500));
+    const waiting = missionOf(env, missionId);
+    assert.equal(waiting.state, "running", "the Mission keeps running while the provider is unprobed");
+    assert.ok(!waiting.steps.some((step) => step.attempts.some((attempt) => attempt.category === "provider_unavailable")), "no attempt is spent on an unobserved provider state");
+    assert.equal(env.launched.length, 0, "nothing is launched before the probe");
+    env.control.unknown = false;
+    await env.tasks.discover();
+    const done = await until(() => { const m = missionOf(env, missionId); return ["completed", "failed", "waiting_for_user"].includes(m.state) ? m : null; }, "completion after the probe", 60_000);
+    assert.equal(done.state, "completed", JSON.stringify(done.steps.map((step) => [step.team?.key, step.state, step.failure?.detail])));
   } finally { await env.cleanup(); }
 });
