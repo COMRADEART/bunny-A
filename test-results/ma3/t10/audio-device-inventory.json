@@ -1,0 +1,59 @@
+{
+  "classification": "LIVE read-only enumeration by the T10 voice worker (no capture opened, nothing played)",
+  "at": "2026-10-11T17:54:49.589Z",
+  "worker": {
+    "protocol": "bunny-voice/1",
+    "stt": {
+      "engine": "Windows SAPI 5.4 System.Speech",
+      "recognizer": "MS-1033-80-DESK",
+      "culture": "en-US",
+      "local": true
+    },
+    "tts": {
+      "engine": "Windows SAPI 5.4 System.Speech",
+      "voices": [
+        "Microsoft David Desktop",
+        "Microsoft Zira Desktop"
+      ],
+      "local": true
+    }
+  },
+  "devices": {
+    "inputs": [
+      {
+        "index": 0,
+        "name": "Microphone Array (Intel® Smart ",
+        "channels": 2
+      }
+    ],
+    "outputs": [
+      {
+        "index": 0,
+        "name": "Speakers (Realtek(R) Audio)",
+        "channels": 2
+      }
+    ],
+    "defaultInput": {
+      "name": "Microphone Array (Intel® Smart Sound Technology for Digital Microphones)",
+      "muted": true,
+      "volume": 0.8051692247390747,
+      "present": true
+    },
+    "defaultOutput": {
+      "name": "Speakers (Realtek(R) Audio)",
+      "muted": false,
+      "volume": 0.46000000834465027,
+      "present": true
+    },
+    "micPrivacy": "allow"
+  },
+  "pnpAudioEndpoints": [
+    "OK | Microphone Array (Intelr Smart Sound Technology for Digital Microphones)",
+    "OK | Speakers (Realtek(R) Audio)",
+    "Unknown | Speakers (SD4780P Audio)"
+  ],
+  "notes": [
+    "Default STT engine here is the worker's no-argument default (SAPI); the Host passes the verified whisper runtime arguments.",
+    "Endpoint mute/volume are read through Core Audio; Bunny never changes them."
+  ]
+}

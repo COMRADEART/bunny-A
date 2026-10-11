@@ -1,0 +1,112 @@
+{
+  "classification": "LIVE read-only comparison of installed production (no writes, no restart)",
+  "release": "Bunny-A-Windows-v26-MA2-R1",
+  "before": "2026-10-11T00:54:53.287Z",
+  "final": "2026-10-11T18:10:40.341Z",
+  "unchangedChecks": {
+    "installJson": true,
+    "currentRelease": true,
+    "releaseManifest": true,
+    "listeners": true,
+    "processesSamePidsAndStartTimes": true,
+    "startupShortcut": true,
+    "micPrivacy": true
+  },
+  "changed": {
+    "databaseTables": [
+      "events",
+      "providers",
+      "sqlite_sequence"
+    ],
+    "newEventCount": 10,
+    "newEventTypes": [
+      "provider.status_changed"
+    ],
+    "newEvents": [
+      {
+        "sequence": 3700,
+        "at": "2026-10-11T01:20:20.540Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: model deepseek-v4.1-flash:cloud → huihui_ai/qwen2.5-abliterate:7b"
+      },
+      {
+        "sequence": 3701,
+        "at": "2026-10-11T01:25:52.335Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: model huihui_ai/qwen2.5-abliterate:7b → deepseek-v4.1-flash:cloud"
+      },
+      {
+        "sequence": 3702,
+        "at": "2026-10-11T02:57:26.082Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: model deepseek-v4.1-flash:cloud → huihui_ai/qwen2.5-abliterate:7b"
+      },
+      {
+        "sequence": 3703,
+        "at": "2026-10-11T03:02:27.745Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: model huihui_ai/qwen2.5-abliterate:7b → deepseek-v4.1-flash:cloud"
+      },
+      {
+        "sequence": 3704,
+        "at": "2026-10-11T03:35:10.464Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: model deepseek-v4.1-flash:cloud → huihui_ai/qwen2.5-abliterate:7b"
+      },
+      {
+        "sequence": 3705,
+        "at": "2026-10-11T03:49:15.556Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: model huihui_ai/qwen2.5-abliterate:7b → deepseek-v4.1-flash:cloud"
+      },
+      {
+        "sequence": 3706,
+        "at": "2026-10-11T09:05:13.189Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: ready → offline, version 0.40.2 → none, model deepseek-v4.1-flash:cloud → none"
+      },
+      {
+        "sequence": 3707,
+        "at": "2026-10-11T09:05:43.294Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: offline → ready, version none → 0.40.2, model none → deepseek-v4.1-flash:cloud"
+      },
+      {
+        "sequence": 3708,
+        "at": "2026-10-11T17:35:34.035Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: model deepseek-v4.1-flash:cloud → huihui_ai/qwen2.5-abliterate:7b"
+      },
+      {
+        "sequence": 3709,
+        "at": "2026-10-11T17:41:36.546Z",
+        "type": "provider.status_changed",
+        "detail": "Ollama: model huihui_ai/qwen2.5-abliterate:7b → deepseek-v4.1-flash:cloud"
+      }
+    ],
+    "explanation": "Every new production event is provider.status_changed, written by the RUNNING production Host itself (its periodic provider probe). It records which model the shared local Ollama service has loaded; T10's disposable live tests loaded and unloaded huihui_ai/qwen2.5-abliterate:7b there, and Ollama had one offline/online blip. The providers table and sqlite_sequence change with those probe records. T10 never wrote production state; its database was only opened read-only.",
+    "audioEndpointsSha256": {
+      "before": "a183733ccbc6367683bae1ce03b8333afc87909bbfad05e971f52d748fa1836f",
+      "final": "2e765cef1eb4d06c66337f0cd0bcc5fa6cf294e5fa3ed8d9e16f8c076b17a34e",
+      "explanation": "The PnP AudioEndpoint list hash (InstanceId|Status|FriendlyName) differs. Current endpoints: Speakers (SD4780P Audio) status Unknown (external display/dock audio, currently disconnected); Speakers (Realtek(R) Audio) OK; Microphone Array (Intel Smart Sound) OK. A device presence change from docking is outside T10. T10 never installs or modifies drivers or audio settings (the worker reads Core Audio only). Endpoint mute is not part of this hash; the user unmuted the microphone themselves."
+    }
+  },
+  "notPerformed": [
+    "deploy T10",
+    "restart production",
+    "migrate production SQLite",
+    "modify credentials",
+    "modify paired phone records",
+    "start the tunnel",
+    "change firewall rules",
+    "modify Startup",
+    "replace installed files",
+    "change microphone privacy",
+    "modify audio drivers",
+    "kill unrelated processes",
+    "enable Missions/Triggers",
+    "push"
+  ],
+  "unchanged": true,
+  "summary": "Production v26-MA2-R1 untouched: same release bytes, install.json, listeners, PIDs and start times, Startup and microphone privacy. Only the running production Host's own provider-probe records (its observation of the shared Ollama model) and the machine's audio endpoint presence changed; T10 wrote neither."
+}

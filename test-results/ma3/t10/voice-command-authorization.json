@@ -1,0 +1,326 @@
+{
+  "liveSupervision": {
+    "file": "agent-voice-supervision.json",
+    "verdict": "PASS",
+    "findings": []
+  },
+  "liveIslandTurns": [
+    {
+      "final": "What is my agent doing?",
+      "kind": "agent_status",
+      "answerSource": "host_facts"
+    },
+    {
+      "final": "Did the test pass?",
+      "kind": "agent_verification",
+      "answerSource": "host_facts"
+    },
+    {
+      "final": "Tell me a story about a rabbit.",
+      "kind": "chat",
+      "answerSource": "model"
+    },
+    {
+      "final": "Stop what is the capital of France?",
+      "kind": "agent_control",
+      "answerSource": "host_facts"
+    },
+    {
+      "final": "What is the capital of France?",
+      "kind": "chat",
+      "answerSource": "model"
+    }
+  ],
+  "deterministic": [
+    {
+      "suite": "library",
+      "name": "V30 status names the agent and its real mission and step",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V30 no active agent says none is running",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V30 several active agents ask for a name instead of guessing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V31 verification counts only recorded checks and never reports a pending state",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V31 with no recorded results the answer says so, and an unverified step is not a pass",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V31 T10-SUP#3 one pending ask is one item: an agent waiting on its Mission's unresolved request is not counted twice",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V31 R3-session#0 a consent offer on a Mission that also has an unrelated unresolved request is still counted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V25 capture and playback truth require the worker confirmation and the matching state",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V29 barge-in applies only where speech is in flight",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V38 V53 a paired device is refused every voice action, before anything is read or dispatched",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V44 a Host restart never revives a voice session: the new Host starts closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V30 verification phrasing maps to agent_verification",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V32 V33 control phrases map to agent_control with a target and no authority of their own",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V34 an unqualified control is classified; the session decides whether it is ambiguous",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V35 V36 V37 V39 approval, permission, shell, scope and owner phrasing is sensitive_refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V35 sensitive wins over control when both match",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V39 V40 approve-by-voice stays refused even with a pending confirmation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V41 redirecting a running agent is redirect_unsupported",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V41 T10-SUP#1 a redirect with a generic action word is redirect_unsupported; authority claims inside a redirect stay refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V33 T10-SUP#2 'stop the current mission' targets the single active agent, not an agent named 'current'",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V36 V39 R3-intent#0 a request wrapped as a question is still refused; genuine information questions stay chat",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V36 R3-intent#1 starting machine or project work is refused; ordinary 'start' chat is not",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10 Part-B a barge-in lead word before a question is dropped; without a question nothing changes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10 R4 D2 with a proposal pending, a turn opening with no/nope still cancels it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V13 V14 V42 a question that needs tools or a hosted model is not auto-approved and answers the refusal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V17 V18 playback confirmed by the worker moves the session to SPEAKING with truthful playing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V29 V34 interrupt never touches agents or missions",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V32 V33 V35 spoken pause proposes, a spoken confirm executes the canonical agent command, and the answer names the canonical state",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V33 a stop or resume proposal is screen-only: a spoken confirm does nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V33 the on-screen confirm executes a stop proposal through the same command path",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V34 an ambiguous agent name asks for clarification and the next turn picks by ordinal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V34 an unknown agent name is refused honestly and proposes nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V34 with no running agent the answer is none running and nothing is proposed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V35 V36 V37 V39 V40 sensitive phrasing creates no proposal, no Task and no agent command",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V41 redirecting a running agent is explicitly unavailable and creates no Task",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V30 V31 status and verification answers come from canonical facts only",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V16 V38 the session never reads or sends anything but the transcript to the chat port",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V39 V40 a barely-heard final (confidence below the floor) is never routed: no Task, no proposal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V32 V39 a low-confidence spoken control or confirm changes nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V34 R3-session#1 a bare cancel that drops a pending name choice says it was cancelled",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10 H6 names match case-insensitively and missing ones are omitted rather than invented",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V07 recognized speech from actual audio: Listening only while the worker confirms capture and fresh",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V23 overlapping conversations cannot corrupt each other: a proposal and clarification expire independently",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V29 voice interruption does not stop agent work: Interrupt is never a stop-agent control",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V30 agent status from canonical facts: status copy comes from the snapshot only",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V31 verification query real outcomes: verification answers are labelled as Host facts",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V32 spoken Pause uses existing Host command: pause is a proposal with on-screen or voice confirm",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V33 spoken Stop targets correct agent: the proposal names the agent it will act on",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V34 ambiguous agent needs clarification: candidates are listed, capped at eight",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V35 voice cannot forge Windows owner: only the workstation principal can run voice",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V36 voice cannot authorize shell: a typed fallback is trimmed, bounded and never classified here",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V37 voice cannot widen Mission scope: a proposal confirmation is limited to pause, resume or stop",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V38 voice cannot bypass phone restrictions: paired devices get the workstation-only copy",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V39 audio prompt injection grants nothing: a clarification or proposal is display only",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V40 replayed speech is not owner auth: a stale proposal past its expiry is not shown",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V41 Talk/Redirect explicitly unavailable: redirect_unsupported never offers a proposal",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V42 chat not converted to Agentic: a chat answer never opens an agent view",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V44 Host restart does not revive stale voice approvals: a Host epoch change drops the held proposal",
+      "result": "PASS"
+    }
+  ]
+}

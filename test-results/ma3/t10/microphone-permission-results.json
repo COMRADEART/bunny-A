@@ -1,0 +1,70 @@
+{
+  "privacyRegistry": "unchanged (see production-final.json unchangedChecks.micPrivacy)",
+  "workerReport": {
+    "micPrivacy": "allow",
+    "defaultInput": {
+      "name": "Microphone Array (Intel® Smart Sound Technology for Digital Microphones)",
+      "muted": true,
+      "volume": 0.8051692247390747,
+      "present": true
+    }
+  },
+  "liveEndpointMuted": "Observed live during the human sessions: with the Windows microphone muted the worker refused capture with ENDPOINT_MUTED and the Island said so (live/human-stt-session-4-whisper-paced.json); Bunny never unmuted it — the user did.",
+  "deterministic": [
+    {
+      "suite": "scripts",
+      "name": "V24 mute aborts an active capture and refuses capture.start until unmuted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V03 V04 device errors route to DEVICE_UNAVAILABLE only from capture-capable states",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V02 V24 V57 an explicit open either starts contained or reports an honest reason, never a silent success",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V24 voice.mute honours both the clients' {on} field and the {muted} spelling over real HTTP",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V03 V04 a permission or device error is truthful: DEVICE_UNAVAILABLE with the worker's code and capturing false",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V24 muted: capture is refused and nothing is captured",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "R1-privacy#0 a paired device never receives a voice turn's prompt, its spoken history or its transcript",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V03 permission denial handled: micPrivacy deny shows the Windows privacy copy and blocks talk",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V04 device unavailable truthful: DEVICE_UNAVAILABLE disables talk and says so",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V04 device unavailable truthful: endpoint mute and worker mute block talk with exact copy",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V24 muted mic captures nothing: muted state disables talk and shows the mute copy",
+      "result": "PASS"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "classification": "STATIC source check + DETERMINISTIC tests + LIVE route receipts",
+  "workerNetworkApisFound": [],
+  "stt": "whisper.cpp in the worker process, model on local disk (pinned sha256); no network at runtime",
+  "tts": "Windows SAPI in process",
+  "liveChatRoutes": [
+    {
+      "final": "Tell me a story about a rabbit.",
+      "provider": "ollama",
+      "model": "huihui_ai/qwen2.5-abliterate:7b"
+    },
+    {
+      "final": "What is the capital of France?",
+      "provider": "ollama",
+      "model": "huihui_ai/qwen2.5-abliterate:7b"
+    }
+  ],
+  "cloudModelsExcluded": [
+    {
+      "suite": "library",
+      "name": "V13 V14 V42 a question that needs tools or a hosted model is not auto-approved and answers the refusal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V16 V38 the session never reads or sends anything but the transcript to the chat port",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V16 T10: a local-only task (every voice turn) is refused at launch when the fresh probe reports its tag hosted",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V16 no unauthorized cloud-audio upload: the status copy never claims cloud speech",
+      "result": "PASS"
+    }
+  ],
+  "browserWebSpeechRemoved": [],
+  "result": "PASS"
+}

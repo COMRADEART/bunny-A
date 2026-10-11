@@ -1,0 +1,109 @@
+{
+  "classification": "LIVE real worker and real speakers",
+  "matrix": {
+    "file": "barge-in-adversarial.json",
+    "summary": {
+      "classification": "LIVE: real voice worker, real speakers; interruption by Host actions (button/hotkey/push-to-talk/mute/host death). Acoustic hands-free barge-in not claimed.",
+      "scenarios": 10,
+      "staleResumed": 0,
+      "meterSilentMs": [
+        90.5464,
+        92.012,
+        93.3634,
+        77.8077,
+        107.62480000000001,
+        25.1096,
+        89.4756,
+        108.8771
+      ],
+      "workerProcessesAfterRun": "0",
+      "p50": 92.012,
+      "p95": 108.8771
+    },
+    "scenarios": [
+      {
+        "id": "B01",
+        "title": "Mid-sentence interruption (button)",
+        "workerResetMs": 19.2455,
+        "meterSilentMs": 90.5464,
+        "workerGoneAfterMs": null
+      },
+      {
+        "id": "B02",
+        "title": "Mid-audio-buffer interruption (inside the first chunk)",
+        "workerResetMs": 15.9702,
+        "meterSilentMs": 92.012,
+        "workerGoneAfterMs": null
+      },
+      {
+        "id": "B03",
+        "title": "User starts talking while Bunny speaks (push-to-talk press = barge-in, then release)",
+        "workerResetMs": 21.6472,
+        "meterSilentMs": 93.3634,
+        "workerGoneAfterMs": null
+      },
+      {
+        "id": "B04",
+        "title": "Rapid repeated interruption (3 interrupts in 300 ms, then again after a restart)",
+        "workerResetMs": 16.319100000000002,
+        "meterSilentMs": 77.8077,
+        "workerGoneAfterMs": null
+      },
+      {
+        "id": "B05",
+        "title": "Interruption after response generation completed (speech still playing)",
+        "workerResetMs": 23.9007,
+        "meterSilentMs": 107.62480000000001,
+        "workerGoneAfterMs": null
+      },
+      {
+        "id": "B06",
+        "title": "Interruption during TTS initialization (answer text arriving, before first playback)",
+        "workerResetMs": null,
+        "meterSilentMs": null,
+        "workerGoneAfterMs": null
+      },
+      {
+        "id": "B07",
+        "title": "Interruption while model output is still streaming",
+        "workerResetMs": 23.610300000000002,
+        "meterSilentMs": 25.1096,
+        "workerGoneAfterMs": null
+      },
+      {
+        "id": "B08",
+        "title": "Interruption followed by an immediate new request",
+        "workerResetMs": 17.317700000000002,
+        "meterSilentMs": 89.4756,
+        "workerGoneAfterMs": null
+      },
+      {
+        "id": "B09",
+        "title": "Microphone mute during speech",
+        "workerResetMs": 25.8721,
+        "meterSilentMs": 108.8771,
+        "workerGoneAfterMs": null
+      },
+      {
+        "id": "B10",
+        "title": "Host disconnect during speech (Host process killed; F04 job closes; worker and its audio die)",
+        "workerResetMs": null,
+        "meterSilentMs": null,
+        "workerGoneAfterMs": 341
+      }
+    ]
+  },
+  "spokenBargeIn": {
+    "file": "live-e2e-conversation.json",
+    "interrupts": [
+      {
+        "source": "button",
+        "workerResetMs": 7.6321,
+        "meterSilentMs": 99.2393,
+        "droppedChunks": 3,
+        "wasPlaying": true
+      }
+    ]
+  },
+  "scope": "Push-to-talk, hotkey, button, mute and Host death interrupt speech. Acoustic hands-free barge-in is not supported (no AEC)."
+}

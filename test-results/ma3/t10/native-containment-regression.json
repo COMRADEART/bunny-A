@@ -1,0 +1,272 @@
+{
+  "tests": [
+    {
+      "suite": "library",
+      "name": "T3: failed capability terminal event rolls back success before fatal containment",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T4: explicit CREATE_BREAKAWAY_FROM_JOB is refused by the kernel",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T7 P27 path prefix cousins and traversal are not containment",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J01-J04/J07: provider root is created suspended inside its job, prompt delivered exactly, record persisted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J11-J15/J18/J45: children, grandchildren, short-lived, detached and orphaned descendants are members and end with the session",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J16/J17: explicit breakaway is refused by the kernel; a member's own permissive nested job cannot leave Bunny's job",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J29-J31/J42: Stop terminates the exact job by handle; unrelated same-image process survives; result is kernel accounting",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J05/J21/J44: an admission failure refuses execution and starts nothing; no fallback launcher exists",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J47/J48: concurrent sessions are isolated; stopping A leaves B running",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J35/J09/J46: abrupt Host death (TerminateProcess, no cleanup code) ends the whole contained tree; unrelated survives",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J29/J43/J42: TaskManager Stop reports kernel-verified job emptiness; the job is live code until then",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J37-J41/J32: restart reconciles interrupted job records by full identity, kills nothing, and holds while identity is alive",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J08/J10: the native job handle carries no SET_ATTRIBUTES right and the module exposes no PID/handle-based job API",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "R1-containment#0 a worker that exits on its own is settled (its job group closed) before any reopen starts a second worker",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#3 the build record must name the worker source, and a source edited after the build is refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#4 an overlong line is discarded to its newline even when its tail arrives in later chunks",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#2 the stdin accounting for the shutdown line is its real byte length",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#5 a malformed event that throws in a listener is reported and never thrown out of the stdout handler",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#0 a poll whose inspection fails is unknown state: the job is terminated and closed before the exit is reported",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V54 containment intact: the client never reports a worker or process as running when the snapshot says it is not",
+      "result": "PASS"
+    }
+  ],
+  "voiceWorkerContained": [
+    {
+      "suite": "library",
+      "name": "F04 J01-J04/J07: provider root is created suspended inside its job, prompt delivered exactly, record persisted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J11-J15/J18/J45: children, grandchildren, short-lived, detached and orphaned descendants are members and end with the session",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J16/J17: explicit breakaway is refused by the kernel; a member's own permissive nested job cannot leave Bunny's job",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J29-J31/J42: Stop terminates the exact job by handle; unrelated same-image process survives; result is kernel accounting",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J05/J21/J44: an admission failure refuses execution and starts nothing; no fallback launcher exists",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J47/J48: concurrent sessions are isolated; stopping A leaves B running",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J35/J09/J46: abrupt Host death (TerminateProcess, no cleanup code) ends the whole contained tree; unrelated survives",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J29/J43/J42: TaskManager Stop reports kernel-verified job emptiness; the job is live code until then",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J37-J41/J32: restart reconciles interrupted job records by full identity, kills nothing, and holds while identity is alive",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 J08/J10: the native job handle carries no SET_ATTRIBUTES right and the module exposes no PID/handle-based job API",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R1-BYPASS-1: verification never runs a python.exe planted in (or on PATH inside) the task folder; the real one runs in a job",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R1-BYPASS-2: the Codex app-server probe runs in a job with interactive stdin and leaves nothing behind",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R1-STOP-3/NATIVE-1/STOP-1: Stop before admission is not admitted; native terminate does not block; done waits for accounting",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R1-RESTART-01..04/R1-startup: identity gaps fail closed, unreadable records never stop the Host, survivors block relaunch of the same work",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R1-LOW-2/SHUT-1: Mission processes on Windows are always job-owned; shutdown awaits stops in flight",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R2-L1: restart absence is recorded as absent_after_restart, never kernel 'empty'; an empty table read is not absence",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R2-L3/L4: Host verification jobs count as live code while open; a refused native launch is recorded as refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R3-BYPASS-CWD-1: Host tools are launched by absolute path; no bare system-tool name remains in Host source",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R3-HOLD-4: an unreadable record that becomes readable is reconciled before its hold is released",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R3-R2-01/R2-03: a parseable malformed record is held, never a startup failure; alias-style reparse entries resolve",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R4-R3-1/FINAL-1: a throwing native terminate or event hook never escapes Stop and never strands accounting",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R4-R3-2: a PATH folder inside the working folder whose name starts with '..' is still inside",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R4-R3-3: a reconcile failure in the unreadable-record hold keeps the hold and retries",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R5-FOLDER: a provider-sessions folder unreadable at startup is released only after every record in it is reconciled",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "F04 R5-GEN/SPLIT: a re-read never returns or rewrites this Host's own live records; a failed annotate never skips close",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T9 F04: absolute lifetime and idle bound are enforced by the Host; presence never extends the lifetime",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "R1-containment#0 a worker that exits on its own is settled (its job group closed) before any reopen starts a second worker",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#3 the build record must name the worker source, and a source edited after the build is refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#4 an overlong line is discarded to its newline even when its tail arrives in later chunks",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#2 the stdin accounting for the shutdown line is its real byte length",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#5 a malformed event that throws in a listener is reported and never thrown out of the stdout handler",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "containment#0 a poll whose inspection fails is unknown state: the job is terminated and closed before the exit is reported",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V53 T5/F01-F04 auth intact: voice is refused for a paired device and never elevated by the client",
+      "result": "PASS"
+    }
+  ],
+  "result": "PASS"
+}
