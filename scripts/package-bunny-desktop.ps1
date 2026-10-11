@@ -82,6 +82,33 @@ try {
   # working-tree binary). The Host refuses to launch it unless the release manifest lists the same sha256.
   if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'native/voice/BunnyVoiceWorker.cs')) {
     Remove-Item -LiteralPath (Join-Path $bunnyBuild 'native/voice/bunny-voice-worker.exe') -Force -ErrorAction SilentlyContinue
+    # The pinned archive carries no gitignored vendor folder. When it pins whisper, the pin-verified runtime DLLs, model and
+    # headers are copied from the workspace's staged vendor folder into the build tree first, so the shim is compiled here
+    # from the archive's whisper-shim.c and recorded in this build's own record (never a prebuilt working-tree shim).
+    $buildPin=Join-Path $bunnyBuild 'native/voice/whisper-pin.json'
+    if(Test-Path -LiteralPath $buildPin) {
+      $pinInputs=Get-Content -LiteralPath $buildPin -Raw | ConvertFrom-Json
+      $vendorFrom=Join-Path $bunnyWorkspace 'native/voice/vendor'
+      $vendorTo=Join-Path $bunnyBuild 'native/voice/vendor'
+      $runtimeTo=Join-Path $vendorTo 'runtime'
+      New-Item -ItemType Directory -Path (Join-Path $runtimeTo 'models') -Force | Out-Null
+      $inputs=@()
+      foreach($property in $pinInputs.runtimeFiles.PSObject.Properties) {$inputs+=@{name=$property.Name;sha=[string]$property.Value}}
+      $inputs+=@{name=('models/'+$pinInputs.model.name);sha=[string]$pinInputs.model.sha256}
+      foreach($entry in $inputs) {
+        $from=Join-Path (Join-Path $vendorFrom 'runtime') $entry.name
+        if(-not (Test-Path -LiteralPath $from)) {throw ('Whisper runtime is not staged (missing '+$entry.name+'); run scripts/stage-whisper.mjs first.')}
+        if((Get-FileHash -LiteralPath $from -Algorithm SHA256).Hash.ToLower() -ne $entry.sha.ToLower()) {throw ('Staged whisper file differs from the pin: '+$entry.name)}
+        Copy-Item -LiteralPath $from -Destination (Join-Path $runtimeTo $entry.name)
+      }
+      $headerFrom=Join-Path $vendorFrom 'whisper-src-v1.9.4'
+      if(-not (Test-Path -LiteralPath $headerFrom)) {throw 'Pinned whisper.cpp headers are not staged; run scripts/stage-whisper.mjs first.'}
+      foreach($relative in @('whisper.cpp-1.9.4/include','whisper.cpp-1.9.4/ggml/include')) {
+        $to=Join-Path (Join-Path $vendorTo 'whisper-src-v1.9.4') $relative
+        New-Item -ItemType Directory -Path (Split-Path -Parent $to) -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $headerFrom $relative) -Destination $to -Recurse
+      }
+    }
     & node (Join-Path $bunnyBuild 'scripts/build-voice-worker.mjs') $bunnyBuild | Out-Null
     if($LASTEXITCODE -ne 0) {throw 'Bunny voice worker build failed.'}
     foreach($name in @('native/voice/BunnyVoiceWorker.cs','native/voice/README.md','scripts/build-voice-worker.mjs')) {Add-PackageFile (Join-Path $bunnyBuild $name) $name 'source' $name}
@@ -93,7 +120,8 @@ try {
   $whisperPin=Join-Path $bunnyBuild 'native/voice/whisper-pin.json'
   if(Test-Path -LiteralPath $whisperPin) {
     $pinData=Get-Content -LiteralPath $whisperPin -Raw | ConvertFrom-Json
-    $stagedRuntime=Join-Path $bunnyWorkspace 'native/voice/vendor/runtime'
+    # The runtime staged into the build tree above: pin-verified DLLs and model plus the shim compiled in this build.
+    $stagedRuntime=Join-Path $bunnyBuild 'native/voice/vendor/runtime'
     $shimRecord=(Get-Content -LiteralPath (Join-Path $bunnyBuild 'native/voice/bunny-voice-worker.json') -Raw | ConvertFrom-Json).whisperShim
     if(-not $shimRecord -or -not (Test-Path -LiteralPath $stagedRuntime)) {throw 'Whisper runtime is not staged; run scripts/stage-whisper.mjs first.'}
     $whisperFiles=@(@{name='bunny-whisper-shim.dll';sha=[string]$shimRecord.binarySha256})
