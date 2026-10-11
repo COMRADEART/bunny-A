@@ -27,6 +27,12 @@ export const MISSION_ACTIONS = new Set([
  */
 const REMOTE = new Set(["mission.approve", "mission.start", "mission.stop", "mission.respond", "mission.get", "mission.revoke_batch", "inbox.ack"]);
 
+/** M-A-3 T11 (review PA-01): a team Mission is approved, started and replanned only through its Coordinator. */
+function teamRoute(missions: MissionManager, value: unknown) {
+  let team = false;
+  try { team = !!missions.mission(String(value ?? "")).team; } catch { team = false; }
+  if (team) throw new CommandRefusedError("A team Mission is approved, started and replanned through its Coordinator Agent (agent.team.approve / agent.team.revise).");
+}
 export async function missionCommand(missions: MissionManager, action: string, data: Record<string, unknown>, access: { local: boolean; actor: string }): Promise<{ mission?: unknown; data?: unknown }> {
   if (!access.local && !REMOTE.has(action)) throw new WorkstationRequiredError(`${action} requires workstation access.`);
   const roots = () => [...missions.tasks.db.projects().map((project) => project.path), missions.tasks.defaultRoot];
@@ -49,10 +55,12 @@ export async function missionCommand(missions: MissionManager, action: string, d
       return { mission: missions.create({ objective: text(data.objective), title: data.title === undefined ? undefined : text(data.title, 200), mode: mode as Mode, projectId: data.projectId == null ? null : id(data.projectId), steps: data.steps, localOnly: data.localOnly === true, providers, origin: access.actor }) };
     }
     case "mission.plan": case "mission.replan":
+      teamRoute(missions, data.id);
       return { mission: await missions.replan(id(data.id), access.actor, data.steps, data.objective === undefined ? undefined : text(data.objective)) };
-    case "mission.approve": return { mission: missions.approve(id(data.id), access.actor, data.start !== false, data.revision === undefined ? undefined : Number(data.revision), data.plan === undefined ? undefined : text(data.plan, 200)) };
+    case "mission.approve": teamRoute(missions, data.id); return { mission: missions.approve(id(data.id), access.actor, data.start !== false, data.revision === undefined ? undefined : Number(data.revision), data.plan === undefined ? undefined : text(data.plan, 200)) };
     case "mission.start": {
       missions.requireEnabled();
+      teamRoute(missions, data.id);
       const mission = missions.mission(id(data.id));
       if (mission.state !== "ready") throw new CommandRefusedError("Only an approved (ready) mission can be started.");
       // M-A-3 T9 (G7): an Agent's Mission runs through its Agent, never as a bare Mission started remotely.

@@ -635,7 +635,7 @@ export async function startHost(
       else if (typeof input.action === "string" && input.action.startsWith("project.")) {
         try {
           const result = await projects.command(input.action, data, local);
-          extra = { data: device && action === "project.artifact" ? deviceArtifactRead(result) : result };
+          extra = { data: device && action === "project.artifact" ? deviceArtifactRead(result, (stepId) => { try { return !!missions.store.step(stepId).team; } catch { return false; } }) : result };
         } catch (error) {
           const message = error instanceof Error ? error.message : "Project command refused.";
           // A paired device never receives local folder paths inside refusal text.

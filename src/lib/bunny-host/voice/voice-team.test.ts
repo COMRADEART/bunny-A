@@ -74,3 +74,10 @@ test("T11-V04: naming what is let through is an approval; thinking something thr
     assert.equal(classifyTranscript(said).kind, "sensitive_refused", said);
   assert.equal(classifyTranscript("let me think it through").kind, "chat");
 });
+
+test("T11-V05 (review SURF-04): going ahead with, passing or revising a plan is refused by voice; questions stay questions", () => {
+  for (const said of ["start the plan", "start the team", "go ahead with the team plan", "proceed with the plan", "let the team go ahead", "make the reviewer pass", "mark the tester as passed", "revise the team plan", "start the mission", "continue the mission", "mark it as verified"])
+    assert.equal(classifyTranscript(said).kind, "sensitive_refused", said);
+  for (const [said, kind] of [["what is the plan", "chat"], ["has the mission finished", "agent_team"], ["is the team done", "agent_team"], ["what is the planning agent doing", "agent_team"]] as const)
+    assert.equal(classifyTranscript(said).kind, kind, said);
+});

@@ -59,5 +59,5 @@ test('T11 chips: the notch draws chips from the shared facts, never a second let
   const presentation = readFileSync(presentationPath, 'utf8');
   assert.match(presentation, /function New-BunnyAgentChip[\s\S]*?Get-BunnyAgentChipFacts \$Agent/);
   assert.doesNotMatch(presentation, /\$name\.Substring\(0, 1\)/);
-  assert.match(readFileSync(placementPath, 'utf8'), /^[\x00-\x7f]*$/, 'Placement.ps1 stays ASCII for Windows PowerShell 5.1');
+  assert.ok([...readFileSync(placementPath, 'utf8')].every((character) => character.codePointAt(0) <= 0x7f), 'Placement.ps1 stays ASCII for Windows PowerShell 5.1');
 });

@@ -390,11 +390,10 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
     presentation: snapshot.presentation
       ? { ...snapshot.presentation, tasks: snapshot.presentation.tasks?.filter((task) => kept.has(task.id)) }
       : snapshot.presentation,
-    // M-A-3 T11: a paired device sees team structure and Host verdicts; Reviewer model text stays on the workstation.
+    // M-A-3 T11: a paired device sees team structure and Host verdicts; Reviewer model text, planner-echoed rejection
+    // text, the user's revision note, fixture origins, folder paths and file locations stay on the workstation.
     missions: snapshot.missions
-      ? { ...snapshot.missions, missions: snapshot.missions.missions.map((mission) => mission.teamView
-          ? { ...mission, teamView: { ...mission.teamView, findings: mission.teamView.findings.map((review) => ({ ...review, findings: review.findings.map((finding) => ({ ...finding, summary: "Advisory Reviewer finding (full text on the Windows Host)." })) })) } }
-          : mission) }
+      ? { ...snapshot.missions, missions: snapshot.missions.missions.map((mission) => mission.team || mission.teamView ? deviceTeamMission(mission) : mission) }
       : snapshot.missions,
     agents: snapshot.agents
       ? {
@@ -408,6 +407,20 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
           ],
         }
       : snapshot.agents,
+  };
+}
+
+type SnapshotMission = NonNullable<HostSnapshot["missions"]>["missions"][number];
+function deviceTeamMission(mission: SnapshotMission): SnapshotMission {
+  const rejected = (list: { at: number; reasons: string[] }[]) => list.map((entry) => ({ at: entry.at, reasons: [REJECTION_DEVICE_LABEL] }));
+  return {
+    ...mission,
+    root: "[Project folder on the Windows Host]",
+    ...(mission.requestedScope ? { requestedScope: { ...mission.requestedScope, projectRoots: mission.requestedScope.projectRoots.map(() => "[Project folder on the Windows Host]") } } : {}),
+    ...(mission.artifacts ? { artifacts: mission.artifacts.map((artifact) => ({ ...artifact, location: { kind: artifact.location.kind, mediaType: artifact.location.mediaType } as typeof artifact.location })) } : {}),
+    ...(mission.team ? { team: { ...mission.team, revisionNote: null, browserFixture: null, offerFiles: [], rejected: rejected(mission.team.rejected) } } : {}),
+    ...(mission.teamView ? { teamView: { ...mission.teamView, rejected: rejected(mission.teamView.rejected),
+      findings: mission.teamView.findings.map((review) => ({ ...review, findings: review.findings.map((finding) => ({ ...finding, summary: "Advisory Reviewer finding (full text on the Windows Host)." })) })) } } : {}),
   };
 }
 
@@ -434,18 +447,24 @@ export function hidePaths(text: string) {
     .replace(/(^|[\s'"`(])\/(?:Users|home|tmp|var|private|mnt|opt|root)\/[^\s'"`,;)]*/g, "$1[Host path]");
 }
 /** A device artifact read keeps the verified body and identity, never the Host file location. */
-export function deviceArtifactRead<T>(result: T): T {
+export function deviceArtifactRead<T>(result: T, teamStep: (stepId: string) => boolean = () => false): T {
   if (!result || typeof result !== "object" || !("artifact" in result)) return result;
-  const read = result as T & { artifact: { location?: { kind: string; mediaType: string; path?: string } } };
+  const read = result as T & { artifact: { type?: string; stepId?: string | null; location?: { kind: string; mediaType: string; path?: string } }; body?: unknown };
   const location = read.artifact.location;
+  // M-A-3 T11 (review SURF-01): a team Reviewer report is model text and a team observation is project file content;
+  // both stay on the workstation, consistent with the device snapshot.
+  const withheld = !!read.artifact.stepId && ["review", "structured_result"].includes(read.artifact.type ?? "") && teamStep(read.artifact.stepId);
   return {
     ...read,
+    ...(withheld ? { body: TEAM_ARTIFACT_DEVICE_LABEL } : {}),
     artifact: {
       ...read.artifact,
       location: location ? { kind: location.kind, mediaType: location.mediaType } : location,
     },
   };
 }
+export const TEAM_ARTIFACT_DEVICE_LABEL = "Team Agent working material (full text on the Windows Host).";
+const REJECTION_DEVICE_LABEL = "Bunny's plan validation rejected this proposal (reasons on the Windows Host).";
 /**
  * A task returned to a device carries no local process, folder or provider session facts. A Mission child's
  * prompt is Bunny's assembled agent prompt (dependency results, artifact excerpts, folders), so the device sees

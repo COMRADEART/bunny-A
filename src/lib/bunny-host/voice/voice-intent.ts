@@ -122,6 +122,15 @@ const EXEC: RegExp[] = [
   /\btype\b.{0,40}\b(?:into|in)\b.{0,20}\b(?:terminal|shell|powershell|cmd|console|command prompt|prompt)\b/,
 ];
 
+const PLAN_TARGET = String.raw`(?:plans?|teams?|missions?|agents?|reviewer|tester|planner|researcher|implementer|documenter|coordinator|tasks?|checks?|review|requirements?)`;
+const PLAN_GO: RegExp[] = [
+  new RegExp(String.raw`\b(?:go ahead|proceed|start|begin|launch|kick off|continue)\b(?: with| on)?(?: the| my| this| that)? (?:[\w'-]+ )?${PLAN_TARGET}\b`),
+  new RegExp(String.raw`\blet\b.{0,30}\b${PLAN_TARGET}\b.{0,20}\b(?:go ahead|proceed|start|begin|continue)\b`),
+  new RegExp(String.raw`\b(?:make|mark|set|force|flag)\b.{0,30}\b${PLAN_TARGET}\b.{0,20}\b(?:pass|passed|passing|succeed|succeeded|green|complete|completed|done|verified|ok)\b`),
+  new RegExp(String.raw`\b(?:make|mark|set|force)\b.{0,30}\b(?:pass|passed|succeed|succeeded|complete|completed|verified)\b`),
+  new RegExp(String.raw`\b(?:revise|replan|re-plan|redo|rewrite)\b.{0,20}\b${PLAN_TARGET}\b`),
+];
+
 /** authz#2: "cancel/abort/kill/terminate the <agent|mission|task>" is an agent stop proposal, never a spoken cancellation. */
 const STOP_NAMED = /^(?:cancel|abort|kill|terminate)\s+(?:(?:the|my|this|that|a|an)\s+)?(?:([\w'-]+)\s+)?(?:agents?|missions?|tasks?)\b\s*(.*)$/;
 const STOP_ORDINAL = /^(?:cancel|abort|kill|terminate)\s+(?:(?:the|my)\s+)?((?:first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|one|two|three|four|five|number (?:one|two|three|four|five))\b.*)$/;
@@ -238,6 +247,8 @@ function isSensitive(normalized: string): boolean {
   if (SYN_WINDOW.some((re) => re.test(normalized))) return true;
   if (SYN_STANDALONE.some((re) => re.test(normalized))) return true;
   if (EXEC.some((re) => re.test(normalized))) return true;
+  // M-A-3 T11 (review SURF-04): going ahead with, passing or revising a plan/team/Agent is a workstation decision.
+  if (PLAN_GO.some((re) => re.test(normalized))) return true;
   return CANCEL_OBJECT.test(normalized) && !CANCEL_OK_OBJECT.test(normalized) && stopRest(normalized) === null;
 }
 

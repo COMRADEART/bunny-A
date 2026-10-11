@@ -110,8 +110,8 @@ export function teamProviderViolation(m: MissionManager, task: OrchTask): string
   if (task.executionScope?.access !== "read") return "TEAM_TOOL_FREE: team model work has read-only provider-session authority.";
   if (task.constraints?.requiresFilesystem || task.constraints?.requiresTerminal || task.constraints?.requiresGit) return "TEAM_TOOL_FREE: team model work never needs workspace tools.";
   if (!runsLocally(live, task.model) || isRemoteOllamaTag({ name: task.model })) return `TEAM_TOOL_FREE: ${task.model} is not a local model.`;
-  const hold = ownerHold(m, step, false);
-  return hold;
+  const hold = ownerHold(m, step);
+  return hold ?? (m.missionPauseGate?.(step.missionId) ? "TEAM_OWNER: the Coordinator is paused; no new provider work is admitted." : null);
 }
 
 // ── handoffs ───────────────────────────────────────────────────────────────
@@ -250,9 +250,11 @@ export async function verifyTeamCriterion(m: MissionManager, mission: Mission, s
   // The file must still be exactly what the team's verified write produced; a changed file voids that verification.
   const subject = step.team?.subject ? m.store.step(step.team.subject) : null;
   const written = subject ? verifiedSource(m, mission.id, subject.id) : null;
+  if (!written || "refused" in written)
+    return { ok: false, lines: [`HANDOFF_REFUSED: ${check.path} has no valid verified write (${written && "refused" in written ? written.refused : "missing subject"})`], artifactIds: outcome.artifactIds };
   const lines: string[] = [];
   let ok = true;
-  if (written && !("refused" in written) && written.sha256 !== actual) { ok = false; lines.push(`STALE_VERIFICATION: ${check.path} changed after its verified write (now ${actual.slice(0, 16)}, verified ${written.sha256.slice(0, 16)}); the earlier verification no longer applies`); }
+  if (written.sha256 !== actual) { ok = false; lines.push(`STALE_VERIFICATION: ${check.path} changed after its verified write (now ${actual.slice(0, 16)}, verified ${written.sha256.slice(0, 16)}); the earlier verification no longer applies`); }
   const target = check.path.toLowerCase().endsWith(".md") ? "markdown" : "html";
   const results = checkRequirements(requirements, output.text, target, dataset, null);
   for (const result of results) { ok &&= result.passed; lines.push(`${result.id} ${result.passed ? "passed" : "failed"} — ${result.detail}`); }
@@ -323,8 +325,10 @@ export function teamPlanReference(steps: MissionStep[]): string {
 
 /** After the planner step verified, turn its plan into the reviewed execution graph (never auto-approved). */
 export async function installTeamPlan(m: MissionManager, mission: Mission & { team: MissionTeam }, planner: MissionStep): Promise<void> {
-  const ref = planner.result?.outputRef ?? planner.result?.artifactIds[0];
-  const body = ref ? m.artifacts.get(ref).body : null;
+  const source = verifiedSource(m, mission.id, planner.id);
+  if ("refused" in source) throw new Error(`HANDOFF_REFUSED: planner output ${source.refused}`);
+  const ref = source.artifactId;
+  const body = source.body;
   const offer = teamOffer(m, mission);
   const validation = validateTeamPlan(body ? JSON.parse(body) : null, offer);
   if (!validation.ok) throw new Error(`The verified plan no longer validates: ${validation.errors.join("; ")}`);
@@ -361,10 +365,20 @@ export function activateRework(m: MissionManager, mission: Mission & { team: Mis
   const originalWrite = failed.team?.subject ? steps.find((step) => step.id === failed.team!.subject) : undefined;
   const originalGenerator = originalWrite?.team?.content ? steps.find((step) => step.id === originalWrite.team!.content) : undefined;
   // Advisory reviewer findings on the failed delivery travel as data with the Host's own failure evidence.
-  const findings = steps.filter((step) => step.team?.kind === "review" && step.team.subject === originalWrite?.id && step.state === "completed").map((step) => {
-    const id = step.result?.outputRef ?? step.result?.artifactIds[0];
-    try { return id ? m.artifacts.get(id).body ?? "" : ""; } catch { return ""; }
-  }).filter(Boolean).join("\n").slice(0, 2000) || null;
+  const reviewerSources: Source[] = [];
+  for (const review of steps.filter((step) => step.team?.kind === "review" && step.team.subject === originalWrite?.id && step.state === "completed")) {
+    const source = verifiedSource(m, mission.id, review.id);
+    if ("refused" in source) {
+      recordHandoff(m, mission, null, replicaGenerator, "context", source.refused, review.id);
+      return false;
+    }
+    reviewerSources.push(source);
+  }
+  const findings = reviewerSources.map((source) => source.body).join("\n").slice(0, 2000) || null;
+  for (const source of reviewerSources) {
+    recordHandoff(m, mission, { stepId: source.step.id, agentId: source.step.team?.agentId ?? null, artifactId: source.artifactId, sha256: source.sha256, type: source.type }, replicaGenerator, "context", null, source.step.id);
+    m.artifacts.consume(source.artifactId, replicaGenerator.id);
+  }
   const attempts = failed.attempts.map((attempt, index) => index === failed.attempts.length - 1 ? { ...attempt, finishedAt: Date.now(), outcome: "failed" as const, category: "verification_failed" as const, detail: detail.slice(0, 1500) } : attempt);
   m.setStep(failed, { state: "failed", finishedAt: Date.now(), attempts, failure: { category: "verification_failed", detail: detail.slice(0, 2000) }, team: { ...failed.team!, supersededBy: replicaVerify.id } }, "mission.step.failed", `${failed.role} failed Host verification; reviewed rework round ${replicaVerify.team!.round} activated.`);
   for (const original of [originalWrite, originalGenerator]) if (original) m.setStep(original, { team: { ...original.team!, supersededBy: original === originalWrite ? replicaWrite.id : replicaGenerator.id } });
@@ -431,7 +445,8 @@ export function teamView(m: MissionManager, mission: Mission & { team: MissionTe
       const line = lines.find((item) => item.startsWith(`${requirement.id} `)) ?? null;
       // A failed check records only its failing lines; a requirement absent from them passed in that same check.
       const requirementFailures = lines.some((item) => /^R[0-9]{1,2} failed /.test(item));
-      const passed = line ? / passed /.test(line) : check?.state === "failed" && requirementFailures ? true : null;
+      const checkedType = check?.team?.target?.toLowerCase().endsWith(".md") ? "markdown" : check?.team?.target?.toLowerCase().endsWith(".html") ? "html" : null;
+      const passed = line ? / passed /.test(line) : check?.state === "failed" && requirementFailures && checkedType === requirement.target ? true : null;
       const detail = line ? line.slice(requirement.id.length + 1, 300) : passed ? "passed in the same check" : null;
       return { id: requirement.id, text: requirement.text, passed, detail, stepId: check?.id ?? null, round: check?.team?.round ?? null };
     }),

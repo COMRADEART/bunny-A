@@ -173,7 +173,7 @@ export class AgentRuntime {
     const run = this.openRun(agent.id, null, null);
     const prior = this.rowState(agent.id);
     if (prior && agentCanTransition(prior, "RUNNING")) this.transition(agent, "RUNNING", run);
-    this.missions.approve(agent.missionId!, actor, true, revision, planReference);
+    this.missions.approve(agent.missionId!, actor, true, revision, planReference, agent.team?.role === "coordinator" ? agent.id : undefined);
     this.emitLifecycle("agent.started", agent, null, run.id);
     return this.snapshot();
   }
@@ -417,7 +417,7 @@ export class AgentRuntime {
     this.validateWorkspace(agent);
     const run = this.store.latestRun(agent.id);
     if (!run || run.endedAt !== null) return this.start(agentId, actor, revision, planReference);
-    this.missions.approve(agent.missionId!, actor, true, revision, planReference);
+    this.missions.approve(agent.missionId!, actor, true, revision, planReference, agent.id);
     this.emitLifecycle("agent.started", agent, null, run.id, { approved: "team-plan" });
     return this.snapshot();
   }
@@ -1128,6 +1128,12 @@ export async function agentCommand(
   // M-A-3 T9: paired devices supervise existing Agents; creating or first starting one stays on the workstation.
   if (isDeviceActor(actor) && (action === "agent.create" || action === "agent.start" || action === "agent.team.approve" || action === "agent.team.revise"))
     throw new WorkstationRequiredError(`${action} requires workstation access on the Windows Host.`);
+  // Team consent belongs to the Coordinator. A member control must never mutate it or stop only a member after revoking it.
+  if (action.startsWith("agent.authorization.")) {
+    const profile = agents.store.agent(agentId);
+    if (profile?.team && profile.team.role !== "coordinator")
+      throw new CommandRefusedError("Team authorization is managed through its Coordinator Agent.");
+  }
   switch (action) {
     case "agent.create":
       return { agents: agents.create(data, actor) };

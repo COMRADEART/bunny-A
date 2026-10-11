@@ -53,7 +53,7 @@ import { CommandRefusedError, safeError, supervisedLoop, type SafeError ,
 import type { ProjectContextResolver } from "../bunny-host/project-context.server.ts";
 import { plannerDraft, teamLimits, TEAM_PLANNER_ID, TEAM_VERSION, validateOutputDir, validateRequirements, type TeamRole } from "./team.ts";
 import {
-  activateRework, canonicalOutput, installTeamPlan, isTeam, liveTeamSteps, observableFiles, ownerHold, ownerRow, planningPhase, recordHandoff, stopTeamAgentSteps,
+  activateRework, canonicalOutput, installTeamPlan, isTeam, liveTeamSteps, observableFiles, ownerHold, ownerRow, planningPhase, stopTeamAgentSteps,
   teamConstraints, teamOffer, teamOperationDeny, teamPlanReference, teamPrompt, teamProviderViolation, teamView, teamWrite, verifyTeamCriterion, TEAM_ROUTING_PROMPT,
   type TeamFaults,
 } from "./team-coordination.server.ts";
@@ -112,6 +112,9 @@ export const DEVICE_ANSWER_TTL_MS = DESKTOP_GRANT_TTL_MS;
 /** M-A-3 T9R-F01: the project changed between a desktop-required ask and the workstation's answer. */
 class DesktopRequestStale extends CommandRefusedError {}
 
+/** M-A-3 T11: how long team model work waits for the local provider to become ready before failing normally. */
+const TEAM_PROVIDER_WAIT_MS = 120_000;
+
 export class MissionManager {
   projectContext: ProjectContextResolver | null = null;
   agentic: AgenticStore;
@@ -128,6 +131,8 @@ export class MissionManager {
   teamFaults: TeamFaults | null = null;
   /** M-A-3 T11: Missions waiting for the first local-provider probe before admitting team model work. */
   private discoveryWaits = new Set<string>();
+  /** When each waiting team step first found the local provider not ready. */
+  private providerWaits = new Map<string, number>();
   /** M-A-3 T9R-F02 (D2): Host-owned inert staging of paired-device file changes. */
   staging: DeviceStaging;
   /**
@@ -852,7 +857,7 @@ export class MissionManager {
       );
     }
   }
-  approve(id: string, by: string, start = true, agenticRevision?: number, planReference?: string): MissionView {
+  approve(id: string, by: string, start = true, agenticRevision?: number, planReference?: string, coordinatorId?: string): MissionView {
     this.requireEnabled();
     let mission = this.store.mission(id);
     if (mission.state !== "waiting_for_approval" || !mission.requestedScope)
@@ -863,6 +868,8 @@ export class MissionManager {
     // M-A-3 T11: a team execution plan is approved only by name (its exact reviewed reference), and only once every
     // step has a durable owning Agent of this Mission.
     if (mission.team) {
+      if (coordinatorId !== mission.team.coordinatorAgentId)
+        throw new CommandRefusedError("A team Mission is approved through its Coordinator Agent.");
       const steps = this.store.steps(id);
       if (!planningPhase(steps) && planReference === undefined)
         throw new CommandRefusedError("Approve the reviewed team plan by its reference.");
@@ -1044,6 +1051,7 @@ export class MissionManager {
     // Model generations in flight, including routed children still waiting for a launch decision.
     let models = team ? steps.filter((step) => step.executor.kind === "model" && (STEP_LIVE.includes(step.state) || (step.state === "waiting_for_approval" && !!step.taskId))).length : 0;
     for (const step of steps.filter((item) => item.state === "ready")) {
+      if (this.missionPauseGate?.(id)) return;
       if (busy >= slots) break;
       if (team) {
         // Per-step owner gate against fresh rows: a paused member admits nothing new, a stopped one never again.
@@ -1287,6 +1295,7 @@ export class MissionManager {
     envelope: AuthorizationEnvelope,
   ): Promise<boolean> {
     this.tasks.containment.assertAccepting("missions");
+    if (this.missionPauseGate?.(mission.id)) return false;
     if (step.team) {
       step = this.store.step(step.id);
       if (step.state !== "ready" || ownerHold(this, step)) return false;
@@ -1350,6 +1359,8 @@ export class MissionManager {
     }
     // M-A-3 T11: tool-free team generations touch no files and hold no lock; team writes hold the whole output folder
     // exclusively (shared-root mutation is serialized); team reads share the folder or the observed file.
+    if (this.missionPauseGate?.(mission.id) || this.stopping.has(mission.id) || this.store.mission(mission.id).state !== "running") return false;
+    if (step.team && ownerHold(this, this.store.step(step.id))) return false;
     const teamLock = step.team && mission.team
       ? step.executor.kind === "model" ? null
         : step.team.kind === "observe" ? (step.team.source && "path" in step.team.source ? resolve(mission.root, step.team.source.path) : mission.root)
@@ -1656,18 +1667,28 @@ export class MissionManager {
    */
   async launchTeamModel(mission: Mission, step: MissionStep, envelope: AuthorizationEnvelope, workspace: string): Promise<boolean> {
     if (!isTeam(mission)) return false;
-    // Right after a Host start the local provider is not probed yet: the step stays ready and is re-checked shortly,
-    // instead of spending an attempt (or holding the team) on a provider state nobody has observed.
+    // The local provider is not ready (unprobed after a Host start, or briefly unreachable while it finishes work from
+    // before a restart): the step stays ready and the provider is re-probed for a bounded while, instead of spending
+    // every attempt in the same instant. After the bound the ordinary budgeted failure path decides.
     const ollama = this.tasks.live().find((provider) => provider.id === "ollama");
-    if (!ollama || ollama.availability === "unknown") {
-      if (!this.discoveryWaits.has(mission.id)) {
-        this.discoveryWaits.add(mission.id);
-        setTimeout(() => { this.discoveryWaits.delete(mission.id); if (!this.closed) this.schedule(mission.id); }, 2000).unref?.();
+    if (!ollama || !["ready", "busy"].includes(ollama.availability)) {
+      const since = this.providerWaits.get(step.id) ?? Date.now();
+      this.providerWaits.set(step.id, since);
+      if (Date.now() - since < TEAM_PROVIDER_WAIT_MS) {
+        if (!this.discoveryWaits.has(mission.id)) {
+          this.discoveryWaits.add(mission.id);
+          setTimeout(() => {
+            this.discoveryWaits.delete(mission.id);
+            if (this.closed) return;
+            void this.tasks.refreshProviders().catch(() => {}).finally(() => { if (!this.closed) this.schedule(mission.id); });
+          }, 5000).unref?.();
+        }
+        return false;
       }
-      return false;
     }
+    this.providerWaits.delete(step.id);
     const built = await teamPrompt(this, mission, step, envelope);
-    if (this.stopping.has(mission.id) || this.store.mission(mission.id).state !== "running") return false;
+    if (this.missionPauseGate?.(mission.id) || this.stopping.has(mission.id) || this.store.mission(mission.id).state !== "running") return false;
     step = this.store.step(step.id);
     if (step.state !== "ready" || ownerHold(this, step)) return false;
     if ("refused" in built) {
@@ -3510,8 +3531,8 @@ export class MissionManager {
     if (step.state !== "waiting_for_approval" || step.taskId !== taskId) return;
     const task = this.tasks.db.get(taskId);
     if (task.approval?.kind === "mission") return;
-    // M-A-3 T11: a direct approval never starts work for a stopped team member; its child is stopped instead.
-    const hold = step.team ? ownerHold(this, step, false) : null;
+    // A direct task approval observes the same current member and Coordinator pause/stop boundaries as the scheduler.
+    const hold = step.team ? ownerHold(this, step) ?? (this.missionPauseGate?.(step.missionId) ? "The Coordinator is paused." : null) : null;
     if (hold) { this.tasks.stopInBackground(taskId, hold); return; }
     if (step.pendingRequestId) {
       const request = this.store.request(step.pendingRequestId);
