@@ -474,8 +474,10 @@ export const useIsland = create<Island>((set, get) => {
       } else {
         // Bound to the turn this press started: the Host ignores a late release for an older turn. An unknown start
         // has no turn, so its defensive end is unbound and ends whatever capture the Host holds.
-        await voiceCall("voice.listen.end", pressTurn ? { turnId: pressTurn } : {});
-        pressTurn = null;
+        // R3-clients#1: capture the binding before the await; a newer press that started meanwhile keeps its own turn.
+        const bound = pressTurn;
+        await voiceCall("voice.listen.end", bound ? { turnId: bound } : {});
+        if (pressTurn === bound) pressTurn = null;
         await runPress(pressEnded(press));
       }
     }

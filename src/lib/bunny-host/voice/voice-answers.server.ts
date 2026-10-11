@@ -146,7 +146,10 @@ export function pendingApprovalFacts(input: {
   // state alone can read RUNNING while consent is pending, which the Windows screen already reports as "Needs approval".
   for (const agent of input.agents) {
     const consentPending = agent.authorization?.state === "WAITING_FOR_USER";
-    if (agent.missionId && missionsAsking.has(agent.missionId)) continue;
+    // A pending consent offer is its own ask (a separate store from Mission requests) and always counts (R3-session#0).
+    // An agent that only waits because its Mission has an unresolved request is that same ask, already listed above.
+    const waitsOnMissionRequest = agent.state === "WAITING_FOR_USER" && !!agent.missionId && missionsAsking.has(agent.missionId);
+    if (!consentPending && waitsOnMissionRequest) continue;
     if (agent.state === "WAITING_FOR_USER" || consentPending) facts.push({ name: `${agent.name} agent`, kind: "mission_request" });
   }
   return facts;

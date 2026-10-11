@@ -11,6 +11,8 @@ class FakeWorker implements VoiceWorkerPort {
   stdinBytes = 0;
   /** When true the fake never answers `devices` (H3: the open path must not hang). */
   silentDevices = false;
+  /** The launch-time recognizer notice a real worker port carries (whisper unavailable). */
+  sttNotice: string | null = null;
   sent: WorkerCommand[] = [];
   closed = false;
   private listeners: ((event: WorkerEvent) => void)[] = [];
@@ -52,7 +54,7 @@ class FakeWorker implements VoiceWorkerPort {
 
 const ready = { ev: "ready", protocol: VOICE_PROTOCOL, pid: 1, stt: { engine: "fake-stt", recognizer: null, culture: null, local: true }, tts: { engine: "fake-tts", voices: [], local: true } };
 
-function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?: VoiceAgentRow[]; silentDevices?: boolean; silentReady?: boolean; softBudget?: number; hardBudget?: number } = {}) {
+function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?: VoiceAgentRow[]; silentDevices?: boolean; silentReady?: boolean; softBudget?: number; hardBudget?: number; sttNotice?: string | null } = {}) {
   let clock = 1_000;
   const timers: { at: number; fn: () => void; done: boolean }[] = [];
   const schedule = (fn: () => void, ms: number) => {
@@ -130,6 +132,7 @@ function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?:
       launchArgs.push(args);
       const worker = new FakeWorker();
       worker.silentDevices = options.silentDevices ?? false;
+      worker.sttNotice = options.sttNotice ?? null;
       workers.push(worker);
       if (!options.silentReady) setImmediate(() => worker.emit(ready));
       return worker;
@@ -1371,4 +1374,73 @@ test("R2-defense#0 the spoken-chat prompt tells the tool-free model it cannot ac
   assert.match(prompt, /cannot approve or deny anything/);
   assert.match(prompt, /never say that something was approved/i);
   assert.match(prompt, /Windows Host screen/);
+});
+
+test("T10-whisper a launch-time whisper fallback is a visible non-fatal notice and the session stays usable", async () => {
+  const notice = "whisper unavailable: whisper.dll differs from the pin; using Windows SAPI";
+  const h = setup({ sttNotice: notice });
+  const snap = await h.open();
+  assert.equal(snap.open, true);
+  assert.equal(snap.state, "IDLE");
+  assert.deepEqual(snap.error, { code: "STT_UNAVAILABLE", message: notice });
+  // The notice survives a turn start, so the fallback stays visible while SAPI is in use.
+  h.worker.emit({ ev: "devices", inputs: [], outputs: [], defaultInput: { name: "Fake mic", muted: false, volume: null, present: true }, defaultOutput: { name: "Fake speaker", muted: false, volume: null, present: true }, micPrivacy: "allow" });
+  const started = await h.session.listenStart("button");
+  assert.notEqual(started.state, "ERROR");
+  assert.deepEqual(started.error, { code: "STT_UNAVAILABLE", message: notice });
+});
+
+test("T10-whisper a worker STT_UNAVAILABLE after ready is a notice, not a session failure", async () => {
+  const h = setup();
+  await h.open();
+  h.worker.emit({ ev: "error", code: "STT_UNAVAILABLE", message: "whisper unavailable: model load failed; using Windows SAPI" });
+  const snap = h.session.snapshot();
+  assert.equal(snap.state, "IDLE");
+  assert.equal(snap.open, true);
+  assert.deepEqual(snap.error, { code: "STT_UNAVAILABLE", message: "whisper unavailable: model load failed; using Windows SAPI" });
+  assert.equal(h.worker.closed, false, "the worker keeps running on SAPI");
+});
+
+test("T10-whisper the ready event names the engine that is actually running (whisper or SAPI)", async () => {
+  const h = setup();
+  await h.open();
+  assert.equal(h.session.snapshot().engines.stt, "fake-stt");
+  h.worker.emit({ ...ready, stt: { engine: "whisper.cpp v1.9.4", recognizer: "ggml-base.en", culture: "en", local: true } });
+  assert.equal(h.session.snapshot().engines.stt, "whisper.cpp v1.9.4");
+});
+
+test("V34 R3-session#1 a bare cancel that drops a pending name choice says it was cancelled", async () => {
+  const h = setup({ agents: [
+    { id: "a1", name: "Builder", state: "RUNNING", revision: 1 },
+    { id: "a2", name: "Tester", state: "RUNNING", revision: 2 },
+  ] });
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "pause the agent", confidence: 0.9 });
+  await h.flush();
+  assert.ok(h.session.snapshot().clarification);
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "cancel", confidence: 0.9 });
+  await h.flush();
+  assert.equal(h.session.snapshot().clarification, null);
+  assert.equal(h.session.snapshot().answer, "Okay, cancelled.");
+  assert.equal(h.commands.length, 0);
+});
+
+test("V25 R3-session#2 concurrent closes join one close; an open after them gets exactly one live worker", async () => {
+  const h = setup();
+  await h.open();
+  const first = h.workers[0];
+  const [a, b] = await Promise.all([h.session.close(), h.session.close()]);
+  assert.equal(a.open, false);
+  assert.equal(b.open, false);
+  assert.equal(first.closed, true);
+  const reopened = h.session.open("push_to_talk");
+  const late = h.session.close();
+  await late;
+  await reopened.catch(() => undefined);
+  const live = h.workers.filter((w) => !w.closed);
+  const snap = h.session.snapshot();
+  assert.ok(live.length <= 1, "never two live workers");
+  assert.equal(snap.open, live.length === 1, "the snapshot's open truth matches the live worker count");
 });

@@ -250,6 +250,25 @@ test("V28 capture during playback is refused with BUSY_PLAYBACK (half duplex)", 
   }
 });
 
+test("V19 V22 LIVE-B03 push-to-talk barge-in: speak.cancel immediately followed by capture.start opens the capture (no BUSY_PLAYBACK)", { skip }, async () => {
+  const w = session(["--input-silence", "--output", "null", "--fixture-pace", "2"]);
+  try {
+    await w.until(e => e.ev === "ready", 15000, "ready");
+    w.send({ op: "speak", turn: "say-1", gen: 1, seq: 0, text: "Bunny is checking every agent now and will report the status back to you in a moment.", device: -1, voice: null });
+    w.send({ op: "speak", turn: "say-1", gen: 1, seq: 1, text: "The second sentence is still queued behind the first one.", device: -1, voice: null });
+    await w.until(e => e.ev === "playback.started" && e.turn === "say-1", 15000, "playback.started");
+    // Exactly what the Host sends on a push-to-talk press during speech: cancel, then capture, back to back.
+    w.send({ op: "speak.cancel", gen: 1 });
+    w.send({ op: "capture.start", turn: "listen-2", gen: 2, device: -1, endpointing: "manual", maxMs: 20000 });
+    const started = await w.until(e => (e.ev === "capture.started" || e.ev === "capture.error") && e.turn === "listen-2", 8000, "capture outcome");
+    assert.equal(started.ev, "capture.started", JSON.stringify(started));
+    assert.equal(w.find(e => e.ev === "playback.started" && e.gen === 1 && e.seq === 1), undefined, "the queued chunk of the cancelled gen never plays");
+    w.send({ op: "capture.abort", gen: 2 });
+  } finally {
+    await w.close();
+  }
+});
+
 test("V24 mute aborts an active capture and refuses capture.start until unmuted", { skip }, async () => {
   const w = session(["--input-silence", "--fixture-pace", "2"]);
   try {
@@ -681,4 +700,151 @@ test("R2-native#3 raw microphone buffers are zeroed before they are freed, and c
   const src = sourceText();
   assert.match(src, /Native\.WipeNative\(data\[i\], Consts\.FrameBytes\);\s*Marshal\.FreeHGlobal\(data\[i\]\);/, "WaveInSource.Close wipes each capture buffer before freeing it");
   assert.match(src, /Array\.Clear\(frame, 0, frame\.Length\);\s*Array\.Clear\(fed, 0, fed\.Length\);/, "CaptureLoop clears its frame and feed buffers on exit");
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// whisper.cpp engine (--stt whisper). These tests need the staged runtime. If it is absent they FAIL with the command
+// to run; they are never skipped silently. Stage with: node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs
+// ---------------------------------------------------------------------------------------------------------------------
+const runtimeDir = join(root, "native/voice/vendor/runtime");
+const modelPath = join(runtimeDir, "models/ggml-base.en.bin");
+const shimPath = join(runtimeDir, "bunny-whisper-shim.dll");
+const whisperArgs = ["--stt", "whisper", "--whisper-dir", runtimeDir, "--whisper-model", modelPath];
+const STAGE_HINT = "whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs";
+
+function requireWhisperRuntime() {
+  const missing = [join(runtimeDir, "whisper.dll"), join(runtimeDir, "ggml.dll"), join(runtimeDir, "ggml-base.dll"), shimPath, modelPath]
+    .filter(p => !existsSync(p))
+    .map(p => p.slice(root.length + 1));
+  assert.equal(missing.length, 0, `${STAGE_HINT}. Missing: ${missing.join(", ")}`);
+}
+
+test("whisper: the staged runtime and model match native/voice/whisper-pin.json and the build record", { skip }, () => {
+  requireWhisperRuntime();
+  const pin = JSON.parse(readFileSync(join(root, "native/voice/whisper-pin.json"), "utf8"));
+  assert.equal(pin.schema, "bunny-whisper-pin/1");
+  assert.equal(pin.commit, "927cfce34f31707e17f2bff35c349632fb9e2c3a");
+  for (const [name, expected] of Object.entries(pin.runtimeFiles)) {
+    assert.equal(sha(join(runtimeDir, name)), expected, `runtime ${name} differs from the pin`);
+  }
+  assert.equal(sha(modelPath), pin.model.sha256, "model differs from the pin");
+  const record = JSON.parse(readFileSync(recordPath, "utf8"));
+  assert.ok(record.whisperShim, `build record has no whisperShim: ${STAGE_HINT}`);
+  assert.equal(record.whisperShim.binarySha256, sha(shimPath), "shim binary differs from the build record");
+  assert.equal(record.whisperShim.sourceSha256, sha(join(root, "native/voice/whisper-shim.c")), "shim source differs from the build record");
+  assert.equal(record.whisperShim.linkedAgainst["whisper.dll"], pin.runtimeFiles["whisper.dll"]);
+});
+
+test("whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error", { skip }, async () => {
+  requireWhisperRuntime();
+  const w = session([...whisperArgs, "--input-silence", "--output", "null"]);
+  try {
+    const ready = await w.until(e => e.ev === "ready", 10000, "ready");
+    assert.deepEqual(ready.stt, { engine: "whisper.cpp v1.9.4", recognizer: "ggml-base.en", culture: "en", local: true });
+    await sleep(300);
+    assert.equal(w.events.find(e => e.ev === "error"), undefined, "no STT_UNAVAILABLE expected when the model loads");
+    const load = /whisper model loaded in (\d+) ms/.exec(w.stderr());
+    assert.ok(load, "the model load time is reported on stderr");
+    assert.ok(Number(load[1]) < 10000, `model load took ${load[1]} ms`);
+    console.log(`[whisper] model load ${load[1]} ms`);
+  } finally {
+    await w.close();
+  }
+});
+
+const PHRASES = [
+  { text: "did the tests pass in my last mission", keys: [/tests? pass/i, /mission/i] },
+  { text: "what is my agent doing", keys: [/agent/i, /doing/i] },
+];
+
+test("whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final", { skip }, async () => {
+  requireWhisperRuntime();
+  const latencies = [];
+  for (const p of PHRASES) {
+    const w = session([...whisperArgs, "--input-synth", p.text, "--fixture-pace", "2", "--output", "null"]);
+    try {
+      await w.until(e => e.ev === "ready", 10000, "ready");
+      w.send({ op: "capture.start", turn: "wt", gen: 1, endpointing: "vad", maxMs: 15000 });
+      const term = await w.until(e => e.turn === "wt" && (e.ev === "stt.final" || e.ev === "stt.none"), 30000, "terminal event");
+      assert.equal(term.ev, "stt.final", `expected a final for "${p.text}", got ${term.ev} ${term.reason || ""}`);
+      for (const key of p.keys) assert.match(term.text, key, `final "${term.text}" lacks ${key}`);
+      assert.ok(term.confidence > 0.5, `confidence ${term.confidence} for "${term.text}" is not above 0.5`);
+      const termIndex = w.events.indexOf(term);
+      const speechEnd = w.events.find(e => e.turn === "wt" && e.ev === "vad" && e.state === "speech_end");
+      assert.ok(speechEnd, "VAD endpointed the utterance");
+      latencies.push(term.mono - speechEnd.mono);
+      const lateEvent = w.events.slice(termIndex + 1).find(e => e.turn === "wt" && e.ev === "stt.partial");
+      assert.equal(lateEvent, undefined, "no stt.partial may follow the final");
+      assert.equal(w.events.filter(e => e.turn === "wt" && (e.ev === "stt.final" || e.ev === "stt.none")).length, 1, "exactly one terminal event");
+      console.log(`[whisper] "${term.text}" confidence ${term.confidence.toFixed(3)} decode after speech_end ${term.mono - speechEnd.mono} ms`);
+    } finally {
+      await w.close();
+    }
+  }
+  assert.ok(latencies.every(ms => ms >= 0 && ms < 15000), `decode latencies ${latencies.join(",")} ms`);
+});
+
+test("whisper: silence never becomes a final (no VAD onset, so stt.none no_speech)", { skip }, async () => {
+  requireWhisperRuntime();
+  const w = session([...whisperArgs, "--input-silence", "--output", "null", "--fixture-pace", "2"]);
+  try {
+    await w.until(e => e.ev === "ready", 10000, "ready");
+    w.send({ op: "capture.start", turn: "ws", gen: 1, endpointing: "manual", maxMs: 5000 });
+    await w.until(e => e.turn === "ws" && e.ev === "capture.started", 5000, "capture.started");
+    await sleep(1500);
+    w.send({ op: "capture.end", turn: "ws", gen: 1 });
+    const term = await w.until(e => e.turn === "ws" && (e.ev === "stt.final" || e.ev === "stt.none"), 15000, "terminal event");
+    assert.equal(term.ev, "stt.none");
+    assert.equal(term.reason, "no_speech");
+    assert.equal(w.events.filter(e => e.turn === "ws" && e.ev === "stt.final").length, 0);
+  } finally {
+    await w.close();
+  }
+});
+
+test("whisper: noise-only input never becomes a final with words", { skip }, async () => {
+  requireWhisperRuntime();
+  const w = session([...whisperArgs, "--input-noise", "--output", "null", "--fixture-pace", "2"]);
+  try {
+    await w.until(e => e.ev === "ready", 10000, "ready");
+    w.send({ op: "capture.start", turn: "wn", gen: 1, endpointing: "vad", maxMs: 15000 });
+    const term = await w.until(e => e.turn === "wn" && (e.ev === "stt.final" || e.ev === "stt.none"), 20000, "terminal event");
+    assert.equal(term.ev, "stt.none", `noise produced a final: "${term.text}"`);
+    assert.ok(["no_speech", "noise_only", "rejected"].includes(term.reason), `reason ${term.reason}`);
+  } finally {
+    await w.close();
+  }
+});
+
+test("whisper: capture.abort that lands during the final decode never emits a final", { skip }, async () => {
+  requireWhisperRuntime();
+  const w = session([...whisperArgs, "--input-synth", PHRASES[0].text, "--fixture-pace", "2", "--output", "null"]);
+  try {
+    await w.until(e => e.ev === "ready", 10000, "ready");
+    w.send({ op: "capture.start", turn: "wa", gen: 1, endpointing: "vad", maxMs: 15000 });
+    await w.until(e => e.turn === "wa" && e.ev === "vad" && e.state === "speech_end", 20000, "speech_end");
+    w.send({ op: "capture.abort", turn: "wa", gen: 1 });
+    const term = await w.until(e => e.turn === "wa" && (e.ev === "stt.final" || e.ev === "stt.none"), 20000, "terminal event");
+    assert.equal(term.ev, "stt.none", "an aborted decode must not produce a final");
+    assert.equal(term.reason, "aborted");
+    await sleep(2000);
+    assert.equal(w.events.filter(e => e.turn === "wa" && e.ev === "stt.final").length, 0, "no final after the abort");
+    assert.equal(w.events.filter(e => e.turn === "wa" && (e.ev === "stt.final" || e.ev === "stt.none")).length, 1, "exactly one terminal event");
+  } finally {
+    await w.close();
+  }
+});
+
+test("whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently", { skip }, async () => {
+  requireWhisperRuntime();
+  const w = session(["--stt", "whisper", "--whisper-dir", runtimeDir, "--whisper-model", join(runtimeDir, "models", "missing-model.bin"), "--input-silence", "--output", "null"]);
+  try {
+    const ready = await w.until(e => e.ev === "ready", 10000, "ready");
+    assert.equal(ready.stt.engine, "Windows SAPI 5.4 System.Speech", "ready must report the SAPI fallback");
+    const err = await w.until(e => e.ev === "error" && e.code === "STT_UNAVAILABLE", 5000, "STT_UNAVAILABLE");
+    assert.match(err.message, /^whisper unavailable: model file is missing; using Windows SAPI$/);
+    assert.ok(w.events.indexOf(err) > w.events.indexOf(ready), "the fallback error follows ready");
+  } finally {
+    await w.close();
+  }
 });

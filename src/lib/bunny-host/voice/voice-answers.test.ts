@@ -160,3 +160,12 @@ test("V31 T10-SUP#3 one pending ask is one item: an agent waiting on its Mission
   assert.deepEqual(facts.map((f) => f.name), ["Bravo mission permission", "Charlie agent"]);
   assert.match(answerApprovals(facts), /2 items are waiting/);
 });
+
+test("V31 R3-session#0 a consent offer on a Mission that also has an unrelated unresolved request is still counted", () => {
+  const facts = pendingApprovalFacts({
+    tasks: [],
+    missions: [{ id: "m1", title: "M", requests: [{ resolvedAt: null }] }],
+    agents: [{ name: "A", state: "RUNNING", missionId: "m1", authorization: { state: "WAITING_FOR_USER" } }],
+  });
+  assert.deepEqual(facts.map((f) => f.name), ["M permission", "A agent"]);
+});

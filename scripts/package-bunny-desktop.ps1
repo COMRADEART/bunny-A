@@ -87,6 +87,27 @@ try {
     foreach($name in @('native/voice/BunnyVoiceWorker.cs','native/voice/README.md','scripts/build-voice-worker.mjs')) {Add-PackageFile (Join-Path $bunnyBuild $name) $name 'source' $name}
     foreach($name in @('native/voice/bunny-voice-worker.exe','native/voice/bunny-voice-worker.json')) {Add-PackageFile (Join-Path $bunnyBuild $name) $name 'generated' $null}
   }
+  # M-A-3 T10 whisper recognizer: the pinned runtime is copied from the workspace's staged vendor folder (stage-whisper.mjs
+  # verifies it against native/voice/whisper-pin.json). Nothing is downloaded here, and every copied file is hash-checked
+  # against the pin before it enters the release. Older pinned sources have no pin and package without it.
+  $whisperPin=Join-Path $bunnyBuild 'native/voice/whisper-pin.json'
+  if(Test-Path -LiteralPath $whisperPin) {
+    $pinData=Get-Content -LiteralPath $whisperPin -Raw | ConvertFrom-Json
+    $stagedRuntime=Join-Path $bunnyWorkspace 'native/voice/vendor/runtime'
+    $shimRecord=(Get-Content -LiteralPath (Join-Path $bunnyBuild 'native/voice/bunny-voice-worker.json') -Raw | ConvertFrom-Json).whisperShim
+    if(-not $shimRecord -or -not (Test-Path -LiteralPath $stagedRuntime)) {throw 'Whisper runtime is not staged; run scripts/stage-whisper.mjs first.'}
+    $whisperFiles=@(@{name='bunny-whisper-shim.dll';sha=[string]$shimRecord.binarySha256})
+    foreach($property in $pinData.runtimeFiles.PSObject.Properties) {$whisperFiles+=@{name=$property.Name;sha=[string]$property.Value}}
+    $whisperFiles+=@{name=('models/'+$pinData.model.name);sha=[string]$pinData.model.sha256}
+    foreach($entry in $whisperFiles) {
+      $from=Join-Path $stagedRuntime $entry.name
+      if(-not (Test-Path -LiteralPath $from)) {throw ('Whisper file missing: '+$entry.name)}
+      $actual=(Get-FileHash -LiteralPath $from -Algorithm SHA256).Hash.ToLower()
+      if($actual -ne ([string]$entry.sha).ToLower()) {throw ('Whisper file differs from the pin: '+$entry.name)}
+      Add-PackageFile $from ('native/voice/vendor/runtime/'+$entry.name) 'vendor' $null
+    }
+    Add-PackageFile $whisperPin 'native/voice/whisper-pin.json' 'source' 'native/voice/whisper-pin.json'
+  }
   if(-not $SkipDashboardBuild) {Copy-Item -LiteralPath (Join-Path $bunnyBuild '.output') -Destination (Join-Path $bunnyPackage '.output') -Recurse}
   foreach($name in @('Bunny-Host.mjs','Bunny-Server.mjs','Bunny-Island.ps1','Bunny-Island.Visual.ps1','Bunny-Island.Motion.ps1','Launch-Bunny-A.ps1','Launch-Bunny-A.cmd','manifest.mjs')) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}
   # Older pinned rollback sources predate the presentation helper.

@@ -210,3 +210,22 @@ async function until(check: () => Promise<boolean>, timeoutMs: number): Promise<
   }
   return true;
 }
+
+test("V24 voice.mute honours both the clients' {on} field and the {muted} spelling over real HTTP", async () => {
+  const f = await fixture({ voice: { workerExtraArgs: ["--input-silence", "--output", "null"] } });
+  try {
+    const opened = await f.command("voice.session.open", { mode: "push_to_talk" });
+    assert.equal(opened.status, 200);
+    if (process.platform === "win32" && (opened.body.data as { open: boolean }).open) {
+      const muted = await f.command("voice.mute", { muted: true });
+      assert.equal((muted.body.data as { muted: boolean }).muted, true);
+      const unmuted = await f.command("voice.mute", { muted: false });
+      assert.equal((unmuted.body.data as { muted: boolean }).muted, false);
+      const legacy = await f.command("voice.mute", { on: true });
+      assert.equal((legacy.body.data as { muted: boolean }).muted, true);
+    }
+    await f.command("voice.session.close");
+  } finally {
+    await f.close();
+  }
+});

@@ -1156,7 +1156,8 @@ async function voiceCommand(voice: VoiceSessionManager, action: string, data: Re
     case "voice.interrupt":
       return voice.interrupt(interruptSource(data.source));
     case "voice.mute":
-      return voice.mute(data.on === true);
+      // The Island and desktop send {on}; {muted} (the snapshot's field name) is accepted too, so either spelling mutes.
+      return voice.mute(data.muted === true || data.on === true);
     case "voice.text":
       return voice.text(typeof data.text === "string" ? data.text : "");
     case "voice.control.confirm":

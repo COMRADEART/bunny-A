@@ -7,8 +7,9 @@
  * Nothing here is reachable from HTTP; test-only worker flags come in through the constructor options.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
+import { cpus } from "node:os";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { OwnedProcessGroup, outputPipe, type OwnedSnapshot } from "../owned-process-group.server.ts";
 import type { WorkerCommand, WorkerEvent } from "./voice-protocol.ts";
@@ -72,6 +73,155 @@ export function verifyWorkerIntegrity(root: string = repoRoot): { exePath: strin
     if (!entry || entry.sha256.toLowerCase() !== actual) throw refuse("release manifest does not list this worker");
   }
   return { exePath, sha256: actual };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Speech recognizer selection (whisper.cpp when the pinned runtime is staged and verified; Windows SAPI otherwise).
+// ---------------------------------------------------------------------------------------------------------------------
+
+export const WHISPER_PIN_RELATIVE = "native/voice/whisper-pin.json";
+export const WHISPER_RUNTIME_RELATIVE = "native/voice/vendor/runtime";
+export const WHISPER_SHIM_FILE = "bunny-whisper-shim.dll";
+export const WHISPER_MODEL_DIRECTORY = "models";
+const RELEASE_MANIFEST = "release-manifest.json";
+const HEX64 = /^[0-9a-fA-F]{64}$/;
+const SAFE_FILE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/** The committed pin (native/voice/whisper-pin.json, written by the native lane's stage script). */
+export type WhisperPin = {
+  schema: "bunny-whisper-pin/1";
+  version: string;
+  commit: string;
+  model: { name: string; sha256: string; size: number };
+  runtimeFiles: Record<string, string>;
+};
+
+export type SpeechEngineSelection = { engine: "whisper"; args: string[] } | { engine: "sapi"; reason: string | null };
+
+/** The notice the Host shows when whisper was configured but cannot be used. Never silent. */
+export function whisperFallbackMessage(reason: string): string {
+  return `whisper unavailable: ${reason}; using Windows SAPI`;
+}
+
+/** Threads for whisper: half the logical processors, clamped to 2..4. */
+export function whisperThreads(cpuCount: number): number {
+  return Math.min(4, Math.max(2, Math.floor(cpuCount / 2)));
+}
+
+function sha256File(path: string): string {
+  const hash = createHash("sha256");
+  const fd = openSync(path, "r");
+  try {
+    const buffer = Buffer.alloc(1024 * 1024);
+    for (;;) {
+      const read = readSync(fd, buffer, 0, buffer.length, null);
+      if (read === 0) break;
+      hash.update(buffer.subarray(0, read));
+    }
+  } finally {
+    closeSync(fd);
+  }
+  return hash.digest("hex");
+}
+
+/** The model is large (about 148 MB): its hash is kept per Host run, keyed by path, size and mtime. */
+const modelHashes = new Map<string, { size: number; mtimeMs: number; sha256: string }>();
+function modelSha256(path: string): { sha256: string; size: number } {
+  const stat = statSync(path);
+  const cached = modelHashes.get(path);
+  if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) return { sha256: cached.sha256, size: stat.size };
+  const sha256 = sha256File(path);
+  modelHashes.set(path, { size: stat.size, mtimeMs: stat.mtimeMs, sha256 });
+  return { sha256, size: stat.size };
+}
+
+function readPin(path: string): WhisperPin {
+  const value = JSON.parse(readFileSync(path, "utf8")) as Partial<WhisperPin>;
+  if (value.schema !== "bunny-whisper-pin/1") throw new Error("schema");
+  const model = value.model;
+  if (!model || typeof model.name !== "string" || !SAFE_FILE_NAME.test(model.name) || typeof model.sha256 !== "string" || !HEX64.test(model.sha256) || typeof model.size !== "number") {
+    throw new Error("model entry");
+  }
+  const runtime = value.runtimeFiles;
+  if (!runtime || typeof runtime !== "object" || Array.isArray(runtime) || Object.keys(runtime).length === 0) throw new Error("runtimeFiles");
+  for (const [name, sha] of Object.entries(runtime)) {
+    if (!SAFE_FILE_NAME.test(name) || name === WHISPER_SHIM_FILE || typeof sha !== "string" || !HEX64.test(sha)) throw new Error(`runtime entry ${name}`);
+  }
+  return value as WhisperPin;
+}
+
+/**
+ * Chooses the recognizer for the next worker launch. whisper is selected only when every pinned file matches: the runtime
+ * DLLs, the shim (against the build record) and the model. In a release layout (release-manifest.json present) every
+ * whisper file must also be listed there with the same hash. Any other state returns SAPI with a reason. Never throws.
+ * Without a pin (a source that predates whisper) the answer is SAPI with no reason.
+ */
+export function selectSpeechEngine(root: string = repoRoot, options: { cpuCount?: number } = {}): SpeechEngineSelection {
+  const pinPath = join(root, WHISPER_PIN_RELATIVE);
+  if (!existsSync(pinPath)) return { engine: "sapi", reason: null };
+  const fail = (reason: string): SpeechEngineSelection => ({ engine: "sapi", reason });
+  try {
+    const runtimeDir = join(root, WHISPER_RUNTIME_RELATIVE);
+    if (!existsSync(runtimeDir)) return fail("runtime not staged");
+    let pin: WhisperPin;
+    try {
+      pin = readPin(pinPath);
+    } catch {
+      return fail("pin unreadable");
+    }
+    let record: { whisperShim?: { binarySha256?: unknown } };
+    try {
+      record = JSON.parse(readFileSync(join(root, WORKER_RECORD_RELATIVE), "utf8"));
+    } catch {
+      return fail("worker build record unreadable");
+    }
+    const shimExpected = record.whisperShim?.binarySha256;
+    if (typeof shimExpected !== "string" || !HEX64.test(shimExpected)) return fail("shim not recorded in the build record");
+
+    // Nothing unlisted may sit in the runtime folder: an extra DLL would be loaded by name.
+    const expected = new Set([...Object.keys(pin.runtimeFiles), WHISPER_SHIM_FILE, WHISPER_MODEL_DIRECTORY]);
+    for (const name of readdirSync(runtimeDir)) if (!expected.has(name)) return fail(`unlisted runtime file ${name}`);
+
+    type Check = { name: string; relative: string; path: string; sha256: string };
+    const runtimeRelative = (name: string) => `${WHISPER_RUNTIME_RELATIVE}/${name}`;
+    const checks: Check[] = [
+      { name: "whisper pin", relative: WHISPER_PIN_RELATIVE, path: pinPath, sha256: "" },
+      ...Object.entries(pin.runtimeFiles).map(([name, sha256]) => ({ name, relative: runtimeRelative(name), path: join(runtimeDir, name), sha256 })),
+      { name: WHISPER_SHIM_FILE, relative: runtimeRelative(WHISPER_SHIM_FILE), path: join(runtimeDir, WHISPER_SHIM_FILE), sha256: shimExpected },
+    ];
+    const hashes = new Map<string, string>();
+    for (const check of checks) {
+      if (!existsSync(check.path)) return fail(`${check.name} missing`);
+      const actual = sha256File(check.path);
+      if (check.sha256 && actual !== check.sha256.toLowerCase()) return fail(`${check.name} differs from the pin`);
+      hashes.set(check.relative, actual);
+    }
+    // The model comes last so a broken DLL never costs a 148 MB hash.
+    const modelPath = join(runtimeDir, WHISPER_MODEL_DIRECTORY, pin.model.name);
+    if (!existsSync(modelPath)) return fail("model missing");
+    const model = modelSha256(modelPath);
+    if (model.size !== pin.model.size) return fail("model size differs from the pin");
+    if (model.sha256 !== pin.model.sha256.toLowerCase()) return fail("model differs from the pin");
+    hashes.set(runtimeRelative(`${WHISPER_MODEL_DIRECTORY}/${pin.model.name}`), model.sha256);
+
+    // containment#0 for whisper: a release folder lists every whisper file with the same hash, or whisper is refused.
+    const manifestPath = join(root, RELEASE_MANIFEST);
+    if (existsSync(manifestPath)) {
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { files?: { path: string; sha256: string }[] };
+      const listed = new Map((manifest.files ?? []).map((file) => [file.path, String(file.sha256).toLowerCase()]));
+      for (const [relative, sha256] of hashes) {
+        if (listed.get(relative) !== sha256) return fail(`release manifest does not list ${relative.split("/").pop()} with this hash`);
+      }
+    }
+
+    const threads = whisperThreads(options.cpuCount ?? cpus().length);
+    return {
+      engine: "whisper",
+      args: ["--stt", "whisper", "--whisper-dir", resolve(runtimeDir), "--whisper-model", resolve(modelPath), "--whisper-threads", String(threads)],
+    };
+  } catch (error) {
+    return fail(`verification error (${error instanceof Error ? error.name : "unknown"})`);
+  }
 }
 
 /**
@@ -171,6 +321,8 @@ export interface VoiceWorkerPort {
   onEvent(listener: (event: WorkerEvent) => void): void;
   /** Resolves with the exit code once the process is gone (or null when unknown). */
   readonly exited: Promise<number | null>;
+  /** Set when whisper was configured but this launch runs Windows SAPI: the notice the session shows after ready. */
+  readonly sttNotice?: string | null;
   /** Graceful shutdown, bounded wait, then forced termination of the whole job. Idempotent. */
   close(): Promise<void>;
 }
@@ -193,6 +345,8 @@ export class VoiceWorkerProcess implements VoiceWorkerPort {
   /** H9: kernel accounting of the job taken at close, before the group drops its handle. Null when it could not be read. */
   closeAccounting: { activeProcesses: number | null; graceful: boolean } | null = null;
   readonly exited: Promise<number | null>;
+  /** See VoiceWorkerPort.sttNotice. Null when whisper is in use or was never configured. */
+  sttNotice: string | null = null;
   private listeners: ((event: WorkerEvent) => void)[] = [];
   private closed = false;
   private resolveExit!: (code: number | null) => void;
@@ -338,11 +492,16 @@ export async function launchVoiceWorker(options: VoiceWorkerLaunchOptions): Prom
   // pipe setup cannot reach the process. Residual: a same-user writer racing the synchronous hash-to-CreateProcess gap is
   // the same-user class that F04 places out of contract.
   const { exePath } = verifyWorkerIntegrity(options.root);
+  // The recognizer is chosen after the awaits too: the whisper DLLs and shim are re-hashed right before the spawn, and the
+  // model is re-checked by its cached stat. Any failure selects SAPI with a reason; it never blocks the launch.
+  const speech = selectSpeechEngine(options.root ?? repoRoot);
   const group = new OwnedProcessGroup(exePath, options.root ?? repoRoot, { action: "voice.worker", dataDirectory: options.dataDirectory });
   const contained = new VoiceWorkerProcess(group, options.shutdownGraceMs ?? 2_000, report);
+  contained.sttNotice = speech.engine === "sapi" && speech.reason !== null ? whisperFallbackMessage(speech.reason) : null;
   worker = contained;
+  const speechArgs = speech.engine === "whisper" ? speech.args : [];
   try {
-    group.spawn(exePath, [...(options.extraArgs ?? [])], options.root ?? repoRoot, workerEnvironment(process.env), out.name, err.name, true);
+    group.spawn(exePath, [...(options.extraArgs ?? []), ...speechArgs], options.root ?? repoRoot, workerEnvironment(process.env), out.name, err.name, true);
   } catch (error) {
     // containment#1: a post-launch failure leaves the root running inside the job. It is settled here by terminating the job
     // and closing the handle (kill-on-close), so no contained process outlives the refused launch.

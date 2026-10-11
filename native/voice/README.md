@@ -24,7 +24,8 @@ playback, releases every handle, emits `bye`, and exits with code 0 (within abou
 - **Capture**: `winmm` `waveInOpen` on the chosen device (or `WAVE_MAPPER` for -1). 16 kHz, mono, 16-bit PCM,
   20 ms buffers in a rotating set of six. Completion is polled; no callbacks are used.
   Device loss is reported after 1.5 s with no completed buffer.
-- **Speech recognition**: SAPI (`System.Speech`) with the en-US dictation grammar, streaming. The recognizer reads a
+- **Speech recognition**: SAPI (`System.Speech`) with the en-US dictation grammar, streaming, unless `--stt whisper` is set
+  (see the Whisper engine section). The recognizer reads a
   blocking PCM pipe. It sees audio only after the worker's own voice-activity gate; text without a speech onset
   is never reported as a final. Recognizer text that SAPI rejected, with no recognized text in the turn, ends as
   `stt.none` with reason `rejected`; rejected text is never promoted to a final.
@@ -52,10 +53,44 @@ playback, releases every handle, emits `bye`, and exits with code 0 (within abou
   value under `CapabilityAccessManager\ConsentStore\microphone` (HKCU and HKLM). The worker never calls `SetMute` or
   `SetMasterVolume`, and never writes any Windows setting.
 
+## Whisper engine (`--stt whisper`)
+
+Production flags, passed by the Host (they are not test-only):
+`--stt whisper --whisper-dir <absolute runtime dir> --whisper-model <absolute model path> [--whisper-threads <n>]`.
+Without `--stt whisper` the worker uses SAPI exactly as before.
+
+- **Runtime**: whisper.cpp v1.9.4 (tag b5130, commit 927cfce, MIT), CPU build. The pinned artifacts and hashes are in
+  `whisper-pin.json`. `scripts/stage-whisper.mjs` verifies the release zip, the source tarball, the vendored headers and
+  the model against the pin, then stages `native/voice/vendor/runtime/` (gitignored). It never downloads: a missing
+  file is reported with its pinned URL. `scripts/build-voice-worker.mjs` builds `bunny-whisper-shim.dll` from
+  `whisper-shim.c` with gcc and records its hashes under `whisperShim` in the build record.
+- **Model**: ggml-base.en (MIT), loaded once at startup (about 150 ms on the test machine). The `ready` event reports
+  `stt: {engine: "whisper.cpp v1.9.4", recognizer: "ggml-base.en", culture: "en", local: true}`.
+- **Fallback, never silent**: if the runtime or model is missing or fails to load, `ready` reports SAPI and an `error`
+  event with code `STT_UNAVAILABLE` and the message `whisper unavailable: <reason>; using Windows SAPI` follows it.
+- **Feed and endpointing**: the recognizer input is a bounded float buffer of the current turn (up to `maxMs`, at most
+  30 s), holding the AGC'd audio. Levels and VAD still use the raw frame. There is no recognizer evidence, so the VAD ends
+  a turn after 900 ms of silence following at least 250 ms of speech, and reports `no_speech` after 8 s without an onset.
+- **Partials**: genuine decodes of the buffered audio, after a VAD onset, at most one in flight, about every 1.2 s once
+  1 s of audio exists. A partial is never sent after the terminal event.
+- **Final**: one full decode of the bounded utterance on the finalize thread, never on the command loop. A `capture.abort`,
+  mute or shutdown that arrives during the decode discards the result: the turn ends as `stt.none` `aborted`.
+- **Acceptance**: `stt.final` confidence is the mean probability of the non-special tokens. A decode is rejected as
+  `stt.none` when it is empty, bracketed (`[BLANK_AUDIO]` gives `no_speech`, other brackets `noise_only`), when a segment's
+  no-speech probability exceeds 0.6, or when a short utterance (under 1 s of speech) is only a known silence phrase such
+  as "you" or "thank you". Without a VAD onset there is no decode, and the turn ends as `no_speech` or `noise_only`.
+  Whisper's own no-speech score is not reliable on silence (zero PCM decoded to "you" with probability 0.000), so the
+  VAD gate is what stops silent hallucinations.
+- **Measured here** (Windows x64, 4 threads): a decode of a 2 to 3 s fixture utterance finished 0.87 to 1.4 s after
+  speech end. That time includes the 900 ms endpoint silence in the buffer.
+- **Logs and data**: whisper and ggml logs go to a no-op callback. The only stderr line is the model load time. Raw audio
+  is never written to disk. Transcript text appears only in `stt.partial` and `stt.final`.
+
 ## Local-only engines
 
 SAPI and `System.Speech` are Windows components that ship with the OS. Nothing is downloaded, nothing is
-installed, and the worker makes no network connection. Recognition and synthesis run locally.
+installed, and the worker makes no network connection. Recognition and synthesis run locally. The whisper runtime is
+staged once from artifacts the operator fetched and pinned by hash, and the worker opens no connection to load it.
 
 ## Fixture flags are test-only
 
@@ -74,6 +109,10 @@ All of its threads are background threads, and it holds only the `winmm` and COM
 ## Limitations
 
 - Recognition is en-US dictation (SAPI `MS-1033-80-DESK`). Accuracy depends on microphone quality and speaking style.
+- Live microphone accuracy with SAPI was measured as unusable on the owner's machine: 10 spoken phrases gave a word error
+  rate of 0.95 and a mean confidence of 0.048, with speech RMS of about 0.003 to 0.008. That is why `--stt whisper` exists.
+  The whisper engine has been tested with synthesized fixtures only. Its live-microphone accuracy must be measured before
+  it is relied on.
 - The render endpoint meter includes audio from other applications. `meterSilentMs` is a measured endpoint
   silence, not proof of this worker's output alone. It is null for the null sink and when the meter is unavailable.
 - There is no acoustic echo cancellation. Voice is half duplex: the Host cancels speech before listening, and the worker
@@ -112,6 +151,9 @@ All of its threads are background threads, and it holds only the `winmm` and COM
   They have not been run against the real microphone or speakers.
 
 ## Build
+
+Whisper runtime: `node scripts/stage-whisper.mjs` (verify and stage, no download), then `node scripts/build-voice-worker.mjs`
+(builds the shim when the runtime is staged, and prints why it skips otherwise).
 
 `node scripts/build-voice-worker.mjs` compiles with the .NET Framework 4.x `csc.exe` (C# 5, x64) and
 records the source, binary, compiler and `System.Speech` hashes in `bunny-voice-worker.json`.

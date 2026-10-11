@@ -286,3 +286,37 @@ test("V33 T10-SUP#2 'stop the current mission' targets the single active agent, 
   assert.equal(classifyTranscript("pause the active agent").target, "");
   assert.equal(classifyTranscript("pause the running agent called Builder").target, "builder");
 });
+
+test("V36 V39 R3-intent#0 a request wrapped as a question is still refused; genuine information questions stay chat", () => {
+  for (const text of [
+    "why dont you restart the server",
+    "why don't you restart the server",
+    "should you accept the pending request",
+    "how about you install the package",
+    "should you unlock it",
+    "can you run the installer",
+  ]) assert.equal(kind(text), "sensitive_refused", text);
+  for (const text of ["how do I enable dark mode", "should I accept it", "what does accept mean", "how does a server restart work", "is the server running", "why is the sky blue"])
+    assert.equal(kind(text), "chat", text);
+});
+
+test("V36 R3-intent#1 starting machine or project work is refused; ordinary 'start' chat is not", () => {
+  for (const text of ["start the server", "start the build", "kick off the build", "fire up the dev server", "ship it", "spin up a container"])
+    assert.equal(kind(text), "sensitive_refused", text);
+  for (const text of ["how do I start the server", "start a story about a rabbit", "what time does the meeting start"])
+    assert.equal(kind(text), "chat", text);
+});
+
+test("R3-intent#3 a bare acknowledgement is not an approval; only the whole-utterance idiom is", () => {
+  assert.equal(kind("okay it"), "sensitive_refused");
+  assert.equal(kind("ok to the request"), "sensitive_refused");
+  assert.equal(kind("okay, it looks great"), "chat");
+  assert.equal(kind("that is fine, it is working now"), "chat");
+  assert.equal(kind("pause the agent"), "agent_control");
+});
+
+test("R3-intent#4 cancelling the pending pause or proposal is a plain cancel", () => {
+  assert.equal(kind("cancel the pending pause", true), "cancel");
+  assert.equal(kind("cancel the pending proposal", true), "cancel");
+  assert.equal(kind("cancel the upload"), "sensitive_refused");
+});

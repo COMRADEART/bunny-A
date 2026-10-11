@@ -6,7 +6,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { launchVoiceWorker, verifyWorkerIntegrity, type VoiceWorkerProcess } from "./voice-worker.server.ts";
+import { launchVoiceWorker, selectSpeechEngine, verifyWorkerIntegrity, type VoiceWorkerProcess } from "./voice-worker.server.ts";
 import type { WorkerEvent } from "./voice-protocol.ts";
 
 /**
@@ -177,6 +177,30 @@ test("T10 H9 killing the Host process ends the contained worker (kill-on-close, 
     assert.equal(gone, true, "the worker died with its Host: the job's kill-on-close reaped it");
   } finally {
     if (child.exitCode === null) child.kill("SIGKILL");
+    rmSync(dataDirectory, { recursive: true, force: true });
+  }
+});
+
+// M-A-3 T10 whisper: the same contained fixture turn, recognized by whisper.cpp from the staged, verified runtime.
+const whisperSelection = windows ? selectSpeechEngine() : { engine: "sapi" as const, reason: "not Windows" };
+const whisperSkip = whisperSelection.engine === "whisper" ? false : `whisper not selected: ${whisperSelection.reason ?? "no whisper pin"}`;
+
+test("T10-whisper a real contained whisper fixture turn ends in stt.final from whisper.cpp", { skip: whisperSkip || (!windows && "Windows only") }, async () => {
+  const dataDirectory = mkdtempSync(join(tmpdir(), "bunny-voice-whisper-"));
+  let worker: VoiceWorkerProcess | null = null;
+  try {
+    worker = await launchVoiceWorker({ dataDirectory, extraArgs: FIXTURE });
+    const ready = await waitFor(worker, "ready");
+    assert.equal(ready.stt.engine, "whisper.cpp v1.9.4", "the worker runs whisper, not SAPI");
+    const final = waitFor(worker, "stt.final", 60_000);
+    worker.send({ op: "capture.start", turn: "whisper-1", gen: 0, device: -1, endpointing: "vad", maxMs: 30_000 });
+    const result = await final;
+    assert.equal(result.turn, "whisper-1");
+    assert.match(result.text.toLowerCase(), /capital/);
+    assert.match(result.text.toLowerCase(), /france/);
+    assert.ok(result.confidence >= 0 && result.confidence <= 1, "confidence is a probability");
+  } finally {
+    if (worker) await worker.close();
     rmSync(dataDirectory, { recursive: true, force: true });
   }
 });

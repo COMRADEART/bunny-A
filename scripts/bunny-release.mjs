@@ -119,6 +119,21 @@ export function importClosure(release) {
       if(!existsSync(join(root,path))) missing.push(path);else files.push(path);
     }
   }
+  // M-A-3 T10 whisper: a release that carries the pin carries every pinned runtime file, the shim and the model, and the
+  // manifest lists them (verify); the closure check only proves presence, the manifest proves the hashes.
+  if (existsSync(join(root, "native/voice/whisper-pin.json"))) {
+    let pin;
+    try {
+      pin = JSON.parse(readFileSync(join(root, "native/voice/whisper-pin.json"), "utf8"));
+    } catch {
+      missing.push("native/voice/whisper-pin.json (unreadable)");
+    }
+    if (pin) {
+      const runtime = "native/voice/vendor/runtime";
+      const whisperPaths = ["native/voice/whisper-pin.json", ...Object.keys(pin.runtimeFiles ?? {}).map((name) => `${runtime}/${name}`), `${runtime}/bunny-whisper-shim.dll`, `${runtime}/models/${pin.model?.name}`];
+      for (const path of whisperPaths) if (!existsSync(join(root, path))) missing.push(path); else files.push(path);
+    }
+  }
   // T6 promises an executable bounded browser family, rather than an optional development import.
   if (existsSync(join(root, "src/lib/bunny-missions/cross-app.ts"))) {
     for (const path of ["node_modules/playwright/index.mjs", "node_modules/playwright-core/index.mjs", "node_modules/playwright/LICENSE", "node_modules/playwright-core/LICENSE"])

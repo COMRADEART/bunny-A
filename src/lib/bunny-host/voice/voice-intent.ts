@@ -80,15 +80,24 @@ const SYN_STANDALONE: RegExp[] = [
   /\bi (?:hereby )?consent\b/,
   /\bsign (?:it|that|this|them) off\b/,
   /\bgive (?:the |a |an |my |your )?go[- ]?ahead\b/,
-  /\b(?:ok|okay|alright|all right|fine)(?:[\s,]+(?:to|with))?[\s,]+(?:it|them|those|these|this one|the request|the approval|the agent|the tool|the command)\b/,
+  // R3-intent#3: the bare "okay it" idiom is an approval only as the whole utterance; "okay, the agent is paused" or
+  // "ok the agent, pause it" are an acknowledgement and a control.
+  /^(?:ok|okay|alright|all right|fine)(?:[\s,]+(?:to|with))?[\s,]+(?:it|them|those|these|this one|the request|the approval|the tool|the command)$/,
 ];
 
-/** A plain question about approvals or commands is answered as chat (fixcheck#4). Direct approval verbs are refused anyway. */
-const QUESTION = /^(?:how|what|why|when|where|who|which|should|is|are|am|was|were|does|did|explain|define|(?:can|could) you (?:explain|tell me|describe)|tell me (?:how|what|why|whether|if))\b/;
+/**
+ * A genuine information question is answered as chat (fixcheck#4); direct approval verbs are refused anyway.
+ * R3-intent#0: a request wrapped as a question ("why don't you restart the server", "should you accept the request",
+ * "how about you install it", "is it okay to ratify it", "can you run ...") is NOT an information question.
+ */
+const QUESTION = /^(?:how (?:do|does|did|can|could|should|would) (?:i|we|one|it|this|that)\b|how (?:to|does|is|are|was|were|much|many|long|often)\b|what\b|which\b|who\b|when\b|where\b|why (?:is|are|was|were|does|do|did)\b(?! not\b)(?! you\b)|should (?:i|we)\b|(?:is|are|was|were|does|did) (?!you\b)\S|explain\b|define\b|(?:can|could) you (?:explain|tell me|describe)\b|tell me (?:how|what|why|whether|if)\b)/;
 
 /** authz#1: imperative command execution against the machine or a project, with or without a listed noun. */
 const EXEC: RegExp[] = [
   /\b(?:run|execute|launch|install|uninstall|restart|reboot|shut ?down|power off|download|spawn|invoke)\s+\S/,
+  // R3-intent#1: starting machine or project work ("start the server", "kick off the build", "ship it").
+  /\b(?:start|starts|starting|kick off|kicks off|fire up|spin up|boot up|boot)\s+(?:(?:the|my|this|that|a|an|our)\s+)?(?:[\w'-]+\s+)?(?:server|servers|build|builds|app|application|service|services|process|tests?|suite|deployment|deploy|container|containers|vm|machine|script|job|jobs|pipeline|program|installer|update|upgrade|backup|sync|upload|download)\b/,
+  /\bship (?:it|this|that|the (?:build|release|app|code|update))\b/,
   // "kill the agent" is an agent stop (authz#2), so kill and terminate refuse only when no agent or mission is named.
   /\b(?:kill|terminate)\s+(?!(?:(?:the|my|this|that|a|an)\s+)?(?:[\w'-]+\s+)?(?:agents?|missions?|tasks?)\b)\S/,
   /\b(?:build|test|deploy|compile)\s+(?:the|my|this|that)\s+(?:project|repo|repository|app|code|server|tests?|suite|package|machine|service|computer)\b/,
@@ -101,7 +110,7 @@ const STOP_NAMED = /^(?:cancel|abort|kill|terminate)\s+(?:(?:the|my|this|that|a|
 const STOP_ORDINAL = /^(?:cancel|abort|kill|terminate)\s+(?:(?:the|my)\s+)?((?:first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th|one|two|three|four|five|number (?:one|two|three|four|five))\b.*)$/;
 /** Another cancel object ("cancel the upload") is not a voice action; a cancel of a pending pause or proposal is. */
 const CANCEL_OBJECT = /^(?:cancel|abort|kill|terminate)\s+\S/;
-const CANCEL_OK_OBJECT = /^(?:cancel|abort|kill|terminate)\s+(?:(?:the|my|this|that)\s+)?(?:proposal|pause|confirmation|it|that|this|please|now)\b/;
+const CANCEL_OK_OBJECT = /^(?:cancel|abort|kill|terminate)\s+(?:(?:the|my|this|that)\s+)?(?:(?:pending|current|active|last)\s+)?(?:proposal|pause|confirmation|request to pause|it|that|this|please|now)\b/;
 
 /** The object text of a stop alias ("the research agent" gives "research "), or null when the utterance is not one. */
 function stopRest(normalized: string): string | null {
@@ -116,7 +125,7 @@ const CONFIRM = /^(?:yes|yeah|yep|yup|confirm|confirmed|do it|go ahead|sure|affi
 const CONFIRM_LEAD = /^(?:yes|yeah|yep|yup|confirm|confirmed|do it|go ahead|sure)\b/;
 /** What may follow a confirm lead-in and still be a confirmation: filler, or the pending pause repeated. Anything else is not. */
 const CONFIRM_TAIL = /^(?:(?:it|that|this|please|now|thanks|thank you|okay|ok|sure|yes|yeah|go|ahead|do it|then|pause|halt)\b[\s,.!?]*)*$/;
-const CANCEL = /^(?:cancel(?:\s+(?:it|that|this|please|now|the (?:proposal|pause|confirmation)))*\s*$|(?:never mind|nevermind|forget it|forget that|no|nope|no thanks|don't|do not)(?=$|[\s,.!?;:]))/;
+const CANCEL = /^(?:cancel(?:\s+(?:it|that|this|please|now|the (?:(?:pending|current|active|last) )?(?:proposal|pause|confirmation)))*\s*$|(?:never mind|nevermind|forget it|forget that|no|nope|no thanks|don't|do not)(?=$|[\s,.!?;:]))/;
 
 const CONTROL = /^(pause|resume|continue|stop|halt|unpause)\b\s*(.*)$/;
 const LEAD_YES = /^(?:yes|yeah|yep|sure|ok|okay)[ ,]+(?=(?:pause|resume|continue|stop|halt|unpause)\b)/;

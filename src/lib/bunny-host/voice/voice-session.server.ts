@@ -113,11 +113,16 @@ export class VoiceSessionManager {
   private readyResolve: ((ok: boolean) => void) | null = null;
   private devicesResolve: (() => void) | null = null;
   private relaunching: Promise<void> | null = null;
+  /** The recognizer notice (whisper unavailable, SAPI in use). Non-fatal: it stays on the snapshot until a turn replaces it. */
+  private sttNotice: string | null = null;
   /** containment#0: a worker whose job group is being settled after an exit; a new open waits for it. */
   private settling: Promise<void> | null = null;
   /** Bumped on every open and close: asynchronous control work from an earlier session never speaks into a later one (races#3). */
   private sessionEpoch = 0;
   private closing = false;
+  /** R3-session#2: one close at a time; a second close joins the first instead of racing it. */
+  private closingPromise: Promise<VoiceSnapshot> | null = null;
+  private pendingAtTurn = false;
   private readonly now: () => number;
   private readonly schedule: (fn: () => void, ms: number) => () => void;
   private readonly softBudget: number;
@@ -194,6 +199,8 @@ export class VoiceSessionManager {
 
   async open(mode: VoiceMode = "push_to_talk"): Promise<VoiceSnapshot> {
     if (this.opening) await this.opening.catch(() => undefined);
+    // R3-session#2: an open never interleaves with an in-flight close (which would orphan the new worker).
+    if (this.closingPromise) await this.closingPromise.catch(() => undefined);
     // containment#0: no second worker starts while the previous job group is still being settled.
     if (this.settling) await this.settling;
     if (this.snap.open) {
@@ -233,7 +240,7 @@ export class VoiceSessionManager {
       hostEpoch: this.deps.hostEpoch,
       principal: "workstation",
       mode,
-      error: null,
+      error: this.standingNotice(),
       createdAt: this.now(),
     };
     // H3: the snapshot must carry real device states, so the answer waits (bounded) for the worker's devices report.
@@ -277,7 +284,23 @@ export class VoiceSessionManager {
       this.setError("TIMEOUT", "Voice worker did not become ready in time.");
       return null;
     }
+    // Each launch states its own recognizer: a relaunch without a fallback clears the previous notice.
+    if (worker.sttNotice) this.setSttNotice(worker.sttNotice);
+    else this.sttNotice = null;
     return worker;
+  }
+
+  /** The STT notice as a snapshot error, kept across turn starts so the fallback stays visible while SAPI is in use. */
+  private standingNotice(): { code: "STT_UNAVAILABLE"; message: string } | null {
+    return this.sttNotice ? { code: "STT_UNAVAILABLE", message: this.sttNotice } : null;
+  }
+
+  /** Shows a recognizer notice without changing the session state: the session stays usable on SAPI. */
+  private setSttNotice(message: string) {
+    this.sttNotice = message.slice(0, 300);
+    this.snap.error = this.standingNotice();
+    this.deps.journal("voice.notice", "Voice recognizer notice shown.");
+    this.touch();
   }
 
   private awaitDevices(): Promise<void> {
@@ -300,7 +323,16 @@ export class VoiceSessionManager {
   }
 
   /** Closes the session: abort capture, cancel speech, stop the voice turn's own inference, shut the worker down. */
-  async close(): Promise<VoiceSnapshot> {
+  close(): Promise<VoiceSnapshot> {
+    if (this.closingPromise) return this.closingPromise;
+    const closing = this.doClose().finally(() => {
+      if (this.closingPromise === closing) this.closingPromise = null;
+    });
+    this.closingPromise = closing;
+    return closing;
+  }
+
+  private async doClose(): Promise<VoiceSnapshot> {
     if (this.relaunching) await this.relaunching;
     if (this.settling) await this.settling;
     if (!this.worker && !this.snap.open) return this.snapshot();
@@ -392,7 +424,7 @@ export class VoiceSessionManager {
     this.snap.answerSource = null;
     this.snap.route = null;
     this.snap.level = null;
-    this.snap.error = null;
+    this.snap.error = this.standingNotice();
     this.setState("ARMING");
     this.tryWorker({
       op: "capture.start",
@@ -478,7 +510,7 @@ export class VoiceSessionManager {
     const turn = this.newTurn("typed");
     this.snap.timing = emptyTiming(turn, this.now());
     this.snap.partial = null;
-    this.snap.error = null;
+    this.snap.error = this.standingNotice();
     this.rememberFinal(turn);
     this.settleForTypedTurn();
     this.acceptFinal(trimmed, turn);
@@ -565,6 +597,9 @@ export class VoiceSessionManager {
     // authz#0: the SENSITIVE classification runs before a pending clarification may consume the final. A clarification
     // answer is then taken only for an exact candidate name or a bare ordinal (see pickCandidate).
     const intent = classifyTranscript(text, { proposalPending: this.voiceConfirmable() });
+    // R3-session#1: whether anything was pending is decided before a clarification is consumed, so a bare "cancel"
+    // that drops a pending name choice truthfully says it was cancelled.
+    this.pendingAtTurn = !!this.snap.proposal || !!this.clarification || !!this.snap.clarification;
     if (intent.kind === "sensitive_refused") this.clearClarification();
     else if (this.resolveClarification(text, turn)) return;
     if ((intent.kind === "agent_control" || intent.kind === "confirm") && confidence < VOICE_LIMITS.minControlConfidence) {
@@ -656,7 +691,7 @@ export class VoiceSessionManager {
         return;
       case "cancel": {
         // authz#2: "Okay, cancelled." is spoken only when something was pending; a bare cancel with nothing pending says so.
-        const pending = !!this.snap.proposal || !!this.snap.clarification;
+        const pending = this.pendingAtTurn || !!this.snap.proposal || !!this.snap.clarification;
         this.snap.proposal = null;
         this.clarification = null;
         this.snap.clarification = null;
@@ -1061,6 +1096,8 @@ export class VoiceSessionManager {
       case "bye":
         return this.onWorkerExit(this.worker, null);
       case "error":
+        // A recognizer that failed to load after ready is a notice, not a session failure: the worker keeps running on SAPI.
+        if (event.code === "STT_UNAVAILABLE") return this.setSttNotice(event.message);
         return this.setError(event.code, event.message);
       case "speak.cancelled":
         return this.onCancelReceipt(event);

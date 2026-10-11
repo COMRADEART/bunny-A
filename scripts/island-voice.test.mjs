@@ -194,7 +194,7 @@ const hostHttpPath = join(root, 'src', 'lib', 'bunny-host', 'http.server.ts');
 test('R1-races#1 R1-truth#0 the on-screen Confirm and Mute send the keys the Host reads (proposalId, on)', () => {
   const host = read(hostHttpPath);
   assert.match(host, /typeof data\.proposalId === "string" \? data\.proposalId : ""/);
-  assert.match(host, /"voice\.mute":\s*return voice\.mute\(data\.on === true\)/);
+  assert.match(host, /"voice\.mute":[\s\S]{0,240}?return voice\.mute\(data\.muted === true \|\| data\.on === true\)/);
   const model = read(modelPath);
   assert.match(model, /confirm: \(proposalId: string\): \{ proposalId: string \} => \(\{ proposalId \}\)/);
   assert.match(model, /mute: \(on: boolean\): \{ on: boolean \} => \(\{ on \}\)/);

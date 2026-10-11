@@ -1,5 +1,6 @@
 // Bunny voice worker (M-A-3 T10). Protocol: src/lib/bunny-host/voice/voice-protocol.ts (bunny-voice/1).
-// C# 5 only (csc v4). Local Windows components only: winmm, Core Audio, System.Speech (SAPI). No network.
+// C# 5 only (csc v4). Local Windows components only: winmm, Core Audio, System.Speech (SAPI), and the optional
+// whisper.cpp runtime behind bunny-whisper-shim.dll (--stt whisper). No network.
 // Fixture flags (--input-*, --output null, --fixture-pace) are test-only; the Host never passes them.
 using System;
 using System.Collections;
@@ -1010,6 +1011,7 @@ internal sealed class Vad
 
     public bool InSpeech { get { return inSpeech; } }
     public bool SawOnset { get { return onset; } }
+    public int SpeechMs { get { return speechMs; } }
     public bool HighEnergy { get { return totalMs > 0 && highMs * 2 >= totalMs; } }
     public double Threshold { get { return Math.Max(floor * 3.0, MinThreshold); } }
 
@@ -1128,6 +1130,150 @@ internal static class StopDecision
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// whisper.cpp engine (--stt whisper). Native surface: bunny-whisper-shim.dll (native/voice/whisper-shim.c), staged
+// next to the pinned whisper.dll, ggml.dll and ggml-base.dll. Local only: no network, no GPU, no file writes.
+// ---------------------------------------------------------------------------------------------------------------
+internal static class WhisperNative
+{
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] public static extern bool SetDllDirectoryW(string path);
+    [DllImport("bunny-whisper-shim.dll", CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr bws_init(byte[] modelUtf8, int threads);
+    [DllImport("bunny-whisper-shim.dll", CallingConvention = CallingConvention.Cdecl)] public static extern int bws_transcribe(IntPtr ctx, float[] pcm, int nSamples, byte[] outUtf8, int outCap, out float confidence, out float noSpeechProb);
+    [DllImport("bunny-whisper-shim.dll", CallingConvention = CallingConvention.Cdecl)] public static extern void bws_free(IntPtr ctx);
+    [DllImport("bunny-whisper-shim.dll", CallingConvention = CallingConvention.Cdecl)] public static extern IntPtr bws_version();
+}
+
+internal sealed class WhisperResult
+{
+    public int Code;
+    public string Text;
+    public float Confidence;
+    public float NoSpeechProb;
+}
+
+// One loaded model. whisper contexts are not re-entrant, so every decode takes decodeGate (one at a time, process-wide).
+internal sealed class WhisperEngine
+{
+    public const string EngineName = "whisper.cpp v1.9.4";
+    public const string ShimName = "bunny-whisper-shim.dll";
+    static readonly object decodeGate = new object();
+    IntPtr ctx;
+
+    public string Recognizer { get; private set; }
+    public long LoadMs { get; private set; }
+
+    WhisperEngine() { }
+
+    // Loads the model once. Returns null with a reason when anything is missing or fails to load (the worker then uses SAPI).
+    public static WhisperEngine Load(string runtimeDir, string modelPath, int threads, out string error)
+    {
+        error = null;
+        if (string.IsNullOrEmpty(runtimeDir) || string.IsNullOrEmpty(modelPath)) { error = "runtime directory and model path are required"; return null; }
+        if (!Path.IsPathRooted(runtimeDir) || !Path.IsPathRooted(modelPath)) { error = "runtime directory and model path must be absolute"; return null; }
+        if (!Directory.Exists(runtimeDir)) { error = "runtime directory is missing"; return null; }
+        if (!File.Exists(Path.Combine(runtimeDir, ShimName))) { error = ShimName + " is missing from the runtime directory"; return null; }
+        if (!File.Exists(modelPath)) { error = "model file is missing"; return null; }
+        try
+        {
+            // Must run before the first P/Invoke into the shim, so the shim and its whisper/ggml dependencies resolve here.
+            if (!WhisperNative.SetDllDirectoryW(runtimeDir)) { error = "runtime directory could not be added to the DLL search path"; return null; }
+            byte[] path = Encoding.UTF8.GetBytes(modelPath + "\0");
+            Stopwatch sw = Stopwatch.StartNew();
+            IntPtr c = WhisperNative.bws_init(path, threads);
+            sw.Stop();
+            if (c == IntPtr.Zero) { error = "model did not load"; return null; }
+            WhisperEngine e = new WhisperEngine();
+            e.ctx = c;
+            e.Recognizer = Path.GetFileNameWithoutExtension(modelPath);
+            e.LoadMs = sw.ElapsedMilliseconds;
+            return e;
+        }
+        catch (DllNotFoundException) { error = "runtime DLL could not be loaded"; }
+        catch (EntryPointNotFoundException) { error = "runtime ABI does not match the shim"; }
+        catch (BadImageFormatException) { error = "runtime DLL architecture does not match"; }
+        catch (Exception ex) { error = "runtime load failed: " + ex.GetType().Name; }
+        return null;
+    }
+
+    // pcm: 16 kHz mono float32, n samples. Never throws for a native failure: the result carries a negative Code.
+    public WhisperResult Transcribe(float[] pcm, int n)
+    {
+        WhisperResult r = new WhisperResult();
+        r.Code = -1;
+        r.Text = "";
+        r.Confidence = 0f;
+        r.NoSpeechProb = 1f;
+        if (ctx == IntPtr.Zero || pcm == null || n <= 0) return r;
+        byte[] outBuf = new byte[8192];
+        try
+        {
+            lock (decodeGate)
+            {
+                float conf;
+                float nsp;
+                int rc = WhisperNative.bws_transcribe(ctx, pcm, n, outBuf, outBuf.Length, out conf, out nsp);
+                r.Code = rc;
+                r.Confidence = conf;
+                r.NoSpeechProb = nsp;
+                if (rc >= 0) r.Text = Encoding.UTF8.GetString(outBuf, 0, Math.Min(rc, outBuf.Length - 1));
+            }
+        }
+        finally
+        {
+            Array.Clear(outBuf, 0, outBuf.Length);
+        }
+        return r;
+    }
+}
+
+// Accepts or rejects one whisper decode. Pure: no devices, no native calls.
+internal static class WhisperGate
+{
+    public const float NoSpeechMax = 0.6f;
+    public const int HallucinationMaxSpeechMs = 1000;
+    // Phrases whisper emits on silence. A short utterance that is only one of these is never a command.
+    static readonly string[] Hallucinations = { "you", "thank you", "thanks for watching", "thank you for watching", "bye", "bye bye", "the end" };
+
+    // null: accepted. Otherwise the stt.none reason.
+    public static string Reject(WhisperResult r, long speechMs, bool highEnergy)
+    {
+        if (r == null || r.Code < 0) return "rejected";
+        string t = r.Text == null ? "" : r.Text.Trim();
+        if (t.Length == 0) return "no_speech";
+        if (IsBracketed(t)) return t.IndexOf("BLANK", StringComparison.OrdinalIgnoreCase) >= 0 ? "no_speech" : "noise_only";
+        if (r.NoSpeechProb > NoSpeechMax) return "no_speech";
+        string n = Normalize(t);
+        if (n.Length == 0) return "no_speech";
+        if (speechMs < HallucinationMaxSpeechMs && Array.IndexOf(Hallucinations, n) >= 0) return "no_speech";
+        return null;
+    }
+
+    static bool IsBracketed(string t)
+    {
+        return (t[0] == '[' && t[t.Length - 1] == ']') || (t[0] == '(' && t[t.Length - 1] == ')');
+    }
+
+    public static string Normalize(string text)
+    {
+        StringBuilder sb = new StringBuilder();
+        bool space = false;
+        foreach (char ch in text.ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(ch))
+            {
+                if (space && sb.Length > 0) sb.Append(' ');
+                space = false;
+                sb.Append(ch);
+            }
+            else if (char.IsWhiteSpace(ch) || ch == '-')
+            {
+                space = true;
+            }
+        }
+        return sb.ToString();
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // One capture turn: capture thread (device -> pipe + VAD + level) and a finalize thread (recognizer flush).
 // ---------------------------------------------------------------------------------------------------------------
 internal sealed class CaptureTurn : IAbandonedRecognizer
@@ -1160,6 +1306,21 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
     long lastEvidenceMono = long.MinValue;
     readonly object evidenceGate = new object();
 
+    // whisper mode only: the bounded utterance buffer (16 kHz mono float32) and its partial/final bookkeeping.
+    // bufGate guards wbuf, wlen, wSealed, wPartialInFlight, wLastPartialLen, wPeakSamples and speechMsPub.
+    readonly WhisperEngine whisper;
+    readonly object bufGate = new object();
+    float[] wbuf;
+    int wlen;
+    long wPeakSamples;
+    bool wSealed;
+    bool wPartialInFlight;
+    int wLastPartialLen;
+    int speechMsPub;
+    bool abortRequested;
+    const int PartialMinSamples = 16000;   // 1 s of audio before the first interim decode
+    const int PartialEverySamples = 19200; // 1.2 s between interim decodes
+
     public CaptureTurn(string turn, long gen, VoiceDevice device, bool vad, long maxBytes)
     {
         Turn = turn;
@@ -1169,6 +1330,14 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         MaxBytes = maxBytes;
     }
 
+    // whisper engine: maxBytes is maxMs * 32 bytes, so the sample bound is maxBytes / 2 (maxMs * 16 samples).
+    public CaptureTurn(string turn, long gen, VoiceDevice device, bool vad, long maxBytes, WhisperEngine engine)
+        : this(turn, gen, device, vad, maxBytes)
+    {
+        whisper = engine;
+        if (engine != null) wbuf = new float[maxBytes / 2];
+    }
+
     // Test seam (selftest only): runs on the new engine before the grammar loads, so a fault here exercises the teardown.
     internal Action<SpeechRecognitionEngine> FaultInjectForTest;
 
@@ -1176,6 +1345,7 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
     // recognizer that never started holds no completion the abandon ledger could wait for, so it cannot be ledgered.
     public void StartRecognizer(RecognizerInfo info)
     {
+        if (whisper != null) return; // whisper turns decode the buffer at finalize; there is no SAPI engine
         engine = info != null ? new SpeechRecognitionEngine(info) : new SpeechRecognitionEngine(new CultureInfo("en-US"));
         try
         {
@@ -1236,7 +1406,11 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
     {
         lock (gate)
         {
-            if (closed) return;
+            if (closed)
+            {
+                if (whisper != null && (reason == "abort" || reason == "mute" || reason == "shutdown")) abortRequested = true;
+                return;
+            }
             closed = true;
             stopReason = reason;
             aborted = reason != "end" && reason != "max" && reason != "vad";
@@ -1297,7 +1471,15 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
                 int ev = vad.Feed(rms, MsSinceEvidence());
                 PublishOnset(vad);
                 agc.Apply(frame, fed, rms, vad.InSpeech);
-                Pipe.Push(fed, 0, Consts.FrameBytes);
+                if (whisper != null)
+                {
+                    AppendWhisper(fed);
+                    MaybeStartPartial(vad);
+                }
+                else
+                {
+                    Pipe.Push(fed, 0, Consts.FrameBytes);
+                }
                 if (ev == Vad.SpeechStart)
                 {
                     Out.Emit(Out.Ev("vad", "turn", Turn, "gen", Gen, "state", "speech_start"));
@@ -1350,10 +1532,11 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
             lock (Program.Gate)
             {
                 if (Program.Active == this) Program.Active = null;
+                if (whisper != null) Program.Finalizing = this;
             }
             string reason;
             lock (gate) { reason = stopReason ?? "error"; }
-            Guard.Emit(Out.Ev("capture.stopped", "turn", Turn, "gen", Gen, "reason", reason, "bufferedPeakBytes", Pipe.PeakUnread));
+            Guard.Emit(Out.Ev("capture.stopped", "turn", Turn, "gen", Gen, "reason", reason, "bufferedPeakBytes", BufferedPeakBytes()));
         }
     }
 
@@ -1402,6 +1585,7 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         {
             sawOnset = v.SawOnset;
             highEnergy = v.HighEnergy;
+            speechMsPub = v.SpeechMs;
         }
     }
 
@@ -1425,6 +1609,138 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         try { e.Dispose(); } catch (Exception) { }
     }
 
+    // whisper: appends one fed (AGC'd) frame to the bounded utterance buffer. Samples past the bound are dropped.
+    void AppendWhisper(byte[] fedFrame)
+    {
+        lock (bufGate)
+        {
+            if (wSealed || wbuf == null) return;
+            for (int i = 0; i + 1 < Consts.FrameBytes; i += 2)
+            {
+                if (wlen >= wbuf.Length) break;
+                short s = (short)(fedFrame[i] | (fedFrame[i + 1] << 8));
+                wbuf[wlen++] = s / 32768f;
+            }
+            if (wlen > wPeakSamples) wPeakSamples = wlen;
+        }
+    }
+
+    // whisper: an interim decode of the utterance so far. Only after a VAD onset, at most one in flight, about every
+    // 1.2 s once 1 s of audio exists. Each partial is a genuine decode of the buffered audio, never fabricated.
+    void MaybeStartPartial(Vad v)
+    {
+        float[] copy;
+        int n;
+        lock (bufGate)
+        {
+            if (wPartialInFlight || wSealed || wbuf == null || !v.SawOnset || StopFlag) return;
+            if (wlen < PartialMinSamples || wlen - wLastPartialLen < PartialEverySamples) return;
+            wPartialInFlight = true;
+            wLastPartialLen = wlen;
+            n = wlen;
+            copy = new float[n];
+            Array.Copy(wbuf, copy, n);
+        }
+        Thread t = new Thread(() => Guard.Run(() => PartialDecode(copy, n), e => FinishPartial()));
+        t.IsBackground = true;
+        t.Start();
+    }
+
+    void PartialDecode(float[] pcm, int n)
+    {
+        try
+        {
+            WhisperResult r = whisper.Transcribe(pcm, n);
+            lock (gate)
+            {
+                string rej = WhisperGate.Reject(r, speechMsPub, highEnergy);
+                string text = r.Text == null ? "" : r.Text.Trim();
+                if (closed || terminal || abortRequested) return;
+                if (rej != null || text.Length == 0 || text == lastPartial) return;
+                lastPartial = text;
+                Out.Emit(Out.Ev("stt.partial", "turn", Turn, "gen", Gen, "text", Out.Trunc(text, 2000)));
+            }
+        }
+        finally
+        {
+            Array.Clear(pcm, 0, pcm.Length);
+            FinishPartial();
+        }
+    }
+
+    void FinishPartial()
+    {
+        lock (bufGate) { wPartialInFlight = false; }
+    }
+
+    long BufferedPeakBytes()
+    {
+        if (whisper == null) return Pipe.PeakUnread;
+        lock (bufGate) { return wPeakSamples * 2; }
+    }
+
+    // whisper: the final is one full decode of the bounded utterance, on the finalize thread (never the command loop).
+    // The buffer is sealed first, so no audio joins after the decision, and it is zeroed on every path.
+    void FinalizeWhisper()
+    {
+        Thread cap = captureThread;
+        if (cap != null) cap.Join(2000);
+        float[] pcm;
+        int n;
+        lock (bufGate)
+        {
+            wSealed = true;
+            pcm = wbuf;
+            n = wlen;
+            wbuf = null;
+            wlen = 0;
+        }
+        bool onset;
+        bool high;
+        bool stopped;
+        long speechMs;
+        lock (gate)
+        {
+            onset = sawOnset;
+            high = highEnergy;
+            speechMs = speechMsPub;
+            stopped = aborted || abortRequested;
+        }
+        WhisperResult r = null;
+        try
+        {
+            if (!stopped && onset && n > 0 && pcm != null) r = whisper.Transcribe(pcm, n);
+        }
+        catch (Exception e)
+        {
+            Out.Diag("whisper decode: " + e.GetType().Name);
+            r = null;
+        }
+        finally
+        {
+            if (pcm != null) Array.Clear(pcm, 0, pcm.Length);
+        }
+
+        lock (gate)
+        {
+            terminal = true;
+            string decision;
+            if (aborted || abortRequested) decision = "aborted";
+            else if (!onset) decision = high ? "noise_only" : "no_speech";
+            else if (r == null) decision = "rejected";
+            else decision = WhisperGate.Reject(r, speechMs, high) ?? "final";
+            terminalEmitted = true;
+            if (decision == "final")
+            {
+                Out.Emit(Out.Ev("stt.final", "turn", Turn, "gen", Gen, "text", Out.Trunc(r.Text.Trim(), 2000), "confidence", (double)r.Confidence));
+            }
+            else
+            {
+                Out.Emit(Out.Ev("stt.none", "turn", Turn, "gen", Gen, "reason", decision));
+            }
+        }
+    }
+
     void FinalizeMain()
     {
         Guard.Run(FinalizeBody, FaultFinalize);
@@ -1432,6 +1748,11 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
 
     void FinalizeBody()
     {
+        if (whisper != null)
+        {
+            FinalizeWhisper();
+            return;
+        }
         Thread cap = captureThread;
         if (cap != null) cap.Join(2000);
         bool done = false;
@@ -1654,7 +1975,13 @@ internal sealed class Speaker
 
     public bool IsBusy()
     {
-        lock (gate) { return queue.Count > 0; }
+        // Busy means audio that can still be heard. A cancelled in-flight chunk stays in the queue until the playback thread
+        // retires it, but Cancel has already reset the device (barge-in): it must not refuse the next capture (live B03).
+        lock (gate)
+        {
+            foreach (Chunk c in queue) if (!c.Cancelled) return true;
+            return false;
+        }
     }
 
     public void Enqueue(string turn, long gen, long seq, string text, uint device, string voice)
@@ -2547,6 +2874,8 @@ internal static class Program
 {
     public static readonly object Gate = new object();
     public static CaptureTurn Active;
+    // The whisper turn whose final decode is still running. capture.abort reaches it after its capture has ended.
+    public static CaptureTurn Finalizing;
     public static bool Muted;
     static Speaker speaker;
     static readonly CancelMeter meter = new CancelMeter(since => Endpoints.PollRenderSilence(since));
@@ -2558,6 +2887,12 @@ internal static class Program
     static string wavPath;
     static bool nullOutput;
     static double pace = 1.0;
+    static string sttEngine = "sapi";
+    static string whisperDir;
+    static string whisperModel;
+    static int whisperThreads = 4;
+    static WhisperEngine whisperEngine;
+    static string whisperError;
 
     static Dictionary<string, object> Ev(string name, params object[] kv) { return Out.Ev(name, kv); }
 
@@ -2573,6 +2908,23 @@ internal static class Program
             else if (a == "--input-noise") inputKind = "noise";
             else if (a == "--input-wav" && i + 1 < args.Length) { inputKind = "wav"; wavPath = args[++i]; }
             else if (a == "--output" && i + 1 < args.Length) nullOutput = args[++i] == "null";
+            else if (a == "--stt" && i + 1 < args.Length)
+            {
+                sttEngine = args[++i];
+                if (sttEngine != "sapi" && sttEngine != "whisper") { Console.Error.WriteLine("unknown --stt engine"); return 2; }
+            }
+            else if (a == "--whisper-dir" && i + 1 < args.Length) whisperDir = args[++i];
+            else if (a == "--whisper-model" && i + 1 < args.Length) whisperModel = args[++i];
+            else if (a == "--whisper-threads" && i + 1 < args.Length)
+            {
+                int th;
+                if (!int.TryParse(args[++i], NumberStyles.None, CultureInfo.InvariantCulture, out th) || th < 1 || th > 64)
+                {
+                    Console.Error.WriteLine("invalid --whisper-threads");
+                    return 2;
+                }
+                whisperThreads = th;
+            }
             else if (a == "--fixture-pace" && i + 1 < args.Length)
             {
                 pace = double.Parse(args[++i], CultureInfo.InvariantCulture);
@@ -2616,6 +2968,14 @@ internal static class Program
             Out.Diag("stt inventory: " + e.GetType().Name);
         }
 
+        if (sttEngine == "whisper")
+        {
+            string err;
+            whisperEngine = WhisperEngine.Load(whisperDir, whisperModel, whisperThreads, out err);
+            if (whisperEngine == null) whisperError = err;
+            else Out.Diag("whisper model loaded in " + whisperEngine.LoadMs + " ms");
+        }
+
         if (inputKind == "synth")
         {
             if (synth == null) { Console.Error.WriteLine("fixture synth requires SAPI"); return 2; }
@@ -2649,9 +3009,10 @@ internal static class Program
         Out.Emit(Ev("ready",
             "protocol", "bunny-voice/1",
             "pid", Process.GetCurrentProcess().Id,
-            "stt", Out.Obj("engine", recognizer != null ? "Windows SAPI 5.4 System.Speech" : null, "recognizer", recognizer != null ? recognizer.Id : null,
-                "culture", recognizer != null ? recognizer.Culture.Name : null, "local", true),
+            "stt", SttReady(),
             "tts", Out.Obj("engine", synth != null ? "Windows SAPI 5.4 System.Speech" : null, "voices", voiceNames, "local", true)));
+
+        if (whisperError != null) Out.Error("STT_UNAVAILABLE", "whisper unavailable: " + whisperError + "; using Windows SAPI");
 
         Thread poll = new Thread(PollDevices);
         poll.IsBackground = true;
@@ -2696,6 +3057,16 @@ internal static class Program
         Shutdown();
         Out.Emit(Ev("bye"));
         return 0;
+    }
+
+    static Dictionary<string, object> SttReady()
+    {
+        if (whisperEngine != null)
+        {
+            return Out.Obj("engine", WhisperEngine.EngineName, "recognizer", whisperEngine.Recognizer, "culture", "en", "local", true);
+        }
+        return Out.Obj("engine", recognizer != null ? "Windows SAPI 5.4 System.Speech" : null, "recognizer", recognizer != null ? recognizer.Id : null,
+            "culture", recognizer != null ? recognizer.Culture.Name : null, "local", true);
     }
 
     static void Shutdown()
@@ -2746,7 +3117,7 @@ internal static class Program
                 case "capture.abort":
                     {
                         CaptureTurn t;
-                        lock (Gate) { t = Active; }
+                        lock (Gate) { t = Active ?? Finalizing; }
                         if (t != null && Num(cmd, "gen", -1) >= t.Gen) t.Finish("abort");
                         return true;
                     }
@@ -2912,7 +3283,10 @@ internal static class Program
                 CaptureError(turn, gen, f.Code, f.Message);
                 return;
             }
-            CaptureTurn t = new CaptureTurn(turn, gen, info, endpointing == "vad", maxMs * Consts.BytesPerMs);
+            WhisperEngine engine = whisperEngine;
+            CaptureTurn t = engine != null
+                ? new CaptureTurn(turn, gen, info, endpointing == "vad", maxMs * Consts.BytesPerMs, engine)
+                : new CaptureTurn(turn, gen, info, endpointing == "vad", maxMs * Consts.BytesPerMs);
             try
             {
                 t.StartRecognizer(recognizer);
