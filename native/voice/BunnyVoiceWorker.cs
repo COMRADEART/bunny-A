@@ -997,8 +997,11 @@ internal sealed class Vad
     public const double MinThreshold = 0.0006;
     // Live finding (Part B, whisper mode): room noise that rose after the 400 ms calibration stayed above floor*3 between
     // words, so no end of speech was ever seen and turns ran to the 30 s cap. Inside speech, a frame is also silent when it
-    // is below EndPeakFraction of the utterance's smoothed speech peak (capped, so one loud transient cannot end a turn).
-    public const double EndPeakFraction = 0.08, EndPeakCap = 0.004;
+    // is below EndPeakFraction of the utterance's smoothed speech peak. R4: the cap is 0.002, so soft speech (>= 0.002)
+    // after a loud section or a click is never counted as silence, and the peak decays (~7 s half-life) so one loud moment
+    // does not set the threshold for the rest of a long turn. Limit (disclosed): a speaker whose peak is less than ~12x the
+    // room noise still never reaches an energy end; the turn then ends on release, a second tap, or the 30 s cap.
+    public const double EndPeakFraction = 0.08, EndPeakCap = 0.002, PeakDecay = 0.998;
     const int CalibrationFrames = 20;
     int frames;
     double floor;
@@ -1073,17 +1076,13 @@ internal sealed class Vad
         }
         // ~100 ms exponential smoothing: the peak follows syllables, not single-frame clicks.
         smooth = smooth * 0.8 + rms * 0.2;
-        if (smooth > speechPeak) speechPeak = smooth;
+        speechPeak = Math.Max(smooth, speechPeak * PeakDecay);
         double endThreshold = Math.Max(threshold, Math.Min(speechPeak * EndPeakFraction, EndPeakCap));
-        if (rms > endThreshold)
-        {
-            speechMs += Consts.FrameMs;
-            silenceMs = 0;
-        }
-        else
-        {
-            silenceMs += Consts.FrameMs;
-        }
+        // R4: speechMs keeps its original meaning (frames above the onset threshold); it feeds the 250 ms end gate and the
+        // whisper hallucination guard. Only the silence clock uses the peak-relative end threshold.
+        if (rms > threshold) speechMs += Consts.FrameMs;
+        if (rms > endThreshold) silenceMs = 0;
+        else silenceMs += Consts.FrameMs;
         if (silenceMs >= SilenceEndMs && msSinceEvidence >= HypothesisHoldMs)
         {
             inSpeech = false;
@@ -2813,7 +2812,7 @@ internal static class SelfTest
         r["noisyTailEndFrame"] = noisyEnd;
 
         // A single loud click (0.5 for one frame) inside steady soft speech at 0.006 must not end the turn: uncapped, 8% of
-        // the clicked smoothed peak would be ~0.0084; the cap holds the end threshold at 0.004, below the speech.
+        // the clicked smoothed peak would be ~0.0084; the cap holds the end threshold at 0.002, below the speech.
         Vad click = new Vad();
         int clickEnd = -1;
         for (int f = 0; f < 200; f++)
@@ -2822,6 +2821,17 @@ internal static class SelfTest
             if (click.Feed(rms, int.MaxValue) == Vad.SpeechEnd && clickEnd < 0) clickEnd = f;
         }
         r["clickEndFrame"] = clickEnd;
+
+        // R4 T10-VAD-1: speech at 0.006, a loud section at 0.08, then 3 s of soft speech at 0.003, then silence. The soft
+        // span (frames 75..224) must not end the turn; the end comes ~900 ms into the true silence (from frame 225).
+        Vad soft = new Vad();
+        int softEnd = -1;
+        for (int f = 0; f < 400; f++)
+        {
+            double rms = f < 25 ? 0.0002 : (f < 50 ? 0.006 : (f < 75 ? 0.08 : (f < 225 ? 0.003 : 0.00001)));
+            if (soft.Feed(rms, int.MaxValue) == Vad.SpeechEnd && softEnd < 0) softEnd = f;
+        }
+        r["softAfterLoudEndFrame"] = softEnd;
 
         // Terminal decisions.
         r["rejectedOnly"] = StopDecision.Terminal(false, true, false, 0, true, false);

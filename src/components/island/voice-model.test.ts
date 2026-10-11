@@ -562,3 +562,10 @@ test("V27 T10: speech into a muted or zero-volume Windows output is disclosed as
   assert.equal(outputNote(snap({ ...base, present: false, muted: true })), null);
   assert.equal(outputNote(snap(null)), null);
 });
+
+test("T10 R4 BUSY_TRANSCRIBING has its own retry copy, never the device-busy wording", () => {
+  const copy = voiceErrorMessage("BUSY_TRANSCRIBING");
+  assert.match(copy, /try again/i);
+  assert.notEqual(copy, voiceErrorMessage("DEVICE_BUSY"));
+  assert.notEqual(copy, "Voice hit an error.");
+});

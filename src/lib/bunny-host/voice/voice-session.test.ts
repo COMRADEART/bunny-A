@@ -1506,3 +1506,34 @@ test("T10 Part-B the close receipt names who ended the session; unknown labels b
   const odd = await h.session.close("<script>");
   assert.equal(odd.lastClose?.source, "client");
 });
+
+test("T10 R4 H-RELAUNCH-WAKE a press waiting on transcription survives the idle relaunch its wake triggers", async () => {
+  const h = setup({ softBudget: 40 });
+  await h.open();
+  await h.session.listenStart("hotkey");
+  const first = h.session.snapshot().turnId!;
+  await h.flush();
+  h.session.listenEnd(first);
+  assert.equal(h.session.snapshot().state, "TRANSCRIBING");
+  const firstWorker = h.worker;
+  const pending = h.session.listenStart("hotkey");
+  await h.flush();
+  // An empty final settles to IDLE: the wake and the soft-budget relaunch happen in the same tick.
+  firstWorker.emit({ ev: "stt.none", turn: first, gen: h.session.snapshot().generation, reason: "no_speech" });
+  for (let i = 0; i < 6; i++) await h.flush();
+  const snap = await pending;
+  assert.notEqual(snap.error?.code, "INTERNAL", "the press is not refused while the relaunch runs");
+  assert.equal(h.workers.length, 2, "the fresh worker was launched");
+  assert.equal(h.worker.ofOp("capture.start").length, 1, "the waiting press captures on the fresh worker");
+  assert.equal(snap.state, "ARMING");
+});
+
+test("T10 R4 a second close while one is in flight still journals its own label", async () => {
+  const h = setup();
+  await h.open();
+  const a = h.session.close("island_exit");
+  const b = h.session.close("desktop_button");
+  await Promise.all([a, b]);
+  assert.ok(h.journal.some(([, detail]) => detail.includes("desktop_button")));
+  assert.equal(h.session.snapshot().lastClose?.source, "island_exit");
+});

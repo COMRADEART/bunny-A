@@ -327,8 +327,13 @@ export class VoiceSessionManager {
 
   /** Closes the session: abort capture, cancel speech, stop the voice turn's own inference, shut the worker down. */
   close(source = "client"): Promise<VoiceSnapshot> {
-    if (this.closingPromise) return this.closingPromise;
-    const closing = this.doClose(/^[a-z_]{1,24}$/.test(source) ? source : "client").finally(() => {
+    const label = /^[a-z_]{1,24}$/.test(source) ? source : "client";
+    if (this.closingPromise) {
+      // R4: a second close joins the first; its own label is still journaled, so the receipt never hides a caller.
+      this.deps.journal("voice.session_closed", `Voice close also requested (${label}) while a close was in flight.`);
+      return this.closingPromise;
+    }
+    const closing = this.doClose(label).finally(() => {
       if (this.closingPromise === closing) this.closingPromise = null;
     });
     this.closingPromise = closing;
@@ -422,6 +427,9 @@ export class VoiceSessionManager {
     if (this.fsm.state === "TRANSCRIBING") {
       const epoch = this.sessionEpoch;
       await this.waitTranscribed(VOICE_LIMITS.transcribeWaitMs);
+      // R4 H-RELAUNCH-WAKE: the settle that woke this press may have started an idle relaunch (worker handle absent while
+      // it runs). The relaunch gate is re-run here, exactly as at the top of listenStart, before the press is judged.
+      if (epoch === this.sessionEpoch && (this.relaunching || this.needsRelaunch())) await this.relaunchIfIdle();
       if (this.closing || epoch !== this.sessionEpoch || !this.snap.open || !this.worker) return this.refuse("INTERNAL", "Voice is not open.");
       if (this.snap.muted) return this.refuse("MUTED", "Microphone is muted; capture was not started.");
       if (this.fsm.state === "TRANSCRIBING") return this.refuse("BUSY_TRANSCRIBING", "The previous turn is still being transcribed. Try again in a moment.");

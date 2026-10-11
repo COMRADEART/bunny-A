@@ -27,13 +27,14 @@ const FILLER = /^(?:(?:um+|uh+|hmm+|er+|ah+|like|so|well|please|hey|ok|okay)\b[\
  */
 const INTERRUPT_LEAD = /^(?:stop|wait|hold on|hang on|sorry|actually|no|nope)\b[\s,.!?:;-]*/;
 const NOT_A_QUESTION_AFTER_LEAD = /^what (?:you(?:'re| are)?|u)\b/;
+const NEGATION_LEAD = /^(?:no|nope)\b/;
 
-export function normalizeTranscript(text: string): string {
+export function normalizeTranscript(text: string, stripLead = true): string {
   let t = text.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim();
   for (let i = 0; i < 3; i++) {
     const before = t;
     t = t.replace(WAKE, "").replace(FILLER, "").trim();
-    const lead = INTERRUPT_LEAD.exec(t);
+    const lead = stripLead ? INTERRUPT_LEAD.exec(t) : null;
     if (lead) {
       const rest = t.slice(lead[0].length).trim();
       if (rest && QUESTION.test(rest) && !NOT_A_QUESTION_AFTER_LEAD.test(rest)) t = rest;
@@ -245,6 +246,9 @@ export function classifyTranscript(
   // V41: a free-form redirect of a running agent is explicitly unsupported; authority claims inside it are still refused.
   if (!QUESTION.test(normalized) && REDIRECT.some((re) => re.test(normalized)) && !AUTHORITY.some((re) => re.test(normalized) || re.test(raw))) return make("redirect_unsupported");
   if (isSensitive(normalized) || (!QUESTION.test(normalized) && isSensitive(raw))) return make("sensitive_refused");
+  // R4 D2: with a proposal pending, a turn that opens with a refusal ("No, what is the agent doing?") still cancels it, as
+  // it did before the barge-in lead word was dropped; the question that follows is not answered in that turn.
+  if (options.proposalPending && NEGATION_LEAD.test(normalizeTranscript(transcript, false))) return make("cancel");
   if (options.proposalPending && (CONFIRM.test(normalized) || isConfirmLead(normalized))) return make("confirm");
   const stop = stopRest(normalized);
   if (stop !== null) {

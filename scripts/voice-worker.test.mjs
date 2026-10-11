@@ -505,6 +505,8 @@ test("T10 Part-B endpointing: room noise above the calibrated floor still ends t
   // (0.0016), so 900 ms of "silence" completes at frame 149. Before the fix this never ended (-1, the 30 s cap live).
   assert.equal(r.noisyTailEndFrame, 149);
   assert.equal(r.clickEndFrame, -1, "a single transient must not raise the end threshold above soft speech");
+  // R4 T10-VAD-1: soft speech after a loud section is not silence; the end is ~900 ms into the true silence (frame 225+).
+  assert.ok(r.softAfterLoudEndFrame >= 269 && r.softAfterLoudEndFrame <= 272, `soft speech ended the turn at frame ${r.softAfterLoudEndFrame}`);
 });
 
 test("T10 stop decision: rejected-only recognizer text is stt.none rejected, never a final", { skip }, async () => {

@@ -40,6 +40,8 @@ export function voiceErrorMessage(code: VoiceErrorCode | "WORKER_EXITED" | "WORK
       return "Spoken replies are unavailable. Answers appear as text.";
     case "BUSY_PLAYBACK":
       return "Bunny is speaking. Interrupt first.";
+    case "BUSY_TRANSCRIBING":
+      return "Still working out what you said. Try again in a moment.";
     case "MUTED":
       return "Microphone is muted in Bunny.";
     case "BUFFER_LIMIT":

@@ -336,3 +336,15 @@ test("T10 Part-B a barge-in lead word before a question is dropped; without a qu
   // A lead word never makes a sensitive question acceptable.
   assert.equal(kind("Wait, what is my password?"), kind("what is my password?"));
 });
+
+test("T10 R4 D2 with a proposal pending, a turn opening with no/nope still cancels it", () => {
+  assert.equal(kind("No, what is the agent doing?", true), "cancel");
+  assert.equal(kind("Nope, what is the capital of France?", true), "cancel");
+  assert.equal(kind("No", true), "cancel");
+  // Without a pending proposal the question is answered (the barge-in lead rule).
+  assert.equal(kind("No, what is the agent doing?"), "agent_status");
+  // "now" and "nobody" are not refusals.
+  assert.notEqual(kind("Now what is the agent doing?", true), "cancel");
+  // Sensitive phrasing is still refused first.
+  assert.equal(kind("No, delete the repository", true), "sensitive_refused");
+});
