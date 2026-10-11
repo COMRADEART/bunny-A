@@ -1,3 +1,4 @@
+import { VOICE_ACTIONS } from "./voice/voice-protocol.ts";
 import type { HostEvent, HostSnapshot } from "./contracts.ts";
 import type { OrchTask } from "../orch/types.ts";
 import type { CapabilityRun, MissionStep, MissionView } from "../bunny-missions/types.ts";
@@ -579,19 +580,21 @@ export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
 
 /** Only the fields used by the dashboard cross its command boundary. Private session/capability data stays local. */
 export function dashboardCommand<
-  T extends { snapshot: HostSnapshot; task?: OrchTask; mission?: MissionView; pairCode?: string ;
-    data?: import("../bunny-missions/types.ts").JsonValue;
+  T extends { snapshot?: HostSnapshot; task?: OrchTask; mission?: MissionView; pairCode?: string ;
+    data?: unknown;
     operation?: { id: string; state: "applied" | "refused" | "failed" | "in_progress"; replayed: boolean };
   },
 >(result: T, projectAction?: string) {
-  const snapshot = dashboardSnapshot(result.snapshot);
+  // M-A-3 T10: voice responses carry only {data: VoiceSnapshot} and no dashboard snapshot.
+  const snapshot = result.snapshot ? dashboardSnapshot(result.snapshot) : undefined;
+  const voiceData = VOICE_ACTIONS.has(projectAction ?? "") && result.data !== undefined;
   return {
-    snapshot,
-    ...(result.data === undefined || !["project.list", "project.get", "project.add", "project.create", "project.update", "project.relink", "project.remove", "project.artifact", "project.repository", "project.agent.create", "operation.status"].includes(projectAction ?? "") ? {} : { data: result.data }),
+    ...(snapshot ? { snapshot } : {}),
+    ...(voiceData || (result.data !== undefined && ["project.list", "project.get", "project.add", "project.create", "project.update", "project.relink", "project.remove", "project.artifact", "project.repository", "project.agent.create", "operation.status"].includes(projectAction ?? "")) ? { data: result.data as import("../bunny-missions/types.ts").JsonValue } : {}),
     ...(result.operation ? { operation: result.operation } : {}),
     pairCode: result.pairCode,
-    task: result.task ? snapshot.tasks.find((task) => task.id === result.task!.id) : undefined,
-    mission: result.mission
+    task: result.task && snapshot ? snapshot.tasks.find((task) => task.id === result.task!.id) : undefined,
+    mission: result.mission && snapshot
       ? snapshot.missions?.missions.find((mission) => mission.id === result.mission!.id)
       : undefined,
   };

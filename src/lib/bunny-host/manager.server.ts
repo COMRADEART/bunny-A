@@ -26,6 +26,9 @@ import { markProviderSessionReview, readProviderSessions, reconcileProviderSessi
 import { HostContainment, safeError, type SafeError } from "./failure.server.ts";
 import { ProjectRegistry } from "./project-registry.server.ts";
 import { deviceMayLaunch } from "./device-authority.server.ts";
+import { isRemoteOllamaTag } from "../orch/exec.server.ts";
+
+export type TaskOutputEvent = { text: string } | { done: true; state: string };
 
 const TERMINAL: TaskState[] = ["completed", "failed", "stopped"];
 const TRANSCRIPT_LIMIT = 20 * 1024 * 1024;
@@ -74,6 +77,8 @@ export class TaskManager {
   bus = new EventEmitter();
   /** M-A-3 T9R (DEV-01): direct tasks a paired device approved; their reroutes stay on local tool-free inference. */
   private readonly deviceApproved = new Set<string>();
+  /** M-A-3 T10: voice listens to a task's real token deltas and terminal state. Listeners carry no authority. */
+  private readonly taskOutputListeners = new Map<string, Set<(event: TaskOutputEvent) => void>>();
   instanceId: string = crypto.randomUUID();
   sessions = new Map<string, RunningSession>();
   stopping = new Set<string>();
@@ -363,6 +368,8 @@ export class TaskManager {
       (patch.state !== owned.state || /^task\.(completed|failed|stopped)$/.test(type))
     )
       return owned;
+    if (patch.state && TERMINAL.includes(patch.state) && patch.state !== owned.state)
+      this.notifyTaskOutput(task.id, { done: true, state: patch.state });
     if (
       JSON.stringify(
         Object.hasOwn(patch, "executionScope") ? patch.executionScope : task.executionScope,
@@ -1113,6 +1120,56 @@ export class TaskManager {
     return { type, detail: clip(detail), at: Date.now(), label: activityLabel(type), actor };
   }
   /** Direct user approval. Unchanged contract: launches exactly one task that is waiting for approval. */
+  onTaskOutput(id: string, listener: (event: TaskOutputEvent) => void): () => void {
+    const set = this.taskOutputListeners.get(id) ?? new Set<(event: TaskOutputEvent) => void>();
+    set.add(listener);
+    this.taskOutputListeners.set(id, set);
+    return () => {
+      set.delete(listener);
+      if (set.size === 0 && this.taskOutputListeners.get(id) === set) this.taskOutputListeners.delete(id);
+    };
+  }
+  private notifyTaskOutput(id: string, event: TaskOutputEvent) {
+    for (const listener of [...(this.taskOutputListeners.get(id) ?? [])]) {
+      try {
+        listener(event);
+      } catch {
+        /* a listener never breaks the provider path */
+      }
+    }
+    if ("done" in event) this.taskOutputListeners.delete(id);
+  }
+  /**
+   * M-A-3 T10: admits a spoken chat turn only when it is a local tool-free generation (the same predicate as
+   * deviceMayLaunch, with a concrete model), and pins the tool-free route like a device approval does (DEV-01).
+   */
+  approveVoiceTurn(id: string): OrchTask {
+    const task = this.db.get(id);
+    if (task.state !== "waiting_for_approval" || task.mission)
+      throw new Error("Voice turn is not waiting for approval.");
+    const provider = this.live().find((entry) => entry.id === task.provider);
+    // privacy#1: the voice gate is explicit about hosted tags. The model must be one the latest probe listed as installed
+    // and local, and the probe must have reported its remote tags (an unprobed list is never trusted). The remote check
+    // inside execute() is a separate layer (orch/exec.server.ts); this gate does not depend on it.
+    const probed = Array.isArray(provider?.remoteModels) && Array.isArray(provider?.models);
+    if (
+      !task.model ||
+      /^(auto|unknown)$/i.test(task.model) ||
+      !probed ||
+      !provider!.models!.includes(task.model) ||
+      provider!.remoteModels!.includes(task.model) ||
+      isRemoteOllamaTag({ name: task.model }) ||
+      !deviceMayLaunch(task, provider!.remoteModels)
+    )
+      throw new Error("Voice may admit only a local tool-free generation with a concrete model.");
+    this.deviceApproved.add(id);
+    return this.launch(
+      id,
+      { kind: "user", at: Date.now() },
+      "approval.voice_tool_free",
+      "Spoken question admitted as a local tool-free generation.",
+    );
+  }
   approve(id: string, by = "workstation"): OrchTask {
     // M-A-3 T9R (DEV-01): a device approved a tool-free route; no launch-time or recovery reroute may leave it.
     // Only an approval that can still launch changes the marker; a refused duplicate approve leaves it intact.
@@ -1378,6 +1435,7 @@ export class TaskManager {
           this.update(current, { model }, "executor.model", `Provider reported model ${model}.`);
       },
       output: (text) => {
+        this.notifyTaskOutput(id, { text });
         pending += text;
         if (pending.length > 2_000_000) pending = pending.slice(-2_000_000);
         flushTimer ??= setTimeout(

@@ -4,6 +4,7 @@
   [string]$DeploymentPath,
   [string]$PreferencePath,
   [switch]$SmokeTest,
+  [switch]$HotkeyTest,
   [switch]$SystemView,
   [switch]$LightView,
   [switch]$CollapsedView,

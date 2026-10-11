@@ -445,10 +445,18 @@ export function deviceArtifactRead<T>(result: T): T {
  * prompt is Bunny's assembled agent prompt (dependency results, artifact excerpts, folders), so the device sees
  * the step objective instead; a direct task keeps the user's own words.
  */
+/** What a paired device sees instead of a spoken voice turn's prompt (privacy#0). */
+export const VOICE_TURN_DEVICE_LABEL = "Voice question (workstation)";
+
 export function deviceTask<T extends Pick<OrchTask, "prompt" | "routingPrompt" | "mission"> & { cwd?: string; pid?: number | null; processTree?: unknown; processTreeAt?: number | null; sessionId?: string | null }>(task: T): T {
+  // privacy#0: a voice turn's prompt carries spoken history and Bunny's earlier answers, and its routingPrompt is the spoken
+  // transcript. Only the in-process voice path sets routingPrompt on a direct (non-mission) task, so such a task is a voice
+  // turn: neither field reaches a device. Mission steps keep their objective, as before.
+  const voiceTurn = !task.mission && task.routingPrompt !== undefined;
   return {
     ...task,
     ...(task.mission ? { prompt: task.routingPrompt ?? "Mission step (Bunny's full prompt stays on the Host)." } : {}),
+    ...(voiceTurn ? { prompt: VOICE_TURN_DEVICE_LABEL, routingPrompt: VOICE_TURN_DEVICE_LABEL } : {}),
     cwd: undefined,
     pid: null,
     processTree: null,

@@ -19,7 +19,8 @@ export type HostRead = { ok: true; snapshot: HostSnapshot } | HostFailure;
 export type HostOperation = { id: string; state: "applied" | "refused" | "failed" | "in_progress"; replayed: boolean };
 export type HostCommandOk = {
   ok: true;
-  snapshot: HostSnapshot;
+  /** Absent for voice.* actions, which answer with {data: VoiceSnapshot} only (cheap polling). */
+  snapshot?: HostSnapshot;
   task?: OrchTask;
   pairCode?: string;
   mission?: MissionView;

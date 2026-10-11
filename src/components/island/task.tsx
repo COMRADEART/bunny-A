@@ -37,7 +37,7 @@ import {
 import { publicTaskLogs } from "./motion-model";
 import { ActivityTimeline } from "./activity";
 import { taskStatus } from "@/lib/bunny-host/presentation";
-import { useVoiceInput, VoicePanel } from "./voice";
+import { VoicePanel } from "./voice";
 
 export function openTask(id: string) {
   useIsland.setState({ decisionTaskId: id, sheet: "task" });
@@ -65,9 +65,8 @@ export function Composer({ phone = false }: { phone?: boolean }) {
   const store = useIsland();
   const providers = liveProviders(store);
   const [advanced, setAdvanced] = useState(false);
-  const voice = useVoiceInput();
-  if (voice.state === "listening" || voice.state === "starting")
-    return <VoicePanel state={voice.state} transcript={voice.transcript} onStop={voice.stop} />;
+  // The voice session replaces the composer while it is open; the Host owns the microphone, not this form.
+  if (store.voice?.open) return <VoicePanel />;
   return (
     <form
       className="composer"
@@ -122,8 +121,9 @@ export function Composer({ phone = false }: { phone?: boolean }) {
         <button
           type="button"
           className="voice-button"
-          aria-label="Voice input"
-          onClick={voice.start}
+          aria-label="Start voice session"
+          title="Start voice (processed on this PC)"
+          onClick={() => void store.openVoice("push_to_talk")}
         >
           <Mic size={15} />
         </button>

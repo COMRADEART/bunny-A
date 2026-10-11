@@ -1399,3 +1399,157 @@
 .t8-app .bunny-toast span {
   overflow-wrap: anywhere;
 }
+
+/* M-A-3 T10 voice surface. Every animation here is driven by real snapshot data; reduced motion turns them off. */
+.t8-app.bunny-app .voice-panel {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 20px;
+  text-align: center;
+  max-width: 100%;
+  min-width: 0;
+}
+.t8-app.bunny-app .voice-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.t8-app.bunny-app .voice-panel > p,
+.t8-app.bunny-app .voice-panel .voice-answer p,
+.t8-app.bunny-app .voice-panel .voice-heard p {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.t8-app.bunny-app .voice-status {
+  color: var(--fg);
+  font-weight: 600;
+}
+.t8-app.bunny-app .voice-status.is-ok {
+  color: var(--positive);
+}
+.t8-app.bunny-app .voice-status.is-busy {
+  color: var(--working);
+}
+.t8-app.bunny-app .voice-status.is-warn {
+  color: var(--warning);
+}
+.t8-app.bunny-app .voice-status.is-error {
+  color: var(--negative);
+}
+.t8-app.bunny-app .voice-notice,
+.t8-app.bunny-app .voice-privacy,
+.t8-app.bunny-app .voice-device {
+  color: var(--muted);
+  font-size: 13px;
+}
+.t8-app.bunny-app .voice-talk {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 180px;
+  min-height: 96px;
+  padding: 14px 20px;
+  border-radius: var(--radius-workspace-panel);
+  border: 1px solid var(--border);
+  background: var(--elevated);
+  color: var(--fg);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+.t8-app.bunny-app .voice-talk:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.t8-app.bunny-app .voice-talk.is-pressed {
+  border-color: var(--working);
+  background: var(--working-soft);
+}
+.t8-app.bunny-app .voice-talk:disabled {
+  color: var(--disabled);
+  cursor: not-allowed;
+}
+.t8-app.bunny-app .voice-wave {
+  height: 32px;
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+}
+.t8-app.bunny-app .voice-wave i {
+  width: 4px;
+  height: 0;
+  min-height: 2px;
+  background: var(--working);
+  border-radius: 2px;
+  transition: height 120ms linear;
+}
+.t8-app.bunny-app .voice-wave:not(.is-live) i {
+  background: var(--border);
+}
+.t8-app.bunny-app .voice-draft {
+  font-style: italic;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-workspace-control);
+  padding: 6px 10px;
+}
+.t8-app.bunny-app .voice-answer,
+.t8-app.bunny-app .voice-heard,
+.t8-app.bunny-app .voice-proposal,
+.t8-app.bunny-app .voice-clarify {
+  width: 100%;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--radius-workspace-control);
+  background: var(--field);
+  text-align: left;
+}
+.t8-app.bunny-app .voice-clarify ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.t8-app.bunny-app .voice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.t8-app.bunny-app .voice-typed {
+  width: 100%;
+  display: flex;
+  gap: 8px;
+}
+.t8-app.bunny-app .voice-typed input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-workspace-control);
+  border: 1px solid var(--border);
+  background: var(--field);
+  color: var(--fg);
+}
+.t8-app.bunny-app .voice-typed input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.t8-app.bunny-app .voice-route {
+  color: var(--muted);
+  font-size: 12px;
+}
+.t8-app.bunny-app .voice-start:disabled {
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .t8-app.bunny-app .voice-wave i,
+  .t8-app.bunny-app .voice-talk {
+    transition: none;
+  }
+}
+.t8-app.bunny-app[data-motion="reduced"] .voice-wave i,
+.t8-app.bunny-app[data-motion="off"] .voice-wave i,
+.t8-app.bunny-app[data-motion="reduced"] .voice-talk,
+.t8-app.bunny-app[data-motion="off"] .voice-talk {
+  transition: none;
+}

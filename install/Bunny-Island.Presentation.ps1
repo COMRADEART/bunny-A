@@ -59,3 +59,57 @@ $bunnyControls.AgentReview.Add_Click({Open-BunnyDashboard ('?view=agentic&agent=
 $bunnyControls.AgentPause.Add_Click({Begin-BunnyCommand 'agent.pause' @{id=$bunnyCurrentAgentId};Update-BunnyAgentPresentation})
 $bunnyControls.AgentResume.Add_Click({Begin-BunnyCommand 'agent.resume' @{id=$bunnyCurrentAgentId};Update-BunnyAgentPresentation})
 $bunnyControls.AgentStop.Add_Click({if($bunnyStopConfirmation -eq $bunnyCurrentAgentId){Begin-BunnyCommand 'agent.stop' @{id=$bunnyCurrentAgentId};$script:bunnyStopConfirmation=$null}else{$script:bunnyStopConfirmation=$bunnyCurrentAgentId};Update-BunnyAgentPresentation})
+
+# T10 agent indicators: one chip per ACTIVE agent from the real snapshot, bounded by Get-BunnyIndicatorLayout (at most
+# three chips plus one "+N" overflow chip). Nothing here is decorative: a chip exists only for an agent the Host reports.
+function Test-BunnyAgentWaiting($Agent) {
+ return (([bool]($Agent.authorization -and $Agent.authorization.state -eq 'WAITING_FOR_USER')) -or ($Agent.state -in @('WAITING_FOR_USER', 'INTERRUPTED')))
+}
+function Get-BunnyActiveAgents {
+ return @($bunnySnapshot.agents.agents | Where-Object { $_ -and $_.state -notin @('COMPLETED', 'FAILED', 'STOPPED') } | Sort-Object @{Expression={ if (Test-BunnyAgentWaiting $_) { 0 } elseif ($_.state -eq 'RUNNING') { 1 } else { 2 } }}, name)
+}
+function New-BunnyAgentChip($Agent) {
+ $ink = if (Test-BunnyAgentWaiting $Agent) { 'BunnyWarning' } elseif ($Agent.state -eq 'RUNNING') { 'BunnyAccent' } else { 'BunnyMuted' }
+ $label = ([string]$Agent.state).Replace('_', ' ').ToLower()
+ $name = [string]$Agent.name
+ $chip = [Windows.Controls.Border]::new()
+ $chip.Width = 16; $chip.Height = 16; $chip.CornerRadius = [Windows.CornerRadius]::new(8); $chip.BorderThickness = [Windows.Thickness]::new(1.5); $chip.Margin = [Windows.Thickness]::new(2)
+ Set-BunnyRef $chip ([Windows.Controls.Border]::BackgroundProperty) 'BunnyField'
+ $chip.SetResourceReference([Windows.Controls.Border]::BorderBrushProperty, $ink)
+ $letter = [Windows.Controls.TextBlock]::new()
+ $letter.Text = if ($name.Length -gt 0) { $name.Substring(0, 1).ToUpper() } else { '?' }
+ $letter.FontSize = 8.5; $letter.FontWeight = 'SemiBold'; $letter.HorizontalAlignment = 'Center'; $letter.VerticalAlignment = 'Center'
+ Set-BunnyRef $letter ([Windows.Controls.TextBlock]::ForegroundProperty) 'BunnyText'
+ $chip.Child = $letter
+ $chip.ToolTip = $name + ' ' + $bunnyDot + ' ' + $label
+ [Windows.Automation.AutomationProperties]::SetName($chip, [string]$chip.ToolTip)
+ $chip.Cursor = [Windows.Input.Cursors]::Hand
+ $chip.Tag = [string]$Agent.id
+ $chip.Add_MouseLeftButtonUp({ Open-BunnyDashboard ('?view=agentic&agent=' + [Uri]::EscapeDataString([string]$this.Tag)) })
+ return $chip
+}
+function New-BunnyOverflowChip([int]$Count, [string[]]$Names) {
+ $chip = [Windows.Controls.Border]::new()
+ $chip.Width = 16; $chip.Height = 16; $chip.CornerRadius = [Windows.CornerRadius]::new(8); $chip.Margin = [Windows.Thickness]::new(2)
+ Set-BunnyRef $chip ([Windows.Controls.Border]::BackgroundProperty) 'BunnyField'
+ $text = [Windows.Controls.TextBlock]::new(); $text.Text = '+' + $Count; $text.FontSize = 8; $text.FontWeight = 'SemiBold'; $text.HorizontalAlignment = 'Center'; $text.VerticalAlignment = 'Center'
+ Set-BunnyRef $text ([Windows.Controls.TextBlock]::ForegroundProperty) 'BunnyMuted'
+ $chip.Child = $text
+ $chip.ToolTip = [string]$Count + ' more active ' + $(if ($Count -eq 1) { 'agent' } else { 'agents' }) + ': ' + (@($Names) -join ', ')
+ [Windows.Automation.AutomationProperties]::SetName($chip, [string]$chip.ToolTip)
+ return $chip
+}
+function Update-BunnyAgentStrip {
+ $strip = $bunnyControls.AgentStrip
+ $agents = @(Get-BunnyActiveAgents)
+ $layout = Get-BunnyIndicatorState $agents.Count
+ $strip.Children.Clear()
+ # Offline, the Host's last agent list is stale: no indicators are drawn for it.
+ if (-not $bunnyOnline -or $agents.Count -eq 0) { $strip.Visibility = 'Collapsed'; return }
+ $strip.Visibility = 'Visible'
+ for ($index = 0; $index -lt $layout.Visible; $index++) { [void]$strip.Children.Add((New-BunnyAgentChip $agents[$index])) }
+ if ($layout.Overflow -gt 0) {
+  $hidden = @($agents | Select-Object -Skip $layout.Visible | ForEach-Object { [string]$_.name })
+  [void]$strip.Children.Add((New-BunnyOverflowChip $layout.Overflow $hidden))
+ }
+}

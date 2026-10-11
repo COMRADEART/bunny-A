@@ -94,3 +94,19 @@ test("Host streaming preserves genuine Ollama output and cancellation during dis
   const stopped=await execute({...request,taskId:"prelaunch-stop"},{signal:controller.signal});
   assert.equal(stopped.stopped,true);assert.equal(generationCalled,false);
 });
+test("V16 T10: a local-only task (every voice turn) is refused at launch when the fresh probe reports its tag hosted", async () => {
+  let generated = false;
+  globalThis.fetch = async (_url, options) => {
+    if (options?.method) { generated = true; return new Response(JSON.stringify({ response: "x" })); }
+    return new Response(JSON.stringify({ models: [{ name: "became-hosted", remote_host: "https://example.invalid" }, { name: "deepseek-v4.1-flash:cloud" }] }));
+  };
+  for (const model of ["became-hosted", "deepseek-v4.1-flash:cloud"]) {
+    const result = await execute({ ...request, taskId: `local-only-${model}`, model, localOnly: true });
+    assert.equal(result.ok, false);
+    assert.match(result.error!, /hosted service; this task requires local execution/);
+  }
+  assert.equal(generated, false, "no generation request reaches a hosted tag");
+  // Without the local-only requirement the ordinary (non-voice) route is unchanged.
+  const ordinary = await execute({ ...request, taskId: "ordinary-hosted", model: "became-hosted" });
+  assert.equal(ordinary.ok, true);
+});

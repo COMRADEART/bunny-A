@@ -113,6 +113,12 @@ export function importClosure(release) {
       if(!existsSync(join(root,path))) missing.push(path);else files.push(path);
     }
   }
+  // M-A-3 T10: the contained voice worker is spawned by path, never imported; a voice release must carry it.
+  if(files.includes("src/lib/bunny-host/voice/voice-worker.server.ts")) {
+    for(const path of ["native/voice/BunnyVoiceWorker.cs","native/voice/bunny-voice-worker.exe","native/voice/bunny-voice-worker.json","scripts/build-voice-worker.mjs"]) {
+      if(!existsSync(join(root,path))) missing.push(path);else files.push(path);
+    }
+  }
   // T6 promises an executable bounded browser family, rather than an optional development import.
   if (existsSync(join(root, "src/lib/bunny-missions/cross-app.ts"))) {
     for (const path of ["node_modules/playwright/index.mjs", "node_modules/playwright-core/index.mjs", "node_modules/playwright/LICENSE", "node_modules/playwright-core/LICENSE"])

@@ -51,6 +51,9 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
   const model = request.model || probe.models[0];
   if (!model) return { ok: false, error: "Ollama is up but has no models.", log: "No model." };
   if (!probe.models.includes(model)) return { ok: false, error: `Model ${model} is no longer available. Route the task again.`, log: "Model missing." };
+  // M-A-3 T10: a local-only task (every voice turn) never reaches a hosted tag, even if it became hosted after routing.
+  if (request.localOnly && (probe.remote?.includes(model) || isRemoteOllamaTag({ name: model })))
+    return { ok: false, error: `Model ${model} runs on a hosted service; this task requires local execution.`, log: "Hosted model refused for a local-only task." };
   if (inflight.has(request.taskId)) return { ok: false, error: "This task is already running.", log: "Duplicate launch refused." };
 
   const controller = new AbortController();

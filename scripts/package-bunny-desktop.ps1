@@ -78,8 +78,17 @@ try {
     foreach($name in @('native/bunny-owned-process.c','native/README.md','scripts/build-owned-process.mjs')) {Add-PackageFile (Join-Path $bunnyBuild $name) $name 'source' $name}
     foreach($name in @('native/bunny-owned-process.node','native/bunny-owned-process.node.json')) {Add-PackageFile (Join-Path $bunnyBuild $name) $name 'generated' $null}
   }
+  # M-A-3 T10: the voice worker is compiled only from the pinned archive's C# source with the Windows csc (no prebuilt
+  # working-tree binary). The Host refuses to launch it unless the release manifest lists the same sha256.
+  if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'native/voice/BunnyVoiceWorker.cs')) {
+    Remove-Item -LiteralPath (Join-Path $bunnyBuild 'native/voice/bunny-voice-worker.exe') -Force -ErrorAction SilentlyContinue
+    & node (Join-Path $bunnyBuild 'scripts/build-voice-worker.mjs') $bunnyBuild | Out-Null
+    if($LASTEXITCODE -ne 0) {throw 'Bunny voice worker build failed.'}
+    foreach($name in @('native/voice/BunnyVoiceWorker.cs','native/voice/README.md','scripts/build-voice-worker.mjs')) {Add-PackageFile (Join-Path $bunnyBuild $name) $name 'source' $name}
+    foreach($name in @('native/voice/bunny-voice-worker.exe','native/voice/bunny-voice-worker.json')) {Add-PackageFile (Join-Path $bunnyBuild $name) $name 'generated' $null}
+  }
   if(-not $SkipDashboardBuild) {Copy-Item -LiteralPath (Join-Path $bunnyBuild '.output') -Destination (Join-Path $bunnyPackage '.output') -Recurse}
-  foreach($name in @('Bunny-Host.mjs','Bunny-Server.mjs','Bunny-Island.ps1','Bunny-Island.Visual.ps1','Bunny-Island.Motion.ps1','Launch-Bunny-A.ps1','Launch-Bunny-A.cmd','manifest.mjs')) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}
+  foreach($name in @('Bunny-Host.mjs','Bunny-Server.mjs','Bunny-Island.ps1','Bunny-Island.Visual.ps1','Bunny-Island.Motion.ps1','Bunny-Island.Placement.ps1','Bunny-Island.Voice.ps1','Launch-Bunny-A.ps1','Launch-Bunny-A.cmd','manifest.mjs')) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}
   # Older pinned rollback sources predate the presentation helper.
   if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'install/Bunny-Island.Presentation.ps1')) {Add-PackageFile (Join-Path $bunnyBuild 'install/Bunny-Island.Presentation.ps1') 'Bunny-Island.Presentation.ps1' 'source' 'install/Bunny-Island.Presentation.ps1'}
   # The tunnel worker runs from the release too, so remote access never starts code from a checkout.

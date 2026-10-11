@@ -22,6 +22,10 @@ import { stopOwnedChildren } from "./owned-processes.server.ts";
 import { dashboardSnapshot, publicEventDetail, projectHostActivity } from "./presentation.ts";
 import { releaseIdentity } from "./release-identity.server.ts";
 import { AGENT_ACTIONS, AgentRuntime, agentCommand } from "./agent-runtime.server.ts";
+import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
+import { VoiceSessionManager, type ListenSource, type InterruptSource } from "./voice/voice-session.server.ts";
+import { launchVoiceWorker } from "./voice/voice-worker.server.ts";
+import { hostFactsFrom, pendingApprovalFacts, type ApprovalFact } from "./voice/voice-answers.server.ts";
 import { ProjectService } from "./project-service.server.ts";
 import {
   actorOf, APPROVAL_ON_HOST, assertDeviceAction, authenticateDevice, CodedRefusal, deviceArtifactRead, deviceExpiresAt, DEVICE_SESSION_MS,
@@ -237,6 +241,8 @@ export async function startHost(
     removeProcessHandlers?: () => void;
     adapters?: ProviderAdapter[];
     sample?: () => Promise<HostSample>;
+    /** M-A-3 T10 test-only voice worker flags (fixture input, null output). Never reachable from HTTP. */
+    voice?: { workerExtraArgs?: string[] };
   } = {},
 ) {
   const paths = hostStatePaths(options.dataDirectory);
@@ -340,6 +346,81 @@ export async function startHost(
       ),
     };
   };
+  // M-A-3 T10: the voice session. Workstation-only; the worker runs contained in a Bunny-owned job and nothing starts until a workstation opens it.
+  const voice = new VoiceSessionManager({
+    hostEpoch: hostIdentity.epoch,
+    dataDirectory,
+    launch: launchVoiceWorker,
+    workerExtraArgs: options.voice?.workerExtraArgs,
+    chat: {
+      submit: (prompt, routingPrompt) => {
+        // Local, tool-free routing only: a voice turn never reaches a hosted or tool-capable route on its own.
+        const task = manager.submit({ prompt, routingPrompt, mode: "fast", override: "auto", constraints: { localOnly: true, offlineOnly: true } });
+        const remoteModels = manager.live().find((entry) => entry.id === task.provider)?.remoteModels;
+        return {
+          taskId: task.id,
+          provider: task.provider,
+          model: task.model ?? null,
+          state: task.state,
+          hasMission: !!task.mission,
+          mayLaunch: !!task.model && !/^auto$/i.test(task.model) && deviceMayLaunch(task, remoteModels),
+        };
+      },
+      admit: (taskId) => {
+        manager.approveVoiceTurn(taskId);
+      },
+      onOutput: (taskId, listener) => manager.onTaskOutput(taskId, listener),
+      // H8: the recorded output of a non-streaming task, spoken when no deltas arrived.
+      output: (taskId) => {
+        try {
+          return db.get(taskId).output || null;
+        } catch {
+          return null;
+        }
+      },
+      stop: async (taskId) => {
+        await manager.stop(taskId, "Voice turn stopped by the user.");
+      },
+    },
+    agents: {
+      rows: () =>
+        agents.snapshot().agents.map((row) => ({
+          id: row.id,
+          name: row.name,
+          state: row.state,
+          // The consent revision the Agent's authorization carries; pause and stop ignore it, resume checks it.
+          revision: row.authorization?.revision ?? 0,
+        })),
+      facts: () => {
+        const tasks = manager.snapshot(0).tasks;
+        const agentRows = agents.snapshot().agents;
+        // H7: tasks waiting for approval, plus the canonical pending mission requests and agent authorizations.
+        let missionViews: { title: string; requests: { resolvedAt?: number | null }[] }[] = [];
+        try {
+          missionViews = missions.snapshot().missions;
+        } catch {
+          missionViews = [];
+        }
+        const approvals: ApprovalFact[] = pendingApprovalFacts({ tasks, missions: missionViews, agents: agentRows });
+        return hostFactsFrom({
+          agents: agentRows,
+          mission: (id) => {
+            try {
+              return agents.missions.get(id).mission;
+            } catch {
+              return null;
+            }
+          },
+          approvals: () => approvals,
+          taskModel: (taskId) => tasks.find((task) => task.id === taskId)?.model ?? null,
+        });
+      },
+      command: async (action, id, revision) => {
+        await agentCommand(agents, action, { id, revision }, "workstation");
+      },
+    },
+    journal: (type, detail) => manager.emit(db.event(type, null, detail)),
+  });
   /** The snapshot as one principal may see it: Host identity and viewer for all, the device projection for devices. */
   const viewFor = (after: number, principal: Principal): HostSnapshot => {
     const base = snapshot(after);
@@ -378,7 +459,9 @@ export async function startHost(
         return { ...row, lastSeenAt, expiresAt: deviceExpiresAt(row.createdAt, lastSeenAt) };
       }),
     };
-    return principal.kind === "device" ? dashboardSnapshot(deviceSnapshot(withVerdicts, principal, presence)) : withVerdicts;
+    // Voice is workstation-only: a device projection never carries it.
+    if (principal.kind === "device") return dashboardSnapshot(deviceSnapshot(withVerdicts, principal, presence));
+    return { ...withVerdicts, voice: voice.snapshot() };
   };
   manager.remoteConfigured = !!process.env.BUNNY_REMOTE_ORIGIN || existsSync(paths.remote);
   if (existsSync(paths.remote))
@@ -511,7 +594,7 @@ export async function startHost(
       let task: OrchTask | undefined;
       let pairCode: string | undefined;
       let session: AgentSession | undefined;
-      let extra: { mission?: unknown; data?: unknown; agents?: unknown; agent?: unknown } = {};
+      let extra: { mission?: unknown; data?: unknown; agents?: unknown; agent?: unknown; voice?: VoiceSnapshot } = {};
       const safeActions = new Set([
         "stop",
         "mission.stop",
@@ -529,6 +612,8 @@ export async function startHost(
         "agent.authorization.deny",
         "agent.authorization.revoke",
         "operation.status",
+        // M-A-3 T10: stopping audio, releasing devices and cancelling a proposal never wait for a degraded Host.
+        ...VOICE_SAFE_ACTIONS,
       ]);
       if (!safeActions.has(action)) containment.assertAccepting("http");
       if (typeof input.action === "string" && AGENT_ACTIONS.has(input.action)) {
@@ -541,6 +626,10 @@ export async function startHost(
         )
           throw new CommandRefusedError("Remote approval can only answer the exact Host offer.");
         extra = await agentCommand(agents, input.action, data, actor);
+      } else if (typeof input.action === "string" && VOICE_ACTIONS.has(input.action)) {
+        // Device principals never reach here: assertDeviceAction refuses every voice action (default-deny).
+        if (device) throw new WorkstationRequiredError("Voice requires the workstation on the Windows Host.");
+        extra = { voice: await voiceCommand(voice, input.action, data) };
       } else if (typeof input.action === "string" && MISSION_ACTIONS.has(input.action))
         extra = await missionCommand(missions, input.action, data, { local, actor });
       else if (typeof input.action === "string" && input.action.startsWith("project.")) {
@@ -778,6 +867,8 @@ export async function startHost(
         const currentAuth = authenticateDevice(db.db, hash(bearer));
         if (!currentAuth.ok) return json(res, { error: "Authentication required.", code: currentAuth.code }, 401);
       }
+      // Voice responses are cheap: the VoiceSnapshot only, never the full dashboard.
+      if (VOICE_ACTIONS.has(action)) return json(res, { data: extra.voice });
       const projected = viewFor(after, principal);
       if (device) {
         if (extra.agents) extra.agents = projected.agents;
@@ -948,6 +1039,8 @@ export async function startHost(
     closed = (async () => {
       const ownedCleanup = stopOwnedChildren();
       try {
+        // M-A-3 T10: release the microphone and speaker before anything else stops.
+        await voice.close().catch(() => undefined);
         await Promise.allSettled(
           [...manager.sessions.keys()].map((id) =>
             containment.health.operationalState === "draining"
@@ -1039,4 +1132,38 @@ export async function startHost(
   );
   console.log(`Bunny-A Host ready on loopback (${manager.instanceId}).`);
   return { server, manager, missions, agents, projects, close, token, port, containment };
+}
+
+/** M-A-3 T10: maps one voice action to the session. Every branch is a workstation-only session operation. */
+async function voiceCommand(voice: VoiceSessionManager, action: string, data: Record<string, unknown>): Promise<VoiceSnapshot> {
+  const source = (value: unknown): ListenSource =>
+    value === "hotkey" || value === "push_to_talk" || value === "hands_free" ? value : "button";
+  const interruptSource = (value: unknown): InterruptSource =>
+    value === "hotkey" || value === "push_to_talk" || value === "mute" || value === "session_close" || value === "host_disconnect" || value === "new_turn" ? value : "button";
+  switch (action) {
+    case "voice.state":
+      return voice.snapshot();
+    case "voice.devices":
+      return voice.refreshDevices();
+    case "voice.session.open":
+      return voice.open(data.mode === "hands_free" ? "hands_free" : "push_to_talk");
+    case "voice.session.close":
+      return voice.close();
+    case "voice.listen.start":
+      return voice.listenStart(source(data.source));
+    case "voice.listen.end":
+      return voice.listenEnd(typeof data.turnId === "string" ? data.turnId.slice(0, 100) : undefined);
+    case "voice.interrupt":
+      return voice.interrupt(interruptSource(data.source));
+    case "voice.mute":
+      return voice.mute(data.on === true);
+    case "voice.text":
+      return voice.text(typeof data.text === "string" ? data.text : "");
+    case "voice.control.confirm":
+      return voice.controlConfirm(typeof data.proposalId === "string" ? data.proposalId : "");
+    case "voice.control.cancel":
+      return voice.controlCancel();
+    default:
+      throw new CommandRefusedError("Unknown voice action.");
+  }
 }

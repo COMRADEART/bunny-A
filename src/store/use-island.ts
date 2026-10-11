@@ -27,6 +27,25 @@ import {
 } from "@/components/island/connection-model";
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
+import type { VoiceMode, VoiceSnapshot } from "@/lib/bunny-host/voice/voice-protocol";
+import {
+  acceptVoiceSnapshot,
+  parseVoiceSnapshot,
+  planUiIntent,
+  typedFallbackText,
+  voiceRequest,
+  type UiSeen,
+} from "@/components/island/voice-model";
+import {
+  PRESS_IDLE,
+  pressDown,
+  pressOpened,
+  pressReset,
+  pressStarted,
+  pressUp,
+  type PressState,
+  type PressStep,
+} from "@/components/island/voice-press";
 import type { OperationalHealth } from "@/lib/bunny-host/failure.server";
 import type { PublicActivity } from "@/lib/bunny-host/presentation";
 import type { ModelCapabilitySnapshot } from "@/lib/bunny-host/model-capability.server";
@@ -171,6 +190,26 @@ type Island = Preferences & {
   modelCapabilities: ModelCapabilitySnapshot | null;
   /** M-A-3 T4 durable Agent runtime state (null until a Host that knows agents answers). */
   agents: AgentSnapshot | null;
+  /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
+  voice: VoiceSnapshot | null;
+  /** Local receipt time of the last voice answer; a stale value means voice is reconnecting, not listening. */
+  voiceReceivedAt: number;
+  /** False when the Host predates voice; null until a voice answer or a voice-bearing snapshot arrives. */
+  voiceSupported: boolean | null;
+  voiceNotice: string | null;
+  /** Push-to-talk is held (pointer or Space). Set synchronously so a quick release is never lost. */
+  voicePressing: boolean;
+  openVoice: (mode?: VoiceMode) => Promise<void>;
+  closeVoice: () => Promise<void>;
+  setVoiceMode: (mode: VoiceMode) => Promise<void>;
+  listenStart: () => Promise<void>;
+  listenEnd: () => Promise<void>;
+  voiceInterrupt: () => Promise<void>;
+  setVoiceMute: (on: boolean) => Promise<void>;
+  sendVoiceText: (text: string) => Promise<void>;
+  confirmVoiceProposal: (id: string) => Promise<void>;
+  cancelVoiceProposal: (id: string) => Promise<void>;
+  refreshVoice: () => Promise<void>;
   composeKind: "task" | "mission";
   missionFocus: string | null;
   setComposeKind: (kind: "task" | "mission") => void;
@@ -381,6 +420,128 @@ export const useIsland = create<Island>((set, get) => {
     disconnected = false;
   let accessGeneration = 0;
   const reconciling = new Set<string>();
+  // M-A-3 T10 voice slice. Polling runs only while a session is open; nothing here starts a session on its own.
+  const VOICE_POLL_MS = 250;
+  const VOICE_HIDDEN_STOP_MS = 30_000;
+  let voiceSeen: UiSeen = null;
+  let voiceTimer: ReturnType<typeof setInterval> | null = null;
+  let voiceBusy = false;
+  let voiceHiddenSince: number | null = null;
+  // Push-to-talk sequencing lives in voice-press.ts; this slice only runs its effects against the Host.
+  let press: PressState = PRESS_IDLE;
+  const stopVoicePolling = () => {
+    if (voiceTimer) clearInterval(voiceTimer);
+    voiceTimer = null;
+  };
+  const acceptVoice = (next: VoiceSnapshot | null) => {
+    if (!next) return;
+    // Any answer proves the Host is reachable, so the receipt time moves even when the content is older.
+    const current = get().voice;
+    set({ voiceReceivedAt: Date.now(), voiceSupported: true });
+    // A stale answer is dropped whole. It must not reset push-to-talk, replay a uiIntent or stop polling, because a
+    // dashboard or /state reply computed before the open landed can arrive after it with open:false.
+    if (!acceptVoiceSnapshot(current, next)) return;
+    set({ voice: next, voiceSupported: true, voiceNotice: null });
+    const plan = planUiIntent(next.uiIntent, voiceSeen, next.hostEpoch ?? "");
+    voiceSeen = plan.seen;
+    if (plan.target) set({ sheet: plan.target.sheet, agentFocus: plan.target.agentFocus ?? get().agentFocus });
+    if (next.open) ensureVoicePolling();
+    else {
+      stopVoicePolling();
+      press = pressReset();
+      set({ voicePressing: false });
+    }
+  };
+  let pressTurn: string | null = null;
+  const runPress = async (planned: PressStep): Promise<void> => {
+    press = planned.state;
+    set({ voicePressing: press.pressed });
+    for (const effect of planned.effects) {
+      if (effect.type === "open_session") {
+        await voiceCall("voice.session.open", { mode: "push_to_talk" });
+        if (get().voice?.open) ensureVoicePolling();
+        await runPress(pressOpened(press, !!get().voice?.open));
+      } else if (effect.type === "listen_start") {
+        ensureVoicePolling();
+        const started = await voiceCall("voice.listen.start");
+        pressTurn = started?.turnId ?? null;
+        await runPress(pressStarted(press, started !== null));
+      } else {
+        // Bound to the turn this press started: the Host ignores a late release for an older turn.
+        await voiceCall("voice.listen.end", pressTurn ? { turnId: pressTurn } : {});
+        pressTurn = null;
+      }
+    }
+  };
+  const voiceCall = async (action: string, data: Record<string, unknown> = {}): Promise<VoiceSnapshot | null> => {
+    let result: HostCommandResult;
+    try {
+      result = await withTimeout(commandBunnyHost({ data: { action, data } }), COMMAND_TIMEOUT_MS);
+    } catch {
+      result = {
+        ok: false,
+        outcome: "refused",
+        code: "HOST_UNREACHABLE",
+        message: "Bunny-A Host did not answer.",
+        status: 0,
+        pairing: false,
+      };
+    }
+    if (result.ok) {
+      const next = parseVoiceSnapshot(result.data);
+      // An answer without the voice contract means the Host predates voice: say so, never fake a session.
+      if (!next) {
+        set({ voiceSupported: false, voiceNotice: "Voice needs the updated Bunny Host." });
+        return null;
+      }
+      acceptVoice(next);
+      return next;
+    }
+    if (result.pairing) {
+      enterPairing(result.code);
+      return null;
+    }
+    if (result.status === 404 || /UNKNOWN|NOT_FOUND|UNSUPPORTED/i.test(result.code)) {
+      set({ voiceSupported: false, voiceNotice: "Voice needs the updated Bunny Host." });
+      return null;
+    }
+    set({ voiceNotice: result.message });
+    return null;
+  };
+  const refreshVoice = async () => {
+    if (voiceBusy) return;
+    if (typeof document !== "undefined" && document.hidden) {
+      voiceHiddenSince ??= Date.now();
+      if (Date.now() - voiceHiddenSince > VOICE_HIDDEN_STOP_MS) stopVoicePolling();
+      return;
+    }
+    voiceHiddenSince = null;
+    voiceBusy = true;
+    try {
+      await voiceCall("voice.state");
+    } finally {
+      voiceBusy = false;
+    }
+  };
+  const ensureVoicePolling = () => {
+    if (voiceTimer || typeof window === "undefined") return;
+    voiceTimer = setInterval(() => {
+      if (!get().voice?.open) {
+        stopVoicePolling();
+        return;
+      }
+      void refreshVoice();
+    }, VOICE_POLL_MS);
+  };
+  if (typeof document !== "undefined")
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) return;
+      voiceHiddenSince = null;
+      if (get().voice?.open) {
+        ensureVoicePolling();
+        void refreshVoice();
+      }
+    });
   const apply = (snapshot: HostSnapshot, after = 0, order = ++requestOrder, generation = accessGeneration) => {
     const state = get();
     // A response admitted before sign-out/revocation cannot repopulate a cleared protected view.
@@ -456,6 +617,8 @@ export const useIsland = create<Island>((set, get) => {
         .map((e) => ({ at: e.at, line: `${e.type}: ${e.detail}` })),
     });
     disconnected = false;
+    // M-A-3 T10: the dashboard carries the same voice truth, so a reconnected page restores it without a voice poll.
+    acceptVoice(parseVoiceSnapshot((snapshot as { voice?: unknown }).voice));
     for (const event of fresh)
       if (
         // A mission's child tasks are approved and reported by the mission itself.
@@ -493,6 +656,9 @@ export const useIsland = create<Island>((set, get) => {
       connectionChecked: true,
       pairingRequired: true,
       agents: null,
+      voice: null,
+      voiceReceivedAt: 0,
+      voicePressing: false,
       missions: null,
       tasks: [],
       projects: [],
@@ -616,7 +782,8 @@ export const useIsland = create<Island>((set, get) => {
     }
     if (generation !== accessGeneration) return null;
     if (result.ok) {
-      apply(result.snapshot, 0, order, generation);
+      // M-A-3 T10: voice.* replies carry only {data}; every other command still returns the dashboard snapshot.
+      if (result.snapshot) apply(result.snapshot, 0, order, generation);
       return result;
     }
     if (result.pairing) {
@@ -639,6 +806,49 @@ export const useIsland = create<Island>((set, get) => {
     get().missions?.missions.find((mission) => mission.requests.some((request) => request.id === requestId))?.id ??
     requestId;
   return {
+    voice: null,
+    voiceReceivedAt: 0,
+    voiceSupported: null,
+    voiceNotice: null,
+    voicePressing: false,
+    refreshVoice: async () => {
+      await refreshVoice();
+    },
+    openVoice: async (mode = "push_to_talk") => {
+      await voiceCall("voice.session.open", { mode });
+      if (get().voice?.open) ensureVoicePolling();
+    },
+    closeVoice: async () => {
+      press = pressReset();
+      set({ voicePressing: false });
+      await voiceCall("voice.session.close");
+    },
+    setVoiceMode: async (mode) => {
+      await voiceCall("voice.session.open", { mode });
+    },
+    listenStart: async () => {
+      await runPress(pressDown(press, !!get().voice?.open));
+    },
+    listenEnd: async () => {
+      await runPress(pressUp(press));
+    },
+    voiceInterrupt: async () => {
+      await voiceCall("voice.interrupt");
+    },
+    setVoiceMute: async (on) => {
+      await voiceCall("voice.mute", voiceRequest.mute(on));
+    },
+    sendVoiceText: async (text) => {
+      const clean = typedFallbackText(text);
+      if (!clean) return;
+      await voiceCall("voice.text", { text: clean });
+    },
+    confirmVoiceProposal: async (id) => {
+      await voiceCall("voice.control.confirm", voiceRequest.confirm(id));
+    },
+    cancelVoiceProposal: async (id) => {
+      await voiceCall("voice.control.cancel", { id });
+    },
     theme: "dark",
     appearance: DEFAULT_APPEARANCE,
     submitting: false,

@@ -315,6 +315,8 @@ export type HostPresence = "online" | "offline" | "sleeping";
 
 export type ExecRequest = {
   taskId: string;
+  /** M-A-3 T10: the task requires local execution; a tag the fresh probe reports as hosted is refused at launch. */
+  localOnly?: boolean;
   provider: ProviderId;
   model: string;
   prompt: string;

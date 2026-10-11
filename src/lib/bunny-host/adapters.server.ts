@@ -172,7 +172,7 @@ export class OllamaAdapter implements ProviderAdapter {
   launch(task: OrchTask, hooks: AdapterHooks): RunningSession {
     const controller = new AbortController();
     hooks.event("agent.started", `Ollama generation requested · ${task.model}.`);
-    const done = execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs }).then((result) => {
+    const done = execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt, localOnly: !!(task.constraints?.localOnly || task.constraints?.offlineOnly) }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs }).then((result) => {
       if (result.ok) hooks.event("agent.completed", result.log); else if (!result.stopped) hooks.event("agent.error", result.error ?? result.log);
       return { ...result, output: result.output ?? "" };
     });

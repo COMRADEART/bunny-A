@@ -32,6 +32,8 @@ export type HostSnapshot = {
   cursor: number;
   /** Read-only, privacy-safe activity over the existing journal and capability records. */
   presentation?: HostPresentation;
+  /** M-A-3 T10: workstation-only voice session state. Absent for paired devices and older Hosts. */
+  voice?: import("./voice/voice-protocol.ts").VoiceSnapshot;
   performance: PerformanceProfile[];
   remoteConfigured: boolean;
   remoteUrl?: string | null;
