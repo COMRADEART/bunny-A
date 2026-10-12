@@ -556,7 +556,28 @@ test("T12 live: model text claiming an action is detected; ordinary answers are 
   for (const text of ["Done.", "Okay, done!", "I've saved it to your desktop.", "The file has been saved.", "Sure! I opened Notepad.", "I have stopped the agent.", "Confirm, paused.", "Approved!", "Okay, it's stopped."]) {
     assert.equal(claimsAction(text), true, text);
   }
-  for (const text of ["I wrote a short poem for you.", "Matrix is a 1999 film.", "It's done on the Windows Host screen.", "That is done on the Windows Host screen.", "The tests passed."]) {
+  for (const text of ["I wrote a short poem for you.", "Matrix is a 1999 film.", "It's done on the Windows Host screen.", "That is done on the Windows Host screen."]) {
+    assert.equal(claimsAction(text), false, text);
+  }
+});
+
+test("T12 closeout: completion and verification claims require Host facts, including unqualified test success", () => {
+  for (const text of ["I have completed the mission.", "I finished all the tasks.", "The task succeeded.", "The mission is complete.",
+    "It is done and verified.", "The tests passed.", "All required checks have passed.", "Your build is successful.",
+    "Good news, the mission is now fully complete.", "I've verified the results.", "Verified.", "I wrapped up the work.",
+    "The research agent has wrapped up the work.", "Your project has passed every check.", "The test suite is green.",
+    "The build is green.", "I checked all tests; they passed.", "I validated the build.", "Mission accomplished.",
+    "I am done with the mission.", "The implementation is complete.", "The tests are all passing.", "Every check passed.",
+    "The project is ready for release.", "The task has reached completion.", "The task has concluded successfully.",
+    "Every mission objective was met.", "All tests came back clean.", "Everything finished without errors.",
+    "The lint check is clear.", "The test results are positive."]) {
+    assert.equal(claimsAction(text), true, text);
+  }
+  for (const text of ["I haven't completed the mission.", "The task has not succeeded.", "Check whether the tests passed.",
+    "If I finished the task, you would see its report.", "A test passes when its actual value matches the expected value.",
+    "Rainbows form when sunlight passes through water droplets.", "I finished explaining the concept.",
+    "A check can return a pass or a failure.", "The tests may be passing, but I cannot verify that.",
+    "I would describe a completed task as done."]) {
     assert.equal(claimsAction(text), false, text);
   }
 });

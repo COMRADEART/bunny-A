@@ -203,6 +203,8 @@ export class VoiceSessionManager {
   private settling: Promise<void> | null = null;
   /** Bumped on every open and close: asynchronous control work from an earlier session never speaks into a later one (races#3). */
   private sessionEpoch = 0;
+  /** Invalidates a Start request suspended across a privacy or mode change, even if the user later unmutes. */
+  private grantRevision = 0;
   private closing = false;
   /** R3-session#2: one close at a time; a second close joins the first instead of racing it. */
   private closingPromise: Promise<VoiceSnapshot> | null = null;
@@ -587,17 +589,24 @@ export class VoiceSessionManager {
    * hands-free start (`grant`) renews the grant only after the closing, open, worker and muted checks pass.
    */
   private async beginListen(source: ListenSource, grant = false): Promise<VoiceSnapshot> {
+    const startEpoch = this.sessionEpoch;
+    const startGrantRevision = this.grantRevision;
+    const startMode = this.snap.mode;
+    const invalidated = () => startEpoch !== this.sessionEpoch || startGrantRevision !== this.grantRevision || startMode !== this.snap.mode;
     // T12-AUTH-06: whether Bunny spoke when the press arrived is read before anything stops the lane or barges in.
     const outputAtPress = this.outputActive();
     // races#3: a session that is closing takes no new turn.
     if (this.closing) return this.refuse("INTERNAL", "Voice is closing.");
     // H5: an in-flight or due relaunch completes before the turn is judged (the worker handle is absent while it runs).
     if (this.relaunching || this.needsRelaunch()) await this.relaunchIfIdle();
+    if (invalidated()) return this.refuse("INTERNAL", "The capture start was invalidated. Start again to enable the microphone.");
     if (!this.snap.open || !this.worker) return this.refuse("INTERNAL", "Voice is not open.");
     if (this.snap.muted) return this.refuse("MUTED", "Microphone is muted; capture was not started.");
     if (this.snap.mode === "hands_free" && this.duplexSupported && source !== "push_to_talk" && (grant || this.grantLive())) {
       if (this.duplexStopping) await this.duplexStopping;
       if (!this.worker || !this.snap.open || this.closing) return this.refuse("INTERNAL", "Voice is not open.");
+      if (this.snap.muted) return this.refuse("MUTED", "Microphone is muted; capture was not started.");
+      if (invalidated() || this.snap.mode !== "hands_free") return this.refuse("INTERNAL", "The hands-free start was invalidated. Start again to enable the microphone.");
       if (grant) this.renewGrant();
       this.startDuplex();
       return this.snapshot();
@@ -606,6 +615,8 @@ export class VoiceSessionManager {
     // RC-05: the press barges in on a held reply, so the held reply is cancelled (interrupted), never resumed first.
     if (this.duplexLane()) await this.stopDuplex("user", { holdOutcome: "interrupted" });
     if (!this.worker || !this.snap.open || this.closing) return this.refuse("INTERNAL", "Voice is not open.");
+    if (this.snap.muted) return this.refuse("MUTED", "Microphone is muted; capture was not started.");
+    if (invalidated()) return this.refuse("INTERNAL", "The capture start was invalidated. Start again to enable the microphone.");
     // Live finding (Part B): a press during TRANSCRIBING was refused as DEVICE_BUSY, which the clients show as "microphone in
     // use by another app". The press now waits (bounded) for the previous final, then starts its turn, barging in on any
     // answer that final began. Only a transcription that outlasts the bound is refused, with its own truthful code.
@@ -617,6 +628,7 @@ export class VoiceSessionManager {
       if (epoch === this.sessionEpoch && (this.relaunching || this.needsRelaunch())) await this.relaunchIfIdle();
       if (this.closing || epoch !== this.sessionEpoch || !this.snap.open || !this.worker) return this.refuse("INTERNAL", "Voice is not open.");
       if (this.snap.muted) return this.refuse("MUTED", "Microphone is muted; capture was not started.");
+      if (invalidated()) return this.refuse("INTERNAL", "The capture start was invalidated. Start again to enable the microphone.");
       if (this.fsm.state === "TRANSCRIBING") return this.refuse("BUSY_TRANSCRIBING", "The previous turn is still being transcribed. Try again in a moment.");
       // A turn another press started while this one waited is left alone; this press joins it.
       if (this.fsm.state === "ARMING" || this.fsm.state === "LISTENING") return this.snapshot();
@@ -1714,6 +1726,8 @@ export class VoiceSessionManager {
       requestedAt: this.now(),
       source,
       workerResetMs: null,
+      workerCancelWaitMs: null,
+      workerResetPending: null,
       meterSilentMs: null,
       droppedChunks: 0,
       inferenceStopped,
@@ -1989,6 +2003,7 @@ export class VoiceSessionManager {
 
   /** Ends the grant and its expiry timer. A later Start click is the only way back. */
   private revokeGrant() {
+    this.grantRevision += 1;
     this.cancelGrantExpiry?.();
     this.cancelGrantExpiry = null;
     this.grantExpiresAt = null;
@@ -2092,6 +2107,8 @@ export class VoiceSessionManager {
     // Review round 5: a held spoken fragment never outlives its lane (mute, mode switch, error, relaunch, close).
     // Review round 6: a soft-budget relaunch keeps the lane's held words (the user is mid-sentence, not stopped).
     if (reason !== "relaunch") this.dropFragment(`hands-free stopped (${reason})`);
+    // Privacy revocation takes effect even while another stop is already awaiting its device receipt.
+    if (reason !== "user" && reason !== "relaunch") this.revokeGrant();
     if (this.duplexStopping) return this.duplexStopping;
     const token = this.duplexToken;
     if (token !== null) this.recordDuplexStop(reason);
@@ -2722,7 +2739,9 @@ export class VoiceSessionManager {
     }
     // In place: the receipt object identity is what lets a late inference-stop acknowledgment find it.
     Object.assign(receipt, {
-      workerResetMs: event.resetMs,
+      workerResetMs: event.resetPending === true ? null : event.resetMs,
+      workerCancelWaitMs: event.resetMs,
+      workerResetPending: event.resetPending === true,
       meterSilentMs: event.meterSilentMs,
       droppedChunks: event.droppedChunks,
       wasPlaying: event.wasPlaying,

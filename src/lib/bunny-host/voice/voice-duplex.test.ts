@@ -1295,6 +1295,30 @@ test("T12-PRIV-01 (round 2): a hands-free start made outside hands-free mode rec
   await h.session.close();
 });
 
+test("T12 closeout: mute during a pending stop revokes consent and invalidates suspended starts even after unmute", async () => {
+  const h = await harness();
+  await h.begin();
+  const first = duplexStarts(h.worker())[0];
+  h.worker().silentStop = true;
+  const ptt = h.session.listenStart("push_to_talk");
+  await tick();
+  const pendingStart = h.session.listenStart("hands_free");
+  h.session.mute(true);
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null);
+  h.session.mute(false);
+  h.worker().emit({ ev: "duplex.stopped", session: first.session, reason: "stop" });
+  await Promise.all([ptt, pendingStart]);
+  h.advance(5000);
+  await tick();
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null);
+  assert.equal(duplexStarts(h.worker()).length, 1, "unmute never restores the old grant");
+  assert.equal(h.session.snapshot().capturing, false);
+  h.worker().silentStop = false;
+  await h.begin();
+  assert.equal(duplexStarts(h.worker()).length, 2, "a fresh explicit Start works");
+  await h.session.close();
+});
+
 test("T12 RES-07: the Host ends a live hands-free lane at the grant's end with reason lifetime, even while speech keeps it active", async () => {
   const h = await harness();
   await h.begin();

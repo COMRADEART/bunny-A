@@ -3517,6 +3517,16 @@ internal sealed class Speaker
                 CloseDevice();
                 waveOut = openDevice(c.Device);
             }
+            // Open may block while Cancel invalidates this chunk. Recheck after the driver returns, before handing it
+            // any samples. Device calls still stay off the command gate; the next playback step applies a pending reset.
+            lock (gate)
+            {
+                if (c.Cancelled)
+                {
+                    c.Submitting = false;
+                    return false;
+                }
+            }
             waveOut.Submit(c);
         }
         catch (VoiceFault f)
@@ -3881,6 +3891,30 @@ internal static class SelfTest
         r["stallCancelPending"] = first.ResetPending;
         r["stallCancelRecovers"] = !second.ResetPending;
         r["stallShutdownBounded"] = shutdownMs < 3000;
+    }
+
+    // No real endpoint: hold the injected driver's Open until Cancel has returned, then verify it receives no old PCM.
+    static void CancelledOpenCheck(Dictionary<string, object> r)
+    {
+        using (ManualResetEvent opened = new ManualResetEvent(false))
+        using (ManualResetEvent release = new ManualResetEvent(false))
+        {
+            RecordingWaveOut rec = new RecordingWaveOut();
+            Speaker speaker = new Speaker(null, false, 1.0, new string[0], d => { opened.Set(); release.WaitOne(3000); return rec; });
+            speaker.AddRenderedForTest("cancelled-open", 1, 0, new byte[32000], 0u);
+            speaker.Start();
+            bool reachedOpen = opened.WaitOne(3000);
+            CancelResult cancel = speaker.Cancel(1);
+            release.Set();
+            Stopwatch deadline = Stopwatch.StartNew();
+            while (!rec.Snapshot().Contains("reset") && deadline.ElapsedMilliseconds < 3000) Thread.Sleep(5);
+            speaker.Shutdown();
+            List<string> ops = rec.Snapshot();
+            r["cancelledOpenReached"] = reachedOpen;
+            r["cancelledOpenResetPending"] = cancel.ResetPending;
+            r["cancelledOpenSubmitted"] = ops.FindAll(op => op == "submit").Count;
+            r["cancelledOpenResetApplied"] = ops.Contains("reset");
+        }
     }
 
     // The ledger releases finished engines and refuses new abandonments past its bound.
@@ -4586,6 +4620,7 @@ internal static class SelfTest
 
         // Playback device stall: a driver that never returns from Open must not hold the command loop.
         StallCheck(r);
+        CancelledOpenCheck(r);
 
         // Abandoned recognizers: the raw audio is released and the ledger refuses past its bound.
         PcmPipe wiped = new PcmPipe();

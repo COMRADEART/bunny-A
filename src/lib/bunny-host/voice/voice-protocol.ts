@@ -111,11 +111,13 @@ export type WorkerEvent = { t: number; mono: number } & (
   | { ev: "playback.idle"; turn: string; gen: number }
   | { ev: "playback.error"; turn: string | null; gen: number | null; code: VoiceErrorCode; message: string }
   /**
-   * Barge-in receipt. `resetMs`: time spent inside waveOutReset. `meterSilentMs`: from the cancel request until the
+   * Barge-in receipt. `resetMs`: elapsed bounded wait for the playback thread's reset acknowledgment, including queue time.
+   * `resetPending` true means that wait expired before acknowledgment; it is not a reset-completion measurement.
+   * `meterSilentMs`: from the cancel request until the
    * render endpoint peak meter (IAudioMeterInformation) read below the silence threshold, i.e. measured audible stop.
    * `wasPlaying` false means nothing was audible when the cancel arrived.
    */
-  | { ev: "speak.cancelled"; gen: number; wasPlaying: boolean; resetMs: number; meterSilentMs: number | null; droppedChunks: number; /** speak commands dropped since the previous receipt because their gen was already cancelled. */ staleDropped?: number }
+  | { ev: "speak.cancelled"; gen: number; wasPlaying: boolean; resetMs: number; resetPending?: boolean; meterSilentMs: number | null; droppedChunks: number; /** speak commands dropped since the previous receipt because their gen was already cancelled. */ staleDropped?: number }
   | { ev: "mute"; on: boolean }
   | { ev: "error"; code: VoiceErrorCode; message: string }
   | { ev: "bye" }
@@ -204,6 +206,10 @@ export type VoiceInterruptReceipt = {
   requestedAt: number;
   source: "button" | "hotkey" | "push_to_talk" | "mute" | "host_disconnect" | "session_close" | "new_turn" | "acoustic" | "speech_stop" | "timeout";
   workerResetMs: number | null;
+  /** Elapsed cancel wait, whether or not the reset was acknowledged. */
+  workerCancelWaitMs?: number | null;
+  /** Unknown before a receipt, true if the bounded wait expired without reset acknowledgment. */
+  workerResetPending?: boolean | null;
   meterSilentMs: number | null;
   droppedChunks: number;
   inferenceStopped: boolean | null;

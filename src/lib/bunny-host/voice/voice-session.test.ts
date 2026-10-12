@@ -421,6 +421,27 @@ test("V19 the worker's speak.cancelled receipt fills the interrupt receipt for t
   assert.equal(receipt.droppedChunks, 2);
 });
 
+test("T12 closeout: a pending reset reports bounded wait without claiming reset completion", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.text("Tell me something");
+  await h.flush();
+  h.chat.text("task-1", "Here is something to say that is long enough to be spoken.");
+  await h.session.interrupt("button");
+  const gen = h.session.snapshot().lastInterrupt!.gen;
+  h.worker.emit({ ev: "speak.cancelled", gen, wasPlaying: true, resetMs: 250, resetPending: true, meterSilentMs: null, droppedChunks: 2 });
+  let receipt = h.session.snapshot().lastInterrupt!;
+  assert.equal(receipt.workerResetMs, null);
+  assert.equal(receipt.workerResetPending, true);
+  assert.equal(receipt.workerCancelWaitMs, 250);
+  assert.equal(receipt.meterSilentMs, null);
+  h.worker.emit({ ev: "speak.cancelled", gen, wasPlaying: true, resetMs: 3, resetPending: false, meterSilentMs: 40, droppedChunks: 2 });
+  receipt = h.session.snapshot().lastInterrupt!;
+  assert.equal(receipt.workerResetMs, 3);
+  assert.equal(receipt.workerResetPending, false);
+  assert.equal(receipt.workerCancelWaitMs, 3);
+});
+
 test("V21 late model deltas and worker playback events from the cancelled generation never restart speech", async () => {
   const h = setup();
   await h.open();
@@ -2100,6 +2121,24 @@ test("T12 live: model text that claims an action is replaced by the truthful ref
   assert.ok(!spoken.some((text) => /saved it|called notes/i.test(text)), "the claim and everything after it are never spoken");
   assert.equal(h.session.snapshot().answerSource, "refusal", "the replaced answer is the Host's sentence");
   assert.ok(h.journal.some(([, detail]) => /claimed an action/.test(detail)));
+});
+
+test("T12 closeout: streamed completion claims are replaced and later chunks never become speech", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.text("Tell me something nice.");
+  await h.flush();
+  h.chat.text("task-1", "Good news, I have fully");
+  h.advance(600);
+  await h.flush();
+  h.chat.text("task-1", " completed the mission. The tests passed. Your build is verified.");
+  h.chat.done("task-1");
+  await h.flush();
+  const spoken = h.worker.ofOp("speak").map((command) => command.text);
+  assert.ok(spoken.includes(SPOKEN_ACTION_CLAIM_TEXT));
+  assert.ok(!spoken.some((text) => /completed the mission|tests passed|build is verified/i.test(text)), JSON.stringify(spoken));
+  assert.equal(h.session.snapshot().answerSource, "refusal");
+  assert.equal(h.commands.length, 0);
 });
 
 test("T12 live: an ordinary model answer is untouched by the claim guard", async () => {

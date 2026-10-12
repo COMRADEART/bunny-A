@@ -603,6 +603,14 @@ test("native#0 a stalled playback driver never holds the command loop: cancel, e
   assert.equal(r.stallShutdownBounded, true, "shutdown does not wait on the driver");
 });
 
+test("T12 closeout: cancelling while the driver opens never submits the cancelled chunk when Open returns", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.cancelledOpenReached, true);
+  assert.equal(r.cancelledOpenResetPending, true);
+  assert.equal(r.cancelledOpenSubmitted, 0);
+  assert.equal(r.cancelledOpenResetApplied, true);
+});
+
 test("native#0 live: a healthy speak.cancel applies the reset within the bounded wait and reports no resetPending", { skip }, async () => {
   const w = session(["--input-silence", "--output", "null", "--fixture-pace", "2"]);
   try {

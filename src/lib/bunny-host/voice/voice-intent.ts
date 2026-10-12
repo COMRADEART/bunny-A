@@ -291,7 +291,7 @@ const NOT_ACTION_AFTER = /^(?:nothing|none|no|neither|with|into|across|up|out|ov
 const BUNNY = /^(?:i|we|bunny|i've|i'll|i'm|i'd|we've|we'll|we're|we'd)$/;
 const DONE_SUBJECT = "(?:(?:the|your|my|this|that) )?(?:[\\w'-]+ )?(?:agents?|missions?|tasks?|team|timers?|alarms?|reminders?|emails?|messages?|texts?|files?|folders?|documents?|notes?|apps?|session|voice|server|process|commits?|branch|meetings?|events?|appointments?|orders?|requests?|reports?|drafts?|backups?|updates?|approvals?|permissions?|deploy(?:ment)?s?|builds?)(?: [\\w'-]+){0,4}?";
 const DONE_PARTICIPLE = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled|set|booked|added|scheduled|updated|granted|muted|unmuted|turned (?:on|off)|switched (?:on|off)|shut down|restarted|deployed|pushed|published|merged|shared|copied|backed up|cleared|emptied|posted|ordered|paid|transferred|uploaded|downloaded|e-?mailed|texted|forwarded|submitted|finished|completed|made|renamed|moved|archived|printed|terminated|killed|halted|aborted|suspended|rejected|denied|confirmed|resolved|authori[sz]ed|accepted|declined|blocked|handled|taken care of)";
-const GENERAL_AFTER = "(?!\\s+(?:automatically|by default|by most|by many|by the (?:app|system|editor)|when|whenever|once|if|unless|until|before|after|every|each|regularly|periodically))";
+const GENERAL_AFTER = "(?!\\s+(?:automatically|by default|by most|by many|by the (?:app|system|editor)|when|whenever|once|if|unless|until|before|after|(?:every|each) (?:time|day|week|month|year)|regularly|periodically))";
 const DONE_CLAIMS: RegExp[] = [
   // Round 6: elliptical completions ("Finished.", "Consider it done.", "It's all taken care of.", "I've taken care of it.").
   /^(?:finished|done and dusted|consider it done|(?:it'?s|that'?s|it is|that is|everything is|everything'?s) (?:all )?(?:taken care of|handled|sorted(?: out)?|done)|all (?:taken care of|handled|sorted|done))[\s.!]*$/,
@@ -325,9 +325,11 @@ function bunnyActs(clause: string): boolean {
     for (let j = i + 1; j < Math.min(words.length, i + 8); j++) {
       const w = words[j];
       if (CLAIM_STOP.test(w)) break;
-      if (CLAIM_FILLER.test(w)) continue;
-      if (ACTION_WORD.test(w)) {
+      if (CLAIM_FILLER.test(w) || w === "fully") continue;
+      if (ACTION_WORD.test(w) || /^(?:complet(?:e|es|ed|ing)|finish(?:es|ed|ing)?|verif(?:y|ies|ied|ying)|validat(?:e|es|ed|ing)|check(?:s|ed|ing)?|succeed(?:s|ed|ing)?|pass(?:es|ed|ing)?)$/.test(w)) {
         const rest = words.slice(j + 1).join(" ");
+        // Finishing an explanation is within tool-free chat; finishing a Mission or checking a build is not.
+        if (/^(?:completed?|finished)$/.test(w) && /^(?:explaining|describing|answering|summari[sz]ing|the explanation|my explanation)\b/.test(rest)) break;
         if (NOT_ACTION_AFTER.test(rest) && !/^back(?:ed|ing)$/.test(w)) break;
         return true;
       }
@@ -338,19 +340,42 @@ function bunnyActs(clause: string): boolean {
 }
 
 /** Round 6: a Host-state phrase inside a question, a negation or a condition reports nothing as done. */
-const DONE_QUALIFIED = /\b(?:can't|cannot|not|whether|if|unless|don't|doesn't|unknown|unclear|check|once|when|until|after|before|ask|see if|find out)\b/;
+const DONE_QUALIFIED = /\b(?:can't|cannot|not|whether|if|unless|don't|doesn't|unknown|unclear|once|when|until|after|before|ask|see if|find out|can|could|would|may|might|should)\b/;
+
+// The tool-free model has no verification port. Completion and test-success statements must come from Host facts,
+// including adjectival ("complete"), elliptical ("Verified.") and pronoun ("It is done and verified") forms.
+const COMPLETION_STATE = "(?:complete(?:d)?|finished|done|verified|validated|pass(?:ed|ing|es)?|succeeded|successful|a success|ready|green|all set|accomplished|wrapped up)";
+const COMPLETION_SUBJECT = "(?:(?:the|your|my|this|that|our|all) )?(?:[\\w'-]+ ){0,3}?(?:agents?|missions?|tasks?|team|work|jobs?|projects?|implementations?|suites?|builds?|deployments?|tests?|checks?|results?|reports?|approvals?|verification)(?: [\\w'-]+){0,4}?";
+const COMPLETION_CLAIMS: RegExp[] = [
+  new RegExp("\\b" + COMPLETION_SUBJECT + "(?:'s| has| have| had| is| are| was| were)?(?: now| just| already| all| been| fully| successfully)* " + COMPLETION_STATE + "\\b" + GENERAL_AFTER),
+  new RegExp("\\b(?:i|we|bunny|it|that|this|everything|all)(?:'m|'re|'s| am| has| have| had| is| are| was| were)(?: now| just| already| all| been| fully| successfully)* " + COMPLETION_STATE + "\\b" + GENERAL_AFTER),
+  /^(?:fully |successfully |all )?(?:completed?|finished|done|verified|passed|succeeded|successful|all set)(?:\s+(?:and|for|to|on|in|now|successfully)\b|[\s.!]*$)/,
+  /\b(?:i|we|bunny)(?:'ve| have| has| just| already)* (?:wrapped up|finished off) (?:it|that|this|them|everything|the|your|all)\b/,
+  /^(?:it|that|this|everything|all) (?:finished|completed|succeeded|passed)\b/,
+];
+
+// Host state belongs to the Host-facts path, not to model narration. A declarative clause whose subject is an operational
+// record is refused regardless of its predicate ("reached completion", "came back clean", "objectives were met").
+// This avoids an ever-growing list of success synonyms; modal, conditional and general explanations stay conversational.
+const HOST_STATE_SUBJECT = /^(?:(?:the|your|my|this|that|our|all|every|each|those|these|a|an) )?(?:[\w'-]+ ){0,3}?(?:agents?|missions?|tasks?|team|work|jobs?|projects?|implementations?|suites?|builds?|deployments?|tests?|checks?|results?|reports?|approvals?|verification)\b\s+\S/;
+function claimsHostState(clause: string): boolean {
+  return HOST_STATE_SUBJECT.test(clause) && !/\?\s*$/.test(clause) && !DONE_QUALIFIED.test(clause) &&
+    !/\b(?:automatically|by default|by most|by many|generally|typically|usually|regularly|periodically)\b/.test(clause);
+}
 
 export function claimsAction(text: string): boolean {
   const t = text.toLowerCase().replace(/[’`]/g, "'").replace(/[—–]/g, ",").replace(/\s+/g, " ").trim();
   for (const sentence of t.split(/(?<=[.!?])\s+/)) {
+    // This sentence describes where an operation is reviewed, rather than asserting that it happened.
+    if (/^(?:it's|it is|that's|that is) done on the windows host screen[.!]*$/.test(sentence)) continue;
     // The whole sentence too, so a parenthetical ("I have, in fact, shut it down") never splits Bunny from its verb.
     if (bunnyActs(sentence.replace(/[,;:]/g, " "))) return true;
-    if (DONE_CLAIMS.some((re) => re.test(sentence.trim()) && !DONE_QUALIFIED.test(sentence))) return true;
+    if ([...DONE_CLAIMS, ...COMPLETION_CLAIMS].some((re) => re.test(sentence.trim()) && !DONE_QUALIFIED.test(sentence))) return true;
     // Every clause is judged on its own, so a lead-in ("Good news,", "Alright then,") never hides a claim.
-    for (const raw of sentence.split(/[,;:]\s*/)) {
+    for (const raw of sentence.split(/[,;:]\s*|\s+but\s+/)) {
       const clause = raw.trim().replace(/^(?:(?:and|so|then|now|well|okay|ok|sure|alright|right|yes|yeah|great|perfect|done|good news)\s+)+/, "");
       if (!clause) continue;
-      if (bunnyActs(clause) || DONE_CLAIMS.some((re) => re.test(clause) && !DONE_QUALIFIED.test(clause))) return true;
+      if (bunnyActs(clause) || claimsHostState(clause) || [...DONE_CLAIMS, ...COMPLETION_CLAIMS].some((re) => re.test(clause) && !DONE_QUALIFIED.test(clause))) return true;
     }
   }
   return false;
