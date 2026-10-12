@@ -51,6 +51,8 @@ export type HostSnapshot = {
   providerUsage?: ProviderUsageServiceSnapshot;
   /** M-A-3 T4 durable Agent runtime snapshot (agent-level continuity state). Optional: older clients ignore it. */
   agents?: AgentSnapshot;
+  /** M-A-3 T13 Personal Agent slots projected onto live Host facts (presentation only). Optional: older clients ignore it. */
+  personalAgents?: import("./personal-agents.ts").PersonalAgentsSnapshot;
 };
 /** `routingPrompt` and `modelOverride` are set in-process by the caller that knows the selection context; HTTP validates both. */
 export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; /** M-A-3 T3 §27: MANUAL exact-model selection; only honored where a real model surface exists. */ modelOverride?: string | null; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };

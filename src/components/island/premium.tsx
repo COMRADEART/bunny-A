@@ -1,14 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Activity,
-  ArrowRight,
   Bot,
-  CheckCircle2,
-  ChevronRight,
   Cpu,
+  FileText,
   Folder,
-  Home,
+  Layers,
   Menu,
   MessageSquare,
   Moon,
@@ -18,6 +16,7 @@ import {
   Smartphone,
   Sun,
   WifiOff,
+  type LucideIcon,
 } from "lucide-react";
 import { liveProviders, useIsland, type Sheet } from "@/store/use-island";
 import {
@@ -30,16 +29,16 @@ import {
   ProviderMark,
   ProviderStatus,
 } from "./ui";
-import { Composer, Approval, Routing, TaskDetail } from "./task";
+import { Approval, TaskDetail } from "./task";
 import { TaskRow, Notifications } from "./desktop";
 import { Projects } from "./projects";
-import { AgenticWorkspace, AgentState, openAgent } from "./agentic";
-import { ActivityRow, ActivityTimeline } from "./activity";
+import { AgenticWorkspace } from "./agentic";
+import { ActivityRow } from "./activity";
 import { Settings } from "./settings";
 import { Pairing, Phone } from "./phone";
 import { Telemetry } from "./telemetry";
 import { useHostStream } from "./host-stream";
-import { attentionRequired, filteredActivities, type ActivityFilters } from "./workspace-model";
+import { filteredActivities, returnFocusTo, type ActivityFilters } from "./workspace-model";
 import { CONNECTION_LABEL, freshnessLabel, pairingReason } from "./connection-model";
 import {
   attentionCount,
@@ -49,18 +48,35 @@ import {
   shortId,
   WORKSTATION_CAPTION,
 } from "./remote-view-model";
+import { ChatHome } from "./chat-home";
+import { Studio } from "./studio";
+import { Approvals } from "./approvals";
+import { Files } from "./files";
+import { ContextPanel } from "./context-panel";
+import { DesignPreview } from "./design-preview";
+import { BunnyCompanion, usePrefersReducedMotion, useHappyWindow } from "./characters";
+import { hostLive } from "./character-model";
+import { approvalCount, pendingApprovalItems } from "./approvals-model";
+import { COMPANION_LABEL, resolveCompanion } from "./companion-model";
+import { activeNavView, deepLinkFromSearch, NAV_MAIN, NAV_SYSTEM, type NavView } from "./nav-model";
 
 import "./premium.css";
+import "./glass.css";
 
-const NAV = [
-  { id: "today", label: "Home", icon: Home },
-  { id: "agentic", label: "Agentic", icon: Bot },
-  { id: "project", label: "Projects", icon: Folder },
-  { id: "activity", label: "Activity", icon: Activity },
-  { id: "provider", label: "Models", icon: Cpu },
-  { id: "devices", label: "Devices", icon: Smartphone },
-  { id: "settings", label: "Settings", icon: Settings2 },
-] as const;
+const NAV_ICONS: Record<NavView, LucideIcon> = {
+  chat: MessageSquare,
+  missions: Layers,
+  agents: Bot,
+  projects: Folder,
+  files: FileText,
+  approvals: ShieldCheck,
+  activity: Activity,
+  settings: Settings2,
+  models: Cpu,
+  devices: Smartphone,
+  "design-preview": Settings2,
+};
+
 export function Island() {
   const store = useIsland();
   const [now, setNow] = useState(0);
@@ -71,10 +87,11 @@ export function Island() {
   useEffect(() => {
     hydrate();
     setNow(Date.now());
-    setCompanion(new URLSearchParams(window.location.search).get("companion") === "1");
+    setCompanion(deepLinkFromSearch(window.location.search).companion);
   }, [hydrate]);
+  // The clock causes expiry renders; each incoming Host event is evaluated with that render's current time.
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    const timer = setInterval(() => setNow(Date.now()), 2_000);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
@@ -95,16 +112,10 @@ export function Island() {
     window.scrollTo({ top: 0 });
     setMenu(false);
   }, [store.sheet]);
-  const page = store.sheet ?? "today";
-  const active =
-    page === "task" || page === "tasks"
-      ? "activity"
-      : page === "phone"
-        ? "devices"
-        : page === "system"
-          ? "settings"
-          : page;
+  const page = store.sheet ?? "chat";
+  const active = activeNavView(page);
   const navigate = (sheet: Sheet) => {
+    if (sheet === "chat") store.setComposeKind("task");
     store.setSheet(sheet);
     setMenu(false);
   };
@@ -118,10 +129,49 @@ export function Island() {
           ? `Host ${store.hostHealth.operationalState}`
           : "Host connected";
   const task = store.tasks.find((row) => row.id === store.decisionTaskId);
+  const viewer = store.viewer?.kind === "device" ? "device" : "workstation";
+  const approvals = approvalCount(
+    pendingApprovalItems({
+      tasks: store.tasks,
+      missions: store.missions?.missions ?? [],
+      agents: store.agents?.agents ?? [],
+      viewer,
+    }),
+  );
   const attention = attentionCount(store.agents?.agents ?? [], store.missions?.missions ?? []);
   const connection = store.connection.state;
   const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  const freshness = freshnessLabel(store.connection.snapshotAt, now || Date.now(), clock);
+  // Keep the first server/client render deterministic, then use actual render time. A newly received interruption
+  // must not be compared with the previous 2 s tick and mistaken for a receipt from the future.
+  const renderNow = now === 0 ? 0 : Date.now();
+  const freshness = freshnessLabel(store.connection.snapshotAt, renderNow, clock);
+  // OS reduced-motion always wins, and so does any Motion setting other than Full (Settings promises both).
+  const systemReduced = usePrefersReducedMotion();
+  const reduced = systemReduced || store.appearance.motion !== "full";
+  // The companion: the Host's voice truth, the connection and any verified Personal Agent result, decided by companion-model.
+  const happyUntil = useHappyWindow(store.personalAgents?.slots ?? null, renderNow, hostLive(store.connection, renderNow));
+  const bunny = resolveCompanion({
+    now: renderNow,
+    connection: store.connection,
+    voice: store.voice,
+    voiceReceivedAt: store.voiceReceivedAt || null,
+    happyUntil,
+    reduced,
+  });
+  if (companion) {
+    // `?companion=1` is the full-screen, touch-first companion (Phone), on every surface link.
+    return (
+      <div className="bunny-app t8-app" data-theme={store.theme} data-motion={store.appearance.motion} data-surface="companion">
+        <a href="#bunny-content" className="skip-link">
+          Skip to content
+        </a>
+        <main id="bunny-content" className="workspace-content" tabIndex={-1}>
+          <Phone now={now} />
+        </main>
+        <Notice />
+      </div>
+    );
+  }
   return (
     <div
       className="bunny-app t8-app"
@@ -134,7 +184,7 @@ export function Island() {
       </a>
       <aside className="app-sidebar">
         <div className="sidebar-brand">
-          <button className="brand-button" onClick={() => navigate("today")}>
+          <button className="brand-button" onClick={() => navigate("chat")}>
             <BunnyMark />
             <span>
               Bunny<span className="brand-suffix">A</span>
@@ -145,7 +195,7 @@ export function Island() {
               <button
                 className="mobile-attention"
                 aria-label={attentionLabel(attention)}
-                onClick={() => navigate("agentic")}
+                onClick={() => navigate("missions")}
               >
                 <ShieldCheck size={16} />
                 <span>{attention}</span>
@@ -163,33 +213,27 @@ export function Island() {
           </span>
         </div>
         <nav id="primary-navigation" aria-label="Primary navigation">
-          {NAV.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              aria-current={active === id ? "page" : undefined}
-              onClick={() => navigate(id)}
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-              {id === "agentic" &&
-                (store.agents?.agents.filter(attentionRequired).length ?? 0) > 0 && (
-                  <span className="nav-count">
-                    {store.agents?.agents.filter(attentionRequired).length}
-                  </span>
-                )}
-            </button>
-          ))}
-          <div className="nav-separator" />
-          <button
-            aria-current={page === "chat" ? "page" : undefined}
-            onClick={() => {
-              store.setComposeKind("task");
-              navigate("chat");
-            }}
-          >
-            <MessageSquare size={18} />
-            <span>Bunny chat</span>
-          </button>
+          {NAV_MAIN.map(({ view, sheet, label }) => {
+            const Icon = NAV_ICONS[view];
+            const count = view === "approvals" ? approvals : view === "missions" ? attention : 0;
+            return (
+              <button key={view} aria-current={active === view ? "page" : undefined} onClick={() => navigate(sheet)}>
+                <Icon size={18} />
+                <span>{label}</span>
+                {count > 0 && <span className="nav-count">{count}</span>}
+              </button>
+            );
+          })}
+          <p className="nav-group-label">System</p>
+          {NAV_SYSTEM.map(({ view, sheet, label }) => {
+            const Icon = NAV_ICONS[view];
+            return (
+              <button key={view} aria-current={active === view ? "page" : undefined} onClick={() => navigate(sheet)}>
+                <Icon size={18} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
         </nav>
         <div className="sidebar-bottom">
           <p className="caption">Work stays with your Host.</p>
@@ -200,7 +244,7 @@ export function Island() {
           <button
             className="quiet-button"
             onClick={() => store.setTheme(store.theme === "dark" ? "light" : "dark")}
-            aria-label={store.theme === "dark" ? "Use light theme" : "Use dark theme"}
+            aria-label={store.theme === "dark" ? "Light appearance: switch theme" : "Dark appearance: switch theme"}
           >
             {store.theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             <span>{store.theme === "dark" ? "Light appearance" : "Dark appearance"}</span>
@@ -209,7 +253,10 @@ export function Island() {
       </aside>
       <div className="app-main">
         <header className="app-topbar">
-          <span>{companion ? "Bunny companion" : "Your personal workspace"}</span>
+          <span className="topbar-companion">
+            <BunnyCompanion state={bunny.state} level={bunny.level} size="compact" reduced={reduced} label={`Bunny is ${COMPANION_LABEL[bunny.state]}`} />
+            <span>Your personal workspace</span>
+          </span>
           <div>
             <span className="stream-indicator" role="status" data-connection={connection}>
               {connection === "live" || connection === "polling"
@@ -232,39 +279,44 @@ export function Island() {
             {store.syncStatus}
           </p>
         )}
-        <main id="bunny-content" className="workspace-content" tabIndex={-1}>
-          {page === "today" ? (
-            <HomeWorkspace now={now} />
-          ) : page === "agentic" || page === "missions" ? (
-            <AgenticWorkspace />
-          ) : page === "project" ? (
-            <Projects />
-          ) : page === "provider" ? (
-            <ModelsWorkspace />
-          ) : page === "activity" || page === "tasks" ? (
-            <ActivityWorkspace now={now} />
-          ) : page === "settings" ? (
-            <Settings />
-          ) : page === "devices" || page === "phone" ? (
-            <DevicesWorkspace />
-          ) : page === "system" ? (
-            <Telemetry />
-          ) : page === "task" ? (
-            <TaskDetail now={now} />
-          ) : page === "extensions" ? (
-            <Notifications now={now} />
-          ) : page === "decision" && task?.state === "waiting_for_approval" ? (
-            <div className="t8-surface">
-              <Approval task={task} />
-            </div>
-          ) : page === "chat" || page === "compose" ? (
-            <ChatWorkspace now={now} />
-          ) : companion ? (
-            <Phone now={now} />
-          ) : (
-            <HomeWorkspace now={now} />
-          )}
-        </main>
+        <div className="workspace-split">
+          <main id="bunny-content" className="workspace-content" tabIndex={-1}>
+            {page === "missions" || page === "agentic" ? (
+              <AgenticWorkspace />
+            ) : page === "agents" ? (
+              <Studio />
+            ) : page === "project" ? (
+              <Projects />
+            ) : page === "files" ? (
+              <Files />
+            ) : page === "approvals" ? (
+              <Approvals />
+            ) : page === "provider" ? (
+              <ModelsWorkspace />
+            ) : page === "activity" || page === "tasks" ? (
+              <ActivityWorkspace now={now} />
+            ) : page === "settings" ? (
+              <Settings />
+            ) : page === "devices" || page === "phone" ? (
+              <DevicesWorkspace />
+            ) : page === "system" ? (
+              <Telemetry />
+            ) : page === "task" ? (
+              <TaskDetail now={now} />
+            ) : page === "extensions" ? (
+              <Notifications now={now} />
+            ) : page === "design-preview" ? (
+              <DesignPreview />
+            ) : page === "decision" && task?.state === "waiting_for_approval" ? (
+              <div className="t8-surface">
+                <Approval task={task} />
+              </div>
+            ) : (
+              <ChatHome now={now} />
+            )}
+          </main>
+          {page !== "design-preview" && <ContextPanel now={now} />}
+        </div>
         <footer className="workspace-footer">
           <span>Bunny-A</span>
           <span>Host authority · independently verified results</span>
@@ -325,179 +377,6 @@ function ConnectionBanner({ freshness }: { freshness: string }) {
         Reconnect
       </button>
     </div>
-  );
-}
-function HomeWorkspace({ now }: { now: number }) {
-  const store = useIsland();
-  const agents = store.agents?.agents ?? [];
-  const active = agents.filter((row) => !["COMPLETED", "FAILED", "STOPPED"].includes(row.state));
-  const pending = agents.filter(attentionRequired);
-  const verified =
-    store.missions?.missions.filter((row) => row.result && row.result.verifiedSteps > 0) ?? [];
-  const providers = liveProviders(store).filter((row) => !row.extension || row.installed);
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">
-            {now
-              ? new Date(now).toLocaleDateString([], {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })
-              : "Your workspace"}
-          </p>
-          <h1>A clear view of your work.</h1>
-          <p>Pick up where you left off, or start something new.</p>
-        </div>
-        <button
-          className="btn primary"
-          onClick={() => {
-            store.setComposeKind("task");
-            store.setSheet("chat");
-          }}
-        >
-          <MessageSquare size={16} />
-          Ask Bunny
-        </button>
-      </div>
-      <div className="home-summary">
-        <button onClick={() => store.setSheet("agentic")}>
-          <Bot size={20} />
-          <strong>{store.hydratedFromHost ? active.length : "—"}</strong>
-          <span>Active Agents</span>
-          <small>Persistent Host work</small>
-        </button>
-        <button onClick={() => store.setSheet("agentic")}>
-          <ShieldCheck size={20} />
-          <strong>{store.hydratedFromHost ? pending.length : "—"}</strong>
-          <span>Need your attention</span>
-          <small>Permissions and recovery</small>
-        </button>
-        <button onClick={() => store.setSheet("agentic")}>
-          <CheckCircle2 size={20} />
-          <strong>{store.hydratedFromHost ? verified.length : "—"}</strong>
-          <span>Verified results</span>
-          <small>Retained Mission checks</small>
-        </button>
-      </div>
-      <section className="t8-section">
-        <div className="section-heading">
-          <h2>Current work</h2>
-          <button className="quiet-button" onClick={() => store.setSheet("agentic")}>
-            Open Agentic
-            <ArrowRight size={15} />
-          </button>
-        </div>
-        <div className="t8-surface">
-          {active.slice(0, 4).map((agent) => (
-            <button className="home-work-row" key={agent.id} onClick={() => openAgent(agent)}>
-              <Bot size={20} />
-              <span>
-                <strong>{agent.name}</strong>
-                <small>{agent.activity?.step ?? "No step currently admitted"}</small>
-              </span>
-              <AgentState agent={agent} />
-              <ChevronRight size={16} />
-            </button>
-          ))}
-          {!active.length && (
-            <Empty
-              title="Ready for your next task."
-              detail="Use Bunny chat for quick help, or Agentic for persistent multistep work."
-            />
-          )}
-        </div>
-      </section>
-      <div className="home-columns">
-        <section className="t8-section">
-          <div className="section-heading">
-            <h2>Recent Projects</h2>
-            <button className="quiet-button" onClick={() => store.setSheet("project")}>
-              All Projects
-              <ArrowRight size={15} />
-            </button>
-          </div>
-          <div className="t8-surface">
-            {store.projects.slice(0, 4).map((project) => (
-              <button
-                className="home-project-row"
-                key={project.id}
-                onClick={() => useIsland.setState({ projectFocus: project.id, sheet: "project" })}
-              >
-                <Folder size={19} />
-                <span>
-                  <strong>{project.name}</strong>
-                  <small>{project.path}</small>
-                </span>
-                <ChevronRight size={16} />
-              </button>
-            ))}
-            {!store.projects.length && (
-              <p className="t8-empty-copy">No registered Projects in this Host.</p>
-            )}
-          </div>
-        </section>
-        <section className="t8-section">
-          <div className="section-heading">
-            <h2>Connections</h2>
-            <button className="quiet-button" onClick={() => store.setSheet("provider")}>
-              Models
-              <ArrowRight size={15} />
-            </button>
-          </div>
-          <div className="t8-surface">
-            {providers.map((provider) => (
-              <div className="connection-row" key={provider.id}>
-                <ProviderMark provider={provider} />
-                <strong>{NAMES[provider.id]}</strong>
-                <ProviderStatus provider={provider} />
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-      <section className="t8-section">
-        <ActivityTimeline limit={5} />
-      </section>
-    </>
-  );
-}
-function ChatWorkspace({ now }: { now: number }) {
-  const store = useIsland();
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Regular Bunny chat</p>
-          <h1>What’s on your mind?</h1>
-          <p>Questions, explanations and ordinary Tasks. Durable Missions live in Agentic.</p>
-        </div>
-      </div>
-      <div className="chat-layout">
-        <section className="t8-surface chat-compose">
-          {store.submitting ? <Routing /> : <Composer />}
-        </section>
-        <section className="t8-section">
-          <h2>Recent ordinary Tasks</h2>
-          <div className="task-list t8-surface">
-            {store.tasks
-              .filter((row) => !row.mission)
-              .slice(0, 12)
-              .map((task) => (
-                <TaskRow task={task} now={now} key={task.id} />
-              ))}
-            {!store.tasks.some((row) => !row.mission) && (
-              <Empty
-                title="Start a conversation."
-                detail="Replies and outcomes come from the supported Host Task path."
-              />
-            )}
-          </div>
-        </section>
-      </div>
-    </>
   );
 }
 function ModelsWorkspace() {
@@ -762,6 +641,7 @@ function DevicesWorkspace() {
   const store = useIsland();
   const [signingOut, setSigningOut] = useState(false);
   const [revoking, setRevoking] = useState<{ id: string; name: string } | null>(null);
+  const dialogOpener = useRef<HTMLElement | null>(null);
   const viewer = store.viewer;
   const when = (ms: number | null | undefined) => (ms ? new Date(ms).toLocaleString() : "Not recorded");
   const identity = store.hostIdentity;
@@ -819,7 +699,13 @@ function DevicesWorkspace() {
               <p className="caption">
                 Creating Agents, first starts, scope changes, pairing and settings are {WORKSTATION_CAPTION.toLowerCase()}.
               </p>
-              <button className="btn danger" onClick={() => setSigningOut(true)}>
+              <button
+                className="btn danger"
+                onClick={(event) => {
+                  dialogOpener.current = event.currentTarget;
+                  setSigningOut(true);
+                }}
+              >
                 Sign out this phone
               </button>
             </>
@@ -845,7 +731,10 @@ function DevicesWorkspace() {
                   <button
                     className="btn quiet danger-text"
                     disabled={!store.canAct()}
-                    onClick={() => setRevoking({ id: device.id, name: device.name })}
+                    onClick={(event) => {
+                      dialogOpener.current = event.currentTarget;
+                      setRevoking({ id: device.id, name: device.name });
+                    }}
                   >
                     Revoke access
                   </button>
@@ -858,7 +747,7 @@ function DevicesWorkspace() {
       <Dialog.Root open={signingOut} onOpenChange={setSigningOut}>
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog" data-theme={store.theme}>
+          <Dialog.Content className="t8-dialog" data-theme={store.theme} onCloseAutoFocus={returnFocusTo(dialogOpener)}>
             <Dialog.Title>Sign out this phone?</Dialog.Title>
             <Dialog.Description>
               This phone revokes its own access on the Host and forgets its session. Agents keep running on
@@ -884,7 +773,7 @@ function DevicesWorkspace() {
       <Dialog.Root open={!!revoking} onOpenChange={(open) => !open && setRevoking(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog" data-theme={store.theme}>
+          <Dialog.Content className="t8-dialog" data-theme={store.theme} onCloseAutoFocus={returnFocusTo(dialogOpener)}>
             <Dialog.Title>Revoke {revoking?.name}?</Dialog.Title>
             <Dialog.Description>
               The device loses access immediately and its open activity streams close. Approval batches it

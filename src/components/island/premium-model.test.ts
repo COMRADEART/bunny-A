@@ -4,6 +4,7 @@ import {
   agentControls,
   attentionRequired,
   currentAgentTask,
+  currentStepLabel,
   filteredActivities,
   selectedTaskModel,
   type AgentView,
@@ -282,4 +283,11 @@ test("T8: new Host epoch reconciles independently of an old larger cursor", () =
   assert.equal(next.restarted, true);
   assert.equal(next.cursor, 1);
   assert.equal(next.instanceId, "host-b");
+});
+
+test("T13 agent row: 'Working on a step now' needs a live Host and a running or verifying step", () => {
+  assert.equal(currentStepLabel({ state: "running" }, true), "Working on a step now");
+  assert.equal(currentStepLabel({ state: "verifying" }, true), "Working on a step now");
+  assert.equal(currentStepLabel({ state: "waiting_for_approval" }, true), "Waiting for approval");
+  assert.equal(currentStepLabel({ state: "running" }, false), "Last known step", "an offline Host never shows work as happening now");
 });

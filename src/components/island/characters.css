@@ -1,0 +1,613 @@
+/* T13 character system (spec §3-§9). Animates transform, opacity and filter only. Every loop and one-shot is driven by
+   the data attributes that characters.tsx sets from character-model.ts; durations come from inline custom properties,
+   so the model is the single source of the timing. Wells are dark in both themes: the art's alpha matte keys dark visors
+   toward transparent, so the well is what keeps the faces visible. */
+
+:root {
+  --wc-well-top: #1a1e2b;
+  --wc-well-bottom: #07080d;
+  --wc-amber: #ffb840;
+  --wc-green: #3ddc97;
+  --wc-red: #ff6b6b;
+  --wc-blue: #7fb0ff;
+  --wc-grey: #8a93a8;
+  --wc-neutral: #c7cee0;
+  --wc-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+/* The text tokens follow the app's own theme setting (data-theme on the shell, as glass.css does), not the OS theme alone. */
+.bunny-app.t8-app,
+.bunny-app.t8-app[data-theme="light"] {
+  --wc-ink: #121726;
+  --wc-muted: #5a6378;
+}
+.bunny-app.t8-app[data-theme="dark"] {
+  --wc-ink: #eef1fa;
+  --wc-muted: #9aa3b8;
+}
+
+/* ---------------------------------------------------------------- frames and wells */
+
+.wc-weapon,
+.wc-companion {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--wc-box, 96px);
+  aspect-ratio: 1;
+  opacity: var(--wc-opacity, 1);
+  vertical-align: middle;
+}
+.wc-weapon[data-size="compact"],
+.wc-companion[data-size="compact"] {
+  --wc-box: 40px;
+}
+.wc-weapon[data-size="pose"],
+.wc-companion[data-size="pose"] {
+  --wc-box: 96px;
+}
+.wc-weapon[data-size="hero"],
+.wc-companion[data-size="hero"] {
+  --wc-box: 176px;
+}
+.wc-weapon[data-weapon="gada"] { --wc-accent: #ffd27a; }
+.wc-weapon[data-weapon="spear"] { --wc-accent: #7fd7ff; }
+.wc-weapon[data-weapon="chakra"] { --wc-accent: #b49cff; }
+.wc-weapon[data-weapon="sword"] { --wc-accent: #d6e0ff; }
+.wc-companion { --wc-accent: #7fb0ff; }
+
+.wc-well {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 22%;
+  background: radial-gradient(120% 95% at 50% 28%, var(--wc-well-top) 0%, var(--wc-well-bottom) 72%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.wc-body {
+  position: absolute;
+  inset: 6%;
+  display: block;
+  transform-origin: 50% 60%;
+  will-change: transform;
+}
+.wc-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.wc-halo,
+.wc-glint,
+.wc-fx,
+.wc-ring {
+  position: absolute;
+  pointer-events: none;
+}
+.wc-halo {
+  inset: -4%;
+  border-radius: 50%;
+  opacity: 0.35;
+  background: radial-gradient(circle, color-mix(in srgb, var(--wc-accent) 45%, transparent) 0%, transparent 62%);
+}
+.wc-glint {
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.35) 50%, transparent 60%);
+}
+.wc-ring {
+  inset: 9%;
+  border: 1.5px solid transparent;
+  border-radius: 50%;
+  transform: scale(var(--wc-level, 1));
+}
+
+/* Tone: muted = 40 % desaturated (paused, failed, stopped); grey = offline; dim = muted microphone or sleeping. */
+.wc-weapon[data-tone="muted"] .wc-body {
+  filter: saturate(0.6);
+}
+.wc-companion[data-tone="dim"] .wc-body {
+  filter: brightness(0.85);
+}
+.wc-weapon[data-tone="grey"] .wc-body,
+.wc-companion[data-tone="grey"] .wc-body {
+  filter: grayscale(1) brightness(0.9);
+}
+
+/* ---------------------------------------------------------------- base loops (spec §6) */
+
+.wc-weapon[data-base="gada-float"] .wc-body {
+  animation: wc-gada-float var(--wc-base-ms) var(--wc-ease) infinite;
+}
+.wc-weapon[data-base="spear-float"] .wc-body {
+  animation: wc-spear-float var(--wc-base-ms) var(--wc-ease) infinite;
+}
+.wc-weapon[data-base="chakra-rotate"] .wc-body {
+  animation: wc-chakra-rotate var(--wc-base-ms) linear infinite;
+}
+.wc-weapon[data-base="sword-hover"] .wc-body {
+  animation: wc-sword-hover var(--wc-base-ms) var(--wc-ease) infinite;
+}
+.wc-weapon[data-base="gada-float"] .wc-halo {
+  animation: wc-glow var(--wc-base-ms) ease-in-out infinite;
+}
+.wc-weapon[data-counter="true"] .wc-halo {
+  inset: -2%;
+  opacity: 0.8;
+  border: 1.5px dashed color-mix(in srgb, var(--wc-accent) 55%, transparent);
+  background: none;
+  animation: wc-counter-rotate var(--wc-counter-ms) linear infinite;
+}
+.wc-weapon[data-base="spear-float"] .wc-glint,
+.wc-weapon[data-base="sword-hover"] .wc-glint {
+  animation: wc-glint var(--wc-base-ms) linear infinite;
+}
+/* ACTIVE: soft halo breathe on top of the base loop. Chakra's counter-rotation is its whole halo. */
+.wc-weapon[data-halo="true"] .wc-halo {
+  animation: wc-breathe-halo var(--wc-halo-ms) ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------- task effect layer (spec §7) */
+
+.wc-fx i {
+  position: absolute;
+  display: none;
+  left: 50%;
+  top: 50%;
+  margin: -2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--wc-accent);
+}
+.wc-fx[data-prim="ring"] i:nth-child(1),
+.wc-fx[data-prim="sweep"] i:nth-child(1),
+.wc-fx[data-prim="beam"] i:nth-child(1),
+.wc-fx[data-prim="trace"] i:nth-child(1) {
+  display: block;
+}
+.wc-fx[data-prim="motes"] i:nth-child(-n + 3),
+.wc-fx[data-prim="sheets"] i:nth-child(-n + 3),
+.wc-fx[data-prim="pulse"] i:nth-child(-n + 3) {
+  display: block;
+}
+.wc-fx[data-prim="segments"] i {
+  display: block;
+}
+
+/* Primitive geometry. Each animation runs for the effect token (2.4 s) and staggers its parts with --wc-i. */
+.wc-fx[data-prim="ring"] i {
+  inset: 12%;
+  left: auto;
+  top: auto;
+  margin: 0;
+  width: auto;
+  height: auto;
+  border: 1.5px dotted var(--wc-accent);
+  border-radius: 50%;
+  background: none;
+  animation: wc-fx-spin var(--wc-effect-ms) linear infinite;
+}
+.wc-fx[data-prim="motes"] i {
+  animation: wc-fx-orbit var(--wc-effect-ms) linear infinite;
+  animation-delay: calc(var(--wc-i) * -800ms);
+}
+.wc-fx[data-prim="segments"] i {
+  left: 14%;
+  width: 16px;
+  height: 3px;
+  margin: 0;
+  border-radius: 2px;
+  top: calc(20% + var(--wc-i) * 12%);
+  animation: wc-fx-blink var(--wc-effect-ms) ease-in-out infinite;
+  animation-delay: calc(var(--wc-i) * -400ms);
+}
+.wc-fx[data-prim="sheets"] i {
+  top: 30%;
+  left: 36%;
+  width: 14px;
+  height: 18px;
+  margin: 0;
+  border-radius: 2px;
+  background: transparent;
+  border: 1.5px solid var(--wc-accent);
+  animation: wc-fx-drift var(--wc-effect-ms) var(--wc-ease-standard) infinite;
+  animation-delay: calc(var(--wc-i) * -800ms);
+}
+.wc-fx[data-prim="beam"] i {
+  top: 50%;
+  left: 0;
+  width: 34%;
+  height: 2px;
+  margin: -1px 0 0;
+  border-radius: 1px;
+  background: linear-gradient(to right, transparent, var(--wc-accent), transparent);
+  animation: wc-fx-beam var(--wc-effect-ms) linear infinite;
+}
+.wc-fx[data-prim="sweep"] i {
+  inset: -20% 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  background: linear-gradient(100deg, transparent 40%, color-mix(in srgb, var(--wc-accent) 50%, transparent) 50%, transparent 60%);
+  animation: wc-fx-sweep var(--wc-effect-ms) linear infinite;
+}
+.wc-fx[data-prim="pulse"] i {
+  inset: 14%;
+  left: auto;
+  top: auto;
+  margin: 0;
+  width: auto;
+  height: auto;
+  border: 1.5px solid var(--wc-accent);
+  border-radius: 50%;
+  background: none;
+  animation: wc-fx-pulse var(--wc-effect-ms) ease-out infinite;
+  animation-delay: calc(var(--wc-i) * -800ms);
+}
+.wc-fx[data-prim="trace"] i {
+  width: 6px;
+  height: 6px;
+  margin: -3px;
+  box-shadow: 0 0 8px var(--wc-accent);
+  animation: wc-fx-trace var(--wc-effect-ms) linear infinite;
+}
+/* Weapon personalities of the same primitive: Chakra's rings expand outward; Sword's sweep runs hilt to tip. */
+.wc-weapon[data-weapon="chakra"][data-effect="pulse"] .wc-fx i {
+  border-style: dashed;
+}
+
+
+/* ---------------------------------------------------------------- ring and halo states (spec §4, §7) */
+
+.wc-weapon[data-ring="amber"] .wc-ring,
+.wc-companion[data-ring="amber"] .wc-ring {
+  border-color: var(--wc-amber);
+  box-shadow: 0 0 14px rgba(255, 184, 64, 0.45);
+}
+.wc-weapon[data-ring="dashed"] .wc-ring,
+.wc-companion[data-ring="dashed"] .wc-ring {
+  border-style: dashed;
+  border-color: rgba(200, 210, 235, 0.5);
+}
+.wc-companion[data-ring="blue"] .wc-ring {
+  border-color: rgba(127, 176, 255, 0.75);
+  box-shadow: 0 0 14px rgba(127, 176, 255, 0.45);
+}
+.wc-companion[data-level="true"] .wc-ring {
+  transition: transform var(--wc-ease-standard) 150ms;
+}
+.wc-weapon[data-ring-pulse="true"] .wc-ring,
+.wc-companion[data-ring-pulse="true"] .wc-ring {
+  animation: wc-ring-pulse 2400ms ease-in-out infinite;
+}
+.wc-weapon[data-ring-spin="true"] .wc-ring {
+  animation: wc-ring-spin 8000ms linear infinite;
+}
+
+/* ---------------------------------------------------------------- companion loops (spec §9) */
+
+.wc-companion[data-loop="breathe"] .wc-body {
+  animation: wc-breathe-body var(--wc-loop-ms) ease-in-out infinite;
+}
+.wc-companion[data-loop="float"] .wc-body {
+  animation: wc-float-body var(--wc-loop-ms) var(--wc-ease) infinite;
+}
+.wc-companion[data-loop="bob"] .wc-body {
+  animation: wc-bob-body var(--wc-loop-ms) var(--wc-ease) infinite;
+}
+.wc-companion[data-loop="orbit"] .wc-ring {
+  border-style: dotted;
+  border-color: rgba(127, 176, 255, 0.7);
+  animation: wc-ring-spin var(--wc-loop-ms) linear infinite;
+}
+
+/* ---------------------------------------------------------------- badges (static; no entrance animation) */
+
+.wc-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 30%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  background: #0b0d14;
+  color: var(--wc-neutral);
+  transition: opacity 150ms var(--wc-ease-standard);
+}
+.wc-badge svg {
+  width: 62%;
+  height: 62%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wc-badge[data-tone="ok"] { color: var(--wc-green); }
+.wc-badge[data-tone="amber"] { color: var(--wc-amber); }
+.wc-badge[data-tone="red"] { color: var(--wc-red); }
+.wc-badge[data-tone="grey"] { color: var(--wc-grey); }
+.wc-badge[data-tone="neutral"] { color: var(--wc-neutral); }
+
+/* ---------------------------------------------------------------- one-shots (spec §8, §9); cleared on the ring/hop end */
+
+.wc-weapon[data-cue="verified"] .wc-body {
+  animation: wc-cue-bounce 900ms cubic-bezier(0.45, 0, 0.2, 1) 1;
+}
+.wc-weapon[data-cue="verified"][data-weapon="spear"] .wc-body {
+  animation: wc-cue-thrust 900ms cubic-bezier(0.65, 0, 0.35, 1) 1;
+}
+.wc-weapon[data-cue="verified"][data-weapon="chakra"] .wc-body {
+  animation: wc-cue-revolve 900ms cubic-bezier(0.1, 0.6, 0.2, 1) 1;
+}
+.wc-weapon[data-cue="verified"][data-weapon="sword"] .wc-body {
+  animation: wc-cue-slash 900ms cubic-bezier(0.65, 0, 0.35, 1) 1;
+}
+.wc-weapon[data-cue="verified"] .wc-ring {
+  border-color: #ffd27a;
+  animation: wc-cue-ring 900ms cubic-bezier(0.2, 0, 0, 1) 1;
+}
+.wc-weapon[data-cue="failed"] .wc-body {
+  animation: wc-cue-shake 400ms linear 1;
+}
+.wc-weapon[data-cue="failed"] .wc-ring {
+  border-color: var(--wc-red);
+  animation: wc-cue-ring 900ms cubic-bezier(0.2, 0, 0, 1) 1;
+}
+.wc-weapon[data-cue="completed"] .wc-body {
+  animation: wc-cue-settle 220ms ease-out 1;
+}
+.wc-weapon[data-cue="completed"] .wc-ring {
+  border-color: var(--wc-neutral);
+  animation: wc-cue-ring 220ms ease-out 1;
+}
+.wc-companion[data-cue="hop"] .wc-body {
+  animation: wc-cue-hop 600ms cubic-bezier(0.2, 0, 0, 1) 1;
+}
+.wc-companion[data-cue="recoil"] .wc-body {
+  animation: wc-cue-recoil 200ms ease-out 1;
+}
+
+/* ---------------------------------------------------------------- reduced motion: loops and one-shots removed, pose,
+   ring and badge kept. data-reduced comes from the component; the app's data-motion and the OS setting also apply. */
+
+.wc-weapon[data-reduced="true"],
+.wc-weapon[data-reduced="true"] *,
+.wc-companion[data-reduced="true"],
+.wc-companion[data-reduced="true"] * {
+  animation: none !important;
+  transition: none !important;
+}
+.bunny-app[data-motion="reduced"] .wc-weapon *,
+.bunny-app[data-motion="off"] .wc-weapon *,
+.bunny-app[data-motion="reduced"] .wc-companion *,
+.bunny-app[data-motion="off"] .wc-companion *,
+.t8-app[data-motion="reduced"] .wc-weapon *,
+.t8-app[data-motion="off"] .wc-weapon *,
+.t8-app[data-motion="reduced"] .wc-companion *,
+.t8-app[data-motion="off"] .wc-companion * {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wc-weapon *,
+  .wc-companion * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The effect layer is a motion layer only: under reduced motion it is not drawn, so the pose, ring and badge stand alone. */
+.wc-weapon[data-reduced="true"] .wc-fx {
+  display: none;
+}
+
+/* Paused surfaces (document hidden, off-screen, forced): every loop holds its current frame. */
+.wc-weapon[data-paused="true"] *,
+.wc-companion[data-paused="true"] * {
+  animation-play-state: paused !important;
+}
+
+/* ---------------------------------------------------------------- strip */
+
+.wc-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.wc-strip-item {
+  display: inline-flex;
+  border-radius: 22%;
+}
+.wc-count {
+  font: 600 12px/1 ui-sans-serif, system-ui, sans-serif;
+  color: var(--wc-muted);
+  padding-inline: 4px;
+}
+/* Text for assistive technology only (the strip's count is announced, not drawn twice). */
+.wc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- keyframes: base loops */
+
+@keyframes wc-gada-float {
+  0%,
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  30% { transform: translate3d(0, -2px, 0) rotate(0deg); }
+  60% { transform: translate3d(0, -1px, 0) rotate(-2deg); }
+  80% { transform: translate3d(0, 0, 0) rotate(-1deg); }
+}
+@keyframes wc-spear-float {
+  0%,
+  100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -1.5px, 0); }
+}
+@keyframes wc-sword-hover {
+  0%,
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(0, -1.5px, 0) rotate(1deg); }
+}
+@keyframes wc-chakra-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes wc-counter-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+@keyframes wc-glow {
+  0%,
+  100% { opacity: 0.35; }
+  50% { opacity: 0.6; }
+}
+@keyframes wc-glint {
+  0% { transform: translate3d(-60%, 40%, 0); opacity: 0; }
+  12% { opacity: 1; }
+  30% { transform: translate3d(60%, -40%, 0); opacity: 0; }
+  100% { transform: translate3d(60%, -40%, 0); opacity: 0; }
+}
+@keyframes wc-breathe-halo {
+  0%,
+  100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.04); }
+}
+
+/* ---------------------------------------------------------------- keyframes: effect primitives */
+
+@keyframes wc-fx-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes wc-fx-orbit {
+  from { opacity: 0.9; transform: rotate(0deg) translateX(calc(var(--wc-box, 96px) * 0.4)); }
+  to { opacity: 0.9; transform: rotate(360deg) translateX(calc(var(--wc-box, 96px) * 0.4)); }
+}
+@keyframes wc-fx-blink {
+  0%,
+  100% { opacity: 0.12; }
+  20% { opacity: 1; }
+  45% { opacity: 0.12; }
+}
+@keyframes wc-fx-drift {
+  0% { opacity: 0; transform: translate3d(0, 60%, 0) scale(0.6); }
+  35% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes wc-fx-beam {
+  0% { opacity: 0; transform: translate3d(calc(var(--wc-box, 96px) * -0.2), 0, 0); }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(calc(var(--wc-box, 96px) * 0.9), 0, 0); }
+}
+@keyframes wc-fx-sweep {
+  0% { opacity: 0; transform: translate3d(-100%, 0, 0); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(100%, 0, 0); }
+}
+@keyframes wc-fx-pulse {
+  0% { opacity: 0.9; transform: scale(0.5); }
+  60% { opacity: 0; transform: scale(1.4); }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+@keyframes wc-fx-trace {
+  from { opacity: 1; transform: rotate(0deg) translateX(calc(var(--wc-box, 96px) * 0.44)); }
+  to { opacity: 1; transform: rotate(360deg) translateX(calc(var(--wc-box, 96px) * 0.44)); }
+}
+@keyframes wc-ring-pulse {
+  0%,
+  100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+@keyframes wc-ring-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ---------------------------------------------------------------- keyframes: companion loops */
+
+@keyframes wc-breathe-body {
+  0%,
+  100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+@keyframes wc-float-body {
+  0%,
+  100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -1.5px, 0); }
+}
+@keyframes wc-bob-body {
+  0%,
+  100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -2px, 0); }
+}
+
+/* ---------------------------------------------------------------- keyframes: one-shots (never looped) */
+
+@keyframes wc-cue-bounce {
+  0% { transform: translate3d(0, 0, 0); }
+  30% { transform: translate3d(0, -7px, 0); }
+  55% { transform: translate3d(0, 0, 0); }
+  75% { transform: translate3d(0, -2px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes wc-cue-thrust {
+  0% { transform: translate3d(0, 0, 0); }
+  35% { transform: translate3d(0, -6px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes wc-cue-revolve {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes wc-cue-slash {
+  0% { transform: translate3d(-4%, 4%, 0) rotate(-6deg); }
+  50% { transform: translate3d(2%, -2%, 0) rotate(3deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+@keyframes wc-cue-shake {
+  0% { transform: translate3d(0, 0, 0); }
+  25% { transform: translate3d(-2px, 0, 0); }
+  50% { transform: translate3d(2px, 0, 0); }
+  75% { transform: translate3d(-2px, 0, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes wc-cue-settle {
+  from { transform: translate3d(0, 1px, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes wc-cue-ring {
+  0% { opacity: 1; transform: scale(0.8); }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+@keyframes wc-cue-hop {
+  0% { transform: translate3d(0, 0, 0); }
+  40% { transform: translate3d(0, -8px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes wc-cue-recoil {
+  0% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+/* Forced colors drop background images, which would remove the dark well the alpha-keyed art needs to keep its faces visible. */
+@media (forced-colors: active) {
+  .wc-well {
+    forced-color-adjust: none;
+  }
+}

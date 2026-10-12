@@ -23,6 +23,7 @@ import {
   type WorkerEvent,
 } from "./voice-protocol.ts";
 import { canTransition, createFsm, hasSpeechInFlight, tryTransition, type VoiceFsm } from "./voice-fsm.ts";
+import { companionState } from "./voice-companion.ts";
 import { VoiceChunker, chunkAnswer, type SpokenChunk } from "./voice-chunker.ts";
 import { claimsAction, classifyTranscript, controlAction, type VoiceIntent } from "./voice-intent.ts";
 import { VoiceTurnTaking, echoMatch, echoTokens, type TurnDecision } from "./voice-turn-taking.ts";
@@ -271,6 +272,10 @@ export class VoiceSessionManager {
   /** Worker events and task deltas dropped as stale (generation, turn or epoch), counted into receipts. */
   private lateEventsDropped = 0;
   private snap: VoiceSnapshot;
+  /** M-A-3 T13: per-process snapshot revision; only ever increases (see touch and resetAfterClose). */
+  private revision = 0;
+  /** M-A-3 T13: identifies this Host process in every snapshot, closed ones included (see VoiceSnapshot.instance). */
+  private readonly instance = randomUUID();
 
   private readonly deps: VoiceSessionDeps;
 
@@ -316,11 +321,17 @@ export class VoiceSessionManager {
       timing: null,
       createdAt: null,
       updatedAt: this.now(),
+      revision: 0,
+      instance: this.instance,
     };
+    this.refreshCompanion();
   }
 
   /** The VoiceSnapshot clients render. A copy: callers cannot mutate session state. */
   snapshot(): VoiceSnapshot {
+    // M-A-3 T13: the companion is re-derived at read time, so a time-based expression (receipt window, proposal expiry) ends
+    // on its own. A change of expression is a change of view, so it advances the revision.
+    if (this.refreshCompanion()) this.bumpRevision();
     const copy = structuredClone(this.snap);
     // The grant lapses with the clock, not with an event: the copy reports the grant's truth at this instant.
     if (copy.duplex) copy.duplex.grantExpiresAt = this.grantLive() ? this.grantExpiresAt : null;
@@ -571,6 +582,8 @@ export class VoiceSessionManager {
       createdAt: null,
       updatedAt: this.now(),
     };
+    this.bumpRevision();
+    this.refreshCompanion();
   }
 
   // -------------------------------------------------------------------------------------------------------------
@@ -3010,6 +3023,27 @@ export class VoiceSessionManager {
       this.snap.duplex.releasing = this.duplexStopping !== null;
       this.snap.duplex.grantExpiresAt = this.grantLive() ? this.grantExpiresAt : null;
     }
+    this.bumpRevision();
+    this.refreshCompanion();
+  }
+
+  /** M-A-3 T13: the snapshot revision only ever increases; a client keeps the highest one it has seen. */
+  private bumpRevision() {
+    this.revision += 1;
+    this.snap.revision = this.revision;
+  }
+
+  /**
+   * M-A-3 T13: the companion expression from the current facts. `since` moves only when the state changes. Returns true
+   * when the expression changed state.
+   */
+  private refreshCompanion(): boolean {
+    const now = this.now();
+    const view = companionState(this.snap, now);
+    const previous = this.snap.companion;
+    const changed = !previous || previous.state !== view.state;
+    this.snap.companion = { state: view.state, reason: view.reason, since: changed ? now : previous.since };
+    return changed;
   }
 }
 

@@ -23,9 +23,10 @@ import { describeTree, descendants, killProcess, processTable, sameProcessIdenti
 } from "./process-tree.server.ts";
 import { verifySpec } from "./verification.server.ts";
 import { markProviderSessionReview, readProviderSessions, reconcileProviderSession, type InterruptedProviderSession } from "./owned-process-group.server.ts";
-import { HostContainment, safeError, type SafeError } from "./failure.server.ts";
+import { CommandRefusedError, HostContainment, safeError, type SafeError } from "./failure.server.ts";
 import { ProjectRegistry } from "./project-registry.server.ts";
 import { deviceMayLaunch } from "./device-authority.server.ts";
+import { PERSONAL_AGENTS_SETTING, PERSONAL_AGENTS_SCHEMA, defaultPersonalAgentsConfig, parsePersonalAgentsConfig, validatePersonalAgentSlots, type PersonalAgentSlotConfig, type PersonalAgentsConfig } from "./personal-agents.ts";
 import { isRemoteOllamaTag } from "../orch/exec.server.ts";
 
 export type TaskOutputEvent = { text: string } | { done: true; state: string };
@@ -88,6 +89,8 @@ export class TaskManager {
   remoteUrl: string | null = null;
   policy: PolicyEngine;
   thermal = { cpuWarn: 90, gpuWarn: 85, autoStop: false };
+  /** M-A-3 T13: the four Personal Agent slots (presentation only), persisted in the settings row PERSONAL_AGENTS_SETTING. */
+  personalAgents: PersonalAgentsConfig = defaultPersonalAgentsConfig();
   hotSensors = new Set<string>();
   flushers = new Map<string, () => void>();
   treeTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -164,6 +167,10 @@ export class TaskManager {
       .prepare("SELECT value FROM settings WHERE key='thermal_policy'")
       .get() as { value: string } | undefined;
     if (savedThermal) this.thermal = JSON.parse(savedThermal.value);
+    const savedPersonalAgents = db.db
+      .prepare("SELECT value FROM settings WHERE key=?")
+      .get(PERSONAL_AGENTS_SETTING) as { value: string } | undefined;
+    this.personalAgents = parsePersonalAgentsConfig(savedPersonalAgents?.value ?? null);
     this.bus.setMaxListeners(100);
     // UI reconnect never calls this. A new Host instance genuinely cannot attach
     // to an old non-interactive pipe; keep session/PID evidence without killing it.
@@ -516,6 +523,37 @@ export class TaskManager {
         `CPU ${cpuWarn}°C, GPU ${gpuWarn}°C; automatic stop ${autoStop ? "enabled by user" : "off"}.`,
       ),
     );
+  }
+  /**
+   * M-A-3 T13: saves the four Personal Agent slots. Presentation only: no Agent or Mission action runs and no
+   * authorization changes. A caller that passes `expectRevision` is refused when the stored revision moved on, so a
+   * stale Studio view never overwrites a newer one. Every binding must be one of `bindableIds` (user-facing Agents).
+   */
+  configurePersonalAgents(slots: unknown, expectRevision: unknown, bindableIds: ReadonlySet<string>): PersonalAgentsConfig {
+    // Both refusals are CommandRefusedError: nothing is written and no containment runs. A write failure is not caught here.
+    if (expectRevision !== undefined && expectRevision !== null && expectRevision !== this.personalAgents.revision)
+      throw new CommandRefusedError(
+        `Personal Agents changed since this view was loaded (current revision ${this.personalAgents.revision}). Nothing was changed; review the current slots.`,
+      );
+    let validated: PersonalAgentSlotConfig[];
+    try {
+      validated = validatePersonalAgentSlots(slots, bindableIds);
+    } catch (error) {
+      throw new CommandRefusedError(error instanceof Error ? error.message : "Personal Agent slots were refused.");
+    }
+    const next: PersonalAgentsConfig = {
+      schema: PERSONAL_AGENTS_SCHEMA,
+      revision: this.personalAgents.revision + 1,
+      updatedAt: Date.now(),
+      slots: validated,
+    };
+    this.db.db
+      .prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+      .run(PERSONAL_AGENTS_SETTING, JSON.stringify(next));
+    this.personalAgents = next;
+    const bound = validated.filter((slot) => slot.agentId !== null).length;
+    this.emit(this.db.event("personal_agents.configured", null, `Personal Agents revision ${next.revision} saved; ${bound} of 4 slots bound.`));
+    return next;
   }
   sample(sample: HostSample) {
     this.samples = [...this.samples, sample].slice(-40);

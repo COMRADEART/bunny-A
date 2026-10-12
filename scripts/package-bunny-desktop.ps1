@@ -141,6 +141,13 @@ try {
   # Older pinned rollback sources predate the presentation helper.
   if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'install/Bunny-Island.Presentation.ps1')) {Add-PackageFile (Join-Path $bunnyBuild 'install/Bunny-Island.Presentation.ps1') 'Bunny-Island.Presentation.ps1' 'source' 'install/Bunny-Island.Presentation.ps1'}
   # M-A-3 T10 notch placement and native voice layers; older pinned sources predate them.
+  # T13 sources require all three native modules and their art. Historical rollback pins predate characters.
+  if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'install/Bunny-Island.Characters.ps1')) {
+    foreach($name in @('Bunny-Island.Characters.ps1','Bunny-Island.Companion.ps1','Bunny-Island.Weapons.ps1')) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}
+    $characterSource=Join-Path $bunnyBuild 'public/bunny-a/characters'
+    if(-not(Test-Path -LiteralPath $characterSource -PathType Container)) {throw 'Bunny character art is missing from the build.'}
+    foreach($item in @(Get-ChildItem -LiteralPath $characterSource -Filter '*.png' -File)) {Add-PackageFile $item.FullName ('characters/'+$item.Name) 'source' ('public/bunny-a/characters/'+$item.Name)}
+  }
   foreach($name in @('Bunny-Island.Placement.ps1','Bunny-Island.Voice.ps1')) {if(Test-Path -LiteralPath (Join-Path $bunnyBuild ('install/'+$name))) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}}
   # The tunnel worker runs from the release too, so remote access never starts code from a checkout.
   foreach($name in @('bunny-tunnel.mjs','bunny-tunnel-state.mjs','bunny-tunnel-paths.mjs','bunny-tunnel-worker.mjs')) {if(Test-Path -LiteralPath (Join-Path $bunnyBuild ('scripts/'+$name))) {Add-PackageFile (Join-Path $bunnyBuild ('scripts/'+$name)) ('scripts/'+$name) 'source' ('scripts/'+$name)}}

@@ -3,12 +3,14 @@ function Invoke-BunnyClick($Control) { if(-not$Control.IsEnabled){throw ('Contro
 function Save-BunnyScreenshot([string]$Name) {
  $directory=if($ScreenshotDirectory){$ScreenshotDirectory}else{Join-Path $Root 'screenshots'};[void](New-Item -ItemType Directory -Path $directory -Force);Resize-Bunny;$bunnyWindow.UpdateLayout()
  # A WPF resize reaches the HWND on the next dispatcher pass, including in test hooks.
- $frame=[Windows.Threading.DispatcherFrame]::new();$settle=[Windows.Threading.DispatcherTimer]::new();$settle.Interval=[TimeSpan]::FromMilliseconds(40);$settle.Add_Tick({$settle.Stop();$frame.Continue=$false});$settle.Start();[Windows.Threading.Dispatcher]::PushFrame($frame);$bunnyWindow.UpdateLayout()
+ # The HWND can lag the requested size by a few passes (a strip can make the notch taller); pump until the actual height matches.
+ for($attempt=0;$attempt-lt10;$attempt++){$frame=[Windows.Threading.DispatcherFrame]::new();$settle=[Windows.Threading.DispatcherTimer]::new();$settle.Interval=[TimeSpan]::FromMilliseconds(40);$settle.Add_Tick({$settle.Stop();$frame.Continue=$false});$settle.Start();[Windows.Threading.Dispatcher]::PushFrame($frame);$bunnyWindow.UpdateLayout();if([Math]::Abs($bunnyWindow.ActualHeight-$bunnyWindow.Height)-lt1){break}}
  $bitmap=[Windows.Media.Imaging.RenderTargetBitmap]::new([int]$bunnyWindow.ActualWidth,[int]$bunnyWindow.ActualHeight,96,96,[Windows.Media.PixelFormats]::Pbgra32);$bitmap.Render($bunnyWindow);$encoder=[Windows.Media.Imaging.PngBitmapEncoder]::new();$encoder.Frames.Add([Windows.Media.Imaging.BitmapFrame]::Create($bitmap));$path=Join-Path $directory ($Name+'.png');$stream=[IO.File]::Create($path);try{$encoder.Save($stream)}finally{$stream.Dispose()};return $path
 }
 $bunnyPreferencePath = if($PreferencePath) {$PreferencePath} else {throw 'Installed Island requires an explicit preference path; the retired repository path is refused.'}
-$bunnyPreferences = @{ size='compact'; position='center'; idle='providers'; glass='medium'; motion='full'; collapse=10; theme='dark'; primary=@('codex','claude','ollama'); edge='top'; edgeOffset=0.5; blur='off' }
+$bunnyPreferences = @{ size='compact'; position='center'; idle='providers'; glass='medium'; motion='full'; collapse=10; theme='dark'; primary=@('codex','claude','ollama'); edge='top'; edgeOffset=0.5; blur='off'; monitor=$null }
 . (Join-Path $PSScriptRoot 'Bunny-Island.Placement.ps1')
+. (Join-Path $PSScriptRoot 'Bunny-Island.Characters.ps1')
 try { if (Test-Path -LiteralPath $bunnyPreferencePath) { $saved=Get-Content -LiteralPath $bunnyPreferencePath -Raw | ConvertFrom-Json; foreach ($property in $saved.PSObject.Properties) { if ($bunnyPreferences.ContainsKey($property.Name)) { $bunnyPreferences[$property.Name]=$property.Value } } } } catch { }
 $bunnyView='idle'; $bunnyExpanded=$false; $bunnyTaskExpanded=$false; $bunnyPending=$null; $bunnyFinishedAt=$null; $bunnySeenTaskState=''; $bunnyHeatDismissed=$null; $bunnyHot=$null; $bunnyOnline=$false; $bunnySettingsUpdating=$false
 $bunnyAnimate = -not $SmokeTest -and [Windows.SystemParameters]::ClientAreaAnimation -and -not [Windows.SystemParameters]::HighContrast
@@ -39,17 +41,33 @@ $bunnyAnimate = -not $SmokeTest -and [Windows.SystemParameters]::ClientAreaAnima
   <Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="{DynamicResource BunnyText}"/><Setter Property="MinHeight" Value="44"/><Setter Property="Padding" Value="12,8"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Border x:Name="Item" CornerRadius="8" Padding="{TemplateBinding Padding}" Background="Transparent"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource BunnyHover}"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource BunnyAccentSoft}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
   <Style TargetType="CheckBox"><Setter Property="Foreground" Value="{DynamicResource BunnyText}"/><Setter Property="MinHeight" Value="44"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><DockPanel><Border x:Name="Box" Width="18" Height="18" CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource BunnyMuted}" Background="{DynamicResource BunnyField}" Margin="0,0,8,0" VerticalAlignment="Center"><Path x:Name="Tick" Data="M0,4 L3,7 L9,0" Stroke="{DynamicResource BunnyAccent}" StrokeThickness="1.7" Margin="3" Visibility="Collapsed"/></Border><ContentPresenter VerticalAlignment="Center"/></DockPanel><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Tick" Property="Visibility" Value="Visible"/><Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource BunnyAccent}"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Box" Property="BorderThickness" Value="2"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
  </StackPanel.Resources>
- <StackPanel x:Name="AgentStrip" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" AutomationProperties.Name="Agent indicators"/>
- <Border x:Name="Glass" Background="{DynamicResource BunnyGlass}" CornerRadius="28" BorderBrush="{DynamicResource BunnySep}" BorderThickness="1" Padding="12,10" Margin="10">
-  <Border.Effect><DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.25"/></Border.Effect>
-  <StackPanel>
-   <DockPanel x:Name="Header" Height="44" LastChildFill="False">
-    <Button x:Name="ExtrasButton" DockPanel.Dock="Right" Style="{DynamicResource IconButton}" ToolTip="Island menu" AutomationProperties.Name="Island menu"/>
-    <Button x:Name="VoiceButton" DockPanel.Dock="Right" Style="{DynamicResource IconButton}" ToolTip="Voice: hold to talk" AutomationProperties.Name="Voice input"/><Button x:Name="SystemButton" DockPanel.Dock="Right" Width="56" Padding="0" ToolTip="System telemetry" AutomationProperties.Name="System telemetry"><TextBlock x:Name="Temperature" Text="--" FontSize="13" Foreground="{DynamicResource BunnyMuted}"/></Button>
-    <Button x:Name="BunnyButton" DockPanel.Dock="Left" Width="44" Padding="0" ToolTip="Ask Bunny" AutomationProperties.Name="Ask Bunny"><Border x:Name="BrandTile" Width="28" Height="28" CornerRadius="8" Background="{DynamicResource BunnyField}"><Path x:Name="BrandMark" Data="M10 17C7 13 7 5 10 5S14 11 14 15H18C18 11 19 5 22 5S25 13 22 17C25 19 25 24 22 26C19 29 13 29 10 26C7 24 7 19 10 17Z M10.8 21 A1.2 1.2 0 1 0 13.2 21 A1.2 1.2 0 1 0 10.8 21 M18.8 21 A1.2 1.2 0 1 0 21.2 21 A1.2 1.2 0 1 0 18.8 21" Fill="{DynamicResource BunnyText}" Width="17" Height="22" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Button>
-    <Border x:Name="HeaderSep" DockPanel.Dock="Left" Width="1" Height="20" Background="{DynamicResource BunnySep}" Margin="4,0,10,0"/>
-    <StackPanel x:Name="Providers" Orientation="Horizontal" VerticalAlignment="Center"/>
+ <Border x:Name="StripCapsule" Visibility="Collapsed" Height="58" Margin="0,14,-12,10" VerticalAlignment="Top" HorizontalAlignment="Left" CornerRadius="29" BorderThickness="1" BorderBrush="#24FFFFFF" Padding="6,0" Background="#FF0B0D14">
+  <StackPanel x:Name="AgentStrip" Orientation="Horizontal" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" AutomationProperties.Name="Agent indicators"/>
+ </Border>
+ <Border x:Name="Glass" CornerRadius="28" BorderThickness="1" Padding="6,0" Margin="10,14,10,10">
+  <Border.Effect><DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.45" Color="#FF000000"/></Border.Effect>
+  <StackPanel x:Name="GlassStack">
+   <DockPanel x:Name="Header" Height="56" LastChildFill="False">
+    <DockPanel.Resources>
+     <SolidColorBrush x:Key="BunnyText" Color="#FFEEF2FA"/><SolidColorBrush x:Key="BunnyMuted" Color="#FF9AA3B8"/><SolidColorBrush x:Key="BunnyAccent" Color="#FF8EB9FF"/>
+     <SolidColorBrush x:Key="BunnyField" Color="#14FFFFFF"/><SolidColorBrush x:Key="BunnyHover" Color="#26FFFFFF"/><SolidColorBrush x:Key="BunnySep" Color="#24FFFFFF"/>
+     <SolidColorBrush x:Key="BunnyAccentSoft" Color="#338EB9FF"/><SolidColorBrush x:Key="BunnyOnAccent" Color="#FF14213A"/><SolidColorBrush x:Key="BunnyPositive" Color="#FF85CFA5"/>
+     <SolidColorBrush x:Key="BunnyWarning" Color="#FFE6BF78"/><SolidColorBrush x:Key="BunnyNegative" Color="#FFF5A09D"/>
+    </DockPanel.Resources>
+    <Button x:Name="ExtrasButton" DockPanel.Dock="Right" Width="44" Height="44" Style="{DynamicResource IconButton}" ToolTip="Quick controls" AutomationProperties.Name="Quick controls"/>
+    <Button x:Name="SearchButton" DockPanel.Dock="Right" Width="44" Height="44" Style="{DynamicResource IconButton}" ToolTip="Open workspace" AutomationProperties.Name="Open workspace"/>
+    <Button x:Name="BunnyButton" DockPanel.Dock="Left" Width="60" Height="56" Padding="0" Background="Transparent" BorderThickness="0" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" ToolTip="Ask Bunny" AutomationProperties.Name="Ask Bunny"><Border x:Name="BrandTile" Width="56" Height="56" CornerRadius="0" Background="Transparent" BorderThickness="0"><Grid><Image x:Name="BunnyArt" Width="56" Height="56" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Bunny companion"/><Border x:Name="CompanionRing" CornerRadius="18" BorderThickness="1.5" Opacity="0" IsHitTestVisible="False" RenderTransformOrigin="0.5,0.5"><Border.RenderTransform><ScaleTransform x:Name="RingScale"/></Border.RenderTransform></Border><Border x:Name="CompanionTint" CornerRadius="18" Background="#8C06080D" Opacity="0" IsHitTestVisible="False"/><Border x:Name="CompanionBadge" Visibility="Collapsed" Width="12" Height="12" CornerRadius="6" Background="#FF2C2C2E" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-3,-3" IsHitTestVisible="False"><TextBlock x:Name="CompanionBadgeText" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#FFFFFFFF"/></Border><Path x:Name="BrandMark" Visibility="Collapsed" Data="M10 17C7 13 7 5 10 5S14 11 14 15H18C18 11 19 5 22 5S25 13 22 17C25 19 25 24 22 26C19 29 13 29 10 26C7 24 7 19 10 17Z M10.8 21 A1.2 1.2 0 1 0 13.2 21 A1.2 1.2 0 1 0 10.8 21 M18.8 21 A1.2 1.2 0 1 0 21.2 21 A1.2 1.2 0 1 0 18.8 21" Fill="{DynamicResource BunnyText}" Width="17" Height="22" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid></Border></Button>
+    <Button x:Name="VoiceButton" DockPanel.Dock="Left" Width="44" Height="44" Style="{DynamicResource IconButton}" ToolTip="Voice: hold to talk" AutomationProperties.Name="Voice input"/>
+    <StackPanel x:Name="NotchBars" DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Height="22" Margin="0,0,8,0" AutomationProperties.Name="Input level">
+     <Border x:Name="Bar1" Width="3" Height="4" CornerRadius="1.5" Margin="1.5,0" VerticalAlignment="Center" Background="{DynamicResource BunnyAccent}"/><Border x:Name="Bar2" Width="3" Height="4" CornerRadius="1.5" Margin="1.5,0" VerticalAlignment="Center" Background="{DynamicResource BunnyAccent}"/><Border x:Name="Bar3" Width="3" Height="4" CornerRadius="1.5" Margin="1.5,0" VerticalAlignment="Center" Background="{DynamicResource BunnyAccent}"/><Border x:Name="Bar4" Width="3" Height="4" CornerRadius="1.5" Margin="1.5,0" VerticalAlignment="Center" Background="{DynamicResource BunnyAccent}"/><Border x:Name="Bar5" Width="3" Height="4" CornerRadius="1.5" Margin="1.5,0" VerticalAlignment="Center" Background="{DynamicResource BunnyAccent}"/>
+    </StackPanel>
+    <TextBlock x:Name="NotchStatus" DockPanel.Dock="Left" Text="Ready" MaxWidth="128" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource BunnyText}" AutomationProperties.Name="Voice status"/>
+    <Button x:Name="SystemButton" Visibility="Collapsed" DockPanel.Dock="Right" Width="56" Padding="0" ToolTip="System telemetry" AutomationProperties.Name="System telemetry"><TextBlock x:Name="Temperature" Text="" FontSize="13" Foreground="{DynamicResource BunnyMuted}"/></Button>
+    <Border x:Name="HeaderSep" Visibility="Collapsed" DockPanel.Dock="Left" Width="1" Height="20" Background="{DynamicResource BunnySep}" Margin="4,0,10,0"/>
+    <StackPanel x:Name="Providers" Visibility="Collapsed" Orientation="Horizontal" VerticalAlignment="Center"/>
    </DockPanel>
+   <Border x:Name="PanelSurface" Visibility="Collapsed" Background="{DynamicResource BunnyPanel}" CornerRadius="22" Margin="0,6,0,6">
+    <StackPanel x:Name="PanelStack">
    <Button x:Name="CompactTask" Visibility="Collapsed" Padding="8,8" HorizontalContentAlignment="Stretch" Margin="0,8,0,0" AutomationProperties.Name="Expand active task"><DockPanel><TextBlock x:Name="CompactTime" DockPanel.Dock="Right" Foreground="{DynamicResource BunnyMuted}" VerticalAlignment="Center"/><StackPanel><TextBlock x:Name="CompactTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="CompactActivity" FontSize="12" Foreground="{DynamicResource BunnyAccent}" TextTrimming="CharacterEllipsis"/></StackPanel></DockPanel></Button>
    <TextBlock x:Name="CompactVoice" Visibility="Collapsed" Margin="8,8,8,0" Foreground="{DynamicResource BunnyAccent}" FontSize="12" TextWrapping="Wrap" AutomationProperties.Name="Voice status"/>
    <TextBlock x:Name="CompactHealth" Visibility="Collapsed" Margin="8,8,8,0" Foreground="{DynamicResource BunnyWarning}" FontSize="12" TextWrapping="Wrap"/>
@@ -63,6 +81,19 @@ $bunnyAnimate = -not $SmokeTest -and [Windows.SystemParameters]::ClientAreaAnima
    </Border>
    <ScrollViewer x:Name="DetailsScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="Details" Visibility="Collapsed" Margin="8,12,8,4">
     <StackPanel Orientation="Horizontal" Margin="0,0,0,16"><Ellipse x:Name="PresenceDot" Width="5" Height="5" Margin="0,0,8,0" VerticalAlignment="Center" Fill="{DynamicResource BunnyPositive}"/><TextBlock x:Name="Presence" Foreground="{DynamicResource BunnyMuted}" FontSize="12"/></StackPanel>
+    <StackPanel x:Name="QuickPanel" Visibility="Collapsed" Margin="0,0,0,4">
+     <TextBlock Text="Bunny" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,12"/>
+     <WrapPanel Margin="0,0,0,14">
+      <Button x:Name="QuickVoice" Content="Voice" Style="{DynamicResource SoftButton}" Margin="0,0,8,8" AutomationProperties.Name="Open voice controls"/>
+      <Button x:Name="QuickWorkspace" Content="Open workspace" Style="{DynamicResource SoftButton}" Margin="0,0,8,8" AutomationProperties.Name="Open workspace"/>
+      <Button x:Name="QuickApprovals" Content="No approvals waiting" Style="{DynamicResource BunnyButtonBase}" Margin="0,0,8,8" AutomationProperties.Name="Pending approvals"/>
+      <Button x:Name="QuickMore" Content="More" Style="{DynamicResource BunnyButtonBase}" Margin="0,0,8,8" AutomationProperties.Name="More Island options"/>
+     </WrapPanel>
+     <TextBlock Text="PERSONAL AGENTS" FontSize="11" Foreground="{DynamicResource BunnyMuted}" Margin="0,0,0,8"/>
+     <StackPanel x:Name="SlotRows"/>
+     <TextBlock x:Name="QuickHost" FontSize="12" Foreground="{DynamicResource BunnyMuted}" TextWrapping="Wrap" Margin="0,10,0,2"/>
+     <TextBlock x:Name="QuickVoiceState" FontSize="12" Foreground="{DynamicResource BunnyMuted}" TextWrapping="Wrap"/>
+    </StackPanel>
     <StackPanel x:Name="ComposerPanel" Visibility="Collapsed">
      <TextBlock x:Name="PromptLabel" Text="What do you want Bunny to do?" FontSize="21" FontWeight="SemiBold" Margin="0,0,0,16"/>
      <TextBox x:Name="Prompt" Tag="Describe a task. Bunny will find the right agent." Height="122" MaxLength="16000" AcceptsReturn="True" TextWrapping="Wrap" AutomationProperties.Name="Task description"/>
@@ -123,6 +154,17 @@ $bunnyAnimate = -not $SmokeTest -and [Windows.SystemParameters]::ClientAreaAnima
     <StackPanel x:Name="ThermalPanel" Visibility="Collapsed"><TextBlock Text="THERMAL WARNING" Foreground="{DynamicResource BunnyWarning}" FontSize="11"/><TextBlock x:Name="ThermalName" FontSize="20" FontWeight="SemiBold" Margin="0,12,0,0"/><TextBlock x:Name="ThermalValue" Foreground="{DynamicResource BunnyWarning}" FontSize="42" Margin="0,8,0,12"/><TextBlock x:Name="ThermalDetail" TextWrapping="Wrap" Foreground="{DynamicResource BunnyMuted}"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0"><Button x:Name="ContinueButton" Content="Continue" Style="{DynamicResource SoftButton}" Margin="0,0,8,0"/><Button x:Name="ThermalStopButton" Content="Stop local task" Style="{DynamicResource DangerButton}"/></StackPanel><TextBlock Text="No task stops without your action." FontSize="12" Foreground="{DynamicResource BunnyMuted}" Margin="0,12,0,0"/></StackPanel>
     <StackPanel x:Name="MenuPanel" Visibility="Collapsed"><Button x:Name="OpenButton" Content="Open application" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"/><Button x:Name="ActiveTasksButton" Content="Active tasks" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"/><Button x:Name="PhoneButton" Content="Phone companion" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"/><Button x:Name="SettingsButton" Content="Appearance" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"/><Button x:Name="ThemeButton" Content="Switch theme" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"/><Button x:Name="CloseButton" Content="Close Island" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" ToolTip="Host-owned tasks keep running"/><TextBlock x:Name="OptionalProviders" FontSize="12" Foreground="{DynamicResource BunnyMuted}" TextWrapping="Wrap" Margin="0,12,0,0"/></StackPanel>
     <StackPanel x:Name="PhonePanel" Visibility="Collapsed"><TextBlock Text="Your workstation, wherever you are." FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="PhoneDetail" Foreground="{DynamicResource BunnyMuted}" TextWrapping="Wrap" Margin="0,12,0,16"/><TextBox x:Name="PhoneCode" IsReadOnly="True" TextWrapping="Wrap"/><Button x:Name="PairButton" Content="Create pairing code" Style="{DynamicResource PrimaryButton}" HorizontalAlignment="Right" Margin="0,16,0,0"/></StackPanel>
+    <StackPanel x:Name="WeaponPanel" Visibility="Collapsed" Margin="0,0,0,4">
+     <DockPanel><Image x:Name="WeaponHero" Width="64" Height="64" Stretch="Uniform" Margin="0,0,14,0" DockPanel.Dock="Left" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="Weapon character"/><StackPanel VerticalAlignment="Center"><TextBlock x:Name="WeaponTitle" FontSize="19" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="WeaponWeapon" Foreground="{DynamicResource BunnyMuted}" FontSize="12" TextTrimming="CharacterEllipsis"/></StackPanel></DockPanel>
+     <TextBlock x:Name="WeaponState" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,2" TextWrapping="Wrap"/>
+     <TextBlock x:Name="WeaponBasis" Foreground="{DynamicResource BunnyMuted}" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
+     <TextBlock x:Name="WeaponContext" FontSize="12" TextWrapping="Wrap" Margin="0,0,0,6"/>
+     <TextBlock x:Name="WeaponProgress" FontSize="12" Margin="0,0,0,4"/>
+     <TextBlock x:Name="WeaponAttention" FontSize="12" Foreground="{DynamicResource BunnyMuted}" Margin="0,0,0,4"/>
+     <TextBlock x:Name="WeaponFailure" Visibility="Collapsed" FontSize="12" Foreground="{DynamicResource BunnyNegative}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+     <TextBlock x:Name="WeaponTechnical" FontSize="11" Foreground="{DynamicResource BunnyMuted}" TextWrapping="Wrap" Margin="0,8,0,12"/>
+     <WrapPanel><Button x:Name="WeaponPause" Content="Pause" Visibility="Collapsed" Style="{DynamicResource BunnyButtonBase}" AutomationProperties.Name="Pause this Agent"/><Button x:Name="WeaponResume" Content="Resume" Visibility="Collapsed" Style="{DynamicResource BunnyButtonBase}" AutomationProperties.Name="Resume this Agent"/><Button x:Name="WeaponStop" Content="Stop" Visibility="Collapsed" Style="{DynamicResource DangerButton}" AutomationProperties.Name="Stop this Agent"/><Button x:Name="WeaponOpen" Content="Open in workspace" Visibility="Collapsed" Style="{DynamicResource SoftButton}" AutomationProperties.Name="Open this Agent in the workspace"/><Button x:Name="WeaponBack" Content="Back" Style="{DynamicResource BunnyButtonBase}" AutomationProperties.Name="Back to the Notch"/></WrapPanel>
+    </StackPanel>
     <StackPanel x:Name="SettingsPanel" Visibility="Collapsed"><TextBlock Text="Make the Island yours." FontSize="21" FontWeight="SemiBold" Margin="0,0,0,16"/><ScrollViewer MaxHeight="480" VerticalScrollBarVisibility="Auto"><StackPanel>
      <TextBlock Text="Island size" Foreground="{DynamicResource BunnyMuted}"/><ComboBox x:Name="SizeChoice" MinHeight="44" Margin="0,4,0,12"/>
      <TextBlock Text="Island position" Foreground="{DynamicResource BunnyMuted}"/><ComboBox x:Name="PositionChoice" MinHeight="44" Margin="0,4,0,12"/>
@@ -135,6 +177,8 @@ $bunnyAnimate = -not $SmokeTest -and [Windows.SystemParameters]::ClientAreaAnima
     <TextBlock x:Name="Notice" Foreground="{DynamicResource BunnyMuted}" TextWrapping="Wrap" FontSize="12" Margin="0,12,0,0"/>
     <Button x:Name="CollapseButton" Content="Collapse" Foreground="{DynamicResource BunnyMuted}" HorizontalAlignment="Right" Margin="0,8,0,0"/>
    </StackPanel></ScrollViewer>
+    </StackPanel>
+   </Border>
   </StackPanel>
  </Border>
 </StackPanel>
@@ -150,7 +194,19 @@ function Set-BunnyTheme([bool]$Light) {
  $script:bunnyLight=$Light
  $palette=if($Light){ @{BunnyText='#202B3C';BunnyMuted='#546278';BunnyField='#10374359';BunnyHover='#143E516D';BunnyPopup='#F4F8FE';BunnyAccent='#315F9F';BunnyAccentSoft='#19315F9F';BunnyOnAccent='#F7FAFF';BunnyPositive='#29734E';BunnyPositiveSoft='#1829734E';BunnyNegative='#AC3937';BunnyNegativeSoft='#18AC3937';BunnyWarning='#8C5D16';BunnyWarningSoft='#188C5D16';BunnySep='#263C506E';BunnySegment='#203C506E';BunnyClaude='#995831';BunnyGlass='#F0F4F8FE'} } else { @{BunnyText='#EFF2F8';BunnyMuted='#AAB3C3';BunnyField='#16ADBFDC';BunnyHover='#17B8CBEB';BunnyPopup='#18202C';BunnyAccent='#8EB9FF';BunnyAccentSoft='#2479A5F0';BunnyOnAccent='#14213A';BunnyPositive='#85CFA5';BunnyPositiveSoft='#1885CFA5';BunnyNegative='#F5A09D';BunnyNegativeSoft='#18F5A09D';BunnyWarning='#E6BF78';BunnyWarningSoft='#18E6BF78';BunnySep='#25C6D7F5';BunnySegment='#25C6D7F5';BunnyClaude='#E6B397';BunnyGlass='#ED181F2B'} }
  $palette.BunnyViolet=if($Light){'#6554A4'}else{'#AB9DF5'};$palette.BunnyGlass=if($Light){'#F0FFFDF9'}else{'#ED0F1728'};$palette.BunnyClaude=if($Light){'#995831'}else{'#E4A27C'}
- if([Windows.SystemParameters]::HighContrast){$palette.BunnyText=[Windows.SystemColors]::WindowTextColor.ToString();$palette.BunnyMuted=$palette.BunnyText;$palette.BunnyGlass=[Windows.SystemColors]::WindowColor.ToString();$palette.BunnySep=$palette.BunnyText;$palette.BunnyViolet=$palette.BunnyText}
+ # The notch itself is black glass in both themes (Set-BunnyGlassSurface). Only the expanded panel surface follows the theme.
+ $palette.BunnyPanel=if($Light){'#F4FBFCFF'}else{'#00000000'}
+ if([Windows.SystemParameters]::HighContrast){
+  $palette.BunnyText=[Windows.SystemColors]::WindowTextColor.ToString();$palette.BunnyMuted=$palette.BunnyText
+  $palette.BunnyGlass=[Windows.SystemColors]::WindowColor.ToString();$palette.BunnySep=$palette.BunnyText;$palette.BunnyViolet=$palette.BunnyText
+  # The panel surface must share the system palette the text was remapped to, or forced-colors text lands on the
+  # theme's transparent/near-black surface and the expanded panel cannot be read (High Contrast White on dark).
+  $palette.BunnyPanel=[Windows.SystemColors]::WindowColor.ToString()
+ }
+ foreach($key in $palette.Keys){$bunnyWindow.Resources[$key]=New-BunnyBrush $palette[$key]}
+ $alpha=switch($bunnyPreferences.glass){'low'{250}'high'{218}default{238}};if([Windows.SystemParameters]::HighContrast){$alpha=255}
+ $glass=$bunnyWindow.Resources['BunnyGlass'].Color;$glass.A=[byte]$alpha;$bunnyWindow.Resources['BunnyGlass']=[Windows.Media.SolidColorBrush]::new($glass)
+ Set-BunnyGlassSurface
  foreach($key in $palette.Keys){$bunnyWindow.Resources[$key]=New-BunnyBrush $palette[$key]}
  $alpha=switch($bunnyPreferences.glass){'low'{250}'high'{218}default{238}};if([Windows.SystemParameters]::HighContrast){$alpha=255}
  $glass=$bunnyWindow.Resources['BunnyGlass'].Color;$glass.A=[byte]$alpha;$bunnyWindow.Resources['BunnyGlass']=[Windows.Media.SolidColorBrush]::new($glass)
@@ -187,7 +243,9 @@ function Get-BunnyIndicatorState([int]$Count) {
  return (Get-BunnyIndicatorLayout -Placement $probe -AgentCount $Count)
 }
 function Set-BunnyPosition {
- $area=[Windows.SystemParameters]::WorkArea
+ # A drag in progress owns the position; the 2 s poll and the display events must not snap it back to the edge.
+ if($script:bunnyDrag-and$script:bunnyDrag.Moved){return}
+ $area=Get-BunnyTargetArea
  $edge=ConvertTo-BunnyEdge $bunnyPreferences.edge
  $vertical=Test-BunnyVertical
  $offset=switch($bunnyPreferences.position){'left'{0.0}'right'{1.0}default{$bunnyPreferences.edgeOffset}}
@@ -201,41 +259,201 @@ function Set-BunnyPosition {
  $bunnyWindow.Top=$placement.Top
  $bunnyWindow.Left=$placement.Left
 }
+# T13 monitors and docking. Device pixels convert to DIPs with the window's own composition scale (the monitor the Island
+# is on); the pure rules (nearest edge, restore, expansion) live in Placement.ps1 and are unit-tested there.
+function Get-BunnyDeviceScale {
+ $source=[Windows.PresentationSource]::FromVisual($bunnyWindow)
+ if(-not $source){return @{X=1.0;Y=1.0}}
+ $matrix=$source.CompositionTarget.TransformToDevice;return @{X=[double]$matrix.M11;Y=[double]$matrix.M22}
+}
+function Convert-BunnyDevicePoint([double]$X,[double]$Y) {
+ $source=[Windows.PresentationSource]::FromVisual($bunnyWindow)
+ if(-not $source){return @{X=$X;Y=$Y}}
+ $point=$source.CompositionTarget.TransformFromDevice.Transform([Windows.Point]::new($X,$Y));return @{X=$point.X;Y=$point.Y}
+}
+function Get-BunnyMonitors {
+ Add-Type -AssemblyName System.Windows.Forms
+ $scale=Get-BunnyDeviceScale;$list=@()
+ foreach($screen in [Windows.Forms.Screen]::AllScreens){
+  $area=$screen.WorkingArea;$dip=Convert-BunnyDeviceRect @{Left=$area.Left;Top=$area.Top;Width=$area.Width;Height=$area.Height} $scale.X $scale.Y
+  $list+=@{Device=[string]$screen.DeviceName;WorkArea=$dip;Primary=[bool]$screen.Primary}
+ }
+ return $list
+}
+# The work area the Island is placed in: the saved monitor when it still matches, else the primary monitor. Before the
+# window has a presentation source (first layout), the primary work area is used as before.
+function Get-BunnyTargetArea {
+ $primary=[Windows.SystemParameters]::WorkArea;$fallback=@{Left=$primary.Left;Top=$primary.Top;Width=$primary.Width;Height=$primary.Height}
+ if(-not [Windows.PresentationSource]::FromVisual($bunnyWindow)){return $fallback}
+ try{$chosen=Select-BunnyMonitor $bunnyPreferences.monitor @(Get-BunnyMonitors);if($chosen){return $chosen.WorkArea}}catch{}
+ return $fallback
+}
+function Sync-BunnyEdgeChoice {
+ $item=@($bunnyControls.EdgeChoice.Items|Where-Object {$_.Tag-eq$bunnyPreferences.edge})|Select-Object -First 1
+ if($item){$script:bunnySettingsUpdating=$true;$bunnyControls.EdgeChoice.SelectedItem=$item;$script:bunnySettingsUpdating=$false}
+}
+function Sync-BunnyPositionChoice {
+ $item=@($bunnyControls.PositionChoice.Items|Where-Object {$_.Tag-eq$bunnyPreferences.position})|Select-Object -First 1
+ if($item){$script:bunnySettingsUpdating=$true;$bunnyControls.PositionChoice.SelectedItem=$item;$script:bunnySettingsUpdating=$false}
+}
+# Keyboard docking: Ctrl+Alt+Arrow moves the Island to that edge and re-centers it along that edge (position becomes
+# 'center', the offset is kept; the monitor is kept). The Settings dropdowns are re-synced to what was saved.
+function Set-BunnyDockEdge([string]$Edge) {
+ $bunnyPreferences.edge=ConvertTo-BunnyEdge $Edge;$bunnyPreferences.position='center'
+ Save-BunnyPreferences;Sync-BunnyEdgeChoice;Sync-BunnyPositionChoice;Resize-Bunny
+}
+function Test-BunnyDockKey($KeyArgs) {
+ $edge=switch([string]$KeyArgs.Key){'Up'{'top'}'Down'{'bottom'}'Left'{'left'}'Right'{'right'}default{$null}}
+ if(-not $edge){return $false}
+ $both=[Windows.Input.ModifierKeys]::Control-bor[Windows.Input.ModifierKeys]::Alt
+ if(([Windows.Input.Keyboard]::Modifiers-band$both)-ne$both){return $false}
+ Set-BunnyDockEdge $edge;return $true
+}
+# Drag: press on the Notch body (never on a control), move more than 6 DIP, release to snap to the nearest edge of the
+# monitor under the pointer. The window follows the pointer during the drag; the snap is applied only on release.
+$script:bunnyDrag=$null
+function Test-BunnyInteractive($Source) {
+ $node=$Source -as [Windows.DependencyObject]
+ while($node){
+  if($node-is[Windows.Controls.Primitives.ButtonBase]-or$node-is[Windows.Controls.Primitives.TextBoxBase]-or$node-is[Windows.Controls.Primitives.Selector]-or$node-is[Windows.Controls.Primitives.ScrollBar]-or$node-is[Windows.Controls.ComboBox]){return $true}
+  if($node-eq$bunnyControls.Glass){return $false}
+  try{$node=[Windows.Media.VisualTreeHelper]::GetParent($node)}catch{return $true}
+ }
+ return $false
+}
+# A release snaps to the edge nearest the pointer. -DevicePoint is only for the evidence harness (synthetic release points);
+# a real release reads the cursor.
+function Invoke-BunnyDockRelease($DevicePoint) {
+ $cursor=if($DevicePoint){$DevicePoint}else{[Windows.Forms.Cursor]::Position};$point=Convert-BunnyDevicePoint $cursor.X $cursor.Y
+ $scale=Get-BunnyDeviceScale;$screen=[Windows.Forms.Screen]::FromPoint([Drawing.Point]::new([int]$cursor.X,[int]$cursor.Y))
+ $area=$screen.WorkingArea;$work=Convert-BunnyDeviceRect @{Left=$area.Left;Top=$area.Top;Width=$area.Width;Height=$area.Height} $scale.X $scale.Y
+ $vertical=Test-BunnyVertical;$size=if($vertical){@{Width=$bunnyWindow.ActualHeight;Height=$bunnyWindow.ActualWidth}}else{@{Width=$bunnyWindow.ActualWidth;Height=$bunnyWindow.ActualHeight}}
+ $target=Get-BunnyNearestEdge -Point $point -WorkArea $work -Size $size
+ $bunnyPreferences.edge=$target.Edge;$bunnyPreferences.edgeOffset=$target.Offset;$bunnyPreferences.position='center'
+ $bunnyPreferences.monitor=@{device=[string]$screen.DeviceName;fingerprint=(Get-BunnyWorkAreaFingerprint $work)}
+ Save-BunnyPreferences;Sync-BunnyEdgeChoice;Sync-BunnyPositionChoice;Resize-Bunny
+}
+Add-Type -AssemblyName System.Windows.Forms
+$bunnyControls.Glass.Add_PreviewMouseLeftButtonDown({
+ if(Test-BunnyInteractive $_.OriginalSource){return}
+ $cursor=[Windows.Forms.Cursor]::Position;$point=Convert-BunnyDevicePoint $cursor.X $cursor.Y
+ $script:bunnyDrag=@{X=[double]$cursor.X;Y=[double]$cursor.Y;GrabX=$point.X-$bunnyWindow.Left;GrabY=$point.Y-$bunnyWindow.Top;Moved=$false}
+})
+$bunnyControls.Glass.Add_PreviewMouseMove({
+ $drag=$script:bunnyDrag
+ if(-not $drag){return}
+ if($_.LeftButton-ne[Windows.Input.MouseButtonState]::Pressed){$script:bunnyDrag=$null;return}
+ $cursor=[Windows.Forms.Cursor]::Position;$scale=Get-BunnyDeviceScale
+ $dx=([double]$cursor.X-$drag.X)/$scale.X;$dy=([double]$cursor.Y-$drag.Y)/$scale.Y
+ if(-not$drag.Moved-and[Math]::Sqrt($dx*$dx+$dy*$dy)-le6){return}
+ $drag.Moved=$true
+ if(-not$bunnyControls.Glass.IsMouseCaptured){[void]$bunnyControls.Glass.CaptureMouse()}
+ $point=Convert-BunnyDevicePoint $cursor.X $cursor.Y
+ $bunnyWindow.Left=$point.X-$drag.GrabX;$bunnyWindow.Top=$point.Y-$drag.GrabY
+})
+$bunnyControls.Glass.Add_PreviewMouseLeftButtonUp({
+ $drag=$script:bunnyDrag;$script:bunnyDrag=$null
+ if($bunnyControls.Glass.IsMouseCaptured){$bunnyControls.Glass.ReleaseMouseCapture()}
+ if(-not$drag-or-not$drag.Moved){return}
+ $_.Handled=$true;Invoke-BunnyDockRelease
+})
 # The one structural change between the two orientations. Horizontal: [indicator column][body row].
 # Vertical: [indicator row] above a column-shaped body when collapsed. An expanded vertical notch uses the row layout.
 function Set-BunnyLayout([bool]$Expanded) {
  $vertical=Test-BunnyVertical
- $column=$vertical -and -not $Expanded
+ $column=$vertical
  $script:bunnyColumn=$column
- $layout=Get-BunnyIndicatorState (@(Get-BunnyActiveAgents).Count)
+ $edge=ConvertTo-BunnyEdge $bunnyPreferences.edge
+ $layout=Get-BunnyIndicatorState (Get-BunnyStripCellCount)
  $bunnyVisualRoot.Orientation=if($layout.Side -eq 'top'){'Vertical'}else{'Horizontal'}
+ # One row of weapons beside a horizontal notch; one column above a collapsed vertical notch. An expanded vertical notch is a
+ # wide card, so its weapons sit in one row above it.
  $bunnyControls.AgentStrip.Orientation=if($layout.Axis -eq 'row'){'Horizontal'}else{'Vertical'}
  $leftDock=if($column){'Top'}else{'Left'}
  $rightDock=if($column){'Bottom'}else{'Right'}
- foreach($element in @($bunnyControls.BunnyButton,$bunnyControls.HeaderSep,$bunnyControls.Providers)){[Windows.Controls.DockPanel]::SetDock($element,$leftDock)}
- foreach($element in @($bunnyControls.ExtrasButton,$bunnyControls.VoiceButton,$bunnyControls.SystemButton)){[Windows.Controls.DockPanel]::SetDock($element,$rightDock)}
- $bunnyControls.Header.Height=if($column){[double]::NaN}else{44}
- $bunnyControls.Providers.Orientation=if($column){'Vertical'}else{'Horizontal'}
- $sep=$bunnyControls.HeaderSep
- if($column){$sep.Width=20;$sep.Height=1;$sep.Margin='0,4,0,4';$sep.HorizontalAlignment='Center'}else{$sep.Width=1;$sep.Height=20;$sep.Margin='4,0,10,0';$sep.HorizontalAlignment='Left'}
- $bunnyControls.SystemButton.Width=if($column){44}else{56}
- $bunnyControls.Glass.Padding=if($column){'6,10'}else{'12,10'}
- $bunnyControls.Glass.CornerRadius=if($column){[Windows.CornerRadius]::new(40)}else{[Windows.CornerRadius]::new(28)}
- if($column){foreach($name in @('CompactTask','CompactVoice','CompactHealth','CompactMission','CompactAgent')){$bunnyControls[$name].Visibility='Collapsed'}}
+ foreach($element in @($bunnyControls.BunnyButton,$bunnyControls.VoiceButton,$bunnyControls.NotchBars,$bunnyControls.NotchStatus)){[Windows.Controls.DockPanel]::SetDock($element,$leftDock)}
+ foreach($element in @($bunnyControls.ExtrasButton,$bunnyControls.SearchButton)){[Windows.Controls.DockPanel]::SetDock($element,$rightDock)}
+ $bunnyControls.Header.Height=if($column){[double]::NaN}else{56}
+ $bunnyControls.NotchStatus.MaxWidth=if($column){54}else{168}
+ $bunnyControls.NotchStatus.TextAlignment=if($column){'Center'}else{'Left'}
+ $bunnyControls.NotchStatus.FontSize=if($column){12}else{13}
+ $bunnyControls.NotchBars.Margin=if($column){'0,2,0,4'}else{'0,0,8,0'}
+ # The Bunny art: 56 DIP, inside the glass. It sits inset from the rounded end (10 DIP in the row, 8 DIP from the top in the
+ # column) and its dark character well is clipped to a rounded square, so the baked square never breaks the capsule's curve.
+ $artSize=56
+ $bunnyControls.BunnyArt.Width=$artSize;$bunnyControls.BunnyArt.Height=$artSize
+ $bunnyControls.BrandTile.Width=$artSize;$bunnyControls.BrandTile.Height=$artSize
+ $bunnyControls.BunnyArt.Clip=[Windows.Media.RectangleGeometry]::new([Windows.Rect]::new(0,0,$artSize,$artSize),18,18)
+ # Board notch-top: Bunny's ears rise a little above the body line. The 14 DIP glass margin above the body holds the lift, so the
+ # art stays inside the window and clear of the screen edge (the 4 DIP safe margin is the window's own placement).
+ $bunnyControls.BunnyButton.Margin=if($column){'0,8,0,0'}else{'10,-14,0,0'}
+ $bunnyControls.Glass.Padding=if($column){'0,6'}else{'6,0'}
+ $bunnyControls.Glass.CornerRadius=[Windows.CornerRadius]::new($(if($column){29}else{28}))
+ # An expanded vertical notch: the header column and the panel sit side by side on one glass capsule (the board's left dock).
+ $wide=[bool]($vertical -and $Expanded)
+ $bunnyControls.GlassStack.Orientation=if($wide){'Horizontal'}else{'Vertical'}
+ $bunnyControls.Header.Width=if($vertical){60}else{[double]::NaN}
+ $bunnyControls.PanelSurface.Width=if($wide){440}else{[double]::NaN}
+ $bunnyControls.PanelSurface.Margin=if($wide){'6,6,6,6'}else{'0,6,0,6'}
+ $bunnyControls.PanelSurface.VerticalAlignment='Top'
+ # Bottom edge with the panel open: the panel opens upward, so the header row moves below the panel (the notch stays on the edge).
+ $header=$bunnyControls.Header;$inner=$bunnyControls.GlassStack
+ $wantLast=[bool]($Expanded -and -not $vertical -and $edge -eq 'bottom')
+ $isLast=[object]::ReferenceEquals($inner.Children[$inner.Children.Count-1],$header)
+ if($wantLast -ne $isLast){[void]$inner.Children.Remove($header);if($wantLast){[void]$inner.Children.Add($header)}else{$inner.Children.Insert(0,$header)}}
+ # Personal Agent strip: connected to the body on the same glass, same height as the Notch body.
+ $strip=$bunnyControls.StripCapsule
+ $stripBottom=[bool]($Expanded -and -not $vertical -and $edge -eq 'bottom')
+ if($column){$strip.Width=58;$strip.Height=[double]::NaN;$strip.Margin='10,10,10,-22';$strip.HorizontalAlignment='Left';$strip.VerticalAlignment='Top';$strip.Padding='0,6'}
+ else{$strip.Width=[double]::NaN;$strip.Height=58;$strip.Margin='0,14,-12,10';$strip.HorizontalAlignment='Left';$strip.VerticalAlignment=$(if($stripBottom){'Bottom'}else{'Top'});$strip.Padding='6,0'}
+ Set-BunnyJoin
 }
-# Refined surface: a gentle vertical gradient, and a 1 px stroke that is brightest at the top edge (the light source).
-# No GPU effect here, so the look is the same on every machine; the blur experiment is recorded separately.
+# Board dock-top: the agent capsule and the Notch are ONE continuous black-glass shape. Where they meet, the touching corners are
+# square and the shared stroke is dropped, so no seam or gap shows. The strip is 58 DIP tall, the same as the Notch body, so the
+# two gradients line up. Off (no strip shown): the Notch keeps its own rounded corners.
+function Set-BunnyJoin {
+ $strip=$bunnyControls.StripCapsule;$glass=$bunnyControls.Glass
+ $vertical=Test-BunnyVertical
+ $glassRadius=$(if($vertical){29}else{28})
+ if($strip.Visibility-ne'Visible'){
+  $strip.CornerRadius=[Windows.CornerRadius]::new(29);$strip.BorderThickness=[Windows.Thickness]::new(1)
+  $glass.CornerRadius=[Windows.CornerRadius]::new($glassRadius);$glass.BorderThickness=[Windows.Thickness]::new(1);return
+ }
+ if($script:bunnyColumn){
+  # Column: the strip sits above the body, so its bottom corners and the body's top corners are the shared edge. The body's
+  # top stroke is dropped there, otherwise a light line would divide the two shapes.
+  $strip.CornerRadius=[Windows.CornerRadius]::new(29,29,0,0);$strip.BorderThickness=[Windows.Thickness]::new(1,1,1,0)
+  $glass.CornerRadius=[Windows.CornerRadius]::new(0,0,$glassRadius,$glassRadius);$glass.BorderThickness=[Windows.Thickness]::new(1,0,1,1)
+ }else{
+  # Row: the strip sits to the left of the body, so its right corners and the body's left corners are the shared edge. The
+  # body's left stroke is dropped for the same reason.
+  $strip.CornerRadius=[Windows.CornerRadius]::new(29,0,0,29);$strip.BorderThickness=[Windows.Thickness]::new(1,1,0,1)
+  $glass.CornerRadius=[Windows.CornerRadius]::new(0,$glassRadius,$glassRadius,0);$glass.BorderThickness=[Windows.Thickness]::new(0,1,1,1)
+ }
+}
+# The Notch is black glossy glass in both themes (spec section 11): #0B0D14 at 92 % with a gradient from #1A1E2B to #07080D,
+# and a 1 px highlight brightest at the top edge. The same material joins the Personal Agent strip. No GPU effect here.
 function Set-BunnyGlassSurface {
- $base=$bunnyWindow.Resources['BunnyGlass'].Color
- $lift=[Windows.Media.Color]::FromArgb($base.A,[byte][Math]::Min(255,$base.R+10),[byte][Math]::Min(255,$base.G+10),[byte][Math]::Min(255,$base.B+10))
+ # High Contrast: the fixed dark glass would put themed window text on an incompatible surface. Under forced colors
+ # the surface follows the system window color, the same palette the text remap in Set-BunnyTheme uses, and the
+ # stroke follows WindowTextColor — opaque, no glass simulation.
+ if([Windows.SystemParameters]::HighContrast){
+  $fill=[Windows.Media.SolidColorBrush]::new([Windows.SystemColors]::WindowColor);$fill.Freeze()
+  $stroke=[Windows.Media.SolidColorBrush]::new([Windows.SystemColors]::WindowTextColor);$stroke.Freeze()
+  $bunnyControls.Glass.Background=$fill;$bunnyControls.Glass.BorderBrush=$stroke
+  $bunnyControls.StripCapsule.Background=$fill;$bunnyControls.StripCapsule.BorderBrush=$stroke
+  return
+ }
  $fill=[Windows.Media.LinearGradientBrush]::new();$fill.StartPoint=[Windows.Point]::new(0,0);$fill.EndPoint=[Windows.Point]::new(0,1)
- [void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new($lift,0));[void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new($base,1))
- $bunnyControls.Glass.Background=$fill
- $inks=if($bunnyLight){@('#B3FFFFFF','#1F000000')}else{@('#59FFFFFF','#12FFFFFF')}
+ [void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString('#EB1A1E2B'),0))
+ [void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString('#EB07080D'),1))
+ $fill.Freeze()
  $stroke=[Windows.Media.LinearGradientBrush]::new();$stroke.StartPoint=[Windows.Point]::new(0,0);$stroke.EndPoint=[Windows.Point]::new(0,1)
- [void]$stroke.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString($inks[0]),0))
- [void]$stroke.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString($inks[1]),1))
- $bunnyControls.Glass.BorderBrush=$stroke
+ [void]$stroke.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString('#24FFFFFF'),0))
+ [void]$stroke.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString('#0AFFFFFF'),1))
+ $stroke.Freeze()
+ $bunnyControls.Glass.Background=$fill;$bunnyControls.Glass.BorderBrush=$stroke
+ $bunnyControls.StripCapsule.Background=$fill;$bunnyControls.StripCapsule.BorderBrush=$stroke
 }
 function Get-BunnyElapsed($Task) {
  if($null-eq$Task.startedAt){return [string][char]0x2014}
@@ -283,55 +501,130 @@ function Enable-BunnyBlur([int]$AccentState = 4, [string]$Tint = '#3DFFFFFF') {
   return [Bunny.Glass.Acrylic]::Apply($hwnd, $AccentState, $abgr)
  } catch { return $false }
 }
+# WPF can leave the window's HWND at its previous height after a content-driven height change (the content is measured at the
+# new height, but the window keeps the old one until another size change arrives). Flush pending work, and if the window still
+# disagrees with the target, step it one DIP down and back so the HWND takes the target size.
+function Sync-BunnyWindowHeight([double]$Height) {
+ # The flush is skipped while the dispatcher is suspended (inside a nested frame); the step itself is always safe.
+ try{$bunnyWindow.Dispatcher.Invoke([Action]{},[Windows.Threading.DispatcherPriority]::Background)}catch{}
+ if([Math]::Abs($bunnyWindow.ActualHeight-$Height)-lt1){return}
+ $bunnyWindow.Height=$Height-1;$bunnyWindow.Height=$Height
+}
 function Resize-Bunny {
+ # A minimized WPF window restores itself the moment its Width/Height are set, so sizing waits for a visible window
+ # and keeps the live-measured minimized motion suppression (IR-M5) in force.
+ if($bunnyWindow.WindowState-eq'Minimized'){$script:bunnyExpanded=($bunnyView-ne'idle');return}
  $expanded=$bunnyView-ne'idle';$script:bunnyExpanded=$expanded
  $bunnyControls.Details.Visibility=if($expanded){'Visible'}else{'Collapsed'}
  $bunnyControls.DetailsScroll.Visibility=$bunnyControls.Details.Visibility
- $area=[Windows.SystemParameters]::WorkArea
+ $bunnyControls.PanelSurface.Visibility=$bunnyControls.Details.Visibility
+ # The collapsed Notch has one fixed height: the task, mission, Agent, health and voice cards wait for the expanded panel.
+ $bunnyControls.CompactVoice.Visibility='Collapsed'
+ if(-not $expanded){foreach($name in @('CompactTask','CompactHealth','CompactMission','CompactAgent')){$bunnyControls[$name].Visibility='Collapsed'}}
+ $area=Get-BunnyTargetArea
  $vertical=Test-BunnyVertical
  Set-BunnyLayout $expanded
  $bunnyControls.DetailsScroll.MaxHeight=[Math]::Max(240,$area.Height-144)
- # Logical body width. A vertical notch's body is its thickness; a horizontal notch adds one indicator column beside it.
+ $bunnyControls.DetailsScroll.Height=[double]::NaN
  $strip=$bunnyControls.AgentStrip.Visibility-eq'Visible'
- $body=if($expanded){540}elseif($vertical){100}else{switch($bunnyPreferences.size){'compact'{360}'detailed'{420}default{384}}}
- $extra=if($strip-and-not$vertical){20}else{0}
+ # Logical body width. A horizontal Notch adds the strip beside it; a collapsed vertical Notch is 78 DIP thick (58 DIP of glass
+ # and its margins); an expanded panel is 540 DIP wide.
+ $body=if($expanded){540}elseif($vertical){78}else{switch($bunnyPreferences.size){'compact'{420}'detailed'{470}default{440}}}
+ $extra=if($strip-and-not$vertical){Get-BunnyStripExtent}else{0}
  $width=[Math]::Min($body+$extra,$area.Width-24)
+ $bunnyControls.Glass.Width=if($vertical){[double]::NaN}else{$body}
  if($script:bunnyTargetWidth-ne$width){$script:bunnyTargetWidth=$width;$from=$bunnyWindow.ActualWidth;$bunnyWindow.BeginAnimation([Windows.Window]::WidthProperty,$null);$bunnyWindow.Width=$width;if($bunnyAnimate-and$from-gt0){$animation=[Windows.Media.Animation.DoubleAnimation]::new($from,$width,[Windows.Duration]::new([TimeSpan]::FromMilliseconds($bunnyMotion.morph)));$animation.FillBehavior='Stop';$animation.EasingFunction=[Windows.Media.Animation.CubicEase]::new();$animation.EasingFunction.EasingMode='EaseOut';$bunnyWindow.BeginAnimation([Windows.Window]::WidthProperty,$animation)}}
  Set-BunnyPosition
  # Flush pending visibility and child changes before measuring the new view.
- # A ScrollViewer otherwise reports the previous viewport until the next dispatcher pass.
  $bunnyWindow.UpdateLayout()
- $measure=[Math]::Max(1,$width-46-$extra)
- $bunnyControls.Details.InvalidateMeasure();$bunnyControls.Details.Measure([Windows.Size]::new($measure,[double]::PositiveInfinity))
- $detailHeight=if($expanded){[Math]::Min($bunnyControls.Details.DesiredSize.Height,$bunnyControls.DetailsScroll.MaxHeight)}else{0}
- $bunnyControls.DetailsScroll.Height=$detailHeight
- $compactHeight=0
- if(-not$expanded-and$bunnyControls.CompactTask.Visibility-eq'Visible'){$bunnyControls.CompactTask.Measure([Windows.Size]::new($measure,[double]::PositiveInfinity));$compactHeight=$bunnyControls.CompactTask.DesiredSize.Height}
- if(-not$expanded-and$bunnyControls.CompactMission.Visibility-eq'Visible'){$bunnyControls.CompactMission.Measure([Windows.Size]::new($measure,[double]::PositiveInfinity));$compactHeight+=$bunnyControls.CompactMission.DesiredSize.Height}
- if(-not$expanded-and$bunnyControls.CompactAgent.Visibility-eq'Visible'){$bunnyControls.CompactAgent.Measure([Windows.Size]::new($measure,[double]::PositiveInfinity));$compactHeight+=$bunnyControls.CompactAgent.DesiredSize.Height}
- if(-not$expanded-and$bunnyControls.CompactHealth.Visibility-eq'Visible'){$bunnyControls.CompactHealth.Measure([Windows.Size]::new($measure,[double]::PositiveInfinity));$compactHeight+=$bunnyControls.CompactHealth.DesiredSize.Height}
- if(-not$expanded-and$bunnyControls.CompactVoice.Visibility-eq'Visible'){$bunnyControls.CompactVoice.Measure([Windows.Size]::new($measure,[double]::PositiveInfinity));$compactHeight+=$bunnyControls.CompactVoice.DesiredSize.Height}
- if($vertical){
-  # A vertical notch is as long as its stacked content: indicator row, header column and any visible body.
-  $bunnyVisualRoot.Measure([Windows.Size]::new($width,[double]::PositiveInfinity))
-  $height=[Math]::Min($bunnyVisualRoot.DesiredSize.Height,$area.Height-12)
- } else {
-  $height=[Math]::Min(86+$detailHeight+$compactHeight,$area.Height-12)
- }
+ # The window height is the measured height of the whole Notch (strip, body and the expanded panel). The panel ScrollViewer caps
+ # its own height, so nothing is clipped at the bottom of the panel (the Collapse button always has its row).
+ $bunnyVisualRoot.Measure([Windows.Size]::new($width,[double]::PositiveInfinity))
+ $height=[Math]::Min($bunnyVisualRoot.DesiredSize.Height,$area.Height-12)
  Set-BunnyHeight $height
  Set-BunnyPosition
+ Sync-BunnyWindowHeight $height
 }
 function Set-BunnyView([string]$View) {
  $script:bunnyView=$View
- foreach($entry in @{composer='ComposerPanel';routing='RoutingPanel';approval='ApprovalPanel';tasks='TasksPanel';task='TaskPanel';system='SystemPanel';thermal='ThermalPanel';menu='MenuPanel';phone='PhonePanel';settings='SettingsPanel';constellation='ConstellationPanel';voice='NativeVoicePanel'}.GetEnumerator()){if($bunnyControls[$entry.Value]){$bunnyControls[$entry.Value].Visibility=if($entry.Key-eq$View){'Visible'}else{'Collapsed'}}}
+ foreach($entry in @{composer='ComposerPanel';routing='RoutingPanel';approval='ApprovalPanel';tasks='TasksPanel';task='TaskPanel';system='SystemPanel';thermal='ThermalPanel';menu='MenuPanel';phone='PhonePanel';settings='SettingsPanel';constellation='ConstellationPanel';voice='NativeVoicePanel';weapon='WeaponPanel';quick='QuickPanel'}.GetEnumerator()){if($bunnyControls[$entry.Value]){$bunnyControls[$entry.Value].Visibility=if($entry.Key-eq$View){'Visible'}else{'Collapsed'}}}
+ if($View-eq'quick'){Update-BunnyQuickPanel}
  $bunnyControls.CompactTask.Visibility=if($View-eq'idle'-and$bunnySelectedId){'Visible'}else{'Collapsed'}
- $bunnyControls.ExtrasButton.ToolTip=if($View-eq'idle'){'Island menu'}else{'Collapse Island'}
- Set-BunnyButton $bunnyControls.ExtrasButton '' $(if($View-eq'idle'){'ellipsis'}else{'x'}) 17
+ $bunnyControls.ExtrasButton.ToolTip=if($View-eq'idle'){'Quick controls'}else{'Collapse Island'}
+ Set-BunnyButton $bunnyControls.ExtrasButton '' $(if($View-eq'idle'){'grid'}else{'x'}) 17
  Resize-Bunny
  if(Get-Command Update-BunnyMotion -ErrorAction SilentlyContinue){Update-BunnyMotion;Resize-Bunny}
  if($bunnyAnimate-and$View-ne'idle'){$fade=[Windows.Media.Animation.DoubleAnimation]::new(0.5,1,[Windows.Duration]::new([TimeSpan]::FromMilliseconds($bunnyMotion.content)));$bunnyControls.Details.BeginAnimation([Windows.UIElement]::OpacityProperty,$fade)}
 }
-function Close-BunnyDetails { Set-BunnyView 'idle' }
+function Close-BunnyDetails {
+ $weapon = if ($bunnyView -eq 'weapon') { $script:bunnyWeaponDetailSlot } else { $null }
+ $script:bunnyWeaponStopConfirm = $null
+ Set-BunnyView 'idle'
+ if ($null -ne $weapon -and $script:bunnyWeaponChips.ContainsKey([int]$weapon) -and $script:bunnyWeaponChips[[int]$weapon].IsVisible) { [void]$script:bunnyWeaponChips[[int]$weapon].Focus() }
+ else { [void]$bunnyControls.ExtrasButton.Focus() }
+}
+# Icons for the header: the grid (quick controls) and the search (open workspace). Same 24-unit stroked set as the rest.
+$bunnyIcons['grid'] = 'M 3,3 H 10 V 10 H 3 Z M 14,3 H 21 V 10 H 14 Z M 14,14 H 21 V 21 H 14 Z M 3,14 H 10 V 21 H 3 Z'
+$bunnyIcons['search'] = 'M 11,3 A 8,8 0 1 0 11,19 A 8,8 0 1 0 11,3 Z M 21,21 L 16.65,16.65'
+$script:bunnySlotRows = @{}
+function Get-BunnySlotRecord([int]$SlotId) {
+ return @($bunnySnapshot.personalAgents.slots | Where-Object { $_ -and [int]$_.slot -eq $SlotId }) | Select-Object -First 1
+}
+function Invoke-BunnySlotRow([int]$SlotId) {
+ # A bound slot opens its detail card; an unassigned slot sends the user to Studio to set it up (never a success message).
+ $slot = Get-BunnySlotRecord $SlotId
+ if ($slot -and $slot.active -and $slot.agentId) { Show-BunnyWeaponDetail $SlotId } else { Open-BunnyDashboard '?view=agentic' }
+}
+function New-BunnySlotRow([int]$SlotId) {
+ # Real Buttons expose their identity and action to UI Automation and support standard Tab/Enter/Space behavior.
+ $row = New-BunnyCharacterButton 14; $row.Padding = [Windows.Thickness]::new(8, 6, 8, 6); $row.Margin = [Windows.Thickness]::new(0, 0, 0, 6)
+ $row.BorderThickness = [Windows.Thickness]::new(0); $row.Background = [Windows.Media.Brushes]::Transparent
+ $row.Cursor = [Windows.Input.Cursors]::Hand; $row.Focusable = $true; $row.Tag = $SlotId
+ $grid = [Windows.Controls.DockPanel]::new()
+ $art = [Windows.Controls.Image]::new(); $art.Width = 30; $art.Height = 44; $art.Stretch = 'Uniform'; $art.VerticalAlignment = 'Center'; $art.HorizontalAlignment = 'Center'; $art.Margin = [Windows.Thickness]::new(0, 0, 16, 0); [Windows.Controls.DockPanel]::SetDock($art, 'Left')
+ [Windows.Media.RenderOptions]::SetBitmapScalingMode($art, [Windows.Media.BitmapScalingMode]::HighQuality)
+ $stack = [Windows.Controls.StackPanel]::new(); $stack.VerticalAlignment = 'Center'
+ $name = [Windows.Controls.TextBlock]::new(); $name.FontWeight = 'SemiBold'; $name.TextTrimming = 'CharacterEllipsis'
+ $state = [Windows.Controls.TextBlock]::new(); $state.FontSize = 12; $state.TextTrimming = 'CharacterEllipsis'; $state.SetResourceReference([Windows.Controls.TextBlock]::ForegroundProperty, 'BunnyMuted')
+ [void]$stack.Children.Add($name); [void]$stack.Children.Add($state)
+ [void]$grid.Children.Add($art); [void]$grid.Children.Add($stack); $row.Content = $grid
+ $row.Add_MouseEnter({ $this.SetResourceReference([Windows.Controls.Control]::BackgroundProperty, 'BunnyHover') })
+ $row.Add_MouseLeave({ $this.Background = [Windows.Media.Brushes]::Transparent })
+ $row.Add_GotKeyboardFocus({ $this.SetResourceReference([Windows.Controls.Control]::BorderBrushProperty, 'BunnyAccent'); $this.BorderThickness = [Windows.Thickness]::new(2) })
+ $row.Add_LostKeyboardFocus({ $this.BorderThickness = [Windows.Thickness]::new(0) })
+ $row.Add_Click({ Invoke-BunnySlotRow ([int]$this.Tag) })
+ $script:bunnySlotRows[$SlotId] = @{ Row = $row; Art = $art; Name = $name; State = $state }
+ return $row
+}
+function Update-BunnyQuickPanel {
+ $c = $bunnyControls
+ if ($c.SlotRows.Children.Count -eq 0) { foreach ($id in 1..4) { [void]$c.SlotRows.Children.Add((New-BunnySlotRow $id)) } }
+ $pending = 0; $dash = [string][char]0x2014
+ foreach ($id in 1..4) {
+  $row = $script:bunnySlotRows[$id]; $slot = Get-BunnySlotRecord $id
+  $bound = [bool]($slot -and $slot.active -and $slot.agentId)
+  if ($slot -and $slot.attention) { $pending += [int]$slot.attention.pendingApprovals }
+  $base = if ($bound) { $script:BunnyWeaponBase[[string]$slot.weapon] } else { $null }
+  $source = if ($base) { Get-BunnyCharacterSource $base.Compact 96 } else { $null }
+  if ($row.Art.Source -ne $source) { $row.Art.Source = $source }
+  $title = if ($slot -and $slot.displayName) { [string]$slot.displayName } else { 'Slot ' + $id }
+  $label = if (-not $bound) { 'Not assigned ' + $dash + ' set up in Studio' } elseif ($slot.presentation) { [string]$slot.presentation.label } else { 'Status unknown' }
+  # A retained snapshot is not live: while the Host is offline a bound row says so (the weapon chips and the card do the same).
+  if ($bound -and -not $bunnyOnline) { $label = 'Last known: ' + $label }
+  $row.Name.Text = $title; $row.State.Text = $label
+  $row.Row.Opacity = if ($bound) { 1 } else { 0.5 }
+  $name = $title + ', ' + $label; $row.Row.ToolTip = $name; [Windows.Automation.AutomationProperties]::SetName($row.Row, $name)
+ }
+ $c.QuickApprovals.Content = if ($pending) { 'Approvals: ' + $pending } else { 'No approvals waiting' }
+ $c.QuickHost.Text = if ($bunnyOnline) { '' } else { 'Host offline. Showing the last known state; commands are unavailable.' }
+ $c.QuickHost.Visibility = if ($bunnyOnline) { 'Collapsed' } else { 'Visible' }
+ $c.QuickVoiceState.Text = 'Voice: ' + [string]$c.VoiceHeadline.Text
+ $c.QuickVoice.IsEnabled = [bool]$bunnyOnline
+}
+function Show-BunnyMenu {
+ $bunnyControls.OptionalProviders.Text = @($bunnySnapshot.providers | Where-Object extension | ForEach-Object { $_.name + ' ' + $bunnyDot + ' ' + $_.availability.Replace('_', ' ') }) -join "`n"
+ Set-BunnyView 'menu'
+}
 function Expand-Bunny { if($bunnySelectedId){Show-BunnyTask;Set-BunnyView $(if((@($bunnySnapshot.tasks|Where-Object id -eq $bunnySelectedId)|Select-Object -First 1).state-eq'waiting_for_approval'){'approval'}else{'task'})}else{Set-BunnyView 'composer'} }
 function Draw-BunnyProviders {
  $bunnyControls.Providers.Children.Clear()
@@ -407,19 +700,27 @@ function Show-BunnySystem {
 function Update-BunnyRouteState {$bunnyControls.RouteButton.IsEnabled=$bunnyOnline-and-not$bunnyPending-and$bunnyControls.Prompt.Text.Trim().Length-gt0;$bunnyControls.CancelButton.IsEnabled=$bunnyOnline-and-not$bunnyPending;$bunnyControls.ChangeButton.IsEnabled=$bunnyOnline-and-not$bunnyPending;if($bunnyPending){$bunnyControls.ApproveButton.IsEnabled=$false;$bunnyControls.StopButton.IsEnabled=$false}}
 function Update-Bunny {
  try{$script:bunnySnapshot=Invoke-Bunny;$script:bunnyOnline=$true;$script:bunnyLastError=$null;$bunnyControls.Presence.Text='Host online '+$bunnyDot+' approval before launch';Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyPositive'
-  $active=@($bunnySnapshot.tasks|Where-Object state -notin @('completed','failed','stopped'));if(-not$bunnySelectedId-and$active.Count){$script:bunnySelectedId=$active[0].id};Populate-BunnyTasks;Show-BunnyTask
-  $sample=@($bunnySnapshot.samples)|Select-Object -Last 1;$temperatures=@();if($sample){if($null-ne$sample.cpu.temperatureC){$temperatures+=$sample.cpu.temperatureC};$temperatures+=@($sample.gpus|Where-Object {$null-ne$_.temperatureC}|ForEach-Object {$_.temperatureC})};$bunnyControls.Temperature.Text=if($temperatures.Count){[string]($temperatures|Measure-Object -Maximum).Maximum+[char]0x00B0}else{'--'}
-  $hot=$null;if($sample-and([DateTimeOffset]::Now.ToUnixTimeMilliseconds()-$sample.at)-lt15000){foreach($gpu in $sample.gpus){if($null-ne$gpu.temperatureC-and$gpu.temperatureC-ge$bunnySnapshot.thermal.gpuWarn){$hot=@{name=$gpu.name;temperature=$gpu.temperatureC;key='gpu:'+ $gpu.name};break}};if(-not$hot-and$null-ne$sample.cpu.temperatureC-and$sample.cpu.temperatureC-ge$bunnySnapshot.thermal.cpuWarn){$hot=@{name='CPU';temperature=$sample.cpu.temperatureC;key='cpu'}}};$script:bunnyHot=$hot
-  if($hot){$local=@($active|Where-Object {$_.provider-eq'ollama'-and$_.model-and$_.model-notmatch':cloud$'-and$_.state-in@('running','launching','verifying')});$bunnyControls.ThermalName.Text=$hot.name;$bunnyControls.ThermalValue.Text=[string]$hot.temperature+[char]0x00B0+'C';$bunnyControls.ThermalDetail.Text=if($local.Count){'Ollama '+$bunnyDot+' '+$local[0].model+"`nLocal Ollama generation is active"}else{'Above your configured warning threshold.'};$bunnyControls.ThermalStopButton.IsEnabled=$local.Count-eq1;$bunnyControls.ThermalStopButton.Tag=if($local.Count-eq1){$local[0].id}else{$null};if($hot.key-ne$bunnyHeatDismissed-and$bunnyView-notin@('composer','routing')){Set-BunnyView 'thermal'}}else{$script:bunnyHeatDismissed=$null}
-  if($bunnyView-eq'system'){Show-BunnySystem};Draw-BunnyProviders;Update-BunnyRouteState
-  if($bunnyFinishedAt-and$bunnyPreferences.collapse-gt0-and$bunnyView-eq'task'-and([DateTimeOffset]::Now.ToUnixTimeMilliseconds()-$bunnyFinishedAt)-ge($bunnyPreferences.collapse*1000)){$script:bunnySelectedId=$null;$script:bunnyFinishedAt=$null;Set-BunnyView 'idle'}
-  if($bunnyView-eq'idle'-and-not$active.Count-and-not$bunnyFinishedAt){$script:bunnySelectedId=$null;$bunnyControls.CompactTask.Visibility='Collapsed'}elseif($bunnyView-eq'idle'-and$active.Count){$bunnyControls.CompactTask.Visibility='Visible'}
-  Update-BunnyPresentation
-  Update-BunnyAgentStrip
-  Update-BunnyVoice
-  Resize-Bunny
+  # While the window is iconic, Host data is still polled but the UI rebuild/animation work waits (spec section 10:
+  # invisible work is throttled). The next visible tick, at most 2 s after restore, replays this block. Update-BunnyMotion
+  # still runs every tick so motion mode keeps tracking the real window state.
+  if($bunnyWindow.WindowState-ne'Minimized'){
+    $active=@($bunnySnapshot.tasks|Where-Object state -notin @('completed','failed','stopped'));if(-not$bunnySelectedId-and$active.Count){$script:bunnySelectedId=$active[0].id};Populate-BunnyTasks;Show-BunnyTask
+    $sample=@($bunnySnapshot.samples)|Select-Object -Last 1;$temperatures=@();if($sample){if($null-ne$sample.cpu.temperatureC){$temperatures+=$sample.cpu.temperatureC};$temperatures+=@($sample.gpus|Where-Object {$null-ne$_.temperatureC}|ForEach-Object {$_.temperatureC})};$bunnyControls.Temperature.Text=if($temperatures.Count){[string]($temperatures|Measure-Object -Maximum).Maximum+[char]0x00B0}else{''}
+    $hot=$null;if($sample-and([DateTimeOffset]::Now.ToUnixTimeMilliseconds()-$sample.at)-lt15000){foreach($gpu in $sample.gpus){if($null-ne$gpu.temperatureC-and$gpu.temperatureC-ge$bunnySnapshot.thermal.gpuWarn){$hot=@{name=$gpu.name;temperature=$gpu.temperatureC;key='gpu:'+ $gpu.name};break}};if(-not$hot-and$null-ne$sample.cpu.temperatureC-and$sample.cpu.temperatureC-ge$bunnySnapshot.thermal.cpuWarn){$hot=@{name='CPU';temperature=$sample.cpu.temperatureC;key='cpu'}}};$script:bunnyHot=$hot
+    if($hot){$local=@($active|Where-Object {$_.provider-eq'ollama'-and$_.model-and$_.model-notmatch':cloud$'-and$_.state-in@('running','launching','verifying')});$bunnyControls.ThermalName.Text=$hot.name;$bunnyControls.ThermalValue.Text=[string]$hot.temperature+[char]0x00B0+'C';$bunnyControls.ThermalDetail.Text=if($local.Count){'Ollama '+$bunnyDot+' '+$local[0].model+"`nLocal Ollama generation is active"}else{'Above your configured warning threshold.'};$bunnyControls.ThermalStopButton.IsEnabled=$local.Count-eq1;$bunnyControls.ThermalStopButton.Tag=if($local.Count-eq1){$local[0].id}else{$null};if($hot.key-ne$bunnyHeatDismissed-and$bunnyView-notin@('composer','routing')){Set-BunnyView 'thermal'}}else{$script:bunnyHeatDismissed=$null}
+    if($bunnyView-eq'system'){Show-BunnySystem};Draw-BunnyProviders;Update-BunnyRouteState
+    if($bunnyFinishedAt-and$bunnyPreferences.collapse-gt0-and$bunnyView-eq'task'-and([DateTimeOffset]::Now.ToUnixTimeMilliseconds()-$bunnyFinishedAt)-ge($bunnyPreferences.collapse*1000)){$script:bunnySelectedId=$null;$script:bunnyFinishedAt=$null;Set-BunnyView 'idle'}
+    if($bunnyView-eq'idle'-and-not$active.Count-and-not$bunnyFinishedAt){$script:bunnySelectedId=$null;$bunnyControls.CompactTask.Visibility='Collapsed'}elseif($bunnyView-eq'idle'-and$active.Count){$bunnyControls.CompactTask.Visibility='Visible'}
+    Update-BunnyPresentation
+    Update-BunnyAgentStrip
+    Update-BunnyVoice
+    Update-BunnyCompanion
+    Update-BunnyWeaponDetail
+    if($bunnyView-eq'quick'){Update-BunnyQuickPanel}
+    Resize-Bunny
+  }
   Update-BunnyMotion
- }catch{$script:bunnyOnline=$false;$script:bunnyLastError=$_.Exception.Message;$bunnyControls.Presence.Text='Host unavailable - retained work may be stale';$bunnyControls.CompactHealth.Text='Host unavailable - retained work may be stale';$bunnyControls.CompactHealth.Visibility='Visible';Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyMuted';$bunnyControls.Temperature.Text='--';$bunnyControls.ApproveButton.IsEnabled=$false;$bunnyControls.StopButton.IsEnabled=$false;Update-BunnyAgentPresentation;Update-BunnyAgentStrip;Update-BunnyVoice;Resize-Bunny;Update-BunnyRouteState;Draw-BunnyProviders;Update-BunnyMotion}
+ }catch{$script:bunnyOnline=$false;$script:bunnyLastError=$_.Exception.Message;$bunnyControls.Presence.Text='Host unavailable - retained work may be stale';$bunnyControls.CompactHealth.Text='Host unavailable - retained work may be stale';$bunnyControls.CompactHealth.Visibility='Visible';Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyMuted';$bunnyControls.Temperature.Text='';$bunnyControls.ApproveButton.IsEnabled=$false;$bunnyControls.StopButton.IsEnabled=$false;Update-BunnyAgentPresentation;Update-BunnyAgentStrip;Update-BunnyVoice;Update-BunnyCompanion;if($bunnyView-eq'quick'){Update-BunnyQuickPanel};Resize-Bunny;Update-BunnyRouteState;Draw-BunnyProviders;Update-BunnyMotion}
 }
 # Async UI commands keep the morph/animation and keyboard responsive; execution stays in the Host.
 function Begin-BunnyCommand([string]$Action,$Data){
@@ -440,6 +741,9 @@ $bunnySettingsUpdating=$true
 . (Join-Path $PSScriptRoot 'Bunny-Island.Voice.ps1')
 . (Join-Path $PSScriptRoot 'Bunny-Island.Motion.ps1')
 . (Join-Path $PSScriptRoot 'Bunny-Island.Presentation.ps1')
+. (Join-Path $PSScriptRoot 'Bunny-Island.Weapons.ps1')
+. (Join-Path $PSScriptRoot 'Bunny-Island.Companion.ps1')
+Initialize-BunnyCompanion
 Add-BunnyChoice $bunnyControls.SizeChoice @(@('compact','Compact'),@('normal','Normal'),@('detailed','Detailed')) 'size'
 Add-BunnyChoice $bunnyControls.PositionChoice @(@('left','Start'),@('center','Center'),@('right','End')) 'position'
 Add-BunnyChoice $bunnyControls.IdleChoice @(@('providers','Agents'),@('temperatures','System'),@('tasks','Active tasks'),@('clock','Clock'),@('mixed','Mixed'),@('minimal','Minimal')) 'idle'
@@ -455,12 +759,24 @@ $bunnyWindow.Add_Closed({try{[Microsoft.Win32.SystemEvents]::remove_DisplaySetti
 try{$bunnyWindow.Add_DpiChanged({Resize-Bunny})}catch{}
 foreach($id in @('codex','claude','ollama','opencode','cline','cursor')){$check=[Windows.Controls.CheckBox]::new();$check.Content=(Get-Culture).TextInfo.ToTitleCase($id);$check.Tag=$id;Set-BunnyRef $check ([Windows.Controls.Control]::ForegroundProperty) 'BunnyText';$check.Margin='0,0,16,8';$check.MinHeight=44;$check.VerticalContentAlignment='Center';$check.IsChecked=$bunnyPreferences.primary-contains$id;$check.Add_Click({$chosen=@($bunnyControls.PrimaryChoices.Children|Where-Object IsChecked|ForEach-Object {$_.Tag});if($chosen.Count-gt3){$this.IsChecked=$false;return};$bunnyPreferences.primary=$chosen;Save-BunnyPreferences;Draw-BunnyProviders});[void]$bunnyControls.PrimaryChoices.Children.Add($check)}
 $bunnySettingsUpdating=$false
-Set-BunnyButton $bunnyControls.RouteButton 'Route' 'arrow-right';Set-BunnyButton $bunnyControls.ApproveButton 'Approve & Run' 'play';Set-BunnyButton $bunnyControls.StopButton 'Stop' 'square'
+Set-BunnyButton $bunnyControls.SearchButton '' 'search' 17;Set-BunnyButton $bunnyControls.RouteButton 'Route' 'arrow-right';Set-BunnyButton $bunnyControls.ApproveButton 'Approve & Run' 'play';Set-BunnyButton $bunnyControls.StopButton 'Stop' 'square'
 Apply-BunnyAppearance;if($LightView){Set-BunnyTheme $true}
 Set-BunnyMotionMode
 $bunnyWindow.Add_SizeChanged({Set-BunnyPosition})
+function Sync-BunnyMotionVisibility {
+ Set-BunnyMotionMode
+ if(-not$bunnyAnimate){Stop-BunnyWeaponStrip;Stop-BunnyCompanionMotion;$script:bunnyCompanionKey=''}
+ else{Update-BunnyAgentStrip;Update-BunnyCompanion}
+}
+$bunnyWindow.Add_StateChanged({Sync-BunnyMotionVisibility})
+$bunnyWindow.Add_IsVisibleChanged({Sync-BunnyMotionVisibility})
 $bunnyControls.BunnyButton.Add_Click({if($bunnyHeld){$script:bunnyHeld=$false;return};Set-BunnyView 'composer';$bunnyControls.Prompt.Focus()|Out-Null})
-$bunnyControls.CollapseButton.Add_Click({Close-BunnyDetails});$bunnyControls.ExtrasButton.Add_Click({if($bunnyView-eq'idle'){$bunnyControls.OptionalProviders.Text=@($bunnySnapshot.providers|Where-Object extension|ForEach-Object {$_.name+' '+$bunnyDot+' '+$_.availability.Replace('_',' ')})-join"`n";Set-BunnyView 'menu'}else{Close-BunnyDetails}})
+$bunnyControls.CollapseButton.Add_Click({Close-BunnyDetails});$bunnyControls.ExtrasButton.Add_Click({if($bunnyView-eq'idle'){Set-BunnyView 'quick'}else{Close-BunnyDetails}})
+$bunnyControls.SearchButton.Add_Click({Open-BunnyApplication ''})
+$bunnyControls.QuickVoice.Add_Click({Set-BunnyView 'voice'})
+$bunnyControls.QuickWorkspace.Add_Click({Open-BunnyApplication ''})
+$bunnyControls.QuickApprovals.Add_Click({Open-BunnyDashboard '?view=agentic'})
+$bunnyControls.QuickMore.Add_Click({Show-BunnyMenu})
 $bunnyControls.CompactTask.Add_Click({if(@($bunnySnapshot.tasks|Where-Object state -notin @('completed','failed','stopped')).Count-gt1){Set-BunnyView 'tasks'}else{Expand-Bunny}})
 $bunnyControls.Prompt.Add_TextChanged({Update-BunnyRouteState})
 $bunnyControls.RouteButton.Add_Click({try{$project=$bunnyControls.ProjectChoice.SelectedItem.Tag;$route=$bunnyControls.RouteChoice.SelectedItem.Tag;Set-BunnyView 'routing';Begin-BunnyCommand 'submit' @{prompt=$bunnyControls.Prompt.Text;mode=@('fast','balanced','deep')[$bunnyControls.Mode.SelectedIndex];projectId=$project;override=$route;constraints=@{localOnly=[bool]$bunnyControls.LocalOnly.IsChecked}}}catch{$bunnyControls.Notice.Text=Get-BunnyError $_;Set-BunnyView 'composer'}})
@@ -486,7 +802,7 @@ $bunnyControls.ShowFolderButton.Add_Click({$task=@($bunnySnapshot.tasks|Where-Ob
 $bunnyControls.PhoneButton.Add_Click({$bunnyControls.PhoneDetail.Text=if($bunnySnapshot.remoteConfigured){'Open the secure companion and enter a one-time code.'}else{'Secure phone access is not configured.'};$bunnyControls.PairButton.IsEnabled=$bunnyOnline-and$bunnySnapshot.remoteConfigured;Set-BunnyView 'phone'})
 $bunnyControls.PairButton.Add_Click({try{$result=Invoke-Bunny 'pairing.create' @{};$bunnyControls.PhoneCode.Text=$result.snapshot.remoteUrl+'/?companion=1'+"`n`n"+$result.pairCode;$bunnyControls.Notice.Text='Single use '+$bunnyDot+' expires in 10 minutes';Resize-Bunny}catch{$bunnyControls.Notice.Text=Get-BunnyError $_}})
 $bunnyControls.ContinueButton.Add_Click({$script:bunnyHeatDismissed=$bunnyHot.key;Close-BunnyDetails});$bunnyControls.ThermalStopButton.Add_Click({if($this.Tag){Begin-BunnyCommand 'stop' @{id=$this.Tag}}})
-$bunnyWindow.Add_PreviewKeyDown({if($_.Key-eq'Escape'){Close-BunnyDetails;$_.Handled=$true}elseif($_.Key-eq'Return'-and([Windows.Input.Keyboard]::Modifiers-band[Windows.Input.ModifierKeys]::Control)){if($bunnyView-eq'composer'-and$bunnyControls.RouteButton.IsEnabled){Invoke-BunnyClick $bunnyControls.RouteButton};$_.Handled=$true}elseif($_.Key-in@('Up','Down')-and$bunnyView-in@('idle','task','tasks')){Move-BunnyFocus $(if($_.Key-eq'Down'){1}else{-1});$_.Handled=$true}})
+$bunnyWindow.Add_PreviewKeyDown({if(Test-BunnyDockKey $_){$_.Handled=$true}elseif($_.Key-eq'Escape'){Close-BunnyDetails;$_.Handled=$true}elseif($_.Key-eq'Return'-and([Windows.Input.Keyboard]::Modifiers-band[Windows.Input.ModifierKeys]::Control)){if($bunnyView-eq'composer'-and$bunnyControls.RouteButton.IsEnabled){Invoke-BunnyClick $bunnyControls.RouteButton};$_.Handled=$true}elseif($_.Key-in@('Up','Down')-and$bunnyView-in@('idle','task','tasks')){Move-BunnyFocus $(if($_.Key-eq'Down'){1}else{-1});$_.Handled=$true}})
 function Move-BunnyFocus([int]$Direction){$active=@($bunnySnapshot.tasks|Where-Object state -notin @('completed','failed','stopped'));if(-not$active.Count){return};$index=0;for($i=0;$i-lt$active.Count;$i++){if($active[$i].id-eq$bunnySelectedId){$index=$i}};$script:bunnySelectedId=$active[($index+$Direction+$active.Count)%$active.Count].id;Show-BunnyTask;if($active.Count-gt1){Populate-BunnyTasks;Set-BunnyView 'tasks'}else{Expand-Bunny}}
 $bunnyWindow.Add_MouseWheel({if($bunnyView-in@('idle','task','tasks')){Move-BunnyFocus $(if($_.Delta-lt0){1}else{-1});$_.Handled=$true}})
 function Populate-BunnyComposer {

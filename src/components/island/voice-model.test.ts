@@ -4,6 +4,8 @@ import type { VoiceProposal, VoiceSnapshot } from "../../lib/bunny-host/voice/vo
 import { readFileSync } from "node:fs";
 import {
   acceptVoiceSnapshot,
+  voiceReplyCurrent,
+  hostCompanionView,
   bargeInNote,
   handsFreeOn,
   handsFreeStatus,
@@ -774,4 +776,47 @@ test("T12 lane2 the store refuses a push-to-talk press and a hands-free start ou
   assert.match(action("setVoiceMode"), /if \(press\.pressed\) await runPress\(pressUp\(press\)\);/);
   assert.ok(action("setVoiceMode").indexOf("runPress(pressUp") < action("setVoiceMode").indexOf("voice.session.open"));
   assert.doesNotMatch(action("setVoiceMode"), /voice\.listen\.start/);
+});
+
+test("T13 revision order: within one Host epoch an older revision is rejected even with a newer updatedAt", () => {
+  const held = snap({ updatedAt: NOW, revision: 7 } as Partial<VoiceSnapshot>);
+  const older = snap({ updatedAt: NOW + 50, revision: 6 } as Partial<VoiceSnapshot>);
+  const newer = snap({ updatedAt: NOW, revision: 8 } as Partial<VoiceSnapshot>);
+  assert.equal(acceptVoiceSnapshot(held, older), false, "a clock that moved forward cannot resurrect an older revision");
+  assert.equal(acceptVoiceSnapshot(held, newer), true, "a newer revision wins even when updatedAt did not move");
+  assert.equal(acceptVoiceSnapshot(held, snap({ updatedAt: NOW, revision: 7 } as Partial<VoiceSnapshot>)), true, "a re-delivery of the same revision is accepted");
+});
+
+test("T13 revision order: a new Host epoch wins regardless of revision, and missing revisions fall back to updatedAt", () => {
+  const held = snap({ updatedAt: NOW, revision: 90 } as Partial<VoiceSnapshot>);
+  assert.equal(acceptVoiceSnapshot(held, snap({ hostEpoch: "e2", updatedAt: NOW - 5, revision: 1 } as Partial<VoiceSnapshot>)), true, "a restarted Host numbers from 1 again");
+  assert.equal(acceptVoiceSnapshot(snap({ updatedAt: NOW + 10 }), snap({ updatedAt: NOW, revision: 3 } as Partial<VoiceSnapshot>)), false, "one side without a revision uses updatedAt");
+  assert.equal(acceptVoiceSnapshot(snap({ updatedAt: NOW }), snap({ updatedAt: NOW + 1 })), true);
+});
+
+test("T13 companion view: the voice-model export is the Host companion expression for the snapshot", () => {
+  assert.equal(hostCompanionView(null, NOW).state, "SLEEPING");
+  assert.equal(hostCompanionView(snap({ open: true, state: "IDLE" }), NOW).state, "READY");
+  assert.equal(hostCompanionView(snap({ open: true, playing: true, state: "SPEAKING" }), NOW).state, "SPEAKING");
+});
+
+test("T13 restart: a closed Host that restarted (revision back to 0, no epoch) replaces the held closed snapshot", () => {
+  const held = snap({ open: false, hostEpoch: null, revision: 7, instance: "before-restart", updatedAt: NOW } as Partial<VoiceSnapshot>);
+  const restarted = snap({ open: false, hostEpoch: null, revision: 0, instance: "after-restart", updatedAt: NOW + 50 } as Partial<VoiceSnapshot>);
+  assert.equal(acceptVoiceSnapshot(held, restarted), true, "a new Host process is a new epoch of ordering");
+  assert.equal(acceptVoiceSnapshot(held, snap({ open: false, hostEpoch: null, revision: 6, instance: "before-restart", updatedAt: NOW + 50 } as Partial<VoiceSnapshot>)), false, "the same process still orders by revision");
+});
+
+test("T13 delayed voice replies cannot restore protected state after revocation or a Host switch", async () => {
+  const admitted = { generation: 1, connection: "live", instanceId: "process-a", hostId: "host-a", hostEpoch: "epoch-a" };
+  const reply = Promise.resolve("old speaking snapshot");
+  for (const changed of [
+    { generation: 2 }, { connection: "pairing" }, { connection: "host-changed" },
+    { instanceId: "process-b" }, { hostId: "host-b" }, { hostEpoch: "epoch-b" },
+  ]) {
+    const current = { ...admitted, ...changed };
+    await reply;
+    assert.equal(voiceReplyCurrent(admitted, current), false, JSON.stringify(changed));
+  }
+  assert.equal(voiceReplyCurrent(admitted, admitted), true, "same principal/process may apply an ordered reply");
 });

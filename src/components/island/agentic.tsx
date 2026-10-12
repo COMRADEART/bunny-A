@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ArrowLeft,
   ArrowRight,
-  Bot,
   CheckCircle2,
+  Layers,
   FileCheck2,
   Folder,
   MessageSquare,
@@ -17,6 +17,8 @@ import {
   X,
 } from "lucide-react";
 import { useIsland } from "@/store/use-island";
+import { WeaponCharacter, usePrefersReducedMotion } from "./characters";
+import { displayState, hostLive } from "./character-model";
 import { AuthorizationCard, TeamsSection } from "./agent";
 import { parseRequirementLines, teamPanels } from "./team-model";
 import { AGENT_STATE_LABEL, CHECKPOINT_LABEL } from "./agent-model";
@@ -24,8 +26,10 @@ import {
   agentControls,
   attentionRequired,
   currentAgentTask,
+  currentStepLabel,
   selectedTaskModel,
   type AgentView,
+  returnFocusTo,
 } from "./workspace-model";
 import { ActivityTimeline } from "./activity";
 import { Empty, NAMES } from "./ui";
@@ -146,6 +150,7 @@ export function PendingAsks({ agent, mission }: { agent: AgentView; mission?: Mi
   const store = useIsland();
   const asks = pendingAsks(agent.authorization, mission);
   const [denying, setDenying] = useState<PendingAsk | null>(null);
+  const denyOpener = useRef<HTMLElement | null>(null);
   if (!asks.length) return null;
   const actNow = store.canAct();
   const caption = controlCaption({
@@ -215,7 +220,10 @@ export function PendingAsks({ agent, mission }: { agent: AgentView; mission?: Mi
               ) : (
                 <p className="control-caption host-required">{verdict.caption}</p>
               )}
-              <button className="btn quiet" disabled={caption !== null} onClick={() => setDenying(ask)}>
+              <button className="btn quiet" disabled={caption !== null} onClick={(event) => {
+                denyOpener.current = event.currentTarget;
+                setDenying(ask);
+              }}>
                 Deny
               </button>
             </div>
@@ -230,7 +238,7 @@ export function PendingAsks({ agent, mission }: { agent: AgentView; mission?: Mi
       <Dialog.Root open={!!denying} onOpenChange={(open) => !open && setDenying(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog" data-theme={store.theme}>
+          <Dialog.Content className="t8-dialog" data-theme={store.theme} onCloseAutoFocus={returnFocusTo(denyOpener)}>
             <Dialog.Title>Deny {denying?.action}?</Dialog.Title>
             <Dialog.Description>
               The Host records your denial. This exact operation will not run, and the Mission step that
@@ -259,6 +267,10 @@ export function PendingAsks({ agent, mission }: { agent: AgentView; mission?: Mi
 }
 
 export function AgenticWorkspace() {
+  // Same reduced-motion contract as the companion and phone surfaces (premium.tsx): the OS preference always wins
+  // and any Motion setting other than Full suppresses the effect layer (Settings promises both).
+  const systemReduced = usePrefersReducedMotion();
+
   const store = useIsland();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
@@ -305,9 +317,9 @@ export function AgenticWorkspace() {
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Dedicated workspace</p>
-          <h1>Agentic</h1>
-          <p>Persistent work. Clear progress. You stay in control.</p>
+          <p className="eyebrow">Missions</p>
+          <h1>Missions</h1>
+          <p>Persistent work on your Host. Closing this window does not stop a Mission; you stay in control.</p>
         </div>
         {isDevice(store.viewer) ? (
           <p className="control-caption">New Agents · {WORKSTATION_CAPTION}</p>
@@ -529,6 +541,7 @@ export function AgenticWorkspace() {
         {matches.slice(offset, offset + 20).map((agent) => {
           const mission = missions.find((row) => row.id === agent.missionId);
           const task = currentAgentTask(agent, mission, store.tasks);
+          const rowLive = hostLive(store.connection, Date.now());
           return (
             <button
               className="agentic-row"
@@ -537,14 +550,29 @@ export function AgenticWorkspace() {
               data-agent-id={agent.id}
             >
               <span className="agent-avatar">
-                <Bot size={20} />
+                {(() => {
+                  // A slotted Personal Agent is drawn as its own character; any other Agent gets a neutral icon, never a provider.
+                  const slot = store.personalAgents?.slots.find((row) => row.agent?.id === agent.id);
+                  return slot ? (
+                    <WeaponCharacter
+                      weapon={slot.weapon}
+                      state={displayState(slot.presentation.state, hostLive(store.connection, Date.now()))}
+                      slot={slot.slot}
+                      size="compact"
+                      reduced={systemReduced || store.appearance.motion !== "full"}
+                      displayName={slot.displayName}
+                    />
+                  ) : (
+                    <Layers size={20} aria-hidden="true" />
+                  );
+                })()}
               </span>
               <span className="agent-row-copy">
                 <strong>{agent.name}</strong>
                 <span>{mission?.objective ?? "Mission objective unavailable"}</span>
                 <small>
                   {task
-                    ? `${NAMES[task.provider]} · ${selectedTaskModel(task)}`
+                    ? currentStepLabel(task, rowLive)
                     : agent.activity?.step
                       ? `${["COMPLETED", "FAILED", "STOPPED"].includes(agent.state) ? "Last step" : agent.state === "CREATED" ? "Planned step" : "Retained step"}: ${agent.activity.step}`
                       : "No Task currently admitted"}
@@ -603,7 +631,7 @@ export function AgenticWorkspace() {
       <section className="t8-section">
         <div className="section-heading">
           <h2>Recent Missions</h2>
-          <span className="caption">Accepted Host records</span>
+          <span className="caption">Accepted Host records · closing this window does not stop a Mission</span>
         </div>
         <div className="t8-surface">
           {missions.slice(0, 6).map((mission) => (
@@ -641,6 +669,7 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
   const store = useIsland();
   const [tab, setTab] = useState("Activity");
   const [review, setReview] = useState(false);
+  const artifactOpener = useRef<HTMLElement | null>(null);
   const [artifact, setArtifact] = useState<{
     title: string;
     body: string;
@@ -817,7 +846,10 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
                           store.host !== "online" ||
                           busy
                         }
-                        onClick={() => void openArtifact(row)}
+                        onClick={(event) => {
+                          artifactOpener.current = event.currentTarget;
+                          void openArtifact(row);
+                        }}
                       >
                         Open verified artifact
                       </button>
@@ -976,7 +1008,7 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
       >
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog artifact-dialog" data-theme={store.theme}>
+          <Dialog.Content className="t8-dialog artifact-dialog" data-theme={store.theme} onCloseAutoFocus={returnFocusTo(artifactOpener)}>
             <Dialog.Title>{artifact?.title}</Dialog.Title>
             <Dialog.Description>
               Verified through the Project artifact authority. SHA-256: {artifact?.sha256}

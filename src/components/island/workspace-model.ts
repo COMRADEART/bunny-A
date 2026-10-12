@@ -32,7 +32,27 @@ export function currentAgentTask(
     (task) => task.id === step?.taskId && !["completed", "failed", "stopped"].includes(task.state),
   );
 }
-export function selectedTaskModel(task: OrchTask | undefined) {
+/**
+ * The Agent row's present-tense claim about its current Task. "Working on a step now" is only ever said for a live Host's
+ * running or verifying step. A waiting step says so, and a Host that is not live shows the last known step, never "now".
+ */
+export function currentStepLabel(task: Pick<OrchTask, "state">, live: boolean): string {
+  if (!live) return "Last known step";
+  if (task.state === "waiting_for_approval") return "Waiting for approval";
+  if (task.state === "running" || task.state === "verifying") return "Working on a step now";
+  return "Step admitted";
+}
+/**
+ * Radix returns focus to its trigger when a dialog closes, and a dialog opened from a plain button has none, so focus would
+ * fall to the page. The element that opened the dialog gets focus back instead.
+ */
+export function returnFocusTo(opener: { current: HTMLElement | null }) {
+  return (event: Event) => {
+    event.preventDefault();
+    opener.current?.focus();
+  };
+}
+export function selectedTaskModel(task: Pick<OrchTask, "model"> | undefined) {
   if (!task) return "No model Task admitted";
   return !task.model ||
     ["auto", "default", "unknown", "provider-default"].includes(task.model.toLowerCase())

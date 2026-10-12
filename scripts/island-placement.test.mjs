@@ -128,22 +128,22 @@ test('V48: left and right are vertical with agent indicators at the TOP of the b
   }
 });
 
-test('V49: indicator layout is bounded (at most 3 chips plus one overflow chip) and counts overflow exactly', { skip }, () => {
+test('V49: indicator layout is bounded (at most 4 weapon chips plus one overflow chip) and counts overflow exactly', { skip }, () => {
   for (const result of runBatch()) {
-    assert.ok(result.visible <= 3, `id ${result.id}: visible chips ${result.visible}`);
-    assert.ok(result.slots <= 4, `id ${result.id}: slots ${result.slots}`);
+    assert.ok(result.visible <= 4, `id ${result.id}: visible chips ${result.visible}`);
+    assert.ok(result.slots <= 5, `id ${result.id}: slots ${result.slots}`);
     assert.equal(result.visible + result.overflow, result.count, `id ${result.id}: count mismatch`);
-    assert.equal(result.overflow, Math.max(0, result.count - 3), `id ${result.id}: overflow`);
+    assert.equal(result.overflow, Math.max(0, result.count - 4), `id ${result.id}: overflow`);
     assert.equal(result.label, result.overflow > 0 ? '+' + result.overflow : '', `id ${result.id}: label`);
   }
 });
 
-test('V47/V48: the indicator axis follows the notch orientation (a column beside a horizontal notch, a row above a vertical one)', { skip }, () => {
+test('V47/V48: the indicator axis follows the notch orientation (ONE row beside a horizontal notch, ONE column above a vertical one)', { skip }, () => {
   for (const result of runBatch()) {
     const edge = cases[result.id].edge;
     if (edge === 'center') continue;
     const vertical = edge === 'left' || edge === 'right';
-    assert.equal(result.axis, vertical ? 'row' : 'column', `id ${result.id} ${edge}`);
+    assert.equal(result.axis, vertical ? 'column' : 'row', `id ${result.id} ${edge}`);
   }
 });
 
@@ -197,12 +197,13 @@ test('display-settings and DPI changes re-fit the notch through Resize-Bunny (si
 
 test('the indicator rule is shared: Visual asks Get-BunnyIndicatorLayout for the side and axis, never a second rule', () => {
   const visual = readFileSync(visualPath, 'utf8');
-  const presentation = readFileSync(join(root, 'install', 'Bunny-Island.Presentation.ps1'), 'utf8');
+  const weapons = readFileSync(join(root, 'install', 'Bunny-Island.Weapons.ps1'), 'utf8');
   assert.match(visual, /function Get-BunnyIndicatorState[\s\S]*?Get-BunnyIndicatorLayout -Placement \$probe/);
   assert.match(visual, /\$bunnyVisualRoot\.Orientation=if\(\$layout\.Side -eq 'top'\)/);
-  assert.match(visual, /\$bunnyControls\.AgentStrip\.Orientation=if\(\$layout\.Axis -eq 'row'\)/);
-  assert.match(presentation, /for \(\$index = 0; \$index -lt \$layout\.Visible; \$index\+\+\)/);
-  assert.match(presentation, /if \(\$layout\.Overflow -gt 0\)/);
+  assert.match(visual, /\$bunnyControls\.AgentStrip\.Orientation=if\(\$layout\.Axis -eq 'row'\)\{'Horizontal'\}else\{'Vertical'\}/);
+  // One container for every weapon (no two-wide grouping): the chips are added to the strip directly, in slot order.
+  assert.doesNotMatch(weapons, /\$groupOrientation|\$group\.Children|\$start \+= 2/);
+  assert.match(weapons, /foreach \(\$item in \$items\) \{ \[void\]\$strip\.Children\.Add\(\$item\) \}/);
 });
 
 test('no random value anywhere in the Island layer (placement, indicators and layout are deterministic)', () => {

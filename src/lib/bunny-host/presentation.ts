@@ -168,6 +168,8 @@ const LABELS: Record<string, string> = {
   "mission.team.rework": "Bounded rework started",
   "mission.team.agent_stopped": "Team member stopped",
   "mission.team.seeded": "Test fault injected (recorded)",
+  // M-A-3 T13 Personal Agent slots (presentation only).
+  "personal_agents.configured": "Personal Agents updated",
 };
 export const publicEventLabel = (type: string) => LABELS[type] ?? "Activity recorded";
 /**

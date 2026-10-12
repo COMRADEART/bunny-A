@@ -309,6 +309,11 @@ export function Settings() {
                     : "Unavailable"}
                 </span>
               </Setting>
+              <Setting label="Design preview" detail="A labelled preview of the character and glass system with fixture data. Not live Host data.">
+                <button className="btn secondary" onClick={() => store.setSheet("design-preview")}>
+                  Open design preview
+                </button>
+              </Setting>
             </>
           )}
         </section>

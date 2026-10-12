@@ -23,6 +23,7 @@ import { dashboardSnapshot, publicEventDetail, projectHostActivity } from "./pre
 import { releaseIdentity } from "./release-identity.server.ts";
 import { AGENT_ACTIONS, AgentRuntime, agentCommand } from "./agent-runtime.server.ts";
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
+import { isUserFacingAgent, projectPersonalAgents } from "./personal-agents.ts";
 import { VoiceSessionManager, type ListenSource, type InterruptSource } from "./voice/voice-session.server.ts";
 import { launchVoiceWorker } from "./voice/voice-worker.server.ts";
 import { hostFactsFrom, pendingApprovalFacts, type ApprovalFact } from "./voice/voice-answers.server.ts";
@@ -359,6 +360,29 @@ export async function startHost(
     const retainedFrom = Number(
       (db.db.prepare("SELECT COALESCE(MIN(sequence),0) n FROM events").get() as { n: number }).n,
     );
+    // A bound Agent whose Mission slid out of the fifteen-newest dashboard window would lose its steps, progress,
+    // result and permission asks in the Personal Agent projection below (a running step would even report
+    // "No step is admitted right now"). The bound Agents' Missions are fetched by id and added to the projection
+    // input; a pruned Mission leaves the slot on its agent-derived state.
+    const missionWindow = canonical.missions?.missions ?? [];
+    const windowIds = new Set(missionWindow.map((mission) => mission.id));
+    const boundIds = new Set((manager.personalAgents?.slots ?? []).map((slot) => slot.agentId).filter(Boolean) as string[]);
+    const boundMissionIds = [
+      ...new Set(
+        (canonical.agents?.agents ?? [])
+          .filter((agent) => boundIds.has(agent.id) && agent.missionId)
+          .map((agent) => String(agent.missionId)),
+      ),
+    ];
+    const extraMissions = [] as NonNullable<HostSnapshot["missions"]>["missions"];
+    for (const id of boundMissionIds) {
+      if (windowIds.has(id)) continue;
+      try {
+        extraMissions.push(missions.view(missions.mission(id)));
+      } catch {
+        // The Mission row is gone (pruned or foreign id): the slot falls back to agent-derived state.
+      }
+    }
     return {
       ...canonical,
       release: installedIdentity,
@@ -368,6 +392,14 @@ export async function startHost(
         retainedFrom,
         ++presentationRevision,
       ),
+      // M-A-3 T13: projected here, before any device redaction (it reads executor params and task events).
+      personalAgents: projectPersonalAgents({
+        config: manager.personalAgents,
+        agents: canonical.agents?.agents ?? [],
+        missions: [...missionWindow, ...extraMissions],
+        tasks: canonical.tasks,
+        now: Date.now(),
+      }),
     };
   };
   // M-A-3 T10: the voice session. Workstation-only; the worker runs contained in a Bunny-owned job and nothing starts until a workstation opens it.
@@ -518,7 +550,16 @@ export async function startHost(
       }),
     };
     // Voice is workstation-only: a device projection never carries it.
-    if (principal.kind === "device") return dashboardSnapshot(deviceSnapshot(withVerdicts, principal, presence));
+    if (principal.kind === "device") {
+      const device = dashboardSnapshot(deviceSnapshot(withVerdicts, principal, presence));
+      // M-A-3 T13: a device reads its slots only. The bindable list is a workstation Studio concern and reaches
+      // beyond the Agents a device is shown (finished Agents are trimmed for devices), so it never leaves the workstation.
+      if (!device.personalAgents) return device;
+      // A slot bound to a finished Agent that the device's trimmed history no longer lists gets no Agent detail either.
+      const listed = new Set((device.agents?.agents ?? []).map((agent) => agent.id));
+      const slots = device.personalAgents.slots.map((slot) => (slot.agent && !listed.has(slot.agent.id) ? { ...slot, agent: null } : slot));
+      return { ...device, personalAgents: { ...device.personalAgents, slots, bindable: [] } };
+    }
     return { ...withVerdicts, voice: voice.snapshot() };
   };
   manager.remoteConfigured = !!process.env.BUNNY_REMOTE_ORIGIN || existsSync(paths.remote);
@@ -805,6 +846,17 @@ export async function startHost(
               throw new Error("Explicit automatic-stop preference required.");
             manager.configureThermal(Number(data.cpuWarn), Number(data.gpuWarn), data.autoStop);
             break;
+          case "personal_agents.configure": {
+            // M-A-3 T13: presentation only. Devices are refused by default-deny; this guard keeps it workstation-only.
+            if (!local) throw new WorkstationRequiredError("Personal Agent slots can only be set on the workstation (Windows Host).");
+            // Refusals (validation, stale revision) arrive as CommandRefusedError from the manager; a write fault is not refused.
+            manager.configurePersonalAgents(
+              data.slots,
+              data.expectRevision,
+              new Set(agents.snapshot().agents.filter(isUserFacingAgent).map((agent) => agent.id)),
+            );
+            break;
+          }
           case "verification.record": {
             if (!local) throw new Error("Independent verification requires workstation access.");
             const original = db.get(text(data.id, 200));

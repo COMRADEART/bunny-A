@@ -6,6 +6,7 @@ import type {
   VoiceSnapshot,
   VoiceTurnKind,
 } from "../../lib/bunny-host/voice/voice-protocol.ts";
+import { companionState } from "../../lib/bunny-host/voice/voice-companion.ts";
 
 /** A snapshot received this recently is live; older means the poll (or dashboard feed) stopped answering. */
 export const VOICE_FRESH_MS = 1500;
@@ -418,12 +419,43 @@ export function parseVoiceSnapshot(value: unknown): VoiceSnapshot | null {
   return candidate as VoiceSnapshot;
 }
 
-/** A newer snapshot replaces the held one; a new Host epoch always replaces it. */
+/**
+ * A newer snapshot replaces the held one; a new Host epoch always replaces it. Within one epoch the order is the Host's
+ * monotonic `revision` when both snapshots carry one (equal revisions are a re-delivery and are accepted), and the
+ * wall-clock `updatedAt` otherwise. The protocol does not yet stamp a revision, so today this is the updatedAt rule.
+ */
 export function acceptVoiceSnapshot(current: VoiceSnapshot | null, next: VoiceSnapshot): boolean {
   if (!current) return true;
   if (current.hostEpoch !== next.hostEpoch) return true;
+  // A restarted Host process restarts its revision, so a different process instance always replaces the held snapshot.
+  if (current.instance && next.instance && current.instance !== next.instance) return true;
+  const held = (current as Partial<OrderedVoiceSnapshot>).revision;
+  const incoming = (next as Partial<OrderedVoiceSnapshot>).revision;
+  if (typeof held === "number" && typeof incoming === "number") return incoming >= held;
   return next.updatedAt >= current.updatedAt;
 }
+type OrderedVoiceSnapshot = VoiceSnapshot & { revision: number };
+
+export type VoiceReplyScope = {
+  generation: number;
+  connection: string;
+  instanceId: string | null;
+  hostId?: string;
+  hostEpoch?: string;
+};
+
+/** A delayed voice answer is protected by the same principal and process boundaries as dashboard state. */
+export function voiceReplyCurrent(admitted: VoiceReplyScope, current: VoiceReplyScope): boolean {
+  return current.connection !== "pairing" && current.connection !== "host-changed"
+    && admitted.generation === current.generation && admitted.instanceId === current.instanceId
+    && admitted.hostId === current.hostId && admitted.hostEpoch === current.hostEpoch;
+}
+
+/**
+ * The Host's companion expression for a snapshot (voice-companion.ts). Pure: the caller decides freshness (see
+ * companion-model.ts), so a stale snapshot is never shown as the Host's current expression.
+ */
+export const hostCompanionView = (snapshot: VoiceSnapshot | null, now: number) => companionState(snapshot, now);
 
 /** Truthful output note: playback can be "playing" into a muted or zero-volume Windows endpoint, which is inaudible. */
 export function outputNote(snapshot: VoiceSnapshot | null): string | null {

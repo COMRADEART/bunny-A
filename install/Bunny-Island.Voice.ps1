@@ -162,13 +162,24 @@ function Invoke-BunnyVoicePumpCore {
   if (-not $script:bunnyVoiceFlight -and $script:bunnyVoiceQueue.Count -gt 0) { Start-BunnyVoiceFlight }
 }
 
+function Test-BunnyVoiceNewer($Candidate, $Current) {
+  # Within one Host epoch the monotonic voice.revision decides; across epochs, or when a snapshot has no revision yet,
+  # updatedAt decides (the earlier rule). A Host restart starts a new epoch, so its revisions never compare with the old.
+  if (-not $Current) { return $true }
+  if (-not $Candidate) { return $false }
+  if ($null -ne $Candidate.revision -and $null -ne $Current.revision -and [string]$Candidate.hostEpoch -eq [string]$Current.hostEpoch) {
+    return ([double]$Candidate.revision -ge [double]$Current.revision)
+  }
+  return ([double]$Candidate.updatedAt -ge [double]$Current.updatedAt)
+}
+
 function Get-BunnyVoiceSource {
   # The 2 s /state snapshot and the 200 ms voice poll are both real Host facts; the newer one wins.
   $fromPoll = $script:bunnyVoiceSnapshot
   $fromState = if ($bunnySnapshot) { $bunnySnapshot.voice } else { $null }
   if (-not $fromPoll) { return $fromState }
   if (-not $fromState) { return $fromPoll }
-  if ([double]$fromPoll.updatedAt -ge [double]$fromState.updatedAt) { return $fromPoll }
+  if (Test-BunnyVoiceNewer $fromPoll $fromState) { return $fromPoll }
   return $fromState
 }
 
@@ -383,6 +394,32 @@ function Get-BunnyBargeInNote($Snap) {
 }
 
 # A render fault is reported in the device line; it must never mark the Host offline in Update-Bunny.
+# The Notch's short voice line. The full headline stays in the expanded panel; nothing here is claimed beyond the headline.
+function Get-BunnyNotchStatus([string]$Headline) {
+  $ellipsis = $bunnyEllipsis
+  switch ($Headline) {
+    'Host offline - voice unavailable' { return 'Host offline' }
+    'Voice is off' { return 'Voice is off' }
+    'Listening' { return 'Listening' + $ellipsis }
+    'Listening - tap to finish' { return 'Listening' + $ellipsis }
+    'Speaking' { return 'Speaking' + $ellipsis }
+    'Listening and speaking' { return 'Listening and speaking' }
+    'Processing' { return 'Thinking' + $ellipsis }
+    'Microphone muted' { return 'Muted' }
+    'Ready' { return 'Ready' }
+    default { if ($Headline.StartsWith('Needs approval')) { return 'Needs approval' }; return $Headline }
+  }
+}
+# Five bars with fixed relative heights. Heights come from the real level only; without a fresh level they rest flat and dim.
+function Update-BunnyNotchBars([double]$Rms, [bool]$Live) {
+  $factors = @(0.45, 0.8, 1.0, 0.7, 0.5)
+  for ($i = 0; $i -lt 5; $i++) {
+    $bar = $bunnyControls['Bar' + ($i + 1)]
+    $bar.Height = if ($Live) { [Math]::Round(4 + 16 * $Rms * $factors[$i], 1) } else { 4 }
+    $bar.Opacity = if ($Live) { 1 } else { 0.35 }
+  }
+}
+
 function Update-BunnyVoice {
   try { Update-BunnyVoiceView } catch { $script:bunnyVoiceError = 'Voice display error: ' + $_.Exception.Message }
 }
@@ -417,15 +454,19 @@ function Update-BunnyVoiceView {
   $track = $bunnyControls.VoiceMeterTrack
   $maxWidth = if ($track.ActualWidth -gt 0) { $track.ActualWidth } else { 240 }
   $rms = 0.0
-  if ($open -and $fresh -and $snap.capturing -and $snap.level -and (($now - [double]$snap.level.at) -lt $bunnyVoiceFreshMs)) {
+  if ($open -and $fresh -and $snap.capturing -and $snap.level -and (($now - [double]$snap.level.at) -ge 0) -and (($now - [double]$snap.level.at) -lt $bunnyVoiceFreshMs)) {
     $rms = [Math]::Min(1.0, [Math]::Max(0.0, [double]$snap.level.rms))
   }
   $bunnyControls.VoiceMeter.Width = [Math]::Round($maxWidth * $rms, 1)
+  # The Notch shows the same truth in a short form, and its bars move only with that real level (flat when there is none).
+  $bunnyControls.NotchStatus.Text = Get-BunnyNotchStatus $headline
+  Update-BunnyNotchBars $rms ([bool]($open -and $fresh -and $snap.capturing))
 
   $device = Get-BunnyVoiceDeviceLine $snap
   $deviceLine = (@($device, $script:bunnyVoiceShortcutNote) | Where-Object { $_ }) -join ' '
   $showCompact = [bool]($open -or $script:bunnyVoiceError)
-  $bunnyControls.CompactVoice.Visibility = if ($showCompact -and -not $script:bunnyColumn) { 'Visible' } else { 'Collapsed' }
+  # The voice line lives in the Notch status and the expanded panel; the compact line never grows the collapsed Notch.
+  $bunnyControls.CompactVoice.Visibility = 'Collapsed'
   $bunnyControls.CompactVoice.Text = if ($deviceLine) { $headline + ' ' + $bunnyDot + ' ' + $deviceLine } else { $headline }
   $bunnyControls.VoiceHeadline.Text = $headline
   $handsFreeMode = [bool]($open -and [string]$snap.mode -eq 'hands_free')

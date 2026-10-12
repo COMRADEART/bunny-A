@@ -12,6 +12,8 @@
  * stale audio or attach text to the wrong turn.
  */
 
+import type { CompanionState } from "./voice-companion.ts";
+
 export const VOICE_PROTOCOL = "bunny-voice/1" as const;
 
 /** Worker-side identity of an audio endpoint. `index` is the winmm device index; -1 is the Windows default (WAVE_MAPPER). */
@@ -312,6 +314,18 @@ export type VoiceSnapshot = {
   timing: VoiceTiming | null;
   createdAt: number | null;
   updatedAt: number;
+  /** M-A-3 T13: monotonic per-process revision, advanced on every state touch and close, so clients can order snapshots. */
+  revision?: number;
+  /**
+   * M-A-3 T13: a random id of the Host process that wrote this snapshot. A restarted Host starts its revision again, so a
+   * client that holds a snapshot from another instance must take the new one whatever its revision says.
+   */
+  instance?: string;
+  /**
+   * M-A-3 T13: the companion expression companionState derives from these facts, re-derived at every read. `since` is the
+   * instant this state was entered (it holds while the state is unchanged). A change of state advances `revision`.
+   */
+  companion?: { state: CompanionState; reason: string; since: number };
 };
 
 /** Host actions (POST /command). All are workstation-only: none is listed in DEVICE_RIGHTS. */

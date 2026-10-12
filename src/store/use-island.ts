@@ -27,9 +27,12 @@ import {
 } from "@/components/island/connection-model";
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
+import type { PersonalAgentsSnapshot } from "@/lib/bunny-host/personal-agents";
+import { deepLinkFromSearch, type ShellSheet } from "@/components/island/nav-model";
 import type { VoiceMode, VoiceSnapshot } from "@/lib/bunny-host/voice/voice-protocol";
 import {
   acceptVoiceSnapshot,
+  voiceReplyCurrent,
   parseVoiceSnapshot,
   planUiIntent,
   typedFallbackText,
@@ -67,25 +70,7 @@ import type {
 
 const KEY = "bunny-a.preferences.v1";
 const LEGACY_KEY = "jev.island.v1";
-export type Sheet =
-  | "today"
-  | "task"
-  | "settings"
-  | "compose"
-  | "decision"
-  | "provider"
-  | "system"
-  | "tasks"
-  | "extensions"
-  | "phone"
-  | "project"
-  | "constellation"
-  | "missions"
-  | "agentic"
-  | "activity"
-  | "chat"
-  | "devices"
-  | null;
+export type Sheet = ShellSheet | "today" | "agentic" | null;
 export type TaskFilter = "all" | "running" | "completed" | "failed" | "stopped";
 export type Draft = {
   id: string;
@@ -111,7 +96,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   glass: "medium",
   motion: "full",
   collapse: 10,
-  theme: "dark",
+  theme: "light",
   primary: ["codex", "claude", "ollama"],
 };
 type Preferences = {
@@ -193,6 +178,8 @@ type Island = Preferences & {
   modelCapabilities: ModelCapabilitySnapshot | null;
   /** M-A-3 T4 durable Agent runtime state (null until a Host that knows agents answers). */
   agents: AgentSnapshot | null;
+  /** M-A-3 T13: the four Personal Agent slots as the Host projected them (presentation only). */
+  personalAgents: PersonalAgentsSnapshot | null;
   /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
   voice: VoiceSnapshot | null;
   /** Local receipt time of the last voice answer; a stale value means voice is reconnecting, not listening. */
@@ -255,6 +242,15 @@ type Island = Preferences & {
   ) => Promise<boolean>;
   revokeBatch: (missionId: string, batchId: string) => Promise<void>;
   ackInbox: (id: string) => void;
+  /**
+   * M-A-3 T13: saves the four Personal Agent slots (workstation only). Resolves true only on the Host's acknowledgment; a
+   * refusal or unknown outcome resolves false and reports its own words through `onRefused`. Nothing is shown as saved first.
+   */
+  configurePersonalAgents: (
+    slots: unknown[],
+    expectRevision: number | null,
+    onRefused?: (caption: string) => void,
+  ) => Promise<boolean>;
   configureMissions: (patch: { enabled?: boolean; triggersEnabled?: boolean }) => void;
   hydrate: () => void;
   refreshOllama: () => Promise<void>;
@@ -497,6 +493,13 @@ export const useIsland = create<Island>((set, get) => {
     action: string,
     data: Record<string, unknown> = {},
   ): Promise<{ snapshot: VoiceSnapshot | null; outcome: StartOutcome }> => {
+    const admitted = get();
+    const generation = accessGeneration;
+    const instanceId = admitted.hostInstanceId;
+    const hostId = admitted.hostIdentity?.hostId;
+    const hostEpoch = admitted.hostIdentity?.epoch;
+    if (admitted.connection.state === "pairing" || admitted.connection.state === "host-changed")
+      return { snapshot: null, outcome: "refused" };
     let result: HostCommandResult;
     try {
       result = await withTimeout(commandBunnyHost({ data: { action, data } }), COMMAND_TIMEOUT_MS);
@@ -511,6 +514,14 @@ export const useIsland = create<Island>((set, get) => {
         pairing: false,
       };
     }
+    // A voice reply is protected Host state too. An old principal/process must not restore it after sign-out,
+    // revocation or a Host switch, or restart push-to-talk effects using the old request's answer.
+    const current = get();
+    if (!voiceReplyCurrent({ generation, connection: admitted.connection.state, instanceId, hostId, hostEpoch }, {
+      generation: accessGeneration, connection: current.connection.state, instanceId: current.hostInstanceId,
+      hostId: current.hostIdentity?.hostId, hostEpoch: current.hostIdentity?.epoch,
+    }))
+      return { snapshot: null, outcome: "unknown" };
     if (result.ok) {
       const next = parseVoiceSnapshot(result.data);
       // An answer without the voice contract means the Host predates voice: say so, never fake a session.
@@ -630,6 +641,7 @@ export const useIsland = create<Island>((set, get) => {
       remoteConfigured: snapshot.remoteConfigured,
       missions: snapshot.missions ?? null,
       agents: snapshot.agents ?? null,
+      personalAgents: snapshot.personalAgents ?? null,
       providerUsage: snapshot.providerUsage ?? null,
       modelCapabilities: snapshot.modelCapabilities ?? null,
       cpuWarn: snapshot.thermal?.cpuWarn ?? 90,
@@ -674,6 +686,10 @@ export const useIsland = create<Island>((set, get) => {
   /** Revoked, expired or unpaired: stop retrying and drop every protected projection from memory. */
   const enterPairing = (code: string) => {
     accessGeneration++;
+    stopVoicePolling();
+    press = pressReset();
+    pressTurn = null;
+    voiceSeen = null;
     refreshing = null;
     disconnected = true;
     set({
@@ -681,6 +697,7 @@ export const useIsland = create<Island>((set, get) => {
       connectionChecked: true,
       pairingRequired: true,
       agents: null,
+      personalAgents: null,
       voice: null,
       voiceReceivedAt: 0,
       voicePressing: false,
@@ -761,15 +778,17 @@ export const useIsland = create<Island>((set, get) => {
     action: string,
     data: Record<string, unknown>,
     targetId: string | null = null,
+    onRefused?: (caption: string) => void,
   ): Promise<HostCommandOk | null> => {
     const mutating = isMutating(action);
     const before = get();
     if (mutating && !before.canAct()) {
-      before.note(
+      const caption =
         before.connection.state === "host-changed"
           ? "This is a different Bunny-A Host. Review it before changing anything."
-          : "Reconnect to the Host before changing anything. Nothing was sent.",
-      );
+          : "Reconnect to the Host before changing anything. Nothing was sent.";
+      if (onRefused) onRefused(caption);
+      else before.note(caption);
       return null;
     }
     if (targetId && (before.pending[targetId] || before.uncertain.some((row) => row.targetId === targetId))) {
@@ -819,7 +838,9 @@ export const useIsland = create<Island>((set, get) => {
       void reconcile({ operationId, action, targetId, since: Date.now(), epoch: identity?.epoch ?? null });
       return null;
     }
-    get().note(commandCaption(result));
+    const caption = commandCaption(result);
+    if (onRefused) onRefused(caption);
+    else get().note(caption);
     if (result.code === "HOST_EPOCH_CHANGED" || result.code === "HOST_IDENTITY_CHANGED") void get().refreshOllama();
     return null;
   };
@@ -891,7 +912,7 @@ export const useIsland = create<Island>((set, get) => {
     cancelVoiceProposal: async (id) => {
       await voiceCall("voice.control.cancel", { id });
     },
-    theme: "dark",
+    theme: "light",
     appearance: DEFAULT_APPEARANCE,
     submitting: false,
     events: [],
@@ -911,7 +932,7 @@ export const useIsland = create<Island>((set, get) => {
     projects: [],
     tasks: [],
     audit: [],
-    sheet: "today",
+    sheet: "chat",
     providerFocus: null,
     decisionTaskId: null,
     prompt: "",
@@ -1003,6 +1024,7 @@ export const useIsland = create<Island>((set, get) => {
     devices: [],
     missions: null,
     agents: null,
+    personalAgents: null,
     providerUsage: null,
     modelCapabilities: null,
     hostHealth: null,
@@ -1072,6 +1094,11 @@ export const useIsland = create<Island>((set, get) => {
     ackInbox: (id) => {
       void command("inbox.ack", { id });
     },
+    configurePersonalAgents: async (slots, expectRevision, onRefused) => {
+      // The Host re-validates every slot and refuses a stale revision; a success is only what the Host acknowledged.
+      const result = await command("personal_agents.configure", { slots, expectRevision }, null, onRefused);
+      return result !== null;
+    },
     configureMissions: (patch) => {
       void command("mission.configure", patch);
     },
@@ -1108,36 +1135,13 @@ export const useIsland = create<Island>((set, get) => {
         gpuWarn: loaded.gpuWarn ?? 85,
         hydrated: true,
       });
-      const query = new URLSearchParams(window.location.search);
-      if (query.get("companion") === "1") set({ sheet: "phone" });
-      const views: Record<string, Sheet> = {
-        today: "today",
-        agents: "agentic",
-        agentic: "agentic",
-        models: "provider",
-        activity: "activity",
-        devices: "devices",
-        chat: "chat",
-        projects: "project",
-        system: "system",
-        settings: "settings",
-        history: "tasks",
-        notifications: "extensions",
-        compose: "compose",
-        constellation: "constellation",
-        missions: "agentic",
-      };
-      const requestedView = query.get("view");
-      if (requestedView && views[requestedView]) set({ sheet: views[requestedView] });
-      const requestedTheme = query.get("theme");
-      if (requestedTheme === "dark" || requestedTheme === "light")
-        set({ theme: requestedTheme, appearance: { ...appearance, theme: requestedTheme } });
-      const taskId = query.get("task");
-      if (taskId) set({ decisionTaskId: taskId, sheet: "task" });
-      const missionId = query.get("mission");
-      if (missionId) set({ missionFocus: missionId, sheet: "agentic" });
-      const agentId = query.get("agent");
-      if (agentId) set({ agentFocus: agentId, sheet: "agentic" });
+      // Deep links (view, companion, theme, task, mission, agent) are read by the shared nav model, so every entry point agrees.
+      const link = deepLinkFromSearch(window.location.search);
+      if (link.sheet) set({ sheet: link.sheet });
+      if (link.theme) set({ theme: link.theme, appearance: { ...appearance, theme: link.theme } });
+      if (link.taskId) set({ decisionTaskId: link.taskId });
+      if (link.missionId) set({ missionFocus: link.missionId });
+      if (link.agentId) set({ agentFocus: link.agentId });
       void get().refreshOllama();
     },
     refreshOllama: async () => {

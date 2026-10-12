@@ -89,7 +89,9 @@ test('V46: Listening requires worker capture AND a fresh poll; otherwise the pan
 
 test('V46: Speaking is shown only from snapshot.playing, and only one branch produces it', () => {
   const voice = read(voicePath);
-  assert.equal([...voice.matchAll(/return 'Speaking'/g)].length, 1);
+  // Scoped to the headline function: the Notch's short status (Get-BunnyNotchStatus) maps the same headline, and is not a second source.
+  const label = voice.slice(voice.indexOf('function Get-BunnyVoiceLabel'), voice.indexOf('function Get-BunnyVoiceDeviceLine'));
+  assert.equal([...label.matchAll(/return 'Speaking'/g)].length, 1);
   assert.match(voice, /if \(\$Snap\.playing\) \{ return 'Speaking' \}/);
 });
 
@@ -182,7 +184,7 @@ test('-HotkeyTest is the only way the alternate test chord is selected, and blur
   const island = read(islandPath);
   assert.match(island, /\[switch\]\$HotkeyTest/);
   const visual = read(visualPath);
-  assert.match(visual, /edgeOffset=0\.5; blur='off' \}/);
+  assert.match(visual, /edgeOffset=0\.5; blur='off'; monitor=\$null \}/);
   assert.match(visual, /if\(\$bunnyPreferences\.blur-eq'acrylic'\)\{\[void\]\(Enable-BunnyBlur\)\}/);
 });
 

@@ -5,6 +5,7 @@ $bunnyOrbState='';$bunnyReplayAt=$null
 function Set-BunnyMotionMode {
  $previous=$bunnyAnimate
  $script:bunnyAnimate=-not$SmokeTest-and[Windows.SystemParameters]::ClientAreaAnimation-and-not[Windows.SystemParameters]::HighContrast-and$bunnyPreferences.motion-eq'full'
+ if(-not$bunnyWindow.IsVisible-or$bunnyWindow.WindowState-eq'Minimized'){$script:bunnyAnimate=$false}
  if($previous-ne$bunnyAnimate){$script:bunnyOrbState=''}
  if($bunnyAnimate-and-not$bunnyControls.ActivityDots.HasAnimatedProperties){$pulse=[Windows.Media.Animation.DoubleAnimation]::new(.35,1,[Windows.Duration]::new([TimeSpan]::FromMilliseconds($bunnyMotion.route)));$pulse.AutoReverse=$true;$pulse.RepeatBehavior=[Windows.Media.Animation.RepeatBehavior]::Forever;$bunnyControls.ActivityDots.BeginAnimation([Windows.UIElement]::OpacityProperty,$pulse)}
  if(-not$bunnyAnimate){$bunnyControls.ActivityDots.BeginAnimation([Windows.UIElement]::OpacityProperty,$null);$bunnyControls.ActivityDots.Opacity=0.8;$bunnyWindow.BeginAnimation([Windows.Window]::WidthProperty,$null);$bunnyWindow.BeginAnimation([Windows.Window]::HeightProperty,$null);$bunnyControls.Details.BeginAnimation([Windows.UIElement]::OpacityProperty,$null)}
@@ -39,7 +40,8 @@ function Set-BunnyOrb([string]$State) {
  Set-BunnyRef $halo ([Windows.Shapes.Shape]::StrokeProperty) $ink
  $bunnyControls.BrandMark.Opacity=if($State-eq'completed'){0.16}else{1};$bunnyControls.OrbCheck.Visibility=if($State-eq'completed'){'Visible'}else{'Collapsed'}
  $bunnyControls.OrbRoot.Opacity=if($State-eq'offline'){0.45}else{1}
- [Windows.Automation.AutomationProperties]::SetName($bunnyControls.BunnyButton,('Bunny '+$State+'. Click to compose.'))
+ # BunnyButton's accessible name is owned by Update-BunnyCompanion (state identity + matching ToolTip); an orb-state
+ # name here fought the companion for the same automation property on every state change.
  if(-not$bunnyAnimate){return}
  if($State-eq'routing'){$rotate=[Windows.Media.Animation.DoubleAnimation]::new(0,360,[Windows.Duration]::new([TimeSpan]::FromMilliseconds($bunnyMotion.route*3)));$rotate.RepeatBehavior=[Windows.Media.Animation.RepeatBehavior]::Forever;$halo.RenderTransform.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty,$rotate)}
  if($State-in@('working','waiting','failed','completed')){$duration=if($State-eq'working'){$bunnyMotion.breath}elseif($State-eq'completed'){$bunnyMotion.success}else{$bunnyMotion.warning};$pulse=[Windows.Media.Animation.DoubleAnimation]::new(0.15,0.65,[Windows.Duration]::new([TimeSpan]::FromMilliseconds($duration)));$pulse.AutoReverse=$true;$pulse.RepeatBehavior=if($State-eq'failed'){[Windows.Media.Animation.RepeatBehavior]::new(2)}elseif($State-eq'completed'){[Windows.Media.Animation.RepeatBehavior]::new(1)}else{[Windows.Media.Animation.RepeatBehavior]::Forever};$halo.BeginAnimation([Windows.UIElement]::OpacityProperty,$pulse)}
@@ -89,8 +91,8 @@ function Draw-BunnyConstellation {
 }
 
 # Reuse the same Island surface; no new top-level windows.
-$orbRoot=[Windows.Controls.Grid]::new();$orbRoot.Width=36;$orbRoot.Height=36;$bunnyControls.BunnyButton.Content=$null;$bunnyControls.BrandTile.CornerRadius=[Windows.CornerRadius]::new(14);[void]$orbRoot.Children.Add($bunnyControls.BrandTile)
-$halo=[Windows.Shapes.Ellipse]::new();$halo.Width=34;$halo.Height=34;$halo.StrokeThickness=1;$halo.StrokeDashArray=[Windows.Media.DoubleCollection]::new();$halo.StrokeDashArray.Add(8);$halo.StrokeDashArray.Add(3);$halo.RenderTransform=[Windows.Media.RotateTransform]::new();$halo.RenderTransformOrigin=[Windows.Point]::new(.5,.5);[void]$orbRoot.Children.Add($halo)
+$orbRoot=[Windows.Controls.Grid]::new();$orbRoot.Width=58;$orbRoot.Height=56;$bunnyControls.BunnyButton.Content=$null;$bunnyControls.BrandTile.CornerRadius=[Windows.CornerRadius]::new(14);[void]$orbRoot.Children.Add($bunnyControls.BrandTile)
+$halo=[Windows.Shapes.Ellipse]::new();$halo.Width=54;$halo.Height=54;$halo.StrokeThickness=1;$halo.StrokeDashArray=[Windows.Media.DoubleCollection]::new();$halo.StrokeDashArray.Add(8);$halo.StrokeDashArray.Add(3);$halo.RenderTransform=[Windows.Media.RotateTransform]::new();$halo.RenderTransformOrigin=[Windows.Point]::new(.5,.5);[void]$orbRoot.Children.Add($halo)
 $check=New-BunnyIcon 'check' 15;Set-BunnyRef $check.Tag ([Windows.Shapes.Shape]::StrokeProperty) 'BunnyPositive';$check.HorizontalAlignment='Center';$check.VerticalAlignment='Center';$check.Visibility='Collapsed';[void]$orbRoot.Children.Add($check);$bunnyControls.BunnyButton.Content=$orbRoot;$bunnyControls.OrbRoot=$orbRoot;$bunnyControls.OrbHalo=$halo;$bunnyControls.OrbCheck=$check
 $shortcuts=[Windows.Controls.WrapPanel]::new();$shortcuts.Margin='0,12,0,0';foreach($shortcut in @(@('Deep Research','Research ','deep'),@('Create PDF','Create a PDF report about ','balanced'),@('Build Website','Build a website for ','balanced'))){$button=[Windows.Controls.Button]::new();$button.Content=$shortcut[0];$button.Tag=$shortcut;$button.FontSize=11;$button.Margin='0,0,4,0';$button.Add_Click({$bunnyControls.Prompt.Text=$this.Tag[1];$bunnyControls.Mode.SelectedIndex=if($this.Tag[2]-eq'deep'){2}else{1};$bunnyControls.Prompt.Focus()|Out-Null});[void]$shortcuts.Children.Add($button)};$bunnyControls.ComposerPanel.Children.Insert(2,$shortcuts)
 $voiceButton=[Windows.Controls.Button]::new();$voiceButton.Content='Voice';$voiceButton.FontSize=11;$voiceButton.Add_Click({Set-BunnyView 'voice'});[void]$shortcuts.Children.Add($voiceButton)

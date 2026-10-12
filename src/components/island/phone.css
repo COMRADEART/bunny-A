@@ -1,0 +1,841 @@
+/* T13 touch-first phone companion (spec §12). Every rule is scoped to .pc-root so the companion never restyles the
+   workstation surfaces. Dark is the default (the board's phone is dark); light follows the app's Appearance setting.
+   Character art always sits on a dark well (.pc-hero-well, and the characters' own .wc-well), so the visors keep their
+   contrast in both themes. Body text is at least 4.5:1 on every surface. Targets are at least 44 px. */
+
+.pc-root {
+  --pc-bg: #0a0d16;
+  --pc-wash:
+    radial-gradient(120% 60% at 12% -8%, rgba(156, 123, 255, 0.2), transparent 60%),
+    radial-gradient(90% 50% at 100% 0%, rgba(127, 176, 255, 0.15), transparent 60%);
+  --pc-card: rgba(20, 24, 38, 0.66);
+  --pc-card-solid: #141824;
+  --pc-chip: rgba(255, 255, 255, 0.06);
+  --pc-input: rgba(7, 8, 13, 0.6);
+  --pc-line: rgba(255, 255, 255, 0.12);
+  --pc-line-strong: rgba(255, 255, 255, 0.24);
+  --pc-ink: #eef1fa;
+  --pc-muted: #9aa3b8;
+  --pc-accent: #9cc3ff;
+  --pc-primary: #4656e6;
+  --pc-danger-bg: #b23a3a;
+  --pc-ok: #3ddc97;
+  --pc-warn: #ffb840;
+  --pc-bad: #ff8a8a;
+  --pc-track: rgba(255, 255, 255, 0.12);
+  --pc-focus: #9cc3ff;
+  --pc-tabbar: #0a0d16;
+  --pc-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--pc-wash), var(--pc-bg);
+  background-attachment: fixed;
+  color: var(--pc-ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+.pc-root[data-theme="light"],
+:root[data-theme="light"] .pc-root,
+.pc-root[data-theme="system"] {
+  --pc-bg: #eef2fb;
+  --pc-wash:
+    radial-gradient(120% 60% at 12% -8%, rgba(201, 194, 255, 0.55), transparent 60%),
+    radial-gradient(90% 50% at 100% 0%, rgba(191, 216, 255, 0.5), transparent 60%);
+  --pc-card: rgba(255, 255, 255, 0.64);
+  --pc-card-solid: #f6f7fb;
+  --pc-chip: rgba(18, 23, 38, 0.06);
+  --pc-input: #ffffff;
+  --pc-line: rgba(18, 23, 38, 0.12);
+  --pc-line-strong: rgba(18, 23, 38, 0.28);
+  --pc-ink: #121726;
+  --pc-muted: #5a6378;
+  --pc-accent: #3446d6;
+  --pc-primary: #4656e6;
+  --pc-danger-bg: #b23a3a;
+  --pc-ok: #0b6b45;
+  --pc-warn: #8a5300;
+  --pc-bad: #b23a3a;
+  --pc-track: rgba(18, 23, 38, 0.1);
+  --pc-focus: #3446d6;
+  --pc-tabbar: #f6f7fb;
+  --pc-shadow: 0 8px 30px rgba(30, 40, 80, 0.1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  .pc-root[data-theme="system"] {
+    color-scheme: light;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .pc-root[data-theme="system"] {
+    --pc-bg: #0a0d16;
+    --pc-wash:
+      radial-gradient(120% 60% at 12% -8%, rgba(156, 123, 255, 0.2), transparent 60%),
+      radial-gradient(90% 50% at 100% 0%, rgba(127, 176, 255, 0.15), transparent 60%);
+    --pc-card: rgba(20, 24, 38, 0.66);
+    --pc-card-solid: #141824;
+    --pc-chip: rgba(255, 255, 255, 0.06);
+    --pc-input: rgba(7, 8, 13, 0.6);
+    --pc-line: rgba(255, 255, 255, 0.12);
+    --pc-line-strong: rgba(255, 255, 255, 0.24);
+    --pc-ink: #eef1fa;
+    --pc-muted: #9aa3b8;
+    --pc-accent: #9cc3ff;
+    --pc-ok: #3ddc97;
+    --pc-warn: #ffb840;
+    --pc-bad: #ff8a8a;
+    --pc-track: rgba(255, 255, 255, 0.12);
+    --pc-focus: #9cc3ff;
+    --pc-tabbar: #0a0d16;
+    --pc-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    color-scheme: dark;
+  }
+}
+
+/* ---------------------------------------------------------------- frame */
+
+.pc-root *,
+.pc-root *::before,
+.pc-root *::after {
+  box-sizing: border-box;
+}
+.pc-root button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.pc-root button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.pc-root button:focus-visible,
+.pc-root textarea:focus-visible {
+  outline: 3px solid var(--pc-focus);
+  outline-offset: 2px;
+}
+.pc-root h1,
+.pc-root h2,
+.pc-root h3,
+.pc-root p {
+  margin: 0;
+}
+.pc-root :is(h1, h2, h3, strong, dd, small, p, li) {
+  overflow-wrap: anywhere;
+}
+
+.pc-root .pc-top {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) max(16px, env(safe-area-inset-right, 0px)) 8px
+    max(16px, env(safe-area-inset-left, 0px));
+  background: var(--pc-tabbar);
+  border-bottom: 1px solid var(--pc-line);
+}
+.pc-root .pc-title {
+  font-size: 18px;
+  font-weight: 650;
+  text-align: center;
+  min-width: 0;
+}
+.pc-root .pc-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 1px solid var(--pc-line);
+  background: var(--pc-card);
+  color: var(--pc-ink);
+}
+.pc-root .pc-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--pc-muted);
+}
+.pc-root .pc-dot[data-tone="ok"] { background: var(--pc-ok); }
+.pc-root .pc-dot[data-tone="warn"] { background: var(--pc-warn); }
+.pc-root .pc-dot[data-tone="danger"] { background: var(--pc-bad); }
+.pc-root .pc-dot[data-tone="neutral"] { background: var(--pc-muted); }
+
+.pc-root .pc-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--pc-line);
+  background: var(--pc-chip);
+  color: var(--pc-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pc-root .pc-top .pc-pill[data-tone="ok"],
+.pc-root .pc-pill[data-tone="ok"] { color: var(--pc-ok); }
+.pc-root .pc-top .pc-pill[data-tone="warn"],
+.pc-root .pc-pill[data-tone="warn"] { color: var(--pc-warn); }
+.pc-root .pc-top .pc-pill[data-tone="danger"],
+.pc-root .pc-pill[data-tone="danger"] { color: var(--pc-bad); }
+.pc-root .pc-pill[data-live] { color: var(--pc-accent); }
+
+.pc-root .pc-main {
+  flex: 1;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(104px + env(safe-area-inset-bottom, 0px))
+    max(16px, env(safe-area-inset-left, 0px));
+}
+
+.pc-root .pc-tabs {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(100%, 560px);
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 2px;
+  padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px))
+    max(8px, env(safe-area-inset-left, 0px));
+  background: var(--pc-tabbar);
+  border-top: 1px solid var(--pc-line);
+}
+.pc-root .pc-tab {
+  min-height: 56px;
+  min-width: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  color: var(--pc-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+.pc-root .pc-tab[data-active="true"] {
+  color: var(--pc-accent);
+  background: var(--pc-chip);
+}
+
+/* ---------------------------------------------------------------- surfaces */
+
+.pc-root .pc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid var(--pc-line);
+  background: var(--pc-card);
+  box-shadow: var(--pc-shadow);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .pc-root .pc-card,
+  .pc-root .pc-tabs,
+  .pc-root .pc-top {
+    background: var(--pc-card-solid);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .pc-root .pc-card,
+  .pc-root .pc-tabs,
+  .pc-root .pc-top {
+    background: var(--pc-card-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (forced-colors: active) {
+  .pc-root .pc-card,
+  .pc-root .pc-row,
+  .pc-root .pc-slot,
+  .pc-root .pc-tile,
+  .pc-root .pc-btn {
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+}
+
+.pc-root .pc-stack,
+.pc-root .pc-home,
+.pc-root .pc-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.pc-root .pc-h2 {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pc-muted);
+}
+.pc-root .pc-h3 {
+  font-size: 15px;
+  font-weight: 650;
+}
+.pc-root .pc-name {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.pc-root .pc-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pc-root .pc-link {
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--pc-accent);
+  font-weight: 600;
+}
+.pc-root .pc-muted {
+  color: var(--pc-muted);
+}
+.pc-root .pc-tiny {
+  font-size: 12px;
+  color: var(--pc-muted);
+}
+.pc-root .pc-line {
+  font-weight: 600;
+}
+.pc-root .pc-basis {
+  color: var(--pc-muted);
+  font-size: 14px;
+}
+.pc-root .pc-state {
+  font-size: 16px;
+  font-weight: 650;
+}
+.pc-root .pc-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--pc-muted);
+  font-size: 14px;
+}
+.pc-root .pc-label {
+  font-size: 14px;
+  color: var(--pc-muted);
+}
+.pc-root .pc-bullets {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pc-root .pc-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--pc-line);
+  background: var(--pc-card-solid);
+}
+.pc-root .pc-banner strong {
+  color: var(--pc-ink);
+}
+.pc-root .pc-banner p {
+  color: var(--pc-muted);
+  font-size: 14px;
+}
+.pc-root .pc-banner[data-tone="warn"] {
+  background: color-mix(in srgb, var(--pc-warn) 16%, var(--pc-card-solid));
+}
+.pc-root .pc-banner[data-tone="danger"] {
+  background: color-mix(in srgb, var(--pc-bad) 16%, var(--pc-card-solid));
+}
+
+/* ---------------------------------------------------------------- buttons and inputs */
+
+.pc-root .pc-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--pc-line-strong);
+  background: var(--pc-chip);
+  color: var(--pc-ink);
+  font-weight: 600;
+}
+.pc-root .pc-btn.primary,
+.pc-root .pc-primary {
+  background: var(--pc-primary);
+  border-color: transparent;
+  color: #ffffff;
+}
+.pc-root .pc-btn.danger {
+  background: var(--pc-danger-bg);
+  border-color: transparent;
+  color: #ffffff;
+}
+.pc-root .pc-primary {
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+}
+.pc-root .pc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.pc-root .pc-input {
+  width: 100%;
+  min-height: 96px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--pc-line-strong);
+  background: var(--pc-input);
+  color: var(--pc-ink);
+  font-size: 16px; /* at least 16 px so iOS does not zoom on focus */
+  resize: vertical;
+}
+.pc-root .pc-segment {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--pc-chip);
+}
+.pc-root .pc-segment button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--pc-ink);
+  font-weight: 600;
+}
+.pc-root .pc-segment button[aria-pressed="true"] {
+  background: var(--pc-primary);
+  color: #ffffff;
+}
+
+/* ---------------------------------------------------------------- home */
+
+.pc-root .pc-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0 0;
+  text-align: center;
+}
+.pc-root .wc-companion[data-size="hero"] {
+  --wc-box: clamp(132px, 42vw, 184px);
+}
+.pc-root .pc-hero-state {
+  font-size: 17px;
+  font-weight: 600;
+}
+.pc-root .pc-slot-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
+}
+.pc-root .pc-slot {
+  min-height: 44px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  border-radius: 18px;
+  border: 1px solid var(--pc-line);
+  background: var(--pc-card);
+  color: var(--pc-ink);
+}
+.pc-root .pc-slot .wc-weapon[data-size="compact"] {
+  --wc-box: 60px;
+  width: min(60px, 100%); /* a character never overruns its own tile, whatever the column width */
+}
+.pc-root .pc-slot-name {
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  max-width: 100%;
+}
+.pc-root .pc-slot-state {
+  font-size: 11px;
+  color: var(--pc-muted);
+  text-align: center;
+  max-width: 100%;
+}
+.pc-root .pc-attention {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.pc-root .pc-attention > div {
+  flex: 1 1 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pc-root .pc-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.pc-root .pc-tile {
+  min-height: 64px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-radius: 18px;
+  border: 1px solid var(--pc-line);
+  background: var(--pc-card);
+  color: var(--pc-ink);
+  font-size: 15px;
+  font-weight: 650;
+  text-align: left;
+}
+
+/* ---------------------------------------------------------------- lists */
+
+.pc-root .pc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pc-root .pc-row {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--pc-line);
+  background: var(--pc-card);
+  color: var(--pc-ink);
+  text-align: left;
+}
+.pc-root .pc-row-static {
+  cursor: default;
+}
+.pc-root .pc-row .wc-weapon[data-size="compact"] {
+  --wc-box: 56px;
+}
+.pc-root .pc-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pc-root .pc-row-main small {
+  color: var(--pc-muted);
+  font-size: 13px;
+}
+.pc-root .pc-slot-empty {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 2px;
+  border-radius: 16px;
+  border: 1px dashed var(--pc-line-strong);
+  color: var(--pc-muted);
+  font-size: 12px;
+  text-align: center;
+}
+.pc-root .pc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* ---------------------------------------------------------------- detail */
+
+.pc-root .pc-hero-well {
+  position: relative;
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: radial-gradient(120% 95% at 50% 28%, #1a1e2b 0%, #07080d 72%);
+}
+.pc-root .pc-hero-well .wc-weapon[data-size="hero"] {
+  --wc-box: clamp(164px, 56vw, 232px);
+}
+.pc-root .pc-facts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pc-root .pc-facts > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 36%) minmax(0, 1fr);
+  gap: 10px;
+}
+.pc-root .pc-facts dt {
+  color: var(--pc-muted);
+  font-size: 14px;
+}
+.pc-root .pc-facts dd {
+  margin: 0;
+  font-size: 15px;
+  min-width: 0;
+}
+.pc-root .pc-steps {
+  display: flex;
+  gap: 4px;
+  height: 10px;
+}
+.pc-root .pc-steps:empty {
+  border-radius: 999px;
+  background: var(--pc-track);
+}
+.pc-root .pc-steps i {
+  flex: 1 1 0;
+  min-width: 4px;
+  border-radius: 999px;
+  background: var(--pc-track);
+}
+.pc-root .pc-steps i[data-seg="done"] {
+  background: var(--pc-accent);
+}
+.pc-root .pc-steps i[data-seg="verified"] {
+  background: var(--pc-ok);
+}
+.pc-root .pc-request {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--pc-line);
+}
+
+/* ---------------------------------------------------------------- landscape phones (for example 844 x 390) */
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .pc-root .pc-home {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    align-items: start;
+    column-gap: 16px;
+  }
+  .pc-root .pc-home > .pc-hero {
+    grid-row: span 3;
+    align-self: center;
+  }
+  .pc-root .pc-hero .wc-companion[data-size="hero"] {
+    --wc-box: 128px;
+  }
+  .pc-root .pc-tab {
+    min-height: 48px;
+  }
+  .pc-root .pc-main {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ---------------------------------------------------------------- tiny phones (320 px) */
+
+@media (max-width: 340px) {
+  .pc-root .pc-tiles {
+    gap: 8px;
+  }
+  .pc-root .pc-tile {
+    padding: 0 10px;
+    font-size: 14px;
+  }
+  .pc-root .pc-title {
+    font-size: 16px;
+  }
+}
+
+/* ---------------------------------------------------------------- motion and hover */
+
+@media (hover: hover) {
+  .pc-root .pc-row:hover,
+  .pc-root .pc-tile:hover,
+  .pc-root .pc-slot:hover {
+    border-color: var(--pc-line-strong);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pc-root *,
+  .pc-root *::before,
+  .pc-root *::after {
+    transition: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ---------------------------------------------------------------- pairing (the shared Pairing markup, styled in the companion) */
+
+.pc-root .pairing {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid var(--pc-line);
+  background: var(--pc-card);
+  box-shadow: var(--pc-shadow);
+}
+.pc-root .pairing-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.pc-root .pairing-title h2 {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.pc-root .pairing-title p {
+  color: var(--pc-muted);
+}
+.pc-root .pairing .eyebrow {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pc-muted);
+}
+.pc-root .pairing .caption {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--pc-muted);
+}
+.pc-root .pairing-workstation {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pc-root .pairing-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pc-root .pairing .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--pc-muted);
+}
+.pc-root .pairing .field input {
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid var(--pc-line-strong);
+  background: var(--pc-input);
+  color: var(--pc-ink);
+  font-size: 16px;
+}
+.pc-root .pairing .btn {
+  min-height: 48px;
+  min-width: 44px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--pc-line-strong);
+  background: var(--pc-chip);
+  color: var(--pc-ink);
+  font-weight: 650;
+  text-decoration: none;
+}
+.pc-root .pairing .btn.primary {
+  background: var(--pc-primary);
+  border-color: transparent;
+  color: #ffffff;
+}
+.pc-root .pairing .btn:disabled {
+  opacity: 0.55;
+}
+.pc-root .pairing .pair-status {
+  font-size: 14px;
+  color: var(--pc-ok);
+}
+.pc-root .pairing .pair-status:empty {
+  display: none;
+}
+.pc-root .pairing-code-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--pc-chip);
+}
+.pc-root .pairing-code-display code {
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  overflow-wrap: anywhere;
+}
+.pc-root .pairing-code-display small {
+  color: var(--pc-muted);
+}

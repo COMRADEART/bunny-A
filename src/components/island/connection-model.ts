@@ -33,6 +33,11 @@ export const STREAM_ERROR_LIMIT = 3;
 export const OFFLINE_AFTER_FAILURES = 2;
 export const POLL_VISIBLE_MS = 3_000;
 export const POLL_HIDDEN_MS = 30_000;
+/**
+ * A live stream still re-reads the canonical snapshot on this cadence. It must stay below SNAPSHOT_FRESH_MS: a 30 s
+ * re-read let the snapshot age past 20 s between reads, so a healthy connection flickered to OFFLINE on the characters.
+ */
+export const LIVE_REFRESH_MS = 15_000;
 const BACKOFF = [3_000, 6_000, 12_000, 30_000, 60_000];
 
 export const initialConnection = (): Connection => ({
@@ -136,7 +141,7 @@ export const pollIntervalMs = (visible: boolean) => (visible ? POLL_VISIBLE_MS :
 export function nextRefreshMs(connection: Pick<Connection, "state" | "readFailures">, visible: boolean): number | null {
   if (!shouldRetry(connection.state)) return null;
   if (connection.readFailures > 0) return backoffMs(connection.readFailures);
-  if (connection.state === "live") return 30_000;
+  if (connection.state === "live") return LIVE_REFRESH_MS;
   return pollIntervalMs(visible);
 }
 

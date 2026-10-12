@@ -8,6 +8,7 @@ import {
   freshnessLabel,
   initialConnection,
   isMutating,
+  LIVE_REFRESH_MS,
   mayStream,
   nextRefreshMs,
   pairingReason,
@@ -114,9 +115,36 @@ test("T9 connection: backoff and polling cadence are bounded", () => {
   assert.equal(nextRefreshMs(polling, true), 3_000);
   assert.equal(nextRefreshMs(polling, false), 30_000);
   const live = run([{ type: "read-ok", at: 0, hostChanged: false }, { type: "stream-signal", at: 1 }]);
-  assert.equal(nextRefreshMs(live, true), 30_000, "a live stream still reconciles every 30 s");
+  assert.equal(nextRefreshMs(live, true), LIVE_REFRESH_MS, "a live stream reconciles on the live cadence");
+  assert.equal(nextRefreshMs(live, false), LIVE_REFRESH_MS, "hidden does not slow a live stream's reconcile");
   const failing = run([{ type: "read-ok", at: 0, hostChanged: false }, { type: "read-fail", at: 1 }, { type: "read-fail", at: 2 }, { type: "read-fail", at: 3 }]);
   assert.equal(nextRefreshMs(failing, true), 12_000);
+});
+test("T13 liveness: a healthy live connection never ages its snapshot past the freshness window", () => {
+  // The character liveness check (hostLive) reads the snapshot age against SNAPSHOT_FRESH_MS. The schedule itself is
+  // under test: at the scheduled wake-up the snapshot is LIVE_REFRESH_MS old and must still be live (otherwise a
+  // healthy connection flickers OFFLINE between reads). Ending every cycle with a read-ok at the same instant would
+  // make that vacuous, so the tick is evaluated alone, before its re-read.
+  assert.ok(LIVE_REFRESH_MS < SNAPSHOT_FRESH_MS, "the live cadence must be shorter than the freshness window");
+  let c = run([{ type: "read-ok", at: 0, hostChanged: false }, { type: "stream-signal", at: 1 }]);
+  assert.equal(c.state, "live");
+  let at = 0;
+  for (let cycle = 0; cycle < 40; cycle += 1) {
+    at += nextRefreshMs(c, true) ?? Number.NaN;
+    c = run([{ type: "tick", at }], c);
+    assert.equal(c.state, "live", `cycle ${cycle}: a scheduled wake-up inside the cadence is still live`);
+    assert.equal(at - (c.snapshotAt ?? 0), LIVE_REFRESH_MS, `cycle ${cycle}: the wake-up snapshot age equals the live cadence`);
+    c = run([{ type: "stream-signal", at }, { type: "read-ok", at, hostChanged: false }], c);
+    assert.equal(c.state, "live", `cycle ${cycle}: still live after a scheduled re-read`);
+    assert.ok(at - (c.snapshotAt ?? 0) <= SNAPSHOT_FRESH_MS);
+  }
+});
+test("T13 liveness: a live connection whose re-read stops really goes stale (not silently live)", () => {
+  // Correctness half: when the Host stops answering, the state must leave `live` once the snapshot ages out.
+  const c = run([{ type: "read-ok", at: 0, hostChanged: false }, { type: "stream-signal", at: 1 }]);
+  const aged = connectionReducer(c, { type: "tick", at: SNAPSHOT_FRESH_MS + 1 });
+  assert.equal(aged.state, "polling", "an aged snapshot is polling (retained, labelled), never live and never a false OFFLINE");
+  assert.equal(aged.readFailures, 0);
 });
 test("T9 connection: an unchanged tick returns the same object (no re-render storm)", () => {
   const c = run([{ type: "read-ok", at: 0, hostChanged: false }]);

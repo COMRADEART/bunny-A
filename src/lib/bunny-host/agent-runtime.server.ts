@@ -83,6 +83,10 @@ export class AgentRuntime {
   snapshot(ids?: string[]): AgentSnapshot {
     const snapshot = this.store.snapshot(ids);
     return { ...snapshot, agents: snapshot.agents.map((agent ) => {
+      // M-A-3 T13: team identity comes from the durable profile on every path, so a member whose Mission facts fail to
+      // load is still a member (never projected as a user-facing Agent).
+      const profileTeam = this.profiles.get(agent.id)?.team;
+      const identity = profileTeam ? { team: { role: profileTeam.role, coordinatorId: profileTeam.coordinatorId, missionId: profileTeam.missionId } } : {};
       try {
         const mission = agent.missionId ? this.missions.get(agent.missionId).mission : null;
         const crossApp = mission?.steps.some((step ) => step.crossApp);
@@ -92,7 +96,7 @@ export class AgentRuntime {
         const profile = this.profiles.get(agent.id);
         const teamFacts = profile?.team && mission ? { team: { role: profile.team.role, coordinatorId: profile.team.coordinatorId, missionId: profile.team.missionId },
           ...(profile.team.role === "coordinator" ? {} : this.memberFacts(agent.id, mission)) } : {};
-        return { ...agent, ...teamFacts, authorization: agent.missionId ? this.missions.agentic.projection(agent.missionId) : null,
+        return { ...agent, ...identity, ...teamFacts, authorization: agent.missionId ? this.missions.agentic.projection(agent.missionId) : null,
           ...(crossApp && mission ? { activity: { application: action?.startsWith("computer.") ? "Microsoft Calculator" : action?.startsWith("browser.") ? "Mission browser" : (action?.split(".")[0] ?? null), action, step: current?.role ?? null, completed: mission.steps.filter((step ) => step.state === "completed").length, total: mission.steps.length, verification: current?.failure?.category === "verification_failed" ? "Verification failed" : current?.state === "verifying" ? "Checking postconditions" : current?.result?.verified ? "Verified" : "Pending verification", artifacts: this.missions.store.artifacts(mission.id).filter((artifact ) => artifact.verification === "verified").slice(-6).map((artifact ) => ({ id: artifact.id, title: artifact.title, verified: true ,
                       })), history: mission.steps.slice(-12).map((step ) => ({ step: step.role, action: step.executor.kind === "capability" ? step.executor.action : "provider", state: step.state ,
                       })) ,
@@ -100,7 +104,7 @@ export class AgentRuntime {
                 } : {}) ,
           };
       }
-      catch { return { ...agent, authorization: null, authorizationError: "Authorization evidence is invalid; all new work is blocked. Stop remains available." ,
+      catch { return { ...agent, ...identity, authorization: null, authorizationError: "Authorization evidence is invalid; all new work is blocked. Stop remains available." ,
           }; }
     }) ,
     };
