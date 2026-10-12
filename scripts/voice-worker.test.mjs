@@ -749,6 +749,66 @@ test("T12-native VT-05 output-aware onset: our own residual at 0.003 never start
   assert.ok(r.duplexOutputUserOnset >= 0 && r.duplexOutputUserOnset <= 10, `user speech at 0.03 over our output is an onset (frame ${r.duplexOutputUserOnset})`);
 });
 
+// T12 AEC repairs (AEC-01, AEC-02, AEC-05, AEC-06, PRIV-03, RC-02). Each assertion here fails on the code before its repair:
+// the selftest cases are constructed to hit the failing path (quiet first frames, a pause, a gap, a replay after output).
+test("T12-native AEC-01/06 echo after quiet first frames, a pause and a gap is never an onset (the residual is floored and held)", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.duplexOutputEchoOnsets, 0, "output starts on 5 quiet frames, then 200 frames of echo at 0.003: no onset (AEC-06 seeding)");
+  assert.equal(r.aecPausedEchoOnsets, 0, "a chunk in flight but paused for 1200 ms (output flag on, device silent), then echo at 0.003: no onset");
+  assert.equal(r.aecGapEchoOnsets, 0, "echo lingering 400 ms past the output flag, then quiet restart frames and echo at 0.003: no onset");
+});
+
+test("T12-native AEC-01 the learned residual is not decayed by a paused (silent) window", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.ok(r.aecResidualBeforePause > 0.0027, `the residual learned the 0.0028 echo (${r.aecResidualBeforePause})`);
+  assert.ok(Math.abs(r.aecResidualAfterPause - r.aecResidualBeforePause) < 1e-9, `1200 ms of silence leaves the residual unchanged (${r.aecResidualAfterPause})`);
+});
+
+test("T12-native AEC-05 user speech at 0.008 over 0.003 echo starts a turn, and never lifts the residual above the echo cap", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.ok(r.aecUserOverEchoOnset >= 0 && r.aecUserOverEchoOnset <= 10, `user speech over our output is an onset (frame ${r.aecUserOverEchoOnset})`);
+  assert.ok(r.aecResidualAfterUserSpeech <= 0.0031, `200 frames of user speech do not raise the residual (${r.aecResidualAfterUserSpeech})`);
+  assert.ok(r.aecThresholdAfterUserSpeech < 0.008, `the onset threshold stays below user speech at 0.008 (${r.aecThresholdAfterUserSpeech})`);
+});
+
+// T12 AEC round 2 (verifier HIGH on AEC-05): the adapt band reaches the cap's echo level, and the multi-frame seed learns a loud
+// steady echo after a quiet start. Before this fix, echo at 0.0045 and 0.005 re-triggered speech_start on every cycle.
+test("T12-native round-2 AEC-01/05 a steady echo at 0.0045 or 0.005, or a loud echo after a quiet start, is no onset while output is audible", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.aecSteadyEcho0045Onsets, 0, "steady echo at 0.0045 with output on from the first frame: no onset (was 6 before the fix)");
+  assert.equal(r.aecSteadyEcho005Onsets, 0, "steady echo at 0.005 with output on from the first frame: no onset");
+  assert.equal(r.aecQuietStartEcho005Onsets, 0, "five quiet frames, then echo at 0.005: the median seed and jump learn it, no onset");
+  assert.ok(r.aecUserOver0045EchoOnset >= 0 && r.aecUserOver0045EchoOnset <= 10, `user speech at 0.008 over a 0.0045 echo is an onset (frame ${r.aecUserOver0045EchoOnset})`);
+  assert.ok(Math.abs(r.aecOutputThresholdCeiling - 0.006) < 1e-9, `with output audible the onset threshold is capped at 0.006 (${r.aecOutputThresholdCeiling})`);
+});
+
+test("T12-native AEC-02 a pre-roll replay never carries frames captured while our output was audible or in its reverb tail", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.prerollEchoFrames, 0, "no replayed frame was captured while our 0.003 echo was audible or in its 260 ms tail");
+  assert.ok(r.prerollReplayedFrames > 0, `the quiet frames around the echo are still replayed (${r.prerollReplayedFrames})`);
+  assert.equal(r.turnFramesKeepCaptureMono, true, "a replayed frame keeps its capture time");
+  assert.equal(r.onsetMonoFromCapture, 700, "the onset is timed from the capture time of its first loud frame, not the replay time");
+});
+
+test("T12-native PRIV-03 a capture loop that ends because the microphone is muted reports 'mute', and the lifetime bound reports 'lifetime'", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.duplexStopReasonOnMute, "mute", "the mute exit is not labelled lifetime");
+  assert.equal(r.duplexStopReasonLifetime, "lifetime", "the maxMs bound still reports lifetime");
+  assert.equal(r.duplexStopReasonMuteAndBound, "lifetime", "a mute that lands in the same read as an expired lifetime bound is reported as the lifetime (round 2)");
+});
+
+// T12 AEC-02 round 2 (verifier LOW): user speech over our output is kept in the pre-roll, while our echo is dropped.
+test("T12-native AEC-02 round-2 user speech at 0.03 captured during our output is kept in the pre-roll for the next turn", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.prerollUserFramesKept, 30, "all 30 frames of user speech over our output are replayed, not dropped as echo");
+});
+
+test("T12-native RC-02 a playback.error for a generation releases its pause: the next chunk of that gen is not paused", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.ttsFailurePauseReleased, true, "after a TTS_UNAVAILABLE for gen 21, the next gen-21 chunk is not paused and completes");
+  assert.equal(r.pauseRefusalReleased, true, "after a refused pause for gen 22, the next gen-22 chunk is not asked to pause and completes");
+});
+
 test("T12-native VT-01 stationary loud ambient in a duplex turn ends after the silence clock, not at the cap", { skip }, async () => {
   const r = await sharedSelfTest();
   assert.ok(r.duplexLoudNoiseStart >= 5 && r.duplexLoudNoiseStart <= 7, `onset after the 120 ms window (frame ${r.duplexLoudNoiseStart})`);

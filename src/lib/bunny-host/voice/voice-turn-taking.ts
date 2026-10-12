@@ -27,6 +27,13 @@ export type TurnEvidence =
 export const INTERRUPT_PHRASE_MIN_MS = 180;
 /** A non-echo partial with at least two content words interrupts only after this much speech. */
 export const SUSTAINED_PARTIAL_MS = 500;
+/** T12 AEC-03: a non-phrase final during output interrupts only with at least this many content words. */
+const SUSTAINED_FINAL_CONTENT_TOKENS = 2;
+/** T12 AEC-04: an echo verdict needs at least this many comparable tokens (or an ordered run of this many in one chunk). */
+export const ECHO_MIN_TOKENS = 3;
+export const ECHO_RUN_MIN = 3;
+/** T12 AEC-03: the words a recognizer invents from silence or bleed. A final with only these words never interrupts. */
+const HALLUCINATIONS = [/^thank you for watching$/, /^thanks for watching$/, /^thank you$/, /^thanks$/, /^you$/, /^bye$/, /^bye bye$/, /^goodbye$/, /^see you next time$/, /^subtitles by\b/, /\bamara org\b/];
 
 /** Multi-word lexicon entries, merged into one token before classification ("mm-hmm" -> "mm hmm" -> "mm_hmm"). */
 const MERGE: [string, string][] = [["mm", "hmm"], ["mm", "hm"], ["uh", "huh"], ["got", "it"], ["i", "see"]];
@@ -87,9 +94,14 @@ export class VoiceTurnTaking {
     // Output is active: the turn is routed only as an interrupt. Everything else resumes the held reply.
     if (this.interrupted) return this.result("interrupt", "interrupt_already_decided");
     const reliable = evidence.confidence >= VOICE_LIMITS.minFinalConfidence;
-    if (reliable && startsWithInterrupt(tokens) && this.heard >= INTERRUPT_PHRASE_MIN_MS) return this.interruptNow("interrupt_phrase_final");
-    if (reliable && !isPureBackchannel(tokens)) return this.interruptNow("finalized_new_user_turn");
-    return this.result("resume", isPureBackchannel(tokens) ? "backchannel" : "not_heard");
+    if (!reliable) return this.result("resume", "not_heard");
+    // T12 AEC-03: whisper-style hallucinations (silence or bleed) never interrupt a reply.
+    if (isKnownHallucination(tokens)) return this.result("resume", "hallucination_during_output");
+    if (startsWithInterrupt(tokens) && this.heard >= INTERRUPT_PHRASE_MIN_MS) return this.interruptNow("interrupt_phrase_final");
+    // T12 AEC-03: a final that is not a phrase must carry sustained, multi-word speech before it may interrupt. A short or
+    // garbled final during output is not confirmed user speech; it resumes the reply, as an unconfirmed final.
+    if (!isPureBackchannel(tokens) && contentTokens(tokens).length >= SUSTAINED_FINAL_CONTENT_TOKENS && this.heard >= SUSTAINED_PARTIAL_MS) return this.interruptNow("finalized_new_user_turn");
+    return this.result("resume", isPureBackchannel(tokens) ? "backchannel" : "unconfirmed_final_during_output");
   }
 
   private none(outputActive: boolean): TurnDecision {
@@ -143,19 +155,71 @@ function startsWithInterrupt(tokens: string[]): boolean {
 }
 
 /**
- * Share of a transcript's comparable tokens that occur in Bunny's own recent spoken tokens (0..1). Filler words are dropped
- * on both sides by the caller passing `spoken` built with `echoTokens`. Zero when the transcript has no comparable token.
+ * Share of a transcript's comparable tokens that occur in a set of spoken tokens (0..1). Zero when the transcript has fewer
+ * than ECHO_MIN_TOKENS comparable tokens: a one- or two-word barge-in ("stop", "no problem") is never echo by overlap alone.
  */
 export function echoOverlap(text: string, spoken: ReadonlySet<string>): number {
   const tokens = echoTokens(text);
-  if (tokens.length === 0) return 0;
+  if (tokens.length < ECHO_MIN_TOKENS) return 0;
   const found = tokens.filter((token) => spoken.has(token)).length;
   return found / tokens.length;
+}
+
+/**
+ * T12 AEC-04: true when a transcript is Bunny's own speech. Evidence is judged per spoken chunk, never across the union of
+ * chunks: one chunk must hold at least ECHO_MIN_TOKENS of the transcript's tokens at the overlap threshold, or an ordered run
+ * of ECHO_RUN_MIN tokens that covers at least half the transcript. A transcript that opens with an interrupt phrase is echo
+ * only when that phrase is part of such a run, so a user's "stop" over Bunny's words still reaches the interrupt check.
+ */
+export function echoMatch(text: string, chunks: readonly (readonly string[])[], threshold: number): boolean {
+  const tokens = echoTokens(text);
+  if (tokens.length < ECHO_MIN_TOKENS) return false;
+  const lead = leadingInterruptLength(tokens);
+  for (const chunk of chunks) {
+    const inChunk = new Set(chunk);
+    const matched = tokens.filter((token) => inChunk.has(token)).length;
+    if (lead > 0 && orderedRunFromStart(tokens, chunk) < Math.max(lead, ECHO_RUN_MIN)) continue;
+    if (matched >= ECHO_MIN_TOKENS && matched / tokens.length >= threshold) return true;
+    const run = orderedRunLength(tokens, chunk);
+    if (run >= ECHO_RUN_MIN && run / tokens.length >= 0.5) return true;
+  }
+  return false;
+}
+
+/** T12 AEC-03: a final made only of the words a recognizer invents from silence or bleed. */
+export function isKnownHallucination(tokens: string[]): boolean {
+  const phrase = tokens.join(" ");
+  return tokens.length > 0 && HALLUCINATIONS.some((re) => re.test(phrase));
 }
 
 /** Comparable tokens for echo matching: normalized words with hesitation fillers removed. */
 export function echoTokens(text: string): string[] {
   return tokenize(text).filter((token) => !HESITATION.has(token));
+}
+
+/** The token count of the interrupt phrase that opens the transcript (0 when it opens with none). */
+function leadingInterruptLength(tokens: string[]): number {
+  let length = 0;
+  for (const phrase of INTERRUPT_PHRASES) if (phrase.every((word, index) => tokens[index] === word)) length = Math.max(length, phrase.length);
+  return length;
+}
+
+/** Length of the longest prefix of `tokens` that appears as a contiguous run inside `chunk`. */
+function orderedRunFromStart(tokens: string[], chunk: readonly string[]): number {
+  let best = 0;
+  for (let start = 0; start < chunk.length; start += 1) {
+    let length = 0;
+    while (length < tokens.length && chunk[start + length] === tokens[length]) length += 1;
+    best = Math.max(best, length);
+  }
+  return best;
+}
+
+/** Length of the longest contiguous run of `tokens` (anywhere) that appears contiguously inside `chunk`. */
+function orderedRunLength(tokens: string[], chunk: readonly string[]): number {
+  let best = 0;
+  for (let i = 0; i < tokens.length; i += 1) best = Math.max(best, orderedRunFromStart(tokens.slice(i), chunk));
+  return best;
 }
 
 function clampMs(value: number): number {

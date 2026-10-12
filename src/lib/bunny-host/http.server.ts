@@ -26,6 +26,7 @@ import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/v
 import { VoiceSessionManager, type ListenSource, type InterruptSource } from "./voice/voice-session.server.ts";
 import { launchVoiceWorker } from "./voice/voice-worker.server.ts";
 import { hostFactsFrom, pendingApprovalFacts, type ApprovalFact } from "./voice/voice-answers.server.ts";
+import type { MissionState } from "../bunny-missions/types.ts";
 import { ProjectService } from "./project-service.server.ts";
 import {
   actorOf, APPROVAL_ON_HOST, assertDeviceAction, authenticateDevice, CodedRefusal, deviceArtifactRead, deviceExpiresAt, DEVICE_SESSION_MS,
@@ -33,6 +34,29 @@ import {
   hidePaths, hostId as stableHostId, mutating, OPERATION_ID, OperationLedger, viewerOf, WindowLimiter,
   WorkstationRequiredError, type DevicePrincipal, type OperationState, type Principal,
 } from "./device-authority.server.ts";
+
+/**
+ * T12 RES-02: whether a Mission state is still open (not finished). Typed over the whole MissionState union, so a state added
+ * later fails to compile until it is classified here, and it can never silently drop out of the voice stop pool.
+ */
+const MISSION_STATE_OPEN: Record<MissionState, boolean> = {
+  draft: true,
+  planning: true,
+  waiting_for_approval: true,
+  ready: true,
+  running: true,
+  waiting_for_user: true,
+  verifying: true,
+  completed: false,
+  failed: false,
+  stopped: false,
+};
+/** T12 RES-02: every Mission state that is not finished (completed, failed and stopped are finished). */
+const VOICE_UNFINISHED_MISSION_STATES = (Object.keys(MISSION_STATE_OPEN) as MissionState[]).filter((state) => MISSION_STATE_OPEN[state]);
+/** T12 RES-02: a canonical Mission as the voice port reads it. Steps are not needed for a stop pool or a state check. */
+function voiceMissionFact(mission: { id: string; title: string; state: string; updatedAt: number; origin?: string }) {
+  return { id: mission.id, title: mission.title, status: mission.state, updatedAt: mission.updatedAt, origin: mission.origin, steps: [] };
+}
 
 const PROVIDERS: ProviderId[]=["codex","claude","ollama","opencode","cline","cursor"];
 function record(value: unknown): Record<string,unknown> {if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("Expected an object.");return value as Record<string,unknown>;}
@@ -370,6 +394,14 @@ export async function startHost(
         manager.approveVoiceTurn(taskId);
       },
       onOutput: (taskId, listener) => manager.onTaskOutput(taskId, listener),
+      // T12 RES-04: the canonical state of a refused spoken question, so a reviewed one leaves the waiting count.
+      taskState: (taskId) => {
+        try {
+          return db.get(taskId).state;
+        } catch {
+          return null;
+        }
+      },
       // H8: the recorded output of a non-streaming task, spoken when no deltas arrived.
       output: (taskId) => {
         try {
@@ -424,6 +456,18 @@ export async function startHost(
       missionStop: async (missionId) => {
         await missionCommand(missions, "mission.stop", { id: missionId }, { local: true, actor: "workstation" });
       },
+      // T12 RES-02: every Mission that has not finished, from the canonical store by state (the recency window never hides a running one).
+      activeMissions: () => missions.store.missionsIn(VOICE_UNFINISHED_MISSION_STATES).map(voiceMissionFact),
+      // T12 RES-02: one Mission by id from canonical state, for the confirm-time stop check.
+      mission: (missionId) => {
+        try {
+          return voiceMissionFact(missions.store.mission(missionId));
+        } catch {
+          return null;
+        }
+      },
+      // T12 RES-01: waiting voice drafts counted by state, never from the 40-newest window.
+      pendingVoiceDrafts: () => missions.store.missionsIn(["draft", "planning", "waiting_for_approval"]).filter((mission) => mission.origin?.startsWith("voice:")).length,
       // T12 F3: a spoken Mission DRAFT through the canonical mission.create (fast, local-only). It is not approved or started here.
       draftMission: async ({ objective, projectId }) => {
         const result = await missionCommand(missions, "mission.create", { objective, mode: "fast", localOnly: true, projectId }, { local: true, actor: "voice:workstation" });

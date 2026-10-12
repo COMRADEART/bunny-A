@@ -25,7 +25,7 @@ import {
 import { canTransition, createFsm, hasSpeechInFlight, tryTransition, type VoiceFsm } from "./voice-fsm.ts";
 import { VoiceChunker, chunkAnswer, type SpokenChunk } from "./voice-chunker.ts";
 import { classifyTranscript, controlAction, type VoiceIntent } from "./voice-intent.ts";
-import { VoiceTurnTaking, echoOverlap, echoTokens, type TurnDecision } from "./voice-turn-taking.ts";
+import { VoiceTurnTaking, echoMatch, echoTokens, type TurnDecision } from "./voice-turn-taking.ts";
 import { answerApprovals, answerFollowUp, answerTeam, answerLastMission, answerModel, answerStatus, answerVerification, humanState, isTerminalAgent, missionLabel, MISSION_OVER, type AgentFact, type ApprovalFact, type FollowUpSubject, type MissionFact } from "./voice-answers.server.ts";
 
 export type ListenSource = "button" | "hotkey" | "push_to_talk" | "hands_free";
@@ -48,6 +48,18 @@ export const REDIRECT_TEXT = "I can't change a running agent's plan by voice. Yo
 /** T12 F3: the one truthful refusal for a Mission draft that was not created. */
 export const DRAFT_REFUSAL = "I couldn't draft that Mission. Nothing was created.";
 export const TOOLS_TEXT = "That question needs tools or a hosted model, so it is waiting for approval on the Windows Host screen.";
+/** T12 RES-04: refused before submit once the spoken questions already waiting for approval reach the cap. */
+export const WAITING_VOICE_TASKS_TEXT = "Some voice questions are already waiting for review on the Windows Host screen.";
+/** T12 RES-04 (round 2): the words of a spoken question, lowercased and unpunctuated, so a repeat of it collapses onto one row. */
+function voiceCollapseKey(transcript: string): string {
+  return transcript.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+/** T12-AUTH-04: "pause the mission" has no voice answer; Missions are paused per Agent or on the Windows Host screen. */
+export const MISSION_PAUSE_TEXT = "Missions are paused and resumed per Agent, or on the Windows Host screen. Nothing was changed.";
+/** T12 AEC-02: a turn whose speech starts this soon after Bunny's output stopped is still the output's tail, not a new turn. */
+const OUTPUT_OVERLAP_TAIL_MS = 300;
+/** T12 AEC-02: how many recent output windows are kept for the overlap check. */
+const OUTPUT_WINDOWS_MAX = 4;
 
 export type VoiceAgentRow = { id: string; name: string; state: string; revision: number };
 export type VoiceChatTask = { taskId: string; provider: string; model: string | null; state: string; hasMission: boolean; mayLaunch: boolean };
@@ -63,10 +75,18 @@ export interface VoiceChatPort {
   stop(taskId: string): Promise<void> | void;
   /** The task's final output text, when the router recorded one (non-streaming providers). Optional. */
   output?(taskId: string): string | null;
+  /** T12 RES-04: the task's canonical state, so a refused spoken question leaves the waiting count when it is reviewed. Optional. */
+  taskState?(taskId: string): string | null;
 }
 export interface VoiceAgentPort {
   rows(): VoiceAgentRow[];
   facts(): { agents: AgentFact[]; missions: MissionFact[]; approvals: ApprovalFact[] };
+  /** T12 RES-02: every Mission that has not finished, read from canonical state (not the recency window). Optional. */
+  activeMissions?(): MissionFact[];
+  /** T12 RES-02: one Mission by id from canonical state, so a stop is confirmed against the record itself. Optional. */
+  mission?(missionId: string): MissionFact | null;
+  /** T12 RES-01: how many voice-origin Missions wait for review, counted from canonical state. Optional. */
+  pendingVoiceDrafts?(): number;
   /** Runs the canonical agent command (agentCommand with the workstation actor). Throws on refusal. */
   command(action: "agent.pause" | "agent.resume" | "agent.stop", id: string, revision: number): Promise<void>;
   /** T12: the canonical MissionManager stop with the workstation actor (missionCommand "mission.stop"). Throws on refusal. */
@@ -116,6 +136,8 @@ type InputTurn = { turn: string; gen: number; timing: VoiceTiming; controller: V
 type SpokenEntry = { turn: string; gen: number; seq: number; tokens: string[]; sentAt: number; playedAt: number | null; endedAt: number | null };
 /** Every way the duplex lane ends. Only a "user" stop or a "relaunch" keeps the hands-free grant. */
 export type DuplexEnd = "user" | "mute" | "idle" | "lifetime" | "error" | "worker_exit" | "close" | "mode" | "relaunch" | "budget";
+/** RC-05: how a held reply ends with the duplex lane. Absent means cancelled (interrupted), never resumed by default. */
+type StopOptions = { holdOutcome?: "resumed" | "interrupted" };
 const SPOKEN_LOG_MAX = 64;
 /** Input turns whose capture ended and whose recognition is still pending: bounded, oldest evicted first. */
 const FINALIZING_MAX = 4;
@@ -184,8 +206,20 @@ export class VoiceSessionManager {
   private readonly finalizing = new Map<string, InputTurn>();
   /** The reply held on speech onset (paused, not cancelled) while the controller decides. */
   private hold: Hold | null = null;
-  /** The explicit user start that permits the microphone to be (re)opened. Null means no live grant. */
+  /**
+   * The explicit user start that permits the microphone to be (re)opened. Null means no live grant. Only a Start click
+   * (listen.start with source hands_free) creates or renews it, after that start's validity checks pass (T12-PRIV-01/02).
+   */
   private grantExpiresAt: number | null = null;
+  /** RES-07: the Host's own timer at the grant's end; it stops the duplex lane even while it is live. */
+  private cancelGrantExpiry: (() => void) | null = null;
+  /** T12 AEC-02: recent windows in which Bunny's output was in flight (end null while still in flight). Overlap is judged on these. */
+  private outputWindows: { start: number; end: number | null }[] = [];
+  /** T12-AUTH-06: whether Bunny's output was audible when the push-to-talk capture being finalized began. */
+  private captureOverlap = false;
+  /** T12 RES-04: spoken questions that were refused and still wait for review on the Host screen (tracked until reviewed). */
+  // T12 RES-04 (round 2): taskId -> the collapse key of its spoken question (see voiceCollapseKey).
+  private readonly waitingVoiceTasks = new Map<string, string>();
   private cancelDuplexReady: (() => void) | null = null;
   private duplexStopping: Promise<void> | null = null;
   private duplexStopResolve: (() => void) | null = null;
@@ -270,8 +304,8 @@ export class VoiceSessionManager {
   // -------------------------------------------------------------------------------------------------------------
 
   async open(mode: VoiceMode = "push_to_talk"): Promise<VoiceSnapshot> {
-    // T12 P2: an explicit hands_free open is a user action; it is the only thing (besides listen.start) that grants the duplex lane.
-    if (mode === "hands_free") this.grantHandsFree();
+    // T12-PRIV-01: an open never creates or renews the hands-free grant. Opening or switching to hands-free only shows the mode;
+    // the microphone opens on an explicit Start hands-free (listen.start with source hands_free), which alone grants it.
     if (this.opening) await this.opening.catch(() => undefined);
     // R3-session#2: an open never interleaves with an in-flight close (which would orphan the new worker).
     if (this.closingPromise) await this.closingPromise.catch(() => undefined);
@@ -292,8 +326,9 @@ export class VoiceSessionManager {
   private async switchMode(mode: VoiceMode) {
     this.snap.mode = mode;
     if (mode === "push_to_talk") {
-      this.grantExpiresAt = null;
-      await this.stopDuplex("mode");
+      this.revokeGrant();
+      // RC-05: a held reply continues when the mode changes; the mode change is not a barge-in.
+      await this.stopDuplex("mode", { holdOutcome: "resumed" });
       this.clearIdle();
       this.cancelRearmTimer();
     }
@@ -427,7 +462,8 @@ export class VoiceSessionManager {
     const wasSpeaking = this.snap.playing || this.hold !== null || hasSpeechInFlight(this.fsm.state);
     const turn = this.snap.turnId ?? "none";
     const gen = this.snap.generation;
-    this.stopDuplex("close");
+    // RC-05: a close cancels a held reply (its receipt says interrupted, never resumed); the duplex release is not a resume.
+    void this.stopDuplex("close");
     // races#3: capture and speech are cut first, before anything is awaited, so queued chunks stop at once. The worker
     // handle is then dropped, so no event or command reaches the closing session.
     // The duplex lane aborted its own input turns in stopDuplex; a generation-only abort would name the wrong lane.
@@ -448,6 +484,7 @@ export class VoiceSessionManager {
     if (receipt && stopping && inferenceStopped === null) void stopping.then((ok) => this.acknowledgeInferenceStop(receipt, ok === true));
     if (releasing) await releasing;
     this.finishDuplexStop();
+    this.cancelWaitingVoiceTasks();
     this.resetAfterClose();
     this.closing = false;
     this.snap.lastClose = { source, at: this.now() };
@@ -457,7 +494,8 @@ export class VoiceSessionManager {
 
   private resetAfterClose() {
     this.clearHold("interrupted", "session_close");
-    this.grantExpiresAt = null;
+    this.revokeGrant();
+    this.outputWindows = [];
     this.spokenLog.length = 0;
     // T12 F8: the spoken history and the Host-facts referent end with the session.
     this.history.length = 0;
@@ -508,27 +546,34 @@ export class VoiceSessionManager {
 
   /** Starts one capture turn. Barge-in when speech is in flight: the generation advances and old speech is cancelled. */
   async listenStart(source: ListenSource = "button"): Promise<VoiceSnapshot> {
-    // T12 P2: an explicit hands_free start is a user action and is the only path that creates or renews the duplex grant.
-    if (source === "hands_free") this.grantHandsFree();
-    return this.beginListen(source);
+    // T12-PRIV-01/02: an explicit hands_free start is the only path that creates or renews the duplex grant, and it does so
+    // only after the start's own validity checks pass (see beginListen). A refused start leaves no new grant.
+    return this.beginListen(source, source === "hands_free");
   }
 
-  /** The turn itself. Internal re-arms come here directly, so they can never create or renew a grant. */
-  private async beginListen(source: ListenSource): Promise<VoiceSnapshot> {
+  /**
+   * The turn itself. Internal re-arms come here with `grant` false, so they can never create or renew a grant. A user's
+   * hands-free start (`grant`) renews the grant only after the closing, open, worker and muted checks pass.
+   */
+  private async beginListen(source: ListenSource, grant = false): Promise<VoiceSnapshot> {
+    // T12-AUTH-06: whether Bunny spoke when the press arrived is read before anything stops the lane or barges in.
+    const outputAtPress = this.outputActive();
     // races#3: a session that is closing takes no new turn.
     if (this.closing) return this.refuse("INTERNAL", "Voice is closing.");
     // H5: an in-flight or due relaunch completes before the turn is judged (the worker handle is absent while it runs).
     if (this.relaunching || this.needsRelaunch()) await this.relaunchIfIdle();
     if (!this.snap.open || !this.worker) return this.refuse("INTERNAL", "Voice is not open.");
     if (this.snap.muted) return this.refuse("MUTED", "Microphone is muted; capture was not started.");
-    if (this.snap.mode === "hands_free" && this.duplexSupported && source !== "push_to_talk" && this.grantLive()) {
+    if (this.snap.mode === "hands_free" && this.duplexSupported && source !== "push_to_talk" && (grant || this.grantLive())) {
       if (this.duplexStopping) await this.duplexStopping;
       if (!this.worker || !this.snap.open || this.closing) return this.refuse("INTERNAL", "Voice is not open.");
+      if (grant) this.renewGrant();
       this.startDuplex();
       return this.snapshot();
     }
     // A push-to-talk press stops the duplex lane ("user" keeps the grant); a button press without a grant is an ordinary turn.
-    if (this.duplexLane()) await this.stopDuplex("user");
+    // RC-05: the press barges in on a held reply, so the held reply is cancelled (interrupted), never resumed first.
+    if (this.duplexLane()) await this.stopDuplex("user", { holdOutcome: "interrupted" });
     if (!this.worker || !this.snap.open || this.closing) return this.refuse("INTERNAL", "Voice is not open.");
     // Live finding (Part B): a press during TRANSCRIBING was refused as DEVICE_BUSY, which the clients show as "microphone in
     // use by another app". The press now waits (bounded) for the previous final, then starts its turn, barging in on any
@@ -545,6 +590,12 @@ export class VoiceSessionManager {
       // A turn another press started while this one waited is left alone; this press joins it.
       if (this.fsm.state === "ARMING" || this.fsm.state === "LISTENING") return this.snapshot();
     }
+    // T12-AUTH-06: a press during output barges in first; its final is then overlapped, so it can never confirm a proposal.
+    this.captureOverlap = outputAtPress;
+    // T12-PRIV-01 (round 2): a Start hands-free click grants only while hands-free mode is on. A start made in push-to-talk mode
+    // (or any other mode) records no grant, so a later hotkey press cannot open the microphone. Without duplex support the
+    // grant still governs hands-free re-arm (see rearmHandsFree), as the Start click is what the grant records.
+    if (grant && this.snap.mode === "hands_free") this.renewGrant();
     if (this.outputActive()) this.bargeIn(source === "push_to_talk" ? "push_to_talk" : "button");
     if (this.snap.capturing || this.fsm.state === "LISTENING" || this.fsm.state === "ARMING") this.tryWorker({ op: "capture.abort", gen: this.snap.generation });
     this.cancelRearmTimer();
@@ -631,7 +682,8 @@ export class VoiceSessionManager {
   mute(on: boolean): VoiceSnapshot {
     this.snap.muted = on;
     if (on) {
-      this.stopDuplex("mute");
+      // RC-05: a mute cancels a held reply (receipt: interrupted, reason mute); the stop is not a resume.
+      void this.stopDuplex("mute");
       this.clearIdle();
       this.cancelRearmTimer();
       // The duplex lane aborts its own input turn inside stopDuplex; a generation-only abort here would name the wrong lane.
@@ -820,7 +872,9 @@ export class VoiceSessionManager {
       this.onNone("no_speech");
       return;
     }
-    this.acceptFinal(trimmed, turn, Number.isFinite(confidence) ? confidence : 0, { source: "push_to_talk", overlapped: false, speechMs: null });
+    // T12-AUTH-06: a push-to-talk final is overlapped when Bunny's output was audible at the press, or when it is Bunny's own speech.
+    const overlapped = this.captureOverlap || this.isEcho(trimmed);
+    this.acceptFinal(trimmed, turn, Number.isFinite(confidence) ? confidence : 0, { source: "push_to_talk", overlapped, speechMs: null });
   }
 
   /** A pending pick consumes the next final: a name or ordinal picks one candidate (V34), then its control or follow-up runs. */
@@ -878,6 +932,8 @@ export class VoiceSessionManager {
       case "mission_control":
         // T12 F2: a Mission stop is proposed only from a clean turn; it executes on the Windows Host screen alone.
         if (this.overlappedDuplexTurn()) return this.answerHost("To stop a Mission, say it again after I finish, or use the Windows Host screen.", turn);
+        // T12-AUTH-04: a Mission pause or resume is answered, never proposed; Missions are paused per Agent or on screen.
+        if (intent.missionVerb) return this.answerHost(MISSION_PAUSE_TEXT, turn);
         this.handleMissionControl(intent, turn);
         return;
       case "cancel": {
@@ -891,8 +947,9 @@ export class VoiceSessionManager {
       }
       case "confirm": {
         const proposal = this.snap.proposal;
-        // T12: a confirm spoken over Bunny's own output (an overlapped duplex turn) never executes; the proposal stays pending.
-        if (proposal && this.voiceConfirmable() && this.turnMeta.source === "duplex" && this.turnMeta.overlapped) this.answerHost("To confirm, say confirm again after I finish, or use the screen.", turn);
+        // T12: a confirm spoken over Bunny's own output (an overlapped turn on any lane, duplex or push-to-talk) never executes;
+        // the proposal stays pending (T12-AUTH-06).
+        if (proposal && this.voiceConfirmable() && this.turnMeta.overlapped) this.answerHost("To confirm, say confirm again after I finish, or use the screen.", turn);
         else if (proposal && this.voiceConfirmable()) this.executeProposal(proposal, "voice", turn);
         else if (proposal) this.answerHost("That action needs the button on the Windows Host screen.", turn);
         else this.answerHost("Nothing is waiting for your confirmation.", turn);
@@ -926,9 +983,12 @@ export class VoiceSessionManager {
     }
   }
 
-  /** T12: the transcript came from the duplex lane while Bunny's own output was audible. Such a turn never makes a draft or a proposal. */
+  /**
+   * T12: the transcript was heard while Bunny's own output was audible (or it is Bunny's own speech). Such a turn never makes a
+   * draft or a proposal, on the duplex lane or on push-to-talk (T12-AUTH-06).
+   */
   private overlappedDuplexTurn(): boolean {
-    return this.turnMeta.source === "duplex" && this.turnMeta.overlapped;
+    return this.turnMeta.overlapped;
   }
 
   /**
@@ -1020,11 +1080,25 @@ export class VoiceSessionManager {
     this.answerHost(this.proposalSentence(this.snap.proposal!), turn);
   }
 
-  /** Active Missions: every canonical Mission that has not finished. Read from the Host's records only. */
+  /**
+   * Active Missions: every canonical Mission that has not finished. Read from the Host's canonical state, never from the
+   * recency window (T12 RES-02): a running Mission older than the newest rows is still a stop candidate.
+   */
   private activeMissions(): Candidate[] {
-    return this.deps.agents.facts().missions
-      .filter((mission) => !MISSION_OVER.includes(mission.status))
-      .map((mission) => ({ id: mission.id, name: mission.title, revision: 0 }));
+    return this.unfinishedMissions().map((mission) => ({ id: mission.id, name: mission.title, revision: 0 }));
+  }
+
+  private unfinishedMissions(): MissionFact[] {
+    const port = this.deps.agents;
+    const source = port.activeMissions ? port.activeMissions() : port.facts().missions;
+    return source.filter((mission) => !MISSION_OVER.includes(mission.status));
+  }
+
+  /** One Mission by id from canonical state (the same source the proposal pool reads), for the confirm-time check. */
+  private missionById(id: string): MissionFact | null {
+    const port = this.deps.agents;
+    if (port.mission) return port.mission(id);
+    return port.facts().missions.find((mission) => mission.id === id) ?? null;
   }
 
   /**
@@ -1097,7 +1171,10 @@ export class VoiceSessionManager {
     const now = this.now();
     if (!port.draftMission) return this.answerHost(DRAFT_REFUSAL, turn);
     if (this.lastDraftAt !== null && now - this.lastDraftAt < VOICE_LIMITS.voiceDraftMinIntervalMs) return this.answerHost("Please wait a moment before drafting another Mission.", turn);
-    const waiting = this.deps.agents.facts().missions.filter((mission) => mission.origin?.startsWith("voice:") && AWAITING_REVIEW.includes(mission.status)).length;
+    // T12 RES-01: counted from canonical state. The recency window of the facts never holds every waiting draft.
+    const waiting = port.pendingVoiceDrafts
+      ? port.pendingVoiceDrafts()
+      : port.facts().missions.filter((mission) => mission.origin?.startsWith("voice:") && AWAITING_REVIEW.includes(mission.status)).length;
     if (waiting >= VOICE_LIMITS.maxPendingVoiceDrafts) return this.answerHost(`${VOICE_LIMITS.maxPendingVoiceDrafts} voice Missions are already waiting for review on the Windows Host screen. Review them there first.`, turn);
     const project = this.resolveProject(objective);
     if (project.names.length > 1) return this.answerHost(`I found several projects: ${project.names.join(", ")}. Say it again with the project name.`, turn);
@@ -1264,7 +1341,7 @@ export class VoiceSessionManager {
         if (current()) this.answerHost("I can't stop a Mission by voice here. Use the Windows Host screen.", turn);
         return;
       }
-      const known = port.facts().missions.find((mission) => mission.id === proposal.agentId);
+      const known = this.missionById(proposal.agentId);
       if (!known || MISSION_OVER.includes(known.status)) {
         this.deps.journal("voice.control_refused", "Mission changed since the proposal; not executed.");
         if (current()) this.answerHost(`${proposal.agentName} is no longer running. Nothing was changed.`, turn);
@@ -1279,7 +1356,7 @@ export class VoiceSessionManager {
       }
       if (!current()) return;
       // Confirmed from the canonical Mission record, never from the request alone.
-      const row = port.facts().missions.find((mission) => mission.id === proposal.agentId);
+      const row = this.missionById(proposal.agentId);
       if (row?.status === "stopped") this.answerHost(`The mission ${proposal.agentName} is stopped.`, turn);
       else this.answerHost(`I asked for that, but the mission ${proposal.agentName} shows ${row ? humanState(row.status) : "no current state"}. I'm not sure it stopped.`, turn);
       return;
@@ -1336,6 +1413,19 @@ export class VoiceSessionManager {
       history,
       `User: ${transcript}`,
     ].filter(Boolean).join("\n\n");
+    // T12 RES-04 (round 2): a repeat of a question that already waits for review adds no row; the same refusal is spoken.
+    const collapseKey = voiceCollapseKey(transcript);
+    if (this.waitingVoiceCount() > 0 && [...this.waitingVoiceTasks.values()].includes(collapseKey)) {
+      this.deps.journal("voice.turn", "Spoken question not submitted: the same question already waits for review.");
+      this.speakAnswer(TOOLS_TEXT, "refusal", turn);
+      return;
+    }
+    // T12 RES-04: once the spoken questions already waiting on the Host screen reach the cap, nothing new is submitted.
+    if (this.waitingVoiceCount() >= VOICE_LIMITS.maxWaitingVoiceTasks) {
+      this.deps.journal("voice.turn", "Spoken question not submitted: voice questions already wait for review.");
+      this.speakAnswer(WAITING_VOICE_TASKS_TEXT, "refusal", turn);
+      return;
+    }
     let task: VoiceChatTask;
     try {
       task = this.deps.chat.submit(prompt, transcript);
@@ -1346,12 +1436,14 @@ export class VoiceSessionManager {
     if (task.state !== "waiting_for_approval" || task.hasMission || !task.mayLaunch) {
       // Real tools, hosted models and anything not tool-free wait on the Windows Host screen; never auto-approved (V13, V14, V42).
       // truth#4: a refused task produced no answer, so it carries no route ("Answered by" would misattribute it).
+      if (task.state === "waiting_for_approval") this.waitingVoiceTasks.set(task.taskId, collapseKey);
       this.speakAnswer(TOOLS_TEXT, "refusal", turn);
       return;
     }
     try {
       this.deps.chat.admit(task.taskId);
     } catch {
+      this.waitingVoiceTasks.set(task.taskId, collapseKey);
       this.speakAnswer(TOOLS_TEXT, "refusal", turn);
       return;
     }
@@ -1363,6 +1455,32 @@ export class VoiceSessionManager {
     };
     if (this.snap.timing) this.snap.timing = { ...this.snap.timing, admittedAt: this.now() };
     this.startInference(task.taskId, turn);
+  }
+
+  /**
+   * T12 RES-04: how many spoken questions this session refused and that still wait for review. A reviewed or finished task
+   * leaves the count (its canonical state is read here). Without the port's state, the count is kept, never guessed down.
+   */
+  private waitingVoiceCount(): number {
+    const chat = this.deps.chat;
+    if (chat.taskState) {
+      for (const id of [...this.waitingVoiceTasks.keys()]) if (chat.taskState(id) !== "waiting_for_approval") this.waitingVoiceTasks.delete(id);
+    }
+    return this.waitingVoiceTasks.size;
+  }
+
+  /**
+   * T12 RES-04 (round 2): closing voice stops only the spoken questions this session submitted that still wait for review.
+   * Agents, Missions and anything the user already reviewed are untouched. Without the port's canonical state the task is
+   * kept, never guessed as waiting, so a reviewed task is never cancelled.
+   */
+  private cancelWaitingVoiceTasks() {
+    const chat = this.deps.chat;
+    for (const id of [...this.waitingVoiceTasks.keys()]) {
+      if (!chat.taskState || chat.taskState(id) !== "waiting_for_approval") continue;
+      void Promise.resolve().then(() => chat.stop(id)).catch(() => undefined);
+    }
+    this.waitingVoiceTasks.clear();
   }
 
   private startInference(taskId: string, turn: string) {
@@ -1608,6 +1726,23 @@ export class VoiceSessionManager {
     }, VOICE_LIMITS.heldResumeMs);
   }
 
+  /**
+   * RC-05: a held reply ends with the outcome its caller decides. "resumed" continues it: a pause-off on its own generation.
+   * "interrupted" cancels it: speak.cancel for the held generation is sent unconditionally, and no pause-off is ever sent first,
+   * so the receipt and the device agree. Callers that cancel their own speech (close, mute) rely on this; a stop without an
+   * outcome cancels, so a close, mute or error is never recorded as resumed.
+   */
+  private releaseHeld(reason: string, opts: StopOptions) {
+    const hold = this.hold;
+    if (!hold) return;
+    if (opts.holdOutcome === "resumed") {
+      this.resumeHeld(reason);
+      return;
+    }
+    this.tryWorker({ op: "speak.cancel", gen: hold.gen });
+    this.clearHold("interrupted", reason);
+  }
+
   /** Resumes a held reply on its own generation. Speech is never cancelled here. */
   private resumeHeld(reason: string) {
     const hold = this.hold;
@@ -1696,9 +1831,8 @@ export class VoiceSessionManager {
       if (expired) this.spokenLog.splice(i, 1);
     }
     if (this.spokenLog.length === 0) return false;
-    const spoken = new Set<string>();
-    for (const entry of this.spokenLog) for (const token of entry.tokens) spoken.add(token);
-    return echoOverlap(text, spoken) >= VOICE_LIMITS.echoOverlap;
+    // T12 AEC-04: judged per spoken chunk (ordered runs and overlap), never across the union of everything Bunny said.
+    return echoMatch(text, this.spokenLog.map((entry) => entry.tokens), VOICE_LIMITS.echoOverlap);
   }
 
   /**
@@ -1709,6 +1843,33 @@ export class VoiceSessionManager {
     return input.overlapped && this.isEcho(text);
   }
 
+  /** T12 AEC-02: output start and end times, one window per period Bunny's output was in flight. Updated by touch(). */
+  private trackOutputWindows() {
+    const active = this.outputActive();
+    const last = this.outputWindows.at(-1);
+    if (active && (!last || last.end !== null)) {
+      this.outputWindows.push({ start: this.now(), end: null });
+      while (this.outputWindows.length > OUTPUT_WINDOWS_MAX) this.outputWindows.shift();
+    } else if (!active && last && last.end === null) {
+      last.end = this.now();
+    }
+  }
+
+  /**
+   * T12 AEC-02: an input turn is overlapped when its speech began inside an output window, or within OUTPUT_OVERLAP_TAIL_MS
+   * after one ended. A turn armed after Bunny stopped, whose onset is Bunny's own tail, is then echo-gated like the rest.
+   */
+  private overlapsOutput(onsetAt: number): boolean {
+    return this.outputWindows.some((window) => onsetAt >= window.start && (window.end === null || onsetAt <= window.end + OUTPUT_OVERLAP_TAIL_MS));
+  }
+
+  /** The Host-clock time a speech onset began: the worker's onset age is subtracted from receipt time; receipt time when absent. */
+  private onsetAt(event: { onsetMono?: number; mono?: number }): number {
+    const now = this.now();
+    if (typeof event.onsetMono === "number" && typeof event.mono === "number" && event.mono >= event.onsetMono) return now - (event.mono - event.onsetMono);
+    return now;
+  }
+
   private countEcho(input: InputTurn) {
     const receipt = this.snap.lastBargeIn;
     if (receipt && receipt.inputTurnId === input.turn) receipt.echoRejected += 1;
@@ -1717,14 +1878,34 @@ export class VoiceSessionManager {
   /** Records why the duplex lane ended. Only a user stop or a relaunch keeps the grant; everything else revokes it. */
   private recordDuplexStop(reason: DuplexEnd) {
     if (this.snap.duplex) this.snap.duplex.stopped = { reason, at: this.now() };
-    if (reason !== "user" && reason !== "relaunch") this.grantExpiresAt = null;
+    if (reason !== "user" && reason !== "relaunch") this.revokeGrant();
     this.deps.journal("voice.duplex", `Hands-free microphone released (${reason}).`);
   }
 
-  /** An explicit user start (open or listen as hands_free) creates or renews the grant. Internal paths never call this. */
-  private grantHandsFree() {
-    this.grantExpiresAt = this.now() + VOICE_LIMITS.duplexGrantMs;
+  /**
+   * An explicit user start (listen as hands_free) creates or renews the grant, and only after its validity checks pass.
+   * The grant lasts duplexGrantMs; the Host's own timer at its end stops the lane (RES-07), not only the worker's maxMs bound.
+   */
+  private renewGrant() {
+    this.cancelGrantExpiry?.();
+    const expiresAt = this.now() + VOICE_LIMITS.duplexGrantMs;
+    this.grantExpiresAt = expiresAt;
+    this.cancelGrantExpiry = this.schedule(() => {
+      this.cancelGrantExpiry = null;
+      if (this.grantExpiresAt !== expiresAt) return;
+      this.revokeGrant();
+      // RES-07: the lane ends with reason "lifetime" while it is live, and a held reply continues (the grant ended, not a barge-in).
+      if (this.duplexLane()) this.stopDuplex("lifetime", { holdOutcome: "resumed" });
+      this.touch();
+    }, VOICE_LIMITS.duplexGrantMs);
     this.touch();
+  }
+
+  /** Ends the grant and its expiry timer. A later Start click is the only way back. */
+  private revokeGrant() {
+    this.cancelGrantExpiry?.();
+    this.cancelGrantExpiry = null;
+    this.grantExpiresAt = null;
   }
 
   private grantLive(): boolean {
@@ -1733,7 +1914,7 @@ export class VoiceSessionManager {
 
   /** A duplex start without a live grant is refused: the microphone stays closed and the last stop reason says why. */
   private denyDuplexStart() {
-    this.grantExpiresAt = null;
+    this.revokeGrant();
     if (this.snap.duplex && !this.snap.duplex.stopped) this.recordDuplexStop("lifetime");
     this.touch();
   }
@@ -1741,13 +1922,15 @@ export class VoiceSessionManager {
   /** Worker exit or budget end: the duplex lane, its grant and any held reply end with the worker. */
   private endDuplexWithWorker(reason: DuplexEnd) {
     if (this.duplexLane()) this.recordDuplexStop(reason);
-    this.grantExpiresAt = null;
+    this.revokeGrant();
     this.clearHold("interrupted", reason);
     this.finishDuplexStop();
   }
 
   /** The worker's own duplex.stopped reason, mapped onto the Host's receipt set. Anything unrecognized is an error. */
   private workerStopReason(reason: string): DuplexEnd {
+    // T12 round 2: the worker's "mute" stop is a mute release, not an error, so the receipt and grant bookkeeping say so.
+    if (/^mute$/i.test(reason)) return "mute";
     return /life|max|time/i.test(reason) ? "lifetime" : "error";
   }
 
@@ -1817,11 +2000,11 @@ export class VoiceSessionManager {
    * Stops the duplex lane. The microphone truth stays on until the worker acknowledges release. Each input turn is aborted
    * with its own turn and gen, and a held reply is resumed on its own generation. The reason is recorded (a receipt).
    */
-  private stopDuplex(reason: DuplexEnd = "user"): Promise<void> {
+  private stopDuplex(reason: DuplexEnd = "user", opts: StopOptions = {}): Promise<void> {
     if (this.duplexStopping) return this.duplexStopping;
     const token = this.duplexToken;
     if (token !== null) this.recordDuplexStop(reason);
-    else if (reason !== "user" && reason !== "relaunch") this.grantExpiresAt = null;
+    else if (reason !== "user" && reason !== "relaunch") this.revokeGrant();
     this.cancelDuplexReady?.();
     this.cancelDuplexReady = null;
     this.cancelDuplexIdle?.();
@@ -1835,7 +2018,7 @@ export class VoiceSessionManager {
       this.duplexStopResolve = resolve;
     });
     const stopping = this.duplexStopping;
-    if (this.hold) this.resumeHeld("duplex_stop");
+    this.releaseHeld(reason, opts);
     for (const turn of [this.input, ...this.finalizing.values()]) {
       if (!turn) continue;
       turn.cancelDeadline?.();
@@ -1937,7 +2120,7 @@ export class VoiceSessionManager {
   private relaunchDuplex() {
     this.detach("duplex relaunch", async () => {
       const old = this.worker;
-      await this.stopDuplex("relaunch");
+      await this.stopDuplex("relaunch", { holdOutcome: "resumed" });
       if (!old || this.closing || !this.snap.open) return;
       this.relaunching = this.doRelaunch(old).finally(() => {
         this.relaunching = null;
@@ -2054,7 +2237,10 @@ export class VoiceSessionManager {
       this.lateEventsDropped += 1;
       return;
     }
-    if (this.outputActive()) input.overlapped = true;
+    // T12 AEC-02: a turn is overlapped when the user's speech was heard while output was audible. Arming and capture events
+    // alone do not count: a turn armed while a reply is still being generated would otherwise be overlapped before anyone spoke.
+    const heardSpeech = event.ev === "vad" || event.ev === "stt.partial" || event.ev === "stt.final" || event.ev === "stt.none" || (event.ev === "level" && event.speech === true);
+    if (heardSpeech && this.outputActive()) input.overlapped = true;
     switch (event.ev) {
       case "capture.started":
         if (input === this.input) {
@@ -2076,6 +2262,8 @@ export class VoiceSessionManager {
       case "vad":
         if (event.state === "speech_start") {
           input.speechOpen = true;
+          // T12 AEC-02: an onset inside an output window, or just after one ended, is Bunny's own tail: the turn is overlapped.
+          if (this.overlapsOutput(this.onsetAt(event))) input.overlapped = true;
           this.noteDuplexActivity();
           const decision = input.controller.decide({ kind: "speech_start", outputActive: this.outputActive() });
           if (decision?.action === "pause") this.holdOutput(input, event);
@@ -2204,7 +2392,7 @@ export class VoiceSessionManager {
         }
         // The worker confirmed the lane after the user's grant may already have lapsed or the mode changed: release it.
         if (this.snap.mode !== "hands_free" || this.snap.muted || this.closing || !this.grantLive()) {
-          this.stopDuplex(this.snap.muted ? "mute" : this.closing ? "close" : this.snap.mode !== "hands_free" ? "mode" : "lifetime");
+          this.stopDuplex(this.snap.muted ? "mute" : this.closing ? "close" : this.snap.mode !== "hands_free" ? "mode" : "lifetime", { holdOutcome: this.closing || this.snap.muted ? "interrupted" : "resumed" });
           return;
         }
         this.duplexStarting = false;
@@ -2227,14 +2415,19 @@ export class VoiceSessionManager {
         if (event.session !== this.duplexToken) return;
         // A worker-initiated stop is recorded here; a Host-initiated stop was recorded when it was requested.
         if (!this.duplexStopping) this.recordDuplexStop(this.workerStopReason(event.reason));
+        // RC-08: a held reply does not wait for the resume timer once the lane is gone. A lifetime end resumes it; a mute or error end cancels it.
+        if (this.hold) this.releaseHeld(this.workerStopReason(event.reason), { holdOutcome: this.workerStopReason(event.reason) === "lifetime" ? "resumed" : "interrupted" });
         this.finishDuplexStop();
         return this.touch();
       default:
         break;
     }
     // A device error on the duplex lane revokes the grant: the microphone stays closed until the user starts hands-free again.
+    // RC-05 (decided): a capture error on the duplex lane cancels a held reply and any reply still in flight. The microphone that
+    // would judge a barge-in is gone, so a resume would play a reply nobody can interrupt; the cancel is the fail-safe.
     if (event.ev === "capture.error" && this.duplexLane()) {
       this.stopDuplex("error");
+      if (this.outputActive()) this.bargeIn("host_disconnect", "capture_error");
       this.setError(event.code, event.message, deviceStateFor(event.code));
       return;
     }
@@ -2300,10 +2493,10 @@ export class VoiceSessionManager {
         if (this.snap.timing && this.snap.timing.firstPlaybackAt === null) this.snap.timing = { ...this.snap.timing, firstPlaybackAt: this.now() };
         this.markSpokenPlayed(event.turn, event.gen, event.seq);
         this.noteDuplexActivity();
-        // A held reply stays silent until its resume receipt: a start that lands during the hold is not audible output.
-        if (this.hold) break;
+        // RC-01: the state tracks output in flight, so a chunk that starts during a hold still leaves PROCESSING. Only the
+        // audibility flag waits: a held reply is not audible until its resume receipt (playback.paused on:false).
         if (this.fsm.state === "PROCESSING" || this.fsm.state === "SPEAKING") {
-          this.snap.playing = true;
+          if (!this.hold) this.snap.playing = true;
           this.setState("SPEAKING");
         }
         break;
@@ -2331,11 +2524,20 @@ export class VoiceSessionManager {
           if (this.fsm.state === "SPEAKING") this.setState("PROCESSING");
         } else {
           if (this.snap.timing) this.snap.timing = { ...this.snap.timing, completedAt: this.snap.timing.completedAt ?? this.now() };
-          if (this.fsm.state === "SPEAKING") this.settleIdle();
+          // RC-01: a reply that finished playing settles from PROCESSING too, so a stuck state can never keep output "active".
+          if (this.fsm.state === "SPEAKING" || this.fsm.state === "PROCESSING") this.settleIdle();
         }
         this.noteDuplexActivity();
         break;
       case "playback.error":
+        // RC-02: a hold on the failed generation releases the worker's pause before the hold is dropped. Otherwise the worker keeps
+        // pausing every later chunk of that generation, and playback waits forever.
+        if (this.hold && event.gen === this.hold.gen) this.tryWorker({ op: "speak.pause", gen: this.hold.gen, on: false });
+        // RC-07: chunks that played before the failure end their echo window now; chunks that never played are not heard.
+        if (event.turn !== null && event.gen !== null) {
+          this.endSpokenPlayback(event.turn, event.gen);
+          this.forgetUnplayed(event.turn, event.gen);
+        }
         this.snap.playing = false;
         this.outstanding = 0;
         this.clearHold("interrupted", "playback_error");
@@ -2621,6 +2823,7 @@ export class VoiceSessionManager {
     this.snap.state = this.fsm.state;
     this.snap.updatedAt = this.now();
     this.snap.outputHeld = this.hold !== null;
+    this.trackOutputWindows();
     if (this.snap.duplex) {
       this.snap.duplex.starting = this.duplexStarting;
       this.snap.duplex.releasing = this.duplexStopping !== null;

@@ -16,6 +16,8 @@ export type VoiceIntent = {
   normalized: string;
   /** T12 F4: what a follow-up asks about (finished, running, progress, doing, verification); absent otherwise. */
   focus?: string;
+  /** T12-AUTH-04: "pause" or "resume" aimed at a Mission. Missions have no voice pause or resume; the answer says so. */
+  missionVerb?: string;
 };
 
 const WAKE = /^(?:(?:hey|ok|okay)\s+)?(?:bunny|bunnie|bunni|honey bunny)\b[\s,.!?:]*/;
@@ -54,6 +56,36 @@ const ORDINALS: [RegExp, number][] = [
   [/\b(fifth|5th|five|number five)\b/, 5],
 ];
 
+/**
+ * T12-AUTH-01: the one inflection-aware lexicon of destructive, publishing, configuration, transfer, execution and approval
+ * verbs. Each stem matches as \bstem\w*\b, so "deleting", "wiping", "force pushing", "reinstalling" and "publishing" count the
+ * same as their base forms. SENSITIVE (chat), EXEC and the draft check (draftAction) all read this table, so a draft and a chat
+ * turn judge the same words. A stem that is also an ordinary status word ("running", "changed", "shared") is never judged by
+ * itself: a status use with no object is not sensitive (STATUS_WORD_USE), and an imperative with its object is (EXEC).
+ */
+// T12-AUTH-01 (round 2): "merg" covers merge, merges, merging and merger. Collision-prone stems are whole inflections, so
+// "changelog", "startup" and "dropdown" are not sensitive words.
+const DIRECT_SENSITIVE_ALTS = ["delet\\w*", "eras\\w*", "wip\\w*", "destroy\\w*", "purg\\w*", "push\\w*", "publish\\w*", "deploy\\w*", "overwrit\\w*", "revert\\w*", "merg\\w*", "commit\\w*", "upload\\w*", "releas\\w*"];
+const SENSITIVE_ALTS = [
+  "delet\\w*", "wip\\w*", "eras\\w*", "destroy\\w*", "purg\\w*", "push\\w*", "publish\\w*", "deploy\\w*", "launch\\w*", "drop(?:s|ped|ping)?", "kill\\w*", "terminat\\w*",
+  "overwrit\\w*", "revert\\w*", "reinstall\\w*", "reboot\\w*", "format\\w*", "chang(?:e|es|ed|ing)", "modif\\w*", "configur\\w*", "send\\w*", "shar(?:e|es|ed|ing)", "upload\\w*",
+  "releas\\w*", "ship\\w*", "commit\\w*", "merg\\w*", "install\\w*", "uninstall\\w*", "run(?:s|ning)?", "execut\\w*", "approv\\w*", "grant\\w*", "authori[sz]\\w*",
+];
+const DIRECT_SENSITIVE_WORD = new RegExp(String.raw`\b(?:${DIRECT_SENSITIVE_ALTS.join("|")})\b`);
+const SENSITIVE_WORD = new RegExp(String.raw`\b(?:${SENSITIVE_ALTS.join("|")})\b`);
+/**
+ * A status use of a shared stem with no object: "is the agent running", "the step was changed", "still running right now",
+ * "pause the running agent called Builder" (the Agent noun is the object of the control, not of the status word).
+ */
+const STATUS_WORD_USE = /\b(?:run|running|runs|chang(?:e|es|ed|ing)|shar(?:e|es|ed|ing))\b(?=\s*(?:$|[?!.,;]|\s(?:in|on|at|for|since|from|recently|yet|still|now|right|already|currently|today|lately|agents?|missions?|tasks?|team)\b))/g;
+/** An agent, mission or task stop ("kill the research agent") is a stop proposal, never a lexicon hit. */
+const AGENT_STOP_USE = /\b(?:kill|kills|killed|killing|terminat\w*)\s+(?:(?:the|my|this|that|a|an)\s+)?(?:[\w'-]+\s+)?(?:agents?|missions?|tasks?)\b/g;
+
+/** True when the wording uses a lexicon word in a sensitive sense. Shared by the chat path and the draft path. */
+function sensitiveWord(text: string): boolean {
+  return SENSITIVE_WORD.test(text.replace(STATUS_WORD_USE, " ").replace(AGENT_STOP_USE, " "));
+}
+
 // Sensitive phrasing: approvals, permissions, shell/commands, deletion, publishing, settings and credentials,
 // scope and mission widening, owner or administrator claims, safety overrides and prompt-injection phrasings.
 const SENSITIVE: RegExp[] = [
@@ -62,11 +94,16 @@ const SENSITIVE: RegExp[] = [
   /\bgive (me |it |the agent |bunny |them )?(access|permission|permissions|power|rights)\b/,
   /\b(run|execute|exec|launch|invoke|start|open)\b.{0,60}\b(command|commands|shell|script|scripts|code|powershell|cmd|bash|terminal|program|executable|npm|git|python|node|rm|del|curl|installer)\b/,
   /\b(powershell|cmd\.exe|bash|shell command|terminal command|sudo|rm|rmdir|del|format c|rm -rf)\b(?!\w)/,
-  /\b(delete|erase|wipe|destroy|purge)\b/,
+  // T12-AUTH-01: destructive, publishing and overwrite verbs in every inflection. Direct stems only; status words such as
+  // "running" or "changed" are judged by their object (below), never by themselves.
+  DIRECT_SENSITIVE_WORD,
   /\bremove\b.{0,40}\b(file|files|folder|folders|directory|directories|repo|repository|database|branch|data|everything|all)\b/,
-  /\b(push|publish|deploy|commit|merge|upload|release)\b/,
-  /\b(send|email|mail|share|post|tweet)\b.{0,40}\b(to|outside|externally|online|the internet|anyone|everyone|them|him|her)\b/,
-  /\b(change|switch|set|update|edit|modify|configure|reconfigure|alter)\b.{0,40}\b(provider|providers|settings?|config|configuration|credentials?|password|passwords|token|tokens|api key|key|model|models|permissions?|policy|policies)\b/,
+  // T12-AUTH-01: a history rewrite or a forced push, with or without a draft prefix ("git reset hard").
+  /\bgit\s+(?:reset|clean|rebase|force|checkout\s+--)\b/,
+  // T12-AUTH-01: an outbound email is a send ("email the report", "email my boss"); "check my emails" is not.
+  /\b(?:email|mail)\w*\s+(?:the|my|this|that|these|those|a|an|it|them|him|her|everyone)\b/,
+  /\b(send|shar|email|mail|share|post|tweet)\w*\b.{0,40}\b(to|outside|externally|online|the internet|anyone|everyone|them|him|her)\b/,
+  /\b(chang|switch|set|update|edit|modif|configur|reconfigur|alter)\w*\b.{0,40}\b(provider|providers|settings?|config|configuration|credentials?|password|passwords|token|tokens|api key|key|model|models|permissions?|policy|policies)\b/,
   /\b(password|passwords|passcode|secret|secrets|credential|credentials|api key|access token|bearer token)\b/,
   /\b(widen|expand|extend|increase|broaden|add)\b.{0,30}\b(scope|access|permissions?|authority|reach)\b/,
   /\bscope\b/,
@@ -113,12 +150,15 @@ const QUESTION = /^(?:how (?:do|does|did|can|could|should|would) (?:i|we|one|it|
 
 /** authz#1: imperative command execution against the machine or a project, with or without a listed noun. */
 const EXEC: RegExp[] = [
-  /\b(?:run|execute|launch|install|uninstall|restart|reboot|shut ?down|power off|download|spawn|invoke)\s+\S/,
+  // T12-AUTH-01: imperatives only ("run", "install", "reboot the machine"); the -ing and -ed forms are status words.
+  /\b(?:run|runs|execute|executes|launch|install|uninstall|restart|reboot|reinstall|shut ?down|power off|download|spawn|invoke|ship)\s+\S/,
+  // T12-AUTH-01: an imperative with a machine or data object: "format", "kill" and "drop" with their targets.
+  /\bdrop(?:s|ped|ping)?\s+(?:(?:the|all|my|our|this|that|every)\s+)?(?:[\w'-]+\s+)?(?:tables?|databases?|db|schema|collections?|indexes|index|columns?|rows?|data)\b/,
   // R3-intent#1: starting machine or project work ("start the server", "kick off the build", "ship it").
   /\b(?:start|starts|starting|kick off|kicks off|fire up|spin up|boot up|boot)\s+(?:(?:the|my|this|that|a|an|our)\s+)?(?:[\w'-]+\s+)?(?:server|servers|build|builds|app|application|service|services|process|tests?|suite|deployment|deploy|container|containers|vm|machine|script|job|jobs|pipeline|program|installer|update|upgrade|backup|sync|upload|download)\b/,
   /\bship (?:it|this|that|the (?:build|release|app|code|update))\b/,
   // "kill the agent" is an agent stop (authz#2), so kill and terminate refuse only when no agent or mission is named.
-  /\b(?:kill|terminate)\s+(?!(?:(?:the|my|this|that|a|an)\s+)?(?:[\w'-]+\s+)?(?:agents?|missions?|tasks?)\b)\S/,
+  /\b(?:kill(?:s|ed|ing)?|terminat(?:e|es|ed|ing)?)\s+(?!(?:(?:the|my|this|that|a|an)\s+)?(?:[\w'-]+\s+)?(?:agents?|missions?|tasks?)\b)\S/,
   /\b(?:build|test|deploy|compile)\s+(?:the|my|this|that)\s+(?:project|repo|repository|app|code|server|tests?|suite|package|machine|service|computer)\b/,
   /\bformat\s+(?:(?:the|my|this|that)\s+)?(?:drive|disk|partition|usb|volume|[a-z]:)/,
   /\btype\b.{0,40}\b(?:into|in)\b.{0,20}\b(?:terminal|shell|powershell|cmd|console|command prompt|prompt)\b/,
@@ -156,6 +196,8 @@ const CONFIRM_TAIL = /^(?:(?:it|that|this|please|now|thanks|thank you|okay|ok|su
 const CANCEL = /^(?:cancel(?:\s+(?:it|that|this|please|now|the (?:(?:pending|current|active|last) )?(?:proposal|pause|confirmation)))*\s*$|(?:never mind|nevermind|forget it|forget that|no|nope|no thanks|don't|do not)(?=$|[\s,.!?;:]))/;
 
 const CONTROL = /^(pause|resume|continue|stop|halt|unpause)\b\s*(.*)$/;
+/** T12-AUTH-04: a pause or resume whose object is a Mission ("pause the mission", "resume the mission alpha"). */
+const MISSION_PAUSE = /^(pause|resume|continue|unpause|halt)\b.*\bmissions?\b/;
 const LEAD_YES = /^(?:yes|yeah|yep|sure|ok|okay)[ ,]+(?=(?:pause|resume|continue|stop|halt|unpause)\b)/;
 
 const STATUS: RegExp[] = [
@@ -251,6 +293,8 @@ export function isConfirmLead(normalized: string): boolean {
 function isSensitive(normalized: string): boolean {
   if (SENSITIVE.some((re) => re.test(normalized))) return true;
   if (QUESTION.test(normalized)) return false;
+  // T12-AUTH-01 (round 2): the chat path reads the same lexicon as the draft path, so one verb gets one verdict.
+  if (sensitiveWord(normalized)) return true;
   if (SYN_WINDOW.some((re) => re.test(normalized))) return true;
   if (SYN_STANDALONE.some((re) => re.test(normalized))) return true;
   if (EXEC.some((re) => re.test(normalized))) return true;
@@ -315,13 +359,20 @@ function missionControlRest(normalized: string): string | null {
  * objective (3-200 characters) or null.
  */
 const DRAFT = /\b(prepare|draft|sketch|outline|write up|make|create|plan)\s+(?:(?:a|an|the|my|me|new|another)\s+)*(?:plan|mission|missions)\b\s*(?:(?:for|to|about|that|on|of)\s+)?(.+)$/;
-const DRAFT_SUBJECT_WORDS = /\b(release|releases|mission|missions|delegate)\b/g;
+// T12-AUTH-01: "release" is not a subject word; "prepare a plan to release the app" is judged as the sensitive verb it is.
+const DRAFT_SUBJECT_WORDS = /\b(mission|missions|delegate)\b/g;
 /**
- * T12 F3 (round 2): a draft that also asks to start, begin, proceed, go live, activate, enable, launch, run, execute, approve,
- * deploy, publish, push or delete is refused. The mission-noun rule is not enough on its own: "create a mission and start it"
- * loses its noun to the subject-word strip, so the action words are judged on the whole wording.
+ * T12 F3 (round 2): a draft that also asks to start, begin, proceed, go live, activate, enable or to use any word of the shared
+ * lexicon (run, execute, approve, deploy, publish, push, delete, wipe, change, send, kill, drop, release ...) is refused. The
+ * mission-noun rule is not enough on its own: "create a mission and start it" loses its noun to the subject-word strip, so the
+ * action words are judged on the whole wording, in every inflection.
  */
-const DRAFT_ACTION = /\b(start|starts|starting|begin|begins|proceed|proceeds|go live|activate|activates|enable|enables|launch|launches|run|runs|execute|executes|approve|approves|deploy|deploys|publish|publishes|push|pushes|delete|deletes)\b/;
+// T12-AUTH-01 (round 2): whole inflections, so "startup pitch" is a draft subject and not a start request.
+const DRAFT_START = /\b(?:start(?:s|ed|ing)?|begin(?:s|ning)?|began|proceed(?:s|ed|ing)?|go live|activate[sd]?|activating|enable[sd]?|enabling)\b/;
+/** A draft that asks to start or to use a sensitive lexicon word, in any inflection. */
+function draftAction(normalized: string): boolean {
+  return DRAFT_START.test(normalized) || sensitiveWord(normalized);
+}
 
 function draftObjective(normalized: string): string | null {
   if (QUESTION.test(normalized)) return null;
@@ -330,7 +381,7 @@ function draftObjective(normalized: string): string | null {
   const objective = match[2].replace(/[\s.!?,;:]+$/, "").trim();
   if (objective.length < 3 || objective.length > 200) return null;
   if (AGENT_NOUN.test(normalized)) return null;
-  if (DRAFT_ACTION.test(normalized)) return null;
+  if (draftAction(normalized)) return null;
   if (AUTHORITY.some((re) => re.test(normalized))) return null;
   // The draft's own nouns are its subject, not authority; every other rule judges the rest of the wording as usual.
   if (isSensitive(normalized.replace(DRAFT_SUBJECT_WORDS, " "))) return null;
@@ -389,7 +440,7 @@ export function classifyTranscript(
   const draft = draftObjective(normalized);
   if (draft !== null) return make("mission_draft", draft);
   // T12 F3 (round 2): a draft request that also asks to start or approve it is refused, never chatted or drafted.
-  if (!QUESTION.test(normalized) && DRAFT.test(normalized) && DRAFT_ACTION.test(normalized)) return make("sensitive_refused");
+  if (!QUESTION.test(normalized) && DRAFT.test(normalized) && draftAction(normalized)) return make("sensitive_refused");
   // V41: a free-form redirect of a running agent is explicitly unsupported; authority claims inside it are still refused.
   if (!QUESTION.test(normalized) && REDIRECT.some((re) => re.test(normalized)) && !AUTHORITY.some((re) => re.test(normalized) || re.test(raw))) return make("redirect_unsupported");
   if (isSensitive(normalized) || (!QUESTION.test(normalized) && isSensitive(raw))) return make("sensitive_refused");
@@ -424,6 +475,10 @@ export function classifyTranscript(
   if (MODEL.some((re) => re.test(normalized))) return make("agent_model");
   if (APPROVALS.some((re) => re.test(normalized))) return make("agent_approvals");
   if (LAST_MISSION.some((re) => re.test(normalized))) return make("agent_last_mission");
+  // T12-AUTH-04: "pause the mission" or "resume the mission" is a Mission control, never an Agent pause or resume. Missions are
+  // paused per Agent or on the Windows Host screen, so the answer says that and no proposal is made.
+  const missionPause = MISSION_PAUSE.exec(normalized);
+  if (missionPause && !AGENT_NOUN.test(normalized)) return { ...make("mission_control"), missionVerb: missionPause[1] };
   // "yes pause it" without a pending proposal is an ordinary control phrase; the leading "yes" is only a lead-in.
   const control = CONTROL.exec(pending ? normalized : normalized.replace(LEAD_YES, ""));
   if (control) {

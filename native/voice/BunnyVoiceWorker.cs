@@ -1318,22 +1318,51 @@ internal sealed class AecSource : IFrameSource
 // updates it while no speech is in progress (DuplexInput owns that update; a standalone Vad owns its own instance).
 // Floor: a min-follower over the last 500 ms with slow attack and fast release. A single loud event never raises it, while
 // stationary ambient above MinThreshold is learned, so stationary noise cannot count as speech forever.
-// Residual: a slow EMA of the AEC output RMS while the worker's own speaker is audible, plus a 260 ms reverb tail. It is
-// null when nothing of ours is playing. While it is set the onset threshold is also at least residual * 3.
+// Residual: a slow EMA of the AEC output RMS while the worker's own speaker is audible, held for ResidualHoldFrames after
+// the output is last audible. It is null when nothing of ours is playing. While it is held the onset threshold is also at
+// least ResidualGain x the effective residual.
+// T12 (AEC-01, AEC-05, AEC-06): the effective residual is never below ResidualFloor, so a quiet first frame cannot seed it
+// low, and it is capped at ResidualCap, so a loud user is not absorbed into it. Round 2 (verifier): the residual is seeded
+// from the median of the first ResidualSeedFrames output-window frames (never from one frame), and it jumps to the cap when
+// the median of the latest frames is above the learning band. So a loud steady echo is learned even after a quiet start.
+// The EMA learns only from frames between ResidualLearnLow and ResidualLearnHigh: silence never decays it (a paused chunk
+// is silent on the device while still in flight), and user speech above the band never raises it. The threshold is then
+// between 0.004 and 0.006 while output is audible or held, so echo at 0.0045 or 0.005 is never an onset, and user speech
+// at about 0.008 still starts a turn.
 internal sealed class AmbientFloor
 {
     public const double MinFloor = 0.0002, MaxFloor = 0.005;
     public const int WindowFrames = 25;
-    public const double AttackAlpha = 0.1, ReleaseAlpha = 0.2, ResidualAlpha = 0.05, ResidualGain = 3.0;
+    public const double AttackAlpha = 0.1, ReleaseAlpha = 0.2, ResidualAlpha = 0.05;
+    public const double ResidualGain = 2.0, ResidualFloor = 0.002, ResidualCap = 0.003;
+    public const double ResidualSilentFraction = 0.5, ResidualAdaptGain = 1.5;
+    // Round 2: the band the EMA learns from is absolute (not relative to the floor-based basis). Its upper edge is
+    // ResidualAdaptGain x ResidualCap, so the learning band reaches the cap's echo level (AEC-05 verifier round 2).
+    public const double ResidualLearnLow = ResidualSilentFraction * ResidualFloor;
+    public const double ResidualLearnHigh = ResidualAdaptGain * ResidualCap;
+    public const int ResidualSeedFrames = 5;
+    // Round 2: the pre-roll taint ceiling. An output-window frame at or above this level is user speech, not our echo: the
+    // onset threshold never exceeds ResidualGain x ResidualCap, so such a frame is above any threshold the echo can set.
+    public const double TaintCeiling = ResidualGain * ResidualCap;
+    // The reverb tail (260 ms) after our output: frames captured here are echo for pre-roll purposes (see DuplexInput).
     public const int OutputTailFrames = 13;
+    // T12 (AEC-01 c): the residual is held across short inter-chunk gaps and pauses (1.5 s after the output was last audible).
+    public const int ResidualHoldFrames = 75;
     readonly object gate = new object();
     readonly double[] window = new double[WindowFrames];
     int windowCount;
     int windowNext;
     double floor;
+    // Session memory: the learned residual is kept across holds, so a new reply starts from what the session has learned.
     double residual;
-    bool residualSet;
+    // Round 2 (AEC-01): the residual is seeded once per session, from the median of the first output-window frames.
+    bool residualSeeded;
+    readonly double[] seedRing = new double[ResidualSeedFrames];
+    readonly double[] seedSort = new double[ResidualSeedFrames];
+    int seedCount;
+    int seedNext;
     int tail;
+    int hold;
     // Set by the owning Vad while a turn is in speech. Read by DuplexInput when it observes frames.
     public volatile bool Speaking;
 
@@ -1343,17 +1372,39 @@ internal sealed class AmbientFloor
 
     public double Floor { get { lock (gate) { return floor; } } }
     public bool OutputActive { get { lock (gate) { return tail > 0; } } }
-    public double? Residual { get { lock (gate) { return tail > 0 && residualSet ? residual : (double?)null; } } }
+    public double? Residual { get { lock (gate) { return hold > 0 ? EffectiveLocked() : (double?)null; } } }
     public double OnsetThreshold { get { lock (gate) { return ThresholdLocked(); } } }
     // Quietest frame of the last WindowFrames (0 before any frame). A turn takes it at onset as its in-speech quiet reference.
     public double WindowMin { get { lock (gate) { if (windowCount == 0) return 0; double quiet = double.MaxValue; for (int i = 0; i < windowCount; i++) if (window[i] < quiet) quiet = window[i]; return quiet; } } }
+
+    // Caller holds gate. The residual the threshold uses: learned, but never below the floor and never above the cap.
+    double EffectiveLocked()
+    {
+        return Math.Min(ResidualCap, Math.Max(ResidualFloor, residual));
+    }
 
     // Caller holds gate.
     double ThresholdLocked()
     {
         double t = Math.Max(floor * 3.0, Vad.MinThreshold);
-        if (tail > 0 && residualSet) t = Math.Max(t, residual * ResidualGain);
+        if (hold > 0) t = Math.Max(t, EffectiveLocked() * ResidualGain);
         return t;
+    }
+
+    // Caller holds gate. Round 2 (AEC-01): the last ResidualSeedFrames output-window frames, for the multi-frame seed.
+    void PushSeedLocked(double rms)
+    {
+        seedRing[seedNext] = rms;
+        seedNext = (seedNext + 1) % ResidualSeedFrames;
+        if (seedCount < ResidualSeedFrames) seedCount++;
+    }
+
+    // Caller holds gate and the ring is full. The median (the middle of five), so one spike or one quiet frame does not seed it.
+    double SeedMedianLocked()
+    {
+        Array.Copy(seedRing, seedSort, ResidualSeedFrames);
+        Array.Sort(seedSort);
+        return seedSort[ResidualSeedFrames / 2];
     }
 
     // Session start: the quietest frame of the calibration window becomes the floor (bounded).
@@ -1370,15 +1421,29 @@ internal sealed class AmbientFloor
             window[windowNext] = rms;
             windowNext = (windowNext + 1) % WindowFrames;
             if (windowCount < WindowFrames) windowCount++;
-            if (output) tail = OutputTailFrames;
-            else if (tail > 0) { tail--; if (tail == 0) residualSet = false; }
-            if (speaking) return;
-            if (tail > 0)
+            if (output) { tail = OutputTailFrames; hold = ResidualHoldFrames; }
+            else
             {
-                // Our own output is audible: the residual model owns this window and the floor holds, so echo cannot lift
-                // the ambient estimate. Frames above the threshold are not echo-like and are never averaged in.
-                if (!residualSet) { residual = rms; residualSet = true; }
-                else if (rms <= ThresholdLocked()) residual += (rms - residual) * ResidualAlpha;
+                if (tail > 0) tail--;
+                if (hold > 0) hold--;
+            }
+            if (speaking) return;
+            if (hold > 0)
+            {
+                // Our own output is held: the residual model owns this window and the floor holds, so echo cannot lift the
+                // ambient estimate. T12 (AEC-01/05): the residual is never seeded from one frame, silence does not decay it,
+                // and only frames inside the learning band are averaged in.
+                if (output) PushSeedLocked(rms);
+                if (seedCount == ResidualSeedFrames)
+                {
+                    // Round 2: seed once from the multi-frame median. Afterwards, a median above the learning band means the
+                    // echo is louder than the EMA can follow from here (a quiet start), so the residual jumps to the cap.
+                    double median = SeedMedianLocked();
+                    if (!residualSeeded) { residual = Math.Min(ResidualCap, median); residualSeeded = true; }
+                    else if (median > ResidualLearnHigh) residual = ResidualCap;
+                }
+                if (rms >= ResidualLearnLow && rms <= ResidualLearnHigh)
+                    residual = Math.Min(ResidualCap, residual + (rms - residual) * ResidualAlpha);
                 return;
             }
             double quiet = double.MaxValue;
@@ -1403,7 +1468,10 @@ internal sealed class DuplexInput
     readonly Func<Func<bool>, IFrameSource> open;
     readonly bool fixture;
     readonly Func<bool> outputAudible;
-    readonly Queue<byte[]> preRoll = new Queue<byte[]>();
+    // T12 (AEC-02): each pre-roll frame keeps its capture time and whether our output was audible (or in its reverb tail)
+    // when it was captured. A tainted frame is never replayed into a new turn: it is echo of our own speech.
+    struct PreRollFrame { public byte[] Data; public long Mono; public bool Tainted; }
+    readonly Queue<PreRollFrame> preRoll = new Queue<PreRollFrame>();
     readonly AmbientFloor ambient = new AmbientFloor(AmbientFloor.MinFloor);
     public volatile bool StopFlag;
     public volatile bool Ready;
@@ -1419,6 +1487,8 @@ internal sealed class DuplexInput
     public DuplexInput(string id, long lifetime, Func<Func<bool>, IFrameSource> factory, bool isFixture, Func<bool> outputAudible)
     { session = id; maxMs = lifetime; open = factory; fixture = isFixture; this.outputAudible = outputAudible; }
     public AmbientFloor Ambient { get { return ambient; } }
+    // The reason the capture loop ended with (the duplex.stopped reason). Set when the loop has finished; read by the selftest.
+    public string EndReason { get; private set; }
     public void Start() { thread = new Thread(Run); thread.IsBackground = true; thread.Start(); }
     // The attached capture is finished first, with the stop's own reason, so closing its frames is never read as a lost device.
     public void Stop(string reason = "abort")
@@ -1441,7 +1511,14 @@ internal sealed class DuplexInput
             if (!Ready || StopFlag) throw new VoiceFault("AEC_UNAVAILABLE", "full-duplex capture is not ready");
             if (active != null && !active.Closed) throw new VoiceFault("DEVICE_BUSY", "recognition capture is already attached");
             active = new TurnFrames();
-            while (preRoll.Count > 0) { byte[] frame = preRoll.Dequeue(); active.Push(frame); Array.Clear(frame, 0, frame.Length); }
+            while (preRoll.Count > 0)
+            {
+                PreRollFrame old = preRoll.Dequeue();
+                // T12 (AEC-02): frames captured while our output was audible, or in its reverb tail, are dropped (zeroed),
+                // never replayed. The rest keep their capture time, so onsets are measured from when they were heard.
+                if (!old.Tainted) active.Push(old.Data, old.Mono);
+                Array.Clear(old.Data, 0, old.Data.Length);
+            }
             return active;
         }
     }
@@ -1475,8 +1552,13 @@ internal sealed class DuplexInput
             if (!fixture && aec == null) throw new VoiceFault("AEC_UNAVAILABLE", "no acoustic echo canceller");
             int calibrated = 0;
             double quietest = double.MaxValue;
-            while (!Cancelled && Out.Clock.ElapsedMilliseconds - start < maxMs)
+            bool timedOut = false;
+            while (true)
             {
+                // T12 (PRIV-03, round 2): the exit cause is recorded where the loop ends. The lifetime bound is checked first, so
+                // a mute that coincides with an expired bound is reported as the lifetime (the bound ran out; see the selftest).
+                if (Out.Clock.ElapsedMilliseconds - start >= maxMs) { timedOut = true; break; }
+                if (Cancelled) break;
                 int st = source.Read(frame);
                 if (st < 0) throw new VoiceFault("DEVICE_LOST", "AEC capture stopped delivering samples");
                 if (st == 0) { Thread.Sleep(1); continue; }
@@ -1485,12 +1567,19 @@ internal sealed class DuplexInput
                 lock (gate)
                 {
                     bool attached = active != null && !active.Closed;
+                    long mono = Out.Clock.ElapsedMilliseconds;
+                    // Echo of our own output: audible now, or within the 13-frame reverb tail that ends at this frame. Read before
+                    // Observe, so the tail covers exactly OutputTailFrames frames after the last audible one. Round 2 (AEC-02
+                    // LOW): a frame at or above TaintCeiling is user speech talking over the output, not echo the threshold can
+                    // absorb, so it is kept for a turn armed later (its onset is then timed from its capture time).
+                    bool tainted = (output || ambient.OutputActive) && rms < AmbientFloor.TaintCeiling;
                     ambient.Observe(rms, attached && ambient.Speaking, output);
-                    if (attached) active.Push(frame);
+                    if (attached) active.Push(frame, mono);
                     else
                     {
-                        preRoll.Enqueue((byte[])frame.Clone());
-                        while (preRoll.Count > PrerollFrames) { byte[] old = preRoll.Dequeue(); Array.Clear(old, 0, old.Length); }
+                        PreRollFrame kept = new PreRollFrame { Data = (byte[])frame.Clone(), Mono = mono, Tainted = tainted };
+                        preRoll.Enqueue(kept);
+                        while (preRoll.Count > PrerollFrames) { PreRollFrame old = preRoll.Dequeue(); Array.Clear(old.Data, 0, old.Data.Length); }
                     }
                 }
                 if (!Ready)
@@ -1514,7 +1603,9 @@ internal sealed class DuplexInput
                     if (!aec.SameEndpoints()) throw new VoiceFault("DEVICE_LOST", "audio endpoint changed; explicitly start voice again");
                 }
             }
-            if (!StopFlag) reason = "lifetime";
+            // T12 (PRIV-03): the loop also ends when the microphone is muted. That is a mute, not the lifetime bound. The cause
+            // is the one recorded at the loop's exit, not the live Muted flag, which may have changed since.
+            if (!StopFlag) reason = timedOut ? "lifetime" : "mute";
         }
         catch (DuplexCancelled)
         {
@@ -1547,27 +1638,31 @@ internal sealed class DuplexInput
                 }
             }
             try { if (source != null) source.Close(); } catch { }
-            lock (gate) { if (active != null) active.Close(); while (preRoll.Count > 0) { byte[] old = preRoll.Dequeue(); Array.Clear(old, 0, old.Length); } }
+            lock (gate) { if (active != null) active.Close(); while (preRoll.Count > 0) { PreRollFrame old = preRoll.Dequeue(); Array.Clear(old.Data, 0, old.Data.Length); } }
+            EndReason = reason;
             if (captureReleased) Guard.Emit(Out.Ev("duplex.stopped", "session", session, "reason", reason));
             if (periodBegun) timeEndPeriod(1);
         }
     }
 
     // One input turn's view of the continuous frames. Bounded: a consumer that falls more than 5 s behind is a BUFFER_LIMIT.
-    sealed class TurnFrames : IFrameSource
+    internal sealed class TurnFrames : IFrameSource
     {
         const int MaxFrames = 250;
         readonly object gate = new object();
-        readonly Queue<byte[]> frames = new Queue<byte[]>();
+        readonly Queue<PreRollFrame> frames = new Queue<PreRollFrame>();
         public bool Closed;
         bool overflow;
-        public void Push(byte[] frame)
+        long lastMono = -1;
+        // T12 (AEC-02): the capture time of the frame last read. A replayed pre-roll frame keeps the time it was heard.
+        public long LastMono { get { lock (gate) { return lastMono; } } }
+        public void Push(byte[] frame, long mono)
         {
             lock (gate)
             {
                 if (Closed) return;
                 if (frames.Count >= MaxFrames) { overflow = true; return; }
-                frames.Enqueue((byte[])frame.Clone());
+                frames.Enqueue(new PreRollFrame { Data = (byte[])frame.Clone(), Mono = mono, Tainted = false });
             }
         }
         public int Read(byte[] frame)
@@ -1576,10 +1671,14 @@ internal sealed class DuplexInput
             {
                 if (overflow) throw new VoiceFault("BUFFER_LIMIT", "continuous recognition queue exceeded 5 seconds");
                 if (frames.Count == 0) return Closed ? -1 : 0;
-                byte[] next = frames.Dequeue(); Buffer.BlockCopy(next, 0, frame, 0, frame.Length); Array.Clear(next, 0, next.Length); return 1;
+                PreRollFrame next = frames.Dequeue();
+                Buffer.BlockCopy(next.Data, 0, frame, 0, frame.Length);
+                Array.Clear(next.Data, 0, next.Data.Length);
+                lastMono = next.Mono;
+                return 1;
             }
         }
-        public void Close() { lock (gate) { Closed = true; while (frames.Count > 0) { byte[] frame = frames.Dequeue(); Array.Clear(frame, 0, frame.Length); } } }
+        public void Close() { lock (gate) { Closed = true; while (frames.Count > 0) { PreRollFrame frame = frames.Dequeue(); Array.Clear(frame.Data, 0, frame.Data.Length); } } }
     }
 }
 
@@ -2167,6 +2266,9 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
 
     // Test-only: whether the capture thread is still running.
     internal bool CaptureAliveForTest { get { Thread c = captureThread; return c != null && c.IsAlive; } }
+    // Test seam (selftest only): the onsetMono of the duplex speech_start this turn emitted (-1 before any).
+    long onsetMonoForTest = -1;
+    internal long OnsetMonoForTest { get { lock (gate) { return onsetMonoForTest; } } }
 
     public void StartCapture(IFrameSource source)
     {
@@ -2239,6 +2341,10 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
             {
                 int st = source.Read(frame);
                 if (st == 0) { Thread.Sleep(2); continue; }
+                // T12 (AEC-02): onsets are timed from when the frame was captured. A replayed pre-roll frame keeps its time.
+                long frameMono = Out.Clock.ElapsedMilliseconds;
+                DuplexInput.TurnFrames timed = source as DuplexInput.TurnFrames;
+                if (timed != null && st > 0) frameMono = timed.LastMono;
                 if (st < 0)
                 {
                     // A capture already finishing (stop, mute, abort) ends quietly: its reason is the one it was finished with.
@@ -2266,7 +2372,7 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
                 }
                 double rms = Math.Sqrt(sumSq / (Consts.FrameBytes / 2));
                 if (Duplex) vad.PauseMs = EndpointPause();
-                if (Duplex && !vad.InSpeech && vad.AboveMs == 0 && rms > vad.Threshold) onsetWindowMono = Out.Clock.ElapsedMilliseconds;
+                if (Duplex && !vad.InSpeech && vad.AboveMs == 0 && rms > vad.Threshold) onsetWindowMono = frameMono;
                 int ev = vad.Feed(rms, MsSinceEvidence());
                 PublishOnset(vad);
                 agc.Apply(frame, fed, rms, vad.InSpeech);
@@ -2284,6 +2390,7 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
                 }
                 if (ev == Vad.SpeechStart)
                 {
+                    if (Duplex) lock (gate) { onsetMonoForTest = onsetWindowMono; }
                     if (Duplex) Out.Emit(Out.Ev("vad", "turn", Turn, "gen", Gen, "state", "speech_start", "onsetMono", onsetWindowMono, "outputActive", vad.OutputActive));
                     else Out.Emit(Out.Ev("vad", "turn", Turn, "gen", Gen, "state", "speech_start"));
                 }
@@ -2849,6 +2956,14 @@ internal sealed class Speaker
         lock (gate) { return inFlight != null && inFlight.Submitted && !inFlight.Cancelled; }
     }
 
+    // T12 (RC-02): a playback.error for a generation ends that generation's pause request. The Host clears its hold on that
+    // error, so the worker must not keep the gen paused: later chunks of the gen would otherwise stall on the device for
+    // ever. Caller holds gate.
+    void ClearPauseFor(long gen)
+    {
+        if (pausedGen == gen) pausedGen = long.MinValue;
+    }
+
     // Playback thread only. A cancelled chunk never touches the device here: the pending reset owns its state, and a
     // paused device is never restarted for a cancelled chunk.
     bool ApplyPause(Chunk c)
@@ -2961,16 +3076,19 @@ internal sealed class Speaker
             if (text == null || text.Length == 0) return;
             if (text.Length > MaxChunkChars)
             {
+                ClearPauseFor(gen);
                 Out.Emit(Out.Ev("playback.error", "turn", turn, "gen", gen, "code", "BUFFER_LIMIT", "message", "chunk exceeds 400 characters"));
                 return;
             }
             if (turn == lastTurn && seq <= lastSeq)
             {
+                ClearPauseFor(gen);
                 Out.Emit(Out.Ev("playback.error", "turn", turn, "gen", gen, "code", "INTERNAL", "message", "seq is not strictly increasing"));
                 return;
             }
             if (queue.Count >= MaxQueued)
             {
+                ClearPauseFor(gen);
                 Out.Emit(Out.Ev("playback.error", "turn", turn, "gen", gen, "code", "BUFFER_LIMIT", "message", "playback queue is full"));
                 return;
             }
@@ -3121,6 +3239,7 @@ internal sealed class Speaker
             if (pcm == null || pcm.Length == 0)
             {
                 c.Cancelled = true;
+                ClearPauseFor(c.Gen);
                 Out.Emit(Out.Ev("playback.error", "turn", c.Turn, "gen", c.Gen, "code", "TTS_UNAVAILABLE", "message", "speech synthesis failed: " + (error ?? "no audio")));
                 Monitor.PulseAll(gate);
                 return true;
@@ -3144,6 +3263,7 @@ internal sealed class Speaker
             {
                 c.Synthesizing = false;
                 c.Cancelled = true;
+                ClearPauseFor(c.Gen);
             }
             Guard.Emit(Out.Ev("playback.error", "turn", c != null ? c.Turn : null, "gen", c != null ? (object)c.Gen : null,
                 "code", "INTERNAL", "message", "speech synthesis fault: " + e.GetType().Name));
@@ -3403,6 +3523,7 @@ internal sealed class Speaker
     // Device failure: report, then drop everything queued. Never re-route to another device. Caller holds gate.
     void FailAndDrop(Chunk c, string code, string message)
     {
+        ClearPauseFor(c.Gen);
         Out.Emit(Out.Ev("playback.error", "turn", c.Turn, "gen", c.Gen, "code", code, "message", Out.Trunc(message, 300)));
         foreach (Chunk q in queue) q.Cancelled = true;
         queue.RemoveAll(q => q.Cancelled && q != inFlight);
@@ -3416,7 +3537,7 @@ internal sealed class Speaker
             Chunk c = stepChunk;
             stepChunk = null;
             inFlight = null;
-            if (c != null) c.Cancelled = true;
+            if (c != null) { c.Cancelled = true; ClearPauseFor(c.Gen); }
             Guard.Emit(Out.Ev("playback.error", "turn", c != null ? c.Turn : null, "gen", c != null ? (object)c.Gen : null,
                 "code", "INTERNAL", "message", "playback fault: " + e.GetType().Name));
             foreach (Chunk q in queue) q.Cancelled = true;
@@ -3850,12 +3971,14 @@ internal static class SelfTest
         }
         r["duplexClickThenSoftStart"] = dStart;
 
-        // (e) our own output is audible and its residual frames sit at 0.003: no onset from the residual. User speech at
-        // 0.03 while the output is still audible is an onset.
+        // (e) our own output is audible and its residual frames sit at 0.003: no onset from the residual. T12 (AEC-06): the
+        // output starts on quiet frames (0.0001), so the residual is not seeded from one quiet frame. User speech at 0.03
+        // while the output is still audible is an onset.
         Vad e = new Vad(true, 0.0002);
         e.SetOutputActive(true);
+        for (int f = 0; f < 5; f++) e.Feed(0.0001, int.MaxValue);
         int eEchoOnsets = 0;
-        for (int f = 0; f < 100; f++) if (e.Feed(0.003, int.MaxValue) == Vad.SpeechStart) eEchoOnsets++;
+        for (int f = 0; f < 200; f++) if (e.Feed(0.003, int.MaxValue) == Vad.SpeechStart) eEchoOnsets++;
         r["duplexOutputEchoOnsets"] = eEchoOnsets;
         int eUserOnset = -1;
         for (int f = 0; f < 40; f++) if (e.Feed(0.03, int.MaxValue) == Vad.SpeechStart && eUserOnset < 0) eUserOnset = f;
@@ -3876,6 +3999,315 @@ internal static class SelfTest
         r["duplexSoftWaitStart"] = gStart;
         r["duplexSoftWaitEnd"] = gEnd;
         r["duplexSoftWaitShort"] = gShort;
+    }
+
+    // T12 residual model (AEC-01, AEC-05) on standalone duplex Vads. Echo is a steady 0.003 while our output is audible.
+    static void DuplexResidualCheck(Dictionary<string, object> r)
+    {
+        // Paused chunk: the output flag stays on while the device is silent for 1200 ms (60 frames), then the echo resumes.
+        // Silence must not decay the residual into a low threshold, so the echo is no onset.
+        Vad paused = new Vad(true, 0.0002);
+        paused.SetOutputActive(true);
+        for (int f = 0; f < 20; f++) paused.Feed(0.003, int.MaxValue);
+        for (int f = 0; f < 60; f++) paused.Feed(0.0002, int.MaxValue);
+        int pausedOnsets = 0;
+        for (int f = 0; f < 100; f++) if (paused.Feed(0.003, int.MaxValue) == Vad.SpeechStart) pausedOnsets++;
+        r["aecPausedEchoOnsets"] = pausedOnsets;
+
+        // Inter-chunk gap: the output flag drops for 400 ms (20 frames), while the echo still lingers at 0.003 (AEC latency
+        // and reverb). The quiet frames before the reply keep the ambient floor low, so only the residual hold can stop the
+        // lingering echo. Then the next chunk starts on quiet AEC frames (0.0001) and the echo resumes at 0.003. Neither the
+        // gap nor the restart may be an onset.
+        Vad gap = new Vad(true, 0.0002);
+        int gapOnsets = 0;
+        for (int f = 0; f < 30; f++) gap.Feed(0.0002, int.MaxValue);
+        gap.SetOutputActive(true);
+        for (int f = 0; f < 5; f++) if (gap.Feed(0.003, int.MaxValue) == Vad.SpeechStart) gapOnsets++;
+        gap.SetOutputActive(false);
+        for (int f = 0; f < 20; f++) if (gap.Feed(0.003, int.MaxValue) == Vad.SpeechStart) gapOnsets++;
+        gap.SetOutputActive(true);
+        for (int f = 0; f < 5; f++) if (gap.Feed(0.0001, int.MaxValue) == Vad.SpeechStart) gapOnsets++;
+        for (int f = 0; f < 100; f++) if (gap.Feed(0.003, int.MaxValue) == Vad.SpeechStart) gapOnsets++;
+        r["aecGapEchoOnsets"] = gapOnsets;
+
+        // User speech at 0.008 for 2 s over the 0.003 echo, with our output still audible: it is an onset, so the residual
+        // cannot absorb a sustained talker (AEC-05). The first onset frame is 5 (120 ms of frames above the threshold).
+        Vad user = new Vad(true, 0.0002);
+        user.SetOutputActive(true);
+        for (int f = 0; f < 20; f++) user.Feed(0.003, int.MaxValue);
+        int userOverEcho = -1;
+        for (int f = 0; f < 100; f++) if (user.Feed(0.008, int.MaxValue) == Vad.SpeechStart && userOverEcho < 0) userOverEcho = f;
+        r["aecUserOverEchoOnset"] = userOverEcho;
+
+        // The model itself: 200 frames of user speech at 0.008 that no turn is attached to, under output, must not lift the
+        // residual or the threshold above what the echo supports (AEC-05). Standalone Vads stop observing after onset, so
+        // this drives the ambient model directly.
+        AmbientFloor model = new AmbientFloor(AmbientFloor.MinFloor);
+        for (int f = 0; f < 20; f++) model.Observe(0.003, false, true);
+        for (int f = 0; f < 200; f++) model.Observe(0.008, false, true);
+        r["aecResidualAfterUserSpeech"] = model.Residual.GetValueOrDefault();
+        r["aecThresholdAfterUserSpeech"] = model.OnsetThreshold;
+
+        // The learned residual is not decayed by a paused (silent) window: it reads the same after 1200 ms of silence with
+        // the output flag on as it did before (AEC-01 b). Echo at 0.0028 is below the 0.004 threshold, so it is no onset.
+        Vad held = new Vad(true, 0.0002);
+        held.SetOutputActive(true);
+        for (int f = 0; f < 150; f++) held.Feed(0.0028, int.MaxValue);
+        double residualBefore = held.Residual.GetValueOrDefault();
+        for (int f = 0; f < 60; f++) held.Feed(0.0002, int.MaxValue);
+        r["aecResidualBeforePause"] = residualBefore;
+        r["aecResidualAfterPause"] = held.Residual.GetValueOrDefault();
+
+        // Round 2 (verifier, HIGH): steady echo above the old 0.0045 ceiling, with output on from the first frame, is no onset.
+        // Before the fix, echo at 0.0045 and 0.005 re-triggered speech_start on every cycle.
+        r["aecSteadyEcho0045Onsets"] = EchoOnsets(0, 0.0, 0.0045, 200);
+        r["aecSteadyEcho005Onsets"] = EchoOnsets(0, 0.0, 0.005, 200);
+        // A quiet start (AEC latency: five 0.0001 frames), then a loud echo: the multi-frame median jump learns it.
+        r["aecQuietStartEcho005Onsets"] = EchoOnsets(5, 0.0001, 0.005, 200);
+        // User speech at 0.008 over a steady 0.0045 echo is still an onset (the cap keeps the threshold below it).
+        r["aecUserOver0045EchoOnset"] = UserOnsetOverEcho(0.0045, 0.008);
+        // The learned ceiling: with output audible, the onset threshold never exceeds 2 x ResidualCap (0.006). This is the
+        // disclosed limit that README.md states.
+        Vad ceiling = new Vad(true, 0.0002);
+        ceiling.SetOutputActive(true);
+        for (int f = 0; f < 100; f++) ceiling.Feed(0.003, int.MaxValue);
+        r["aecOutputThresholdCeiling"] = ceiling.Threshold;
+    }
+
+    // Output on from the first frame: `leadFrames` frames at leadLevel, then `frames` frames at echo. Returns the onsets.
+    static int EchoOnsets(int leadFrames, double leadLevel, double echo, int frames)
+    {
+        Vad v = new Vad(true, 0.0002);
+        v.SetOutputActive(true);
+        for (int f = 0; f < leadFrames; f++) v.Feed(leadLevel, int.MaxValue);
+        int onsets = 0;
+        for (int f = 0; f < frames; f++) if (v.Feed(echo, int.MaxValue) == Vad.SpeechStart) onsets++;
+        return onsets;
+    }
+
+    // Steady echo with output on, then user speech at `user` for 100 frames. Returns the frame of the first onset (-1 if none).
+    static int UserOnsetOverEcho(double echo, double user)
+    {
+        Vad v = new Vad(true, 0.0002);
+        v.SetOutputActive(true);
+        for (int f = 0; f < 20; f++) v.Feed(echo, int.MaxValue);
+        for (int f = 0; f < 100; f++) if (v.Feed(user, int.MaxValue) == Vad.SpeechStart) return f;
+        return -1;
+    }
+
+    // A scripted AEC stream for the duplex checks: one level per frame, and whether our output was audible for that frame.
+    // After the script it delivers nothing (Read returns 0) until the input is stopped.
+    sealed class ScriptedFrames : IFrameSource
+    {
+        readonly double[] levels;
+        readonly bool[] output;
+        int next;
+        public volatile bool OutputNow;
+        public volatile int Delivered;
+        public ScriptedFrames(double[] levels, bool[] output) { this.levels = levels; this.output = output; }
+        public int Read(byte[] frame)
+        {
+            if (next >= levels.Length) return 0;
+            short s = (short)Math.Round(levels[next] * 32768.0);
+            for (int i = 0; i + 1 < frame.Length; i += 2) { frame[i] = (byte)(s & 0xFF); frame[i + 1] = (byte)((s >> 8) & 0xFF); }
+            OutputNow = output[next];
+            next++;
+            Delivered = next;
+            return 1;
+        }
+        public void Close() { }
+    }
+
+    static byte[] ConstantFrame(double level)
+    {
+        byte[] frame = new byte[Consts.FrameBytes];
+        short s = (short)Math.Round(level * 32768.0);
+        for (int i = 0; i + 1 < frame.Length; i += 2) { frame[i] = (byte)(s & 0xFF); frame[i + 1] = (byte)((s >> 8) & 0xFF); }
+        return frame;
+    }
+
+    // T12 (AEC-02): a duplex onset is timed from the capture time of its first loud frame. Frames replayed now keep the stamp
+    // they were captured with: 10 quiet frames stamped 500..680 ms, then loud frames from 700 ms. The onset must read 700.
+    static void DuplexOnsetTimeCheck(Dictionary<string, object> r)
+    {
+        DuplexInput.TurnFrames replayed = new DuplexInput.TurnFrames();
+        for (int i = 0; i < 30; i++) replayed.Push(ConstantFrame(i < 10 ? 0.0002 : 0.02), 500 + 20 * i);
+        CaptureTurn turn = new CaptureTurn("selftest-onset", 1, null, false, 1000000);
+        turn.Duplex = true;
+        turn.Ambient = new AmbientFloor(AmbientFloor.MinFloor);
+        turn.StartCapture(replayed);
+        WaitUntil(() => turn.OnsetMonoForTest >= 0, 3000);
+        turn.Finish("abort");
+        turn.Join(3000);
+        r["onsetMonoFromCapture"] = turn.OnsetMonoForTest;
+    }
+
+    static void WaitUntil(Func<bool> condition, int ms)
+    {
+        Stopwatch w = Stopwatch.StartNew();
+        while (!condition() && w.ElapsedMilliseconds < ms) Thread.Sleep(5);
+    }
+
+    // T12 pre-roll (AEC-02): frames captured while our output was audible, or in its reverb tail, are never replayed into a
+    // turn armed after the output. Quiet frames captured before the output, and quiet frames after the tail, are replayed.
+    static void DuplexPrerollCheck(Dictionary<string, object> r)
+    {
+        // 20 quiet frames (calibration), 30 frames of our echo at 0.003 with output audible, 33 quiet frames. The next 13
+        // frames after the echo are its reverb tail.
+        List<double> levels = new List<double>();
+        List<bool> outputs = new List<bool>();
+        for (int i = 0; i < 20; i++) { levels.Add(0.0002); outputs.Add(false); }
+        for (int i = 0; i < 30; i++) { levels.Add(0.003); outputs.Add(true); }
+        for (int i = 0; i < 33; i++) { levels.Add(0.0002); outputs.Add(false); }
+        ScriptedFrames script = new ScriptedFrames(levels.ToArray(), outputs.ToArray());
+        DuplexInput input = new DuplexInput("selftest-preroll", 20000, cancelled => script, true, () => script.OutputNow);
+        input.Start();
+        WaitUntil(() => input.Ready && script.Delivered == levels.Count, 5000);
+        DuplexInput.TurnFrames replay = (DuplexInput.TurnFrames)input.Attach();
+        int replayed = 0, echoReplayed = 0;
+        byte[] buffer = new byte[Consts.FrameBytes];
+        while (replay.Read(buffer) > 0)
+        {
+            replayed++;
+            if (Rms(buffer) > 0.002) echoReplayed++;
+        }
+        input.Stop();
+        input.Join(3000);
+        r["prerollReplayedFrames"] = replayed;
+        r["prerollEchoFrames"] = echoReplayed;
+
+        // The replayed frame keeps the time it was captured at, not the time it is read back.
+        DuplexInput.TurnFrames stamped = new DuplexInput.TurnFrames();
+        stamped.Push(new byte[Consts.FrameBytes], 4321);
+        stamped.Read(new byte[Consts.FrameBytes]);
+        r["turnFramesKeepCaptureMono"] = stamped.LastMono == 4321;
+
+        // Round 2 (AEC-02 LOW): user speech at 0.03 captured while our output is audible is not echo, so it is kept in the
+        // pre-roll. Its 30 frames are all replayed (the echo frames of the check above are dropped).
+        List<double> ul = new List<double>();
+        List<bool> uo = new List<bool>();
+        for (int i = 0; i < 20; i++) { ul.Add(0.0002); uo.Add(false); }
+        for (int i = 0; i < 30; i++) { ul.Add(0.03); uo.Add(true); }
+        for (int i = 0; i < 33; i++) { ul.Add(0.0002); uo.Add(false); }
+        ScriptedFrames talk = new ScriptedFrames(ul.ToArray(), uo.ToArray());
+        DuplexInput over = new DuplexInput("selftest-preroll-talk", 20000, cancelled => talk, true, () => talk.OutputNow);
+        over.Start();
+        WaitUntil(() => over.Ready && talk.Delivered == ul.Count, 5000);
+        DuplexInput.TurnFrames talkReplay = (DuplexInput.TurnFrames)over.Attach();
+        int userKept = 0;
+        byte[] talkBuffer = new byte[Consts.FrameBytes];
+        while (talkReplay.Read(talkBuffer) > 0) if (Rms(talkBuffer) > 0.02) userKept++;
+        over.Stop();
+        over.Join(3000);
+        r["prerollUserFramesKept"] = userKept;
+    }
+
+    // T12-PRIV-03: a capture loop that ends because the microphone is muted reports "mute"; the lifetime bound still reports
+    // "lifetime".
+    static void DuplexStopReasonCheck(Dictionary<string, object> r)
+    {
+        double[] quiet = new double[40];
+        bool[] none = new bool[40];
+        for (int i = 0; i < quiet.Length; i++) quiet[i] = 0.0002;
+        ScriptedFrames muteSource = new ScriptedFrames(quiet, none);
+        DuplexInput muted = new DuplexInput("selftest-mute", 20000, cancelled => muteSource, true, () => false);
+        muted.Start();
+        WaitUntil(() => muted.Ready, 5000);
+        Program.Muted = true;
+        muted.Join(3000);
+        Program.Muted = false;
+        r["duplexStopReasonOnMute"] = muted.EndReason;
+
+        ScriptedFrames lifeSource = new ScriptedFrames(quiet, none);
+        DuplexInput lifetime = new DuplexInput("selftest-lifetime", 300, cancelled => lifeSource, true, () => false);
+        lifetime.Start();
+        lifetime.Join(3000);
+        r["duplexStopReasonLifetime"] = lifetime.EndReason;
+
+        // Round 2 (PRIV-03 verifier): the mute and the lifetime bound run out in the same read (the bound is 300 ms, the read
+        // holds for 400 ms). The bound is what the loop's next check sees first, so the reason is "lifetime", not "mute".
+        DuplexInput coincide = new DuplexInput("selftest-mute-bound", 300, cancelled => new MuteOnRead(0, 400), true, () => false);
+        coincide.Start();
+        coincide.Join(5000);
+        Program.Muted = false;
+        r["duplexStopReasonMuteAndBound"] = coincide.EndReason;
+    }
+
+    // A frame source that mutes the microphone on read number muteAt, and holds that read for holdMs.
+    sealed class MuteOnRead : IFrameSource
+    {
+        readonly int muteAt;
+        readonly int holdMs;
+        int calls;
+        public MuteOnRead(int muteAt, int holdMs) { this.muteAt = muteAt; this.holdMs = holdMs; }
+        public int Read(byte[] frame)
+        {
+            if (calls++ == muteAt) { Program.Muted = true; Thread.Sleep(holdMs); }
+            Buffer.BlockCopy(ConstantFrame(0.0002), 0, frame, 0, frame.Length);
+            return 1;
+        }
+        public void Close() { }
+    }
+
+    // RC-02 (worker side): a playback.error for a gen releases that gen's pause, so the next chunk of the gen is not paused.
+    // Counts every pause request, every pause the driver applied, and every chunk the device completed.
+    sealed class PauseLog
+    {
+        public int PauseRequests;
+        public int PauseApplied;
+        public int Completed;
+        public bool Refuse;
+    }
+
+    // A driver for the pause checks. Seq 0 never completes on its own (it waits for a pause to be applied or refused); later
+    // chunks complete 150 ms after their submit. A refusing driver throws on every pause request.
+    sealed class PauseDriver : IWaveOut
+    {
+        readonly PauseLog log;
+        readonly Stopwatch sinceSubmit = new Stopwatch();
+        public PauseDriver(PauseLog log) { this.log = log; }
+        public uint Device { get { return 0u; } }
+        public void Submit(Chunk c) { sinceSubmit.Start(); }
+        public bool IsDone(Chunk c) { return c.Seq > 0 && sinceSubmit.ElapsedMilliseconds >= 150; }
+        public void Release(Chunk c) { lock (log) log.Completed++; }
+        public void Reset() { }
+        public void Pause(bool on)
+        {
+            if (!on) return;
+            lock (log) log.PauseRequests++;
+            if (log.Refuse) throw new VoiceFault("DEVICE_UNAVAILABLE", "device refused pause");
+            lock (log) log.PauseApplied++;
+        }
+        public void Close() { }
+    }
+
+    static void PauseReleaseCheck(Dictionary<string, object> r)
+    {
+        // (b) pause requested for gen 21; its first chunk fails to synthesize (TTS_UNAVAILABLE); the next chunk of gen 21 plays.
+        // It must not be paused on the device, and it must complete.
+        PauseLog ttsLog = new PauseLog();
+        Speaker tts = new Speaker(null, false, 1.0, new string[0], d => new PauseDriver(ttsLog));
+        tts.Start();
+        tts.Pause(21, true);
+        tts.Enqueue("selftest-tts", 21, 0, "a sentence that cannot be rendered", 0u, null);
+        tts.AddRenderedForTest("selftest-tts", 21, 1, new byte[320], 0u);
+        WaitUntil(() => ttsLog.Completed >= 1, 3000);
+        tts.Shutdown();
+        r["ttsFailurePauseReleased"] = ttsLog.PauseRequests == 0 && ttsLog.Completed == 1;
+
+        // (c) a device that refuses pause: the first chunk of gen 22 fails with the device's code; the next chunk of gen 22 is
+        // not asked to pause, and it completes.
+        PauseLog refusedLog = new PauseLog { Refuse = true };
+        Speaker refused = new Speaker(null, false, 1.0, new string[0], d => new PauseDriver(refusedLog));
+        refused.Start();
+        refused.Pause(22, true);
+        refused.AddRenderedForTest("selftest-refused", 22, 0, new byte[320], 0u);
+        WaitUntil(() => refusedLog.PauseRequests >= 1, 3000);
+        Thread.Sleep(100);
+        refused.AddRenderedForTest("selftest-refused", 22, 1, new byte[320], 0u);
+        WaitUntil(() => refusedLog.Completed >= 1, 3000);
+        refused.Shutdown();
+        r["pauseRefusalReleased"] = refusedLog.PauseRequests == 1 && refusedLog.Completed == 1;
     }
 
     public static int Run()
@@ -4042,6 +4474,12 @@ internal static class SelfTest
 
         // T12 duplex endpointing with explicit floors. Standalone duplex Vads: no devices, no recognizer, nothing audible.
         DuplexVadCheck(r);
+        // T12 residual model, pre-roll taint and stamps, the mute stop reason, and the pause release on a playback.error.
+        DuplexResidualCheck(r);
+        DuplexPrerollCheck(r);
+        DuplexStopReasonCheck(r);
+        PauseReleaseCheck(r);
+        DuplexOnsetTimeCheck(r);
 
         Out.Emit(Out.Ev("selftest", "results", r));
         return 0;
@@ -4565,6 +5003,12 @@ internal static class Program
         info.Channels = 1;
     }
 
+    // T12 (RC-02): a refused speak ends any pause request its gen already holds (the Host clears its hold on the error).
+    static void ReleaseGenPause(long gen)
+    {
+        if (speaker != null && gen >= 0) speaker.Pause(gen, false);
+    }
+
     static void Speak(Dictionary<string, object> cmd)
     {
         string turn = Str(cmd, "turn");
@@ -4576,11 +5020,13 @@ internal static class Program
         bool deviceOk = TryDeviceArg(cmd, out device);
         if (turn == null || gen < 0 || seq < 0 || text == null)
         {
+            ReleaseGenPause(gen);
             Out.Emit(Ev("playback.error", "turn", turn, "gen", gen < 0 ? (object)null : (object)gen, "code", "INTERNAL", "message", "invalid speak"));
             return;
         }
         if (!deviceOk)
         {
+            ReleaseGenPause(gen);
             Out.Emit(Ev("playback.error", "turn", turn, "gen", gen, "code", "DEVICE_UNAVAILABLE", "message", "device index is outside the valid range"));
             return;
         }
@@ -4588,12 +5034,13 @@ internal static class Program
         {
             // T12: while the echo reference is still being measured, output has no bound endpoint. Refuse, never play on
             // an unbound device that the echo canceller cannot see.
+            ReleaseGenPause(gen);
             Out.Emit(Ev("playback.error", "turn", turn, "gen", gen, "code", "AEC_UNAVAILABLE", "message", "full-duplex reference is not ready"));
             return;
         }
         if (duplex != null && duplex.Ready && !duplex.StopFlag)
         {
-            if (device >= 0 && (uint)device != duplex.RenderDevice) { Out.Emit(Ev("playback.error", "turn", turn, "gen", gen, "code", "AEC_UNAVAILABLE", "message", "output differs from AEC reference")); return; }
+            if (device >= 0 && (uint)device != duplex.RenderDevice) { ReleaseGenPause(gen); Out.Emit(Ev("playback.error", "turn", turn, "gen", gen, "code", "AEC_UNAVAILABLE", "message", "output differs from AEC reference")); return; }
             speaker.Enqueue(turn, gen, seq, text, duplex.RenderDevice, voice);
         }
         else speaker.Enqueue(turn, gen, seq, text, device < 0 ? Native.WAVE_MAPPER : (uint)device, voice);

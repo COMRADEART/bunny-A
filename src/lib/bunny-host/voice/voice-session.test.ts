@@ -1,7 +1,7 @@
 import test from "node:test";
 import type { MissionFact } from "./voice-answers.server.ts";
 import assert from "node:assert/strict";
-import { VoiceSessionManager, REFUSAL_TEXT, REDIRECT_TEXT, TOOLS_TEXT, pickCandidate, SPOKEN_CHAT_INSTRUCTION, type VoiceAgentRow, type VoiceChatTask, type VoiceTaskEvent } from "./voice-session.server.ts";
+import { VoiceSessionManager, REFUSAL_TEXT, REDIRECT_TEXT, TOOLS_TEXT, MISSION_PAUSE_TEXT, WAITING_VOICE_TASKS_TEXT, pickCandidate, SPOKEN_CHAT_INSTRUCTION, type VoiceAgentRow, type VoiceChatTask, type VoiceTaskEvent } from "./voice-session.server.ts";
 import { deviceTask, VOICE_TURN_DEVICE_LABEL } from "../device-authority.server.ts";
 import type { VoiceWorkerPort } from "./voice-worker.server.ts";
 import { VOICE_LIMITS, VOICE_PROTOCOL, type WorkerCommand, type WorkerEvent, type VoiceMode } from "./voice-protocol.ts";
@@ -55,7 +55,13 @@ class FakeWorker implements VoiceWorkerPort {
 
 const ready = { ev: "ready", protocol: VOICE_PROTOCOL, pid: 1, stt: { engine: "fake-stt", recognizer: null, culture: null, local: true }, tts: { engine: "fake-tts", voices: [], local: true } };
 
-function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?: VoiceAgentRow[]; silentDevices?: boolean; silentReady?: boolean; softBudget?: number; hardBudget?: number; sttNotice?: string | null; /** T12: Mission rows the Host reports, and the canonical Mission ports (stop, draft, projects). */ missions?: MissionFact[]; missionPort?: boolean; projects?: { id: string; name: string }[]; draftFails?: boolean; stopFails?: boolean } = {}) {
+/** T12-AUTH-06: the spoken answer has finished playing, so a push-to-talk press after it is not overlapped by Bunny's output. */
+function finishSpeech(h: ReturnType<typeof setup>) {
+  const snap = h.session.snapshot();
+  h.worker.emit({ ev: "playback.idle", turn: snap.turnId, gen: snap.generation });
+}
+
+function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?: VoiceAgentRow[]; silentDevices?: boolean; silentReady?: boolean; softBudget?: number; hardBudget?: number; sttNotice?: string | null; /** T12: Mission rows the Host reports, and the canonical Mission ports (stop, draft, projects). */ missions?: MissionFact[]; missionPort?: boolean; projects?: { id: string; name: string }[]; draftFails?: boolean; stopFails?: boolean; /** T12 RES-01/02: the facts window: only the newest N Missions (by updatedAt) are reported by facts(). Canonical ports are not windowed. */ missionWindow?: number } = {}) {
   let clock = 1_000;
   const timers: { at: number; fn: () => void; done: boolean }[] = [];
   const schedule = (fn: () => void, ms: number) => {
@@ -79,14 +85,22 @@ function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?:
   const commands: { action: string; id: string; revision: number }[] = [];
   let tasks: VoiceChatTask[] = [{ taskId: "task-1", provider: "ollama", model: "qwen3:8b", state: "waiting_for_approval", hasMission: false, mayLaunch: true }];
   const outputs = new Map<string, Set<(event: VoiceTaskEvent) => void>>();
+  // T12 RES-04: the canonical state of every submitted task, so a reviewed question leaves the waiting count.
+  const taskStates = new Map<string, string>();
   const chat = {
+    /** T12 RES-04: the test's view of task states (a reviewed task is marked here). */
+    states: taskStates,
     submits: [] as string[],
     admitted: [] as string[],
     stops: [] as string[],
     submit(prompt: string) {
       this.submits.push(prompt);
       const task = tasks.shift() ?? { taskId: `task-${this.submits.length + 1}`, provider: "ollama", model: "qwen3:8b", state: "waiting_for_approval", hasMission: false, mayLaunch: true };
+      taskStates.set(task.taskId, task.state);
       return task;
+    },
+    taskState(taskId: string): string | null {
+      return taskStates.get(taskId) ?? null;
     },
     admit(taskId: string) {
       this.admitted.push(taskId);
@@ -121,7 +135,12 @@ function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?:
   let draftCount = 0;
   const agents = {
     rows: () => rows.map((row) => ({ ...row })),
-    facts: () => ({ agents: rows.map((row) => ({ id: row.id, name: row.name, state: row.state, missionId: null, updatedAt: 1 })), missions: missionRows.map((mission) => ({ ...mission })), approvals: [] }),
+    facts: () => ({
+      agents: rows.map((row) => ({ id: row.id, name: row.name, state: row.state, missionId: null, updatedAt: 1 })),
+      // The recency window: the newest `missionWindow` Missions only, as the Host's 40-row facts read reports them.
+      missions: (options.missionWindow ? [...missionRows].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, options.missionWindow) : missionRows).map((mission) => ({ ...mission })),
+      approvals: [],
+    }),
     command: async (action: "agent.pause" | "agent.resume" | "agent.stop", id: string, revision: number) => {
       commands.push({ action, id, revision });
       const row = rows.find((item) => item.id === id);
@@ -147,6 +166,13 @@ function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?:
             return { id, title, state: "waiting_for_approval" };
           },
           projects: () => options.projects ?? [],
+          // T12 RES-01/02: canonical reads, never windowed.
+          activeMissions: () => missionRows.filter((mission) => !["completed", "failed", "stopped"].includes(mission.status)).map((mission) => ({ ...mission })),
+          mission: (missionId: string) => {
+            const found = missionRows.find((mission) => mission.id === missionId);
+            return found ? { ...found } : null;
+          },
+          pendingVoiceDrafts: () => missionRows.filter((mission) => mission.origin?.startsWith("voice:") && ["draft", "planning", "waiting_for_approval"].includes(mission.status)).length,
         }
       : {}),
   };
@@ -489,6 +515,7 @@ test("V32 V33 V35 spoken pause proposes, a spoken confirm executes the canonical
   assert.equal(proposal.action, "agent.pause");
   assert.equal(proposal.confirmVia, "voice_or_screen");
   assert.equal(h.commands.length, 0, "a proposal alone executes nothing");
+  finishSpeech(h);
   await h.session.listenStart();
   h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "yes", confidence: 0.9 });
   await h.flush();
@@ -1073,6 +1100,7 @@ test("R1-races#3 a control confirmation that finishes after its session was clos
   h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "pause the agent", confidence: 0.9 });
   await h.flush();
   assert.equal(h.session.snapshot().proposal?.action, "agent.pause");
+  finishSpeech(h);
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
   const original = h.agents.command;
@@ -1195,6 +1223,7 @@ test("R1-authz#3 a proposal whose agent revision moved on is refused before any 
   await h.session.listenStart();
   h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "pause the agent", confidence: 0.9 });
   await h.flush();
+  finishSpeech(h);
   h.rows[0].revision = 9;
   await h.session.listenStart();
   h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "yes", confidence: 0.9 });
@@ -1723,17 +1752,18 @@ test("T12 F3: a Project name that matches several registered Projects creates no
 test("T12 F3: no matching Project drafts into the default workspace, and says so", async () => {
   const h = setup({ missionPort: true, projects: [{ id: "p1", name: "Inventory" }] });
   await h.open();
-  await h.session.text("draft a mission to write release notes");
+  await h.session.text("draft a mission to write onboarding notes");
   await h.flush();
-  assert.deepEqual(h.drafts, [{ objective: "write release notes", projectId: null }]);
+  assert.deepEqual(h.drafts, [{ objective: "write onboarding notes", projectId: null }]);
   assert.match(h.session.snapshot().answer ?? "", /It uses the default workspace, because no project name matched\.$/);
 });
 
 test("T12 F3: drafts are rate-limited, then allowed again after the interval", async () => {
   const h = setup({ missionPort: true });
   await h.open();
-  await h.session.text("draft a mission to write release notes");
+  await h.session.text("draft a mission to write onboarding notes");
   await h.flush();
+  // T12-AUTH-01 (round 2): "changelog" is a benign subject, not the inflection stem "chang", so both drafts are Missions.
   await h.session.text("draft a mission to write the changelog");
   await h.flush();
   assert.equal(h.drafts.length, 1);
@@ -1748,7 +1778,7 @@ test("T12 F3: at most maxPendingVoiceDrafts voice drafts may await review at onc
   const waiting = Array.from({ length: VOICE_LIMITS.maxPendingVoiceDrafts }, (_, i) => mission(`v${i}`, `Draft ${i}`, "waiting_for_approval", { origin: "voice:workstation" }));
   const h = setup({ missionPort: true, missions: waiting });
   await h.open();
-  await h.session.text("draft a mission to write release notes");
+  await h.session.text("draft a mission to write onboarding notes");
   await h.flush();
   assert.equal(h.drafts.length, 0);
   assert.match(h.session.snapshot().answer ?? "", /already waiting for review on the Windows Host screen/);
@@ -1915,4 +1945,115 @@ test("T12 F8: a proposal id never reaches the spoken history or a chat prompt", 
   await h.session.text("what is the capital of France");
   await h.flush();
   assert.equal(h.chat.submits.at(-1)?.includes(id), false);
+});
+
+// -----------------------------------------------------------------------------------------------------------------
+// Review round (T12 RES-01, RES-02, RES-04, AUTH-04, AUTH-06): canonical reads and bounded approvals
+// -----------------------------------------------------------------------------------------------------------------
+
+/** Forty-one completed, non-voice Missions that are newer than everything else: the recency window is full of them. */
+function newerCompleted(count: number, from: number): MissionFact[] {
+  return Array.from({ length: count }, (_, i) => mission(`done-${i}`, `Done ${i}`, "completed", { updatedAt: from + i, origin: "workstation" }));
+}
+
+test("T12 RES-01: three waiting voice drafts are counted even behind 41 newer Missions, so a fourth spoken draft is refused", async () => {
+  const drafts = [1, 2, 3].map((n) => mission(`v${n}`, `Draft ${n}`, "waiting_for_approval", { updatedAt: n, origin: "voice:workstation" }));
+  const h = setup({ missionPort: true, missionWindow: 40, missions: [...drafts, ...newerCompleted(41, 100)] });
+  await h.open();
+  // The recency window alone would show none of the three drafts; the canonical count still sees them all.
+  assert.equal(h.agents.facts().missions.filter((item) => item.origin?.startsWith("voice:")).length, 0);
+  await h.session.text("prepare a plan for the onboarding guide");
+  await h.flush();
+  assert.equal(h.drafts.length, 0, "mission.create is not called for the fourth draft");
+  assert.equal(h.session.snapshot().answer, `${VOICE_LIMITS.maxPendingVoiceDrafts} voice Missions are already waiting for review on the Windows Host screen. Review them there first.`);
+});
+
+test("T12 RES-02: a running Mission older than the 40-newest window is a stop candidate, and its confirmed stop reads the canonical record", async () => {
+  const running = mission("m1", "Alpha", "running", { updatedAt: 1 });
+  const h = setup({ missionPort: true, missionWindow: 40, missions: [running, ...newerCompleted(40, 100)] });
+  await h.open();
+  await h.session.text("stop the mission Alpha");
+  await h.flush();
+  assert.equal(h.session.snapshot().proposal?.agentId, "m1", "the old running Mission is proposed, not reported absent");
+  assert.equal(h.session.snapshot().answer, "Confirm on the Windows Host screen to stop the mission Alpha.");
+  const proposal = h.session.snapshot().proposal!;
+  h.session.controlConfirm(proposal.id);
+  await h.flush();
+  assert.deepEqual(h.stops, ["m1"]);
+  assert.equal(h.session.snapshot().answer, "The mission Alpha is stopped.", "confirmed from the canonical record, which the window does not hold");
+});
+
+test("T12 RES-04: spoken questions waiting for approval are capped; a reviewed one frees its place; the cap is spoken and nothing is submitted", async () => {
+  const h = setup();
+  await h.open();
+  const refused = (i: number): VoiceChatTask => ({ taskId: `wait-${i}`, provider: "ollama", model: "qwen3:8b", state: "waiting_for_approval", hasMission: false, mayLaunch: false });
+  h.setTasks(Array.from({ length: 25 }, (_, i) => refused(i)));
+  for (let i = 0; i < 25; i += 1) {
+    await h.session.text(`what is the weather question ${i}`);
+    await h.flush();
+  }
+  assert.equal(h.chat.submits.length, VOICE_LIMITS.maxWaitingVoiceTasks, "nothing beyond the cap is submitted");
+  assert.equal(h.session.snapshot().answer, WAITING_VOICE_TASKS_TEXT);
+  // A question that was reviewed on the Host screen no longer counts: one more question is submitted.
+  h.chat.states.set("wait-0", "completed");
+  await h.session.text("what is the weather again");
+  await h.flush();
+  assert.equal(h.chat.submits.length, VOICE_LIMITS.maxWaitingVoiceTasks + 1);
+  await h.session.close();
+});
+
+test("T12 RES-04 (round 2): a repeat of a question that already waits adds no row and speaks the same refusal", async () => {
+  const h = setup();
+  await h.open();
+  h.setTasks([{ taskId: "dup-0", provider: "ollama", model: "qwen3:8b", state: "waiting_for_approval", hasMission: false, mayLaunch: false }]);
+  await h.session.text("What is the Weather today?");
+  await h.flush();
+  assert.equal(h.chat.submits.length, 1);
+  await h.session.text("what is the weather today");
+  await h.flush();
+  assert.equal(h.chat.submits.length, 1, "the identical question is collapsed onto the waiting row, not submitted again");
+  assert.equal(h.session.snapshot().answer, TOOLS_TEXT);
+  await h.session.close();
+});
+
+test("T12 RES-04 (round 2): closing voice stops only the still-waiting voice questions, never a reviewed one", async () => {
+  const h = setup();
+  await h.open();
+  const refused = (i: number): VoiceChatTask => ({ taskId: `close-${i}`, provider: "ollama", model: "qwen3:8b", state: "waiting_for_approval", hasMission: false, mayLaunch: false });
+  h.setTasks([refused(0), refused(1)]);
+  await h.session.text("what is the weather in Oslo");
+  await h.flush();
+  await h.session.text("what is the weather in Lima");
+  await h.flush();
+  h.chat.states.set("close-0", "completed");
+  await h.session.close();
+  await h.flush();
+  assert.deepEqual(h.chat.stops, ["close-1"], "only the question still waiting for review is cancelled with the session");
+});
+
+test("T12-AUTH-04: 'pause the mission' gets a Mission answer and no Agent proposal", async () => {
+  const h = setup({ missionPort: true });
+  await h.open();
+  await h.session.text("pause the mission");
+  await h.flush();
+  assert.equal(h.session.snapshot().proposal, null, "no proposal is made");
+  assert.equal(h.session.snapshot().answer, MISSION_PAUSE_TEXT);
+  assert.equal(h.commands.length, 0);
+});
+
+test("T12-AUTH-06: a push-to-talk press while Bunny is still speaking is overlapped, so a spoken yes cannot confirm the proposal", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "pause the agent", confidence: 0.9 });
+  await h.flush();
+  assert.equal(h.session.snapshot().proposal?.action, "agent.pause");
+  // Bunny is still speaking the proposal sentence (no playback idle yet): the next press barges in and is overlapped.
+  assert.ok(h.session.snapshot().playing || h.session.snapshot().state !== "IDLE");
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "yes", confidence: 0.9 });
+  await h.flush();
+  assert.deepEqual(h.commands, [], "the overlapped confirm executes nothing");
+  assert.equal(h.session.snapshot().proposal?.action, "agent.pause", "the proposal stays pending");
+  assert.match(h.session.snapshot().answer ?? "", /To confirm, say confirm again after I finish/);
 });

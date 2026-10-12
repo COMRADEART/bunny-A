@@ -350,6 +350,8 @@ export const VOICE_LIMITS = {
   /** T12: spoken Mission drafts are rate-limited; at most this many voice drafts may await review at once. */
   voiceDraftMinIntervalMs: 30_000,
   maxPendingVoiceDrafts: 3,
+  /** T12 RES-04: at most this many spoken questions may wait for approval on the Host screen at once; beyond it nothing is submitted. */
+  maxWaitingVoiceTasks: 3,
   /** T12: a spoken follow-up ("did it finish?", "the second one") resolves against the last Host-facts subject this long. */
   referentTtlMs: 180_000,
   proposalTtlMs: 30_000,

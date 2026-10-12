@@ -115,12 +115,35 @@ session reports `duplex.error` and never falls back to a raw microphone. Turns a
   the window's quietest frame at onset as its quiet reference, and a frame within 1.5x of that reference counts as silent.
   Stationary ambient therefore ends its turn after the 900 ms silence clock (or the 4 s soft wait), not at the 30 s cap.
   Speech after silence is judged against that silence, so only a steady level with no quiet part is affected.
-- Output-aware onset: while our own speaker is audible (plus a 260 ms reverb tail), a residual EMA of the AEC output sets
-  the onset threshold to at least `residual * 3`. Level events report `floor`, `residual` (null when nothing is audible)
-  and `outputActive`.
+- Output-aware onset: while our own speaker is audible, or held for 1.5 s after it was last audible, the onset threshold is
+  at least `residual * 2`. The residual is a session value. It is seeded once from the median of the first five
+  output-window frames (never from one frame). It jumps to its cap when the median of the latest five is above 0.0045, so
+  a loud echo that follows a quiet start (AEC latency) is learned. Its effective value is never below 0.002 (so a quiet
+  first frame cannot seed it low) and never above 0.003 (so a sustained talker is not absorbed into it). The EMA learns
+  only from frames between 0.001 and 0.0045. Silence never decays it: a paused chunk is silent on the device while still
+  in flight, and an inter-chunk gap is silent too. User speech above 0.0045 never raises it. Net effect while held: the
+  threshold is between 0.004 and 0.006, so steady echo at 0.003, 0.0045 or 0.005 (from a steady start or a quiet one) is
+  never an onset, and user speech at about 0.008 is.
+  Limits (disclosed, measured with the selftest): the threshold never exceeds 0.006, so echo above 0.006 RMS at the device
+  still starts a turn while output is audible. Speech at or below 0.006 RMS does not barge in during output or the 1.5 s
+  hold, so quiet speech over output (Limitations: 0.003 to 0.008 on the owner's microphone) may be held back. This trade
+  is accepted pending a product decision on the measured quiet-speech level. Level events report `floor`, `residual` (null
+  when nothing is held) and `outputActive`.
+- Pre-roll and echo: each pre-roll frame keeps its capture time (Out.Clock). A frame captured while our output was audible,
+  or in its 260 ms reverb tail, is echo when it is below 0.006 RMS, and such a frame is dropped rather than replayed. A
+  louder frame in that window is user speech over our output, so it is kept. A new turn replays the kept frames, and its
+  onset (`onsetMono`) is the capture time of the first loud frame, so an echo of our own speech is never replayed as the
+  start of a user turn.
+- Duplex stop reason (`duplex.stopped`): `stop` (the Host asked for it), `mute` (the microphone was muted and the loop
+  ended for it), `lifetime` (the lifetime bound ran out; a mute that lands in the same read as an expired bound is
+  reported as `lifetime`), or `error`.
+- Pause release on failure: a `playback.error` for a generation releases that generation's device pause, so the next
+  chunk of the generation is not paused and can complete. (The Host side of this, releasing its own hold, is a Host-lane change.)
 - Endpointing: duplex speech always ends with `speech_end` after the silence clock. A burst under 250 ms ends the turn with
   `short: true` and `stt.none` reason `too_short`, with no decode. Speech with no frame above the onset threshold for 4 s
   ends the turn regardless of recognizer evidence.
+- A `playback.error` for a generation releases that generation's pause request on the worker, so the rest of the gen plays
+  unpaused. The Host clears its hold on that error and must not rely on the worker keeping the gen paused.
 - Pause receipts: `playback.paused` (on) reports `requestMono` (when the request arrived), and `silentMono`/`meterSilentMs`
   when the render meter read silent within 1.5 s. Both are measured from the moment the device was paused, not from the
   request, so a pause requested before any audio plays is not charged for the wait. `wasAudible` is the meter at that

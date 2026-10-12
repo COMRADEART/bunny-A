@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { VoiceSessionManager, type VoiceTaskEvent } from "./voice-session.server.ts";
 import type { VoiceWorkerPort } from "./voice-worker.server.ts";
 import { VOICE_LIMITS, VOICE_PROTOCOL, type WorkerCommand, type WorkerEvent } from "./voice-protocol.ts";
-import { VoiceTurnTaking, echoOverlap, echoTokens, tokenize, type TurnEvidence } from "./voice-turn-taking.ts";
+import { VoiceTurnTaking, echoMatch, echoOverlap, echoTokens, tokenize, type TurnEvidence } from "./voice-turn-taking.ts";
 
 /** Synthetic protocol regression only: a fake worker and a virtual clock. These tests make no acoustic or hardware claims. */
 class Worker implements VoiceWorkerPort {
@@ -176,10 +176,12 @@ const pauses = (w: Worker) => w.sent.filter((c): c is Extract<WorkerCommand, { o
 // Lifecycle and the explicit grant (P2, P4, P5, items 5-7)
 // -----------------------------------------------------------------------------------------------------------------
 
-test("T12 grant: opening hands-free alone has no microphone; the explicit start opens it with the grant as the lifetime bound", async () => {
+test("T12 grant: opening hands-free alone has no microphone and no grant; the explicit start opens it with the grant as the lifetime bound", async () => {
   const h = await harness();
   assert.equal(h.session.snapshot().capturing, false);
-  assert.ok(h.session.snapshot().duplex?.grantExpiresAt, "open(hands_free) records the user's grant");
+  // T12-PRIV-01: only a Start hands-free creates the grant. A mode open or switch never does, so no duplex.start follows it.
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null, "open(hands_free) records no grant");
+  assert.equal(duplexStarts(h.worker()).length, 0, "open(hands_free) sends no duplex.start");
   await h.begin();
   assert.equal(h.session.snapshot().capturing, true);
   assert.equal(duplexStarts(h.worker())[0].maxMs, VOICE_LIMITS.duplexGrantMs);
@@ -594,6 +596,8 @@ test("T12 echo: a transcript that is not Bunny's speech is not treated as echo",
   await h.final("Explain the moon");
   h.speaking();
   h.emitInput({ ev: "vad", state: "speech_start" });
+  // AEC-03: a final during output interrupts only with audible speech behind it; 600 ms of the user's voice is heard here.
+  h.emitInput({ ev: "level", rms: 0.05, peak: 0.1, speech: true, speechMs: 600 });
   h.emitInput({ ev: "stt.final", text: "Wait, what about Mars and the rovers", confidence: 0.9 });
   await tick();
   assert.equal(h.session.snapshot().turnDecision?.action, "interrupt");
@@ -616,7 +620,10 @@ test("T12 confirm (item 2): a confirm spoken over Bunny's own output never execu
   await h.final("explain the moon");
   h.speaking();
   h.emitInput({ ev: "vad", state: "speech_start" });
-  h.emitInput({ ev: "stt.final", text: "confirm", confidence: 0.9 });
+  // AEC-03: a lone "confirm" over output is unconfirmed speech and resumes the reply; "confirm it" with 600 ms of voice interrupts and
+  // is routed, and the overlapped turn is refused as a confirmation.
+  h.emitInput({ ev: "level", rms: 0.05, peak: 0.1, speech: true, speechMs: 600 });
+  h.emitInput({ ev: "stt.final", text: "confirm it", confidence: 0.9 });
   await tick();
   const snap = h.session.snapshot();
   assert.deepEqual(h.controls, [], "no canonical command ran");
@@ -943,8 +950,9 @@ test("T12 controller: a final during output that is backchannel or hesitation re
   for (const text of ["Yeah.", "uh-huh", "Mm-hmm", "mm hmm", "Okay", "Got it", "I see", "um", "uh, yep", "Sure!"]) {
     assert.equal(during(text), "resume", text);
   }
-  assert.equal(during("Explain the moon"), "interrupt");
-  assert.equal(during("Explain the moon", 0.05), "resume", "a barely-heard final is not an interrupt");
+  assert.equal(during("Explain the moon", 0.8, 600), "interrupt");
+  assert.equal(during("Explain the moon", 0.8, 300), "resume", "AEC-03: 300 ms of speech is not enough for an unconfirmed final");
+  assert.equal(during("Explain the moon", 0.05, 600), "resume", "a barely-heard final is not an interrupt");
   assert.equal(during("Wait, what?", 0.9), "interrupt");
 });
 
@@ -1123,6 +1131,7 @@ test("T12 hold ownership (round 2): an older finalizing turn never cancels a new
   assert.notEqual(newer.turn, older.turn);
   h.emitInput({ ev: "vad", state: "speech_start" }, newer);
   assert.equal(h.session.snapshot().lastBargeIn?.inputTurnId, newer.turn, "the newer turn took over the pause");
+  h.emitInput({ ev: "level", rms: 0.05, peak: 0.1, speech: true, speechMs: 300 }, older);
   h.emitInput({ ev: "stt.final", text: "Wait, what about Mars", confidence: 0.9 }, older);
   await tick();
   const mid = h.session.snapshot();
@@ -1157,6 +1166,7 @@ test("T12 F1 duplex: 'stop talking' while Bunny speaks silences her, speaks noth
   const speaks = () => h.worker().sent.filter((c) => c.op === "speak").length;
   const spokenBefore = speaks();
   h.emitInput({ ev: "vad", state: "speech_start" });
+  h.emitInput({ ev: "level", rms: 0.05, peak: 0.1, speech: true, speechMs: 300 });
   h.emitInput({ ev: "stt.final", text: "stop talking", confidence: 0.9 });
   await tick();
   const snap = h.session.snapshot();
@@ -1191,5 +1201,307 @@ test("T12 F3 duplex: a clean spoken draft request drafts one Mission through the
   assert.deepEqual(h.drafted, [{ objective: "the dashboard project", projectId: null }]);
   assert.equal(h.admissions.length, 0, "a draft is not a chat question");
   assert.match(h.session.snapshot().answer ?? "", /^I drafted a Mission: the dashboard project\. It is waiting for review on the Windows Host screen\. I can't approve or start it by voice\./);
+  await h.session.close();
+});
+
+// -----------------------------------------------------------------------------------------------------------------
+// Review round: grant creation (PRIV), Host-side expiry (RES-07), echo tail (AEC-02), final authority (AEC-03), echo
+// specificity (AEC-04), playback state and hold release (RC-01, RC-02, RC-05, RC-07, RC-08)
+// -----------------------------------------------------------------------------------------------------------------
+
+test("T12-PRIV-01: a switch to hands_free never reopens the microphone when the turn in flight settles", async () => {
+  const h = await harness();
+  await h.session.close();
+  await h.session.open("push_to_talk");
+  await h.session.text("Explain the moon");
+  await tick();
+  const turn = h.session.snapshot().turnId!;
+  const gen = h.session.snapshot().generation;
+  h.speaking();
+  await h.session.open("hands_free");
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null, "the mode switch records no grant");
+  h.done();
+  h.worker().emit({ ev: "playback.chunk_done", turn, gen, seq: 0 });
+  h.worker().emit({ ev: "playback.idle", turn, gen });
+  await tick();
+  h.advance(VOICE_LIMITS.duplexGrantMs / 10);
+  await tick();
+  assert.equal(duplexStarts(h.worker()).length, 0, "no duplex.start without a Start hands-free click");
+  assert.equal(h.session.snapshot().capturing, false);
+  await h.session.close();
+});
+
+test("T12-PRIV-02: a refused hands-free start leaves no grant: muted, and closed sessions take none", async () => {
+  const h = await harness();
+  h.session.mute(true);
+  await h.session.listenStart("hands_free");
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null, "a muted start records no grant");
+  assert.equal(duplexStarts(h.worker()).length, 0);
+  await h.session.close();
+  await h.session.listenStart("hands_free");
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null, "a closed session records no grant");
+});
+
+test("T12-PRIV-01 (round 2): a hands-free start made outside hands-free mode records no grant, so a later hotkey press cannot open the microphone", async () => {
+  // The verifier's probe: open(push_to_talk); listenStart('hands_free'); open('hands_free'); listenStart('hotkey').
+  const h = await harness();
+  await h.session.close();
+  await h.session.open("push_to_talk");
+  await h.session.listenStart("hands_free");
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null, "a start outside hands-free mode records no grant");
+  await h.session.open("hands_free");
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null, "the mode switch records no grant");
+  await h.session.listenStart("hotkey");
+  await tick();
+  assert.equal(duplexStarts(h.worker()).length, 0, "a hotkey press with no grant never starts the duplex lane");
+  assert.equal(h.session.snapshot().duplex?.grantExpiresAt, null);
+  await h.session.close();
+});
+
+test("T12 RES-07: the Host ends a live hands-free lane at the grant's end with reason lifetime, even while speech keeps it active", async () => {
+  const h = await harness();
+  await h.begin();
+  for (let elapsed = 0; elapsed < VOICE_LIMITS.duplexGrantMs; elapsed += 60_000) {
+    h.advance(60_000);
+    // Continuous user speech keeps the idle release from firing, so only the grant's end can stop the lane.
+    h.emitInput({ ev: "vad", state: "speech_start" });
+  }
+  await tick();
+  const snap = h.session.snapshot();
+  assert.equal(snap.duplex?.active, false, "the lane ended at the grant's end");
+  assert.equal(snap.duplex?.stopped?.reason, "lifetime");
+  assert.equal(snap.duplex?.grantExpiresAt, null);
+  assert.equal(h.worker().sent.filter((c) => c.op === "duplex.stop").length, 1, "the Host told the worker to release the microphone");
+  await h.session.close();
+});
+
+test("T12 AEC-02: a turn whose speech starts just after Bunny stopped is her own tail; her last sentence is dropped as echo, with no Task", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Explain the moon");
+  h.speaking();
+  const turn = h.session.snapshot().turnId!;
+  const gen = h.session.snapshot().generation;
+  h.done();
+  h.worker().emit({ ev: "playback.chunk_done", turn, gen, seq: 0 });
+  h.worker().emit({ ev: "playback.idle", turn, gen });
+  await tick();
+  assert.equal(h.session.snapshot().state, "IDLE");
+  h.advance(200);
+  const admitted = h.admissions.length;
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  h.emitInput({ ev: "stt.final", text: SENTENCE.trim(), confidence: 0.95 });
+  await tick();
+  assert.equal(h.admissions.length, admitted, "no Task");
+  assert.equal(h.session.snapshot().turnDecision?.reason, "echo_of_own_speech");
+  await h.session.close();
+});
+
+test("T12 AEC-02 (control): the same words from a quiet turn a second after Bunny stopped are the user's own turn", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Explain the moon");
+  h.speaking();
+  const turn = h.session.snapshot().turnId!;
+  const gen = h.session.snapshot().generation;
+  h.done();
+  h.worker().emit({ ev: "playback.chunk_done", turn, gen, seq: 0 });
+  h.worker().emit({ ev: "playback.idle", turn, gen });
+  await tick();
+  h.advance(1_000);
+  const admitted = h.admissions.length;
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  h.emitInput({ ev: "stt.final", text: SENTENCE.trim(), confidence: 0.95 });
+  await tick();
+  assert.equal(h.admissions.length, admitted + 1, "a quiet turn is routed as the user's words");
+  await h.session.close();
+});
+
+test("T12 AEC-03: a whisper hallucination during output never interrupts, and it is routed nowhere", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final();
+  h.speaking();
+  const gen = h.session.snapshot().generation;
+  const admitted = h.admissions.length;
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  h.emitInput({ ev: "level", rms: 0.05, peak: 0.1, speech: true, speechMs: 600 });
+  h.emitInput({ ev: "stt.final", text: "Thank you for watching.", confidence: 0.9 });
+  await tick();
+  const snap = h.session.snapshot();
+  assert.equal(snap.generation, gen, "no barge-in");
+  assert.equal(snap.turnDecision?.reason, "hallucination_during_output");
+  assert.equal(h.admissions.length, admitted, "no Task");
+  assert.equal(snap.outputHeld, false, "the reply resumes");
+  await h.session.close();
+});
+
+test("T12 AEC-03 controller: a final during output interrupts only on an interrupt phrase after 180 ms or sustained speech after 500 ms", () => {
+  const during = (text: string, ms: number, confidence = 0.9) => {
+    const c = new VoiceTurnTaking();
+    pauseAt(c, { kind: "speech_start", outputActive: true });
+    c.decide({ kind: "level", speechMs: ms });
+    return c.decide({ kind: "final", text, confidence, echo: false, outputActive: true })?.action;
+  };
+  assert.equal(during("Wait", 200), "interrupt", "an interrupt phrase after 180 ms");
+  assert.equal(during("Wait", 100), "resume", "an interrupt phrase too short to be speech does not interrupt");
+  assert.equal(during("Explain the moon", 600), "interrupt");
+  assert.equal(during("Explain the moon", 300), "resume", "300 ms is not sustained speech");
+  assert.equal(during("Mars", 900), "resume", "one content word is not enough");
+  for (const text of ["Thank you for watching", "thanks for watching", "Thank you.", "you", "Bye", "Subtitles by the Amara.org community"]) assert.equal(during(text, 900), "resume", text);
+});
+
+test("T12 AEC-04: echo needs specificity: short barge-ins are never echo, and evidence is judged per spoken chunk", () => {
+  const letMe = [echoTokens("Let me stop there for a moment while I check the rest.")];
+  assert.equal(echoMatch("stop", letMe, 0.6), false, "one word is never echo");
+  assert.equal(echoMatch("stop there", letMe, 0.6), false, "two words are never echo");
+  assert.equal(echoMatch("let me stop there", letMe, 0.6), true, "Bunny's own words, in order, are echo");
+  assert.equal(echoMatch("stop let me stop there", letMe, 0.6), false, "an interrupt phrase that is not part of the run is not echo");
+  const moonCircles = [echoTokens("The moon circles Earth."), echoTokens("It shows us the same face.")];
+  assert.equal(echoMatch("moon circles shows same", moonCircles, 0.6), false, "tokens split across two chunks are not one chunk's echo");
+  assert.equal(echoOverlap("moon circles shows same", new Set(moonCircles.flat())), 1, "the union would wrongly call it echo");
+  assert.equal(echoMatch("the moon circles earth", moonCircles, 0.6), true);
+  assert.equal(echoOverlap("stop", new Set(["stop"])), 0, "a short transcript has no numeric overlap");
+});
+
+test("T12 AEC-04: Bunny said 'Let me stop there', the user says 'stop': the barge-in reaches speech_stop and cancels the reply", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Explain the moon");
+  h.speaking("Let me stop there for a moment while I check the rest of the answer. ");
+  const gen = h.session.snapshot().generation;
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  h.emitInput({ ev: "level", rms: 0.05, peak: 0.1, speech: true, speechMs: 300 });
+  h.emitInput({ ev: "stt.final", text: "stop", confidence: 0.9 });
+  await tick();
+  const snap = h.session.snapshot();
+  assert.equal(snap.turnDecision?.action, "interrupt");
+  assert.equal(snap.turnKind, "speech_stop", "the barge-in is routed as a speech stop");
+  assert.ok(h.worker().sent.some((c) => c.op === "speak.cancel" && c.gen === gen), "the reply is cancelled");
+  await h.session.close();
+});
+
+test("T12 RC-01: a single-chunk reply held on onset and resumed still settles to IDLE once its playback ends", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Explain the moon");
+  const turn = h.session.snapshot().turnId!;
+  const gen = h.session.snapshot().generation;
+  // One chunk streams in (state PROCESSING, nothing audible yet). The user starts speaking, so the chunk is held before it plays.
+  h.outputs.get(h.admissions.at(-1)!)?.({ text: SENTENCE });
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  assert.equal(h.session.snapshot().outputHeld, true);
+  h.worker().emit({ ev: "playback.started", turn, gen, seq: 0 });
+  assert.equal(h.session.snapshot().state, "SPEAKING", "the state follows the chunk even while held");
+  assert.equal(h.session.snapshot().playing, false, "a held reply is not audible");
+  h.advance(VOICE_LIMITS.heldResumeMs + 1);
+  assert.equal(h.session.snapshot().outputHeld, false);
+  assert.ok(pauses(h.worker()).some((c) => !c.on && c.gen === gen), "resumed");
+  h.worker().emit({ ev: "playback.paused", turn, gen, on: false });
+  assert.equal(h.session.snapshot().playing, true, "audible again on the resume receipt");
+  h.done();
+  h.worker().emit({ ev: "playback.chunk_done", turn, gen, seq: 0 });
+  h.worker().emit({ ev: "playback.idle", turn, gen });
+  await tick();
+  assert.equal(h.session.snapshot().state, "IDLE", "the reply settles");
+  assert.equal(h.session.snapshot().playing, false);
+  await h.session.close();
+});
+
+test("T12 RC-02: a playback error on a held reply releases the worker's pause for that generation before the hold is dropped", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final();
+  h.speaking();
+  const turn = h.session.snapshot().turnId!;
+  const gen = h.session.snapshot().generation;
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  assert.equal(h.session.snapshot().outputHeld, true);
+  h.worker().emit({ ev: "playback.error", turn, gen, code: "TTS_UNAVAILABLE", message: "the device refused the pause" });
+  await tick();
+  assert.deepEqual(pauses(h.worker()).filter((c) => c.gen === gen).map((c) => c.on), [true, false], "the pause-off is sent after the pause-on, for the failed generation");
+  assert.equal(h.session.snapshot().outputHeld, false);
+  await h.session.close();
+});
+
+test("T12 RC-05: close, mute, duplex.error and capture.error cancel a held reply: the receipt says interrupted, and no pause-off is sent", async () => {
+  for (const action of ["close", "mute", "duplex.error", "capture.error"] as const) {
+    const h = await harness();
+    await h.begin();
+    await h.final();
+    h.speaking();
+    const turn = h.session.snapshot().turnId!;
+    const gen = h.session.snapshot().generation;
+    const session = duplexStarts(h.worker())[0].session;
+    // A mute with nothing left in flight still cancels: the chunk has finished, playback is still open.
+    if (action === "mute") h.worker().emit({ ev: "playback.chunk_done", turn, gen, seq: 0 });
+    h.emitInput({ ev: "vad", state: "speech_start" });
+    assert.equal(h.session.snapshot().outputHeld, true, action);
+    if (action === "close") await h.session.close();
+    else if (action === "mute") h.session.mute(true);
+    else if (action === "duplex.error") h.worker().emit({ ev: "duplex.error", session, code: "DEVICE_LOST", message: "device gone" });
+    else h.worker().emit({ ev: "capture.error", turn: null, gen: null, code: "DEVICE_LOST", message: "device gone" });
+    await tick();
+    const receipt = h.session.snapshot().lastBargeIn;
+    assert.equal(receipt?.outcome, "interrupted", action);
+    assert.ok(!pauses(h.worker()).some((c) => !c.on && c.gen === gen), `${action}: no pause-off for the cancelled generation`);
+    assert.ok(h.worker().sent.some((c) => c.op === "speak.cancel" && c.gen === gen), `${action}: the reply is cancelled`);
+    assert.equal(h.session.snapshot().outputHeld, false, action);
+    if (action !== "close") await h.session.close();
+  }
+});
+
+test("T12 RC-07: a playback error ends the echo window of the chunks that played, so they stop counting as echo", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Explain the moon");
+  h.speaking();
+  const turn = h.session.snapshot().turnId!;
+  const gen = h.session.snapshot().generation;
+  h.worker().emit({ ev: "playback.error", turn, gen, code: "TTS_UNAVAILABLE", message: "playback failed" });
+  h.done();
+  await tick();
+  h.advance(VOICE_LIMITS.echoWindowMs + 1);
+  await h.final("Explain Mars");
+  h.speaking("Mars has two small moons named Phobos and Deimos orbiting it. ");
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  h.emitInput({ ev: "level", rms: 0.05, peak: 0.1, speech: true, speechMs: 600 });
+  // The failed chunk's words are the user's now: outside its window, they are not echo, so they can interrupt.
+  h.emitInput({ ev: "stt.final", text: SENTENCE.trim(), confidence: 0.9 });
+  await tick();
+  assert.equal(h.session.snapshot().turnDecision?.action, "interrupt", "not dropped as echo of the failed chunk");
+  await h.session.close();
+});
+
+test("T12 RC-08: a worker-initiated lifetime stop releases a held reply at once, without waiting for the resume timer", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final();
+  h.speaking();
+  const gen = h.session.snapshot().generation;
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  const start = duplexStarts(h.worker())[0];
+  h.worker().emit({ ev: "duplex.stopped", session: start.session, reason: "lifetime" });
+  await tick();
+  assert.equal(h.session.snapshot().outputHeld, false, "released now, not at heldResumeMs");
+  assert.ok(pauses(h.worker()).some((c) => !c.on && c.gen === gen), "resumed on its own generation");
+  assert.equal(h.session.snapshot().lastBargeIn?.outcome, "resumed");
+  await h.session.close();
+});
+
+test("T12 RC-08 (round 2): a worker mute stop is recorded as a mute release, not an error, and a held reply is interrupted", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final();
+  h.speaking();
+  const gen = h.session.snapshot().generation;
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  const start = duplexStarts(h.worker())[0];
+  h.worker().emit({ ev: "duplex.stopped", session: start.session, reason: "mute" });
+  await tick();
+  assert.equal(h.session.snapshot().duplex?.stopped?.reason, "mute", "the receipt names the mute release");
+  assert.equal(h.session.snapshot().outputHeld, false, "the held reply is released now");
+  assert.equal(h.session.snapshot().lastBargeIn?.outcome, "interrupted", "a mute release never resumes the reply");
+  assert.ok(!pauses(h.worker()).some((c) => !c.on && c.gen === gen), "no pause-off is sent for the cancelled reply");
   await h.session.close();
 });

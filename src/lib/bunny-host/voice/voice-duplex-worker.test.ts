@@ -80,7 +80,10 @@ test("T12 native fixture: mute stops continuous source; close leaves zero active
   try {
     await start(h);
     h.worker.send({ op: "mute", on: true });
-    await h.until(e => e.ev === "duplex.stopped");
+    const stopped = await h.until(e => e.ev === "duplex.stopped") as unknown as { reason: string };
+    // T12 (PRIV-03): a mute is never reported as the lifetime bound. The mute op stops the loop as a stop; a loop that sees the
+    // mute first reports "mute" (native selftest duplexStopReasonOnMute).
+    assert.notEqual(stopped.reason, "lifetime", "a mute-driven stop is not labelled as the lifetime bound");
     h.worker.send({ op: "capture.start", turn: "muted", gen: 1, device: -1, endpointing: "manual", maxMs: 1000, duplex: true, session: "fixture-duplex" });
     await h.until(e => e.ev === "capture.error" && e.code === "MUTED");
     await h.worker.close();

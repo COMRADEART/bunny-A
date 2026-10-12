@@ -380,7 +380,9 @@ test("T12 F2: a Mission stop is a mission_control; an agent noun in the same utt
 test("T12 F3: a draft request is mission_draft with its objective; approve, run or start wording stays refused", () => {
   assert.equal(kind("prepare a plan for the dashboard project"), "mission_draft");
   assert.equal(classifyTranscript("prepare a plan for the dashboard project").target, "the dashboard project");
-  assert.equal(classifyTranscript("draft a mission to write release notes").target, "write release notes");
+  // T12-AUTH-01: "release" is a sensitive verb in every form, so a draft that names it is refused rather than drafted. Exempting
+  // the word as a noun would let "prepare a plan to release the app" through, so the draft is refused (was mission_draft).
+  assert.equal(kind("draft a mission to write release notes"), "sensitive_refused");
   assert.equal(classifyTranscript("create a mission to build the inventory page").target, "build the inventory page");
   for (const text of ["create a mission and run it", "start a new mission", "approve the mission", "delegate it and approve", "create a mission and deploy it", "make a plan and publish it", "prepare a plan and approve it"])
     assert.equal(kind(text), "sensitive_refused", text);
@@ -399,8 +401,9 @@ test("T12 F3 round 2: a draft that also says start, begin, proceed, go live, act
     assert.equal(kind(text), "sensitive_refused", text);
     assert.notEqual(kind(text), "mission_draft", text);
   }
-  // A draft without an action word still drafts; the subject word "release" is not an action.
-  assert.equal(kind("draft a mission to write release notes"), "mission_draft");
+  // A draft without an action word still drafts. "release" is no longer a subject word (T12-AUTH-01), so release notes refuse.
+  assert.equal(kind("draft a mission to write dashboard notes"), "mission_draft");
+  assert.equal(kind("draft a mission to write release notes"), "sensitive_refused");
 });
 
 test("T12 hostile: override, approve-all and owner claims are sensitive_refused", () => {
@@ -446,4 +449,77 @@ test("T12 F7: redirect-shaped turns, including named roles, are redirect_unsuppo
   assert.equal(kind("tell the tester to also check the README"), "redirect_unsupported");
   assert.equal(kind("have the agent do the review instead"), "redirect_unsupported");
   assert.equal(kind("tell the tester to approve it"), "sensitive_refused");
+});
+
+// T12-AUTH-01 (review): one inflection-aware lexicon judges drafts and chat alike. Every reproduction phrase from the finding is
+// refused, whatever its inflection, and the draft prefix never makes a destructive wording into a Mission.
+test("T12-AUTH-01: inflected destructive drafts are sensitive_refused, never mission_draft", () => {
+  for (const text of [
+    "prepare a plan for deleting the production database",
+    "make a plan for wiping the cache",
+    "prepare a plan for force pushing main",
+    "prepare a plan for publishing the blog post",
+    "prepare a plan for reinstalling windows",
+    "prepare a plan for changing the provider settings",
+    "prepare a plan for sending the data to the vendor",
+    "prepare a plan for killing all processes",
+    "prepare a plan for dropping the tables",
+    "prepare a plan for overwriting the config",
+    "prepare a plan to release the app",
+    // T12-AUTH-01 (round 2): "merg" covers every inflection of merge.
+    "prepare a plan for merging the branch",
+    "prepare a plan for the git merging",
+  ])
+    assert.equal(kind(text), "sensitive_refused", text);
+});
+
+test("T12-AUTH-01: the same destructive words without a draft prefix are refused on the chat path too", () => {
+  for (const text of ["deleting the repo now", "git reset hard", "email the report", "delete the repo", "publish", "push", "wipe the drive"])
+    assert.equal(kind(text), "sensitive_refused", text);
+  // T12-AUTH-01 (round 2): the chat path reads the draft path's lexicon, so each inflected verb is refused as a plain statement too.
+  for (const text of [
+    "reinstalling windows",
+    "rebooting the machine",
+    "installing the update",
+    "uninstalling the driver",
+    "executing the script",
+    "shipping the build",
+    "running the migration",
+    "configuring the firewall",
+    "modifying the registry",
+    "launching the app",
+    "formatting the disk",
+    "sharing the folder with bob",
+    "merging the branch",
+  ])
+    assert.equal(kind(text), "sensitive_refused", text);
+});
+
+test("T12-AUTH-01: ordinary status wording that shares a stem is still answered, not refused", () => {
+  assert.equal(kind("is the agent running"), "agent_status");
+  assert.notEqual(kind("the step was changed"), "sensitive_refused");
+  assert.notEqual(kind("what changed in the last mission"), "sensitive_refused");
+  assert.notEqual(kind("check my emails from the boss"), "sensitive_refused");
+  assert.equal(kind("kill the agent"), "agent_control", "a named agent is still a stop proposal");
+});
+
+test("T12-AUTH-01 (round 2): a benign collision with a stem is not refused, on either path", () => {
+  // "changelog", "startup" and "dropdown" share a prefix with a stem but are different words.
+  assert.equal(kind("draft a mission to write the changelog"), "mission_draft");
+  assert.equal(kind("draft a mission for the startup pitch"), "mission_draft");
+  assert.equal(kind("draft a mission to fix the dropdown menu"), "mission_draft");
+  assert.equal(kind("the changelog looks fine"), "chat");
+});
+
+// T12-AUTH-04 (review): "pause the mission" is never folded into an Agent pause or resume. It is answered as a Mission control
+// with no proposal, so the intent carries the verb and no agent target.
+test("T12-AUTH-04: pause or resume aimed at a Mission is a Mission answer, never an Agent proposal", () => {
+  for (const [text, verb] of [["pause the mission", "pause"], ["resume the mission", "resume"], ["resume the mission alpha", "resume"]] as const) {
+    const intent = classifyTranscript(text);
+    assert.equal(intent.kind, "mission_control", text);
+    assert.equal(intent.missionVerb, verb, text);
+  }
+  assert.equal(classifyTranscript("pause the agent").missionVerb, undefined);
+  assert.equal(kind("pause alpha"), "agent_control");
+  assert.equal(classifyTranscript("stop the mission").missionVerb, undefined, "a stop of a Mission is still the Mission stop");
 });
