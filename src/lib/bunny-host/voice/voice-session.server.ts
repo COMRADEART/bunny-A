@@ -72,6 +72,11 @@ const UNFINISHED_LAST_WORD = /\b(?:and|but|or|because|if|a|an|the|my|your|our|th
  * a sentence (or on whisper's trailing ellipsis), is unfinished (review round 6: "Prepare a plan for the" is a draft whose
  * objective is "the"). Anything else (a stop, a close, a refusal, a status question, a confirm, a control) is never held.
  */
+/** Review round 7: an objective that is only filler words or ends on a word that cannot end a sentence was cut off. */
+function isCutOffObjective(objective: string): boolean {
+  const t = objective.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+  return !t || UNFINISHED_LAST_WORD.test(t) || /^(?:it|this|that|them|something|stuff|things?)$/.test(t);
+}
 function isUnfinishedChat(text: string, proposalPending: boolean): boolean {
   const kind = classifyTranscript(text, { proposalPending }).kind;
   if (kind !== "chat" && kind !== "mission_draft") return false;
@@ -1216,6 +1221,8 @@ export class VoiceSessionManager {
     const port = this.deps.agents;
     const now = this.now();
     if (!port.draftMission) return this.answerHost(DRAFT_REFUSAL, turn);
+    // Review round 7: a request cut off before its subject ("Prepare a plan for the") drafts nothing.
+    if (isCutOffObjective(objective)) return this.answerHost("I couldn't draft that Mission because the request was cut off. Nothing was created. Please say the whole request again.", turn);
     if (this.lastDraftAt !== null && now - this.lastDraftAt < VOICE_LIMITS.voiceDraftMinIntervalMs) return this.answerHost("Please wait a moment before drafting another Mission.", turn);
     // T12 RES-01: counted from canonical state. The recency window of the facts never holds every waiting draft.
     const waiting = port.pendingVoiceDrafts
@@ -2528,6 +2535,8 @@ export class VoiceSessionManager {
         return this.touch();
       case "mute":
         this.snap.muted = event.on;
+        // Review round 7: a worker-reported mute drops held words too, as a Host mute does.
+        if (event.on) this.dropFragment("muted");
         return this.touch();
       case "bye":
         return this.onWorkerExit(this.worker, null);

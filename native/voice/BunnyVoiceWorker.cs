@@ -1373,6 +1373,9 @@ internal sealed class AmbientFloor
     // Round 5: more audible frames than a pre-onset burst of user speech can supply (an onset needs 6 frames above threshold).
     public const int BurstAudibleMin = 8;
     public const int BurstLeadMaxFrames = 50;
+    // Review round 7: the first seed skips at most 200 ms of quiet lead-in. On the measured (quiet) device the echo is below
+    // ResidualLearnLow, so a longer skip let a user who spoke in the first second of the first reply seed the residual.
+    public const int FirstSeedLeadMaxFrames = 10;
     readonly double[] burstRing = new double[BurstSeedFrames];
     readonly double[] burstSort = new double[BurstSeedFrames];
     int burstCount;
@@ -1470,8 +1473,8 @@ internal sealed class AmbientFloor
                 // and only frames inside the learning band are averaged in.
                 if (output)
                 {
-                    // Round 6: the first seed also skips a quiet lead-in (AEC latency, TTS lead-in) of up to 1 s.
-                    if (residualSeeded || rms >= ResidualLearnLow || seedLead >= BurstLeadMaxFrames) PushSeedLocked(rms);
+                    // Rounds 6/7: the first seed also skips a quiet lead-in (AEC latency, TTS lead-in) of up to 200 ms.
+                    if (residualSeeded || rms >= ResidualLearnLow || seedLead >= FirstSeedLeadMaxFrames) PushSeedLocked(rms);
                     else seedLead++;
                     // Round 5: the window opens at the burst's first audible frame; a silent lead-in of up to 1 s is skipped.
                     // A quiet device (all output frames silent) opens it after 1 s and learns its quiet level.

@@ -1706,3 +1706,24 @@ test("T12 review r6: a three-part sentence waits again, worker exit and interrup
   assert.equal(i.session.snapshot().finalTranscript, "dashboard", "an interrupt cut the unfinished sentence");
   await i.session.close();
 });
+
+test("T12 review r7: a cut-off draft that timed out creates nothing, and a worker-reported mute drops held words", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Prepare a plan for the");
+  h.advance(2600);
+  await tick();
+  await tick();
+  assert.equal(h.drafted.length, 0, "no Mission is drafted from a cut-off request");
+  assert.match(h.session.snapshot().answer ?? "", /request was cut off\. Nothing was created/);
+  await h.session.close();
+  const m = await harness();
+  await m.begin();
+  await m.final("Tell me about the");
+  m.worker().emit({ ev: "mute", on: true });
+  m.advance(2600);
+  await tick();
+  await tick();
+  assert.equal(m.admissions.length, 0, "a worker-reported mute dropped the held words");
+  await m.session.close();
+});
