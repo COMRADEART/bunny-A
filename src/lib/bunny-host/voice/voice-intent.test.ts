@@ -553,7 +553,7 @@ test("T12 live: requests to act on the computer get the fixed answer, never the 
 });
 
 test("T12 live: model text claiming an action is detected; ordinary answers are not", () => {
-  for (const text of ["Done.", "Okay, done!", "I've saved it to your desktop.", "The file has been saved.", "Sure! I opened Notepad.", "I have stopped the agent."]) {
+  for (const text of ["Done.", "Okay, done!", "I've saved it to your desktop.", "The file has been saved.", "Sure! I opened Notepad.", "I have stopped the agent.", "Confirm, paused.", "Approved!", "Okay, it's stopped."]) {
     assert.equal(claimsAction(text), true, text);
   }
   for (const text of ["I wrote a short poem for you.", "Matrix is a 1999 film.", "It's done on the Windows Host screen.", "That is done on the Windows Host screen.", "The tests passed."]) {

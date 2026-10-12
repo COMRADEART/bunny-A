@@ -271,6 +271,8 @@ const ACTION_CLAIM: RegExp[] = [
   /^(?:(?:ok(?:ay)?|sure|alright|all right|got it)[\s,!.]*)?(?:(?:all |it'?s |it is |that'?s |that is )?done)[\s.!]*$/,
   /\bi(?:'ve| have| just| already)* (?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|ran|started|stopped|paused|resumed|turned (?:on|off)|changed|moved|renamed|downloaded|uploaded|enabled|disabled)\b/,
   /\b(?:has|have) (?:now )?been (?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled)\b/,
+  // T12 live (agent-speech run 1): the model answered "Confirm, paused." A bare outcome word as the whole sentence is a claim.
+  /^(?:(?:confirm(?:ed)?|ok(?:ay)?|sure|alright|yes|done)[\s,!.]+)?(?:it'?s |it is |agent |the agent )?(?:paused|stopped|approved|resumed|started|cancell?ed|saved|opened|closed|deleted|executed|granted)[\s.!]*$/,
 ];
 export function claimsAction(text: string): boolean {
   const t = text.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim();
