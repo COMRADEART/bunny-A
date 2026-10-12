@@ -1,0 +1,89 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "scripts",
+      "test": "V47-V49: every edge, work area, size and offset places the notch fully inside the WorkArea",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V47: top and bottom are horizontal with agent indicators LEFT of the body",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V48: left and right are vertical with agent indicators at the TOP of the body",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V47/V48: the indicator axis follows the notch orientation (a column beside a horizontal notch, a row above a vertical one)",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V47/V48: the vertical size is swapped before placement (length along the edge, thickness across it)",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 composite truth in WPF: Listening and speaking only with capture and playback, Speaking only from playback, Paused for a held reply",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 idle release (item 6): no speech and no output for duplexIdleMs stops duplex, revokes the grant and journals it without transcripts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 idle release: speech re-arms the idle timer, so the microphone stays open while the user talks",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 idle release (round 2): silent turns that end on their own do not keep a quiet room open; 120 s of silence releases the lane",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 live: an idle release leaves no LISTENING state, and a new user start clears the old stop receipt",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V45 closed voice UI does not stop AgentRuntime: a closed snapshot never enables a control that acts on agents",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V47 agent indicators left of horizontal notch: UI intent is one-shot and names the agent to open",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V47b uiIntent kinds: open_agentic and open_agent focus the Agentic sheet, open_approvals opens it without a focus",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V48 agent indicators top of vertical notch: a stale uiIntent after reload does not navigate",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 composite truth: Listening and speaking only with confirmed capture and playback; Speaking only from playback; never Listening without capture",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "nativeUIA": "live/uia-run-7.log and .jsonl",
+    "nativeDPI": "150% primary monitor; historical real WPF flow",
+    "browser": "browser-render-results.json"
+  },
+  "limitations": [
+    "Secondary monitor / mixed DPI NOT TESTED."
+  ]
+}

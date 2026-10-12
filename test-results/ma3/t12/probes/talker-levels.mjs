@@ -1,0 +1,35 @@
+// M-A-3 T12 diagnostic (no human): AEC-output levels of a second loudspeaker talker (monitor, outside the AEC reference),
+// alone and over Bunny's own speech. Prints per-window level stats; no audio retained.
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
+import { launchVoiceWorker } from "../../../../src/lib/bunny-host/voice/voice-worker.server.ts";
+const mk = (p) => launchVoiceWorker({ dataDirectory: mkdtempSync(join(tmpdir(), p)) });
+const A = await mk("bunny-t12-tl-a-"), C = await mk("bunny-t12-tl-c-");
+const ev = [];
+A.onEvent((e) => ev.push({ w: "A", ...e, at: Date.now() }));
+C.onEvent((e) => ev.push({ w: "C", ...e, at: Date.now() }));
+await sleep(900);
+A.send({ op: "duplex.start", session: "tl", maxMs: 300000 });
+await sleep(1500);
+A.send({ op: "capture.start", turn: "a1", gen: 1, device: -1, endpointing: "manual", maxMs: 30000, duplex: true, session: "tl" });
+await sleep(1500);
+const mark = (k) => ev.push({ w: "M", ev: k, at: Date.now() });
+const phrase = "Wait, what is two plus two? Hold on, how many legs does a spider have?";
+mark("talker_alone_start");
+C.send({ op: "speak", turn: "c1", gen: 1, seq: 0, text: phrase, device: Number(process.argv[2] ?? 1), voice: "Microsoft Zira Desktop" });
+await sleep(6000); mark("talker_alone_end");
+A.send({ op: "speak", turn: "s1", gen: 1, seq: 0, text: "This is Bunny speaking a long sentence on the laptop speakers so that the second talker has to compete with my own voice for a while.", device: -1, voice: null });
+await sleep(1500); mark("doubletalk_start");
+C.send({ op: "speak", turn: "c2", gen: 2, seq: 0, text: phrase, device: Number(process.argv[2] ?? 1), voice: "Microsoft Zira Desktop" });
+await sleep(6000); mark("doubletalk_end");
+A.send({ op: "capture.end", turn: "a1", gen: 1 });
+await sleep(4000);
+A.send({ op: "duplex.stop", session: "tl" });
+await sleep(1000);
+await A.close(); await C.close();
+const t0 = ev[0].at;
+const rows = ev.filter((e) => e.ev === "level" || e.w === "M" || ["playback.started", "playback.idle", "vad", "stt.final", "stt.partial"].includes(e.ev)).map((e) => e.ev === "level" ? `${e.at - t0}\tA level rms=${e.rms.toFixed(5)} peak=${e.peak.toFixed(4)} floor=${(e.floor ?? 0).toFixed(5)} res=${e.residual == null ? "-" : e.residual.toFixed(5)} out=${e.outputActive ? 1 : 0} sp=${e.speech ? 1 : 0}` : `${e.at - t0}\t${e.w} ${e.ev} ${e.state ?? ""} ${e.text ?? ""}`);
+writeFileSync(process.argv[3] ?? "talker-levels.txt", rows.join("\n"));
+console.log(rows.join("\n"));

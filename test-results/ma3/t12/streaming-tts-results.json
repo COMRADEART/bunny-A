@@ -1,0 +1,393 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "scripts",
+      "test": "chunked cloudflared output stays unavailable until the full hostname and connection arrive",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "streaming injector handles </head> split across chunks",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "streaming injector passes post-head chunks through untouched",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V46: Speaking is shown only from snapshot.playing, and only one branch produces it",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "push-to-talk while SPEAKING sends voice.listen.start (no gate on playing) and the press never sends an interrupt",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "the mic glyph carries Listening and Speaking as an accent, and a fault as a warning (collapsed notch has no status line)",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R1-truth#6 the WPF Interrupt control is enabled only from a fresh snapshot, like the Speaking label",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#1 a release queued before the listen.start is acknowledged binds to that start turn",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#5 closing sends no queued-but-unsent open or listen, and the close lands after the open in flight",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#5 static: the window close sends the session close whenever an open or listen was sent or queued",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 UI-09 the WPF composite label order: releasing, then both halves, then speaking only from playing, then held",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 composite truth in WPF: Listening and speaking only with capture and playback, Speaking only from playback, Paused for a held reply",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V19 V22 LIVE-B03 push-to-talk barge-in: speak.cancel immediately followed by capture.start opens the capture (no BUSY_PLAYBACK)",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V18 speech chunks play strictly in seq order on the null sink",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V19 V20 speak.cancel stops audible playback and nothing from that gen starts afterwards",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V21 a late speak with an old gen after cancel never plays",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V22 rapid cancel and speak cycles keep turn state and gen monotonic",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T10 staleDropped: speak commands at or below the highest cancelled gen are counted per cancel receipt",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "native#0 a stalled playback driver never holds the command loop: cancel, enqueue and shutdown stay bounded",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 closeout: cancelling while the driver opens never submits the cancelled chunk when Open returns",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "native#0 live: a healthy speak.cancel applies the reset within the bounded wait and reports no resetPending",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "native#3 speak.cancel receipts share one meter worker, and a full queue starts no thread",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-native#2 a playback chunk whose header never completes is released after the reset, and its device handle is closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native RC-02 a playback.error for a generation releases its pause: the next chunk of that gen is not paused",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native N-03 the stdout queue is 2048 lines / 1 MiB and the stall watchdog is 10 s, both bounded",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native N-02 a pending reset is applied before any pause decision, and a cancelled chunk never restarts the device",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native N-06 speak.pause emits a measured receipt off the playback thread, bounded to 1.5 s",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "streamed output is coalesced into one write instead of one per chunk",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V18 TTS chunks are ordered with strictly increasing seq from 0",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V18 chunks split at sentence boundaries once at least 40 chars are speakable",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V06 V18 hard split keeps every chunk at or under the 400 char limit on word boundaries",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 the first chunk is released at a clause boundary once it has at least 30 speakable chars",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 a short clause before the 30 char minimum is not released as the first chunk",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 later chunks keep the sentence boundary: a comma inside a later sentence is not a cut",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 with a clock, a first chunk with no boundary is released at a word boundary after 450 ms idle",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native fixture: pause/resume then generation cancellation never resurrects old chunks",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 confirm: once Bunny has finished speaking, a confirm executes the proposal through the canonical command",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 echo window (round 2): the tail of a long chunk is echo while it plays, and for echoWindowMs after it stops",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F1 duplex: 'stop talking' while Bunny speaks silences her, speaks nothing, and proposes and chats nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 AEC-04: echo needs specificity: short barge-ins are never echo, and evidence is judged per spoken chunk",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-01: a single-chunk reply held on onset and resumed still settles to IDLE once its playback ends",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-07: a playback error ends the echo window of the chunks that played, so they stop counting as echo",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H10 a degraded Host keeps stop, mute, release and state working and refuses starting or speaking",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V17 V18 playback confirmed by the worker moves the session to SPEAKING with truthful playing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V19 the worker's speak.cancelled receipt fills the interrupt receipt for the old generation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "the answer chunks are sent with the current generation and turn",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H2 a text-only answer (TTS failed) completes the turn at playback.error, not before",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H8 an empty final output speaks nothing and says no answer",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H13 listen.start while SPEAKING cancels speech, stops only the turn's inference, and starts a new capture",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-races#3 a control confirmation that finishes after its session was closed and reopened speaks nothing into the new session",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R2-truth#4 a screen Cancel clears the model route and speaks a host fact that carries no route",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F1: a bare stop with no agent running settles idle and speaks nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F1: a typed 'stop talking' while Bunny speaks is a speech stop receipt, speaks nothing and starts no turn",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RES-04 (round 2): a repeat of a question that already waits adds no row and speaks the same refusal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12-AUTH-06: a push-to-talk press while Bunny is still speaking is overlapped, so a spoken yes cannot confirm the proposal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 closeout: streamed completion claims are replaced and later chunks never become speech",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r6: a claim split across two streamed chunks is still replaced",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V25 a speak with an immediate speak.cancel produces a cancel receipt for that generation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "the stdout framer yields whole lines across chunk boundaries and accepts CRLF",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "containment#4 an overlong line is discarded to its newline even when its tail arrives in later chunks",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T9R readiness: Stop while another Mission owns the desktop queue cannot restore",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "Stop before acquisition or while queued prevents any future launch",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "A12: restart during a read child requeues it once; one interrupted row, one recovered row, same agent and mission",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "A16/A17: the removed provider's requeue re-routes to the remaining eligible provider",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "T11-I07: after a restart, requeued team work waits for the first provider probe instead of failing or holding",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T8: chunked SSE signal survives multibyte private text and closes exactly once",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V17 TTS playback works: real playback truth reads Speaking, and only then",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V18 TTS chunks in order: the answer text is shown whole and not reordered by the view model",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V20 pending chunks do not resume: nothing reads Speaking unless the playback flag is set",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V21 late model callbacks do not restart playback: a finished session never reads Speaking",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V27 playback device loss handled: playback errors surface and Speaking stops",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V28 barge-in replaces the old echo gate: talk stays enabled while Bunny speaks or thinks, and only a capturing mic refuses",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "R1-truth#6 Speaking and Interrupt are freshness-gated like Listening: a stale playing flag reads Reconnecting and enables no Interrupt",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 composite truth: Listening and speaking only with confirmed capture and playback; Speaking only from playback; never Listening without capture",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 new turn kinds have plain labels: mission control, mission draft and stopped speaking",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T10 press while speaking is barge-in: the sequencer takes no playback input and starts a listen",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "synthesis": "Windows SAPI 5.4 System.Speech",
+    "playback": "Ordered bounded winmm PCM chunks",
+    "lateGeneration": "Cancelled generation cannot queue or submit old chunks, including blocked Open.",
+    "completionClaims": "Model output claims are refused; verified Host facts use their own path."
+  },
+  "limitations": []
+}

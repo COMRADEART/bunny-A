@@ -1,0 +1,238 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "scripts",
+      "test": "non-canvas app with no custom card gets a soft BRAND NOTE (utility exception)",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "a fresh og-pending marker silences the whole gate view",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "Cloudflare API errors and documentation are never public companion URLs",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "chunked cloudflared output stays unavailable until the full hostname and connection arrive",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "a server without the endpoint probes as null, not as agreement",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "manual endpointing finalizes only on capture.end",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V11 silence never becomes a command: stt.none no_speech, no final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T10 endpointing: recognizer evidence keeps no_speech from firing and bounds the turn end",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T10 Part-B endpointing: room noise above the calibrated floor still ends the turn; one loud click does not",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native VT-02 stationary ambient never counts as speech: no onset in 10 s and the floor learns the level",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native VT-03 speech over a calibrated noise floor starts and ends about 900 ms after it stops",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native VT-G3 a loud click does not permanently suppress soft speech that follows it",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native round-2 AEC-01/05 a steady echo at 0.0045 or 0.005, or a loud echo after a quiet start, is no onset while output is audible",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native live calibration: the measured device residual never starts a turn and 0.003 speech over it does within 120 ms",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native endpointing ignores whisper's trailing full stop and waits longer after a word that cannot end a sentence",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native VT-01 stationary loud ambient in a duplex turn ends after the silence clock, not at the cap",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native VT-09 soft speech with no frame above the onset threshold for 4 s ends the turn, even with evidence held fresh",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native N-05 three rotating silence buffers keep the render endpoint fed",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "whisper: silence never becomes a final (no VAD onset, so stt.none no_speech)",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "hard constraints and overrides fail closed; privacy preference does not exclude cloud",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "hard localOnly constraint excludes cloud providers outright, whatever their score",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA1: local-only routing never inherits an Ollama cloud-hosted default; other routing is unchanged",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA1: a stale local-only task whose model is cloud-hosted is refused at launch",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R09: a local-only task excludes the cloud candidates",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R10: a cloud-only task excludes the local candidates",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T3 §8/R09/R10: local-only and cloud-only constraints exclude on every other candidate with a reason",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native identity: changing enumeration cannot reuse a cached render index for another endpoint",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native: stationary loud ambient in a duplex vad turn ends as speech_end (it is never speech for ever)",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 AUD-14/item 8: a soft-budget relaunch during hands-free happens at a safe point, keeps the grant, and restarts duplex within it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 receipts (item 3): detection-to-silence and onset-to-silence come from the worker's monotonic receipts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 idle release (round 2): silent turns that end on their own do not keep a quiet room open; 120 s of silence releases the lane",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F1 duplex: 'stop talking' while Bunny speaks silences her, speaks nothing, and proposes and chats nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V11 silence is not fabricated as a command and returns to IDLE",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H5 above the soft stdin budget an idle session relaunches the worker and keeps its session id",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA1: Ollama locality is per model: local-only missions get a local model; a cloud-hosted tag is never launched as local",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "unconfigured cloud providers refuse launch without a network request",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA1: Ollama discovery marks cloud-hosted tags as remote, never as local models",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "Ollama cloud activity never claims the model executes locally",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "cloud and unknown Ollama models cannot be presented as local inference",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V04 device unavailable truthful: endpoint mute and worker mute block talk with exact copy",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V11 silence not fabricated as command: an empty turn is no command and shows no transcript",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V16 no unauthorized cloud-audio upload: the status copy never claims cloud speech",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 a measured barge-in shows the detection-to-silence time; an unmeasured or negative one shows nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "R2-fixcheck#1 the hold-to-talk listen.start payload is source push_to_talk (manual endpointing on the Host)",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "recheck": "live-recheck-results.json",
+    "manualFallback": "Final regression includes manual end of turn."
+  },
+  "limitations": [
+    "Host-side fragment join is unit-proven; recheck 2 did not exercise it live."
+  ]
+}

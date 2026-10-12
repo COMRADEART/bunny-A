@@ -1,0 +1,343 @@
+✔ build record matches the source and the compiled worker (4.4437ms)
+✖ ready event reports local SAPI engines and the worker protocol (380.1365ms)
+✔ devices event is a read-only real enumeration with structure only (172.5942ms)
+✖ V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD (15018.0841ms)
+✖ manual endpointing finalizes only on capture.end (15019.5658ms)
+✖ V11 silence never becomes a command: stt.none no_speech, no final (8130.3542ms)
+✖ V12 noise-only input fails safely: vad noise_only and no final (10144.2224ms)
+✖ V06 total capture is bounded by maxMs and reports the buffered peak (8133.8526ms)
+✖ V05 a second capture.start while capturing is refused with DEVICE_BUSY (8137.9723ms)
+✖ V28 capture during playback is refused with BUSY_PLAYBACK (half duplex) (15135.0771ms)
+✖ V19 V22 LIVE-B03 push-to-talk barge-in: speak.cancel immediately followed by capture.start opens the capture (no BUSY_PLAYBACK) (15127.8569ms)
+✖ V24 mute aborts an active capture and refuses capture.start until unmuted (8131.891ms)
+✖ V18 speech chunks play strictly in seq order on the null sink (20131.7718ms)
+✖ V19 V20 speak.cancel stops audible playback and nothing from that gen starts afterwards (15135.1802ms)
+✔ V21 a late speak with an old gen after cancel never plays (931.786ms)
+✖ V22 rapid cancel and speak cycles keep turn state and gen monotonic (15121.0232ms)
+✖ V25 shutdown with an active capture releases everything and exits 0 within 2 s (8142.2914ms)
+✔ unknown op is answered with UNKNOWN_OP and malformed JSON keeps the process alive (168.8774ms)
+✔ BUFFER_LIMIT rejects oversized speech text (144.0869ms)
+✖ V52 stdout carries only bounded JSON events with no audio-looking payload (15019.4509ms)
+✔ a command line over 64 KiB is rejected and the worker stays alive (170.2073ms)
+✖ T10 endpointing: recognizer evidence keeps no_speech from firing and bounds the turn end (2271.3853ms)
+✖ T10 Part-B endpointing: room noise above the calibrated floor still ends the turn; one loud click does not (2247.7798ms)
+✖ T10 stop decision: rejected-only recognizer text is stt.none rejected, never a final (2231.7059ms)
+✖ T10 AGC: the gained audio never changes the reported levels, and gain stays in 1x..24x (2227.7976ms)
+✖ T10 levels: reported rms and peak equal the raw fixture samples window by window (AGC cannot change them) (15154.2019ms)
+✔ T10 staleDropped: speak commands at or below the highest cancelled gen are counted per cancel receipt (149.5146ms)
+✖ native#0 a stalled playback driver never holds the command loop: cancel, enqueue and shutdown stay bounded (2234.3502ms)
+✖ native#0 live: a healthy speak.cancel applies the reset within the bounded wait and reports no resetPending (15123.8304ms)
+✖ native#2 abandoned recognizers: raw audio is zeroed and released, and the ledger refuses past its bound (0.4287ms)
+✖ native#3 speak.cancel receipts share one meter worker, and a full queue starts no thread (0.1078ms)
+✖ native#4 device index is range-checked: out of range is DEVICE_UNAVAILABLE and never wraps to another device (0.1388ms)
+✖ native#5 a worker thread fault is contained: the guard runs its handler and the body never escapes (0.0909ms)
+✖ native#6 the finalize decision reads the onset state published during capture, not a value set at thread exit (0.0665ms)
+✖ R2-native#0 a recognizer whose start throws is disposed before the error propagates, so the turn holds no engine (0.195ms)
+✖ R2-native#1 the capture thread body is guarded: a protocol write that fails on a closed pipe ends the turn, not the process (0.1103ms)
+✖ R2-native#2 a playback chunk whose header never completes is released after the reset, and its device handle is closed (0.0889ms)
+✖ R2-native#3 raw microphone buffers are zeroed before they are freed, and capture frames are cleared when the turn ends (0.0682ms)
+✔ whisper: the staged runtime and model match native/voice/whisper-pin.json and the build record (132.0515ms)
+[whisper] model load 177 ms
+✔ whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error (640.4839ms)
+✖ whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final (10009.9536ms)
+✔ whisper: silence never becomes a final (no VAD onset, so stt.none no_speech) (1843.0772ms)
+✔ whisper: noise-only input never becomes a final with words (4522.9584ms)
+✖ whisper: capture.abort that lands during the final decode never emits a final (10005.4468ms)
+✖ whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently (133.0404ms)
+ℹ tests 45
+ℹ suites 0
+ℹ pass 11
+ℹ fail 34
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 252520.498
+
+✖ failing tests:
+
+test at scripts\voice-worker.test.mjs:84:1
+✖ ready event reports local SAPI engines and the worker protocol (380.1365ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'object' !== 'string'
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:91:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'object',
+    expected: 'string',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:122:1
+✖ V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD (15018.0841ms)
+  Error: timed out waiting for ready; last events: ; stderr: tts unavailable: NullReferenceException
+  fixture synth requires SAPI
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:153:1
+✖ manual endpointing finalizes only on capture.end (15019.5658ms)
+  Error: timed out waiting for ready; last events: ; stderr: tts unavailable: NullReferenceException
+  fixture synth requires SAPI
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:172:1
+✖ V11 silence never becomes a command: stt.none no_speech, no final (8130.3542ms)
+  Error: timed out waiting for capture.started; last events: ready,capture.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:189:1
+✖ V12 noise-only input fails safely: vad noise_only and no final (10144.2224ms)
+  Error: timed out waiting for noise_only; last events: ready,capture.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:204:1
+✖ V06 total capture is bounded by maxMs and reports the buffered peak (8133.8526ms)
+  Error: timed out waiting for capture.stopped; last events: ready,capture.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:219:1
+✖ V05 a second capture.start while capturing is refused with DEVICE_BUSY (8137.9723ms)
+  Error: timed out waiting for capture.started; last events: ready,capture.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:236:1
+✖ V28 capture during playback is refused with BUSY_PLAYBACK (half duplex) (15135.0771ms)
+  Error: timed out waiting for playback.started; last events: ready,playback.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:253:1
+✖ V19 V22 LIVE-B03 push-to-talk barge-in: speak.cancel immediately followed by capture.start opens the capture (no BUSY_PLAYBACK) (15127.8569ms)
+  Error: timed out waiting for playback.started; last events: ready,playback.error,playback.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:272:1
+✖ V24 mute aborts an active capture and refuses capture.start until unmuted (8131.891ms)
+  Error: timed out waiting for capture.started; last events: ready,capture.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:296:1
+✖ V18 speech chunks play strictly in seq order on the null sink (20131.7718ms)
+  Error: timed out waiting for playback.idle; last events: ready,playback.error,playback.error,playback.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:314:1
+✖ V19 V20 speak.cancel stops audible playback and nothing from that gen starts afterwards (15135.1802ms)
+  Error: timed out waiting for playback.started; last events: ready,playback.error,playback.error,playback.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:352:1
+✖ V22 rapid cancel and speak cycles keep turn state and gen monotonic (15121.0232ms)
+  Error: timed out waiting for tts.ready; last events: ready,playback.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:374:1
+✖ V25 shutdown with an active capture releases everything and exits 0 within 2 s (8142.2914ms)
+  Error: timed out waiting for capture.started; last events: ready,capture.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:421:1
+✖ V52 stdout carries only bounded JSON events with no audio-looking payload (15019.4509ms)
+  Error: timed out waiting for ready; last events: ; stderr: tts unavailable: NullReferenceException
+  fixture synth requires SAPI
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:490:1
+✖ T10 endpointing: recognizer evidence keeps no_speech from firing and bounds the turn end (2271.3853ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:502:1
+✖ T10 Part-B endpointing: room noise above the calibrated floor still ends the turn; one loud click does not (2247.7798ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:512:1
+✖ T10 stop decision: rejected-only recognizer text is stt.none rejected, never a final (2231.7059ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:521:1
+✖ T10 AGC: the gained audio never changes the reported levels, and gain stays in 1x..24x (2227.7976ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:529:1
+✖ T10 levels: reported rms and peak equal the raw fixture samples window by window (AGC cannot change them) (15154.2019ms)
+  Error: timed out waiting for capture.stopped; last events: ready,capture.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:596:1
+✖ native#0 a stalled playback driver never holds the command loop: cancel, enqueue and shutdown stay bounded (2234.3502ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:606:1
+✖ native#0 live: a healthy speak.cancel applies the reset within the bounded wait and reports no resetPending (15123.8304ms)
+  Error: timed out waiting for playback.started; last events: ready,playback.error,playback.error; stderr: tts unavailable: NullReferenceException
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:622:1
+✖ native#2 abandoned recognizers: raw audio is zeroed and released, and the ledger refuses past its bound (0.4287ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:631:1
+✖ native#3 speak.cancel receipts share one meter worker, and a full queue starts no thread (0.1078ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:639:1
+✖ native#4 device index is range-checked: out of range is DEVICE_UNAVAILABLE and never wraps to another device (0.1388ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:664:1
+✖ native#5 a worker thread fault is contained: the guard runs its handler and the body never escapes (0.0909ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:670:1
+✖ native#6 the finalize decision reads the onset state published during capture, not a value set at thread exit (0.0665ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:683:1
+✖ R2-native#0 a recognizer whose start throws is disposed before the error propagates, so the turn holds no engine (0.195ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:690:1
+✖ R2-native#1 the capture thread body is guarded: a protocol write that fails on a closed pipe ends the turn, not the process (0.1103ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:697:1
+✖ R2-native#2 a playback chunk whose header never completes is released after the reset, and its device handle is closed (0.0889ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:707:1
+✖ R2-native#3 raw microphone buffers are zeroed before they are freed, and capture frames are cleared when the turn ends (0.0682ms)
+  Error: selftest exited 3762504530
+      at ChildProcess.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:470:40)
+      at ChildProcess.emit (node:events:509:28)
+      at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+
+test at scripts\voice-worker.test.mjs:770:1
+✖ whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final (10009.9536ms)
+  Error: timed out waiting for ready; last events: ; stderr: tts unavailable: NullReferenceException
+  whisper model loaded in 181 ms
+  fixture synth requires SAPI
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:829:1
+✖ whisper: capture.abort that lands during the final decode never emits a final (10005.4468ms)
+  Error: timed out waiting for ready; last events: ; stderr: tts unavailable: NullReferenceException
+  whisper model loaded in 161 ms
+  fixture synth requires SAPI
+  
+      at Timeout._onTimeout (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:53:19)
+      at listOnTimeout (node:internal/timers:605:17)
+      at process.processTimers (node:internal/timers:541:7)
+
+test at scripts\voice-worker.test.mjs:848:1
+✖ whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently (133.0404ms)
+  AssertionError [ERR_ASSERTION]: ready must report the SAPI fallback
+  + actual - expected
+  
+  + null
+  - 'Windows SAPI 5.4 System.Speech'
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/voice-worker.test.mjs:853:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 'Windows SAPI 5.4 System.Speech',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

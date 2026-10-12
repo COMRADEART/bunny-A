@@ -1,0 +1,33 @@
+// M-A-3 T12 diagnostic: AEC lane (worker A) vs raw microphone (worker B) levels while a HUMAN speaks; no playback.
+// Level numbers and transcripts only; no audio retained.
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
+import { launchVoiceWorker } from "../../../../src/lib/bunny-host/voice/voice-worker.server.ts";
+const mk = (p) => launchVoiceWorker({ dataDirectory: mkdtempSync(join(tmpdir(), p)) });
+const A = await mk("bunny-t12-vl-a-"), B = await mk("bunny-t12-vl-b-");
+const ev = [];
+A.onEvent((e) => ev.push({ w: "A", ...e, at: Date.now() }));
+B.onEvent((e) => ev.push({ w: "B", ...e, at: Date.now() }));
+await sleep(700);
+A.send({ op: "duplex.start", session: "vl", maxMs: 300000 });
+for (let i = 0; i < 60 && !ev.some((e) => e.ev === "duplex.started" || e.ev === "duplex.error"); i++) await sleep(100);
+A.send({ op: "capture.start", turn: "a1", gen: 1, device: -1, endpointing: "manual", maxMs: 30000, duplex: true, session: "vl" });
+B.send({ op: "capture.start", turn: "b1", gen: 1, device: -1, endpointing: "manual", maxMs: 30000 });
+await sleep(Number(process.argv[2] ?? 16000));
+A.send({ op: "capture.end", turn: "a1", gen: 1 }); B.send({ op: "capture.end", turn: "b1", gen: 1 });
+await sleep(7000);
+A.send({ op: "duplex.stop", session: "vl" });
+await sleep(800);
+await A.close(); await B.close();
+const t0 = ev[0].at;
+const lv = (w) => ev.filter((e) => e.w === w && e.ev === "level");
+const out = [];
+const a = lv("A"), b = lv("B");
+for (let i = 0; i < Math.max(a.length, b.length); i += 2) out.push(`${a[i] ? a[i].at - t0 : "-"}\tAEC rms=${a[i]?.rms.toFixed(5)} sp=${a[i]?.speech ? 1 : 0}\tRAW rms=${b[i]?.rms.toFixed(5)}`);
+for (const e of ev.filter((x) => ["stt.final", "vad", "stt.none", "duplex.error", "capture.error"].includes(x.ev))) out.push(`${e.at - t0}\t${e.w} ${e.ev} ${e.state ?? e.reason ?? ""} ${e.text ?? e.message ?? ""} ${e.confidence ?? ""}`);
+writeFileSync(process.argv[3] ?? "voice-levels.txt", out.join("\n"));
+const st = (l) => { const v = l.map((e) => e.rms).sort((x, y) => x - y); return { n: v.length, p50: v[Math.floor(v.length / 2)], p90: v[Math.floor(v.length * 0.9)], max: v[v.length - 1] }; };
+console.log(JSON.stringify({ aec: st(a), raw: st(b) }));
+console.log(out.filter((l) => /stt|vad|error/.test(l)).join("\n"));

@@ -1,0 +1,499 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "scripts",
+      "test": "T10-XG-06: rollback refuses a paused Mission with a live desktop grant, even outside the snapshot page",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T10 rollback preflight refuses orphan grant and interrupted or waiting work independently",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R1-races#1 R1-truth#0 the on-screen Confirm and Mute send the keys the Host reads (proposalId, on)",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R1-truth#1 the WPF Mute button sends voice.mute with the Host key on (not muted) and reflects snapshot.muted",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 P7 unmute never reopens the microphone in WPF: the Mute handler sends voice.mute only",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 UI-01/P7 WPF: Start hands-free sends the one explicit grant, Finish my turn ends the input by id, and a toggle never starts listening",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V24 mute aborts an active capture and refuses capture.start until unmuted",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native PRIV-03 a capture loop that ends because the microphone is muted reports 'mute', and the lifetime bound reports 'lifetime'",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native N-01 duplex open honors stop and mute before, during and after the device open",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "classifies scope_denied without claiming a missing grant",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: stale evidence, an unknown policy, or a claimed VALIDATED profile without required facts grants no authority",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "hard constraints and overrides fail closed; privacy preference does not exclude cloud",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "the session transcript is private evidence on disk",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T5: private projection does not mutate the canonical journal, task or run",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T5: public command results omit private sessions and arbitrary capability payloads",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T5: unknown actions and private reasoning cannot supply public labels",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T7 P30 private Host authority files cannot be context",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T7 P34/P35 private files and README authority claims cannot grant context",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T9R F-02: workstation revocation ends Mission approvals the lost device granted, including a failed Mission's Retry",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T3 §6/§26: classification is deterministic; ambiguity stays conservative with UNKNOWN privacy",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native fixture: mute stops continuous source; close leaves zero active Job processes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 grant: opening hands-free alone has no microphone and no grant; the explicit start opens it with the grant as the lifetime bound",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 grant: starting is visible while duplex.start is in flight, and nothing is captured until it is confirmed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 grant: a lifetime stop revokes the grant, so a typed answer and the next idle re-arm never reopen the microphone",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 grant: a button press without a live grant is an ordinary turn, never a duplex start",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 idle release (item 6): no speech and no output for duplexIdleMs stops duplex, revokes the grant and journals it without transcripts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 lifecycle (item 7): a worker exit clears all duplex state, the grant and the held reply",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 lifecycle: a push-to-talk press stops duplex with reason user and keeps the grant; the press awaits the release cleanly",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 lifecycle: switching to push_to_talk stops duplex with reason mode and revokes the grant",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 AUD-14/item 8: a soft-budget relaunch during hands-free happens at a safe point, keeps the grant, and restarts duplex within it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 item 7: the input budget ending the session clears the duplex lane, its grant and any held reply",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 mute and close release duplex; old events cannot restart capture or change Agents",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 grant without duplex (round 2): with no duplex support, hands-free re-arm reopens only while the grant is live",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12-PRIV-01: a switch to hands_free never reopens the microphone when the turn in flight settles",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12-PRIV-02: a refused hands-free start leaves no grant: muted, and closed sessions take none",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12-PRIV-01 (round 2): a hands-free start made outside hands-free mode records no grant, so a later hotkey press cannot open the microphone",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 closeout: mute during a pending stop revokes consent and invalidates suspended starts even after unmute",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RES-07: the Host ends a live hands-free lane at the grant's end with reason lifetime, even while speech keeps it active",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-05: close, mute, duplex.error and capture.error cancel a held reply: the receipt says interrupted, and no pause-off is sent",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-08 (round 2): a worker mute stop is recorded as a mute release, not an error, and a held reply is interrupted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r5: a fragment built turn never confirms, and mute drops a held fragment",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r7: a cut-off draft that timed out creates nothing, and a worker-reported mute drops held words",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H10 a degraded Host keeps stop, mute, release and state working and refuses starting or speaking",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V24 voice.mute honours both the clients' {on} field and the {muted} spelling over real HTTP",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V24 muted: capture is refused and nothing is captured",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-privacy#0 a paired device never receives a voice turn's prompt, its spoken history or its transcript",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "privacy#2 the worker allowlist is pinned to the set the real worker needs, and profile or user variables never reach it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A02 explicit user consent: proposal and forged oneTime never grant execution",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A10 cross-Agent identity substitution cannot grant authority",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A30 prior T9 epoch cannot be revived by Agentic grant",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T9 remote: a paired phone may grant only the offered batch, revoke its own, and the counts stay canonical",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T9 privacy: canonical execution input never reaches renderer snapshots, requests, runs, events or batch records",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T9 rule changes before approval: standing ask-every-time prevents granting an old offer",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA0R: all DNS answers are checked; public names resolving to private addresses are denied",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA0R: isolated Chromium cannot reach Bunny Host via private DNS, redirects, subresources or rebinding",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "target records use existing SQLite settings and do not create a grant or schema",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "isolated browser: SSRF guard on loopback/private hosts and URL schemes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T6 X19: untrusted document instructions do not grant tools",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T6 X05: private browser profiles and Host authority are not project resources",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T6 X18: private DNS answers and credential URLs refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E32: sign-out leaves workstation-granted envelopes and workstation Missions running",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E24b: a trusted-desktop grant past its lifetime is refused for the exact operation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E09: a Mission read or list of the private staging folder is refused even with a broad root",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E48: while a change is staged, Mission reads and lists of the private staging folder fail even when the workstation allows the ask",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E47c: a promotion advances the Host mutation sequence, so a trusted-desktop grant approved before it is void",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-R1-3: a device write never stages into private Host state, even when the project root contains the Host data folder",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "permission decisions: envelope scope, always-ask classes, grants and hard approvals",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "records redact secrets and private typed text",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA0R: custom read scope reaches codex launch restrictions; role names grant nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA0R: custom read scope reaches claude launch restrictions; role names grant nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-5: Retry never reuses a denied shell approval, and a spent grant never covers the retried session",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-6: replanning a bounded task into shell execution requires separate authorization; old grants die",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-T: terminal commands in a phone-approved Mission run only under an exact single-use workstation grant",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-7: workstation revocation of a device ends every outstanding approval it granted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-8: a Host restart rejects stale remote approvals and trusted-desktop grants from the earlier epoch",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-10: a trusted-desktop grant cannot be replayed for another target, command, folder, Mission, plan, Task, Host or epoch",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-R4 (HIGH/MEDIUM): a grant is spent only at the last refusal point, every session start spends it, and a refused launch does not burn it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-R6 (LOW): grants are attempt-bound, bound to the Task/plan in force when asked, and never projected to a phone",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-R9 (HIGH/MEDIUM): a terminal grant binds option-named files and is voided by any later project change",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-R10 (MEDIUM/LOW): device answers never extend an expired envelope; device views carry no grant records; start judges real providers",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-R57 (MEDIUM): every device response drops trusted-desktop grant, operation and binding records",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "M62: the planner's file offer excludes private and Host material and the output folder",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "T11-SURF: real active/completed team device snapshots and artifact reads withhold Host paths and private working text",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "private reasoning and ambiguous untyped logs are not exposed",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T8: chunked SSE signal survives multibyte private text and closes exactly once",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V01 mic inactive by default: a closed session reads Voice is off and no control can listen",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V03 permission denial handled: micPrivacy deny shows the Windows privacy copy and blocks talk",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V04 device unavailable truthful: endpoint mute and worker mute block talk with exact copy",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V24 muted mic captures nothing: muted state disables talk and shows the mute copy",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V25 mic resources released on close: a closed session cannot show live level or listening",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V39 audio prompt injection grants nothing: a clarification or proposal is display only",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "R1-races#1 R1-truth#0 the on-screen Confirm payload is the field the Host reads (proposalId), and Mute sends on",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V27 T10: speech into a muted or zero-volume Windows output is disclosed as inaudible; unknown volume is not called muted",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 UI-01 Start hands-free is the explicit grant: shown in hands-free with no live capture, enabled only when the duplex can start",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 P7 unmute and a mode switch never reopen the microphone: only the explicit startHandsFree sends listen.start",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 lane2 a closed session shows no hands-free row and no barge-in receipt, even when the Host kept mode and the last receipt",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T10 press with a closed session opens first, then listens once the session is open",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "explicitStart": true,
+    "localSTTandTTS": true,
+    "rawAudioFilesRetained": false,
+    "newConsentRace": "Suspended Start invalidated by revocation, including mute-unmute.",
+    "nativeCaptureOnly": "A real worker owns capture; clients do not secretly record."
+  },
+  "limitations": []
+}

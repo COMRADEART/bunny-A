@@ -1,0 +1,438 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "scripts",
+      "test": "T10 rollback preflight refuses orphan grant and interrupted or waiting work independently",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "MA2 T1 Windows controller: complete cutover and idempotent retry",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "MA2 T1 Windows controller: after-copy",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "MA2 T1 Windows controller: after-config",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "MA2 T1 Windows controller: after-host",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "push-to-talk while SPEAKING sends voice.listen.start (no gate on playing) and the press never sends an interrupt",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "the Interrupt control sends voice.interrupt and is the only control that cancels speech",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R1-truth#6 the WPF Interrupt control is enabled only from a fresh snapshot, like the Speaking label",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#0 a second tap held 600 ms ends the latched turn and its release Click starts nothing new",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 UI-04 WPF interrupt enablement matches React: playing, thinking or holding a reply, from a fresh snapshot",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 UI-09 the WPF composite label order: releasing, then both halves, then speaking only from playing, then held",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 composite truth in WPF: Listening and speaking only with capture and playback, Speaking only from playback, Paused for a held reply",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 lane2 the WPF mode switch ends a held press before the mode changes",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "stopOutcome fails when a pid survives or the port is still held",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native AEC-01/06 echo after quiet first frames, a pause and a gap is never an onset (the residual is floored and held)",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native VT-09 soft speech with no frame above the onset threshold for 4 s ends the turn, even with evidence held fresh",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "an interrupted pass leaves the target on its old bytes, temp-free",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A14: an ambiguous interrupted WRITE attempt asks the user — the agent pauses instead of replaying",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A12: an interrupted READ-only step is SAFE_TO_REPLAY — re-admitted once, within the attempt ceiling",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A20 runtime claim: exactly one recovery walk runs while a claim is held; released afterwards",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T3: disabled Missions reconcile interrupted execution without scheduling or resuming",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: restart marks history interrupted without trusting a persisted PID or handle",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T5: interrupted and uncertain cleanup have explicit presentation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T5: restart evidence shows interruption and fresh retry, never resumed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T7 interrupted migration rolls back original rows and can be retried",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F04 J37-J41/J32: restart reconciles interrupted job records by full identity, kills nothing, and holds while identity is alive",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F04 R3-R2-01/R2-03: a parseable malformed record is held, never a startup failure; alias-style reparse entries resolve",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 lifecycle (item 7): a worker exit clears all duplex state, the grant and the held reply",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 item 7: the input budget ending the session clears the duplex lane, its grant and any held reply",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 item 9: a recognition deadline drops only that input turn, resumes any held reply, and keeps the session open",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 item 9: a held reply is released once recognition gives up on its turn, and it is resumed, not cancelled",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 item 10: interrupt while idle-listening keeps capture truth, aborts only the input turn (with its turn and gen) and re-arms",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 echo (item 1): a partial and a final of the exact sentence being spoken never interrupt or create a Task",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 live trial 4: real speech whose recognition is late keeps the reply held past heldResumeMs; the late question interrupts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 live trial 4: the late-recognition hold is still bounded by heldMaxMs (cancel, never a stale resume)",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 hold: without an end marker, a held reply resumes at heldResumeMs after the last activity and not before",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 backchannel (item 4): 'uh-huh', 'Yep.' and 'mm-hmm' during output resume the reply and never route",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 interrupt (item 4): 'wait, did the tests pass' during output interrupts and is routed once",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 level alone never interrupts: sustained audible speech without transcript keeps the reply held, then resumes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 held (item 3): a reply held past heldMaxMs is cancelled, and it is never resumed stale",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 classifier: a partial alone never implies an interruption or a command",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: onset pauses only while output is active; otherwise it is an ordinary accept",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: level evidence never interrupts, however long it lasts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: a partial interrupts only with an interrupt phrase after 180 ms, or two content words after 500 ms",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: partial echo never interrupts, and partials without output never interrupt",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: a final during output that is backchannel or hesitation resumes; a reliable non-backchannel final interrupts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: a final made only of lexicon words resumes even when it is long, and never interrupts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: echo finals are dropped whether or not output is active",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: with no output, hesitation or a wordless acknowledgment is dropped; words (even 'yes') are accepted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: an empty final and stt.none resume during output and accept otherwise; a decided interrupt never resumes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: a short burst resumes during output only; a long one waits for transcript evidence",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 AEC-03: a whisper hallucination during output never interrupts, and it is routed nowhere",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 AEC-03 controller: a final during output interrupts only on an interrupt phrase after 180 ms or sustained speech after 500 ms",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-01: a single-chunk reply held on onset and resumed still settles to IDLE once its playback ends",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-02: a playback error on a held reply releases the worker's pause for that generation before the hold is dropped",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-05: close, mute, duplex.error and capture.error cancel a held reply: the receipt says interrupted, and no pause-off is sent",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-08: a worker-initiated lifetime stop releases a held reply at once, without waiting for the resume timer",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-08 (round 2): a worker mute stop is recorded as a mute release, not an error, and a held reply is interrupted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 live re-check: an unfinished sentence with no continuation is routed as heard after the wait; finished turns are not held",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r5: typed input drops a held fragment, so stale words can never confirm a newer proposal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r5: a spoken control after a held fragment is routed on its own, never joined into chat",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r5: a fragment built turn never confirms, and mute drops a held fragment",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r6: a three-part sentence waits again, worker exit and interrupt drop held words, and held words stay visible",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r7: a cut-off draft that timed out creates nothing, and a worker-reported mute drops held words",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V19 the worker's speak.cancelled receipt fills the interrupt receipt for the old generation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V22 rapid interruptions keep the turn state consistent",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V29 V34 interrupt never touches agents or missions",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E23b: a device answer held across a Host restart is stamped INVALIDATED_BY_HOST_RESTART and never executes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-R2-6: a promotion interrupted by a Host restart is reconciled from disk and, if it did not land, listed for review",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "recovery after a Host restart: interrupted steps are reported, never resumed; retry starts a fresh child",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-R21 (HIGH): a phone cannot start or resume workstation-held program launches or UI automation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-R36 (HIGH): descendants of a finished workstation session keep paired-device changes held until none survives",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-R47 (HIGH): a phone-answered write held under live code keeps its paired-device attribution after the workstation answers the hold",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "execution delivers model output and releases its task controller",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "A12: restart during a read child requeues it once; one interrupted row, one recovered row, same agent and mission",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T6 UI: waiting, failure, interruption and completion retain honest control states",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T8: interrupted Agents do not invent a Resume or Pause command",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V19 interrupted audio stops: Interrupt and barge-in talk are enabled while playing, and the state reads Interrupted after",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V29 voice interruption does not stop agent work: Interrupt is never a stop-agent control",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V44 Host restart does not revive stale voice approvals: a Host epoch change drops the held proposal",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "R1-truth#6 Speaking and Interrupt are freshness-gated like Listening: a stale playing flag reads Reconnecting and enables no Interrupt",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 UI-03 a held reply shows Paused for you and keeps Interrupt enabled, which cancels the hold",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 lane2 the store refuses a push-to-talk press and a hands-free start outside the matching open mode, and ends a held press before a mode switch",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T10 duplicate press while held sends no second listen.start",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "actions": [
+      "pause",
+      "resume",
+      "interrupt",
+      "accept",
+      "drop"
+    ],
+    "source": "src/lib/bunny-host/voice/voice-turn-taking.ts",
+    "decisions": "Local acoustic duration plus actual transcript evidence; energy alone cannot execute commands."
+  },
+  "limitations": []
+}
