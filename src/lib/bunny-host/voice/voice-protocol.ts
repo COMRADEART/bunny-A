@@ -23,16 +23,22 @@ export type VoiceEndpointState = { name: string | null; muted: boolean | null; v
 // ---------------------------------------------------------------------------------------------------------------
 export type WorkerCommand =
   | { op: "devices" }
+  | { op: "duplex.start"; session: string; maxMs: number }
+  | { op: "duplex.stop"; session: string }
   /** Open the input device and start recognition for exactly one turn. Refused while playback is active (half duplex). */
-  | { op: "capture.start"; turn: string; gen: number; device: number; endpointing: "manual" | "vad"; maxMs: number }
+  | { op: "capture.start"; turn: string; gen: number; device: number; endpointing: "manual" | "vad"; maxMs: number; duplex?: boolean; session?: string }
   /** Manual end of turn (push-to-talk release): stop capture, flush the recognizer, emit stt.final or stt.none. */
   | { op: "capture.end"; turn: string; gen: number }
-  /** Discard the turn: stop capture and recognition, emit no final. */
-  | { op: "capture.abort"; gen: number }
+  /**
+   * Discard the turn: stop capture and recognition, emit no final. T12: when `turn` is given, the worker aborts only the
+   * capture whose turn id AND gen match exactly (the duplex input lane has its own ids, separate from output generations).
+   */
+  | { op: "capture.abort"; gen: number; turn?: string }
   /** Synthesize one ordered chunk and queue it for playback. `seq` starts at 0 per turn and is strictly increasing. */
   | { op: "speak"; turn: string; gen: number; seq: number; text: string; device: number; voice: string | null }
   /** Barge-in: waveOutReset, drop every queued or synthesizing chunk with gen <= `gen`, report measured silence. */
   | { op: "speak.cancel"; gen: number }
+  | { op: "speak.pause"; gen: number; on: boolean }
   /** Microphone mute: aborts any capture and refuses capture.start until unmuted. Does not touch Windows settings. */
   | { op: "mute"; on: boolean }
   | { op: "shutdown" };
@@ -48,6 +54,7 @@ export type VoiceErrorCode =
   | "DEVICE_BUSY"
   | "DEVICE_LOST" // device disappeared while open
   | "FORMAT_UNSUPPORTED"
+  | "AEC_UNAVAILABLE"
   | "STT_UNAVAILABLE"
   | "TTS_UNAVAILABLE"
   | "BUSY_PLAYBACK" // capture.start while playback active
@@ -65,20 +72,41 @@ export type WorkerEvent = { t: number; mono: number } & (
       pid: number;
       stt: { engine: string; recognizer: string | null; culture: string | null; local: true };
       tts: { engine: string; voices: string[]; local: true };
+      duplex?: { supported: boolean; backend: string };
     }
+  /** `floor`: the measured AEC-processed ambient RMS at start (bounded), carried across the session's input turns. */
+  | { ev: "duplex.started"; session: string; aec: string; reference: string; inputId: string | null; outputId: string | null; renderDevice: number; fixture: boolean; floor?: number }
+  | { ev: "duplex.stopped"; session: string; reason: string }
+  | { ev: "duplex.error"; session: string; code: VoiceErrorCode; message: string }
   | { ev: "devices"; inputs: VoiceDevice[]; outputs: VoiceDevice[]; defaultInput: VoiceEndpointState; defaultOutput: VoiceEndpointState; micPrivacy: "allow" | "deny" | "unknown" }
   | { ev: "device.changed"; defaultInput: VoiceEndpointState; defaultOutput: VoiceEndpointState }
   | { ev: "capture.started"; turn: string; gen: number; device: VoiceDevice; sampleRate: 16000; channels: 1 }
   | { ev: "capture.first_audio"; turn: string; gen: number }
-  | { ev: "level"; turn: string; gen: number; rms: number; peak: number; speech: boolean }
-  | { ev: "vad"; turn: string; gen: number; state: "speech_start" | "speech_end" | "noise_only" | "no_speech" }
+  /**
+   * T12 duplex fields (absent on half-duplex turns): `speechMs` accumulated above-threshold speech in this turn; `floor` the
+   * bounded ambient estimate; `residual` the AEC-output RMS estimate while the worker's own playback is audible (null when
+   * nothing plays); `outputActive` whether the worker's speaker was writing audio during this window.
+   */
+  | { ev: "level"; turn: string; gen: number; rms: number; peak: number; speech: boolean; speechMs?: number; floor?: number; residual?: number | null; outputActive?: boolean }
+  /**
+   * T12: `onsetMono` (speech_start) is the worker-monotonic time of the first above-threshold frame of the onset window,
+   * i.e. the detected acoustic onset; `speechMs` (speech_end) is the speech duration; `short` marks a burst below the
+   * recognition minimum that ends without a decode. `outputActive` reports whether own playback was audible at onset.
+   */
+  | { ev: "vad"; turn: string; gen: number; state: "speech_start" | "speech_end" | "noise_only" | "no_speech"; onsetMono?: number; speechMs?: number; short?: boolean; outputActive?: boolean }
   | { ev: "stt.partial"; turn: string; gen: number; text: string }
   | { ev: "stt.final"; turn: string; gen: number; text: string; confidence: number }
-  | { ev: "stt.none"; turn: string; gen: number; reason: "no_speech" | "noise_only" | "rejected" | "aborted" | "timeout" }
+  | { ev: "stt.none"; turn: string; gen: number; reason: "no_speech" | "noise_only" | "rejected" | "aborted" | "timeout" | "too_short" }
   | { ev: "capture.stopped"; turn: string; gen: number; reason: "end" | "abort" | "vad" | "max" | "mute" | "error" | "shutdown"; bufferedPeakBytes: number }
   | { ev: "capture.error"; turn: string | null; gen: number | null; code: VoiceErrorCode; message: string }
   | { ev: "tts.ready"; turn: string; gen: number; seq: number; audioMs: number; synthMs: number }
   | { ev: "playback.started"; turn: string; gen: number; seq: number }
+  /**
+   * T12 pause/resume receipt (the acoustic barge-in silence path). `requestMono`: worker-monotonic time the speak.pause
+   * command was applied; `silentMono`: when the render endpoint meter read silent after a pause (null when not measured);
+   * `meterSilentMs` = silentMono - requestMono; `wasAudible`: the meter was above silence when the pause was applied.
+   */
+  | { ev: "playback.paused"; turn: string; gen: number; on: boolean; requestMono?: number; silentMono?: number | null; meterSilentMs?: number | null; wasAudible?: boolean }
   | { ev: "playback.chunk_done"; turn: string; gen: number; seq: number }
   | { ev: "playback.idle"; turn: string; gen: number }
   | { ev: "playback.error"; turn: string | null; gen: number | null; code: VoiceErrorCode; message: string }
@@ -119,6 +147,9 @@ export type VoiceTurnKind =
   | "agent_last_mission"
   | "agent_team" // M-A-3 T11: team questions (how many working, which agent is testing, what is the planner doing, failures, finished)
   | "agent_control" // pause / resume / stop -> proposal, then canonical agent.* command
+  | "mission_control" // T12: "stop the mission" -> screen-confirmed mission.stop proposal (never folded into agent.stop)
+  | "mission_draft" // T12: "prepare a plan for X" -> a Mission DRAFT via canonical mission.create; approval/start stay on screen
+  | "speech_stop" // T12: "stop", "wait", "be quiet", "stop talking": silences Bunny's speech only; never an Agent or Mission control
   | "open_ui" // open Agentic workspace / show results
   | "confirm" // spoken confirmation of a pending voice proposal (pause only)
   | "cancel" // "never mind" / "cancel"
@@ -128,7 +159,9 @@ export type VoiceTurnKind =
 
 export type VoiceProposal = {
   id: string;
-  action: "agent.pause" | "agent.resume" | "agent.stop";
+  action: "agent.pause" | "agent.resume" | "agent.stop" | "mission.stop";
+  /** T12: what the proposal acts on. Absent means "agent" (T10 proposals). For "mission", agentId/agentName carry the Mission id/title. */
+  subject?: "agent" | "mission";
   agentId: string;
   agentName: string;
   revision: number;
@@ -166,13 +199,40 @@ export type VoiceInterruptReceipt = {
   turnId: string;
   gen: number;
   requestedAt: number;
-  source: "button" | "hotkey" | "push_to_talk" | "mute" | "host_disconnect" | "session_close" | "new_turn";
+  source: "button" | "hotkey" | "push_to_talk" | "mute" | "host_disconnect" | "session_close" | "new_turn" | "acoustic" | "speech_stop" | "timeout";
   workerResetMs: number | null;
   meterSilentMs: number | null;
   droppedChunks: number;
   inferenceStopped: boolean | null;
+  /** Canonical stop acknowledgment is not proof that a remote inference server stopped computing. */
+  inferenceCancellation?: "not_requested" | "requested" | "acknowledged" | "failed";
   lateEventsDropped: number;
   wasPlaying: boolean;
+};
+
+/**
+ * T12: one hands-free acoustic barge-in, end to end. Worker-monotonic values (`*Mono`) share one clock, so
+ * `detectionToSilenceMs` = silentMono - detectMono is exact; `onsetToSilenceMs` = silentMono - onsetMono adds the onset
+ * window. Neither includes the capture pipeline delay before the worker sees a frame; that is measured separately and
+ * reported as an estimate, never folded in silently. Null means not measured (e.g. nothing was audible).
+ */
+export type VoiceBargeInReceipt = {
+  inputTurnId: string;
+  outputTurnId: string;
+  gen: number;
+  onsetMono: number | null;
+  detectMono: number | null;
+  pauseRequestMono: number | null;
+  silentMono: number | null;
+  detectionToSilenceMs: number | null;
+  onsetToSilenceMs: number | null;
+  wasAudible: boolean | null;
+  /** pending: output is held for the user; resumed: it was a backchannel/noise; interrupted: the old answer was cancelled. */
+  outcome: "pending" | "resumed" | "interrupted";
+  reason: string;
+  decidedAt: number | null;
+  /** Transcripts dropped during this input turn because they matched Bunny's own recent speech (echo). */
+  echoRejected: number;
 };
 
 /**
@@ -193,6 +253,31 @@ export type VoiceSnapshot = {
   capturing: boolean;
   /** Real playback truth: the worker confirmed audio is being written to the output device. */
   playing: boolean;
+  /** Independent input identity; turnId/generation continue to identify the conversational output. */
+  inputTurnId?: string | null;
+  /**
+   * T12 hands-free (full-duplex) truth. `active`: the worker confirmed the echo-cancelled microphone is open. `starting`:
+   * duplex.start sent, not yet confirmed. `releasing`: stop sent, release not yet acknowledged (capture truth stays on).
+   * `grantExpiresAt`: the explicit user start that permits the microphone to be (re)opened; null = no live grant, so
+   * nothing reopens the microphone until the user starts hands-free again. `stopped`: why the last duplex session ended
+   * ("user", "mute", "idle", "lifetime", "error", "worker_exit", "close", "mode") with its time; a receipt, never authority.
+   */
+  duplex?: {
+    available: boolean;
+    active: boolean;
+    aec: string | null;
+    reference: string | null;
+    fixture: boolean;
+    releasing?: boolean;
+    starting?: boolean;
+    grantExpiresAt?: number | null;
+    stopped?: { reason: string; at: number } | null;
+  };
+  /** T12: Bunny's reply is held (paused, not cancelled) while the controller decides whether the user is taking the turn. */
+  outputHeld?: boolean;
+  turnDecision?: { action: "pause" | "resume" | "interrupt" | "accept" | "drop"; reason: string; speechMs: number; at: number } | null;
+  /** T12: the most recent hands-free acoustic barge-in receipt (see VoiceBargeInReceipt). */
+  lastBargeIn?: VoiceBargeInReceipt | null;
   muted: boolean;
   /** Last real input level (0..1) with its receipt time; null when not capturing. Clients animate only from this. */
   level: { rms: number; peak: number; speech: boolean; at: number } | null;
@@ -249,6 +334,23 @@ export const VOICE_LIMITS = {
   maxAnswerChars: 4_000,
   maxHistoryTurns: 6,
   handsFreeIdleMs: 60_000,
+  /** T12: an explicit hands-free start grants at most this long; renewal needs a new user start. */
+  duplexGrantMs: 30 * 60_000,
+  /** T12: with no user speech and no Bunny output for this long, the echo-cancelled microphone is released (grant revoked). */
+  duplexIdleMs: 120_000,
+  /** T12: a held reply resumes when no interrupt-grade evidence arrives within this long after the last speech activity. */
+  heldResumeMs: 1_200,
+  /** T12: a reply is never held longer than this; past it the old answer is cancelled rather than resumed stale. */
+  heldMaxMs: 6_000,
+  /** T12: transcript-to-own-speech token overlap at or above this is treated as echo and dropped. */
+  echoOverlap: 0.6,
+  /** T12: how far back Bunny's own spoken chunks are kept for the echo comparison. */
+  echoWindowMs: 12_000,
+  /** T12: spoken Mission drafts are rate-limited; at most this many voice drafts may await review at once. */
+  voiceDraftMinIntervalMs: 30_000,
+  maxPendingVoiceDrafts: 3,
+  /** T12: a spoken follow-up ("did it finish?", "the second one") resolves against the last Host-facts subject this long. */
+  referentTtlMs: 180_000,
   proposalTtlMs: 30_000,
   clarificationTtlMs: 30_000,
   workerStdinSoftBudget: 384 * 1024, // the F04 interactive budget is 512 KiB cumulative per group; relaunch at idle before it

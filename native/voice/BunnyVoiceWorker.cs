@@ -221,16 +221,78 @@ internal static class Out
 {
     static readonly object Lock = new object();
     static Stream stream;
+    static readonly Queue<byte[]> pending = new Queue<byte[]>();
+    static Thread writer;
+    static bool testStream;
+    static bool writing;
+    static long writingSince = -1;
+    static int queuedBytes;
     public static readonly Stopwatch Clock = Stopwatch.StartNew();
+    // T12 bounds: 2048 lines / 1 MiB of queued protocol bytes; overflow or a write stalled past StallExitMs exits contained.
+    const int MaxPendingLines = 2048, MaxPendingBytes = 1024 * 1024, StallExitMs = 10000;
 
-    public static void Open() { stream = Console.OpenStandardOutput(); }
+    public static void Open()
+    {
+        stream = Console.OpenStandardOutput();
+        writer = new Thread(() => {
+            while (true)
+            {
+                byte[] bytes;
+                lock (Lock) { while (pending.Count == 0) Monitor.Wait(Lock); bytes = pending.Dequeue(); queuedBytes -= bytes.Length; writing = true; Interlocked.Exchange(ref writingSince, Clock.ElapsedMilliseconds); }
+                try { stream.Write(bytes, 0, bytes.Length); stream.Flush(); }
+                catch { Environment.Exit(3); }
+                finally { Array.Clear(bytes, 0, bytes.Length); Interlocked.Exchange(ref writingSince, -1); lock (Lock) { writing = false; Monitor.PulseAll(Lock); } }
+            }
+        });
+        writer.IsBackground = true; writer.Start();
+        Thread watchdog = new Thread(() => {
+            while (true) {
+                Thread.Sleep(250);
+                long at = Interlocked.Read(ref writingSince);
+                // T12: 10 s, not 2 s. A briefly slow Host must not kill a healthy worker; a Host that never reads still
+                // exits here, and the queue bounds below keep memory finite while it waits.
+                if (at >= 0 && Clock.ElapsedMilliseconds - at > StallExitMs) Environment.Exit(3);
+            }
+        });
+        watchdog.IsBackground = true; watchdog.Start();
+    }
+    public static void Drain(int ms)
+    {
+        Stopwatch wait = Stopwatch.StartNew();
+        lock (Lock) { while ((pending.Count > 0 || writing) && wait.ElapsedMilliseconds < ms) Monitor.Wait(Lock, 10); }
+    }
+
+    internal static int StalledPipeSelfTest()
+    {
+        SwapStreamForTest(new StalledStream());
+        Emit(Ev("test.stalled_pipe"));
+        // Must outlast StallExitMs (10 s): the production watchdog has to exit 3 before this sleep returns.
+        Thread.Sleep(30000);
+        return 9;
+    }
+    sealed class StalledStream : Stream
+    {
+        readonly ManualResetEvent block = new ManualResetEvent(false);
+        public override bool CanRead { get { return false; } }
+        public override bool CanSeek { get { return false; } }
+        public override bool CanWrite { get { return true; } }
+        public override long Length { get { return 0; } }
+        public override long Position { get { return 0; } set { } }
+        public override void Flush() { }
+        public override int Read(byte[] b, int o, int n) { throw new NotSupportedException(); }
+        public override long Seek(long n, SeekOrigin origin) { throw new NotSupportedException(); }
+        public override void SetLength(long n) { throw new NotSupportedException(); }
+        public override void Write(byte[] b, int o, int n) { block.WaitOne(); }
+    }
 
     // Test-only seam (selftest): swaps the protocol stream and returns the previous one, so a closed-pipe write can be
     // simulated in-process without killing the test runner.
     internal static Stream SwapStreamForTest(Stream s)
     {
+        Drain(500);
         Stream previous = stream;
         stream = s;
+        testStream = s != null && s.GetType().Name == "BrokenStream";
         return previous;
     }
 
@@ -246,8 +308,13 @@ internal static class Out
         byte[] bytes = Encoding.ASCII.GetBytes(line + "\n");
         lock (Lock)
         {
-            stream.Write(bytes, 0, bytes.Length);
-            stream.Flush();
+            if (testStream) { stream.Write(bytes, 0, bytes.Length); return; }
+            // A non-reading Host may stall only the writer. Finite protocol memory; overflow ends the contained
+            // worker and releases microphone/output at process exit rather than trapping an audio state lock.
+            if (pending.Count >= MaxPendingLines || queuedBytes + bytes.Length > MaxPendingBytes) { Environment.Exit(3); return; }
+            pending.Enqueue(bytes);
+            queuedBytes += bytes.Length;
+            Monitor.PulseAll(Lock);
         }
     }
 
@@ -403,26 +470,37 @@ internal class MMDeviceEnumeratorCom { }
 [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IMMDeviceEnumerator
 {
+    [PreserveSig]
     int EnumAudioEndpoints(int dataFlow, int stateMask, out IntPtr devices);
+    [PreserveSig]
     int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice device);
 }
 
 [ComImport, Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IMMDevice
 {
+    [PreserveSig]
     int Activate(ref Guid iid, int clsctx, IntPtr activationParams, [MarshalAs(UnmanagedType.IUnknown)] out object iface);
+    [PreserveSig]
     int OpenPropertyStore(int access, out IPropertyStore store);
+    [PreserveSig]
     int GetId(out IntPtr id);
+    [PreserveSig]
     int GetState(out int state);
 }
 
 [ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IPropertyStore
 {
+    [PreserveSig]
     int GetCount(out uint count);
+    [PreserveSig]
     int GetAt(uint index, out PropKey key);
+    [PreserveSig]
     int GetValue(ref PropKey key, IntPtr value);
+    [PreserveSig]
     int SetValue(ref PropKey key, IntPtr value);
+    [PreserveSig]
     int Commit();
 }
 
@@ -430,24 +508,38 @@ internal interface IPropertyStore
 [ComImport, Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IAudioEndpointVolume
 {
+    [PreserveSig]
     int RegisterControlChangeNotify(IntPtr notify);
+    [PreserveSig]
     int UnregisterControlChangeNotify(IntPtr notify);
+    [PreserveSig]
     int GetChannelCount(out uint count);
+    [PreserveSig]
     int SetMasterVolumeLevel(float level, IntPtr ctx);
+    [PreserveSig]
     int SetMasterVolumeLevelScalar(float level, IntPtr ctx);
+    [PreserveSig]
     int GetMasterVolumeLevel(out float level);
+    [PreserveSig]
     int GetMasterVolumeLevelScalar(out float level);
+    [PreserveSig]
     int SetChannelVolumeLevel(uint channel, float level, IntPtr ctx);
+    [PreserveSig]
     int SetChannelVolumeLevelScalar(uint channel, float level, IntPtr ctx);
+    [PreserveSig]
     int GetChannelVolumeLevel(uint channel, out float level);
+    [PreserveSig]
     int GetChannelVolumeLevelScalar(uint channel, out float level);
+    [PreserveSig]
     int SetMute([MarshalAs(UnmanagedType.Bool)] bool mute, IntPtr ctx);
+    [PreserveSig]
     int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
 }
 
 [ComImport, Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IAudioMeterInformation
 {
+    [PreserveSig]
     int GetPeakValue(out float peak);
 }
 
@@ -536,8 +628,9 @@ internal static class Endpoints
         }
     }
 
-    // Peak meter of the default render endpoint. Includes other applications' audio.
-    public static double? PollRenderSilence(Stopwatch since)
+    // Peak meter of the default render endpoint. Includes other applications' audio. Polled on a meter worker, never on
+    // the playback thread. `since` is the caller's clock; the poll gives up once it passes maxMs (SilentMs stays null).
+    public static MeterReading PollRender(Stopwatch since, int maxMs)
     {
         IMMDeviceEnumerator en = null;
         IMMDevice dev = null;
@@ -549,14 +642,18 @@ internal static class Endpoints
             Guid iid = IidMeter;
             if (dev.Activate(ref iid, 23, IntPtr.Zero, out m) != 0 || m == null) return null;
             IAudioMeterInformation meter = (IAudioMeterInformation)m;
-            while (since.ElapsedMilliseconds <= 1000)
+            MeterReading reading = new MeterReading();
+            bool first = true;
+            while (since.ElapsedMilliseconds <= maxMs)
             {
                 float peak;
                 if (meter.GetPeakValue(out peak) != 0) return null;
-                if (peak < 0.001f) return since.Elapsed.TotalMilliseconds;
+                // Audible at the first reading, taken right after the pause or cancel was applied (endpoint latency is ~ms).
+                if (first) { reading.AudibleAtStart = peak >= 0.001f; first = false; }
+                if (peak < 0.001f) { reading.SilentMs = since.Elapsed.TotalMilliseconds; return reading; }
                 Thread.Sleep(5);
             }
-            return null;
+            return reading;
         }
         catch (Exception)
         {
@@ -755,6 +852,13 @@ internal sealed class FixtureSource : IFrameSource
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+internal sealed class StalledFixtureSource : IFrameSource
+{
+    readonly ManualResetEvent block = new ManualResetEvent(false);
+    public int Read(byte[] frame) { block.WaitOne(); return -1; }
+    public void Close() { }
+}
+
 // Output: waveOut device, or a real-time clocked null sink (test-only).
 // ---------------------------------------------------------------------------------------------------------------
 // The device surface used by the playback thread. Tests substitute a fake; the worker uses WaveOut.
@@ -765,6 +869,8 @@ internal interface IWaveOut
     bool IsDone(Chunk c);
     void Release(Chunk c);
     void Reset();
+    // Pause and restart the output without returning its buffers. Throws VoiceFault(DEVICE_LOST) when the driver refuses.
+    void Pause(bool on);
     void Close();
 }
 
@@ -790,6 +896,9 @@ internal sealed class WaveOut : IWaveOut
 
     public static IWaveOut Open(uint device)
     {
+        string reference = Program.RenderReference;
+        if (reference != null && !AecSource.RenderIdentityMatches(device, reference, AecSource.RenderEndpointId))
+            throw new VoiceFault("AEC_UNAVAILABLE", "render index no longer identifies the echo-reference endpoint");
         WaveFormatEx fmt = Native.Format();
         IntPtr h;
         uint r = Native.waveOutOpen(out h, device, ref fmt, IntPtr.Zero, IntPtr.Zero, 0);
@@ -798,11 +907,19 @@ internal sealed class WaveOut : IWaveOut
             string code = r == Native.MMSYSERR_ALLOCATED ? "DEVICE_BUSY" : (r == Native.WAVERR_BADFORMAT ? "FORMAT_UNSUPPORTED" : "DEVICE_UNAVAILABLE");
             throw new VoiceFault(code, "waveOutOpen failed: " + Native.MmErrorName(r));
         }
+        if (reference != null && !string.Equals(AecSource.EndpointId(h), reference, StringComparison.OrdinalIgnoreCase))
+        {
+            Native.waveOutClose(h);
+            throw new VoiceFault("AEC_UNAVAILABLE", "opened output differs from the echo reference");
+        }
         return new WaveOut(h, device);
     }
 
     public void Submit(Chunk c)
     {
+        string reference = Program.RenderReference;
+        if (reference != null && !string.Equals(AecSource.EndpointId(handle), reference, StringComparison.OrdinalIgnoreCase))
+            throw new VoiceFault("AEC_UNAVAILABLE", "submitted output differs from the echo reference");
         c.Data = Marshal.AllocHGlobal(c.Pcm.Length);
         Marshal.Copy(c.Pcm, 0, c.Data, c.Pcm.Length);
         c.Header = Marshal.AllocHGlobal(Native.HdrSize);
@@ -850,6 +967,14 @@ internal sealed class WaveOut : IWaveOut
         if (handle != IntPtr.Zero) Native.waveOutReset(handle);
     }
 
+    public void Pause(bool on)
+    {
+        uint result = on ? waveOutPause(handle) : waveOutRestart(handle);
+        if (result != 0) throw new VoiceFault("DEVICE_LOST", "output pause failed");
+    }
+    [DllImport("winmm.dll")] static extern uint waveOutPause(IntPtr handle);
+    [DllImport("winmm.dll")] static extern uint waveOutRestart(IntPtr handle);
+
     // waveOutReset returns every pending header to the application before it returns, so after the reset the driver
     // owns no chunk. Those chunks are unprepared and freed here, and the handle is closed even if the first
     // waveOutClose fails (it fails with still-playing while headers are prepared): one reset and one retry.
@@ -870,6 +995,591 @@ internal sealed class WaveOut : IWaveOut
             Native.waveOutClose(handle);
         }
         handle = IntPtr.Zero;
+    }
+}
+
+// T12: source-mode Windows Voice Capture DSP. Windows captures and synchronizes the selected render reference;
+// it is never replaced with a raw-microphone fallback. All COM and keepalive handles belong to one audio thread.
+[ComImport, Guid("745057C7-F353-4F2D-A7EE-58434477730E")]
+internal class AudioAecCom { }
+[ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-C0A9B9A0BCA6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface AecDeviceCollection
+{
+    [PreserveSig] int GetCount(out uint count);
+    [PreserveSig] int Item(uint index, out IMMDevice device);
+}
+[StructLayout(LayoutKind.Sequential)]
+internal struct AecMediaType
+{
+    public Guid major, subtype;
+    public int fixedSize, temporal;
+    public uint sampleSize;
+    public Guid format;
+    public IntPtr unknown;
+    public uint formatSize;
+    public IntPtr formatData;
+}
+[StructLayout(LayoutKind.Sequential)]
+internal struct AecOutput
+{
+    public IntPtr buffer;
+    public uint status;
+    public long timestamp, duration;
+}
+[ComImport, Guid("D8AD0F58-5494-4102-97C5-EC798E59BCF4"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface AecMediaObject
+{
+    [PreserveSig] int GetStreamCount(out uint inputs, out uint outputs);
+    [PreserveSig] int GetInputStreamInfo(uint index, out uint flags);
+    [PreserveSig] int GetOutputStreamInfo(uint index, out uint flags);
+    [PreserveSig] int GetInputType(uint index, uint type, IntPtr result);
+    [PreserveSig] int GetOutputType(uint index, uint type, IntPtr result);
+    [PreserveSig] int SetInputType(uint index, IntPtr type, uint flags);
+    [PreserveSig] int SetOutputType(uint index, ref AecMediaType type, uint flags);
+    [PreserveSig] int GetInputCurrentType(uint index, IntPtr type);
+    [PreserveSig] int GetOutputCurrentType(uint index, IntPtr type);
+    [PreserveSig] int GetInputSizeInfo(uint index, out uint size, out uint lookahead, out uint alignment);
+    [PreserveSig] int GetOutputSizeInfo(uint index, out uint size, out uint alignment);
+    [PreserveSig] int GetInputMaxLatency(uint index, out long latency);
+    [PreserveSig] int SetInputMaxLatency(uint index, long latency);
+    [PreserveSig] int Flush();
+    [PreserveSig] int Discontinuity(uint index);
+    [PreserveSig] int AllocateStreamingResources();
+    [PreserveSig] int FreeStreamingResources();
+    [PreserveSig] int GetInputStatus(uint index, out uint flags);
+    [PreserveSig] int ProcessInput(uint index, IntPtr buffer, uint flags, long timestamp, long duration);
+    [PreserveSig] int ProcessOutput(uint flags, uint count, [In, Out] AecOutput[] buffers, out uint status);
+    [PreserveSig] int Lock(int locked);
+}
+[ComVisible(true), Guid("59EFF8B9-938C-4A26-82F2-95CB84CDC837"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface AecBufferPort
+{
+    [PreserveSig] int SetLength(uint length);
+    [PreserveSig] int GetMaxLength(out uint length);
+    [PreserveSig] int GetBufferAndLength(out IntPtr data, out uint length);
+}
+[ComVisible(true), ClassInterface(ClassInterfaceType.None)]
+public sealed class AecBuffer : AecBufferPort
+{
+    public readonly IntPtr Data = Marshal.AllocHGlobal(6400);
+    public uint Length;
+    public int SetLength(uint length) { if (length > 6400) return unchecked((int)0x80070057); Length = length; return 0; }
+    public int GetMaxLength(out uint length) { length = 6400; return 0; }
+    public int GetBufferAndLength(out IntPtr data, out uint length) { data = Data; length = Length; return 0; }
+    public void Close() { Native.WipeNative(Data, 6400); Marshal.FreeHGlobal(Data); }
+}
+// Thrown when a cancellation checkpoint fires inside an open/construct path: the caller closes what was opened.
+internal sealed class DuplexCancelled : Exception
+{
+    public DuplexCancelled() : base("full-duplex open cancelled") { }
+}
+
+internal sealed class AecSource : IFrameSource
+{
+    // T12: one second of 16 kHz mono PCM16 is the bound on drained-but-unread AEC output.
+    const int PendingBytes = 32000;
+    // DMO_OUTPUT_DATA_BUFFERF_INCOMPLETE: more output is waiting behind this ProcessOutput call.
+    const uint DmoOutputIncomplete = 0x01000000;
+    const int MaxDrainCalls = 16;
+    // Three rotating 100 ms silence buffers keep the render endpoint (and so the AEC reference) fed through a stalled poll.
+    const int SilenceBuffers = 3;
+    object instance;
+    AecMediaObject dmo;
+    AecBuffer buffer;
+    IntPtr bufferInterface;
+    IWaveOut keepalive;
+    readonly Chunk[] silences = new Chunk[SilenceBuffers];
+    byte[] pending = new byte[PendingBytes];
+    int offset, length;
+    long lastAudio = Out.Clock.ElapsedMilliseconds;
+    public readonly string InputId, OutputId;
+    public readonly uint RenderDevice;
+    public long MediaTimestamp;
+    public bool Produced;
+    bool closed;
+    readonly AecOutput[] output = new AecOutput[1];
+    static readonly Guid PropertySet = new Guid("6F52C567-0360-4BD2-9617-CCBF1421C939");
+    [DllImport("winmm.dll")] static extern uint waveOutMessage(IntPtr device, uint message, IntPtr arg1, IntPtr arg2);
+    static void Check(int hr) { if (hr < 0) Marshal.ThrowExceptionForHR(hr); }
+    static void Release(object value) { if (value != null && Marshal.IsComObject(value)) Marshal.ReleaseComObject(value); }
+    static string Id(IMMDevice device)
+    {
+        IntPtr p;
+        Check(device.GetId(out p));
+        try { return Marshal.PtrToStringUni(p); } finally { Marshal.FreeCoTaskMem(p); }
+    }
+    static int DefaultIndex(int flow, out string id)
+    {
+        IMMDeviceEnumerator en = (IMMDeviceEnumerator)new MMDeviceEnumeratorCom();
+        IMMDevice device = null;
+        object collection = null;
+        IntPtr pointer = IntPtr.Zero;
+        try
+        {
+            Check(en.GetDefaultAudioEndpoint(flow, 1, out device));
+            id = Id(device);
+            Check(en.EnumAudioEndpoints(flow, 1, out pointer));
+            collection = Marshal.GetObjectForIUnknown(pointer);
+            AecDeviceCollection list = (AecDeviceCollection)collection;
+            uint count;
+            Check(list.GetCount(out count));
+            for (uint i = 0; i < count && i < 65535; i++)
+            {
+                IMMDevice item;
+                Check(list.Item(i, out item));
+                try { if (Id(item) == id) return (int)i; } finally { Release(item); }
+            }
+            throw new VoiceFault("AEC_UNAVAILABLE", "default endpoint not in the active AEC collection");
+        }
+        finally { if (pointer != IntPtr.Zero) Marshal.Release(pointer); Release(collection); Release(device); Release(en); }
+    }
+    static uint RenderIndex(string endpointId)
+    {
+        for (uint i = 0; i < Native.waveOutGetNumDevs(); i++)
+        {
+            IntPtr size = Marshal.AllocHGlobal(4);
+            IntPtr text = IntPtr.Zero;
+            try
+            {
+                if (waveOutMessage(new IntPtr(i), 0x812, size, IntPtr.Zero) != 0) continue;
+                int bytes = Marshal.ReadInt32(size);
+                if (bytes < 2 || bytes > 65536) continue;
+                text = Marshal.AllocHGlobal(bytes);
+                if (waveOutMessage(new IntPtr(i), 0x811, text, new IntPtr(bytes)) == 0 &&
+                    string.Equals(Marshal.PtrToStringUni(text), endpointId, StringComparison.OrdinalIgnoreCase)) return i;
+            }
+            finally { if (text != IntPtr.Zero) Marshal.FreeHGlobal(text); Marshal.FreeHGlobal(size); }
+        }
+        throw new VoiceFault("AEC_UNAVAILABLE", "speaker endpoint cannot be bound to the echo reference");
+    }
+    public static string EndpointId(IntPtr device)
+    {
+        IntPtr size = Marshal.AllocHGlobal(4), text = IntPtr.Zero;
+        try
+        {
+            if (waveOutMessage(device, 0x812, size, IntPtr.Zero) != 0) return null;
+            int bytes = Marshal.ReadInt32(size);
+            if (bytes < 2 || bytes > 65536) return null;
+            text = Marshal.AllocHGlobal(bytes);
+            return waveOutMessage(device, 0x811, text, new IntPtr(bytes)) == 0 ? Marshal.PtrToStringUni(text) : null;
+        }
+        finally { if (text != IntPtr.Zero) Marshal.FreeHGlobal(text); Marshal.FreeHGlobal(size); }
+    }
+    public static string RenderEndpointId(uint device) { return EndpointId(new IntPtr(device)); }
+    internal static bool RenderIdentityMatches(uint device, string reference, Func<uint, string> lookup)
+    { return reference != null && string.Equals(lookup(device), reference, StringComparison.OrdinalIgnoreCase); }
+    void Property(uint pid, short type, int value)
+    {
+        PropKey key = new PropKey { fmtid = PropertySet, pid = pid };
+        IntPtr variant = Marshal.AllocHGlobal(24);
+        try
+        {
+            Native.WipeNative(variant, 24);
+            Marshal.WriteInt16(variant, type);
+            if (type == 11) Marshal.WriteInt16(variant, 8, value != 0 ? (short)-1 : (short)0);
+            else Marshal.WriteInt32(variant, 8, value);
+            Check(((IPropertyStore)instance).SetValue(ref key, variant));
+            Native.WipeNative(variant, 24);
+            Check(((IPropertyStore)instance).GetValue(ref key, variant));
+            int actual = type == 11 ? (Marshal.ReadInt16(variant, 8) == 0 ? 0 : 1) : Marshal.ReadInt32(variant, 8);
+            if (Marshal.ReadInt16(variant) != type || actual != value) throw new VoiceFault("AEC_UNAVAILABLE", "AEC property readback differs");
+        }
+        finally { Native.PropVariantClear(variant); Marshal.FreeHGlobal(variant); }
+    }
+    // T12: cancelled() is polled between the expensive steps (endpoint enumeration, device open, COM creation, streaming
+    // allocation), so a stop or mute during open releases what was opened instead of finishing the whole setup.
+    static void Checkpoint(Func<bool> cancelled)
+    {
+        if (cancelled != null && cancelled()) throw new DuplexCancelled();
+    }
+
+    public AecSource(Func<bool> cancelled)
+    {
+        try
+        {
+            Checkpoint(cancelled);
+            if (Endpoints.MicPrivacy() == "deny") throw new VoiceFault("PERMISSION_DENIED", "Windows microphone privacy denies capture");
+            if (Endpoints.Read(1).Muted == true) throw new VoiceFault("ENDPOINT_MUTED", "Windows microphone is muted");
+            Checkpoint(cancelled);
+            int mic = DefaultIndex(1, out InputId);
+            Checkpoint(cancelled);
+            int render = DefaultIndex(0, out OutputId);
+            Checkpoint(cancelled);
+            RenderDevice = RenderIndex(OutputId);
+            Checkpoint(cancelled);
+            keepalive = WaveOut.Open(RenderDevice);
+            for (int i = 0; i < SilenceBuffers; i++)
+            {
+                silences[i] = new Chunk();
+                silences[i].Pcm = new byte[Consts.FrameBytes * 5];
+                keepalive.Submit(silences[i]);
+            }
+            Checkpoint(cancelled);
+            instance = new AudioAecCom();
+            dmo = (AecMediaObject)instance;
+            Property(2, 3, 0); // VT_I4 SINGLE_CHANNEL_AEC; not NS/AGC-only mode.
+            Property(3, 11, 1); // VT_BOOL source mode
+            Property(4, 3, (render << 16) | mic);
+            // Leave proven Windows AEC/AES/noise defaults intact; no registry timestamp statistics are enabled.
+            WaveFormatEx wave = Native.Format();
+            IntPtr format = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(WaveFormatEx)));
+            try
+            {
+                Marshal.StructureToPtr(wave, format, false);
+                AecMediaType media = new AecMediaType {
+                    major = new Guid("73647561-0000-0010-8000-00AA00389B71"),
+                    subtype = new Guid("00000001-0000-0010-8000-00AA00389B71"),
+                    fixedSize = 1, sampleSize = 2, format = new Guid("05589F81-C356-11CE-BF01-00AA0055595A"),
+                    formatSize = (uint)Marshal.SizeOf(typeof(WaveFormatEx)), formatData = format };
+                Check(dmo.SetOutputType(0, ref media, 0));
+                Checkpoint(cancelled);
+                Check(dmo.AllocateStreamingResources());
+            }
+            finally { Marshal.FreeHGlobal(format); }
+            buffer = new AecBuffer();
+            bufferInterface = Marshal.GetComInterfaceForObject(buffer, typeof(AecBufferPort));
+            output[0].buffer = bufferInterface;
+        }
+        catch { Close(); throw; }
+    }
+    public int Read(byte[] frame)
+    {
+        if (closed) return -1;
+        // Refill whichever silence buffer the driver has returned, so at least two stay queued while this one is refilled.
+        for (int i = 0; i < SilenceBuffers; i++)
+        {
+            if (keepalive.IsDone(silences[i])) { keepalive.Release(silences[i]); keepalive.Submit(silences[i]); }
+        }
+        if (length - offset < Consts.FrameBytes)
+        {
+            int left = length - offset;
+            int stale = length;
+            if (left > 0) Buffer.BlockCopy(pending, offset, pending, 0, left);
+            // The bytes past the moved tail are consumed or stale copies: wipe them so raw microphone audio does not linger.
+            if (stale > left) Array.Clear(pending, left, stale - left);
+            offset = 0; length = left;
+            // Drain every output the DMO has ready. INCOMPLETE means another ProcessOutput call returns the rest of this
+            // period; a single call per frame would silently drop it.
+            for (int call = 0; ; call++)
+            {
+                buffer.Length = 0;
+                output[0].status = 0;
+                uint status;
+                int hr = dmo.ProcessOutput(0, 1, output, out status);
+                if (hr < 0) throw new VoiceFault("AEC_UNAVAILABLE", "AEC ProcessOutput failed: 0x" + hr.ToString("X8"));
+                uint produced = buffer.Length;
+                if (produced > 0)
+                {
+                    if (produced > (uint)(pending.Length - length))
+                    {
+                        Native.WipeNative(buffer.Data, (int)Math.Min(produced, 6400u));
+                        throw new VoiceFault("BUFFER_LIMIT", "AEC output exceeded the one second pending bound");
+                    }
+                    Marshal.Copy(buffer.Data, pending, length, (int)produced);
+                    // The output is copied out of unmanaged memory, so the unmanaged copy is wiped as well.
+                    Native.WipeNative(buffer.Data, (int)produced);
+                    length += (int)produced;
+                    lastAudio = Out.Clock.ElapsedMilliseconds;
+                }
+                MediaTimestamp = output[0].timestamp;
+                if ((output[0].status & DmoOutputIncomplete) == 0 || call + 1 >= MaxDrainCalls) break;
+            }
+            if (length < Consts.FrameBytes) return Out.Clock.ElapsedMilliseconds - lastAudio > 2000 ? -1 : 0;
+        }
+        Buffer.BlockCopy(pending, offset, frame, 0, Consts.FrameBytes);
+        Array.Clear(pending, offset, Consts.FrameBytes);
+        offset += Consts.FrameBytes;
+        Produced = true;
+        return 1;
+    }
+    public bool SameEndpoints()
+    {
+        string mic, render;
+        DefaultIndex(1, out mic); DefaultIndex(0, out render);
+        return mic == InputId && render == OutputId;
+    }
+    public void Close()
+    {
+        if (closed) return;
+        closed = true;
+        try { if (dmo != null) dmo.FreeStreamingResources(); } catch { }
+        if (bufferInterface != IntPtr.Zero) { Marshal.Release(bufferInterface); bufferInterface = IntPtr.Zero; }
+        if (buffer != null) { buffer.Close(); buffer = null; }
+        Release(instance); instance = null; dmo = null;
+        // Keepalive Close reclaims every submitted silence buffer after the reset; the wipe below covers raw output.
+        if (keepalive != null) { keepalive.Close(); keepalive = null; }
+        for (int i = 0; i < silences.Length; i++) silences[i] = null;
+        Array.Clear(pending, 0, pending.Length);
+        offset = 0; length = 0;
+    }
+}
+
+// T12: the ambient model of one duplex session. Carried across input turns (never recalibrated per turn). Every AEC frame
+// updates it while no speech is in progress (DuplexInput owns that update; a standalone Vad owns its own instance).
+// Floor: a min-follower over the last 500 ms with slow attack and fast release. A single loud event never raises it, while
+// stationary ambient above MinThreshold is learned, so stationary noise cannot count as speech forever.
+// Residual: a slow EMA of the AEC output RMS while the worker's own speaker is audible, plus a 260 ms reverb tail. It is
+// null when nothing of ours is playing. While it is set the onset threshold is also at least residual * 3.
+internal sealed class AmbientFloor
+{
+    public const double MinFloor = 0.0002, MaxFloor = 0.005;
+    public const int WindowFrames = 25;
+    public const double AttackAlpha = 0.1, ReleaseAlpha = 0.2, ResidualAlpha = 0.05, ResidualGain = 3.0;
+    public const int OutputTailFrames = 13;
+    readonly object gate = new object();
+    readonly double[] window = new double[WindowFrames];
+    int windowCount;
+    int windowNext;
+    double floor;
+    double residual;
+    bool residualSet;
+    int tail;
+    // Set by the owning Vad while a turn is in speech. Read by DuplexInput when it observes frames.
+    public volatile bool Speaking;
+
+    public AmbientFloor(double initial) { floor = Clamp(initial); }
+
+    public static double Clamp(double v) { return v < MinFloor ? MinFloor : (v > MaxFloor ? MaxFloor : v); }
+
+    public double Floor { get { lock (gate) { return floor; } } }
+    public bool OutputActive { get { lock (gate) { return tail > 0; } } }
+    public double? Residual { get { lock (gate) { return tail > 0 && residualSet ? residual : (double?)null; } } }
+    public double OnsetThreshold { get { lock (gate) { return ThresholdLocked(); } } }
+    // Quietest frame of the last WindowFrames (0 before any frame). A turn takes it at onset as its in-speech quiet reference.
+    public double WindowMin { get { lock (gate) { if (windowCount == 0) return 0; double quiet = double.MaxValue; for (int i = 0; i < windowCount; i++) if (window[i] < quiet) quiet = window[i]; return quiet; } } }
+
+    // Caller holds gate.
+    double ThresholdLocked()
+    {
+        double t = Math.Max(floor * 3.0, Vad.MinThreshold);
+        if (tail > 0 && residualSet) t = Math.Max(t, residual * ResidualGain);
+        return t;
+    }
+
+    // Session start: the quietest frame of the calibration window becomes the floor (bounded).
+    public void Calibrate(double quietest)
+    {
+        lock (gate) { floor = Clamp(quietest); }
+    }
+
+    // One frame. `speaking`: a turn is in speech, so nothing is learned. `output`: our speaker is audible now.
+    public void Observe(double rms, bool speaking, bool output)
+    {
+        lock (gate)
+        {
+            window[windowNext] = rms;
+            windowNext = (windowNext + 1) % WindowFrames;
+            if (windowCount < WindowFrames) windowCount++;
+            if (output) tail = OutputTailFrames;
+            else if (tail > 0) { tail--; if (tail == 0) residualSet = false; }
+            if (speaking) return;
+            if (tail > 0)
+            {
+                // Our own output is audible: the residual model owns this window and the floor holds, so echo cannot lift
+                // the ambient estimate. Frames above the threshold are not echo-like and are never averaged in.
+                if (!residualSet) { residual = rms; residualSet = true; }
+                else if (rms <= ThresholdLocked()) residual += (rms - residual) * ResidualAlpha;
+                return;
+            }
+            double quiet = double.MaxValue;
+            for (int i = 0; i < windowCount; i++) if (window[i] < quiet) quiet = window[i];
+            floor = Clamp(floor + (quiet - floor) * (quiet > floor ? AttackAlpha : ReleaseAlpha));
+        }
+    }
+}
+
+// Continuous physical capture with bounded per-turn fan-out. Child Close detaches recognition, not the microphone.
+// Every AEC frame updates the session AmbientFloor, between turns too. Frames are kept in a 3 s preroll so the next input
+// turn starts with the audio that led into it.
+internal sealed class DuplexInput
+{
+    // ~400 ms of measurement before duplex.started. The floor starts from the quietest of these frames.
+    const int CalibrationFrames = 20;
+    // 3 s of preroll for the next turn.
+    const int PrerollFrames = 150;
+    readonly object gate = new object();
+    readonly string session;
+    readonly long maxMs;
+    readonly Func<Func<bool>, IFrameSource> open;
+    readonly bool fixture;
+    readonly Func<bool> outputAudible;
+    readonly Queue<byte[]> preRoll = new Queue<byte[]>();
+    readonly AmbientFloor ambient = new AmbientFloor(AmbientFloor.MinFloor);
+    public volatile bool StopFlag;
+    public volatile bool Ready;
+    public uint RenderDevice;
+    public string ReferenceId;
+    TurnFrames active;
+    Thread thread;
+
+    // N-10: the DMO poll runs at ~1 ms while a duplex session is live. Always paired: begun in Run, ended in its finally.
+    [DllImport("winmm.dll")] static extern uint timeBeginPeriod(uint period);
+    [DllImport("winmm.dll")] static extern uint timeEndPeriod(uint period);
+
+    public DuplexInput(string id, long lifetime, Func<Func<bool>, IFrameSource> factory, bool isFixture, Func<bool> outputAudible)
+    { session = id; maxMs = lifetime; open = factory; fixture = isFixture; this.outputAudible = outputAudible; }
+    public AmbientFloor Ambient { get { return ambient; } }
+    public void Start() { thread = new Thread(Run); thread.IsBackground = true; thread.Start(); }
+    // The attached capture is finished first, with the stop's own reason, so closing its frames is never read as a lost device.
+    public void Stop(string reason = "abort")
+    {
+        StopFlag = true;
+        CaptureTurn attached;
+        lock (Program.Gate) { attached = Program.Active; }
+        if (attached != null && attached.Duplex) attached.Finish(reason);
+        lock (gate) { if (active != null) active.Close(); }
+    }
+    public void Join(int ms) { if (thread != null) thread.Join(ms); }
+    public bool Alive { get { return thread != null && thread.IsAlive; } }
+    // N-01: a stop or a mute is honored before the device opens and after it returns, at each open checkpoint.
+    bool Cancelled { get { return StopFlag || Program.Muted; } }
+
+    public IFrameSource Attach()
+    {
+        lock (gate)
+        {
+            if (!Ready || StopFlag) throw new VoiceFault("AEC_UNAVAILABLE", "full-duplex capture is not ready");
+            if (active != null && !active.Closed) throw new VoiceFault("DEVICE_BUSY", "recognition capture is already attached");
+            active = new TurnFrames();
+            while (preRoll.Count > 0) { byte[] frame = preRoll.Dequeue(); active.Push(frame); Array.Clear(frame, 0, frame.Length); }
+            return active;
+        }
+    }
+
+    static double FrameRms(byte[] frame)
+    {
+        double sumSq = 0;
+        for (int i = 0; i + 1 < frame.Length; i += 2)
+        {
+            double s = (short)(frame[i] | (frame[i + 1] << 8)) / 32768.0;
+            sumSq += s * s;
+        }
+        return Math.Sqrt(sumSq / (frame.Length / 2));
+    }
+
+    void Run()
+    {
+        IFrameSource source = null;
+        byte[] frame = new byte[Consts.FrameBytes];
+        long start = Out.Clock.ElapsedMilliseconds, nextCheck = start + 1000;
+        string reason = "stop";
+        bool periodBegun = false;
+        try
+        {
+            if (Cancelled) throw new DuplexCancelled();
+            timeBeginPeriod(1);
+            periodBegun = true;
+            source = open(() => Cancelled);
+            if (Cancelled) throw new DuplexCancelled();
+            AecSource aec = source as AecSource;
+            if (!fixture && aec == null) throw new VoiceFault("AEC_UNAVAILABLE", "no acoustic echo canceller");
+            int calibrated = 0;
+            double quietest = double.MaxValue;
+            while (!Cancelled && Out.Clock.ElapsedMilliseconds - start < maxMs)
+            {
+                int st = source.Read(frame);
+                if (st < 0) throw new VoiceFault("DEVICE_LOST", "AEC capture stopped delivering samples");
+                if (st == 0) { Thread.Sleep(1); continue; }
+                double rms = FrameRms(frame);
+                bool output = outputAudible != null && outputAudible();
+                lock (gate)
+                {
+                    bool attached = active != null && !active.Closed;
+                    ambient.Observe(rms, attached && ambient.Speaking, output);
+                    if (attached) active.Push(frame);
+                    else
+                    {
+                        preRoll.Enqueue((byte[])frame.Clone());
+                        while (preRoll.Count > PrerollFrames) { byte[] old = preRoll.Dequeue(); Array.Clear(old, 0, old.Length); }
+                    }
+                }
+                if (!Ready)
+                {
+                    quietest = Math.Min(quietest, rms);
+                    if (++calibrated >= CalibrationFrames)
+                    {
+                        ambient.Calibrate(quietest);
+                        RenderDevice = aec != null ? aec.RenderDevice : Native.WAVE_MAPPER;
+                        ReferenceId = aec != null ? aec.OutputId : null;
+                        Ready = true;
+                        Out.Emit(Out.Ev("duplex.started", "session", session, "aec", fixture ? "fixture:no-aec" : "Windows Voice Capture DSP/source",
+                            "reference", fixture ? "fixture" : "selected-render-endpoint", "inputId", aec != null ? aec.InputId : null,
+                            "outputId", aec != null ? aec.OutputId : null, "renderDevice", (long)RenderDevice, "fixture", fixture,
+                            "floor", ambient.Floor));
+                    }
+                }
+                if (aec != null && Out.Clock.ElapsedMilliseconds >= nextCheck)
+                {
+                    nextCheck = Out.Clock.ElapsedMilliseconds + 1000;
+                    if (!aec.SameEndpoints()) throw new VoiceFault("DEVICE_LOST", "audio endpoint changed; explicitly start voice again");
+                }
+            }
+            if (!StopFlag) reason = "lifetime";
+        }
+        catch (DuplexCancelled)
+        {
+            reason = "stop";
+        }
+        catch (Exception e)
+        {
+            reason = "error";
+            VoiceFault fault = e as VoiceFault;
+            Guard.Emit(Out.Ev("duplex.error", "session", session, "code", fault != null ? fault.Code : "AEC_UNAVAILABLE",
+                "message", fault != null ? fault.Message : "AEC source failed: " + e.GetType().Name));
+        }
+        finally
+        {
+            StopFlag = true; Ready = false;
+            Array.Clear(frame, 0, frame.Length);
+            // The attached capture finishes before its frames close (see Stop), so a stop is never reported as a lost device.
+            CaptureTurn finishing;
+            bool captureReleased = true;
+            lock (Program.Gate) { finishing = Program.Active; }
+            if (finishing != null && finishing.Duplex)
+            {
+                finishing.Finish("abort");
+                lock (gate) { if (active != null) active.Close(); }
+                finishing.JoinCapture(500);
+                if (finishing.CaptureAliveForTest)
+                {
+                    Guard.Emit(Out.Ev("duplex.error", "session", session, "code", "DEVICE_BUSY", "message", "capture thread is still releasing; worker cleanup required"));
+                    captureReleased = false;
+                }
+            }
+            try { if (source != null) source.Close(); } catch { }
+            lock (gate) { if (active != null) active.Close(); while (preRoll.Count > 0) { byte[] old = preRoll.Dequeue(); Array.Clear(old, 0, old.Length); } }
+            if (captureReleased) Guard.Emit(Out.Ev("duplex.stopped", "session", session, "reason", reason));
+            if (periodBegun) timeEndPeriod(1);
+        }
+    }
+
+    // One input turn's view of the continuous frames. Bounded: a consumer that falls more than 5 s behind is a BUFFER_LIMIT.
+    sealed class TurnFrames : IFrameSource
+    {
+        const int MaxFrames = 250;
+        readonly object gate = new object();
+        readonly Queue<byte[]> frames = new Queue<byte[]>();
+        public bool Closed;
+        bool overflow;
+        public void Push(byte[] frame)
+        {
+            lock (gate)
+            {
+                if (Closed) return;
+                if (frames.Count >= MaxFrames) { overflow = true; return; }
+                frames.Enqueue((byte[])frame.Clone());
+            }
+        }
+        public int Read(byte[] frame)
+        {
+            lock (gate)
+            {
+                if (overflow) throw new VoiceFault("BUFFER_LIMIT", "continuous recognition queue exceeded 5 seconds");
+                if (frames.Count == 0) return Closed ? -1 : 0;
+                byte[] next = frames.Dequeue(); Buffer.BlockCopy(next, 0, frame, 0, frame.Length); Array.Clear(next, 0, next.Length); return 1;
+            }
+        }
+        public void Close() { lock (gate) { Closed = true; while (frames.Count > 0) { byte[] frame = frames.Dequeue(); Array.Clear(frame, 0, frame.Length); } } }
     }
 }
 
@@ -992,8 +1702,32 @@ internal sealed class PcmPipe : Stream
 // ---------------------------------------------------------------------------------------------------------------
 internal sealed class Vad
 {
+    readonly bool duplex;
+    // Duplex only. A session's turns share the DuplexInput model (it learns from every frame); a standalone duplex Vad owns one.
+    readonly AmbientFloor ambient;
+    readonly bool ownsAmbient;
+    bool outputNow;
+    public int PauseMs = SilenceEndMs;
+    public Vad() : this(false) { }
+    public Vad(bool continuous) : this(continuous, AmbientFloor.MinFloor, null) { }
+    public Vad(bool continuous, double initialFloor) : this(continuous, initialFloor, null) { }
+    public Vad(bool continuous, double initialFloor, AmbientFloor shared)
+    {
+        duplex = continuous;
+        if (continuous)
+        {
+            ambient = shared ?? new AmbientFloor(initialFloor);
+            ownsAmbient = shared == null;
+            // A turn that was aborted mid-speech leaves the shared flag set; a new turn starts with no speech in progress.
+            ambient.Speaking = false;
+        }
+    }
     public const int None = 0, SpeechStart = 1, SpeechEnd = 2, NoSpeech = 3, NoiseOnly = 4;
     public const int OnsetMs = 120, SilenceEndMs = 900, HypothesisHoldMs = 700, NoSpeechMs = 8000, EvidenceMs = 1500;
+    // T12 duplex: speech with no frame above the onset threshold for this long ends the turn (the 30 s cap is still the bound).
+    public const int SoftSpeechMaxMs = 4000;
+    // Bursts shorter than this are "short": ended without a recognition decode in duplex, ignored in half duplex.
+    public const int ShortSpeechMs = 250;
     public const double MinThreshold = 0.0006;
     // Live finding (Part B, whisper mode): room noise that rose after the 400 ms calibration stayed above floor*3 between
     // words, so no end of speech was ever seen and turns ran to the 30 s cap. Inside speech, a frame is also silent when it
@@ -1002,6 +1736,11 @@ internal sealed class Vad
     // does not set the threshold for the rest of a long turn. Limit (disclosed): a speaker whose peak is less than ~12x the
     // room noise still never reaches an energy end; the turn then ends on release, a second tap, or the 30 s cap.
     public const double EndPeakFraction = 0.08, EndPeakCap = 0.002, PeakDecay = 0.998;
+    // Duplex only. Stationary loud ambient (above the onset threshold, far above the capped floor) never falls under the
+    // end threshold, so it could hold a turn open for ever. A frame is therefore also silent when it is within
+    // NoiseRefGain of the quietest frame seen just before the onset: a steady level has no quiet part to fall to, and a
+    // speaker's pauses still do. Sustained speech after silence is judged against that silence, so it is not silent.
+    public const double NoiseRefGain = 1.5;
     const int CalibrationFrames = 20;
     int frames;
     double floor;
@@ -1017,12 +1756,24 @@ internal sealed class Vad
     bool noiseSent;
     double smooth;
     double speechPeak;
+    int aboveSpeechMs;
+    bool endedShort;
+    double quietRef; // duplex only: the ambient window's quietest frame at onset
 
     public bool InSpeech { get { return inSpeech; } }
     public bool SawOnset { get { return onset; } }
     public int SpeechMs { get { return speechMs; } }
+    public int AboveMs { get { return aboveMs; } }
+    // True when the last speech_end was a burst below ShortSpeechMs (duplex only).
+    public bool EndedShort { get { return endedShort; } }
     public bool HighEnergy { get { return totalMs > 0 && highMs * 2 >= totalMs; } }
-    public double Threshold { get { return Math.Max(floor * 3.0, MinThreshold); } }
+    public double Threshold { get { return duplex ? ambient.OnsetThreshold : Math.Max(floor * 3.0, MinThreshold); } }
+    // Duplex readings for level and vad events. Residual is null when nothing of ours is audible.
+    public double Floor { get { return duplex ? ambient.Floor : floor; } }
+    public double? Residual { get { return duplex ? ambient.Residual : null; } }
+    public bool OutputActive { get { return duplex && ambient.OutputActive; } }
+    // Standalone duplex only: whether our speaker is audible for the owned model. Sessions observe output in DuplexInput.
+    public void SetOutputActive(bool on) { outputNow = on; }
 
     // msSinceEvidence: milliseconds since the recognizer last hypothesized or detected speech (int.MaxValue if never).
     public int Feed(double rms, int msSinceEvidence)
@@ -1030,9 +1781,10 @@ internal sealed class Vad
         frames++;
         totalMs = frames * Consts.FrameMs;
         if (!onset && rms >= 0.02) highMs += Consts.FrameMs;
-        if (frames <= CalibrationFrames)
+        if (!duplex && frames <= CalibrationFrames)
         {
-            // Calibration over the first 400 ms: no onset allowed. The floor is the quietest frame seen.
+            // Calibration over the first 400 ms: no onset allowed. The floor is the quietest frame seen. Duplex turns do
+            // not recalibrate: the session's ambient model was measured before the first turn could start.
             floor = frames == 1 ? rms : Math.Min(floor, rms);
             return None;
         }
@@ -1049,16 +1801,19 @@ internal sealed class Vad
                     speechMs = aboveMs;
                     silenceMs = 0;
                     quietMs = 0;
+                    aboveSpeechMs = 0;
                     smooth = rms;
                     speechPeak = rms;
+                    if (duplex) { ambient.Speaking = true; quietRef = ambient.WindowMin; }
                     return SpeechStart;
                 }
             }
             else
             {
                 aboveMs = 0;
-                floor = floor * 0.95 + rms * 0.05;
+                if (!duplex) floor = floor * 0.95 + rms * 0.05;
             }
+            if (ownsAmbient) ambient.Observe(rms, false, outputNow);
             // The no-speech clock only runs while the recognizer has produced no evidence.
             if (msSinceEvidence < EvidenceMs) quietMs = 0;
             else quietMs += Consts.FrameMs;
@@ -1081,14 +1836,31 @@ internal sealed class Vad
         // R4: speechMs keeps its original meaning (frames above the onset threshold); it feeds the 250 ms end gate and the
         // whisper hallucination guard. Only the silence clock uses the peak-relative end threshold.
         if (rms > threshold) speechMs += Consts.FrameMs;
-        if (rms > endThreshold) silenceMs = 0;
+        // Duplex: stationary ambient above the threshold is silent too (see NoiseRefGain). Half duplex is unchanged.
+        double quietBelow = duplex ? Math.Max(endThreshold, quietRef * NoiseRefGain) : endThreshold;
+        if (rms > quietBelow) silenceMs = 0;
         else silenceMs += Consts.FrameMs;
-        if (silenceMs >= SilenceEndMs && msSinceEvidence >= HypothesisHoldMs)
+        if (rms > threshold) aboveSpeechMs = 0;
+        else aboveSpeechMs += Consts.FrameMs;
+        bool silenceEnd = silenceMs >= PauseMs && msSinceEvidence >= HypothesisHoldMs;
+        // T12 duplex: soft speech that never rises above the onset threshold for SoftSpeechMaxMs ends the turn, whatever the
+        // peak logic or recognizer evidence says, so a held-open turn cannot run on until the 30 s cap.
+        bool softEnd = duplex && aboveSpeechMs >= SoftSpeechMaxMs;
+        if (silenceEnd || softEnd)
         {
             inSpeech = false;
             aboveMs = 0;
-            if (speechMs >= 250) return SpeechEnd;
+            if (duplex)
+            {
+                // Every duplex onset ends with a speech_end, including bursts below ShortSpeechMs (the caller ends them
+                // without a decode). Half duplex keeps its T10 rule: a short burst is dropped silently.
+                endedShort = speechMs < ShortSpeechMs;
+                ambient.Speaking = false;
+                return SpeechEnd;
+            }
+            if (speechMs >= ShortSpeechMs) return SpeechEnd;
         }
+        if (ownsAmbient) ambient.Observe(rms, true, outputNow);
         return None;
     }
 }
@@ -1289,6 +2061,9 @@ internal static class WhisperGate
 // ---------------------------------------------------------------------------------------------------------------
 internal sealed class CaptureTurn : IAbandonedRecognizer
 {
+    public bool Duplex;
+    // T12 duplex: the session's ambient model (shared across turns). Null for half-duplex turns.
+    public AmbientFloor Ambient;
     public readonly string Turn;
     public readonly long Gen;
     public readonly VoiceDevice Device;
@@ -1309,6 +2084,10 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
     bool terminalEmitted;
     bool sawOnset;
     bool highEnergy;
+    // T12: the VAD ended the turn on a burst below ShortSpeechMs (duplex): finalize without a decode, reason too_short.
+    bool shortEnded;
+    // Guarded by Program.Gate: set when the terminal event is out. See Program.Finalizing.
+    bool finalizeDone;
     bool timedOut;
     bool rejectedSeen;
     string stopReason;
@@ -1412,6 +2191,7 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         Thread f = finalThread;
         if (f != null) f.Join(ms);
     }
+    public void JoinCapture(int ms) { Thread c = captureThread; if (c != null) c.Join(ms); }
 
     public void Finish(string reason)
     {
@@ -1419,7 +2199,9 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         {
             if (closed)
             {
-                if (whisper != null && (reason == "abort" || reason == "mute" || reason == "shutdown")) abortRequested = true;
+                // T12: an abort reaches a turn that is only finalizing (its capture ended), for either engine. Its final
+                // is then withheld and it reports aborted, so an abort never produces text.
+                if (reason == "abort" || reason == "mute" || reason == "shutdown") abortRequested = true;
                 return;
             }
             closed = true;
@@ -1442,13 +2224,15 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
     {
         byte[] frame = new byte[Consts.FrameBytes];
         byte[] fed = new byte[Consts.FrameBytes];
-        Vad vad = new Vad();
+        Vad vad = Duplex ? new Vad(true, AmbientFloor.MinFloor, Ambient) : new Vad(false);
         Agc agc = new Agc();
         bool first = true;
         long bytes = 0;
         double windowSq = 0;
         double windowPeak = 0;
         int windowFrames = 0;
+        // T12 duplex: worker-monotonic time of the first above-threshold frame of the current onset window.
+        long onsetWindowMono = -1;
         try
         {
             while (!StopFlag)
@@ -1457,6 +2241,8 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
                 if (st == 0) { Thread.Sleep(2); continue; }
                 if (st < 0)
                 {
+                    // A capture already finishing (stop, mute, abort) ends quietly: its reason is the one it was finished with.
+                    if (StopFlag) break;
                     EmitCaptureError("DEVICE_LOST", "input device stopped delivering audio");
                     Finish("error");
                     break;
@@ -1479,6 +2265,8 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
                     if (a > peak) peak = a;
                 }
                 double rms = Math.Sqrt(sumSq / (Consts.FrameBytes / 2));
+                if (Duplex) vad.PauseMs = EndpointPause();
+                if (Duplex && !vad.InSpeech && vad.AboveMs == 0 && rms > vad.Threshold) onsetWindowMono = Out.Clock.ElapsedMilliseconds;
                 int ev = vad.Feed(rms, MsSinceEvidence());
                 PublishOnset(vad);
                 agc.Apply(frame, fed, rms, vad.InSpeech);
@@ -1496,12 +2284,19 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
                 }
                 if (ev == Vad.SpeechStart)
                 {
-                    Out.Emit(Out.Ev("vad", "turn", Turn, "gen", Gen, "state", "speech_start"));
+                    if (Duplex) Out.Emit(Out.Ev("vad", "turn", Turn, "gen", Gen, "state", "speech_start", "onsetMono", onsetWindowMono, "outputActive", vad.OutputActive));
+                    else Out.Emit(Out.Ev("vad", "turn", Turn, "gen", Gen, "state", "speech_start"));
                 }
                 else if (ev == Vad.SpeechEnd)
                 {
-                    Out.Emit(Out.Ev("vad", "turn", Turn, "gen", Gen, "state", "speech_end"));
-                    if (VadEndpoint) Finish("vad");
+                    if (Duplex) Out.Emit(Out.Ev("vad", "turn", Turn, "gen", Gen, "state", "speech_end", "speechMs", vad.SpeechMs, "short", vad.EndedShort));
+                    else Out.Emit(Out.Ev("vad", "turn", Turn, "gen", Gen, "state", "speech_end"));
+                    if (VadEndpoint)
+                    {
+                        // A short burst ends the turn without a decode; the flag is read by the finalizer under gate.
+                        lock (gate) { shortEnded = Duplex && vad.EndedShort; }
+                        Finish("vad");
+                    }
                 }
                 else if (ev == Vad.NoSpeech)
                 {
@@ -1519,7 +2314,16 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
                 if (windowFrames == 5)
                 {
                     double rmsWindow = Math.Sqrt(windowSq / (5.0 * (Consts.FrameBytes / 2)));
-                    Out.Emit(Out.Ev("level", "turn", Turn, "gen", Gen, "rms", rmsWindow, "peak", windowPeak, "speech", vad.InSpeech));
+                    Dictionary<string, object> lv = Out.Ev("level", "turn", Turn, "gen", Gen, "rms", rmsWindow, "peak", windowPeak, "speech", vad.InSpeech, "speechMs", vad.SpeechMs);
+                    if (Duplex)
+                    {
+                        // T12: the bounded floor, the output residual (null when nothing of ours is audible) and whether it is.
+                        double? residual = vad.Residual;
+                        lv["floor"] = vad.Floor;
+                        lv["residual"] = residual.HasValue ? (object)residual.Value : null;
+                        lv["outputActive"] = vad.OutputActive;
+                    }
+                    Out.Emit(lv);
                     windowSq = 0;
                     windowPeak = 0;
                     windowFrames = 0;
@@ -1545,8 +2349,11 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
             PublishOnset(vad);
             lock (Program.Gate)
             {
+                // The turn stops being the active capture here, so the next input turn may attach while this one finalizes.
+                // It stays reachable for capture.abort until its final is emitted (Program.Finalizing).
                 if (Program.Active == this) Program.Active = null;
-                if (whisper != null) Program.Finalizing = this;
+                // A finalizer that already finished (the capture thread was slow to exit) must not leave an entry behind.
+                if (!finalizeDone) Program.Finalizing.Add(this);
             }
             string reason;
             lock (gate) { reason = stopReason ?? "error"; }
@@ -1557,6 +2364,19 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
     void MarkEvidence()
     {
         lock (evidenceGate) { lastEvidenceMono = Out.Clock.ElapsedMilliseconds; }
+    }
+
+    int EndpointPause()
+    {
+        string text;
+        lock (gate) { text = lastPartial; }
+        if (string.IsNullOrWhiteSpace(text)) return 900;
+        string normalized = text.Trim().ToLowerInvariant();
+        if (normalized.EndsWith(".") || normalized.EndsWith("?") || normalized.EndsWith("!")) return 700;
+        string[] words = normalized.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        string last = words.Length > 0 ? words[words.Length - 1] : "";
+        if (last == "and" || last == "but" || last == "because" || last == "to" || last == "um" || last == "uh") return 1400;
+        return 1000;
     }
 
     int MsSinceEvidence()
@@ -1712,6 +2532,7 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         bool onset;
         bool high;
         bool stopped;
+        bool quick;
         long speechMs;
         lock (gate)
         {
@@ -1719,11 +2540,13 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
             high = highEnergy;
             speechMs = speechMsPub;
             stopped = aborted || abortRequested;
+            quick = shortEnded;
         }
         WhisperResult r = null;
         try
         {
-            if (!stopped && onset && n > 0 && pcm != null) r = whisper.Transcribe(pcm, n);
+            // T12: a short duplex burst is never decoded (no decode cost, no hallucinated text from a click).
+            if (!stopped && onset && !quick && n > 0 && pcm != null) r = whisper.Transcribe(pcm, n);
         }
         catch (Exception e)
         {
@@ -1740,6 +2563,7 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
             terminal = true;
             string decision;
             if (aborted || abortRequested) decision = "aborted";
+            else if (quick) decision = "too_short";
             else if (!onset) decision = high ? "noise_only" : "no_speech";
             else if (r == null) decision = "rejected";
             else decision = WhisperGate.Reject(r, speechMs, high) ?? "final";
@@ -1757,7 +2581,15 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
 
     void FinalizeMain()
     {
-        Guard.Run(FinalizeBody, FaultFinalize);
+        try
+        {
+            Guard.Run(FinalizeBody, FaultFinalize);
+        }
+        finally
+        {
+            // Terminal event is emitted (or the fault path emitted it): the turn is no longer reachable for abort.
+            lock (Program.Gate) { finalizeDone = true; Program.Finalizing.Remove(this); }
+        }
     }
 
     void FinalizeBody()
@@ -1769,10 +2601,13 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         }
         Thread cap = captureThread;
         if (cap != null) cap.Join(2000);
+        bool quick;
+        lock (gate) { quick = shortEnded; }
         bool done = false;
         try
         {
-            if (!aborted)
+            // T12: a short duplex burst skips the recognizer flush entirely (it is ended without a decode).
+            if (!aborted && !quick)
             {
                 // 300 ms of trailing silence lets the recognizer close the last phrase, then EOF.
                 Pipe.Push(new byte[9600], 0, 9600);
@@ -1810,7 +2645,8 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         {
             terminal = true;
             // Recognizer text without a VAD onset is never trusted; rejected-only text is never promoted.
-            string decision = StopDecision.Terminal(aborted, sawOnset, highEnergy, texts.Count, rejectedSeen, timedOut);
+            // An abort that lands while a short burst finalizes wins, as it does on the whisper path.
+            string decision = quick && !(aborted || abortRequested) ? "too_short" : StopDecision.Terminal(aborted || abortRequested, sawOnset, highEnergy, texts.Count, rejectedSeen, timedOut);
             terminalEmitted = true;
             if (decision == "final")
             {
@@ -1948,6 +2784,13 @@ internal sealed class Speaker
     Chunk synthChunk;
     Chunk stepChunk;
     long maxCancelled = long.MinValue;
+    long pausedGen = long.MinValue;
+    // Worker-monotonic time of the speak.pause request that set pausedGen (receipt requestMono). Guarded by gate.
+    long pauseRequestMono;
+    // Playback thread state: whether the device is currently paused, and the turn and gen whose chunk paused it.
+    bool devicePaused;
+    string devicePausedTurn;
+    long devicePausedGen;
     string lastTurn;
     long lastSeq = -1;
     long staleSinceCancel;
@@ -1976,6 +2819,114 @@ internal sealed class Speaker
     }
 
     public bool NullOutput { get { return nullOutput; } }
+
+    // T12 pause receipt: the meter worker that measures how long the render endpoint takes to read silent after a pause.
+    // Separate from the cancel meter, so a pause never delays a cancel receipt. Null: pause receipts are not measured.
+    public CancelMeter PauseMeter;
+
+    // Command-loop side. A pause is requested for one generation at a time; its request time is kept for the receipt.
+    public void Pause(long gen, bool on)
+    {
+        lock (gate)
+        {
+            if (gen <= maxCancelled) return;
+            if (on)
+            {
+                if (pausedGen != gen)
+                {
+                    pausedGen = gen;
+                    pauseRequestMono = Out.Clock.ElapsedMilliseconds;
+                }
+            }
+            else if (pausedGen == gen) pausedGen = long.MinValue;
+            Monitor.PulseAll(gate);
+        }
+    }
+
+    // True while our own audio is playing (a chunk submitted and not cancelled). The duplex model adds its own reverb tail.
+    public bool Audible()
+    {
+        lock (gate) { return inFlight != null && inFlight.Submitted && !inFlight.Cancelled; }
+    }
+
+    // Playback thread only. A cancelled chunk never touches the device here: the pending reset owns its state, and a
+    // paused device is never restarted for a cancelled chunk.
+    bool ApplyPause(Chunk c)
+    {
+        bool want;
+        long requestMono;
+        lock (gate)
+        {
+            want = !c.Cancelled && pausedGen == c.Gen;
+            requestMono = pauseRequestMono;
+        }
+        if (c.Cancelled) return devicePaused;
+        if (want == devicePaused) return want;
+        if (!want)
+        {
+            try { if (waveOut != null) waveOut.Pause(false); }
+            catch (VoiceFault f) { PauseDeviceFailed(c, f); return devicePaused; }
+            // A real transition back to playing. Only emitted on transitions, never repeated.
+            ReleasePaused(c.Turn, c.Gen);
+            return false;
+        }
+        try { if (waveOut != null) waveOut.Pause(true); }
+        catch (VoiceFault f) { PauseDeviceFailed(c, f); return false; }
+        // The receipt is measured from the moment the device was paused. A request that waited for audio to start is not
+        // counted as silence latency; requestMono still reports when the request arrived.
+        long appliedMono = Out.Clock.ElapsedMilliseconds;
+        Stopwatch clock = Stopwatch.StartNew();
+        devicePaused = true;
+        devicePausedTurn = c.Turn;
+        devicePausedGen = c.Gen;
+        EmitPauseReceipt(c, requestMono, appliedMono, clock, waveOut != null);
+        return true;
+    }
+
+    // Playback thread only. The device left the paused state: announced once, for the turn and gen that paused it.
+    void ReleasePaused(string turn, long gen)
+    {
+        devicePaused = false;
+        Out.Emit(Out.Ev("playback.paused", "turn", turn, "gen", gen, "on", false));
+    }
+
+    // A device that refuses to pause fails the chunk with the device's own code, as a refused submit does.
+    void PauseDeviceFailed(Chunk c, VoiceFault f)
+    {
+        lock (gate) { FailAndDrop(c, f.Code, f.Message); }
+        CloseDevice();
+    }
+
+    // The receipt for one applied pause. Measured ones are finished on the meter worker, so the playback thread never polls.
+    // silentMono is the worker-monotonic time the render meter read silent (appliedMono + meterSilentMs).
+    void EmitPauseReceipt(Chunk c, long requestMono, long appliedMono, Stopwatch clock, bool realDevice)
+    {
+        Dictionary<string, object> d = Out.Ev("playback.paused", "turn", c.Turn, "gen", c.Gen, "on", true, "requestMono", requestMono);
+        if (!realDevice || PauseMeter == null)
+        {
+            // Null sink (fixtures) or no meter: nothing is measured. The null sink is "audible" while a chunk is submitted.
+            d["silentMono"] = null;
+            d["meterSilentMs"] = null;
+            if (!realDevice) d["wasAudible"] = c.Submitted;
+            Out.Emit(d);
+            return;
+        }
+        bool queued = PauseMeter.TrySubmit(clock, reading =>
+        {
+            double? silent = reading == null ? null : reading.SilentMs;
+            d["silentMono"] = silent.HasValue ? (object)(appliedMono + (long)Math.Round(silent.Value)) : null;
+            d["meterSilentMs"] = silent.HasValue ? (object)silent.Value : null;
+            if (reading != null) d["wasAudible"] = reading.AudibleAtStart;
+            Out.Emit(d);
+        });
+        if (!queued)
+        {
+            // The meter queue is full: the receipt is still sent, unmeasured.
+            d["silentMono"] = null;
+            d["meterSilentMs"] = null;
+            Out.Emit(d);
+        }
+    }
 
     public void Start()
     {
@@ -2064,6 +3015,8 @@ internal sealed class Speaker
         lock (gate)
         {
             if (gen > maxCancelled) maxCancelled = gen;
+            // A cancelled generation is never paused again; its pause request is closed.
+            if (pausedGen <= gen) pausedGen = long.MinValue;
             Chunk playing = inFlight;
             r.WasPlaying = playing != null && (playing.Submitted || playing.Submitting) && !playing.Cancelled && playing.Gen <= gen;
             foreach (Chunk c in queue)
@@ -2303,6 +3256,15 @@ internal sealed class Speaker
                 CloseDevice();
             }
         }
+        // The reset returns every buffer. A device paused before it is restarted here, with no chunk in it, so the next
+        // chunk is never submitted to a device the worker believes is running but the driver still holds paused. The
+        // restart is a real transition, announced for the chunk that paused the device.
+        if (devicePaused)
+        {
+            try { if (waveOut != null) waveOut.Pause(false); }
+            catch (VoiceFault) { CloseDevice(); }
+            if (devicePaused) ReleasePaused(devicePausedTurn, devicePausedGen);
+        }
         lock (gate)
         {
             resetDone = want;
@@ -2313,6 +3275,7 @@ internal sealed class Speaker
     // Playback thread only (or Shutdown after that thread exited). Never called with gate held.
     void CloseDevice()
     {
+        if (devicePaused) ReleasePaused(devicePausedTurn, devicePausedGen);
         IWaveOut h = waveOut;
         waveOut = null;
         idleClock = null;
@@ -2332,9 +3295,14 @@ internal sealed class Speaker
         }
         double durationMs = c.AudioMs / pace;
         Stopwatch sw = Stopwatch.StartNew();
-        while (sw.Elapsed.TotalMilliseconds < durationMs)
+        double playedMs = 0;
+        long last = sw.ElapsedMilliseconds;
+        while (playedMs < durationMs)
         {
             if (c.Cancelled) return false;
+            long at = sw.ElapsedMilliseconds;
+            if (!ApplyPause(c)) playedMs += at - last;
+            last = at;
             Thread.Sleep(2);
         }
         lock (gate)
@@ -2387,15 +3355,21 @@ internal sealed class Speaker
         }
 
         Stopwatch sw = Stopwatch.StartNew();
+        long pausedMs = 0, lastTick = 0;
         bool timedOut = false;
         while (!DeviceDone(c))
         {
-            if (sw.ElapsedMilliseconds > c.AudioMs * 2 + 3000)
+            // T12: a pending barge-in reset is applied before any pause decision in the same tick, so a cancelled chunk is
+            // never restarted on a device that is about to be reset.
+            ApplyPendingReset();
+            long tick = sw.ElapsedMilliseconds;
+            if (ApplyPause(c)) pausedMs += tick - lastTick;
+            lastTick = tick;
+            if (tick - pausedMs > c.AudioMs * 2 + 3000)
             {
                 timedOut = true;
                 break;
             }
-            ApplyPendingReset();
             Thread.Sleep(3);
         }
         if (timedOut)
@@ -2481,16 +3455,24 @@ internal static class Guard
 // One background worker answers the speak.cancel receipts that need a render-meter reading. Requests wait in a bounded
 // FIFO, so a burst of cancels never starts a thread per cancel. A request that does not fit is answered by the caller
 // with meterSilentMs null (not measured).
+internal sealed class MeterReading
+{
+    // Milliseconds from the request until the render meter read silent; null when not reached within the bound.
+    public double? SilentMs;
+    // The meter was above silence at the first reading (taken just after the request was applied).
+    public bool AudibleAtStart;
+}
+
 internal sealed class CancelMeter
 {
     public const int MaxPending = 4;
     readonly object gate = new object();
     readonly Queue<MeterJob> pending = new Queue<MeterJob>();
-    readonly Func<Stopwatch, double?> poll;
+    readonly Func<Stopwatch, MeterReading> poll;
     Thread worker;
     int threadsStarted;
 
-    public CancelMeter(Func<Stopwatch, double?> poll)
+    public CancelMeter(Func<Stopwatch, MeterReading> poll)
     {
         this.poll = poll;
     }
@@ -2501,7 +3483,7 @@ internal sealed class CancelMeter
     }
 
     // False when the queue is full. The caller then reports the receipt without a meter reading.
-    public bool TrySubmit(Stopwatch since, Action<double?> done)
+    public bool TrySubmit(Stopwatch since, Action<MeterReading> done)
     {
         lock (gate)
         {
@@ -2532,17 +3514,17 @@ internal sealed class CancelMeter
                 while (pending.Count == 0) Monitor.Wait(gate);
                 job = pending.Dequeue();
             }
-            double? silent = null;
-            try { silent = poll(job.Since); }
-            catch (Exception) { silent = null; }
-            Guard.Run(() => job.Done(silent), e => { });
+            MeterReading reading = null;
+            try { reading = poll(job.Since); }
+            catch (Exception) { reading = null; }
+            Guard.Run(() => job.Done(reading), e => { });
         }
     }
 
     sealed class MeterJob
     {
         public Stopwatch Since;
-        public Action<double?> Done;
+        public Action<MeterReading> Done;
     }
 }
 
@@ -2594,7 +3576,24 @@ internal static class SelfTest
         public bool IsDone(Chunk c) { return reset; }
         public void Release(Chunk c) { }
         public void Reset() { reset = true; }
+        public void Pause(bool on) { }
         public void Close() { }
+    }
+
+    // A driver that records the order of its calls, so the playback thread's pause and reset ordering can be checked.
+    sealed class RecordingWaveOut : IWaveOut
+    {
+        readonly List<string> ops = new List<string>();
+        volatile bool reset;
+        public uint Device { get { return 0u; } }
+        public void Submit(Chunk c) { Record("submit"); }
+        public bool IsDone(Chunk c) { return reset; }
+        public void Release(Chunk c) { }
+        public void Reset() { Record("reset"); reset = true; }
+        public void Pause(bool on) { Record(on ? "pause:true" : "pause:false"); }
+        public void Close() { Record("close"); }
+        void Record(string op) { lock (ops) ops.Add(op); }
+        public List<string> Snapshot() { lock (ops) return new List<string>(ops); }
     }
 
     // A driver whose header never completes on its own. Only a reset completes it, and Release is recorded.
@@ -2608,6 +3607,7 @@ internal static class SelfTest
         public bool IsDone(Chunk c) { return reset; }
         public void Release(Chunk c) { Released++; }
         public void Reset() { reset = true; }
+        public void Pause(bool on) { }
         public void Close() { Closed++; }
     }
 
@@ -2733,11 +3733,11 @@ internal static class SelfTest
     {
         ManualResetEvent polling = new ManualResetEvent(false);
         ManualResetEvent release = new ManualResetEvent(false);
-        CancelMeter meter = new CancelMeter(sw => { polling.Set(); release.WaitOne(3000); return 5.0; });
+        CancelMeter meter = new CancelMeter(sw => { polling.Set(); release.WaitOne(3000); return new MeterReading { SilentMs = 5.0 }; });
         int delivered = 0;
         int accepted = 0;
         object tally = new object();
-        Action<double?> done = v => { lock (tally) { delivered++; } };
+        Action<MeterReading> done = v => { lock (tally) { delivered++; } };
         if (meter.TrySubmit(Stopwatch.StartNew(), done)) accepted++;
         polling.WaitOne(3000);
         for (int i = 0; i < CancelMeter.MaxPending; i++)
@@ -2762,9 +3762,134 @@ internal static class SelfTest
         r["meterDelivered"] = total;
     }
 
+    // N-02 behaviour on the playback thread, against a recording driver. A pause is applied before the reset of a cancelled
+    // chunk, no restart happens before that reset, and a cancelled chunk is never paused again.
+    static void PlaybackOrderCheck(Dictionary<string, object> r)
+    {
+        RecordingWaveOut rec = new RecordingWaveOut();
+        Speaker sp = new Speaker(null, false, 1.0, new string[0], d => rec);
+        sp.PauseMeter = new CancelMeter(since => new MeterReading { SilentMs = 5.0, AudibleAtStart = true });
+        sp.Start();
+        sp.AddRenderedForTest("selftest-order", 11, 0, new byte[32000 * 2], 0u); // 2 s of 16 kHz mono 16-bit
+        Stopwatch w = Stopwatch.StartNew();
+        while (!rec.Snapshot().Contains("submit") && w.ElapsedMilliseconds < 3000) Thread.Sleep(5);
+        sp.Pause(11, true);
+        while (!rec.Snapshot().Contains("pause:true") && w.ElapsedMilliseconds < 6000) Thread.Sleep(5);
+        CancelResult cancel = sp.Cancel(11);
+        Thread.Sleep(150);
+        List<string> ops = rec.Snapshot();
+        sp.Shutdown();
+        int pauseAt = ops.IndexOf("pause:true");
+        int resetAt = ops.IndexOf("reset");
+        int restartAt = ops.IndexOf("pause:false");
+        r["playbackPausedBeforeReset"] = pauseAt >= 0 && resetAt > pauseAt;
+        r["playbackNoRestartBeforeReset"] = resetAt >= 0 && (restartAt < 0 || restartAt > resetAt);
+        r["playbackNoPauseAfterCancel"] = pauseAt >= 0 && ops.LastIndexOf("pause:true") == pauseAt;
+        r["playbackCancelAcknowledged"] = !cancel.ResetPending;
+    }
+
+    // T12 cases (a)-(f) of the duplex endpointing contract. Frames are 20 ms; the comments give the expected frame indices.
+    static void DuplexVadCheck(Dictionary<string, object> r)
+    {
+        // (a) quiet, then a 200 ms burst at 0.02: the onset is seen, and the burst ends (short) after the silence clock.
+        Vad a = new Vad(true, 0.0002);
+        int aStart = -1, aEnd = -1;
+        bool aShort = false;
+        for (int f = 0; f < 200; f++)
+        {
+            int ev = a.Feed((f >= 20 && f < 30) ? 0.02 : 0.0002, int.MaxValue);
+            if (ev == Vad.SpeechStart && aStart < 0) aStart = f;
+            if (ev == Vad.SpeechEnd && aEnd < 0) { aEnd = f; aShort = a.EndedShort; }
+        }
+        r["duplexBurstStart"] = aStart;
+        r["duplexBurstEnd"] = aEnd;
+        r["duplexBurstShort"] = aShort;
+
+        // (h) stationary LOUD ambient (about 0.05 RMS with a deterministic +-10% wobble, above the 0.005 floor cap) cannot hold a
+        // turn open for ever: an onset is seen at frame 6 and a speech_end follows about 900 ms after it (the silence clock).
+        Vad h = new Vad(true, 0.0002);
+        int hStart = -1, hEnd = -1;
+        uint seed = 12345;
+        for (int f = 0; f < 600; f++)
+        {
+            seed = seed * 1664525u + 1013904223u;
+            double level = 0.045 + 0.01 * (((seed >> 8) & 0xFFFF) / 65535.0);
+            int ev = h.Feed(level, int.MaxValue);
+            if (ev == Vad.SpeechStart && hStart < 0) hStart = f;
+            if (ev == Vad.SpeechEnd && hEnd < 0) hEnd = f;
+        }
+        r["duplexLoudNoiseStart"] = hStart;
+        r["duplexLoudNoiseEnd"] = hEnd;
+
+        // (b) stationary ambient at 0.0008 from a quiet start for 10 s: the floor learns it, and no onset is ever seen.
+        Vad b = new Vad(true, 0.0002);
+        int bStarts = 0;
+        for (int f = 0; f < 500; f++) if (b.Feed(0.0008, int.MaxValue) == Vad.SpeechStart) bStarts++;
+        r["duplexStationarySpeechStarts"] = bStarts;
+        r["duplexStationaryFloor"] = b.Floor;
+
+        // (c) ambient 0.0008 with 1 s of speech at 0.02 (frames 20..69): the turn ends about 900 ms after the speech.
+        Vad c = new Vad(true, 0.0008);
+        int cStart = -1, cEnd = -1;
+        for (int f = 0; f < 200; f++)
+        {
+            int ev = c.Feed((f >= 20 && f < 70) ? 0.02 : 0.0008, int.MaxValue);
+            if (ev == Vad.SpeechStart && cStart < 0) cStart = f;
+            if (ev == Vad.SpeechEnd && cEnd < 0) cEnd = f;
+        }
+        r["duplexNoisySpeechStart"] = cStart;
+        r["duplexNoisySpeechEnd"] = cEnd;
+
+        // (d) a loud click at frame 20, then soft speech at 0.002 from frame 25: the click does not suppress the onset.
+        Vad d = new Vad(true, 0.0002);
+        int dStart = -1;
+        for (int f = 0; f < 150; f++)
+        {
+            double rms = f == 20 ? 0.5 : ((f >= 25 && f < 125) ? 0.002 : 0.0002);
+            if (d.Feed(rms, int.MaxValue) == Vad.SpeechStart && dStart < 0) dStart = f;
+        }
+        r["duplexClickThenSoftStart"] = dStart;
+
+        // (e) our own output is audible and its residual frames sit at 0.003: no onset from the residual. User speech at
+        // 0.03 while the output is still audible is an onset.
+        Vad e = new Vad(true, 0.0002);
+        e.SetOutputActive(true);
+        int eEchoOnsets = 0;
+        for (int f = 0; f < 100; f++) if (e.Feed(0.003, int.MaxValue) == Vad.SpeechStart) eEchoOnsets++;
+        r["duplexOutputEchoOnsets"] = eEchoOnsets;
+        int eUserOnset = -1;
+        for (int f = 0; f < 40; f++) if (e.Feed(0.03, int.MaxValue) == Vad.SpeechStart && eUserOnset < 0) eUserOnset = f;
+        r["duplexOutputUserOnset"] = eUserOnset;
+
+        // (f) soft tail just below the onset threshold (0.0005 < 0.0006) with recognizer evidence held fresh, so the silence
+        // clock cannot end the turn. Only the 4 s soft-speech bound may end it: last above-threshold frame 34, end ~frame 234.
+        Vad g = new Vad(true, 0.0002);
+        int gStart = -1, gEnd = -1;
+        bool gShort = false;
+        for (int f = 0; f < 600; f++)
+        {
+            double rms = f < 20 ? 0.0002 : (f < 35 ? 0.02 : 0.0005);
+            int ev = g.Feed(rms, 0);
+            if (ev == Vad.SpeechStart && gStart < 0) gStart = f;
+            if (ev == Vad.SpeechEnd && gEnd < 0) { gEnd = f; gShort = g.EndedShort; }
+        }
+        r["duplexSoftWaitStart"] = gStart;
+        r["duplexSoftWaitEnd"] = gEnd;
+        r["duplexSoftWaitShort"] = gShort;
+    }
+
     public static int Run()
     {
         Dictionary<string, object> r = new Dictionary<string, object>();
+        // Render-identity guard only: these two checks prove that a cached render index is refused when the enumeration
+        // reorders. They prove nothing about echo cancellation; AEC effectiveness is verified by device evidence, never here.
+        string defaultId = "endpoint-A";
+        uint mappingIndex = 1;
+        Dictionary<uint, string> endpoints = new Dictionary<uint, string>();
+        endpoints[0] = "endpoint-B"; endpoints[1] = defaultId;
+        r["renderIdentityInitiallyMatches"] = AecSource.RenderIdentityMatches(mappingIndex, defaultId, i => endpoints[i]);
+        endpoints[1] = "endpoint-B";
+        r["renderIdentityReorderRefused"] = !AecSource.RenderIdentityMatches(mappingIndex, defaultId, i => endpoints[i]);
 
         // Recognizer evidence every 500 ms through 9 s of quiet: no no_speech may fire.
         Vad alive = new Vad();
@@ -2908,9 +4033,15 @@ internal static class SelfTest
         // Cancel meter: one worker for any number of receipts; a full queue is refused, never a new thread.
         MeterCheck(r);
 
+        // Playback ordering around a pause and a barge-in reset, on a recording driver.
+        PlaybackOrderCheck(r);
+
         // Containment: a failed recognizer start, a capture body whose protocol write fails, a timed-out chunk, and the
         // wipe of unmanaged audio. Each runs against fakes or a broken stream; no device or recognizer audio is used.
         ContainmentCheck(r);
+
+        // T12 duplex endpointing with explicit floors. Standalone duplex Vads: no devices, no recognizer, nothing audible.
+        DuplexVadCheck(r);
 
         Out.Emit(Out.Ev("selftest", "results", r));
         return 0;
@@ -2919,13 +4050,19 @@ internal static class SelfTest
 
 internal static class Program
 {
+    public static string RenderReference { get { DuplexInput input = duplex; return input != null && input.Ready && !input.StopFlag ? input.ReferenceId : null; } }
     public static readonly object Gate = new object();
     public static CaptureTurn Active;
-    // The whisper turn whose final decode is still running. capture.abort reaches it after its capture has ended.
-    public static CaptureTurn Finalizing;
-    public static bool Muted;
+    // Turns whose capture has ended and whose terminal event (final, none or aborted) is still pending. capture.abort
+    // reaches them (T12, AUD-04), so the next input turn can attach while one finalizes. Guarded by Gate.
+    public static readonly List<CaptureTurn> Finalizing = new List<CaptureTurn>();
+    const int MaxFinalizing = 3;
+    public static volatile bool Muted;
     static Speaker speaker;
-    static readonly CancelMeter meter = new CancelMeter(since => Endpoints.PollRenderSilence(since));
+    // Speak.cancel receipts (1 s bound) and speak.pause receipts (1.5 s bound) are measured by separate meter workers, so a
+    // pause measurement never delays a cancel receipt.
+    static readonly CancelMeter meter = new CancelMeter(since => Endpoints.PollRender(since, 1000));
+    static readonly CancelMeter pauseMeter = new CancelMeter(since => Endpoints.PollRender(since, 1500));
     static RecognizerInfo recognizer;
     static byte[] synthFixture;
     static byte[] wavFixture;
@@ -2940,6 +4077,7 @@ internal static class Program
     static int whisperThreads = 4;
     static WhisperEngine whisperEngine;
     static string whisperError;
+    static DuplexInput duplex;
 
     static Dictionary<string, object> Ev(string name, params object[] kv) { return Out.Ev(name, kv); }
 
@@ -2950,9 +4088,11 @@ internal static class Program
         {
             string a = args[i];
             if (a == "--input-synth" && i + 1 < args.Length) { inputKind = "synth"; synthText = args[++i]; }
-            else if (a == "--selftest") return SelfTest.Run();
+            else if (a == "--selftest") { int result = SelfTest.Run(); Out.Drain(1000); return result; }
+            else if (a == "--selftest-output-stall") return Out.StalledPipeSelfTest();
             else if (a == "--input-silence") inputKind = "silence";
             else if (a == "--input-noise") inputKind = "noise";
+            else if (a == "--input-stall") inputKind = "stall";
             else if (a == "--input-wav" && i + 1 < args.Length) { inputKind = "wav"; wavPath = args[++i]; }
             else if (a == "--output" && i + 1 < args.Length) nullOutput = args[++i] == "null";
             else if (a == "--stt" && i + 1 < args.Length)
@@ -3051,12 +4191,14 @@ internal static class Program
         }
 
         speaker = new Speaker(synth, nullOutput, pace, installed);
+        speaker.PauseMeter = pauseMeter;
         speaker.Start();
 
         Out.Emit(Ev("ready",
             "protocol", "bunny-voice/1",
             "pid", Process.GetCurrentProcess().Id,
             "stt", SttReady(),
+            "duplex", Out.Obj("supported", true, "backend", "Windows Voice Capture DSP/source"),
             "tts", Out.Obj("engine", synth != null ? "Windows SAPI 5.4 System.Speech" : null, "voices", voiceNames, "local", true)));
 
         if (whisperError != null) Out.Error("STT_UNAVAILABLE", "whisper unavailable: " + whisperError + "; using Windows SAPI");
@@ -3103,6 +4245,7 @@ internal static class Program
 
         Shutdown();
         Out.Emit(Ev("bye"));
+        Out.Drain(500);
         return 0;
     }
 
@@ -3118,6 +4261,8 @@ internal static class Program
 
     static void Shutdown()
     {
+        DuplexInput input = duplex;
+        if (input != null) input.Stop("shutdown");
         CaptureTurn t;
         lock (Gate) { t = Active; }
         if (t != null)
@@ -3126,6 +4271,7 @@ internal static class Program
             t.Join(1500);
         }
         speaker.Shutdown();
+        if (input != null) input.Join(1000);
     }
 
     // Returns false when the process must shut down.
@@ -3153,6 +4299,10 @@ internal static class Program
             switch (op)
             {
                 case "devices": EmitDevices(); return true;
+                case "duplex.start": StartDuplex(cmd); return true;
+                case "duplex.stop":
+                    if (duplex != null && Str(cmd, "session") == duplexSession) duplex.Stop();
+                    return true;
                 case "capture.start": StartCapture(cmd); return true;
                 case "capture.end":
                     {
@@ -3163,19 +4313,31 @@ internal static class Program
                     }
                 case "capture.abort":
                     {
+                        // T12: with a turn id, only the capture (active or finalizing) whose turn AND gen match exactly is aborted.
+                        // Without one, the T10 rule: the active capture (or the latest finalizing one) at gen or later.
+                        string abortTurn = Str(cmd, "turn");
+                        long abortGen = Num(cmd, "gen", -1);
+                        if (abortTurn != null)
+                        {
+                            CaptureTurn exact = FindCapture(abortTurn, abortGen);
+                            if (exact != null) exact.Finish("abort");
+                            return true;
+                        }
                         CaptureTurn t;
-                        lock (Gate) { t = Active ?? Finalizing; }
-                        if (t != null && Num(cmd, "gen", -1) >= t.Gen) t.Finish("abort");
+                        lock (Gate) { t = Active ?? (Finalizing.Count > 0 ? Finalizing[Finalizing.Count - 1] : null); }
+                        if (t != null && abortGen >= t.Gen) t.Finish("abort");
                         return true;
                     }
                 case "speak": Speak(cmd); return true;
                 case "speak.cancel": CancelSpeech(cmd); return true;
+                case "speak.pause": speaker.Pause(Num(cmd, "gen", -1), Bool(cmd, "on")); return true;
                 case "mute":
                     {
                         bool on = Bool(cmd, "on");
                         lock (Gate)
                         {
                             Muted = on;
+                            if (on && duplex != null) duplex.Stop("mute");
                             if (on && Active != null) Active.Finish("mute");
                         }
                         Out.Emit(Ev("mute", "on", on));
@@ -3293,6 +4455,17 @@ internal static class Program
         Out.Emit(Ev("capture.error", "turn", turn, "gen", gen < 0 ? (object)null : (object)gen, "code", code, "message", message));
     }
 
+    // The capture (active, or finalizing) that carries exactly this turn id and generation, or null.
+    static CaptureTurn FindCapture(string turn, long gen)
+    {
+        lock (Gate)
+        {
+            if (Active != null && Active.Turn == turn && Active.Gen == gen) return Active;
+            foreach (CaptureTurn f in Finalizing) if (f.Turn == turn && f.Gen == gen) return f;
+            return null;
+        }
+    }
+
     static void StartCapture(Dictionary<string, object> cmd)
     {
         string turn = Str(cmd, "turn");
@@ -3316,14 +4489,23 @@ internal static class Program
         {
             if (Muted) { CaptureError(turn, gen, "MUTED", "microphone is muted"); return; }
             if (Active != null) { CaptureError(turn, gen, "DEVICE_BUSY", "capture already active"); return; }
-            if (speaker.IsBusy()) { CaptureError(turn, gen, "BUSY_PLAYBACK", "speech playback is active; cancel it before listening"); return; }
+            // T12: a finished capture does not block the next one; only a bounded number of finalizing turns may be pending.
+            if (Finalizing.Count >= MaxFinalizing) { CaptureError(turn, gen, "STT_UNAVAILABLE", "previous turns are still finalizing"); return; }
+            bool continuous = Bool(cmd, "duplex");
+            if (!continuous && speaker.IsBusy()) { CaptureError(turn, gen, "BUSY_PLAYBACK", "speech playback is active; cancel it before listening"); return; }
             if (!AbandonLedger.HasRoom()) { CaptureError(turn, gen, "STT_UNAVAILABLE", "speech recognizer is still busy with an abandoned turn"); return; }
 
             IFrameSource source;
             VoiceDevice info;
             try
             {
-                OpenInput(device, out source, out info);
+                if (continuous)
+                {
+                    if (duplex == null || !duplex.Ready || duplex.StopFlag || Str(cmd, "session") != duplexSession) throw new VoiceFault("AEC_UNAVAILABLE", "full-duplex capture is unavailable");
+                    source = duplex.Attach();
+                    info = new VoiceDevice { Index = inputKind != null ? -2 : -1, Name = inputKind != null ? "fixture:duplex" : "AEC processed default microphone", Channels = 1 };
+                }
+                else OpenInput(device, out source, out info);
             }
             catch (VoiceFault f)
             {
@@ -3334,6 +4516,8 @@ internal static class Program
             CaptureTurn t = engine != null
                 ? new CaptureTurn(turn, gen, info, endpointing == "vad", maxMs * Consts.BytesPerMs, engine)
                 : new CaptureTurn(turn, gen, info, endpointing == "vad", maxMs * Consts.BytesPerMs);
+            t.Duplex = continuous;
+            if (continuous) t.Ambient = duplex.Ambient;
             try
             {
                 t.StartRecognizer(recognizer);
@@ -3359,6 +4543,7 @@ internal static class Program
             info.Name = "fixture:" + inputKind;
             info.Channels = 1;
             if (inputKind == "synth") source = new FixtureSource(synthFixture, false, pace);
+            else if (inputKind == "stall") source = new StalledFixtureSource();
             else if (inputKind == "silence") source = new FixtureSource(null, false, pace);
             else if (inputKind == "noise") source = new FixtureSource(null, true, pace);
             else source = new FixtureSource(wavFixture, false, pace);
@@ -3399,7 +4584,41 @@ internal static class Program
             Out.Emit(Ev("playback.error", "turn", turn, "gen", gen, "code", "DEVICE_UNAVAILABLE", "message", "device index is outside the valid range"));
             return;
         }
-        speaker.Enqueue(turn, gen, seq, text, device < 0 ? Native.WAVE_MAPPER : (uint)device, voice);
+        if (duplex != null && !duplex.StopFlag && !duplex.Ready)
+        {
+            // T12: while the echo reference is still being measured, output has no bound endpoint. Refuse, never play on
+            // an unbound device that the echo canceller cannot see.
+            Out.Emit(Ev("playback.error", "turn", turn, "gen", gen, "code", "AEC_UNAVAILABLE", "message", "full-duplex reference is not ready"));
+            return;
+        }
+        if (duplex != null && duplex.Ready && !duplex.StopFlag)
+        {
+            if (device >= 0 && (uint)device != duplex.RenderDevice) { Out.Emit(Ev("playback.error", "turn", turn, "gen", gen, "code", "AEC_UNAVAILABLE", "message", "output differs from AEC reference")); return; }
+            speaker.Enqueue(turn, gen, seq, text, duplex.RenderDevice, voice);
+        }
+        else speaker.Enqueue(turn, gen, seq, text, device < 0 ? Native.WAVE_MAPPER : (uint)device, voice);
+    }
+
+    static string duplexSession;
+    static void StartDuplex(Dictionary<string, object> cmd)
+    {
+        string session = Str(cmd, "session");
+        if (string.IsNullOrEmpty(session) || session.Length > 80 || Muted)
+        { Out.Emit(Ev("duplex.error", "session", session, "code", Muted ? "MUTED" : "INTERNAL", "message", "duplex start refused")); return; }
+        if (duplex != null && !duplex.StopFlag)
+        { if (session != duplexSession) Out.Emit(Ev("duplex.error", "session", session, "code", "DEVICE_BUSY", "message", "another duplex session is active")); return; }
+        if (duplex != null)
+        {
+            duplex.Join(1000);
+            if (duplex.Alive) { Out.Emit(Ev("duplex.error", "session", session, "code", "DEVICE_BUSY", "message", "previous audio session is still releasing")); return; }
+        }
+        long lifetime = Math.Max(1000, Math.Min(1800000, Num(cmd, "maxMs", 1800000)));
+        duplexSession = session;
+        duplex = new DuplexInput(session, lifetime, cancelled => {
+            if (inputKind == null) return (IFrameSource)new AecSource(cancelled);
+            IFrameSource source; VoiceDevice info; OpenInput(-1, out source, out info); return source;
+        }, inputKind != null, () => speaker != null && speaker.Audible());
+        duplex.Start();
     }
 
     // Device argument: absent or null is the default device (-1). Otherwise it must be an integer in [-1, int.MaxValue];
@@ -3440,7 +4659,7 @@ internal static class Program
             return;
         }
         // The receipt is answered by the shared meter worker. When its queue is full the receipt is still sent, unmeasured.
-        Action<double?> done = silent => EmitCancelled(gen, r, silent);
+        Action<MeterReading> done = m => EmitCancelled(gen, r, m == null ? (double?)null : m.SilentMs);
         if (!meter.TrySubmit(since, done)) done(null);
     }
 

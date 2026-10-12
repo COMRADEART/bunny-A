@@ -172,7 +172,7 @@ test('the Interrupt control sends voice.interrupt and is the only control that c
 
 test('the mic glyph carries Listening and Speaking as an accent, and a fault as a warning (collapsed notch has no status line)', () => {
   const voice = read(voicePath);
-  assert.match(voice, /\$label -eq 'Listening' -or \$label -eq 'Speaking'\) \{ 'BunnyAccent' \}/);
+  assert.match(voice, /\$label -eq 'Listening' -or \$label -eq 'Listening and speaking' -or \$label -eq 'Speaking' -or \$label -eq 'Paused for you'\) \{ 'BunnyAccent' \}/);
   assert.match(voice, /\$label -like 'Voice needs\*' -or \$label -like 'Host offline\*'\) \{ 'BunnyWarning' \}/);
 });
 
@@ -236,7 +236,7 @@ test('R1-truth#8 the WPF uiIntent seq is scoped to the Host epoch: a new epoch r
 
 test('R1-truth#6 the WPF Interrupt control is enabled only from a fresh snapshot, like the Speaking label', () => {
   const voice = read(voicePath);
-  assert.match(voice, /\$bunnyControls\.VoiceInterrupt\.IsEnabled = \$online -and \$open -and \$fresh -and \[bool\]\$snap\.playing/);
+  assert.match(voice, /\$bunnyControls\.VoiceInterrupt\.IsEnabled = \$online -and \$open -and \$fresh -and \(\[bool\]\$snap\.playing -or \[bool\]\$snap\.outputHeld -or \$state -eq 'PROCESSING'\)/);
   assert.match(voice, /if \(-not \$Fresh\) \{ return 'Reconnecting'/);
 });
 
@@ -293,6 +293,8 @@ const HARNESS_FUNCTIONS = [
   'Invoke-BunnyVoiceIntent', 'Set-BunnyVoiceSnapshot', 'Test-BunnyVoiceQueued', 'Start-BunnyVoiceListen',
   'Stop-BunnyVoiceListen', 'Invoke-BunnyVoiceClick', 'Start-BunnyVoicePointer', 'Stop-BunnyVoicePointer',
   'Clear-BunnyVoiceOpening', 'Invoke-BunnyVoiceCloseNow', 'Get-BunnyVoiceLiveProposal', 'Get-BunnyVoiceLabel',
+  'Get-BunnyHandsFreeRow', 'Get-BunnyBargeInNote', 'Set-BunnyHandsFree', 'Start-BunnyHandsFreeListen', 'Finish-BunnyVoiceTurn',
+  'Start-BunnyHotkeyHold',
 ];
 
 // Test doubles: the clock, the Host (a fake HttpClient that answers every request with a new turn for listen.start),
@@ -320,6 +322,10 @@ $script:client | Add-Member -MemberType ScriptMethod -Name SendAsync -Value {
   $content | Add-Member -MemberType ScriptMethod -Name ReadAsStringAsync -Value { New-FakeTask $true $false $script:lastBody }
   return New-FakeTask $true $false ([pscustomobject]@{ StatusCode = 200; Content = $content })
 }
+# The shortcut hold timer: a fake that counts starts, so a hands-free press that must not start a hold is observable.
+$script:bunnyVoiceHotkeyTimer = [pscustomobject]@{ Starts = 0 }
+$script:bunnyVoiceHotkeyTimer | Add-Member -MemberType ScriptMethod -Name Start -Value { $this.Starts++ }
+$script:bunnyVoiceHotkeyTimer | Add-Member -MemberType ScriptMethod -Name Stop -Value { }
 $bunnyOnline = $true
 $bunnyEllipsis = '...'
 $bunnyDot = '-'
@@ -335,6 +341,8 @@ function Reset-Harness {
   $script:bunnyVoiceFlight = $null
   $script:bunnyVoiceSnapshot = $null
   $script:bunnyVoiceListening = $false
+  $script:bunnyVoiceHeld = $false
+  $script:bunnyVoiceHotkeyTimer.Starts = 0
   $script:bunnyVoiceTapLatched = $false
   $script:bunnyVoiceOpenSent = $false
   $script:bunnyVoicePointerClick = $false
@@ -423,6 +431,90 @@ $pLive = Get-BunnyVoiceLiveProposal $live $now
 $r['expiredProposalIsNull'] = ($null -eq $pExpired)
 $r['expiredLabel'] = [string](Get-BunnyVoiceLabel $expired $true $true 'LISTENING' @() ([bool]$pExpired))
 $r['liveLabel'] = [string](Get-BunnyVoiceLabel $live $true $true 'LISTENING' @() ([bool]$pLive))
+
+Reset-Harness
+function NewSnap([string]$Mode, $Duplex, [bool]$Muted, [bool]$Held, [bool]$Capturing, [bool]$Playing, $Fault, $Barge, $TurnId, [bool]$Open = $true) {
+  [pscustomobject]@{ open = $Open; mode = $Mode; muted = $Muted; state = 'LISTENING'; capturing = $Capturing; playing = $Playing; outputHeld = $Held; duplex = $Duplex; error = $Fault; lastBargeIn = $Barge; inputTurnId = $TurnId; devices = $null }
+}
+function Dx([bool]$Active, [bool]$Starting, [bool]$Releasing, [bool]$Available, $Stopped) {
+  [pscustomobject]@{ available = $Available; active = $Active; starting = $Starting; releasing = $Releasing; stopped = $Stopped }
+}
+$r['rowPttIsEmpty'] = [string](Get-BunnyHandsFreeRow (NewSnap 'push_to_talk' (Dx $false $false $false $true $null) $false $false $false $false $null $null $null))
+$r['rowStarting'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $false $true $false $true $null) $false $false $false $false $null $null $null))
+$r['rowActive'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $true $false $false $true $null) $false $false $true $false $null $null $null))
+$r['rowHeld'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $true $false $false $true $null) $false $true $true $false $null $null $null))
+$r['rowReleasing'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $true $false $true $true $null) $false $false $true $false $null $null $null))
+$r['rowMuted'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $false $false $false $true $null) $true $false $false $false $null $null $null))
+$r['rowAec'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $false $false $false $false $null) $false $false $false $false $null $null $null))
+$r['rowIdle'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $false $false $false $true ([pscustomobject]@{ reason = 'idle' })) $false $false $false $false $null $null $null))
+$r['rowLifetime'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $false $false $false $true ([pscustomobject]@{ reason = 'lifetime' })) $false $false $false $false $null $null $null))
+$r['rowOff'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $false $false $false $true $null) $false $false $false $false $null $null $null))
+$r['labelBoth'] = [string](Get-BunnyVoiceLabel (NewSnap 'push_to_talk' $null $false $false $true $true $null $null $null) $true $true 'SPEAKING' @() $false)
+$r['labelSpeakOnly'] = [string](Get-BunnyVoiceLabel (NewSnap 'push_to_talk' $null $false $false $false $true $null $null $null) $true $true 'SPEAKING' @() $false)
+$r['labelListenOnly'] = [string](Get-BunnyVoiceLabel (NewSnap 'push_to_talk' $null $false $false $true $false $null $null $null) $true $true 'LISTENING' @() $false)
+$r['labelHeld'] = [string](Get-BunnyVoiceLabel (NewSnap 'hands_free' $null $false $true $false $false $null $null $null) $true $true 'SPEAKING' @() $false)
+$r['labelNotCapturing'] = [string](Get-BunnyVoiceLabel (NewSnap 'push_to_talk' $null $false $false $false $false $null $null $null) $true $true 'LISTENING' @() $false)
+$r['bargeNote'] = [string](Get-BunnyBargeInNote (NewSnap 'push_to_talk' $null $false $false $false $false $null ([pscustomobject]@{ detectionToSilenceMs = 180.4 }) $null))
+$r['bargeNone'] = [string](Get-BunnyBargeInNote (NewSnap 'push_to_talk' $null $false $false $false $false $null ([pscustomobject]@{ detectionToSilenceMs = $null }) $null))
+$r['rowClosed'] = [string](Get-BunnyHandsFreeRow (NewSnap 'hands_free' (Dx $false $false $false $true ([pscustomobject]@{ reason = 'idle' })) $false $false $false $false $null $null $null $false))
+$r['bargeClosed'] = [string](Get-BunnyBargeInNote (NewSnap 'hands_free' $null $false $false $false $false $null ([pscustomobject]@{ detectionToSilenceMs = 180.4 }) $null $false))
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'hands_free' (Dx $false $false $false $true $null) $false $false $false $false $null $null $null
+Start-BunnyVoiceListen 'push_to_talk'; Drain
+$r['pttInHandsFreeWire'] = (Wire-Lines) -join ','
+$r['pttInHandsFreeListening'] = [bool]$script:bunnyVoiceListening
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'hands_free' (Dx $false $false $false $true $null) $false $false $false $false $null $null $null
+Start-BunnyHotkeyHold; Drain
+$r['hotkeyHandsFreeWire'] = (Wire-Lines) -join ','
+$r['hotkeyHandsFreeHeld'] = [bool]$script:bunnyVoiceHeld
+$r['hotkeyHandsFreeTimer'] = [int]$script:bunnyVoiceHotkeyTimer.Starts
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'hands_free' (Dx $true $false $false $true $null) $false $false $true $false $null $null 'I1'
+Start-BunnyHotkeyHold; Drain
+$r['hotkeyLiveWire'] = (Wire-Lines) -join ','
+$r['hotkeyLiveTimer'] = [int]$script:bunnyVoiceHotkeyTimer.Starts
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'push_to_talk' (Dx $false $false $false $true $null) $false $false $false $false $null $null $null
+Start-BunnyHotkeyHold; Drain
+$r['hotkeyPttWire'] = (Wire-Lines) -join ','
+$r['hotkeyPttTimer'] = [int]$script:bunnyVoiceHotkeyTimer.Starts
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'push_to_talk' (Dx $false $false $false $true $null) $false $false $false $false $null $null $null
+Start-BunnyVoiceListen 'push_to_talk'; Drain
+Set-BunnyHandsFree $true; Drain
+$r['switchWhileListeningWire'] = (Wire-Lines) -join ','
+$r['switchWhileListeningListening'] = [bool]$script:bunnyVoiceListening
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'hands_free' (Dx $false $false $false $true $null) $false $false $false $false $null $null $null
+Start-BunnyHandsFreeListen; Drain
+$r['startHandsFreeWire'] = (Wire-Lines) -join ','
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'hands_free' (Dx $true $false $false $true $null) $false $false $true $false $null $null 'I1'
+Finish-BunnyVoiceTurn; Drain
+$r['finishWire'] = (Wire-Lines) -join ','
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'hands_free' (Dx $true $false $false $true $null) $false $false $true $false $null $null $null
+Finish-BunnyVoiceTurn; Drain
+$r['finishNoTurnWire'] = (Wire-Lines) -join ','
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'push_to_talk' (Dx $false $false $false $true $null) $false $false $false $false $null $null $null
+Set-BunnyHandsFree $true; Drain
+$r['toggleOnSendsOnlyOpen'] = (Wire-Lines) -join ','
+
+Reset-Harness
+$script:bunnyVoiceSnapshot = NewSnap 'hands_free' (Dx $false $false $false $true $null) $false $false $false $false $null $null $null
+Set-BunnyHandsFree $true; Drain
+$r['toggleAlreadyOnSendsNothing'] = (Wire-Lines) -join ','
 `;
 
 function buildVoiceHarness(text) {
@@ -543,4 +635,178 @@ test('R2-races#2 the desktop press maps a transport failure to unknown (defensiv
   assert.match(store, /outcome: "unknown",\r?\n\s+code: "HOST_UNREACHABLE"/);
   assert.match(store, /const started: StartOutcome = snapshot \? "started" : outcome === "refused" \? "refused" : "unknown";/);
   assert.match(store, /await runPress\(pressEnded\(press\)\)/);
+});
+
+// T12 UI lane. The hands-free surface is mode-only on the toggle, starts only by an explicit control, and never reopens the
+// microphone on unmute. The static checks pin the controls and copy; the harness scenarios above run the real functions.
+test('T12 UI-07 the WPF hands-free notice and the AEC copy are the same strings as voice-model.ts', () => {
+  const voice = read(voicePath);
+  const model = read(modelPath);
+  const notice = 'Hands-free keeps the microphone on while Bunny speaks, using Windows echo cancellation on the default speaker. It turns off after 2 minutes of silence and after 30 minutes.';
+  const aec = 'Echo-cancelled hands-free audio is unavailable. Use push-to-talk.';
+  assert.ok(model.includes(notice), 'shared notice copy in voice-model.ts');
+  assert.ok(voice.includes(notice), 'WPF notice copy');
+  assert.ok(model.includes(aec), 'shared AEC copy in voice-model.ts');
+  assert.ok(voice.includes(aec), 'WPF AEC copy');
+  assert.doesNotMatch(voice, /echo cancellation on the default speaker\.\s*Sessions|30 minutes\.\s*Hands-free listens continuously/);
+});
+
+test('T12 UI-01 the hands-free toggle is mode-only in WPF, and a mode switch never sends listen.start', () => {
+  const voice = read(voicePath);
+  assert.match(voice, /\$bunnyControls\.VoiceHandsFree\.IsChecked = \$handsFreeMode/);
+  const setter = voice.slice(voice.indexOf('function Set-BunnyHandsFree'), voice.indexOf('# A proposal the Host has not expired yet'));
+  assert.doesNotMatch(setter, /voice\.listen\.start/);
+  assert.match(setter, /if \(\[string\]\$snap\.mode -eq \$mode\) \{ return \}/);
+});
+
+test('T12 UI-01 the explicit Start hands-free is the only WPF path that sends a hands-free listen.start, and it is named', () => {
+  const voice = read(voicePath);
+  const starts = [...voice.matchAll(/'voice\.listen\.start' @\{ source = 'hands_free' \}/g)];
+  assert.equal(starts.length, 1, 'exactly one hands-free listen.start site');
+  const fn = voice.slice(voice.indexOf('function Start-BunnyHandsFreeListen'), voice.indexOf('function Finish-BunnyVoiceTurn'));
+  assert.match(fn, /\$snap\.mode\) -eq 'hands_free'|\[string\]\$snap\.mode -eq 'hands_free'/);
+  assert.match(voice, /'Start hands-free'/);
+  assert.match(voice, /AutomationProperties\]::SetName\(\$script:bunnyVoiceStart, 'Start hands-free listening'\)/);
+});
+
+test('T12 P7 unmute never reopens the microphone in WPF: the Mute handler sends voice.mute only', () => {
+  const voice = read(voicePath);
+  const mute = voice.slice(voice.indexOf('$bunnyControls.VoiceMute.Add_Click'), voice.indexOf('$bunnyControls.VoiceClose.Add_Click'));
+  assert.match(mute, /'voice\.mute'/);
+  assert.doesNotMatch(mute, /voice\.listen\.start|Start-BunnyVoiceListen|Start-BunnyHandsFreeListen/);
+});
+
+test('T12 UI-02 the WPF Finish my turn control ends the live input by its input id and is named', () => {
+  const voice = read(voicePath);
+  const fn = voice.slice(voice.indexOf('function Finish-BunnyVoiceTurn'), voice.indexOf('# ---- wiring'));
+  assert.match(fn, /\$snap\.duplex\.active/);
+  assert.match(fn, /'voice\.listen\.end' @\{ turnId = \[string\]\$snap\.inputTurnId \}/);
+  assert.match(voice, /'Finish my turn'/);
+  assert.match(voice, /SetName\(\$script:bunnyVoiceFinish, 'Finish my turn'\)/);
+});
+
+test('T12 UI-02 the WPF talk button is disabled in hands-free, so no release caption can sit on a disabled control', () => {
+  const voice = read(voicePath);
+  assert.match(voice, /\$bunnyControls\.VoiceMic\.IsEnabled = \$online -and -not \$handsFreeMode/);
+  assert.match(voice, /\$bunnyControls\.VoiceButton\.IsEnabled = \$online -and -not \$handsFreeMode/);
+});
+
+test('T12 UI-04 WPF interrupt enablement matches React: playing, thinking or holding a reply, from a fresh snapshot', () => {
+  const voice = read(voicePath);
+  assert.match(voice, /\$bunnyControls\.VoiceInterrupt\.IsEnabled = \$online -and \$open -and \$fresh -and \(\[bool\]\$snap\.playing -or \[bool\]\$snap\.outputHeld -or \$state -eq 'PROCESSING'\)/);
+});
+
+test('T12 UI-04 WPF proposal sentence for a Mission stop is "Stop the Mission <title>" and never offers voice confirmation', () => {
+  const voice = read(voicePath);
+  assert.match(voice, /'mission\.stop' \{ 'Stop' \}/);
+  assert.match(voice, /\$subjectWord = if \(\$isMission\) \{ 'the Mission ' \} else \{ '' \}/);
+  assert.match(voice, /\$sayConfirm = \[string\]\$proposal\.confirmVia -eq 'voice_or_screen' -and -not \$isMission/);
+});
+
+test('T12 UI-09 the WPF composite label order: releasing, then both halves, then speaking only from playing, then held', () => {
+  const voice = read(voicePath);
+  const fn = voice.slice(voice.indexOf('function Get-BunnyVoiceLabel'), voice.indexOf('function Get-BunnyVoiceDeviceLine'));
+  const at = (text) => fn.indexOf(text);
+  assert.ok(at("'Releasing microphone'") > 0 && at("'Listening and speaking'") > at("'Releasing microphone'"));
+  assert.ok(at("'Speaking'") > at("'Listening and speaking'"));
+  assert.ok(at("'Paused for you'") > at("'Speaking'"));
+  assert.ok(at("'Listening'") > at("'Paused for you'"));
+});
+
+test('T12 UI-03 WPF status row and barge-in receipt are data-only, derived from snapshot.duplex and lastBargeIn, never animated', () => {
+  const voice = read(voicePath);
+  assert.doesNotMatch(voice, /DoubleAnimation|BeginAnimation|Storyboard|Get-Random|System\.Random/);
+  assert.match(voice, /\[Math\]::Round\(\$ms\) \+ ' ms'|\[string\]\[Math\]::Round\(\$ms\)/);
+  assert.match(voice, /\$script:bunnyVoiceRow\.Text = \$handsFreeRow/);
+  assert.match(voice, /\$script:bunnyVoiceReceipt\.Text = \$receipt/);
+});
+
+test('T12 UI-01 the WPF hands-free status row is derived from snapshot.duplex, empty outside hands-free, and never claims more than the Host reports', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.equal(r.rowPttIsEmpty, '', 'push-to-talk shows no hands-free row');
+  assert.equal(r.rowStarting, 'Starting...');
+  assert.equal(r.rowActive, 'Listening while Bunny speaks (echo-cancelled)');
+  assert.equal(r.rowHeld, 'Paused for you');
+  assert.equal(r.rowReleasing, 'Releasing microphone...');
+  assert.equal(r.rowMuted, 'Muted');
+  assert.equal(r.rowAec, 'Echo-cancelled hands-free audio is unavailable. Use push-to-talk.');
+  assert.equal(r.rowIdle, 'Stopped after 2 minutes of silence');
+  assert.equal(r.rowLifetime, 'Stopped after 30 minutes');
+  assert.equal(r.rowOff, 'Off. Press Start hands-free to listen.');
+});
+
+test('T12 composite truth in WPF: Listening and speaking only with capture and playback, Speaking only from playback, Paused for a held reply', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.equal(r.labelBoth, 'Listening and speaking');
+  assert.equal(r.labelSpeakOnly, 'Speaking');
+  assert.equal(r.labelListenOnly, 'Listening');
+  assert.equal(r.labelHeld, 'Paused for you');
+  assert.notEqual(r.labelNotCapturing, 'Listening', 'no capture confirmed means no Listening claim');
+});
+
+test('T12 UI-03 the WPF barge-in receipt shows the measured time and nothing when unmeasured', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.equal(r.bargeNote, 'Stopped speaking in 180 ms');
+  assert.equal(r.bargeNone, '');
+});
+
+test('T12 UI-01/P7 WPF: Start hands-free sends the one explicit grant, Finish my turn ends the input by id, and a toggle never starts listening', { skip }, () => {
+  const r = runVoiceHarness();
+  // Each list is joined with commas in the harness (PowerShell unrolls one-element arrays), so an empty list is an empty string.
+  const list = (value) => (value ? String(value).split(',') : []);
+  assert.deepEqual(list(r.startHandsFreeWire), ['voice.listen.start:hands_free']);
+  assert.deepEqual(list(r.finishWire), ['voice.listen.end@I1']);
+  assert.deepEqual(list(r.finishNoTurnWire), [], 'no input turn id means no release is sent');
+  assert.deepEqual(list(r.toggleOnSendsOnlyOpen), ['voice.session.open'], 'turning hands-free on opens the session only');
+  assert.deepEqual(list(r.toggleAlreadyOnSendsNothing), [], 'the toggle reflects mode and sends nothing when the mode already matches');
+});
+
+test('T12 lane2 the WPF shortcut press in hands-free is the explicit hands-free start: no hold, no release, no duplex restart', { skip }, () => {
+  const r = runVoiceHarness();
+  const list = (value) => (value ? String(value).split(',') : []);
+  assert.deepEqual(list(r.hotkeyHandsFreeWire), ['voice.listen.start:hands_free'], 'one hands-free start, as the Start control sends');
+  assert.equal(r.hotkeyHandsFreeHeld, false, 'no hold is recorded, so no release can end the duplex input');
+  assert.equal(r.hotkeyHandsFreeTimer, 0, 'the release poll never starts');
+  assert.deepEqual(list(r.hotkeyLiveWire), [], 'a press while the duplex lane is live sends nothing');
+  assert.equal(r.hotkeyLiveTimer, 0);
+  assert.deepEqual(list(r.hotkeyPttWire), ['voice.listen.start:hotkey'], 'the shortcut in push-to-talk keeps its hold');
+  assert.equal(r.hotkeyPttTimer, 1);
+});
+
+test('T12 lane2 the WPF push-to-talk start is refused in hands-free: no listen.start and no capture intent', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.equal(r.pttInHandsFreeWire, '', 'nothing reaches the Host');
+  assert.equal(r.pttInHandsFreeListening, false);
+});
+
+test('T12 lane2 the WPF mode switch ends a held press before the mode changes', { skip }, () => {
+  const r = runVoiceHarness();
+  const list = (value) => (value ? String(value).split(',') : []);
+  assert.deepEqual(list(r.switchWhileListeningWire), ['voice.listen.start:push_to_talk', 'voice.listen.end@T1', 'voice.session.open'], 'the release is queued ahead of the mode open');
+  assert.equal(r.switchWhileListeningListening, false);
+});
+
+test('T12 lane2 the WPF status row and barge-in receipt are empty while no session is open, even if the Host kept mode and the last receipt', { skip }, () => {
+  const r = runVoiceHarness();
+  assert.equal(r.rowClosed, '', 'a closed session shows no hands-free row');
+  assert.equal(r.bargeClosed, '', 'a closed session shows no barge-in receipt');
+});
+
+test('T12 lane2 static: the shortcut branches to the hands-free start before any hold, and push-to-talk never starts in hands-free', () => {
+  const voice = read(voicePath);
+  const hold = voice.slice(voice.indexOf('function Start-BunnyHotkeyHold'), voice.indexOf('function Invoke-BunnyHotkeyPoll'));
+  assert.ok(hold.indexOf('Start-BunnyHandsFreeListen') > 0, 'the hands-free branch exists');
+  assert.ok(hold.indexOf('Start-BunnyHandsFreeListen') < hold.indexOf("Start-BunnyVoiceListen 'hotkey'"), 'the branch returns before the hold');
+  assert.match(hold, /Start-BunnyHandsFreeListen; return/);
+  const listen = voice.slice(voice.indexOf('function Start-BunnyVoiceListen'), voice.indexOf('function Stop-BunnyVoiceListen'));
+  assert.match(listen, /-eq 'hands_free'\) \{ return \}/);
+  const setter = voice.slice(voice.indexOf('function Set-BunnyHandsFree'), voice.indexOf('# A proposal the Host has not expired yet'));
+  assert.ok(setter.indexOf('Stop-BunnyVoiceListen') < setter.indexOf("'voice.session.open'"), 'a held press ends before the mode open is queued');
+});
+
+test('T12 lane2 static: the hands-free start is refused unless the session is open in hands_free and the duplex is idle', () => {
+  const voice = read(voicePath);
+  const fn = voice.slice(voice.indexOf('function Start-BunnyHandsFreeListen'), voice.indexOf('function Finish-BunnyVoiceTurn'));
+  assert.match(fn, /-not \(\$snap -and \$snap\.open -and \[string\]\$snap\.mode -eq 'hands_free'\)\) \{ return \}/);
+  assert.match(fn, /\$snap\.duplex\.active -or \$snap\.duplex\.starting -or \$snap\.duplex\.releasing/);
 });

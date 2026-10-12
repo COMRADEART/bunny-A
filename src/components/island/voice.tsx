@@ -4,12 +4,15 @@ import { useIsland } from "@/store/use-island";
 import { BunnyOrb } from "./motion";
 import {
   answerSourceLabel,
+  bargeInNote,
   clarificationView,
   draftPartial,
   emptyTurnNote,
   endpointLabel,
   outputNote,
   handsFreeOn,
+  handsFreeStatus,
+  HANDS_FREE_NOTICE,
   levelBars,
   nextVoiceMode,
   proposalView,
@@ -82,9 +85,13 @@ export function VoicePanel({ onEnded }: { onEnded?: () => void }) {
   const orb = live ? "listening" : voice?.state === "PROCESSING" ? "routing" : speaking ? "working" : "idle";
   const pressed = store.voicePressing;
   // Holding talk while Bunny speaks or thinks is barge-in: the Host cancels that turn and starts a new capture.
-  const bargeIn = speaking || voice?.state === "PROCESSING";
+  // A held reply is barge-in too: the hold is cancelled by the user's own speech or Interrupt.
+  const bargeIn = speaking || voice?.state === "PROCESSING" || voice?.outputHeld === true;
+  const handsFree = handsFreeOn(voice);
   // The caption follows the Host's capture truth, not the press flag: a turn the Host ended on silence stops saying Listening.
-  const talkLabel = talkButtonLabel({ pressed, live, bargeIn });
+  const talkLabel = talkButtonLabel({ pressed, live, bargeIn, handsFree });
+  const handsFreeRow = handsFreeStatus(voice);
+  const receipt = bargeInNote(voice);
 
   const pointerStart = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0 || !controls.pushToTalk) return;
@@ -154,8 +161,8 @@ export function VoicePanel({ onEnded }: { onEnded?: () => void }) {
         type="button"
         className={`voice-talk${pressed ? " is-pressed" : ""}`}
         aria-pressed={pressed}
-        aria-label={pressed ? "Release to finish" : "Hold to talk"}
-        disabled={!controls.pushToTalk && !pressed}
+        aria-label={handsFree ? talkLabel : pressed ? "Release to finish" : "Hold to talk"}
+        disabled={handsFree || (!controls.pushToTalk && !pressed)}
         onPointerDown={pointerStart}
         onPointerUp={pointerEnd}
         onPointerCancel={pointerEnd}
@@ -175,6 +182,12 @@ export function VoicePanel({ onEnded }: { onEnded?: () => void }) {
       <p role="status" aria-live="polite" className={`voice-status ${TONE_CLASS[status.tone]}`}>
         {status.label}
       </p>
+      {handsFreeRow ? (
+        <p className={`voice-status voice-handsfree ${TONE_CLASS[handsFreeRow.tone]}`} aria-label="Hands-free status">
+          {handsFreeRow.label}
+        </p>
+      ) : null}
+      {receipt ? <p className="voice-notice" aria-label="Last barge-in">{receipt}</p> : null}
       {store.voiceNotice ? <p className="voice-notice">{store.voiceNotice}</p> : null}
       {draft ? (
         <p className="voice-draft" aria-label="Draft from speech, not sent">
@@ -236,6 +249,22 @@ export function VoicePanel({ onEnded }: { onEnded?: () => void }) {
         </div>
       ) : null}
       <div className="voice-actions">
+        {controls.handsFreeStartShown ? (
+          <button
+            type="button"
+            className="btn primary"
+            disabled={!controls.handsFreeStart}
+            onClick={() => void store.startHandsFree()}
+          >
+            <Mic size={14} aria-hidden="true" />
+            Start hands-free
+          </button>
+        ) : null}
+        {controls.finishTurn ? (
+          <button type="button" className="btn secondary" onClick={() => void store.finishVoiceTurn()}>
+            Finish my turn
+          </button>
+        ) : null}
         <button
           type="button"
           className="btn secondary"
@@ -269,9 +298,7 @@ export function VoicePanel({ onEnded }: { onEnded?: () => void }) {
           End session
         </button>
       </div>
-      {handsFreeOn(voice) ? (
-        <p className="voice-notice">Hands-free listens continuously. It stops after a minute of silence.</p>
-      ) : null}
+      {handsFree ? <p className="voice-notice">{HANDS_FREE_NOTICE}</p> : null}
       <form className="voice-typed" onSubmit={submitTyped}>
         <label className="sr-only" htmlFor="voice-typed-input">
           Type your question instead

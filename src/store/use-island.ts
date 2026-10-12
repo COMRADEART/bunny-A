@@ -205,6 +205,10 @@ type Island = Preferences & {
   openVoice: (mode?: VoiceMode) => Promise<void>;
   closeVoice: () => Promise<void>;
   setVoiceMode: (mode: VoiceMode) => Promise<void>;
+  /** The explicit user start that creates the Host hands-free grant (voice.listen.start source hands_free). */
+  startHandsFree: () => Promise<void>;
+  /** Ends the live hands-free input turn by its input id (voice.listen.end). A no-op unless duplex is active. */
+  finishVoiceTurn: () => Promise<void>;
   listenStart: () => Promise<void>;
   listenEnd: () => Promise<void>;
   voiceInterrupt: () => Promise<void>;
@@ -844,18 +848,35 @@ export const useIsland = create<Island>((set, get) => {
       set({ voicePressing: false });
       await voiceCall("voice.session.close", { source: "desktop_button" });
     },
+    // Switching the mode never opens the microphone: hands-free needs the explicit startHandsFree (the Host grant).
     setVoiceMode: async (mode) => {
+      // A press still held when the mode changes is ended first: hands-free has no hold, so no capture survives the switch.
+      if (press.pressed) await runPress(pressUp(press));
       await voiceCall("voice.session.open", { mode });
     },
+    // Only an open hands-free session takes the explicit start. A stale click (the poll has not caught up) must not
+    // reach the Host as a hands-free grant while the session is still push-to-talk.
+    startHandsFree: async () => {
+      if (!get().voice?.open || get().voice?.mode !== "hands_free") return;
+      await voiceCall("voice.listen.start", { source: "hands_free" });
+    },
     listenStart: async () => {
+      // Hands-free has no hold. A long-press (floating Ask Bunny) must not turn the session into hold-to-talk.
+      if (get().voice?.open && get().voice?.mode === "hands_free") return;
       await runPress(pressDown(press, !!get().voice?.open));
     },
     listenEnd: async () => {
       await runPress(pressUp(press));
     },
+    finishVoiceTurn: async () => {
+      const inputTurn = get().voice?.inputTurnId;
+      if (!get().voice?.duplex?.active || !inputTurn) return;
+      await voiceCall("voice.listen.end", { turnId: inputTurn });
+    },
     voiceInterrupt: async () => {
       await voiceCall("voice.interrupt");
     },
+    // Unmuting never reopens the microphone: P7. The user presses Start hands-free again.
     setVoiceMute: async (on) => {
       await voiceCall("voice.mute", voiceRequest.mute(on));
     },

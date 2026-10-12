@@ -1,8 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { VoiceProposal, VoiceSnapshot } from "../../lib/bunny-host/voice/voice-protocol.ts";
+import { readFileSync } from "node:fs";
 import {
   acceptVoiceSnapshot,
+  bargeInNote,
+  handsFreeOn,
+  handsFreeStatus,
+  HANDS_FREE_NOTICE,
+  HANDS_FREE_UNAVAILABLE,
+  nextVoiceMode,
+  TURN_KIND_LABEL,
   outputNote,
   answerSourceLabel,
   clarificationView,
@@ -568,4 +576,202 @@ test("T10 R4 BUSY_TRANSCRIBING has its own retry copy, never the device-busy wor
   assert.match(copy, /try again/i);
   assert.notEqual(copy, voiceErrorMessage("DEVICE_BUSY"));
   assert.notEqual(copy, "Voice hit an error.");
+});
+
+// T12 UI lane (M-A-3 T12). The hands-free toggle is the Host mode, the status row is derived from duplex, the explicit
+// Start hands-free is the only grant, and every composite claim comes from its own real flag.
+const duplexOf = (overrides: Partial<NonNullable<VoiceSnapshot["duplex"]>> = {}): NonNullable<VoiceSnapshot["duplex"]> => ({
+  available: true,
+  active: false,
+  aec: "windows-aec",
+  reference: "default-render",
+  fixture: false,
+  ...overrides,
+});
+const handsFree = (overrides: Partial<VoiceSnapshot> = {}): VoiceSnapshot => snap({ mode: "hands_free", ...overrides });
+const barge = (detectionToSilenceMs: number | null): NonNullable<VoiceSnapshot["lastBargeIn"]> => ({
+  inputTurnId: "in-1",
+  outputTurnId: "out-1",
+  gen: 1,
+  onsetMono: null,
+  detectMono: null,
+  pauseRequestMono: null,
+  silentMono: null,
+  detectionToSilenceMs,
+  onsetToSilenceMs: null,
+  wasAudible: true,
+  outcome: "pending",
+  reason: "test",
+  decidedAt: null,
+  echoRejected: 0,
+});
+
+test("T12 UI-01 the hands-free toggle shows the Host mode only: on means mode hands_free, and a click asks for the other mode", () => {
+  assert.equal(handsFreeOn(handsFree({ duplex: duplexOf({ active: false }) })), true, "mode on with no live capture is still on");
+  assert.equal(handsFreeOn(handsFree({ duplex: duplexOf({ active: true, fixture: true }) })), true, "a fixture duplex does not flip the toggle");
+  assert.equal(handsFreeOn(snap({ mode: "push_to_talk", duplex: duplexOf({ active: true }) })), false);
+  assert.equal(handsFreeOn(null), false);
+  assert.equal(nextVoiceMode(handsFree()), "push_to_talk");
+  assert.equal(nextVoiceMode(snap({ mode: "push_to_talk" })), "hands_free");
+  assert.equal(nextVoiceMode(null), "hands_free");
+});
+
+test("T12 UI-01 the hands-free status row is derived from duplex, is null outside hands-free, and never drives the toggle", () => {
+  assert.equal(handsFreeStatus(null), null);
+  assert.equal(handsFreeStatus(snap({ mode: "push_to_talk", duplex: duplexOf({ active: true }) })), null);
+  assert.deepEqual(handsFreeStatus(handsFree({ duplex: duplexOf({ starting: true }) })), { label: "Starting…", tone: "busy" });
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf({ active: true }) }))?.label, "Listening while Bunny speaks (echo-cancelled)");
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf({ active: true }), outputHeld: true }))?.label, "Paused for you");
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf({ active: true, releasing: true }) }))?.label, "Releasing microphone…");
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf({ active: true }), muted: true }))?.label, "Muted");
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf({ available: false }) }))?.label, HANDS_FREE_UNAVAILABLE);
+  assert.equal(
+    handsFreeStatus(handsFree({ duplex: duplexOf(), error: { code: "AEC_UNAVAILABLE", message: "no AEC" } }))?.label,
+    HANDS_FREE_UNAVAILABLE,
+  );
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf({ stopped: { reason: "idle", at: NOW } }) }))?.label, "Stopped after 2 minutes of silence");
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf({ stopped: { reason: "lifetime", at: NOW } }) }))?.label, "Stopped after 30 minutes");
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf({ stopped: { reason: "worker_exit", at: NOW } }) }))?.label, "Stopped (worker exit)");
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf() }))?.label, "Off. Press Start hands-free to listen.");
+});
+
+test("T12 UI-01 Start hands-free is the explicit grant: shown in hands-free with no live capture, enabled only when the duplex can start", () => {
+  const idle = voiceControls({ ...base, snapshot: handsFree({ duplex: duplexOf() }), typedText: "" });
+  assert.equal(idle.handsFreeStartShown, true);
+  assert.equal(idle.handsFreeStart, true);
+  assert.equal(idle.pushToTalk, false, "hands-free has no hold-to-talk");
+  const idleStopped = voiceControls({ ...base, snapshot: handsFree({ duplex: duplexOf({ stopped: { reason: "idle", at: NOW } }) }), typedText: "" });
+  assert.equal(idleStopped.handsFreeStart, true, "an idle-released session can be started again by the user");
+  for (const duplex of [duplexOf({ starting: true }), duplexOf({ active: true }), duplexOf({ releasing: true })]) {
+    const busy = voiceControls({ ...base, snapshot: handsFree({ duplex }), typedText: "" });
+    assert.equal(busy.handsFreeStartShown, false);
+    assert.equal(busy.handsFreeStart, false);
+  }
+  const unavailable = voiceControls({ ...base, snapshot: handsFree({ duplex: duplexOf({ available: false }) }), typedText: "" });
+  assert.equal(unavailable.handsFreeStartShown, true, "the user sees why it cannot start");
+  assert.equal(unavailable.handsFreeStart, false);
+  assert.equal(voiceControls({ ...base, snapshot: handsFree({ duplex: duplexOf(), muted: true }), typedText: "" }).handsFreeStart, false);
+  assert.equal(voiceControls({ ...base, now: NOW + VOICE_STALE_MS + 1, snapshot: handsFree({ duplex: duplexOf() }), typedText: "" }).handsFreeStart, false);
+  const pushMode = voiceControls({ ...base, snapshot: snap({ mode: "push_to_talk", duplex: duplexOf() }), typedText: "" });
+  assert.equal(pushMode.handsFreeStartShown, false);
+  assert.equal(pushMode.handsFreeStart, false);
+});
+
+test("T12 UI-02 Finish my turn exists only while the echo-cancelled input is live and has an input turn id", () => {
+  assert.equal(voiceControls({ ...base, snapshot: handsFree({ duplex: duplexOf({ active: true }), inputTurnId: "in-1" }), typedText: "" }).finishTurn, true);
+  assert.equal(voiceControls({ ...base, snapshot: handsFree({ duplex: duplexOf({ active: true }), inputTurnId: null }), typedText: "" }).finishTurn, false);
+  assert.equal(voiceControls({ ...base, snapshot: handsFree({ duplex: duplexOf(), inputTurnId: "in-1" }), typedText: "" }).finishTurn, false);
+  assert.equal(voiceControls({ ...base, snapshot: null, typedText: "" }).finishTurn, false);
+});
+
+test("T12 UI-03 a held reply shows Paused for you and keeps Interrupt enabled, which cancels the hold", () => {
+  const held = snap({ state: "SPEAKING", playing: false, outputHeld: true, capturing: true });
+  assert.equal(voiceStatus({ ...base, snapshot: held }).label, "Paused for you");
+  assert.equal(voiceControls({ ...base, snapshot: held, typedText: "" }).interrupt, true);
+  assert.equal(voiceControls({ ...base, receivedAt: NOW - VOICE_FRESH_MS, snapshot: held, typedText: "" }).interrupt, false, "a stale hold is not interruptible");
+});
+
+test("T12 UI-02 the talk caption in hands-free never says release to finish", () => {
+  assert.equal(talkButtonLabel({ pressed: false, live: true, bargeIn: false, handsFree: true }), "Listening hands-free");
+  assert.equal(talkButtonLabel({ pressed: false, live: false, bargeIn: false, handsFree: true }), "Hands-free is on. No need to hold.");
+  assert.doesNotMatch(talkButtonLabel({ pressed: true, live: true, bargeIn: true, handsFree: true }), /release/i);
+});
+
+test("T12 composite truth: Listening and speaking only with confirmed capture and playback; Speaking only from playback; never Listening without capture", () => {
+  const both = snap({ state: "SPEAKING", capturing: true, playing: true, level: { rms: 0.2, peak: 0.3, speech: true, at: NOW } });
+  const bothStatus = voiceStatus({ ...base, snapshot: both });
+  assert.equal(bothStatus.label, "Listening and speaking");
+  assert.equal(bothStatus.live, true);
+  assert.equal(voiceStatus({ ...base, snapshot: snap({ state: "SPEAKING", playing: true, capturing: false }) }).label, "Speaking");
+  assert.equal(voiceStatus({ ...base, snapshot: snap({ state: "LISTENING", capturing: true, playing: false }) }).label, "Listening…");
+  assert.notEqual(voiceStatus({ ...base, snapshot: snap({ state: "LISTENING", capturing: false, playing: false }) }).label, "Listening…");
+  const speakingState = snap({ state: "SPEAKING", capturing: false, playing: false });
+  assert.notEqual(voiceStatus({ ...base, snapshot: speakingState }).label, "Speaking", "a state without playback is never Speaking");
+  const captureOnlySpeaking = voiceStatus({ ...base, snapshot: snap({ state: "SPEAKING", capturing: true, playing: false }) });
+  assert.notEqual(captureOnlySpeaking.label, "Listening and speaking");
+  assert.notEqual(captureOnlySpeaking.label, "Speaking");
+});
+
+test("T12 new turn kinds have plain labels: mission control, mission draft and stopped speaking", () => {
+  assert.equal(TURN_KIND_LABEL.mission_control, "Mission control");
+  assert.equal(TURN_KIND_LABEL.mission_draft, "Mission draft");
+  assert.equal(TURN_KIND_LABEL.speech_stop, "Stopped speaking");
+});
+
+test("T12 a Mission stop proposal reads Stop the Mission <title> and is screen-confirm only", () => {
+  const mission: VoiceProposal = {
+    id: "p-m",
+    action: "mission.stop",
+    subject: "mission",
+    agentId: "m-1",
+    agentName: "Launch plan",
+    revision: 1,
+    confirmVia: "voice_or_screen",
+    createdAt: NOW,
+    expiresAt: NOW + 30_000,
+    hostEpoch: "e1",
+  };
+  const view = proposalView(mission, NOW);
+  assert.equal(view?.title, "Stop the Mission Launch plan?");
+  assert.equal(view?.confirmByVoice, false, "a Mission stop is never confirmed by voice, whatever confirmVia says");
+  assert.match(view?.hint ?? "", /Voice cannot confirm this/);
+  const agent = proposalView({ ...mission, action: "agent.stop", subject: "agent" }, NOW);
+  assert.equal(agent?.title, "Stop Launch plan?", "agent proposals keep their wording");
+  assert.equal(agent?.confirmByVoice, true);
+});
+
+test("T12 a measured barge-in shows the detection-to-silence time; an unmeasured or negative one shows nothing", () => {
+  assert.equal(bargeInNote(snap({ lastBargeIn: barge(180.4) })), "Stopped speaking in 180 ms");
+  assert.equal(bargeInNote(snap({ lastBargeIn: barge(null) })), null);
+  assert.equal(bargeInNote(snap({ lastBargeIn: barge(-5) })), null);
+  assert.equal(bargeInNote(snap()), null);
+});
+
+test("T12 UI-07 the hands-free notice states only what the duplex path enforces, and the AEC copy is one string", () => {
+  assert.equal(
+    HANDS_FREE_NOTICE,
+    "Hands-free keeps the microphone on while Bunny speaks, using Windows echo cancellation on the default speaker. It turns off after 2 minutes of silence and after 30 minutes.",
+  );
+  assert.equal(HANDS_FREE_UNAVAILABLE, "Echo-cancelled hands-free audio is unavailable. Use push-to-talk.");
+  assert.equal(voiceErrorMessage("AEC_UNAVAILABLE"), HANDS_FREE_UNAVAILABLE);
+});
+
+test("T12 P7 unmute and a mode switch never reopen the microphone: only the explicit startHandsFree sends listen.start", () => {
+  const store = readFileSync(new URL("../../store/use-island.ts", import.meta.url), "utf8");
+  const action = (name: string): string => {
+    const start = store.indexOf(`    ${name}: async`);
+    assert.ok(start > 0, `${name} exists`);
+    return store.slice(start, store.indexOf("    },", start));
+  };
+  assert.doesNotMatch(action("setVoiceMute"), /voice\.listen\.start/);
+  assert.doesNotMatch(action("setVoiceMode"), /voice\.listen\.start/);
+  assert.match(action("startHandsFree"), /voice\.listen\.start/);
+  assert.match(action("startHandsFree"), /source: "hands_free"/);
+  assert.match(action("finishVoiceTurn"), /voice\.listen\.end/);
+  assert.match(action("finishVoiceTurn"), /turnId: inputTurn/);
+});
+
+test("T12 lane2 a closed session shows no hands-free row and no barge-in receipt, even when the Host kept mode and the last receipt", () => {
+  const closed = handsFree({ open: false, duplex: duplexOf({ stopped: { reason: "idle", at: NOW } }), lastBargeIn: barge(180) });
+  assert.equal(handsFreeStatus(closed), null, "mode and the last stop reason outlive a close, which is not a live state");
+  assert.equal(bargeInNote(closed), null);
+  assert.equal(handsFreeStatus(handsFree({ duplex: duplexOf({ stopped: { reason: "idle", at: NOW } }) }))?.label, "Stopped after 2 minutes of silence", "open still shows it");
+});
+
+test("T12 lane2 the store refuses a push-to-talk press and a hands-free start outside the matching open mode, and ends a held press before a mode switch", () => {
+  const store = readFileSync(new URL("../../store/use-island.ts", import.meta.url), "utf8");
+  const action = (name: string): string => {
+    const start = store.indexOf(`    ${name}: async`);
+    assert.ok(start > 0, `${name} exists`);
+    return store.slice(start, store.indexOf("    },", start));
+  };
+  // A long-press in hands-free (floating Ask Bunny) must not become a push-to-talk listen.start.
+  assert.match(action("listenStart"), /if \(get\(\)\.voice\?\.open && get\(\)\.voice\?\.mode === "hands_free"\) return;/);
+  assert.match(action("listenStart"), /runPress\(pressDown/);
+  // A stale hands-free click in push-to-talk must not grant the duplex.
+  assert.match(action("startHandsFree"), /if \(!get\(\)\.voice\?\.open \|\| get\(\)\.voice\?\.mode !== "hands_free"\) return;/);
+  // A held press is ended before the mode changes, and the switch itself never starts a listen.
+  assert.match(action("setVoiceMode"), /if \(press\.pressed\) await runPress\(pressUp\(press\)\);/);
+  assert.ok(action("setVoiceMode").indexOf("runPress(pressUp") < action("setVoiceMode").indexOf("voice.session.open"));
+  assert.doesNotMatch(action("setVoiceMode"), /voice\.listen\.start/);
 });

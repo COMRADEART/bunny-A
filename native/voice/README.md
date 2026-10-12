@@ -101,6 +101,36 @@ The null sink is a real-time clock, not an audio device: nothing is audible duri
 With fixture input, the worker does not touch the microphone and does not apply the hardware pre-checks
 (privacy and endpoint mute). Those checks run only on real devices.
 
+## Full-duplex input (M-A-3 T12)
+
+`duplex.start` opens one continuous input through the Windows Voice Capture DSP in source mode (`CLSID_CWMAudioAEC`), bound
+to the default render endpoint as its reference. If the DSP, the endpoint identity or the reference binding fails, the
+session reports `duplex.error` and never falls back to a raw microphone. Turns attach with `capture.start` `duplex: true`.
+
+- Startup: the first 20 frames (about 400 ms) measure the ambient floor. `duplex.started` carries `floor`, and no onset is
+  admitted before it. Stop and mute are honored before, during and after the device open.
+- Ambient model (`AmbientFloor`): the floor is a min-follower over 500 ms with slow attack and fast release, clamped to
+  [0.0002, 0.005]. It learns from every frame while no speech is in progress, between turns too. The floor cap bounds the
+  onset threshold, so ambient above about 0.015 RMS can still start a turn. It cannot hold one open: a duplex turn takes
+  the window's quietest frame at onset as its quiet reference, and a frame within 1.5x of that reference counts as silent.
+  Stationary ambient therefore ends its turn after the 900 ms silence clock (or the 4 s soft wait), not at the 30 s cap.
+  Speech after silence is judged against that silence, so only a steady level with no quiet part is affected.
+- Output-aware onset: while our own speaker is audible (plus a 260 ms reverb tail), a residual EMA of the AEC output sets
+  the onset threshold to at least `residual * 3`. Level events report `floor`, `residual` (null when nothing is audible)
+  and `outputActive`.
+- Endpointing: duplex speech always ends with `speech_end` after the silence clock. A burst under 250 ms ends the turn with
+  `short: true` and `stt.none` reason `too_short`, with no decode. Speech with no frame above the onset threshold for 4 s
+  ends the turn regardless of recognizer evidence.
+- Pause receipts: `playback.paused` (on) reports `requestMono` (when the request arrived), and `silentMono`/`meterSilentMs`
+  when the render meter read silent within 1.5 s. Both are measured from the moment the device was paused, not from the
+  request, so a pause requested before any audio plays is not charged for the wait. `wasAudible` is the meter at that
+  moment. The meter is polled on a separate worker, never on the playback thread. `playback.paused` (on: false) is sent
+  once for each real transition back to playing, including a barge-in reset that restarts a paused device.
+- The preroll is 3 s. The next turn can attach as soon as the previous capture stops, while that turn still finalizes.
+  `capture.abort` with `turn` and `gen` reaches only the matching capture, active or finalizing.
+- Timing: `timeBeginPeriod(1)` is held for the life of a session and always released. Output is drained while the DSP
+  reports INCOMPLETE, into a bounded one-second buffer. Three rotating silence buffers keep the reference endpoint fed.
+
 ## Containment
 
 The Host launches the worker inside a `KILL_ON_JOB_CLOSE` Job Object. The worker spawns no child processes.
@@ -115,8 +145,9 @@ All of its threads are background threads, and it holds only the `winmm` and COM
   it is relied on.
 - The render endpoint meter includes audio from other applications. `meterSilentMs` is a measured endpoint
   silence, not proof of this worker's output alone. It is null for the null sink and when the meter is unavailable.
-- There is no acoustic echo cancellation. Voice is half duplex: the Host cancels speech before listening, and the worker
-  refuses `capture.start` (`BUSY_PLAYBACK`) while playback is queued or active.
+- Half-duplex capture (the default, T10) is unchanged: the worker refuses `capture.start` (`BUSY_PLAYBACK`) while playback
+  is queued or active. The full-duplex lane (below) is implemented, but its acoustic effectiveness is not verified by any
+  test here. Only device evidence can show that echo is actually cancelled.
 - Per-turn recognizers are created for each capture. Creating one costs a few hundred milliseconds, and it is the
   price of a clean finalize.
 - If the recognizer does not complete even after cancel, the turn finishes on its normal decision (a final only for text

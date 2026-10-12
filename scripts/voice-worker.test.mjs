@@ -713,6 +713,152 @@ test("R2-native#3 raw microphone buffers are zeroed before they are freed, and c
 });
 
 // ---------------------------------------------------------------------------------------------------------------------
+// M-A-3 T12 native checks. The duplex endpointing cases run in the selftest against explicit floors (no device, no
+// recognizer). Frames are 20 ms. "AEC effectiveness" is NOT asserted anywhere: the render-identity checks only prove the
+// endpoint-id guard, and echo cancellation needs device evidence.
+// ---------------------------------------------------------------------------------------------------------------------
+test("T12-native VT-01 a short duplex burst (200 ms) ends its speech turn: onset, then speech_end within 1.2 s, flagged short", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.ok(r.duplexBurstStart >= 0, "the 200 ms burst is an onset (not dropped as too short to start)");
+  assert.ok(r.duplexBurstEnd >= 30, "speech_end follows the burst, it is not withheld for being under 250 ms");
+  assert.ok(r.duplexBurstEnd - 30 <= 60, `speech_end within 1.2 s of the burst end (frames ${r.duplexBurstEnd - 30})`);
+  assert.equal(r.duplexBurstShort, true, "the burst is reported as short so the turn ends without a decode");
+});
+
+test("T12-native VT-02 stationary ambient never counts as speech: no onset in 10 s and the floor learns the level", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.duplexStationarySpeechStarts, 0, "0.0008 stationary noise from a 0.0002 start is never an onset");
+  assert.ok(r.duplexStationaryFloor > 0.0005, `the floor rose toward the ambient level (${r.duplexStationaryFloor})`);
+});
+
+test("T12-native VT-03 speech over a calibrated noise floor starts and ends about 900 ms after it stops", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.ok(r.duplexNoisySpeechStart >= 20 && r.duplexNoisySpeechStart <= 26, "onset at the speech start (frame 20 plus the 120 ms window)");
+  assert.ok(r.duplexNoisySpeechEnd >= 70, "the turn does not end inside the speech");
+  assert.ok(r.duplexNoisySpeechEnd - 70 <= 60, `speech_end within 1.2 s of the speech stop (${r.duplexNoisySpeechEnd - 70} frames)`);
+});
+
+test("T12-native VT-G3 a loud click does not permanently suppress soft speech that follows it", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.ok(r.duplexClickThenSoftStart >= 25 && r.duplexClickThenSoftStart <= 35, `soft speech after a 0.5 click is detected (onset frame ${r.duplexClickThenSoftStart})`);
+});
+
+test("T12-native VT-05 output-aware onset: our own residual at 0.003 never starts a turn, but user speech over it does", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.duplexOutputEchoOnsets, 0, "residual frames while our output is audible are not onsets");
+  assert.ok(r.duplexOutputUserOnset >= 0 && r.duplexOutputUserOnset <= 10, `user speech at 0.03 over our output is an onset (frame ${r.duplexOutputUserOnset})`);
+});
+
+test("T12-native VT-01 stationary loud ambient in a duplex turn ends after the silence clock, not at the cap", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.ok(r.duplexLoudNoiseStart >= 5 && r.duplexLoudNoiseStart <= 7, `onset after the 120 ms window (frame ${r.duplexLoudNoiseStart})`);
+  assert.ok(r.duplexLoudNoiseEnd >= 0, "the steady 0.05 ambient ends its turn");
+  assert.ok(r.duplexLoudNoiseEnd - r.duplexLoudNoiseStart <= 60, `speech_end within 1.2 s of the onset (${r.duplexLoudNoiseEnd - r.duplexLoudNoiseStart} frames)`);
+});
+
+test("T12-native N-02 behaviour: on the playback thread a pause precedes the reset, and no restart happens before it", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.playbackPausedBeforeReset, true, "the device is paused for the chunk before the barge-in");
+  assert.equal(r.playbackNoRestartBeforeReset, true, "no pause(false) is issued before the reset of the cancelled chunk");
+  assert.equal(r.playbackNoPauseAfterCancel, true, "a cancelled chunk is never paused again");
+  assert.equal(r.playbackCancelAcknowledged, true, "the cancel receipt is not pending");
+});
+
+test("T12-native VT-09 soft speech with no frame above the onset threshold for 4 s ends the turn, even with evidence held fresh", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.ok(r.duplexSoftWaitEnd >= 0, "the held soft turn ends");
+  assert.ok(r.duplexSoftWaitEnd - 35 >= 195 && r.duplexSoftWaitEnd - 35 <= 205, `ends at the 4 s soft bound (${r.duplexSoftWaitEnd - 35} frames after the tail starts)`);
+  assert.equal(r.duplexSoftWaitShort, false, "a 300 ms speech turn is not a short burst");
+});
+
+test("T12-native N-07 the render-identity checks are labelled as guards, and claim no echo cancellation", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.equal(r.renderIdentityInitiallyMatches, true);
+  assert.equal(r.renderIdentityReorderRefused, true);
+  assert.equal("aecMappingInitiallyMatches" in r, false, "the old, misleading key is gone");
+  assert.match(sourceText(), /They prove nothing about echo cancellation/, "the source states the limit");
+});
+
+test("T12-native N-03 the stdout queue is 2048 lines / 1 MiB and the stall watchdog is 10 s, both bounded", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /MaxPendingLines = 2048, MaxPendingBytes = 1024 \* 1024, StallExitMs = 10000;/);
+  assert.match(src, /pending\.Count >= MaxPendingLines \|\| queuedBytes \+ bytes\.Length > MaxPendingBytes\) \{ Environment\.Exit\(3\); return; \}/, "overflow still exits contained");
+  assert.match(src, /Thread\.Sleep\(30000\);\s*return 9;/, "the stalled-pipe selftest outlasts the watchdog");
+});
+
+test("T12-native N-01 duplex open honors stop and mute before, during and after the device open", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /if \(Cancelled\) throw new DuplexCancelled\(\);\s*timeBeginPeriod\(1\);/, "a cancelled session never reaches the device");
+  assert.match(src, /source = open\(\(\) => Cancelled\);\s*if \(Cancelled\) throw new DuplexCancelled\(\);/, "a cancel during open closes the source without looping");
+  assert.match(src, /catch \(DuplexCancelled\)\s*\{\s*reason = "stop";/, "a cancel is a stop, not a duplex.error");
+  assert.ok((src.match(/Checkpoint\(cancelled\);/g) || []).length >= 7, "AecSource construction has checkpoints between each expensive step");
+  assert.match(src, /static bool Muted|public static volatile bool Muted;/, "the mute flag is visible across threads");
+});
+
+test("T12-native N-02 a pending reset is applied before any pause decision, and a cancelled chunk never restarts the device", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /ApplyPendingReset\(\);\s*long tick = sw\.ElapsedMilliseconds;\s*if \(ApplyPause\(c\)\)/, "the reset comes first in the playback tick");
+  assert.match(src, /if \(c\.Cancelled\) return devicePaused;\s*if \(want == devicePaused\) return want;/, "ApplyPause returns before any device call for a cancelled chunk");
+  assert.match(src, /if \(devicePaused\)\s*\{\s*try \{ if \(waveOut != null\) waveOut\.Pause\(false\); \}\s*catch \(VoiceFault\) \{ CloseDevice\(\); \}\s*if \(devicePaused\) ReleasePaused\(devicePausedTurn, devicePausedGen\);/, "the reset restarts a paused device and announces the release once");
+  assert.match(src, /void PauseDeviceFailed\(Chunk c, VoiceFault f\)/, "a refused pause fails the chunk with the device code");
+});
+
+test("T12-native N-06 speak.pause emits a measured receipt off the playback thread, bounded to 1.5 s", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /static readonly CancelMeter pauseMeter = new CancelMeter\(since => Endpoints\.PollRender\(since, 1500\)\);/, "the pause meter is bounded at 1500 ms");
+  assert.match(src, /bool queued = PauseMeter\.TrySubmit\(clock, reading =>/, "the receipt is finished on the meter worker");
+  assert.match(src, /long appliedMono = Out\.Clock\.ElapsedMilliseconds;\s*Stopwatch clock = Stopwatch\.StartNew\(\);/, "the meter clock starts when the device is paused, not when the request arrived");
+  assert.match(src, /\(object\)\(appliedMono \+ \(long\)Math\.Round\(silent\.Value\)\)/, "silentMono is measured from the applied pause");
+  assert.match(src, /"requestMono", requestMono/, "the receipt carries the request time");
+  assert.match(src, /meter\.TrySubmit\(since, done\)/, "cancel receipts keep their own meter");
+});
+
+test("T12-native N-04 AEC output is drained while INCOMPLETE is set, into a bounded one-second pending buffer", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /const uint DmoOutputIncomplete = 0x01000000;/);
+  assert.match(src, /PendingBytes = 32000;/);
+  assert.match(src, /for \(int call = 0; ; call\+\+\)[\s\S]*?ProcessOutput\(0, 1, output, out status\)[\s\S]*?if \(\(output\[0\]\.status & DmoOutputIncomplete\) == 0 \|\| call \+ 1 >= MaxDrainCalls\) break;/, "the drain loop continues while INCOMPLETE");
+  assert.match(src, /BUFFER_LIMIT", "AEC output exceeded the one second pending bound"/, "overflow is an explicit BUFFER_LIMIT");
+});
+
+test("T12-native N-05 three rotating silence buffers keep the render endpoint fed", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /const int SilenceBuffers = 3;/);
+  assert.match(src, /for \(int i = 0; i < SilenceBuffers; i\+\+\)\s*\{\s*if \(keepalive\.IsDone\(silences\[i\]\)\)/, "every silence buffer is refilled as the driver returns it");
+});
+
+test("T12-native N-10 timeBeginPeriod(1) is paired with timeEndPeriod(1) on every path of a duplex session", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /timeBeginPeriod\(1\);\s*periodBegun = true;/);
+  assert.match(src, /if \(periodBegun\) timeEndPeriod\(1\);/, "ended in the finally, so error and cancel paths are covered");
+  assert.equal((src.match(/timeBeginPeriod\(1\);/g) || []).length, 1, "one begin per session");
+});
+
+test("T12-native VT-09 the finalizing turns stay abortable through a bounded list, so a new capture can attach", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /Program\.Finalizing\.Add\(this\);/, "a turn that stops capturing stays reachable until its terminal event");
+  assert.match(src, /lock \(Program\.Gate\) \{ finalizeDone = true; Program\.Finalizing\.Remove\(this\); \}/, "the entry is removed once the terminal event is out");
+  assert.match(src, /if \(!finalizeDone\) Program\.Finalizing\.Add\(this\);/, "a finalizer that finished first leaves no entry behind");
+  assert.match(src, /if \(Finalizing\.Count >= MaxFinalizing\)/, "the finalizing backlog is bounded");
+  assert.match(src, /Active != null\) \{ CaptureError\(turn, gen, "DEVICE_BUSY"/, "only the active capture blocks a new one");
+});
+
+test("T12-native AUD-04 capture.abort with a turn id matches turn AND gen exactly", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /CaptureTurn exact = FindCapture\(abortTurn, abortGen\);/);
+  assert.match(src, /if \(Active != null && Active\.Turn == turn && Active\.Gen == gen\) return Active;/);
+  assert.match(src, /foreach \(CaptureTurn f in Finalizing\) if \(f\.Turn == turn && f\.Gen == gen\) return f;/);
+});
+
+test("T12-native VT-01 duplex speech_end always reports speechMs and short, and short bursts skip the decode", { skip }, () => {
+  const src = sourceText();
+  assert.match(src, /"speechMs", vad\.SpeechMs, "short", vad\.EndedShort/);
+  assert.match(src, /if \(!aborted && !quick\)/, "the SAPI flush is skipped for short bursts");
+  assert.match(src, /if \(!stopped && onset && !quick && n > 0/, "the whisper decode is skipped for short bursts");
+  assert.match(src, /"too_short"/);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
 // whisper.cpp engine (--stt whisper). These tests need the staged runtime. If it is absent they FAIL with the command
 // to run; they are never skipped silently. Stage with: node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs
 // ---------------------------------------------------------------------------------------------------------------------

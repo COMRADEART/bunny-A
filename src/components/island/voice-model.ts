@@ -15,6 +15,11 @@ export const VOICE_PRIVACY_NOTE =
   "Voice is processed on this PC by Windows speech (no audio leaves your computer).";
 export const VOICE_UNSUPPORTED = "Voice needs the updated Bunny Host.";
 export const VOICE_WORKSTATION_ONLY = "Voice runs on the workstation only.";
+/** Shared with the WPF Island (install/Bunny-Island.Voice.ps1): the same copy on both surfaces. */
+export const HANDS_FREE_UNAVAILABLE = "Echo-cancelled hands-free audio is unavailable. Use push-to-talk.";
+/** UI-07: states only what the Host does. Nothing here promises more than the duplex path enforces. */
+export const HANDS_FREE_NOTICE =
+  "Hands-free keeps the microphone on while Bunny speaks, using Windows echo cancellation on the default speaker. It turns off after 2 minutes of silence and after 30 minutes.";
 
 export type VoiceTone = "idle" | "ok" | "busy" | "warn" | "error";
 export type VoiceStatus = { label: string; tone: VoiceTone; live: boolean };
@@ -34,6 +39,8 @@ export function voiceErrorMessage(code: VoiceErrorCode | "WORKER_EXITED" | "WORK
       return "The microphone disconnected. Reconnect it and try again.";
     case "FORMAT_UNSUPPORTED":
       return "This microphone format is not supported.";
+    case "AEC_UNAVAILABLE":
+      return HANDS_FREE_UNAVAILABLE;
     case "STT_UNAVAILABLE":
       return "Speech recognition is unavailable. Type your question instead.";
     case "TTS_UNAVAILABLE":
@@ -102,8 +109,14 @@ export function voiceStatus(input: {
   if (snapshot.state === "DEVICE_UNAVAILABLE")
     return { label: voiceErrorMessage("DEVICE_UNAVAILABLE"), tone: "error", live: false };
   if (!snapshot.open) return { label: "Voice is off", tone: "idle", live: false };
+  if (snapshot.duplex?.releasing) return { label: "Releasing microphone…", tone: "busy", live: false };
+  // T12 composite truth: each half is claimed only from its own real flag. Paused output is never "Speaking", and a
+  // capture that is not confirmed is never "Listening".
+  const listening = voiceListening(snapshot, receivedAt, now);
+  if (voiceSpeaking(snapshot, receivedAt, now) && listening) return { label: "Listening and speaking", tone: "busy", live: true };
   if (voiceSpeaking(snapshot, receivedAt, now)) return { label: "Speaking", tone: "busy", live: true };
-  if (voiceListening(snapshot, receivedAt, now)) return { label: "Listening…", tone: "ok", live: true };
+  if (snapshot.outputHeld === true) return { label: "Paused for you", tone: "busy", live: listening };
+  if (listening) return { label: "Listening…", tone: "ok", live: true };
   switch (snapshot.state) {
     case "ARMING":
       return { label: "Opening microphone…", tone: "busy", live: false };
@@ -181,10 +194,12 @@ export type ProposalView = {
 export function proposalView(proposal: VoiceProposal | null, now: number): ProposalView | null {
   if (!proposal || now >= proposal.expiresAt) return null;
   const verb = proposal.action === "agent.pause" ? "Pause" : proposal.action === "agent.resume" ? "Resume" : "Stop";
-  const confirmByVoice = proposal.confirmVia === "voice_or_screen";
+  // T12: a Mission stop is screen-confirm only, whatever the Host says about confirmVia: voice never stops a Mission.
+  const mission = proposal.subject === "mission";
+  const confirmByVoice = !mission && proposal.confirmVia === "voice_or_screen";
   return {
-    title: `${verb} ${proposal.agentName}?`,
-    confirmLabel: `Confirm ${verb.toLowerCase()}`,
+    title: mission ? `Stop the Mission ${proposal.agentName}?` : `${verb} ${proposal.agentName}?`,
+    confirmLabel: mission ? "Confirm stop" : `Confirm ${verb.toLowerCase()}`,
     hint: confirmByVoice ? "Say “confirm” or press Confirm." : "Confirm on screen. Voice cannot confirm this.",
     confirmByVoice,
     proposalId: proposal.id,
@@ -208,6 +223,9 @@ export const TURN_KIND_LABEL: Record<VoiceTurnKind, string> = {
   agent_last_mission: "Last mission",
   agent_team: "Agent team",
   agent_control: "Agent control",
+  mission_control: "Mission control",
+  mission_draft: "Mission draft",
+  speech_stop: "Stopped speaking",
   open_ui: "Open view",
   confirm: "Confirmation",
   cancel: "Cancelled",
@@ -229,6 +247,11 @@ export type VoiceControls = {
   interrupt: boolean;
   mute: boolean;
   handsFree: boolean;
+  /** The explicit hands-free start (the user's grant). Shown while hands-free is the mode and no capture is live or starting. */
+  handsFreeStartShown: boolean;
+  handsFreeStart: boolean;
+  /** "Finish my turn": ends the live duplex input turn by its input id. Only while the echo-cancelled input is active. */
+  finishTurn: boolean;
   endSession: boolean;
   typedSend: boolean;
   muteLabel: string;
@@ -236,9 +259,11 @@ export type VoiceControls = {
 
 /**
  * Talk button caption. "Listening" is shown only while the Host confirms capture (live), never from the press flag
- * alone: a held button whose turn the Host already ended on silence must not keep claiming capture.
+ * alone: a held button whose turn the Host already ended on silence must not keep claiming capture. In hands-free the
+ * talk button is disabled, so it never offers a release caption.
  */
-export function talkButtonLabel(input: { pressed: boolean; live: boolean; bargeIn: boolean }): string {
+export function talkButtonLabel(input: { pressed: boolean; live: boolean; bargeIn: boolean; handsFree?: boolean }): string {
+  if (input.handsFree) return input.live ? "Listening hands-free" : "Hands-free is on. No need to hold.";
   if (input.live) return "Listening… release to finish";
   if (input.pressed) return "Keep holding…";
   return input.bargeIn ? "Hold to interrupt and talk" : "Hold to talk, or hold Space";
@@ -270,28 +295,80 @@ export function voiceControls(input: {
     snapshot.devices.micPrivacy === "deny";
   const working = snapshot?.state === "TRANSCRIBING" || snapshot?.state === "PROCESSING";
   const fresh = now - receivedAt < VOICE_FRESH_MS;
+  const duplex = snapshot?.duplex;
+  const handsFreeMode = snapshot?.mode === "hands_free";
+  const duplexBusy = !!duplex?.active || !!duplex?.starting || !!duplex?.releasing;
+  const duplexUnavailable = duplex?.available === false || snapshot?.error?.code === "AEC_UNAVAILABLE";
   return {
     open,
     startSession: available && !open,
     // Push-to-talk is barge-in: holding it while Bunny speaks or thinks makes the Host cancel that turn and listen.
-    // Only a device that is blocked or already capturing refuses a press.
-    pushToTalk: available && open && !stale && !deviceBlocked && !snapshot?.capturing,
-    interrupt: available && open && fresh && (voiceSpeaking(snapshot, receivedAt, now) || snapshot?.state === "PROCESSING"),
+    // Only a device that is blocked or already capturing refuses a press. Hands-free is a mode of its own: no hold.
+    pushToTalk: available && open && !stale && !deviceBlocked && !snapshot?.capturing && !handsFreeMode,
+    // A held reply is interruptible: Interrupt cancels it (the Host resolves the pending hold as interrupted).
+    interrupt:
+      available &&
+      open &&
+      fresh &&
+      (voiceSpeaking(snapshot, receivedAt, now) || snapshot?.state === "PROCESSING" || snapshot?.outputHeld === true),
     mute: available && open,
     handsFree: available && open,
+    handsFreeStartShown: open && handsFreeMode && !duplexBusy,
+    handsFreeStart: available && open && !stale && handsFreeMode && !duplexBusy && !duplexUnavailable && !deviceBlocked,
+    finishTurn: available && open && !!duplex?.active && !!snapshot?.inputTurnId,
     endSession: available && open,
     typedSend: available && input.typedText.trim().length > 0 && input.typedText.trim().length <= VOICE_TYPED_MAX && !working,
     muteLabel: voiceMuted(snapshot) ? "Unmute" : "Mute",
   };
 }
 
-/** The Host's canonical mode, shown as a toggle. Hands-free is an explicit opt-in only. */
+/**
+ * The hands-free toggle shows the Host's mode and nothing else (UI-01): on = mode is hands_free. Whether the microphone
+ * is actually live is the status row's job (handsFreeStatus), so the toggle never claims listening it cannot prove.
+ */
 export function handsFreeOn(snapshot: VoiceSnapshot | null): boolean {
   return snapshot?.mode === "hands_free";
 }
 
+/** Clicking the toggle asks the Host for the other mode. Turning hands-free on never opens the microphone by itself. */
 export function nextVoiceMode(snapshot: VoiceSnapshot | null): VoiceMode {
   return handsFreeOn(snapshot) ? "push_to_talk" : "hands_free";
+}
+
+export type HandsFreeRow = { label: string; tone: VoiceTone };
+
+/**
+ * The hands-free status row, derived from snapshot.duplex and never driving the toggle. Null outside hands-free mode and
+ * while no session is open: the Host keeps mode and the last stop reason after a close, which is not a live state.
+ * Order: a mute the user chose is shown first, then transitions, then the live state, then why it last stopped.
+ */
+export function handsFreeStatus(snapshot: VoiceSnapshot | null): HandsFreeRow | null {
+  if (!snapshot || !snapshot.open || snapshot.mode !== "hands_free") return null;
+  const duplex = snapshot.duplex;
+  if (snapshot.muted || snapshot.state === "MUTED") return { label: "Muted", tone: "warn" };
+  if (duplex?.starting) return { label: "Starting…", tone: "busy" };
+  if (duplex?.releasing) return { label: "Releasing microphone…", tone: "busy" };
+  if (duplex?.available === false || snapshot.error?.code === "AEC_UNAVAILABLE")
+    return { label: HANDS_FREE_UNAVAILABLE, tone: "error" };
+  if (duplex?.active) {
+    // Output held for the user: the reply is paused, the microphone is still open for the user's words.
+    if (snapshot.outputHeld === true) return { label: "Paused for you", tone: "busy" };
+    return { label: "Listening while Bunny speaks (echo-cancelled)", tone: "ok" };
+  }
+  const stopped = duplex?.stopped ?? null;
+  if (stopped?.reason === "idle") return { label: "Stopped after 2 minutes of silence", tone: "idle" };
+  if (stopped?.reason === "lifetime") return { label: "Stopped after 30 minutes", tone: "idle" };
+  if (stopped) return { label: `Stopped (${stopped.reason.replace(/_/g, " ")})`, tone: "idle" };
+  return { label: "Off. Press Start hands-free to listen.", tone: "idle" };
+}
+
+/** Compact barge-in receipt: the measured time from detection to a silent output. Null when not measured. */
+export function bargeInNote(snapshot: VoiceSnapshot | null): string | null {
+  // A receipt from a closed session is history, not the current state: nothing is shown while no session is open.
+  if (!snapshot?.open) return null;
+  const ms = snapshot.lastBargeIn?.detectionToSilenceMs;
+  if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0) return null;
+  return `Stopped speaking in ${Math.round(ms)} ms`;
 }
 
 /** Clean a typed fallback before it is sent as voice.text. */

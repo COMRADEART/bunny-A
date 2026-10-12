@@ -120,7 +120,8 @@ function Complete-BunnyVoiceResponse([int]$Status, [string]$Text, [string]$Actio
   try { $body = $Text | ConvertFrom-Json } catch { $body = $null }
   if ($Status -ge 200 -and $Status -lt 300 -and $body -and $body.data) {
     Set-BunnyVoiceSnapshot $body.data
-    Set-BunnyVoiceStartOutcome $Action 'known' $body.data.turnId
+    $inputTurn = if ($body.data.inputTurnId) { $body.data.inputTurnId } else { $body.data.turnId }
+    Set-BunnyVoiceStartOutcome $Action 'known' $inputTurn
     return
   }
   # The Host answered and refused (or failed) before it captured anything.
@@ -208,6 +209,8 @@ function Test-BunnyVoiceQueued([string]$Action) {
 
 function Start-BunnyVoiceListen([string]$Source) {
   $snap = Get-BunnyVoiceSource
+  # Hands-free has no hold: a push-to-talk start never reaches the Host in that mode (the hands-free start is explicit).
+  if ($snap -and $snap.open -and [string]$snap.mode -eq 'hands_free') { return }
   if (-not ($snap -and $snap.open) -and -not (Test-BunnyVoiceQueued 'voice.session.open')) {
     Add-BunnyVoiceRequest 'voice.session.open' @{ mode = 'push_to_talk' } $false
   }
@@ -279,13 +282,17 @@ function Invoke-BunnyVoiceCloseNow {
   [void](Get-BunnyVoiceClient).SendAsync((New-BunnyVoiceRequestMessage 'voice.session.close' @{ source = 'island_exit' })).Wait(1500)
 }
 
+# The toggle shows the Host's mode and nothing else. Switching never opens the microphone: hands-free needs the explicit
+# Start hands-free control (voice.listen.start source hands_free), which creates the Host grant. The Host switches the
+# mode in place when a session is already open (same session, same worker).
 function Set-BunnyHandsFree([bool]$Want) {
   if ($script:bunnyVoiceUpdating) { return }
   $snap = Get-BunnyVoiceSource
   $mode = if ($Want) { 'hands_free' } else { 'push_to_talk' }
   if ($snap -and $snap.open) {
     if ([string]$snap.mode -eq $mode) { return }
-    Add-BunnyVoiceRequest 'voice.session.close' @{ source = 'island_hands_free' } $true
+    # A press still held when the mode changes is ended first (queued ahead of the open): hands-free has no hold.
+    Stop-BunnyVoiceListen
     Add-BunnyVoiceRequest 'voice.session.open' @{ mode = $mode } $false
   } elseif ($Want) {
     Add-BunnyVoiceRequest 'voice.session.open' @{ mode = $mode } $false
@@ -305,8 +312,12 @@ function Get-BunnyVoiceLabel($Snap, [bool]$Open, [bool]$Fresh, [string]$State, $
   if (-not $Open) { return 'Voice is off' }
   if (-not $Fresh) { return 'Reconnecting' + $bunnyEllipsis }
   if ($Snap.muted -or $State -eq 'MUTED') { return 'Microphone muted' }
-  if ($Snap.capturing) { return 'Listening' }
+  # Composite truth, as voice-model.ts: each half is claimed only from its own real flag.
+  if ($Snap.duplex -and $Snap.duplex.releasing) { return 'Releasing microphone' + $bunnyEllipsis }
+  if ($Snap.capturing -and $Snap.playing) { return 'Listening and speaking' }
   if ($Snap.playing) { return 'Speaking' }
+  if ($Snap.outputHeld) { return 'Paused for you' }
+  if ($Snap.capturing) { return 'Listening' }
   if ($Proposal -or @($Waiting).Count -gt 0) { return 'Needs approval' }
   if ($State -eq 'TRANSCRIBING' -or $State -eq 'PROCESSING') { return 'Processing' }
   if ($State -eq 'INTERRUPTED') { return 'Interrupted' }
@@ -327,12 +338,48 @@ function Get-BunnyVoiceDeviceLine($Snap) {
   # Playback into a muted or zero-volume endpoint is inaudible: say so instead of implying Bunny is heard.
   if ($Snap.devices -and $Snap.devices.output -and $Snap.devices.output.present -and ($Snap.devices.output.muted -eq $true -or ($null -ne $Snap.devices.output.volume -and [double]$Snap.devices.output.volume -eq 0))) { return "Speakers are muted in Windows. Bunny's replies are shown as text." }
   if ($code -eq 'DEVICE_BUSY') { return 'Microphone is in use by another app' }
+  # Same copy as HANDS_FREE_UNAVAILABLE in voice-model.ts: hands-free is refused and push-to-talk remains.
+  if ($code -eq 'AEC_UNAVAILABLE') { return 'Echo-cancelled hands-free audio is unavailable. Use push-to-talk.' }
   if ($code) {
     $message = [string]$Snap.error.message
     if ($message.Length -gt 160) { $message = $message.Substring(0, 160) }
     return $message
   }
   return ''
+}
+
+# The hands-free status row, derived from snapshot.duplex (mirrors handsFreeStatus in voice-model.ts). It never drives the
+# toggle. Empty outside hands-free mode.
+function Get-BunnyHandsFreeRow($Snap) {
+  # Nothing is shown while no session is open: mode and the last stop reason outlive a close on the Host.
+  if (-not $Snap -or -not $Snap.open -or [string]$Snap.mode -ne 'hands_free') { return '' }
+  $duplex = $Snap.duplex
+  if ($Snap.muted -or [string]$Snap.state -eq 'MUTED') { return 'Muted' }
+  if ($duplex -and $duplex.starting) { return 'Starting' + $bunnyEllipsis }
+  if ($duplex -and $duplex.releasing) { return 'Releasing microphone' + $bunnyEllipsis }
+  if (($duplex -and $duplex.available -eq $false) -or ($Snap.error -and [string]$Snap.error.code -eq 'AEC_UNAVAILABLE')) {
+    return 'Echo-cancelled hands-free audio is unavailable. Use push-to-talk.'
+  }
+  if ($duplex -and $duplex.active) {
+    if ($Snap.outputHeld) { return 'Paused for you' }
+    return 'Listening while Bunny speaks (echo-cancelled)'
+  }
+  $stopped = if ($duplex) { $duplex.stopped } else { $null }
+  if ($stopped) {
+    $reason = [string]$stopped.reason
+    if ($reason -eq 'idle') { return 'Stopped after 2 minutes of silence' }
+    if ($reason -eq 'lifetime') { return 'Stopped after 30 minutes' }
+    return 'Stopped (' + $reason.Replace('_', ' ') + ')'
+  }
+  return 'Off. Press Start hands-free to listen.'
+}
+
+# Compact barge-in receipt (mirrors bargeInNote in voice-model.ts): data only, shown only when the Host measured it.
+function Get-BunnyBargeInNote($Snap) {
+  if (-not $Snap -or -not $Snap.open -or -not $Snap.lastBargeIn -or $null -eq $Snap.lastBargeIn.detectionToSilenceMs) { return '' }
+  $ms = [double]$Snap.lastBargeIn.detectionToSilenceMs
+  if ($ms -lt 0) { return '' }
+  return 'Stopped speaking in ' + [string][Math]::Round($ms) + ' ms'
 }
 
 # A render fault is reported in the device line; it must never mark the Host offline in Update-Bunny.
@@ -381,7 +428,8 @@ function Update-BunnyVoiceView {
   $bunnyControls.CompactVoice.Visibility = if ($showCompact -and -not $script:bunnyColumn) { 'Visible' } else { 'Collapsed' }
   $bunnyControls.CompactVoice.Text = if ($deviceLine) { $headline + ' ' + $bunnyDot + ' ' + $deviceLine } else { $headline }
   $bunnyControls.VoiceHeadline.Text = $headline
-  $bunnyControls.VoiceHint.Text = if (-not $open) { 'Hold the mic or press Ctrl + Alt + Space to talk. Bunny answers out loud and never acts on speech alone.' } elseif ($script:bunnyVoiceTapLatched) { 'Tap the mic again to finish. Speech is only text until you confirm an action on screen.' } elseif ($proposal) { 'Confirm or cancel on screen. Speech alone never changes an agent.' } else { 'Speech is only text until you confirm an action on screen.' }
+  $handsFreeMode = [bool]($open -and [string]$snap.mode -eq 'hands_free')
+  $bunnyControls.VoiceHint.Text = if (-not $open) { 'Hold the mic or press Ctrl + Alt + Space to talk. Bunny answers out loud and never acts on speech alone.' } elseif ($script:bunnyVoiceTapLatched) { 'Tap the mic again to finish. Speech is only text until you confirm an action on screen.' } elseif ($proposal) { 'Confirm or cancel on screen. Speech alone never changes an agent.' } elseif ($handsFreeMode) { 'Hands-free keeps the microphone on while Bunny speaks, using Windows echo cancellation on the default speaker. It turns off after 2 minutes of silence and after 30 minutes.' } else { 'Speech is only text until you confirm an action on screen.' }
   $bunnyControls.VoiceDevice.Text = $deviceLine
   $partial = if ($open -and $snap -and $snap.partial) { [string]$snap.partial } else { '' }
   $bunnyControls.VoicePartialLabel.Visibility = if ($partial) { 'Visible' } else { 'Collapsed' }
@@ -398,33 +446,57 @@ function Update-BunnyVoiceView {
   $bunnyControls.VoiceClarify.Text = $clarify
   $bunnyControls.VoiceClarify.Visibility = if ($clarify) { 'Visible' } else { 'Collapsed' }
   if ($proposal) {
-    $verb = switch ([string]$proposal.action) { 'agent.pause' { 'Pause' } 'agent.resume' { 'Resume' } 'agent.stop' { 'Stop' } default { 'Change' } }
-    $bunnyControls.VoiceProposalText.Text = $verb + ' ' + [string]$proposal.agentName + '? ' + $(if ($proposal.confirmVia -eq 'voice_or_screen') { 'Say confirm or press Confirm.' } else { 'Press Confirm on screen to proceed.' })
+    # A Mission stop is screen-confirm only (voice never confirms it), so its sentence says so and never offers voice.
+    $isMission = [string]$proposal.subject -eq 'mission'
+    $verb = switch ([string]$proposal.action) { 'agent.pause' { 'Pause' } 'agent.resume' { 'Resume' } 'agent.stop' { 'Stop' } 'mission.stop' { 'Stop' } default { 'Change' } }
+    $subjectWord = if ($isMission) { 'the Mission ' } else { '' }
+    $sayConfirm = [string]$proposal.confirmVia -eq 'voice_or_screen' -and -not $isMission
+    $bunnyControls.VoiceProposalText.Text = $verb + ' ' + $subjectWord + [string]$proposal.agentName + '? ' + $(if ($sayConfirm) { 'Say confirm or press Confirm.' } else { 'Press Confirm on screen to proceed.' })
     $bunnyControls.VoiceProposal.Visibility = 'Visible'
   } else {
     $bunnyControls.VoiceProposal.Visibility = 'Collapsed'
   }
 
   $online = [bool]$bunnyOnline
-  $bunnyControls.VoiceButton.IsEnabled = $online
-  $bunnyControls.VoiceButton.ToolTip = 'Voice: ' + $headline
+  $duplex = if ($snap) { $snap.duplex } else { $null }
+  $duplexBusy = [bool]($duplex -and ($duplex.active -or $duplex.starting -or $duplex.releasing))
+  $duplexUnavailable = [bool]($duplex -and $duplex.available -eq $false) -or [bool]($snap -and $snap.error -and [string]$snap.error.code -eq 'AEC_UNAVAILABLE')
+  $deviceBlocked = [bool]($snap -and ($snap.muted -or $snap.devices.micPrivacy -eq 'deny'))
+  $startShown = [bool]($handsFreeMode -and -not $duplexBusy)
+  $startEnabled = [bool]($online -and $fresh -and $startShown -and -not $duplexUnavailable -and -not $deviceBlocked)
+  $finishShown = [bool]($open -and $duplex -and $duplex.active -and $snap.inputTurnId)
+  $handsFreeRow = Get-BunnyHandsFreeRow $snap
+  $receipt = Get-BunnyBargeInNote $snap
+  $script:bunnyVoiceStart.Visibility = if ($startShown) { 'Visible' } else { 'Collapsed' }
+  $script:bunnyVoiceStart.IsEnabled = $startEnabled
+  $script:bunnyVoiceFinish.Visibility = if ($finishShown) { 'Visible' } else { 'Collapsed' }
+  $script:bunnyVoiceFinish.IsEnabled = $online -and $finishShown
+  $script:bunnyVoiceRow.Text = $handsFreeRow
+  $script:bunnyVoiceRow.Visibility = if ($handsFreeRow) { 'Visible' } else { 'Collapsed' }
+  $script:bunnyVoiceReceipt.Text = $receipt
+  $script:bunnyVoiceReceipt.Visibility = if ($receipt) { 'Visible' } else { 'Collapsed' }
+
   # The collapsed notch has no room for a status line, so the mic glyph carries the state: accent while listening or speaking.
-  $voiceInk = if ($label -eq 'Listening' -or $label -eq 'Speaking') { 'BunnyAccent' } elseif ($label -like 'Voice needs*' -or $label -like 'Host offline*') { 'BunnyWarning' } else { '' }
+  $voiceInk = if ($label -eq 'Listening' -or $label -eq 'Listening and speaking' -or $label -eq 'Speaking' -or $label -eq 'Paused for you') { 'BunnyAccent' } elseif ($label -like 'Voice needs*' -or $label -like 'Host offline*') { 'BunnyWarning' } else { '' }
+  $bunnyControls.VoiceButton.IsEnabled = $online -and -not $handsFreeMode
+  $bunnyControls.VoiceButton.ToolTip = 'Voice: ' + $headline
   if ($voiceInk) { $bunnyControls.VoiceButton.SetResourceReference([Windows.Controls.Control]::ForegroundProperty, $voiceInk) } else { $bunnyControls.VoiceButton.ClearValue([Windows.Controls.Control]::ForegroundProperty) }
-  $bunnyControls.VoiceMic.IsEnabled = $online
-  $bunnyControls.VoiceInterrupt.IsEnabled = $online -and $open -and $fresh -and [bool]$snap.playing
+  # Hands-free has no hold: push-to-talk is disabled in that mode, as in the React panel.
+  $bunnyControls.VoiceMic.IsEnabled = $online -and -not $handsFreeMode
+  # Interrupt: enabled from a fresh snapshot while Bunny is audible, thinking, or holding a reply (cancels the hold).
+  $bunnyControls.VoiceInterrupt.IsEnabled = $online -and $open -and $fresh -and ([bool]$snap.playing -or [bool]$snap.outputHeld -or $state -eq 'PROCESSING')
   $bunnyControls.VoiceMute.IsEnabled = $online -and $open
   $bunnyControls.VoiceMute.Content = if ($snap -and $snap.muted) { 'Unmute' } else { 'Mute' }
   $bunnyControls.VoiceClose.IsEnabled = $online -and $open
   $script:bunnyVoiceUpdating = $true
-  try { $bunnyControls.VoiceHandsFree.IsChecked = [bool]($open -and [string]$snap.mode -eq 'hands_free') } finally { $script:bunnyVoiceUpdating = $false }
+  try { $bunnyControls.VoiceHandsFree.IsChecked = $handsFreeMode } finally { $script:bunnyVoiceUpdating = $false }
   $bunnyControls.VoiceHandsFree.IsEnabled = $online
   $bunnyControls.VoiceText.IsEnabled = $online
   $bunnyControls.VoiceSend.IsEnabled = $online -and ([string]$bunnyControls.VoiceText.Text).Trim().Length -gt 0
   $bunnyControls.VoiceConfirm.IsEnabled = $online -and [bool]$proposal
   $bunnyControls.VoiceCancelProposal.IsEnabled = $online -and [bool]$proposal
 
-  $layoutKey = '' + $showCompact + '|' + [bool]$proposal + '|' + [bool]$deviceLine + '|' + [bool]$clarify + '|' + [bool]$route + '|' + [bool]$partial
+  $layoutKey = '' + $showCompact + '|' + [bool]$proposal + '|' + [bool]$deviceLine + '|' + [bool]$clarify + '|' + [bool]$route + '|' + [bool]$partial + '|' + [bool]$handsFreeRow + '|' + [bool]$receipt + '|' + $startShown + '|' + $finishShown
   if ($layoutKey -ne $script:bunnyVoiceLayoutKey) {
     $script:bunnyVoiceLayoutKey = $layoutKey
     Resize-Bunny
@@ -473,6 +545,9 @@ function Register-BunnyVoiceHotkey {
 
 function Start-BunnyHotkeyHold {
   if ($script:bunnyVoiceHeld) { return }
+  # Hands-free has no hold. The shortcut press is the explicit hands-free start instead, and no release is ever sent for it.
+  $snap = Get-BunnyVoiceSource
+  if ($snap -and $snap.open -and [string]$snap.mode -eq 'hands_free') { Start-BunnyHandsFreeListen; return }
   $script:bunnyVoiceHeld = $true
   $script:bunnyVoiceHeldAt = Get-BunnyNowMs
   Start-BunnyVoiceListen 'hotkey'
@@ -495,6 +570,23 @@ function Stop-BunnyVoiceHotkey {
   }
 }
 
+# The explicit user start that creates the Host hands-free grant. Nothing else (mode switch, unmute) opens hands-free capture.
+function Start-BunnyHandsFreeListen {
+  $snap = Get-BunnyVoiceSource
+  if (-not ($snap -and $snap.open -and [string]$snap.mode -eq 'hands_free')) { return }
+  # A live or starting duplex lane is never restarted by a second press (the control is hidden then, the shortcut is not).
+  if ($snap.duplex -and ($snap.duplex.active -or $snap.duplex.starting -or $snap.duplex.releasing)) { return }
+  Add-BunnyVoiceRequest 'voice.listen.start' @{ source = 'hands_free' } $false
+}
+
+# Ends the live echo-cancelled input turn by its input id. A no-op unless the duplex input is active.
+function Finish-BunnyVoiceTurn {
+  $snap = Get-BunnyVoiceSource
+  if ($snap -and $snap.open -and $snap.duplex -and $snap.duplex.active -and $snap.inputTurnId) {
+    Add-BunnyVoiceRequest 'voice.listen.end' @{ turnId = [string]$snap.inputTurnId } $false
+  }
+}
+
 # ---- wiring: names come from the Visual XAML (every x:Name is bound into $bunnyControls) ----
 $script:bunnyVoiceHotkeyTimer = [Windows.Threading.DispatcherTimer]::new()
 $script:bunnyVoiceHotkeyTimer.Interval = [TimeSpan]::FromMilliseconds(40)
@@ -510,6 +602,42 @@ foreach ($button in @($bunnyControls.VoiceButton, $bunnyControls.VoiceMic)) {
   $button.Add_PreviewMouseLeftButtonUp({ Stop-BunnyVoicePointer })
   $button.Add_Click({ Invoke-BunnyVoiceClick })
 }
+# Hands-free controls that the XAML does not carry: the explicit Start hands-free and Finish my turn buttons, the status
+# row and the barge-in receipt. Each is named for automation and parented beside its XAML peers, so the layout stays in
+# the Visual file's rows.
+$script:bunnyVoiceStart = [Windows.Controls.Button]::new()
+$script:bunnyVoiceStart.Content = 'Start hands-free'
+$script:bunnyVoiceStart.Visibility = 'Collapsed'
+$script:bunnyVoiceStart.SetResourceReference([Windows.FrameworkElement]::StyleProperty, 'PrimaryButton')
+[Windows.Automation.AutomationProperties]::SetName($script:bunnyVoiceStart, 'Start hands-free listening')
+$script:bunnyVoiceFinish = [Windows.Controls.Button]::new()
+$script:bunnyVoiceFinish.Content = 'Finish my turn'
+$script:bunnyVoiceFinish.Visibility = 'Collapsed'
+$script:bunnyVoiceFinish.SetResourceReference([Windows.FrameworkElement]::StyleProperty, 'BunnyButtonBase')
+[Windows.Automation.AutomationProperties]::SetName($script:bunnyVoiceFinish, 'Finish my turn')
+$script:bunnyVoiceRow = [Windows.Controls.TextBlock]::new()
+$script:bunnyVoiceRow.FontSize = 12
+$script:bunnyVoiceRow.TextWrapping = 'Wrap'
+$script:bunnyVoiceRow.Margin = [Windows.Thickness]::new(0, 0, 0, 6)
+$script:bunnyVoiceRow.Visibility = 'Collapsed'
+$script:bunnyVoiceRow.SetResourceReference([Windows.Controls.TextBlock]::ForegroundProperty, 'BunnyMuted')
+[Windows.Automation.AutomationProperties]::SetName($script:bunnyVoiceRow, 'Hands-free status')
+$script:bunnyVoiceReceipt = [Windows.Controls.TextBlock]::new()
+$script:bunnyVoiceReceipt.FontSize = 12
+$script:bunnyVoiceReceipt.TextWrapping = 'Wrap'
+$script:bunnyVoiceReceipt.Margin = [Windows.Thickness]::new(0, 0, 0, 6)
+$script:bunnyVoiceReceipt.Visibility = 'Collapsed'
+$script:bunnyVoiceReceipt.SetResourceReference([Windows.Controls.TextBlock]::ForegroundProperty, 'BunnyMuted')
+[Windows.Automation.AutomationProperties]::SetName($script:bunnyVoiceReceipt, 'Last barge-in')
+$voiceRow = $bunnyControls.VoiceMute.Parent
+$voiceRow.Children.Insert($voiceRow.Children.IndexOf($bunnyControls.VoiceMute), $script:bunnyVoiceStart)
+$voiceRow.Children.Insert($voiceRow.Children.IndexOf($bunnyControls.VoiceMute), $script:bunnyVoiceFinish)
+$voiceColumn = $bunnyControls.VoiceHint.Parent
+$hintIndex = $voiceColumn.Children.IndexOf($bunnyControls.VoiceHint)
+$voiceColumn.Children.Insert($hintIndex + 1, $script:bunnyVoiceRow)
+$voiceColumn.Children.Insert($hintIndex + 2, $script:bunnyVoiceReceipt)
+$script:bunnyVoiceStart.Add_Click({ Start-BunnyHandsFreeListen })
+$script:bunnyVoiceFinish.Add_Click({ Finish-BunnyVoiceTurn })
 $bunnyControls.VoiceInterrupt.Add_Click({ Request-BunnyVoiceInterrupt 'button' })
 $bunnyControls.VoiceMute.Add_Click({
   $snap = Get-BunnyVoiceSource
