@@ -78,12 +78,14 @@ const SENSITIVE_WORD = new RegExp(String.raw`\b(?:${SENSITIVE_ALTS.join("|")})\b
  * "pause the running agent called Builder" (the Agent noun is the object of the control, not of the status word).
  */
 const STATUS_WORD_USE = /\b(?:run|running|runs|chang(?:e|es|ed|ing)|shar(?:e|es|ed|ing))\b(?=\s*(?:$|[?!.,;]|\s(?:in|on|at|for|since|from|recently|yet|still|now|right|already|currently|today|lately|agents?|missions?|tasks?|team)\b))/g;
+/** Review round 3: "are you running any tasks" asks for status; its progressive "running" is not a command. */
+const RUNNING_QUESTION = /\bare you running (?:any|some) (?:tasks?|missions?|jobs?|work)\b/g;
 /** An agent, mission or task stop ("kill the research agent") is a stop proposal, never a lexicon hit. */
 const AGENT_STOP_USE = /\b(?:kill|kills|killed|killing|terminat\w*)\s+(?:(?:the|my|this|that|a|an)\s+)?(?:[\w'-]+\s+)?(?:agents?|missions?|tasks?)\b/g;
 
 /** True when the wording uses a lexicon word in a sensitive sense. Shared by the chat path and the draft path. */
 function sensitiveWord(text: string): boolean {
-  return SENSITIVE_WORD.test(text.replace(STATUS_WORD_USE, " ").replace(AGENT_STOP_USE, " "));
+  return SENSITIVE_WORD.test(text.replace(RUNNING_QUESTION, " ").replace(STATUS_WORD_USE, " ").replace(AGENT_STOP_USE, " "));
 }
 
 // Sensitive phrasing: approvals, permissions, shell/commands, deletion, publishing, settings and credentials,
@@ -208,8 +210,9 @@ const STATUS: RegExp[] = [
   /^(status|agent status|mission status|how('s| is) (it|the agent|my agent) going)$/,
   /\b(agent|mission) status\b/,
   // T12 live: "is any task you're running there now?", "is anything running?", "are you running any tasks?"
-  /\b(?:is|are) (?:there )?(?:anything|any (?:tasks?|agents?|missions?|jobs?|work))\b.{0,24}\b(?:running|working|active|in progress)\b/,
-  /\bare you (?:running|doing|working on) (?:any|a|some) (?:tasks?|missions?|jobs?|work)\b/,
+  /\b(?:is|are) (?:there )?anything (?:still )?(?:running|working|active|in progress)(?: (?:right now|now|at the moment|currently))?$/,
+  /\b(?:is|are) (?:there )?any (?:tasks?|agents?|missions?|jobs?|work)\b.{0,24}\b(?:running|working|active|in progress)\b/,
+  /\bare you (?:running|doing|working on) (?:any|some) (?:tasks?|missions?|jobs?|work)(?: (?:right now|now|at the moment|currently))?$/,
   // T12 live: "tell me whether the task is done" (whisper also heard "where the task is done").
   /\b(?:whether|if|where) (?:the |my |that |this )?(?:tasks?|missions?|agents?|work|job) (?:is|are|has|have)\b.{0,12}\b(?:done|finished|complete|completed|over|running|working)\b/,
 ];
@@ -252,31 +255,61 @@ function teamQuestion(normalized: string): string | null {
 }
 
 /** T12 live: the whole turn asks to end voice. Anchored, so "stop listening to the tester" is not a close. */
-const VOICE_CLOSE = /^(?:(?:end|close|stop|exit|quit|turn off|switch off|shut off|shut down)\s+(?:the\s+|this\s+)?(?:voice|listening|mic|microphone|hands[- ]?free)(?:\s+(?:session|chat|mode|conversation))?|stop listening|(?:you can )?stop listening to me)(?:\s+(?:now|please|bunny))*$/;
+const VOICE_CLOSE = /^(?:(?:end|close|stop|exit|quit|turn off|switch off|shut off|shut down)\s+(?:the\s+|this\s+)?(?:voice|listening|mic|microphone|hands[- ]?free)(?:\s+(?:session|chat|mode|conversation))?|stop listening|(?:you can )?stop listening to me)(?:\s+(?:now|please|bunny|thanks|thank you))*$/;
 /**
  * T12 live: an imperative to act on the computer ("open notes", "and save it on desktop", "create a file"). Voice has no
  * computer tools; these get a fixed answer instead of the chat model, which once answered "Done." to "end voice now".
  */
 const DEVICE_OBJECT = "(?:apps?|applications?|programs?|notes?|notepad|files?|folders?|documents?|docs?|desktop|downloads|browser|chrome|edge|firefox|tabs?|emails?|e-mails?|mail|messages?|texts?|windows?|settings|word|excel|powerpoint|terminal|command prompt|powershell|spotify|music|websites?|web pages?|screenshots?|calendar|reminders?|alarms?|timers?)";
+/**
+ * Review round 3: the computer object must be the verb's own direct object (at most one determiner and one modifier between
+ * them), so "open notes" or "set a timer" is an action while "make a list of good apps" or "create a summary of the
+ * documents" stays chat. Agent-addressed wording is never a computer action (it is a redirect; see classifyTranscript).
+ */
 const DEVICE_ACTION: RegExp[] = [
-  new RegExp(`^(?:and |then |also )?(?:(?:can|could|would|will) you |please )?(?:open|launch|start up|close|save|create|make|delete|remove|send|email|text|type|download|install|play|move|copy|rename|edit|set|turn on|turn off|switch to|go to)\\b.{0,40}\\b${DEVICE_OBJECT}\\b`),
+  new RegExp(`^(?:and |then |also )?(?:(?:can|could|would|will) you |please )?(?:open|launch|start up|close|save|create|make|delete|remove|send|email|text|type|download|install|play|move|copy|rename|edit|set|turn on|turn off|switch to|go to)(?: (?:up|on|off))?(?: (?:a|an|the|my|this|that|new|some|your))?(?: (?:a|an|the|my|this|that|new|some|your))?(?: [\\w'-]+)? ${DEVICE_OBJECT}\\b`),
   /^(?:and |then |also )?(?:(?:can|could|would|will) you |please )?(?:save|put|store|write|copy|move|export) (?:it|that|this|them|those|the \w+)\b.{0,20}\b(?:on|to|in|into) (?:the |my )?(?:desktop|disk|drive|downloads|documents|folder|file)\b/,
 ];
 
 /**
- * T12 live: model text that claims Bunny acted ("Done.", "I've saved it", "it has been opened"). The spoken-chat model is
- * tool-free, so such a sentence is never true; the session replaces it (see SPOKEN_ACTION_CLAIM_TEXT).
+ * T12 live + review round 3: model text that claims Bunny acted. The spoken-chat model is tool-free, so such a sentence is never
+ * true; the session replaces it (see SPOKEN_ACTION_CLAIM_TEXT). Judged per sentence and anchored on Bunny itself acting
+ * ("I've saved it", "Paused the agent.", "Ending voice now.", "Your file has been saved."), so a general statement such as
+ * "Word saves it automatically once a file has been saved" or "I started with three ideas" is not a claim.
  */
+const CLAIM_LEAD = /^(?:(?:ok(?:ay)?|sure|alright|all right|got it|yes|yeah|yep|great|perfect|no problem|confirm(?:ed)?|done)[\s,!.:;-]+)+/;
+const CLAIM_PAST = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|ran|started|stopped|paused|resumed|turned|changed|moved|renamed|downloaded|uploaded|enabled|disabled|set|booked|added|scheduled|updated|made|granted|put|played|muted|unmuted|wrote|written|shut|switched|activated|deactivated|submitted|reset)";
+// Strong verbs claim an action whatever their object ("I opened Notepad"); the rest only with an action object.
+const CLAIM_STRONG = "(?:opened|saved|deleted|removed|sent|launched|installed|approved|executed|granted|uploaded|downloaded|cancell?ed|booked|scheduled|submitted|muted|unmuted|activated|deactivated|shut down|switched off|switched on|turned off|turned on)";
+const CLAIM_OBJECT = "(?:it|that|this|them|those|these|everything|all of (?:it|them)|(?:(?:a|an|the|your|my|that|this|a new|the new)\\s+)?(?:[\\w'-]+\\s+)?(?:agents?|missions?|tasks?|files?|folders?|documents?|notes?|notepad|apps?|applications?|programs?|timers?|alarms?|reminders?|events?|meetings?|appointments?|table|order|messages?|emails?|mail|texts?|requests?|commands?|settings?|session|voice|microphone|mic|browser|chrome|window|tab|page|website|list|playlist|music|song|calendar|permissions?|approvals?|desktop|plan|draft))\\b";
+const CLAIM_ING = "(?:ending|closing|opening|stopping|pausing|saving|starting|launching|deleting|approving|sending|setting|creating|cancell?ing|resuming|turning (?:on|off)|shutting down|switching (?:on|off))";
+const CLAIM_PARTICIPLE = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled|set|booked|added|scheduled|updated|granted|muted|unmuted|turned (?:on|off)|switched (?:on|off)|shut down|done)";
 const ACTION_CLAIM: RegExp[] = [
+  // "Done." / "Okay, done!" / "It's done."
   /^(?:(?:ok(?:ay)?|sure|alright|all right|got it)[\s,!.]*)?(?:(?:all |it'?s |it is |that'?s |that is )?done)[\s.!]*$/,
-  /\bi(?:'ve| have| just| already)* (?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|ran|started|stopped|paused|resumed|turned (?:on|off)|changed|moved|renamed|downloaded|uploaded|enabled|disabled)\b/,
-  /\b(?:has|have) (?:now )?been (?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled)\b/,
-  // T12 live (agent-speech run 1): the model answered "Confirm, paused." A bare outcome word as the whole sentence is a claim.
+  // "I've saved it to your desktop.", "I went ahead and paused it.", "I opened Notepad.", "I've set a reminder for five."
+  new RegExp(`^i(?:'ve|'d| have| just| already| went ahead and| have just| have now)* (?:${CLAIM_STRONG}\\b|${CLAIM_PAST}(?: (?:up|on|off|down|ahead))? ${CLAIM_OBJECT})`),
+  // "Paused the agent.", "Opened it for you.", "Stopped it."
+  new RegExp(`^${CLAIM_PAST}(?: (?:up|on|off|down))? (?:it|that|this|them|the|your|a|an)\\b`),
+  // "I'm opening Notepad now.", "Ending voice now.", "Closing voice.", "ending the voice session"
+  new RegExp(`^(?:i'?m |i am |now )${CLAIM_ING}\\b`),
+  new RegExp(`^${CLAIM_ING}\\b[^.!?]{0,40}\\bnow\\b`),
+  new RegExp(`^${CLAIM_ING}(?: [\\w'-]+){0,3}[\\s.!]*$`),
+  // "Your file has been saved.", "It's paused now.", "The timer is set.", "The file is saved to your desktop." (whole sentence)
+  new RegExp(`^(?:it|that|this|everything|all|(?:the|your|my) [\\w'-]+(?: [\\w'-]+)?)(?:'s| is| was| has been| have been|'s been| are| were)(?: now| all)? ${CLAIM_PARTICIPLE}(?: (?:for you|now|successfully|as requested|(?:to|on|in) (?:your|the) (?:desktop|folder|calendar|list|documents)))*[\\s.!]*$`),
+  // T12 live (agent-speech run 1): "Confirm, paused." A bare outcome word as the whole sentence is a claim.
   /^(?:(?:confirm(?:ed)?|ok(?:ay)?|sure|alright|yes|done)[\s,!.]+)?(?:it'?s |it is |agent |the agent )?(?:paused|stopped|approved|resumed|started|cancell?ed|saved|opened|closed|deleted|executed|granted)[\s.!]*$/,
 ];
 export function claimsAction(text: string): boolean {
   const t = text.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim();
-  return ACTION_CLAIM.some((re) => re.test(t));
+  for (const raw of t.split(/(?<=[.!?])\s+/)) {
+    const sentence = raw.trim();
+    if (!sentence) continue;
+    // The whole sentence first (so "Okay, done!" is judged as said), then without its lead-in ("Done, the timer is set.").
+    const bare = sentence.replace(CLAIM_LEAD, "").trim();
+    if (ACTION_CLAIM.some((re) => re.test(sentence) || (bare && re.test(bare)))) return true;
+  }
+  return false;
 }
 
 const MODEL = [/\bwhich model\b/, /\bwhat model\b/, /\bmodel (is|are) (it|being used|working|running|active)\b/];
@@ -292,6 +325,8 @@ const REDIRECT = [
   /\b(tell|ask|make|have|get|order|instruct|direct) (the |my |this |that )?agents?\b/,
   // T12 F7: a named role or a qualified agent is addressed too ("ask the implementation agent to ...", "tell the tester to ...").
   /\b(tell|ask|have|get|order|instruct|direct)\s+(?:the|my|this|that|our)\s+(?:[\w'-]+\s+){0,2}?(?:agents?|testers?|reviewers?|planners?|researchers?|implementers?|documenters?|coordinators?)\b/,
+  // Review round 3: "make the reviewer agent check the documents" (make + a qualified agent noun; bare roles stay out).
+  /\bmake\s+(?:the|my|this|that|our)\s+(?:[\w'-]+\s+){0,2}?agents?\b/,
   /\bchange the plan\b/,
   /\bredirect\b/,
   /\binstead,? (do|make|build|try|write|change|use)\b/,
@@ -485,7 +520,8 @@ export function classifyTranscript(
   const speech = speechStop(normalized, pending);
   if (speech) return make("speech_stop", speech);
   // T12 live: "end voice", "stop listening" close the voice session; ending only removes capability, so it needs no screen.
-  if (VOICE_CLOSE.test(normalized)) return make("voice_close");
+  // Review round 3: inner punctuation never defeats an explicit close ("End voice, please.").
+  if (VOICE_CLOSE.test(normalized.replace(/[,.!?;:]+/g, " ").replace(/\s+/g, " ").trim())) return make("voice_close");
   // T12 F2: "stop/cancel/abort/end the mission" never becomes an Agent stop.
   const missionRest = missionControlRest(normalized);
   if (missionRest !== null) {
@@ -501,7 +537,8 @@ export function classifyTranscript(
   if (CONFIRM.test(normalized) && !pending) return make("confirm");
   if (OPEN_UI.some((re) => re.test(normalized))) return make("open_ui");
   // T12 live: requests to act on the computer get a fixed answer; the tool-free chat model never sees (or "does") them.
-  if (!QUESTION.test(normalized) && DEVICE_ACTION.some((re) => re.test(normalized))) return make("device_action_unsupported");
+  // Review round 3: an Agent-addressed instruction is a redirect, never a computer action.
+  if (!QUESTION.test(normalized) && !AGENT_NOUN.test(normalized) && DEVICE_ACTION.some((re) => re.test(normalized))) return make("device_action_unsupported");
   const team = teamQuestion(normalized);
   if (team) return make("agent_team", team);
   // T12 F4: follow-ups resolve against the last Host-facts subject; they are never chat.

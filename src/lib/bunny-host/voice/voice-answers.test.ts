@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { answerApprovals, answerFollowUp, answerLastMission, answerMissionFinished, answerModel, answerStatus, answerVerification, hostFactsFrom, missionLabel, pendingApprovalFacts, spokenModel, stepFact, type AgentFact, type MissionFact } from "./voice-answers.server.ts";
+import { spokenTitle, answerApprovals, answerFollowUp, answerLastMission, answerMissionFinished, answerModel, answerStatus, answerVerification, hostFactsFrom, missionLabel, pendingApprovalFacts, spokenModel, stepFact, type AgentFact, type MissionFact } from "./voice-answers.server.ts";
 import type { Mission, MissionStep } from "../../bunny-missions/types.ts";
 
 const mission = (over: Partial<MissionFact> = {}): MissionFact => ({
@@ -211,4 +211,12 @@ test("T12 hostFactsFrom: every canonical Mission is a fact once, with its origin
   assert.equal(facts.missions.length, 1, "a Mission reported twice is listed once");
   assert.equal(facts.missions[0].origin, "voice:workstation");
   assert.equal(facts.missions[0].status, "waiting_for_approval");
+});
+
+test("T12 review r3: spokenTitle keeps short titles whole and cuts long ones at a clause", () => {
+  assert.equal(spokenTitle("Build a report of 1,000 files"), "Build a report of 1,000 files");
+  assert.equal(spokenTitle("Bug: login fails on Safari"), "Bug: login fails on Safari");
+  assert.notEqual(spokenTitle("Fix login (admin) bug"), spokenTitle("Fix login (guest) bug"));
+  assert.equal(spokenTitle("Build an offline page that groups data/inventory.csv items by category, with a Markdown summary and a README that explains it"),
+    "Build an offline page that groups data/inventory.csv items by category");
 });

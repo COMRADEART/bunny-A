@@ -266,13 +266,18 @@ export function answerFollowUp(focus: string, subject: FollowUpSubject): string 
 }
 
 /**
- * T12 live: a long Mission objective is read as its opening words only (up to the first comma, at most eight words), so a
- * spoken answer reaches the fact quickly. Short titles are unchanged.
+ * T12 live: a long Mission objective is read as its opening clause only, so a spoken answer reaches the fact quickly.
+ * Titles of up to 12 words are unchanged.
  */
 export function spokenTitle(title: string): string {
-  const head = title.split(/[,;:(]/)[0].trim() || title.trim();
-  const words = head.split(/\s+/).filter(Boolean);
-  return words.length > 8 ? words.slice(0, 8).join(" ") : head;
+  // Review round 3: titles of up to 12 words are read whole, so "1,000 files", "Bug: login fails" and "(admin)" survive.
+  // A longer title is cut at its first clause boundary (", " or "; ") when that leaves 4-12 words, else after 8 words.
+  const whole = title.trim();
+  const words = whole.split(/\s+/).filter(Boolean);
+  if (words.length <= 12) return whole;
+  const clause = whole.split(/[,;]\s/)[0].trim();
+  const clauseWords = clause.split(/\s+/).filter(Boolean).length;
+  return clauseWords >= 4 && clauseWords <= 12 ? clause : words.slice(0, 8).join(" ");
 }
 
 /** T12 F6: names the Mission a verification or model answer describes, and says so when it is not the active one. */

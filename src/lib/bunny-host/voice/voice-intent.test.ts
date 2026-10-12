@@ -560,3 +560,35 @@ test("T12 live: model text claiming an action is detected; ordinary answers are 
     assert.equal(claimsAction(text), false, text);
   }
 });
+
+// T12 independent review round 3: every example the reviewers used, as regression cases.
+test("T12 review r3: the claim guard catches claims of acting and leaves honest information answers alone", () => {
+  for (const text of ["Ending voice now.", "Okay, ending the voice session.", "Closing voice.", "Okay, I've set a reminder for five.", "I've booked the table for two.",
+    "I've added it to your list.", "Done, the timer is set.", "It's been saved.", "Saved it for you.", "I went ahead and paused it.", "Paused the agent.", "Stopped it.",
+    "It's paused now.", "Opened it for you.", "The file is saved to your desktop.", "Your file has been saved.", "I'm opening Notepad now."]) {
+    assert.equal(claimsAction(text), true, text);
+  }
+  for (const text of ["Yes, Word saves it automatically once a file has been saved.", "I ran into a problem with the plan.", "I started with three ideas: Biscuit, Milo and Juno.",
+    "I ran the numbers and it's about 40 percent.", "The document has been saved automatically by most editors.", "Opening a file in Word takes two clicks.",
+    "Starting with the basics, a rainbow needs sunlight and rain.", "I wrote a short poem for you."]) {
+    assert.equal(claimsAction(text), false, text);
+  }
+});
+
+test("T12 review r3: an explicit close with inner punctuation still ends voice", () => {
+  for (const text of ["End voice, please.", "Stop listening, please.", "Okay, end voice, thanks.", "end the voice session, please bunny", "stop listening, bunny"]) {
+    assert.equal(kind(text), "voice_close", text);
+  }
+});
+
+test("T12 review r3: status, computer-action and redirect routing keep ordinary requests in chat", () => {
+  assert.equal(kind("are you running any tasks?"), "agent_status");
+  assert.equal(kind("are you running any tasks right now"), "agent_status");
+  for (const text of ["Is anything running on port 8080?", "Are you doing a job search for me this week?", "Is anything running slow on my laptop?",
+    "Make a list of good apps for learning Spanish.", "Make a playlist of calm music for studying.", "create a summary of the documents"]) {
+    assert.equal(kind(text), "chat", text);
+  }
+  assert.equal(kind("make the reviewer agent check the documents"), "redirect_unsupported");
+  assert.equal(kind("open a new browser tab"), "device_action_unsupported");
+  assert.equal(kind("run the tasks now"), "sensitive_refused", "an imperative run stays refused");
+});

@@ -792,6 +792,13 @@ test("T12-native live calibration: the measured device residual never starts a t
   assert.ok(r.aecLiveUserOnset >= 0 && r.aecLiveUserOnset <= 6, `0.003 user speech over the live residual is an onset within 120 ms (frame ${r.aecLiveUserOnset})`);
 });
 
+test("T12-native review round 3: a seed taken while the user talked over the first reply is lowered by the next reply and never raised later", { skip }, async () => {
+  const r = await sharedSelfTest();
+  assert.ok(r.reseedPinnedThreshold >= 0.005, `the contaminated first seed pins the threshold high (${r.reseedPinnedThreshold})`);
+  assert.ok(r.reseedNextReplyThreshold <= 0.0007, `the next reply's echo-only seed lowers it to the floor band (${r.reseedNextReplyThreshold})`);
+  assert.ok(r.reseedLaterTalkThreshold <= 0.0007, `talking over a later reply's first frames does not raise it (${r.reseedLaterTalkThreshold})`);
+});
+
 test("T12-native endpointing ignores whisper's trailing full stop and waits longer after a word that cannot end a sentence", { skip }, async () => {
   const r = await sharedSelfTest();
   // "Prepare approach and prepare." / "Prepare a." / "Open notes and..." / "write about matrix." / a question /

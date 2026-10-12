@@ -919,9 +919,10 @@ internal sealed class WaveOut : IWaveOut
 
     public void Submit(Chunk c)
     {
-        string reference = Program.RenderReference;
-        if (reference != null && !AecSource.RenderIdentityMatches(device, reference, AecSource.RenderEndpointId))
-            throw new VoiceFault("AEC_UNAVAILABLE", "submitted output differs from the echo reference");
+        // Review round 3: the identity is verified when the stream is opened (above). An opened HWAVEOUT stays bound to the
+        // physical device it was opened on, so a later re-number of the wave list (a device added or removed) does not move
+        // it; re-checking the index per chunk only refused a still-correct stream mid-reply. Every new Open re-verifies, and
+        // a default-endpoint change stops the duplex lane on its own.
         c.Data = Marshal.AllocHGlobal(c.Pcm.Length);
         Marshal.Copy(c.Pcm, 0, c.Data, c.Pcm.Length);
         c.Header = Marshal.AllocHGlobal(Native.HdrSize);
@@ -1367,6 +1368,10 @@ internal sealed class AmbientFloor
     double residual;
     // Round 2 (AEC-01): the residual is seeded once per session, from the median of the first output-window frames.
     bool residualSeeded;
+    // T12 review round 3: every later output burst re-samples its first frames once and may only LOWER the residual. A seed
+    // taken while the user talked over the very first reply (it pinned the residual at the cap for the session) is undone by
+    // the next reply; talking over a later reply can never raise it.
+    bool burstSampled;
     readonly double[] seedRing = new double[ResidualSeedFrames];
     readonly double[] seedSort = new double[ResidualSeedFrames];
     int seedCount;
@@ -1441,7 +1446,12 @@ internal sealed class AmbientFloor
             else
             {
                 if (tail > 0) tail--;
-                if (hold > 0) hold--;
+                if (hold > 0)
+                {
+                    hold--;
+                    // The burst is over (held 1.5 s past the last audible frame): the next burst samples a fresh seed.
+                    if (hold == 0) { seedCount = 0; seedNext = 0; burstSampled = false; }
+                }
             }
             if (speaking) return;
             if (hold > 0)
@@ -1455,6 +1465,13 @@ internal sealed class AmbientFloor
                     // Round 2: seed once from the multi-frame median of the first output frames.
                     residual = Math.Min(ResidualCap, SeedMedianLocked());
                     residualSeeded = true;
+                    burstSampled = true;
+                }
+                else if (seedCount == ResidualSeedFrames && !burstSampled)
+                {
+                    // Round 3: a later burst's seed only ever lowers the learned residual (see burstSampled).
+                    residual = Math.Min(residual, SeedMedianLocked());
+                    burstSampled = true;
                 }
                 // T12 live calibration: the residual only follows frames close to itself (a relative band), and there is no
                 // "jump to the cap". Measured user double-talk passes the DSP at 10-100x the residual, so a jump or a wide band
@@ -4095,6 +4112,19 @@ internal static class SelfTest
         int liveUser = -1;
         for (int f = 0; f < 50; f++) if (live.Feed(0.003, int.MaxValue) == Vad.SpeechStart && liveUser < 0) liveUser = f;
         r["aecLiveUserOnset"] = liveUser;
+
+        // T12 review round 3: the user talks (0.004) over the first frames of the session's first reply, so the seed is the
+        // user's voice and the threshold is pinned high. The next reply carries only the measured echo (5e-5): its seed lowers
+        // the residual again. Talking over a later reply's first frames never raises it.
+        AmbientFloor pin = new AmbientFloor(AmbientFloor.MinFloor);
+        for (int f = 0; f < 10; f++) pin.Observe(0.004, false, true);
+        r["reseedPinnedThreshold"] = pin.OnsetThreshold;
+        for (int f = 0; f < AmbientFloor.ResidualHoldFrames + 5; f++) pin.Observe(0.0001, false, false);
+        for (int f = 0; f < 10; f++) pin.Observe(0.00005, false, true);
+        r["reseedNextReplyThreshold"] = pin.OnsetThreshold;
+        for (int f = 0; f < AmbientFloor.ResidualHoldFrames + 5; f++) pin.Observe(0.0001, false, false);
+        for (int f = 0; f < 10; f++) pin.Observe(0.004, false, true);
+        r["reseedLaterTalkThreshold"] = pin.OnsetThreshold;
 
         // T12 live endpointing: the split phrases from the endurance session, plus finished and empty partials.
         string[] endpointProbe = { "Prepare approach and prepare.", "Prepare a.", "Open notes and...", "write about matrix.",
