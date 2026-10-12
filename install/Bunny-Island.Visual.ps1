@@ -436,7 +436,7 @@ function Set-BunnyJoin {
 function Set-BunnyGlassSurface {
  # High Contrast: the fixed dark glass would put themed window text on an incompatible surface. Under forced colors
  # the surface follows the system window color, the same palette the text remap in Set-BunnyTheme uses, and the
- # stroke follows WindowTextColor — opaque, no glass simulation.
+ # stroke follows WindowTextColor - opaque, no glass simulation.
  if([Windows.SystemParameters]::HighContrast){
   $fill=[Windows.Media.SolidColorBrush]::new([Windows.SystemColors]::WindowColor);$fill.Freeze()
   $stroke=[Windows.Media.SolidColorBrush]::new([Windows.SystemColors]::WindowTextColor);$stroke.Freeze()

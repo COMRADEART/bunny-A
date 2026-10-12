@@ -97,7 +97,7 @@ test('V46: Speaking is shown only from snapshot.playing, and only one branch pro
 
 test('V46: the level meter is driven only by snapshot.level with a freshness check, never by a timer or random value', () => {
   const voice = read(voicePath);
-  assert.match(voice, /\$snap\.level -and \(\(\$now - \[double\]\$snap\.level\.at\) -lt \$bunnyVoiceFreshMs\)/);
+  assert.match(voice, /\$snap\.level -and[\s\S]*?\$now - \[double\]\$snap\.level\.at[\s\S]*?-ge 0[\s\S]*?\$now - \[double\]\$snap\.level\.at[\s\S]*?-lt \$bunnyVoiceFreshMs/);
   assert.doesNotMatch(voice, /Get-Random|System\.Random|\$rnd\b/);
 });
 
