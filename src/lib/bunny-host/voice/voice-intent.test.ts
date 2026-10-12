@@ -592,3 +592,27 @@ test("T12 review r3: status, computer-action and redirect routing keep ordinary 
   assert.equal(kind("open a new browser tab"), "device_action_unsupported");
   assert.equal(kind("run the tasks now"), "sensitive_refused", "an imperative run stays refused");
 });
+
+// T12 review round 4 (re-check of b4b29b9): lead-ins, a broad verb list, denials and figurative uses.
+test("T12 review r4: a lead-in never hides a claim, common action verbs are covered, denials and general statements are not claims", () => {
+  for (const text of ["Good news, I've saved it.", "So I've saved it.", "Okay so I've saved it.", "Right, I've closed the window.", "Certainly, I have opened the folder.",
+    "Alright then, I've paused the agent.", "All set, I've saved it.", "Your reminder has been created for 9 AM.", "Sure thing, I've stopped the research agent.",
+    "Perfect — I've saved it.", "Your file has been saved in your Downloads folder.", "I've emailed the report to you.", "I've restarted the server.",
+    "I've deployed it to production.", "I've pushed the commit.", "I've shared the file with the team.", "I've copied the folder to the desktop.", "I've backed up your files.",
+    "I've uninstalled the app.", "I've killed the process.", "I've cleared the cache.", "I've emptied the trash.", "I've refreshed the page.", "I've posted the update.",
+    "I've merged the branch.", "I've texted him the time.", "The timer is set for five minutes.", "Your file was saved to the Documents folder."]) {
+    assert.equal(claimsAction(text), true, text);
+  }
+  for (const text of ["Saving files is easy.", "Deleting files is risky.", "Opening it is safe.", "Starting tomorrow is fine.", "I made a list of three options: rest, water, and a walk.",
+    "I set up a plan for the week: first, rest.", "I deleted nothing; the files are still there.", "I approved nothing.", "I launched into an explanation of the risks.",
+    "I opened with the main point: voice is not authority.", "I ended up recommending the second option.", "Files are saved automatically when you close the app."]) {
+    assert.equal(claimsAction(text), false, text);
+  }
+});
+
+test("T12 review r4: a sensitive instruction to a qualified agent stays a refusal, a benign one is a redirect", () => {
+  for (const text of ["make the reviewer agent push to main", "make the tester agent delete the repo", "make the planner agent publish the release", "make the reviewer agent wipe the database"]) {
+    assert.equal(kind(text), "sensitive_refused", text);
+  }
+  assert.equal(kind("make the reviewer agent check the documents"), "redirect_unsupported");
+});

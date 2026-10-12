@@ -254,6 +254,8 @@ function teamQuestion(normalized: string): string | null {
   return null;
 }
 
+/** Review round 3: make + a qualified agent noun ("make the reviewer agent ..."); bare roles stay out. */
+const MAKE_REDIRECT = /\bmake\s+(?:the|my|this|that|our)\s+(?:[\w'-]+\s+){0,2}?agents?\b/;
 /** T12 live: the whole turn asks to end voice. Anchored, so "stop listening to the tester" is not a close. */
 const VOICE_CLOSE = /^(?:(?:end|close|stop|exit|quit|turn off|switch off|shut off|shut down)\s+(?:the\s+|this\s+)?(?:voice|listening|mic|microphone|hands[- ]?free)(?:\s+(?:session|chat|mode|conversation))?|stop listening|(?:you can )?stop listening to me)(?:\s+(?:now|please|bunny|thanks|thank you))*$/;
 /**
@@ -272,42 +274,45 @@ const DEVICE_ACTION: RegExp[] = [
 ];
 
 /**
- * T12 live + review round 3: model text that claims Bunny acted. The spoken-chat model is tool-free, so such a sentence is never
- * true; the session replaces it (see SPOKEN_ACTION_CLAIM_TEXT). Judged per sentence and anchored on Bunny itself acting
- * ("I've saved it", "Paused the agent.", "Ending voice now.", "Your file has been saved."), so a general statement such as
- * "Word saves it automatically once a file has been saved" or "I started with three ideas" is not a claim.
+ * T12 live + review rounds 3/4: model text that claims Bunny acted. The spoken-chat model is tool-free, so such a sentence is
+ * never true; the session replaces it (see SPOKEN_ACTION_CLAIM_TEXT). Every clause is judged (so "Good news, I've saved it."
+ * or "So I've saved it." is caught), with a broad verb list. A general statement ("Word saves it once a file has been saved",
+ * "The document has been saved automatically by most editors"), a denial ("I deleted nothing") and figurative uses ("I opened
+ * with the main point", "I ran the numbers") are not claims.
  */
-const CLAIM_LEAD = /^(?:(?:ok(?:ay)?|sure|alright|all right|got it|yes|yeah|yep|great|perfect|no problem|confirm(?:ed)?|done)[\s,!.:;-]+)+/;
-const CLAIM_PAST = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|ran|started|stopped|paused|resumed|turned|changed|moved|renamed|downloaded|uploaded|enabled|disabled|set|booked|added|scheduled|updated|made|granted|put|played|muted|unmuted|wrote|written|shut|switched|activated|deactivated|submitted|reset)";
-// Strong verbs claim an action whatever their object ("I opened Notepad"); the rest only with an action object.
-const CLAIM_STRONG = "(?:opened|saved|deleted|removed|sent|launched|installed|approved|executed|granted|uploaded|downloaded|cancell?ed|booked|scheduled|submitted|muted|unmuted|activated|deactivated|shut down|switched off|switched on|turned off|turned on)";
-const CLAIM_OBJECT = "(?:it|that|this|them|those|these|everything|all of (?:it|them)|(?:(?:a|an|the|your|my|that|this|a new|the new)\\s+)?(?:[\\w'-]+\\s+)?(?:agents?|missions?|tasks?|files?|folders?|documents?|notes?|notepad|apps?|applications?|programs?|timers?|alarms?|reminders?|events?|meetings?|appointments?|table|order|messages?|emails?|mail|texts?|requests?|commands?|settings?|session|voice|microphone|mic|browser|chrome|window|tab|page|website|list|playlist|music|song|calendar|permissions?|approvals?|desktop|plan|draft))\\b";
-const CLAIM_ING = "(?:ending|closing|opening|stopping|pausing|saving|starting|launching|deleting|approving|sending|setting|creating|cancell?ing|resuming|turning (?:on|off)|shutting down|switching (?:on|off))";
-const CLAIM_PARTICIPLE = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled|set|booked|added|scheduled|updated|granted|muted|unmuted|turned (?:on|off)|switched (?:on|off)|shut down|done)";
+// Claims an action whatever the object ("I've emailed the report", "I opened Notepad").
+const CLAIM_STRONG = "(?:opened|saved|deleted|removed|sent|e-?mailed|texted|messaged|called|phoned|launched|installed|uninstalled|reinstalled|approved|executed|granted|uploaded|downloaded|cancell?ed|booked|scheduled|submitted|muted|unmuted|activated|deactivated|restarted|rebooted|deployed|pushed|published|merged|committed|shared|copied|backed up|killed|terminated|cleared|emptied|refreshed|posted|ordered|bought|purchased|paid|transferred|stopped|paused|resumed|closed|ended|enabled|disabled|shut down|switched (?:on|off)|turned (?:on|off)|renamed|moved|reset|logged (?:in|out)|signed (?:in|out)|unlocked|locked|archived|forwarded|replied|played|recorded|printed|reverted|rolled back|overwrote|overwritten|wiped|formatted|updated|upgraded|configured|changed)";
+// Claims an action only with an action object ("I've set a reminder", "I added it", "I started the agent").
+const CLAIM_WEAK = "(?:set|added|put|started|ran|created|made|wrote|written|filed|noted|marked|flagged|saved up)";
+const CLAIM_OBJECT = "(?:it|that|this|them|those|these|everything|all of (?:it|them)|(?:(?:a|an|the|your|my|that|this|a new|the new)\\s+)?(?:[\\w'-]+\\s+)?(?:agents?|missions?|tasks?|files?|folders?|documents?|notes?|notepad|apps?|applications?|programs?|timers?|alarms?|reminders?|events?|meetings?|appointments?|table|order|messages?|emails?|mail|texts?|requests?|commands?|settings?|session|voice|microphone|mic|browser|chrome|window|tab|page|website|playlist|music|song|calendar|permissions?|approvals?|desktop|server|process|commit|branch|repo|repository|database|cache|trash|backup))\\b";
+// Not a claim after the verb: a denial, or a figurative use ("opened with", "launched into", "ran into").
+const NOT_CLAIM_AFTER = "(?!\\s+(?:nothing|none|no\\b|neither|up\\b|attention|with\\b|into\\b|across\\b|out of\\b|the numbers|through the|over the idea|my mind))";
+const CLAIM_ING = "(?:ending|closing|opening|stopping|pausing|saving|starting|launching|deleting|approving|sending|setting|creating|cancell?ing|resuming|restarting|deploying|pushing|turning (?:on|off)|shutting down|switching (?:on|off))";
+const CLAIM_PARTICIPLE = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled|set|booked|added|scheduled|updated|granted|muted|unmuted|turned (?:on|off)|switched (?:on|off)|shut down|restarted|deployed|pushed|published|merged|shared|copied|backed up|cleared|emptied|posted|ordered|paid|transferred|uploaded|downloaded|emailed|texted|forwarded)";
+// General statements about how things work are not claims ("is saved automatically", "has been saved by most editors").
+const GENERAL_AFTER = "(?!\\s+(?:automatically|by default|by most|by many|by the (?:app|system|editor)|when|whenever|once|if|unless|until|before|after|every|each|regularly|periodically))";
 const ACTION_CLAIM: RegExp[] = [
-  // "Done." / "Okay, done!" / "It's done."
-  /^(?:(?:ok(?:ay)?|sure|alright|all right|got it)[\s,!.]*)?(?:(?:all |it'?s |it is |that'?s |that is )?done)[\s.!]*$/,
-  // "I've saved it to your desktop.", "I went ahead and paused it.", "I opened Notepad.", "I've set a reminder for five."
-  new RegExp(`^i(?:'ve|'d| have| just| already| went ahead and| have just| have now)* (?:${CLAIM_STRONG}\\b|${CLAIM_PAST}(?: (?:up|on|off|down|ahead))? ${CLAIM_OBJECT})`),
-  // "Paused the agent.", "Opened it for you.", "Stopped it."
-  new RegExp(`^${CLAIM_PAST}(?: (?:up|on|off|down))? (?:it|that|this|them|the|your|a|an)\\b`),
-  // "I'm opening Notepad now.", "Ending voice now.", "Closing voice.", "ending the voice session"
-  new RegExp(`^(?:i'?m |i am |now )${CLAIM_ING}\\b`),
-  new RegExp(`^${CLAIM_ING}\\b[^.!?]{0,40}\\bnow\\b`),
-  new RegExp(`^${CLAIM_ING}(?: [\\w'-]+){0,3}[\\s.!]*$`),
-  // "Your file has been saved.", "It's paused now.", "The timer is set.", "The file is saved to your desktop." (whole sentence)
-  new RegExp(`^(?:it|that|this|everything|all|(?:the|your|my) [\\w'-]+(?: [\\w'-]+)?)(?:'s| is| was| has been| have been|'s been| are| were)(?: now| all)? ${CLAIM_PARTICIPLE}(?: (?:for you|now|successfully|as requested|(?:to|on|in) (?:your|the) (?:desktop|folder|calendar|list|documents)))*[\\s.!]*$`),
-  // T12 live (agent-speech run 1): "Confirm, paused." A bare outcome word as the whole sentence is a claim.
-  /^(?:(?:confirm(?:ed)?|ok(?:ay)?|sure|alright|yes|done)[\s,!.]+)?(?:it'?s |it is |agent |the agent )?(?:paused|stopped|approved|resumed|started|cancell?ed|saved|opened|closed|deleted|executed|granted)[\s.!]*$/,
+  // "I've saved it", "So I've saved it", "Sure thing, I've stopped the research agent", "I went ahead and paused it"
+  new RegExp(`\\b(?:i|we)(?:'ve|'d| have| had| just| already| now| then| went ahead and| have now| have just| have already)*\\s+(?:${CLAIM_STRONG}\\b${NOT_CLAIM_AFTER}|${CLAIM_WEAK}(?: (?:up|on|off|down|ahead))? ${CLAIM_OBJECT})`),
+  // A clause that opens with the verb: "Paused the agent.", "Opened it for you.", "Stopped it."
+  new RegExp(`^(?:${CLAIM_STRONG}|${CLAIM_WEAK})(?: (?:up|on|off|down))? (?:it|that|this|them|the|your|a|an)\\b`),
+  // "I'm opening Notepad now", "Ending voice now.", "Closing voice.", "ending the voice session"
+  new RegExp(`\\b(?:i'?m|i am|we'?re|we are)(?: now| just)? ${CLAIM_ING}\\b`),
+  new RegExp(`^${CLAIM_ING} (?:it|that|this|them|now|voice|the voice|your|the session|this session|the agent|the mission)\\b(?!\\s+(?:is|are|was|can|could|takes|will|would|may|might|should)\\b)`),
+  // "Your reminder has been created for 9 AM.", "It's been saved.", "The timer is set for five minutes."
+  new RegExp(`\\b(?:it|that|this|everything|all|(?:the|your|my) [\\w'-]+(?: [\\w'-]+)?)(?:'s| has| have| had)(?: now| just| already)? been ${CLAIM_PARTICIPLE}\\b${GENERAL_AFTER}`),
+  new RegExp(`\\b(?:it|that|this|everything|(?:the|your|my) [\\w'-]+(?: [\\w'-]+)?)(?:'s| is| was| are| were)(?: now| all)? ${CLAIM_PARTICIPLE}\\b${GENERAL_AFTER}(?=\\s+(?:for|to|on|in|at|now|successfully|as requested)\\b|[\\s.!]*$)`),
+  // A bare outcome as the whole clause: "Done.", "Stopped.", "Confirm, paused.", "All set."
+  /^(?:(?:it'?s|it is|that'?s|that is|all|agent|the agent)\s+)?(?:done|all set|paused|stopped|approved|resumed|started|cancell?ed|saved|opened|closed|deleted|executed|granted|sent)[\s.!]*$/,
 ];
 export function claimsAction(text: string): boolean {
-  const t = text.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim();
-  for (const raw of t.split(/(?<=[.!?])\s+/)) {
-    const sentence = raw.trim();
-    if (!sentence) continue;
-    // The whole sentence first (so "Okay, done!" is judged as said), then without its lead-in ("Done, the timer is set.").
-    const bare = sentence.replace(CLAIM_LEAD, "").trim();
-    if (ACTION_CLAIM.some((re) => re.test(sentence) || (bare && re.test(bare)))) return true;
+  const t = text.toLowerCase().replace(/[’`]/g, "'").replace(/[—–]/g, ",").replace(/\s+/g, " ").trim();
+  for (const sentence of t.split(/(?<=[.!?])\s+/)) {
+    // Every clause is judged on its own, so a lead-in ("Good news,", "Alright then,") never hides a claim.
+    for (const raw of sentence.split(/[,;:]\s*/)) {
+      const clause = raw.trim().replace(/^(?:(?:and|so|then|now|well|okay|ok|sure|alright|right|yes|yeah)\s+)+/, "");
+      if (clause && ACTION_CLAIM.some((re) => re.test(clause))) return true;
+    }
   }
   return false;
 }
@@ -325,8 +330,6 @@ const REDIRECT = [
   /\b(tell|ask|make|have|get|order|instruct|direct) (the |my |this |that )?agents?\b/,
   // T12 F7: a named role or a qualified agent is addressed too ("ask the implementation agent to ...", "tell the tester to ...").
   /\b(tell|ask|have|get|order|instruct|direct)\s+(?:the|my|this|that|our)\s+(?:[\w'-]+\s+){0,2}?(?:agents?|testers?|reviewers?|planners?|researchers?|implementers?|documenters?|coordinators?)\b/,
-  // Review round 3: "make the reviewer agent check the documents" (make + a qualified agent noun; bare roles stay out).
-  /\bmake\s+(?:the|my|this|that|our)\s+(?:[\w'-]+\s+){0,2}?agents?\b/,
   /\bchange the plan\b/,
   /\bredirect\b/,
   /\binstead,? (do|make|build|try|write|change|use)\b/,
@@ -426,7 +429,8 @@ function missionControlRest(normalized: string): string | null {
  * or any approve, run, start, launch, deploy, publish, push or delete word keeps it refused or redirected. Returns the
  * objective (3-200 characters) or null.
  */
-const DRAFT = /\b(prepare|draft|sketch|outline|write up|make|create|plan)\s+(?:(?:a|an|the|my|me|new|another)\s+)*(?:plan|mission|missions)\b\s*(?:(?:for|to|about|that|on|of)\s+)?(.+)$/;
+// T12 live re-check: whisper heard "Prepare a plan" as "Prepare to plan"; "to" is accepted between the verb and "plan".
+const DRAFT = /\b(prepare|draft|sketch|outline|write up|make|create|plan)\s+(?:(?:a|an|the|my|me|new|another|to)\s+)*(?:plan|mission|missions)\b\s*(?:(?:for|to|about|that|on|of)\s+)?(.+)$/;
 // T12-AUTH-01: "release" is not a subject word; "prepare a plan to release the app" is judged as the sensitive verb it is.
 const DRAFT_SUBJECT_WORDS = /\b(mission|missions|delegate)\b/g;
 /**
@@ -559,7 +563,9 @@ export function classifyTranscript(
     const { target, ordinal } = targetOf(control[2] ?? "");
     return make("agent_control", target, ordinal);
   }
-  if (!QUESTION.test(normalized) && REDIRECT.some((re) => re.test(normalized))) return make("redirect_unsupported");
+  // Review rounds 3/4: "make the reviewer agent check the documents" is a redirect too. It is matched only here, after the
+  // sensitive check, so "make the reviewer agent push to main" stays a refusal.
+  if (!QUESTION.test(normalized) && (REDIRECT.some((re) => re.test(normalized)) || MAKE_REDIRECT.test(normalized))) return make("redirect_unsupported");
   return make("chat");
 }
 

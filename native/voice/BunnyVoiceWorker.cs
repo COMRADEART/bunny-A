@@ -1327,14 +1327,13 @@ internal sealed class AecSource : IFrameSource
 // Residual: a slow EMA of the AEC output RMS while the worker's own speaker is audible, held for ResidualHoldFrames after
 // the output is last audible. It is null when nothing of ours is playing. While it is held the onset threshold is also at
 // least ResidualGain x the effective residual.
-// T12 (AEC-01, AEC-05, AEC-06): the effective residual is never below ResidualFloor, so a quiet first frame cannot seed it
-// low, and it is capped at ResidualCap, so a loud user is not absorbed into it. Round 2 (verifier): the residual is seeded
-// from the median of the first ResidualSeedFrames output-window frames (never from one frame), and it jumps to the cap when
-// the median of the latest frames is above the learning band. So a loud steady echo is learned even after a quiet start.
-// The EMA learns only from frames between ResidualLearnLow and ResidualLearnHigh: silence never decays it (a paused chunk
-// is silent on the device while still in flight), and user speech above the band never raises it. The threshold is then
-// between 0.004 and 0.006 while output is audible or held, so echo at 0.0045 or 0.005 is never an onset, and user speech
-// at about 0.008 still starts a turn.
+// T12 (AEC-01, AEC-05, AEC-06): the effective residual is never below ResidualFloor and never above ResidualCap. It is seeded
+// from the median of the first ResidualSeedFrames output frames of a session (never from one frame). T12 live calibration:
+// the EMA then learns only from frames in a
+// band relative to the residual itself (no jump to the cap), because measured user double-talk passes the DSP at 10-100x the
+// echo residual. Review rounds 3/4: every output burst then re-samples its first 500 ms of output (BurstSeedFrames) and the
+// median replaces the residual in either direction (capped). Frames while the user is in speech are never observed, so a
+// quiet lead-in or the user's ~120 ms before an onset is a minority of the window and pins nothing.
 internal sealed class AmbientFloor
 {
     public const double MinFloor = 0.0002, MaxFloor = 0.005;
@@ -1368,9 +1367,12 @@ internal sealed class AmbientFloor
     double residual;
     // Round 2 (AEC-01): the residual is seeded once per session, from the median of the first output-window frames.
     bool residualSeeded;
-    // T12 review round 3: every later output burst re-samples its first frames once and may only LOWER the residual. A seed
-    // taken while the user talked over the very first reply (it pinned the residual at the cap for the session) is undone by
-    // the next reply; talking over a later reply can never raise it.
+    // T12 review rounds 3/4: every output burst re-samples its first BurstSeedFrames output frames once and the median replaces
+    // the residual (see Observe).
+    public const int BurstSeedFrames = 25;
+    readonly double[] burstRing = new double[BurstSeedFrames];
+    readonly double[] burstSort = new double[BurstSeedFrames];
+    int burstCount;
     bool burstSampled;
     readonly double[] seedRing = new double[ResidualSeedFrames];
     readonly double[] seedSort = new double[ResidualSeedFrames];
@@ -1449,8 +1451,8 @@ internal sealed class AmbientFloor
                 if (hold > 0)
                 {
                     hold--;
-                    // The burst is over (held 1.5 s past the last audible frame): the next burst samples a fresh seed.
-                    if (hold == 0) { seedCount = 0; seedNext = 0; burstSampled = false; }
+                    // The burst is over (held 1.5 s past the last audible frame): the next burst samples afresh.
+                    if (hold == 0) { burstCount = 0; burstSampled = false; }
                 }
             }
             if (speaking) return;
@@ -1459,18 +1461,25 @@ internal sealed class AmbientFloor
                 // Our own output is held: the residual model owns this window and the floor holds, so echo cannot lift the
                 // ambient estimate. T12 (AEC-01/05): the residual is never seeded from one frame, silence does not decay it,
                 // and only frames inside the learning band are averaged in.
-                if (output) PushSeedLocked(rms);
+                if (output)
+                {
+                    PushSeedLocked(rms);
+                    if (!burstSampled && burstCount < BurstSeedFrames) burstRing[burstCount++] = rms;
+                }
                 if (seedCount == ResidualSeedFrames && !residualSeeded)
                 {
                     // Round 2: seed once from the multi-frame median of the first output frames.
                     residual = Math.Min(ResidualCap, SeedMedianLocked());
                     residualSeeded = true;
-                    burstSampled = true;
                 }
-                else if (seedCount == ResidualSeedFrames && !burstSampled)
+                if (residualSeeded && !burstSampled && burstCount == BurstSeedFrames)
                 {
-                    // Round 3: a later burst's seed only ever lowers the learned residual (see burstSampled).
-                    residual = Math.Min(residual, SeedMedianLocked());
+                    // Review rounds 3/4: each burst's first 500 ms of output (frames while the user is in speech are never
+                    // observed) replaces the residual by its median, in either direction. A quiet lead-in or the user's
+                    // ~120 ms before an onset is a minority of these frames, so neither pins the residual.
+                    Array.Copy(burstRing, burstSort, BurstSeedFrames);
+                    Array.Sort(burstSort);
+                    residual = Math.Min(ResidualCap, burstSort[BurstSeedFrames / 2]);
                     burstSampled = true;
                 }
                 // T12 live calibration: the residual only follows frames close to itself (a relative band), and there is no
@@ -4113,18 +4122,29 @@ internal static class SelfTest
         for (int f = 0; f < 50; f++) if (live.Feed(0.003, int.MaxValue) == Vad.SpeechStart && liveUser < 0) liveUser = f;
         r["aecLiveUserOnset"] = liveUser;
 
-        // T12 review round 3: the user talks (0.004) over the first frames of the session's first reply, so the seed is the
-        // user's voice and the threshold is pinned high. The next reply carries only the measured echo (5e-5): its seed lowers
-        // the residual again. Talking over a later reply's first frames never raises it.
+        // T12 review rounds 3/4. (a) The user talks (0.004) over the first frames of the session's first reply: the 5-frame
+        // seed is the user's voice and the threshold is pinned high. (b) The next reply carries only the measured echo (5e-5):
+        // its 500 ms burst median lowers the residual again. (c) The user's ~120 ms before an onset over a later reply (6
+        // frames), then frames while in speech (never observed), then echo: the burst median stays at the echo level.
         AmbientFloor pin = new AmbientFloor(AmbientFloor.MinFloor);
         for (int f = 0; f < 10; f++) pin.Observe(0.004, false, true);
         r["reseedPinnedThreshold"] = pin.OnsetThreshold;
         for (int f = 0; f < AmbientFloor.ResidualHoldFrames + 5; f++) pin.Observe(0.0001, false, false);
-        for (int f = 0; f < 10; f++) pin.Observe(0.00005, false, true);
+        for (int f = 0; f < 30; f++) pin.Observe(0.00005, false, true);
         r["reseedNextReplyThreshold"] = pin.OnsetThreshold;
         for (int f = 0; f < AmbientFloor.ResidualHoldFrames + 5; f++) pin.Observe(0.0001, false, false);
-        for (int f = 0; f < 10; f++) pin.Observe(0.004, false, true);
+        for (int f = 0; f < 6; f++) pin.Observe(0.004, false, true);
+        for (int f = 0; f < 20; f++) pin.Observe(0.004, true, true);
+        for (int f = 0; f < 30; f++) pin.Observe(0.00005, false, true);
         r["reseedLaterTalkThreshold"] = pin.OnsetThreshold;
+        // (d) Round 4: a loud steady echo (0.0012) whose second reply opens with a 100 ms quiet lead-in: the residual follows
+        // the echo, so the echo stays below the onset threshold (it was pinned at the floor and self-triggered every frame).
+        AmbientFloor lead = new AmbientFloor(AmbientFloor.MinFloor);
+        for (int f = 0; f < 30; f++) lead.Observe(0.0012, false, true);
+        for (int f = 0; f < AmbientFloor.ResidualHoldFrames + 5; f++) lead.Observe(0.0001, false, false);
+        for (int f = 0; f < 5; f++) lead.Observe(0.00005, false, true);
+        for (int f = 0; f < 30; f++) lead.Observe(0.0012, false, true);
+        r["reseedLeadInThreshold"] = lead.OnsetThreshold;
 
         // T12 live endpointing: the split phrases from the endurance session, plus finished and empty partials.
         string[] endpointProbe = { "Prepare approach and prepare.", "Prepare a.", "Open notes and...", "write about matrix.",

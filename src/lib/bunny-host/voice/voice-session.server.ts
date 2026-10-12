@@ -63,6 +63,22 @@ function voiceCollapseKey(transcript: string): string {
 export const MISSION_PAUSE_TEXT = "Missions are paused and resumed per Agent, or on the Windows Host screen. Nothing was changed.";
 /** T12: speech at least this long is recognized by the worker (shorter bursts end as stt.none too_short without a decode). */
 const MIN_RECOGNIZED_SPEECH_MS = 250;
+/** T12 live re-check: how long an unfinished sentence waits for the user to start speaking again, and its hard bound. */
+const FRAGMENT_WAIT_MS = 2500;
+const FRAGMENT_MAX_MS = 9000;
+const UNFINISHED_LAST_WORD = /\b(?:and|but|or|because|if|a|an|the|my|your|our|their|to|for|of|about|with|from|into|um|uh|er|erm)$/;
+/**
+ * T12 live re-check: a duplex final that would only reach the chat model and ends on a word that cannot end a sentence
+ * (or on whisper's trailing ellipsis) is unfinished. Anything that is not chat (a stop, a close, a refusal, a status
+ * question, a confirm) is never held.
+ */
+function isUnfinishedChat(text: string, proposalPending: boolean): boolean {
+  if (classifyTranscript(text, { proposalPending }).kind !== "chat") return false;
+  const trimmed = text.trim();
+  if (/(?:\.\.\.|…)$/.test(trimmed)) return true;
+  const words = trimmed.toLowerCase().replace(/[’`]/g, "'").replace(/[\s.!?,;:]+$/, "");
+  return UNFINISHED_LAST_WORD.test(words);
+}
 /** T12 AEC-02: a turn whose speech starts this soon after Bunny's output stopped is still the output's tail, not a new turn. */
 const OUTPUT_OVERLAP_TAIL_MS = 300;
 /** T12 AEC-02: how many recent output windows are kept for the overlap check. */
@@ -237,6 +253,8 @@ export class VoiceSessionManager {
   private turnMeta: TurnMeta = TYPED_META;
   /** T12: whether Bunny's output was audible when the transcript being accepted was heard, before the turn settled to PROCESSING. */
   private outputAtFinal = false;
+  /** T12 live re-check: an unfinished duplex sentence waiting for its continuation (see holdFragment). */
+  private fragment: { text: string; turn: string; confidence: number; meta: TurnMeta; cancel: (() => void) | null } | null = null;
   /** T12 F4: the last Host-facts list of Agents or Missions. Cleared on close. */
   private referent: Referent | null = null;
   /** T12 F3: when a spoken Mission draft was last attempted (the rate limit between drafts). */
@@ -2403,7 +2421,52 @@ export class VoiceSessionManager {
 
   private onFinalDuplex(text: string, turn: string, confidence: number, input: InputTurn) {
     // First-final guard is recorded above before any async routing. Only this finalized path can reach Host intents.
-    this.acceptFinal(text, turn, confidence, { source: "duplex", overlapped: input.overlapped, speechMs: input.controller.speechMs });
+    let meta: TurnMeta = { source: "duplex", overlapped: input.overlapped, speechMs: input.controller.speechMs };
+    // T12 live re-check: a hesitation after "Prepare a" ended the turn before whisper had any partial text, so the worker's
+    // endpointing could not know the sentence was unfinished. A held fragment is joined with the next final here; the joined
+    // text is classified from scratch, overlapped if either part was, at the lower confidence of the two.
+    const held = this.fragment;
+    if (held) {
+      this.clearFragment();
+      text = `${held.text.replace(/[\s.!?,;:…]+$/, "")} ${text}`.slice(0, VOICE_LIMITS.maxTranscriptChars);
+      confidence = Math.min(confidence, held.confidence);
+      meta = { source: "duplex", overlapped: meta.overlapped || held.meta.overlapped, speechMs: (meta.speechMs ?? 0) + (held.meta.speechMs ?? 0) };
+      this.deps.journal("voice.turn", "An unfinished spoken sentence was joined with its continuation.");
+    } else if (isUnfinishedChat(text, this.voiceConfirmable())) {
+      this.holdFragment(text, turn, confidence, meta);
+      return;
+    }
+    this.acceptFinal(text, turn, confidence, meta);
+  }
+
+  /**
+   * Holds an unfinished sentence (chat-bound, ending on a word that cannot end a sentence) for its continuation. It is
+   * routed alone when the user does not start speaking again within FRAGMENT_WAIT_MS, or once FRAGMENT_MAX_MS has passed.
+   */
+  private holdFragment(text: string, turn: string, confidence: number, meta: TurnMeta) {
+    const since = this.now();
+    const check = () => {
+      const fragment = this.fragment;
+      if (!fragment || fragment.turn !== turn) return;
+      const speaking = !!this.input?.speechOpen || this.finalizing.size > 0;
+      if (speaking && this.now() - since < FRAGMENT_MAX_MS) {
+        fragment.cancel = this.schedule(check, 250);
+        return;
+      }
+      this.clearFragment();
+      if (this.closing || !this.snap.open) return;
+      this.deps.journal("voice.turn", "An unfinished spoken sentence had no continuation; routed as heard.");
+      this.snap.turnId = turn;
+      this.acceptFinal(text, turn, confidence, meta);
+    };
+    this.fragment = { text, turn, confidence, meta, cancel: this.schedule(check, FRAGMENT_WAIT_MS) };
+    this.snap.partial = text.slice(0, VOICE_LIMITS.maxTranscriptChars);
+    this.deps.journal("voice.turn", "Waiting for the rest of an unfinished spoken sentence.");
+  }
+
+  private clearFragment() {
+    this.fragment?.cancel?.();
+    this.fragment = null;
   }
 
   private onWorkerEvent(event: WorkerEvent) {
@@ -2831,6 +2894,7 @@ export class VoiceSessionManager {
   }
 
   private clearTimers() {
+    this.clearFragment();
     this.clearIdle();
     this.cancelRearmTimer();
     this.cancelInferenceTimer?.();

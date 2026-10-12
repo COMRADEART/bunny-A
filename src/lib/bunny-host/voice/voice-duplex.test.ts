@@ -1562,3 +1562,57 @@ test("T12 live: an idle release leaves no LISTENING state, and a new user start 
   assert.equal(again.duplex?.stopped, null, "a live lane carries no stop receipt");
   await h.session.close();
 });
+
+// T12 live re-check (2026-10-12): "Prepare a … plan for the dashboard project." ended after "Prepare to" because whisper had no
+// partial yet; the two halves reached the model as two chat turns. An unfinished chat-bound sentence now waits for its rest.
+test("T12 live re-check: an unfinished sentence is joined with its continuation and routed once", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Prepare to");
+  assert.equal(h.admissions.length, 0, "the fragment is not sent to the model");
+  assert.equal(h.drafted.length, 0);
+  h.advance(1200);
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  await tick();
+  h.advance(2000);
+  await tick();
+  assert.equal(h.admissions.length, 0, "still waiting: the user is speaking again");
+  h.emitInput({ ev: "stt.final", text: "plan for the dashboard project.", confidence: 0.9 });
+  await tick();
+  await tick();
+  assert.equal(h.session.snapshot().finalTranscript, "Prepare to plan for the dashboard project.");
+  assert.equal(h.session.snapshot().turnKind, "mission_draft");
+  assert.equal(h.drafted.length, 1);
+  assert.match(h.drafted[0].objective, /dashboard project/);
+  assert.equal(h.admissions.length, 0, "never sent to the chat model");
+  assert.ok(h.journal.some((line) => line.includes("joined with its continuation")));
+  await h.session.close();
+});
+
+test("T12 live re-check: an unfinished sentence with no continuation is routed as heard after the wait; finished turns are not held", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Tell me about the");
+  assert.equal(h.admissions.length, 0);
+  h.advance(2600);
+  await tick();
+  await tick();
+  assert.equal(h.admissions.length, 1, "routed alone once the user did not go on");
+  assert.equal(h.session.snapshot().finalTranscript, "Tell me about the");
+  await h.session.close();
+  const k = await harness();
+  await k.begin();
+  await k.final("What time is it?");
+  await tick();
+  assert.equal(k.admissions.length, 1, "a finished question is routed at once");
+  await k.session.close();
+  const s = await harness();
+  await s.begin();
+  await s.final("stop talking");
+  await tick();
+  assert.equal(s.session.snapshot().turnKind, "speech_stop", "a stop is never held");
+  await s.final("Close the");
+  assert.equal(s.admissions.length, 0, "an unfinished chat-bound sentence is held");
+  await s.session.close();
+  assert.equal(s.admissions.length, 0, "closing drops a held fragment; nothing reaches the model");
+});
