@@ -156,6 +156,8 @@ export type VoiceTurnKind =
   | "cancel" // "never mind" / "cancel"
   | "sensitive_refused" // approval, permission, shell, credential, scope, owner claims: never by voice
   | "redirect_unsupported" // free-form Agent Talk/Redirect: explicitly unavailable in T10
+  | "voice_close" // T12: "end voice", "stop listening": closes this voice session (capability-reducing only)
+  | "device_action_unsupported" // T12: "open notes", "save it on the desktop": voice never acts on the computer
   | "empty";
 
 export type VoiceProposal = {

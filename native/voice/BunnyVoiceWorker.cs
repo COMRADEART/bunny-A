@@ -2495,13 +2495,7 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
     {
         string text;
         lock (gate) { text = lastPartial; }
-        if (string.IsNullOrWhiteSpace(text)) return 900;
-        string normalized = text.Trim().ToLowerInvariant();
-        if (normalized.EndsWith(".") || normalized.EndsWith("?") || normalized.EndsWith("!")) return 700;
-        string[] words = normalized.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-        string last = words.Length > 0 ? words[words.Length - 1] : "";
-        if (last == "and" || last == "but" || last == "because" || last == "to" || last == "um" || last == "uh") return 1400;
-        return 1000;
+        return Endpointing.PauseFor(text);
     }
 
     int MsSinceEvidence()
@@ -3689,6 +3683,37 @@ internal static class Tts
 // Fixtures (test-only input sources) and the process entry point.
 // ---------------------------------------------------------------------------------------------------------------
 // Test-only deterministic checks of the endpointing, decision and gain rules. No devices, no recognizer, no audio.
+// ---------------------------------------------------------------------------------------------------------------
+// Duplex end-of-turn pause chosen from the latest partial. T12 live finding: whisper partials always end with a full
+// stop, so trailing punctuation is not evidence that the user finished; a hesitation after "Prepare a" split one request
+// into two turns 700 ms later. Punctuation is ignored, and a partial ending on a word that cannot end a sentence
+// (conjunction, article, preposition, possessive, filler) waits longer.
+// ---------------------------------------------------------------------------------------------------------------
+internal static class Endpointing
+{
+    public const int NoTextMs = 900, DefaultMs = 1000, ContinuationMs = 1500;
+    static readonly HashSet<string> Continuations = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "and", "but", "or", "so", "because", "then", "if", "that", "which", "when", "while",
+        "a", "an", "the", "my", "your", "our", "their", "his", "her", "its", "this", "these", "those", "some",
+        "to", "for", "of", "about", "with", "on", "in", "at", "from", "into", "by", "as",
+        "um", "uh", "er", "erm", "hmm", "like", "is", "are", "was", "please"
+    };
+
+    public static int PauseFor(string partial)
+    {
+        if (string.IsNullOrWhiteSpace(partial)) return NoTextMs;
+        string trimmed = partial.Trim();
+        string normalized = trimmed.ToLowerInvariant().TrimEnd('.', '?', '!', ',', ';', ':', '-', ' ', '…');
+        if (normalized.Length == 0) return NoTextMs;
+        // Whisper writes a trailing ellipsis when the speaker trailed off mid-sentence.
+        if (trimmed.EndsWith("...") || trimmed.EndsWith("…")) return ContinuationMs;
+        string[] words = normalized.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        string last = words.Length > 0 ? words[words.Length - 1].Trim('\'', '"', ',') : "";
+        return Continuations.Contains(last) ? ContinuationMs : DefaultMs;
+    }
+}
+
 // Run: bunny-voice-worker.exe --selftest. Emits one "selftest" event with the measured values.
 internal static class SelfTest
 {
@@ -4070,6 +4095,13 @@ internal static class SelfTest
         int liveUser = -1;
         for (int f = 0; f < 50; f++) if (live.Feed(0.003, int.MaxValue) == Vad.SpeechStart && liveUser < 0) liveUser = f;
         r["aecLiveUserOnset"] = liveUser;
+
+        // T12 live endpointing: the split phrases from the endurance session, plus finished and empty partials.
+        string[] endpointProbe = { "Prepare approach and prepare.", "Prepare a.", "Open notes and...", "write about matrix.",
+            "How many agents are working?", "Is it for the", "", "Stop.", "Tell me about…" };
+        string[] endpointPauses = new string[endpointProbe.Length];
+        for (int i = 0; i < endpointProbe.Length; i++) endpointPauses[i] = Endpointing.PauseFor(endpointProbe[i]).ToString(CultureInfo.InvariantCulture);
+        r["endpointPauses"] = string.Join(",", endpointPauses);
 
         // The model itself: 200 frames of user speech at 0.008 that no turn is attached to, under output, must not lift the
         // residual or the threshold above what the echo supports (AEC-05). Standalone Vads stop observing after onset, so

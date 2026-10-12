@@ -232,6 +232,8 @@ export const TURN_KIND_LABEL: Record<VoiceTurnKind, string> = {
   cancel: "Cancelled",
   sensitive_refused: "Not allowed by voice",
   redirect_unsupported: "Talk/Redirect is not available by voice",
+  voice_close: "Voice ended",
+  device_action_unsupported: "Computer actions are not available by voice",
   empty: "No speech heard",
 };
 

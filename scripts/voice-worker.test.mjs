@@ -792,6 +792,14 @@ test("T12-native live calibration: the measured device residual never starts a t
   assert.ok(r.aecLiveUserOnset >= 0 && r.aecLiveUserOnset <= 6, `0.003 user speech over the live residual is an onset within 120 ms (frame ${r.aecLiveUserOnset})`);
 });
 
+test("T12-native endpointing ignores whisper's trailing full stop and waits longer after a word that cannot end a sentence", { skip }, async () => {
+  const r = await sharedSelfTest();
+  // "Prepare approach and prepare." / "Prepare a." / "Open notes and..." / "write about matrix." / a question /
+  // "Is it for the" / "" / "Stop." / "Tell me about…"
+  assert.equal(r.endpointPauses, "1000,1500,1500,1000,1000,1500,900,1000,1500",
+    "punctuation never shortens the pause below 1000 ms; continuations and trailing ellipses wait 1500 ms");
+});
+
 test("T12-native AEC-02 a pre-roll replay never carries frames captured while our output was audible or in its reverb tail", { skip }, async () => {
   const r = await sharedSelfTest();
   assert.equal(r.prerollEchoFrames, 0, "no replayed frame was captured while our 0.003 echo was audible or in its 260 ms tail");

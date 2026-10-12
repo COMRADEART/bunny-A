@@ -245,10 +245,10 @@ export type FollowUpSubject = { kind: "agent"; agent: AgentFact; mission: Missio
  */
 export function answerFollowUp(focus: string, subject: FollowUpSubject): string {
   const mission: MissionFact | null = subject.mission;
-  const label = subject.kind === "agent" ? subject.agent.name : `the mission ${subject.mission.title}`;
+  const label = subject.kind === "agent" ? subject.agent.name : `the mission ${spokenTitle(subject.mission.title)}`;
   const state = subject.kind === "agent" ? subject.agent.state : subject.mission.status;
   const over = MISSION_OVER.includes(state.toLowerCase()) || isTerminalAgent(state);
-  if (focus === "verification") return mission ? `For the mission ${mission.title}: ${answerVerification(mission)}` : answerVerification(null);
+  if (focus === "verification") return mission ? `For the mission ${spokenTitle(mission.title)}: ${answerVerification(mission)}` : answerVerification(null);
   if (focus === "finished") {
     const word = state.toLowerCase();
     if (word === "completed") return `Yes, ${label} has finished.`;
@@ -265,7 +265,17 @@ export function answerFollowUp(focus: string, subject: FollowUpSubject): string 
   return sentences.join(" ");
 }
 
+/**
+ * T12 live: a long Mission objective is read as its opening words only (up to the first comma, at most eight words), so a
+ * spoken answer reaches the fact quickly. Short titles are unchanged.
+ */
+export function spokenTitle(title: string): string {
+  const head = title.split(/[,;:(]/)[0].trim() || title.trim();
+  const words = head.split(/\s+/).filter(Boolean);
+  return words.length > 8 ? words.slice(0, 8).join(" ") : head;
+}
+
 /** T12 F6: names the Mission a verification or model answer describes, and says so when it is not the active one. */
 export function missionLabel(mission: MissionFact): string {
-  return `For the mission ${mission.title}${MISSION_OVER.includes(mission.status) ? " (not the active one)" : ""}: `;
+  return `For the mission ${spokenTitle(mission.title)}${MISSION_OVER.includes(mission.status) ? " (not the active one)" : ""}: `;
 }

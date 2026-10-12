@@ -1542,3 +1542,23 @@ test("T12 RC-08 (round 2): a worker mute stop is recorded as a mute release, not
   assert.ok(!pauses(h.worker()).some((c) => !c.on && c.gen === gen), "no pause-off is sent for the cancelled reply");
   await h.session.close();
 });
+
+// T12 live endurance findings (2026-10-12): after an idle release the snapshot said LISTENING with capturing false, and after
+// the user started hands-free again it still carried the old "idle" stop receipt while active.
+test("T12 live: an idle release leaves no LISTENING state, and a new user start clears the old stop receipt", async () => {
+  const h = await harness();
+  await h.begin();
+  h.advance(VOICE_LIMITS.duplexIdleMs + 1);
+  await tick();
+  const released = h.session.snapshot();
+  assert.equal(released.duplex?.active, false);
+  assert.equal(released.capturing, false);
+  assert.notEqual(released.state, "LISTENING", "nothing listens once the lane is released");
+  assert.equal(released.duplex?.stopped?.reason, "idle");
+  await h.session.listenStart("hands_free");
+  await tick();
+  const again = h.session.snapshot();
+  assert.equal(again.duplex?.active, true);
+  assert.equal(again.duplex?.stopped, null, "a live lane carries no stop receipt");
+  await h.session.close();
+});

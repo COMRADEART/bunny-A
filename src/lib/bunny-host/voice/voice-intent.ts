@@ -207,6 +207,11 @@ const STATUS: RegExp[] = [
   /\b(is|are) (my |the )?(agent|agents|bunny|you|mission|task)s?\b.{0,12}\b(paused|running|stopped|done|finished|idle|working|complete|completed|blocked|waiting)\b/,
   /^(status|agent status|mission status|how('s| is) (it|the agent|my agent) going)$/,
   /\b(agent|mission) status\b/,
+  // T12 live: "is any task you're running there now?", "is anything running?", "are you running any tasks?"
+  /\b(?:is|are) (?:there )?(?:anything|any (?:tasks?|agents?|missions?|jobs?|work))\b.{0,24}\b(?:running|working|active|in progress)\b/,
+  /\bare you (?:running|doing|working on) (?:any|a|some) (?:tasks?|missions?|jobs?|work)\b/,
+  // T12 live: "tell me whether the task is done" (whisper also heard "where the task is done").
+  /\b(?:whether|if|where) (?:the |my |that |this )?(?:tasks?|missions?|agents?|work|job) (?:is|are|has|have)\b.{0,12}\b(?:done|finished|complete|completed|over|running|working)\b/,
 ];
 const VERIFY = [
   /\b(did|do|does|have|has|were|was|are|is)\b.{0,30}\b(tests?|checks?|verification|builds?|typecheck|lint|suite|specs?)\b.{0,30}\b(pass|passed|passing|fail|failed|failing|green|red|succeed|succeeded)\b/,
@@ -244,6 +249,32 @@ function teamQuestion(normalized: string): string | null {
   if (MISSION_DONE.test(normalized) && !/\b(team|agents?)\b/.test(normalized)) return "finished";
   if (TEAM_FINISHED.test(normalized)) return "finished";
   return null;
+}
+
+/** T12 live: the whole turn asks to end voice. Anchored, so "stop listening to the tester" is not a close. */
+const VOICE_CLOSE = /^(?:(?:end|close|stop|exit|quit|turn off|switch off|shut off|shut down)\s+(?:the\s+|this\s+)?(?:voice|listening|mic|microphone|hands[- ]?free)(?:\s+(?:session|chat|mode|conversation))?|stop listening|(?:you can )?stop listening to me)(?:\s+(?:now|please|bunny))*$/;
+/**
+ * T12 live: an imperative to act on the computer ("open notes", "and save it on desktop", "create a file"). Voice has no
+ * computer tools; these get a fixed answer instead of the chat model, which once answered "Done." to "end voice now".
+ */
+const DEVICE_OBJECT = "(?:apps?|applications?|programs?|notes?|notepad|files?|folders?|documents?|docs?|desktop|downloads|browser|chrome|edge|firefox|tabs?|emails?|e-mails?|mail|messages?|texts?|windows?|settings|word|excel|powerpoint|terminal|command prompt|powershell|spotify|music|websites?|web pages?|screenshots?|calendar|reminders?|alarms?|timers?)";
+const DEVICE_ACTION: RegExp[] = [
+  new RegExp(`^(?:and |then |also )?(?:(?:can|could|would|will) you |please )?(?:open|launch|start up|close|save|create|make|delete|remove|send|email|text|type|download|install|play|move|copy|rename|edit|set|turn on|turn off|switch to|go to)\\b.{0,40}\\b${DEVICE_OBJECT}\\b`),
+  /^(?:and |then |also )?(?:(?:can|could|would|will) you |please )?(?:save|put|store|write|copy|move|export) (?:it|that|this|them|those|the \w+)\b.{0,20}\b(?:on|to|in|into) (?:the |my )?(?:desktop|disk|drive|downloads|documents|folder|file)\b/,
+];
+
+/**
+ * T12 live: model text that claims Bunny acted ("Done.", "I've saved it", "it has been opened"). The spoken-chat model is
+ * tool-free, so such a sentence is never true; the session replaces it (see SPOKEN_ACTION_CLAIM_TEXT).
+ */
+const ACTION_CLAIM: RegExp[] = [
+  /^(?:(?:ok(?:ay)?|sure|alright|all right|got it)[\s,!.]*)?(?:(?:all |it'?s |it is |that'?s |that is )?done)[\s.!]*$/,
+  /\bi(?:'ve| have| just| already)* (?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|ran|started|stopped|paused|resumed|turned (?:on|off)|changed|moved|renamed|downloaded|uploaded|enabled|disabled)\b/,
+  /\b(?:has|have) (?:now )?been (?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled)\b/,
+];
+export function claimsAction(text: string): boolean {
+  const t = text.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim();
+  return ACTION_CLAIM.some((re) => re.test(t));
 }
 
 const MODEL = [/\bwhich model\b/, /\bwhat model\b/, /\bmodel (is|are) (it|being used|working|running|active)\b/];
@@ -451,6 +482,8 @@ export function classifyTranscript(
   // T12 F1: a speech stop is classified before any control or chat; it silences Bunny and nothing else.
   const speech = speechStop(normalized, pending);
   if (speech) return make("speech_stop", speech);
+  // T12 live: "end voice", "stop listening" close the voice session; ending only removes capability, so it needs no screen.
+  if (VOICE_CLOSE.test(normalized)) return make("voice_close");
   // T12 F2: "stop/cancel/abort/end the mission" never becomes an Agent stop.
   const missionRest = missionControlRest(normalized);
   if (missionRest !== null) {
@@ -465,6 +498,8 @@ export function classifyTranscript(
   if (CANCEL.test(normalized)) return make("cancel");
   if (CONFIRM.test(normalized) && !pending) return make("confirm");
   if (OPEN_UI.some((re) => re.test(normalized))) return make("open_ui");
+  // T12 live: requests to act on the computer get a fixed answer; the tool-free chat model never sees (or "does") them.
+  if (!QUESTION.test(normalized) && DEVICE_ACTION.some((re) => re.test(normalized))) return make("device_action_unsupported");
   const team = teamQuestion(normalized);
   if (team) return make("agent_team", team);
   // T12 F4: follow-ups resolve against the last Host-facts subject; they are never chat.

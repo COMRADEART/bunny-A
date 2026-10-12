@@ -24,7 +24,7 @@ import {
 } from "./voice-protocol.ts";
 import { canTransition, createFsm, hasSpeechInFlight, tryTransition, type VoiceFsm } from "./voice-fsm.ts";
 import { VoiceChunker, chunkAnswer, type SpokenChunk } from "./voice-chunker.ts";
-import { classifyTranscript, controlAction, type VoiceIntent } from "./voice-intent.ts";
+import { claimsAction, classifyTranscript, controlAction, type VoiceIntent } from "./voice-intent.ts";
 import { VoiceTurnTaking, echoMatch, echoTokens, type TurnDecision } from "./voice-turn-taking.ts";
 import { answerApprovals, answerFollowUp, answerTeam, answerLastMission, answerModel, answerStatus, answerVerification, humanState, isTerminalAgent, missionLabel, MISSION_OVER, type AgentFact, type ApprovalFact, type FollowUpSubject, type MissionFact } from "./voice-answers.server.ts";
 
@@ -40,8 +40,13 @@ export const SPOKEN_CHAT_INSTRUCTION = [
   "You are Bunny, a voice assistant. Answer in one to three short spoken sentences without markdown.",
   "You cannot take any action. You cannot approve or deny anything, grant permissions, run commands, change settings, or pause, resume, stop or control agents or missions.",
   "Never say that you did any of those things, and never say that something was approved, cancelled, run, changed or stopped.",
-  "If the user asks for one of those things, tell them it is done on the Windows Host screen.",
+  "You also cannot open apps, create, write or save files, browse, send messages, or end this voice session.",
+  "If the user asks for one of those things, tell them it is done on the Windows Host screen. Never answer with only \"Done\".",
 ].join(" ");
+/** T12 live: replaces model text that claims an action the tool-free model cannot take (see claimsAction). */
+export const SPOKEN_ACTION_CLAIM_TEXT = "I can't do that by voice. Nothing was changed.";
+/** T12 live: the fixed answer to a request to act on the computer. */
+export const DEVICE_ACTION_TEXT = "I can't do things on this computer by voice. I can answer questions, report on your agents, or draft a Mission.";
 
 export const REFUSAL_TEXT = "I can't do that by voice. Approvals, permissions and commands are reviewed on the Windows Host screen.";
 export const REDIRECT_TEXT = "I can't change a running agent's plan by voice. You can pause or stop it, or start a new Mission in the Agentic workspace.";
@@ -127,7 +132,7 @@ type Clarification =
   | { purpose: "followup"; focus: string; candidates: Candidate[]; expiresAt: number };
 /** T12 F4: the ids a Host-facts answer named, in spoken order. Ids only: the state is always read again from live rows. */
 type Referent = { kind: "agents" | "missions"; ids: string[]; missionId: string | null; at: number; hostEpoch: string };
-type Inference = { taskId: string; turn: string; gen: number; chunker: VoiceChunker; spoken: string[]; done: boolean; received: boolean };
+type Inference = { taskId: string; turn: string; gen: number; chunker: VoiceChunker; spoken: string[]; done: boolean; received: boolean; claimBlocked?: boolean };
 /** T12: a reply held on speech onset. Keyed by output generation: a resume or a stale timer can never touch newer speech. */
 type Hold = { turn: string; gen: number; inputTurn: string; inputGen: number; cancelResume: (() => void) | null; cancelMax: (() => void) | null };
 /** T12: how the Host received a transcript: from the duplex lane, a push-to-talk capture, or typed text. */
@@ -927,6 +932,14 @@ export class VoiceSessionManager {
       case "speech_stop":
         this.handleSpeechStop(intent, turn);
         return;
+      case "voice_close":
+        // T12 live: ending voice only removes capability, so a spoken request is honoured at once, overlapped or not.
+        this.deps.journal("voice.turn", "Voice session ended by a spoken request.");
+        void this.close("voice_command");
+        return;
+      case "device_action_unsupported":
+        this.speakAnswer(DEVICE_ACTION_TEXT, "refusal", turn);
+        return;
       case "mission_draft":
         // T12 F3: a draft is never made from speech that overlapped Bunny's own output; the user says it again.
         if (this.overlappedDuplexTurn()) return this.answerHost("To draft a Mission, say it again after I finish, or use the Windows Host screen.", turn);
@@ -1504,7 +1517,7 @@ export class VoiceSessionManager {
       }
       if ("text" in event) {
         current.received = true;
-        for (const chunk of current.chunker.push(event.text)) this.sendChunk(current, chunk);
+        for (const chunk of current.chunker.push(event.text)) this.sendModelChunk(current, chunk);
         if (this.snap.timing && this.snap.timing.firstTokenAt === null) this.snap.timing = { ...this.snap.timing, firstTokenAt: this.now() };
         this.touch();
         return;
@@ -1520,6 +1533,21 @@ export class VoiceSessionManager {
     }, VOICE_LIMITS.inferenceTimeoutMs);
   }
 
+  /**
+   * T12 live: model text is spoken only while it makes no claim that Bunny acted. The first claiming sentence is replaced by
+   * the truthful refusal and the rest of that answer is dropped (the tool-free model cannot have acted).
+   */
+  private sendModelChunk(current: Inference, chunk: SpokenChunk) {
+    if (current.claimBlocked) return;
+    if (claimsAction(chunk.text)) {
+      current.claimBlocked = true;
+      this.deps.journal("voice.turn", "A spoken answer claimed an action the voice model cannot take; it was replaced.");
+      this.sendChunk(current, { ...chunk, text: SPOKEN_ACTION_CLAIM_TEXT });
+      return;
+    }
+    this.sendChunk(current, chunk);
+  }
+
   private sendChunk(current: { turn: string; gen: number; spoken: string[] }, chunk: SpokenChunk) {
     this.outstanding += 1;
     current.spoken.push(chunk.text);
@@ -1532,16 +1560,17 @@ export class VoiceSessionManager {
     // H8: a non-streaming provider delivered no deltas but recorded a final output: speak it, bounded, through the chunker.
     if (!current.received && state === "completed") {
       const final = this.deps.chat.output?.(current.taskId)?.trim();
-      if (final) for (const chunk of current.chunker.push(final)) this.sendChunk(current, chunk);
+      if (final) for (const chunk of current.chunker.push(final)) this.sendModelChunk(current, chunk);
     }
-    for (const chunk of current.chunker.end()) this.sendChunk(current, chunk);
+    for (const chunk of current.chunker.end()) this.sendModelChunk(current, chunk);
     current.done = true;
     this.releaseInference(current);
     const answer = current.spoken.join(" ");
     if (answer) {
       this.history.push({ user: this.snap.finalTranscript ?? "", assistant: answer.slice(0, 600) });
       while (this.history.length > VOICE_LIMITS.maxHistoryTurns) this.history.shift();
-      this.setAnswer(answer, "model");
+      // A replaced claim is the Host's sentence, not the model's.
+      this.setAnswer(answer, current.claimBlocked ? "refusal" : "model");
     } else {
       this.setAnswer(state === "completed" ? "I didn't get an answer." : `That answer did not finish (${state}).`, "refusal");
     }
@@ -2079,6 +2108,12 @@ export class VoiceSessionManager {
     this.snap.inputTurnId = null;
     this.snap.capturing = false;
     this.snap.level = null;
+    // T12 live: with the lane released nothing is listening, so LISTENING is no longer true. Nothing is re-armed here: only
+    // a user start reopens the microphone.
+    if (this.fsm.state === "LISTENING") {
+      this.setState("IDLE");
+      if (this.snap.muted) this.setState("MUTED");
+    }
     const resolve = this.duplexStopResolve;
     this.duplexStopResolve = null;
     this.duplexStopping = null;
@@ -2412,7 +2447,7 @@ export class VoiceSessionManager {
         this.duplexStarting = false;
         this.cancelDuplexReady?.();
         this.cancelDuplexReady = null;
-        this.snap.duplex = { ...freshDuplex(true, this.snap.duplex?.stopped ?? null), active: true, aec: event.aec, reference: event.reference, fixture: event.fixture, grantExpiresAt: this.grantExpiresAt };
+        this.snap.duplex = { ...freshDuplex(true, null), active: true, aec: event.aec, reference: event.reference, fixture: event.fixture, grantExpiresAt: this.grantExpiresAt };
         this.snap.capturing = true;
         this.armDuplexTurn();
         // The idle clock starts with the lane; only speech and output activity re-arm it (noteDuplexActivity).

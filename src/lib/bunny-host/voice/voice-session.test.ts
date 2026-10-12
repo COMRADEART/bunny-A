@@ -1,7 +1,7 @@
 import test from "node:test";
 import type { MissionFact } from "./voice-answers.server.ts";
 import assert from "node:assert/strict";
-import { VoiceSessionManager, REFUSAL_TEXT, REDIRECT_TEXT, TOOLS_TEXT, MISSION_PAUSE_TEXT, WAITING_VOICE_TASKS_TEXT, pickCandidate, SPOKEN_CHAT_INSTRUCTION, type VoiceAgentRow, type VoiceChatTask, type VoiceTaskEvent } from "./voice-session.server.ts";
+import { VoiceSessionManager, REFUSAL_TEXT, REDIRECT_TEXT, TOOLS_TEXT, MISSION_PAUSE_TEXT, SPOKEN_ACTION_CLAIM_TEXT, DEVICE_ACTION_TEXT, WAITING_VOICE_TASKS_TEXT, pickCandidate, SPOKEN_CHAT_INSTRUCTION, type VoiceAgentRow, type VoiceChatTask, type VoiceTaskEvent } from "./voice-session.server.ts";
 import { deviceTask, VOICE_TURN_DEVICE_LABEL } from "../device-authority.server.ts";
 import type { VoiceWorkerPort } from "./voice-worker.server.ts";
 import { VOICE_LIMITS, VOICE_PROTOCOL, type WorkerCommand, type WorkerEvent, type VoiceMode } from "./voice-protocol.ts";
@@ -2056,4 +2056,61 @@ test("T12-AUTH-06: a push-to-talk press while Bunny is still speaking is overlap
   assert.deepEqual(h.commands, [], "the overlapped confirm executes nothing");
   assert.equal(h.session.snapshot().proposal?.action, "agent.pause", "the proposal stays pending");
   assert.match(h.session.snapshot().answer ?? "", /To confirm, say confirm again after I finish/);
+});
+
+// T12 live endurance findings (2026-10-12).
+test("T12 live: a spoken 'end voice now' closes the session (labelled voice_command) and never reaches the chat model", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "End voice now.", confidence: 0.9 });
+  await h.flush();
+  await h.flush();
+  const snap = h.session.snapshot();
+  assert.equal(h.chat.submits.length, 0, "no model task");
+  assert.equal(snap.open, false);
+  assert.equal(snap.lastClose?.source, "voice_command");
+  assert.equal(h.worker.closed, true);
+  assert.equal(h.commands.length, 0, "no Agent command");
+});
+
+test("T12 live: a request to act on the computer gets the fixed answer and no model task", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "and save it on desktop.", confidence: 0.9 });
+  await h.flush();
+  assert.equal(h.chat.submits.length, 0);
+  assert.equal(h.session.snapshot().answer, DEVICE_ACTION_TEXT);
+  assert.equal(h.session.snapshot().answerSource, "refusal");
+});
+
+test("T12 live: model text that claims an action is replaced by the truthful refusal and the rest is dropped", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "Tell me something nice.", confidence: 0.9 });
+  await h.flush();
+  assert.match(h.chat.submits[0], /cannot open apps, create, write or save files/);
+  h.chat.text("task-1", "Sure thing. I've saved it to your desktop. It is called notes.");
+  h.chat.done("task-1");
+  await h.flush();
+  const spoken = h.worker.ofOp("speak").map((command) => command.text);
+  assert.ok(spoken.includes(SPOKEN_ACTION_CLAIM_TEXT), `replacement spoken (${JSON.stringify(spoken)})`);
+  assert.ok(!spoken.some((text) => /saved it|called notes/i.test(text)), "the claim and everything after it are never spoken");
+  assert.equal(h.session.snapshot().answerSource, "refusal", "the replaced answer is the Host's sentence");
+  assert.ok(h.journal.some(([, detail]) => /claimed an action/.test(detail)));
+});
+
+test("T12 live: an ordinary model answer is untouched by the claim guard", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "Write about the matrix.", confidence: 0.9 });
+  await h.flush();
+  h.chat.text("task-1", "The Matrix is a 1999 science fiction film. It follows a hacker who learns the truth about his world.");
+  h.chat.done("task-1");
+  await h.flush();
+  assert.equal(h.session.snapshot().answerSource, "model");
+  assert.ok(!h.worker.ofOp("speak").some((command) => command.text === SPOKEN_ACTION_CLAIM_TEXT));
 });

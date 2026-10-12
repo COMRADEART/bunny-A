@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyTranscript, normalizeTranscript, controlAction } from "./voice-intent.ts";
+import { classifyTranscript, normalizeTranscript, controlAction, claimsAction } from "./voice-intent.ts";
 
 const kind = (text: string, proposalPending = false) => classifyTranscript(text, { proposalPending }).kind;
 
@@ -522,4 +522,41 @@ test("T12-AUTH-04: pause or resume aimed at a Mission is a Mission answer, never
   assert.equal(classifyTranscript("pause the agent").missionVerb, undefined);
   assert.equal(kind("pause alpha"), "agent_control");
   assert.equal(classifyTranscript("stop the mission").missionVerb, undefined, "a stop of a Mission is still the Mission stop");
+});
+
+// T12 live endurance findings (2026-10-12): phrasings that reached the chat model, and the model's "Done." to "end voice now".
+test("T12 live: status phrasings heard in the endurance session read Host facts, ordinary questions stay chat", () => {
+  for (const text of ["Is any task you're running there now?", "Is anything running?", "Tell me whether the task is done.", "Tell me where the task is done.", "are there any agents working"]) {
+    assert.equal(kind(text), "agent_status", text);
+  }
+  for (const text of ["Are there any good books about running?", "Is a car running on electricity better?", "What time is it?", "Is it raining?"]) {
+    assert.equal(kind(text), "chat", text);
+  }
+});
+
+test("T12 live: a spoken request to end voice closes voice; a stop aimed at someone else does not", () => {
+  for (const text of ["End voice now.", "Stop listening.", "turn off the mic please", "close the voice session", "end hands-free mode", "exit voice"]) {
+    assert.equal(kind(text), "voice_close", text);
+  }
+  assert.notEqual(kind("stop listening to the tester"), "voice_close");
+  assert.equal(kind("stop talking"), "speech_stop", "silencing Bunny is not ending voice");
+  assert.equal(kind("stop the mission"), "mission_control");
+});
+
+test("T12 live: requests to act on the computer get the fixed answer, never the chat model", () => {
+  for (const text of ["Open notes and...", "and save it on desktop.", "open chrome", "can you create a file called notes", "set a timer for five minutes", "play some music"]) {
+    assert.equal(kind(text), "device_action_unsupported", text);
+  }
+  for (const text of ["write about matrix.", "write a poem about the sea", "what is a desktop computer"]) assert.equal(kind(text), "chat", text);
+  assert.equal(kind("open the agentic workspace"), "open_ui");
+  assert.equal(kind("prepare a plan for a dashboard"), "mission_draft");
+});
+
+test("T12 live: model text claiming an action is detected; ordinary answers are not", () => {
+  for (const text of ["Done.", "Okay, done!", "I've saved it to your desktop.", "The file has been saved.", "Sure! I opened Notepad.", "I have stopped the agent."]) {
+    assert.equal(claimsAction(text), true, text);
+  }
+  for (const text of ["I wrote a short poem for you.", "Matrix is a 1999 film.", "It's done on the Windows Host screen.", "That is done on the Windows Host screen.", "The tests passed."]) {
+    assert.equal(claimsAction(text), false, text);
+  }
 });
