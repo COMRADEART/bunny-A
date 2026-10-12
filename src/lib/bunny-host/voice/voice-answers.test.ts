@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { answerApprovals, answerLastMission, answerModel, answerStatus, answerVerification, hostFactsFrom, pendingApprovalFacts, spokenModel, stepFact, type MissionFact } from "./voice-answers.server.ts";
+import { answerApprovals, answerFollowUp, answerLastMission, answerMissionFinished, answerModel, answerStatus, answerVerification, hostFactsFrom, missionLabel, pendingApprovalFacts, spokenModel, stepFact, type AgentFact, type MissionFact } from "./voice-answers.server.ts";
+import type { Mission, MissionStep } from "../../bunny-missions/types.ts";
 
 const mission = (over: Partial<MissionFact> = {}): MissionFact => ({
   id: "m1",
@@ -168,4 +169,46 @@ test("V31 R3-session#0 a consent offer on a Mission that also has an unrelated u
     agents: [{ name: "A", state: "RUNNING", missionId: "m1", authorization: { state: "WAITING_FOR_USER" } }],
   });
   assert.deepEqual(facts.map((f) => f.name), ["M permission", "A agent"]);
+});
+
+// M-A-3 T12: answers about finished Missions, follow-up subjects and the Mission a verification answer names.
+
+test("T12 F5: 'has the mission finished' answers from the newest canonical Mission, plain or team", () => {
+  const checks = [{ name: "Build", outcome: "passed" as const }, { name: "Lint", outcome: "passed" as const }];
+  const done = mission({ title: "Dashboard", status: "completed", updatedAt: 20, steps: [{ title: "Build", status: "completed", model: null, checks }] });
+  assert.equal(answerMissionFinished([done]), "The mission Dashboard has finished. 2 of 2 recorded verification checks passed.");
+  assert.equal(answerMissionFinished([mission({ title: "Inventory", status: "running", updatedAt: 30 }), done]), "The mission Inventory has not finished. It is running.", "an active Mission is the one reported");
+  assert.equal(answerMissionFinished([mission({ title: "Old", status: "failed" })]), "The mission Old has failed.");
+  assert.equal(answerMissionFinished([]), "No mission is recorded.");
+});
+
+test("T12 F4: a follow-up answers an Agent or a Mission from its canonical state; unrecorded values are said to be unrecorded", () => {
+  const builder: AgentFact = { id: "a1", name: "Builder", state: "RUNNING", missionId: "m1", updatedAt: 1 };
+  const alpha = mission({ id: "m1", title: "Alpha", status: "running" });
+  assert.equal(answerFollowUp("running", { kind: "agent", agent: builder, mission: alpha }), "Yes, Builder is still running.");
+  assert.equal(answerFollowUp("finished", { kind: "agent", agent: { ...builder, state: "COMPLETED" }, mission: null }), "Yes, Builder has finished.");
+  assert.equal(answerFollowUp("finished", { kind: "agent", agent: { ...builder, state: "FAILED" }, mission: null }), "No, Builder failed.");
+  assert.equal(answerFollowUp("finished", { kind: "mission", mission: alpha }), "No, the mission Alpha is still running.");
+  const progress = answerFollowUp("progress", { kind: "agent", agent: builder, mission: alpha });
+  assert.match(progress, /Current step: Run the suite\./, "the recorded running step is named");
+  assert.match(progress, /No progress percentage is recorded\./, "no percentage is ever invented");
+  assert.equal(answerFollowUp("verification", { kind: "agent", agent: builder, mission: null }), "No agent mission is available to check.");
+});
+
+test("T12 F6: a Mission that is not the active one is labelled as such", () => {
+  assert.equal(missionLabel(mission({ title: "Alpha", status: "running" })), "For the mission Alpha: ");
+  assert.equal(missionLabel(mission({ title: "Beta", status: "completed" })), "For the mission Beta (not the active one): ");
+});
+
+test("T12 hostFactsFrom: every canonical Mission is a fact once, with its origin, not only the Missions an Agent holds", () => {
+  const draft = (id: string) => ({ id, title: "Plain draft", state: "waiting_for_approval", origin: "voice:workstation", updatedAt: 1, steps: [] }) as unknown as Mission & { steps: MissionStep[] };
+  const facts = hostFactsFrom({
+    agents: [],
+    mission: () => null,
+    approvals: () => [],
+    allMissions: () => [draft("p1"), draft("p1")],
+  });
+  assert.equal(facts.missions.length, 1, "a Mission reported twice is listed once");
+  assert.equal(facts.missions[0].origin, "voice:workstation");
+  assert.equal(facts.missions[0].status, "waiting_for_approval");
 });

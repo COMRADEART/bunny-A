@@ -26,7 +26,7 @@ import { canTransition, createFsm, hasSpeechInFlight, tryTransition, type VoiceF
 import { VoiceChunker, chunkAnswer, type SpokenChunk } from "./voice-chunker.ts";
 import { classifyTranscript, controlAction, type VoiceIntent } from "./voice-intent.ts";
 import { VoiceTurnTaking, echoOverlap, echoTokens, type TurnDecision } from "./voice-turn-taking.ts";
-import { answerApprovals, answerTeam, answerLastMission, answerModel, answerStatus, answerVerification, isTerminalAgent, type AgentFact, type ApprovalFact, type MissionFact } from "./voice-answers.server.ts";
+import { answerApprovals, answerFollowUp, answerTeam, answerLastMission, answerModel, answerStatus, answerVerification, humanState, isTerminalAgent, missionLabel, MISSION_OVER, type AgentFact, type ApprovalFact, type FollowUpSubject, type MissionFact } from "./voice-answers.server.ts";
 
 export type ListenSource = "button" | "hotkey" | "push_to_talk" | "hands_free";
 export type InterruptSource = VoiceInterruptReceipt["source"];
@@ -44,7 +44,9 @@ export const SPOKEN_CHAT_INSTRUCTION = [
 ].join(" ");
 
 export const REFUSAL_TEXT = "I can't do that by voice. Approvals, permissions and commands are reviewed on the Windows Host screen.";
-export const REDIRECT_TEXT = "Redirecting a running agent isn't supported in this version. You can stop it and start a new Mission in the Agentic workspace.";
+export const REDIRECT_TEXT = "I can't change a running agent's plan by voice. You can pause or stop it, or start a new Mission in the Agentic workspace.";
+/** T12 F3: the one truthful refusal for a Mission draft that was not created. */
+export const DRAFT_REFUSAL = "I couldn't draft that Mission. Nothing was created.";
 export const TOOLS_TEXT = "That question needs tools or a hosted model, so it is waiting for approval on the Windows Host screen.";
 
 export type VoiceAgentRow = { id: string; name: string; state: string; revision: number };
@@ -73,7 +75,7 @@ export interface VoiceAgentPort {
    * T12: the canonical missionCommand "mission.create" of a DRAFT (origin voice:workstation, mode fast, local-only, no
    * steps, no team). It never approves or starts; the Mission waits for review on the Windows Host screen. Throws on refusal.
    */
-  draftMission?(input: { objective: string; projectId: string | null }): { id: string; title: string; state: string };
+  draftMission?(input: { objective: string; projectId: string | null }): Promise<{ id: string; title: string; state: string }> | { id: string; title: string; state: string };
   /** T12: registered Projects, for resolving a spoken Project name ("the dashboard project"). */
   projects?(): { id: string; name: string }[];
 }
@@ -97,7 +99,12 @@ export type VoiceSessionDeps = {
 };
 
 type Candidate = { id: string; name: string; revision: number };
-type Clarification = { action: VoiceProposal["action"]; candidates: Candidate[]; expiresAt: number };
+/** T12: a pending pick. A control names the Agent or Mission to act on; a follow-up names the subject to answer about. */
+type Clarification =
+  | { purpose: "control"; action: VoiceProposal["action"]; subject: "agent" | "mission"; candidates: Candidate[]; expiresAt: number }
+  | { purpose: "followup"; focus: string; candidates: Candidate[]; expiresAt: number };
+/** T12 F4: the ids a Host-facts answer named, in spoken order. Ids only: the state is always read again from live rows. */
+type Referent = { kind: "agents" | "missions"; ids: string[]; missionId: string | null; at: number; hostEpoch: string };
 type Inference = { taskId: string; turn: string; gen: number; chunker: VoiceChunker; spoken: string[]; done: boolean; received: boolean };
 /** T12: a reply held on speech onset. Keyed by output generation: a resume or a stale timer can never touch newer speech. */
 type Hold = { turn: string; gen: number; inputTurn: string; inputGen: number; cancelResume: (() => void) | null; cancelMax: (() => void) | null };
@@ -156,7 +163,8 @@ export class VoiceSessionManager {
   private readonly softBudget: number;
   private readonly hardBudget: number;
   private readonly finalized = new Set<string>();
-  private readonly history: { user: string; assistant: string }[] = [];
+  /** Short spoken history for chat follow-ups. Host-facts answers are kept too, marked `host` (T12 F8). Cleared on close. */
+  private readonly history: { user: string; assistant: string; host?: boolean }[] = [];
   private cancelIdle: (() => void) | null = null;
   private cancelRearm: (() => void) | null = null;
   private cancelInferenceTimer: (() => void) | null = null;
@@ -186,6 +194,12 @@ export class VoiceSessionManager {
   private readonly spokenLog: SpokenEntry[] = [];
   /** How the transcript that is being accepted reached the Host. Read by dispatch for the overlapped-confirm rule. */
   private turnMeta: TurnMeta = TYPED_META;
+  /** T12: whether Bunny's output was audible when the transcript being accepted was heard, before the turn settled to PROCESSING. */
+  private outputAtFinal = false;
+  /** T12 F4: the last Host-facts list of Agents or Missions. Cleared on close. */
+  private referent: Referent | null = null;
+  /** T12 F3: when a spoken Mission draft was last attempted (the rate limit between drafts). */
+  private lastDraftAt: number | null = null;
 
   /** Worker events and task deltas dropped as stale (generation, turn or epoch), counted into receipts. */
   private lateEventsDropped = 0;
@@ -445,6 +459,9 @@ export class VoiceSessionManager {
     this.clearHold("interrupted", "session_close");
     this.grantExpiresAt = null;
     this.spokenLog.length = 0;
+    // T12 F8: the spoken history and the Host-facts referent end with the session.
+    this.history.length = 0;
+    this.referent = null;
     this.sessionEpoch += 1;
     // races#5: no re-arm or idle timer from the closed session may fire into a later open.
     this.cancelRearmTimer();
@@ -641,7 +658,16 @@ export class VoiceSessionManager {
     if (!this.worker || !this.snap.open) return this.refuse("INTERNAL", "Voice is not open.");
     // T12: typed text never stops the hands-free microphone. It barges in on output and proceeds while the duplex lane stays live.
     if (!this.worker || !this.snap.open || this.closing) return this.refuse("INTERNAL", "Voice is not open.");
-    if (this.outputActive()) this.bargeIn("button");
+    if (this.outputActive()) {
+      // T12 F1: a typed "stop talking" while Bunny speaks silences her, and nothing else is done with the text.
+      const speechStop = classifyTranscript(trimmed, { proposalPending: this.voiceConfirmable() }).kind === "speech_stop";
+      this.bargeIn(speechStop ? "speech_stop" : "button");
+      if (speechStop) {
+        this.settleIdle(false);
+        this.touch();
+        return this.snapshot();
+      }
+    }
     if (!this.duplexLane() && (this.snap.capturing || this.fsm.state === "LISTENING" || this.fsm.state === "ARMING")) this.tryWorker({ op: "capture.abort", gen: this.snap.generation });
     this.cancelRearmTimer();
     this.clearIdle();
@@ -713,6 +739,7 @@ export class VoiceSessionManager {
   /** Accepts one final transcript for a turn. Callers gate duplicates (V09, V10) before this point. */
   private acceptFinal(text: string, turn: string, confidence = 1, meta: TurnMeta = TYPED_META) {
     this.turnMeta = meta;
+    this.outputAtFinal = this.outputActive();
     this.expireProposal();
     this.snap.finalTranscript = text;
     this.snap.partial = null;
@@ -722,6 +749,13 @@ export class VoiceSessionManager {
     this.setState("PROCESSING");
     // Speech is untrusted input: a barely-heard final is never routed, and never controls an agent.
     if (confidence < VOICE_LIMITS.minFinalConfidence) {
+      // T12 F1: a barely heard "stop" while Bunny speaks still silences her, and nothing else is said.
+      if (this.outputAtFinal && classifyTranscript(text, { proposalPending: this.voiceConfirmable() }).kind === "speech_stop") {
+        this.snap.turnKind = "speech_stop";
+        this.bargeIn("speech_stop");
+        this.settleIdle(false);
+        return;
+      }
       this.snap.turnKind = "empty";
       this.deps.journal("voice.turn", "Turn not routed: recognizer confidence too low.");
       this.speakAnswer("Sorry, I didn't catch that clearly. Please say it again.", "host_facts", turn);
@@ -741,7 +775,7 @@ export class VoiceSessionManager {
     this.pendingAtTurn = !!this.snap.proposal || !!this.clarification || !!this.snap.clarification;
     if (intent.kind === "sensitive_refused") this.clearClarification();
     else if (this.resolveClarification(text, turn)) return;
-    if ((intent.kind === "agent_control" || intent.kind === "confirm") && confidence < VOICE_LIMITS.minControlConfidence) {
+    if ((intent.kind === "agent_control" || intent.kind === "confirm" || intent.kind === "mission_control" || intent.kind === "mission_draft") && confidence < VOICE_LIMITS.minControlConfidence) {
       this.snap.turnKind = intent.kind;
       this.deps.journal("voice.turn", `Turn classified as ${intent.kind} but not acted on: recognizer confidence too low.`);
       this.speakAnswer("I'm not sure I heard that right, so I won't change anything. Please say it again, or use the button on screen.", "host_facts", turn);
@@ -789,7 +823,7 @@ export class VoiceSessionManager {
     this.acceptFinal(trimmed, turn, Number.isFinite(confidence) ? confidence : 0, { source: "push_to_talk", overlapped: false, speechMs: null });
   }
 
-  /** A pending clarification consumes the next final: a name or ordinal picks the agent (V34). */
+  /** A pending pick consumes the next final: a name or ordinal picks one candidate (V34), then its control or follow-up runs. */
   private resolveClarification(text: string, turn: string): boolean {
     const clarification = this.clarification;
     if (!clarification) return false;
@@ -797,8 +831,14 @@ export class VoiceSessionManager {
     if (clarification.expiresAt <= this.now()) return false;
     const choice = pickCandidate(text, clarification.candidates);
     if (!choice) return false;
-    this.proposeAgentControl(clarification.action, choice);
-    this.speakAnswer(this.proposalSentence(this.snap.proposal!), "host_facts", turn);
+    if (clarification.purpose === "control") {
+      this.proposeControl(clarification.action, choice, clarification.subject);
+      this.answerHost(this.proposalSentence(this.snap.proposal!), turn);
+      return true;
+    }
+    const subject = subjectFor(this.deps.agents.facts(), choice.id);
+    if (subject) this.speakFollowUp(clarification.focus, subject, turn);
+    else this.answerHost("That one is no longer on the Host.", turn);
     return true;
   }
 
@@ -828,27 +868,39 @@ export class VoiceSessionManager {
       case "redirect_unsupported":
         this.speakAnswer(REDIRECT_TEXT, "refusal", turn);
         return;
+      case "speech_stop":
+        this.handleSpeechStop(intent, turn);
+        return;
+      case "mission_draft":
+        // T12 F3: a draft is never made from speech that overlapped Bunny's own output; the user says it again.
+        if (this.overlappedDuplexTurn()) return this.answerHost("To draft a Mission, say it again after I finish, or use the Windows Host screen.", turn);
+        return this.draftMission(intent.target, turn);
+      case "mission_control":
+        // T12 F2: a Mission stop is proposed only from a clean turn; it executes on the Windows Host screen alone.
+        if (this.overlappedDuplexTurn()) return this.answerHost("To stop a Mission, say it again after I finish, or use the Windows Host screen.", turn);
+        this.handleMissionControl(intent, turn);
+        return;
       case "cancel": {
         // authz#2: "Okay, cancelled." is spoken only when something was pending; a bare cancel with nothing pending says so.
         const pending = this.pendingAtTurn || !!this.snap.proposal || !!this.snap.clarification;
         this.snap.proposal = null;
         this.clarification = null;
         this.snap.clarification = null;
-        this.speakAnswer(pending ? "Okay, cancelled." : "Nothing is waiting to be cancelled.", "host_facts", turn);
+        this.answerHost(pending ? "Okay, cancelled." : "Nothing is waiting to be cancelled.", turn);
         return;
       }
       case "confirm": {
         const proposal = this.snap.proposal;
         // T12: a confirm spoken over Bunny's own output (an overlapped duplex turn) never executes; the proposal stays pending.
-        if (proposal && this.voiceConfirmable() && this.turnMeta.source === "duplex" && this.turnMeta.overlapped) this.speakAnswer("To confirm, say confirm again after I finish, or use the screen.", "host_facts", turn);
+        if (proposal && this.voiceConfirmable() && this.turnMeta.source === "duplex" && this.turnMeta.overlapped) this.answerHost("To confirm, say confirm again after I finish, or use the screen.", turn);
         else if (proposal && this.voiceConfirmable()) this.executeProposal(proposal, "voice", turn);
-        else if (proposal) this.speakAnswer("That action needs the button on the Windows Host screen.", "host_facts", turn);
-        else this.speakAnswer("Nothing is waiting for your confirmation.", "host_facts", turn);
+        else if (proposal) this.answerHost("That action needs the button on the Windows Host screen.", turn);
+        else this.answerHost("Nothing is waiting for your confirmation.", turn);
         return;
       }
       case "open_ui":
         this.setUi("open_agentic", null);
-        this.speakAnswer("Opening the agentic workspace on the Windows Host.", "host_facts", turn);
+        this.answerHost("Opening the agentic workspace on the Windows Host.", turn);
         return;
       case "agent_control":
         this.handleControl(intent, turn);
@@ -858,17 +910,55 @@ export class VoiceSessionManager {
       case "agent_model":
       case "agent_approvals":
       case "agent_last_mission":
-        this.speakAnswer(this.hostAnswer(intent.kind), "host_facts", turn);
+        this.answerHost(this.hostAnswer(intent.kind), turn);
         return;
       case "agent_team": {
         const facts = this.deps.agents.facts();
-        this.speakAnswer(answerTeam(intent.target, facts.agents, facts.missions), "host_facts", turn);
+        this.rememberTeamReferent(intent.target, facts);
+        this.answerHost(answerTeam(intent.target, facts.agents, facts.missions), turn);
         return;
       }
+      case "agent_followup":
+        return this.handleFollowUp(intent, turn, transcript);
       case "chat":
         await this.chat(transcript, turn);
         return;
     }
+  }
+
+  /** T12: the transcript came from the duplex lane while Bunny's own output was audible. Such a turn never makes a draft or a proposal. */
+  private overlappedDuplexTurn(): boolean {
+    return this.turnMeta.source === "duplex" && this.turnMeta.overlapped;
+  }
+
+  /**
+   * A host-authored answer to the transcript that asked for it. It is spoken like any answer and kept in the short history as a
+   * Host fact, so a chat follow-up has context. The history never carries a proposal id: only the spoken text is kept.
+   */
+  private answerHost(text: string, turn: string) {
+    this.speakAnswer(text, "host_facts", turn);
+    const user = this.snap.finalTranscript;
+    if (!user) return;
+    this.history.push({ user, assistant: text.slice(0, 600), host: true });
+    while (this.history.length > VOICE_LIMITS.maxHistoryTurns) this.history.shift();
+  }
+
+  /**
+   * T12 F1: "stop talking" silences Bunny only. Output that was audible when the words were heard counts, even when the duplex
+   * controller already cut it. With no output, a bare "stop" asks which is meant while an Agent runs; nothing is executed.
+   */
+  private handleSpeechStop(intent: VoiceIntent, turn: string) {
+    if (this.outputAtFinal || this.overlappedDuplexTurn()) {
+      if (this.outputActive()) this.bargeIn("speech_stop");
+      this.settleIdle(false);
+      return;
+    }
+    const agentRunning = this.deps.agents.rows().some((row) => !isTerminalAgent(row.state));
+    if (intent.target === "ambiguous" && agentRunning) {
+      this.answerHost("Stop talking, or stop an agent?", turn);
+      return;
+    }
+    this.settleIdle();
   }
 
   private hostAnswer(kind: VoiceTurnKind): string {
@@ -879,55 +969,105 @@ export class VoiceSessionManager {
       .filter((item) => ["completed", "failed", "stopped"].includes(item.status))
       .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
     switch (kind) {
-      case "agent_status":
+      case "agent_status": {
+        const live = facts.agents.filter((agent) => !isTerminalAgent(agent.state));
+        if (live.length > 0) this.setReferent("agents", live.map((agent) => agent.id), live.length === 1 ? live[0].missionId : null);
         return answerStatus(facts.agents, facts.missions);
+      }
       case "agent_verification":
-        return answerVerification(activeMission ?? finished);
+        return this.missionAnswer(activeMission ?? finished, answerVerification);
       case "agent_model":
-        return answerModel(activeMission ?? finished);
+        return this.missionAnswer(activeMission ?? finished, answerModel);
       case "agent_approvals":
         return answerApprovals(facts.approvals);
       default:
+        if (finished) this.setReferent("missions", [finished.id], finished.id);
         return answerLastMission(finished);
     }
   }
 
-  private handleControl(intent: VoiceIntent, turn: string) {
-    const action = controlAction(intent.normalized);
-    if (!action) return this.speakAnswer("I didn't understand which control you meant.", "refusal", turn);
-    const active = this.deps.agents.rows().filter((row) => !isTerminalAgent(row.state));
-    if (active.length === 0) return this.speakAnswer("No agent is running right now.", "host_facts", turn);
-    // authz#3: a spoken name is honored. The ordinal picks by position only when no name matches; when the name and the
-    // position point at different agents, the speaker is asked which one (never silently the position).
-    const named = intent.target ? active.filter((row) => row.name.toLowerCase() === intent.target.toLowerCase()) : [];
-    const byPosition = intent.ordinal !== null ? active[intent.ordinal - 1] : undefined;
-    if (intent.ordinal !== null && !byPosition) return this.speakAnswer("There is no agent with that number.", "host_facts", turn);
-    let candidates: Candidate[] = active;
-    if (intent.target && named.length === 0) {
-      if (!byPosition) return this.speakAnswer(`I can't find an agent named ${intent.target}.`, "host_facts", turn);
-      candidates = [byPosition];
-    } else if (named.length > 0) {
-      candidates = byPosition ? uniqueById([...named, byPosition]) : named;
-    } else if (byPosition) {
-      candidates = [byPosition];
-    }
-    if (candidates.length > 1) {
-      const expiresAt = this.now() + VOICE_LIMITS.clarificationTtlMs;
-      const question = `Which agent should I ${action.slice(6)}?`;
-      this.clarification = { action, candidates, expiresAt };
-      this.snap.clarification = { question, candidates: candidates.map((row) => ({ id: row.id, name: row.name })), expiresAt };
-      this.deps.journal("voice.control_proposed", `Clarification needed among ${candidates.length} agents.`);
-      return this.speakAnswer(`${question} ${candidates.map((row) => row.name).join(", ")}.`, "host_facts", turn);
-    }
-    this.proposeAgentControl(action, candidates[0]);
-    this.speakAnswer(this.proposalSentence(this.snap.proposal!), "host_facts", turn);
+  /** T12 F6: a verification or model answer names the Mission it describes, and says when that is not the active one. */
+  private missionAnswer(mission: MissionFact | null, answer: (mission: MissionFact | null) => string): string {
+    if (!mission) return answer(null);
+    this.setReferent("missions", [mission.id], mission.id);
+    return `${missionLabel(mission)}${answer(mission)}`;
   }
 
-  private proposeAgentControl(action: VoiceProposal["action"], row: Candidate) {
+  private handleControl(intent: VoiceIntent, turn: string) {
+    const action = controlAction(intent.normalized);
+    if (!action) return this.answerHost("I didn't understand which control you meant.", turn);
+    const active = this.deps.agents.rows().filter((row) => !isTerminalAgent(row.state));
+    if (active.length === 0) return this.answerHost("No agent is running right now.", turn);
+    const choice = this.chooseTargets(intent, active, "agent");
+    if ("reply" in choice) return this.answerHost(choice.reply, turn);
+    if (choice.candidates.length > 1) return this.askWhich({ purpose: "control", action, subject: "agent" }, choice.candidates, turn);
+    this.proposeControl(action, choice.candidates[0], "agent");
+    this.answerHost(this.proposalSentence(this.snap.proposal!), turn);
+  }
+
+  /**
+   * T12 F2: "stop the mission" proposes a screen-confirmed mission.stop for one active Mission. The Mission id travels as the
+   * proposal's agentId; the Mission's own canonical stop runs it. An Agent stop is never proposed for a Mission.
+   */
+  private handleMissionControl(intent: VoiceIntent, turn: string) {
+    if (!this.deps.agents.missionStop) return this.answerHost("I can't stop a Mission by voice here. Use the Windows Host screen.", turn);
+    const pool = this.activeMissions();
+    if (pool.length === 0) return this.answerHost("No mission is running right now.", turn);
+    const choice = this.chooseTargets(intent, pool, "mission");
+    if ("reply" in choice) return this.answerHost(choice.reply, turn);
+    if (choice.candidates.length > 1) return this.askWhich({ purpose: "control", action: "mission.stop", subject: "mission" }, choice.candidates, turn);
+    this.proposeControl("mission.stop", choice.candidates[0], "mission");
+    this.answerHost(this.proposalSentence(this.snap.proposal!), turn);
+  }
+
+  /** Active Missions: every canonical Mission that has not finished. Read from the Host's records only. */
+  private activeMissions(): Candidate[] {
+    return this.deps.agents.facts().missions
+      .filter((mission) => !MISSION_OVER.includes(mission.status))
+      .map((mission) => ({ id: mission.id, name: mission.title, revision: 0 }));
+  }
+
+  /**
+   * The rows a spoken control or pick names. A named target is honored; the ordinal picks by position only when no name matches,
+   * and when the name and the position disagree the speaker is asked (authz#3). Messages are unchanged for Agents.
+   */
+  private chooseTargets(intent: VoiceIntent, pool: Candidate[], noun: "agent" | "mission"): { candidates: Candidate[] } | { reply: string } {
+    const named = intent.target ? pool.filter((row) => row.name.toLowerCase() === intent.target.toLowerCase()) : [];
+    const byPosition = intent.ordinal !== null ? pool[intent.ordinal - 1] : undefined;
+    if (intent.ordinal !== null && !byPosition) return { reply: `There is no ${noun} with that number.` };
+    if (intent.target && named.length === 0) {
+      if (!byPosition) return { reply: noun === "agent" ? `I can't find an agent named ${intent.target}.` : `I can't find a mission named ${intent.target}.` };
+      return { candidates: [byPosition] };
+    }
+    if (named.length > 0) return { candidates: byPosition ? uniqueById([...named, byPosition]) : named };
+    if (byPosition) return { candidates: [byPosition] };
+    return { candidates: pool };
+  }
+
+  /** A pending pick. The next final that names one candidate resolves it; anything else leaves the question unanswered. */
+  private askWhich(base: { purpose: "control"; action: VoiceProposal["action"]; subject: "agent" | "mission" } | { purpose: "followup"; focus: string }, candidates: Candidate[], turn: string) {
+    const expiresAt = this.now() + VOICE_LIMITS.clarificationTtlMs;
+    const names = candidates.map((row) => row.name);
+    if (base.purpose === "control") {
+      const question = `Which ${base.subject} should I ${base.action.split(".")[1]}?`;
+      this.clarification = { purpose: "control", action: base.action, subject: base.subject, candidates, expiresAt };
+      this.snap.clarification = { question, candidates: candidates.map((row) => ({ id: row.id, name: row.name })), expiresAt };
+      this.deps.journal("voice.control_proposed", `Clarification needed among ${candidates.length} ${base.subject}s.`);
+      return this.answerHost(`${question} ${names.join(", ")}.`, turn);
+    }
+    const question = `Which one: ${orList(names)}?`;
+    this.clarification = { purpose: "followup", focus: base.focus, candidates, expiresAt };
+    this.snap.clarification = { question, candidates: candidates.map((row) => ({ id: row.id, name: row.name })), expiresAt };
+    this.deps.journal("voice.turn", `Clarification needed among ${candidates.length} Host facts.`);
+    return this.answerHost(question, turn);
+  }
+
+  private proposeControl(action: VoiceProposal["action"], row: Candidate, subject: "agent" | "mission") {
     const now = this.now();
     this.snap.proposal = {
       id: randomUUID(),
       action,
+      ...(subject === "mission" ? { subject: "mission" as const } : {}),
       agentId: row.id,
       agentName: row.name,
       revision: row.revision,
@@ -936,14 +1076,146 @@ export class VoiceSessionManager {
       expiresAt: now + VOICE_LIMITS.proposalTtlMs,
       hostEpoch: this.deps.hostEpoch,
     };
+    this.setReferent(subject === "mission" ? "missions" : "agents", [row.id], subject === "mission" ? row.id : null);
     this.deps.journal("voice.control_proposed", `Proposed ${action} (confirm via ${this.snap.proposal.confirmVia}).`);
   }
 
   private proposalSentence(p: VoiceProposal): string {
-    const verb = p.action.slice(6);
+    const verb = p.action.split(".")[1];
+    if (p.subject === "mission") return `Confirm on the Windows Host screen to ${verb} the mission ${p.agentName}.`;
     return p.confirmVia === "voice_or_screen"
       ? `Say confirm, or confirm on the Windows Host screen, to ${verb} ${p.agentName}.`
       : `Confirm on the Windows Host screen to ${verb} ${p.agentName}.`;
+  }
+
+  /**
+   * T12 F3: a spoken Mission draft through the canonical mission.create (origin voice:workstation, fast, local-only). The draft
+   * waits for review on the Windows Host screen; it is never approved or started from here.
+   */
+  private async draftMission(objective: string, turn: string) {
+    const port = this.deps.agents;
+    const now = this.now();
+    if (!port.draftMission) return this.answerHost(DRAFT_REFUSAL, turn);
+    if (this.lastDraftAt !== null && now - this.lastDraftAt < VOICE_LIMITS.voiceDraftMinIntervalMs) return this.answerHost("Please wait a moment before drafting another Mission.", turn);
+    const waiting = this.deps.agents.facts().missions.filter((mission) => mission.origin?.startsWith("voice:") && AWAITING_REVIEW.includes(mission.status)).length;
+    if (waiting >= VOICE_LIMITS.maxPendingVoiceDrafts) return this.answerHost(`${VOICE_LIMITS.maxPendingVoiceDrafts} voice Missions are already waiting for review on the Windows Host screen. Review them there first.`, turn);
+    const project = this.resolveProject(objective);
+    if (project.names.length > 1) return this.answerHost(`I found several projects: ${project.names.join(", ")}. Say it again with the project name.`, turn);
+    this.lastDraftAt = now;
+    const epoch = this.sessionEpoch;
+    let draft: { id: string; title: string; state: string };
+    try {
+      draft = await port.draftMission({ objective, projectId: project.projectId });
+    } catch {
+      this.deps.journal("voice.error", "Mission draft refused; nothing was created.");
+      if (epoch === this.sessionEpoch) this.answerHost(DRAFT_REFUSAL, turn);
+      return;
+    }
+    if (epoch !== this.sessionEpoch) {
+      this.deps.journal("voice.turn", "Mission draft created; the voice session closed before it was spoken.");
+      return;
+    }
+    this.deps.journal("voice.mission_draft", `Mission draft ${draft.id} created (${draft.state}).`);
+    if (!AWAITING_REVIEW.includes(draft.state)) return this.answerHost(DRAFT_REFUSAL, turn);
+    this.setReferent("missions", [draft.id], draft.id);
+    this.setUi("open_agentic", null);
+    const sentence = `I drafted a Mission: ${draft.title}. It is waiting for review on the Windows Host screen. I can't approve or start it by voice.`;
+    this.answerHost(project.projectId ? sentence : `${sentence} It uses the default workspace, because no project name matched.`, turn);
+  }
+
+  /** The Project a draft names: exactly one registered Project whose name words all appear in the objective. */
+  private resolveProject(objective: string): { projectId: string | null; names: string[] } {
+    const words = new Set(objective.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+    const matches = (this.deps.agents.projects?.() ?? []).filter((project) => {
+      const tokens = project.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+      return tokens.length > 0 && tokens.every((token) => words.has(token));
+    });
+    if (matches.length > 1) return { projectId: null, names: matches.map((project) => project.name) };
+    return { projectId: matches[0]?.id ?? null, names: [] };
+  }
+
+  /**
+   * T12 F4: a follow-up about the last Host-facts subject. The subject is resolved from live rows only. One candidate is
+   * answered; several are asked about by name; no referent is a general status answer; a name that is no Host subject is a chat.
+   */
+  private async handleFollowUp(intent: VoiceIntent, turn: string, transcript: string) {
+    const focus = intent.focus ?? "finished";
+    const facts = this.deps.agents.facts();
+    const referent = this.liveReferent();
+    if (!referent) {
+      if (intent.target) {
+        const named = this.subjectsNamed(facts, intent.target);
+        if (named.length === 1) return this.speakFollowUp(focus, named[0], turn);
+        if (named.length > 1) return this.askWhich({ purpose: "followup", focus }, named.map(subjectCandidate), turn);
+        // A name that is no Host subject, with no earlier Host answer in view, is an ordinary question.
+        return this.chat(transcript, turn);
+      }
+      if (intent.ordinal !== null) return this.answerHost("I'm not sure which one you mean. Ask about an agent or mission by name.", turn);
+      return this.answerHost(this.hostAnswer(focus === "verification" ? "agent_verification" : "agent_status"), turn);
+    }
+    if (intent.ordinal !== null) {
+      const id = referent.ids[intent.ordinal - 1];
+      if (!id) return this.answerHost("There is no one with that number in the last answer.", turn);
+      const subject = subjectFor(facts, id);
+      if (!subject) return this.answerHost("That one is no longer on the Host.", turn);
+      return this.speakFollowUp(focus, subject, turn);
+    }
+    const listed = referent.ids.map((id) => subjectFor(facts, id)).filter((subject): subject is FollowUpSubject => subject !== null);
+    if (intent.target) {
+      const wanted = intent.target.toLowerCase();
+      const inList = listed.filter((subject) => subjectName(subject).toLowerCase() === wanted);
+      const pool = inList.length > 0 ? inList : this.subjectsNamed(facts, intent.target);
+      if (pool.length === 1) return this.speakFollowUp(focus, pool[0], turn);
+      if (pool.length > 1) return this.askWhich({ purpose: "followup", focus }, pool.map(subjectCandidate), turn);
+      return this.answerHost(`I can't find ${intent.target} in the last answer.`, turn);
+    }
+    if (listed.length === 0) return this.answerHost("Nothing from the last answer is still on the Host.", turn);
+    if (listed.length === 1) return this.speakFollowUp(focus, listed[0], turn);
+    return this.askWhich({ purpose: "followup", focus }, listed.map(subjectCandidate), turn);
+  }
+
+  private speakFollowUp(focus: string, subject: FollowUpSubject, turn: string) {
+    const id = subjectCandidate(subject).id;
+    if (!this.liveReferent()) this.setReferent(subject.kind === "agent" ? "agents" : "missions", [id], subject.kind === "agent" ? subject.agent.missionId : id);
+    this.answerHost(answerFollowUp(focus, subject), turn);
+  }
+
+  /** Subjects (Agents and Missions) whose name is exactly the spoken name, from live rows. */
+  private subjectsNamed(facts: { agents: AgentFact[]; missions: MissionFact[] }, name: string): FollowUpSubject[] {
+    const wanted = name.toLowerCase();
+    const ids = [...facts.agents.filter((agent) => agent.name.toLowerCase() === wanted).map((agent) => agent.id), ...facts.missions.filter((mission) => mission.title.toLowerCase() === wanted).map((mission) => mission.id)];
+    return ids.map((id) => subjectFor(facts, id)).filter((subject): subject is FollowUpSubject => subject !== null);
+  }
+
+  /** The last Host-facts list, while it is within referentTtlMs and was named under this Host epoch. */
+  private liveReferent(): Referent | null {
+    const referent = this.referent;
+    if (!referent) return null;
+    if (referent.hostEpoch !== this.deps.hostEpoch || this.now() - referent.at > VOICE_LIMITS.referentTtlMs) {
+      this.referent = null;
+      return null;
+    }
+    return referent;
+  }
+
+  /** Records the ids a Host-facts answer named, in spoken order. Ids only: the state is always read again from live rows. */
+  private setReferent(kind: Referent["kind"], ids: string[], missionId: string | null) {
+    if (ids.length === 0) return;
+    this.referent = { kind, ids: [...ids], missionId, at: this.now(), hostEpoch: this.deps.hostEpoch };
+  }
+
+  /** Team answers name the Agents that are working (counts and roles) or the Mission they describe. */
+  private rememberTeamReferent(question: string, facts: { agents: AgentFact[]; missions: MissionFact[] }) {
+    if (question === "count" || question.startsWith("role:")) {
+      const role = question.startsWith("role:") ? question.slice(5) : null;
+      const ids = facts.agents
+        .filter((agent) => !isTerminalAgent(agent.state) && (role ? agent.role === role : agent.role && agent.role !== "coordinator"))
+        .map((agent) => agent.id);
+      this.setReferent("agents", ids, null);
+      return;
+    }
+    const newest = [...facts.missions].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+    if (newest) this.setReferent("missions", [newest.id], newest.id);
   }
 
   /**
@@ -967,7 +1239,7 @@ export class VoiceSessionManager {
       const row = this.deps.agents.rows().find((item) => item.id === proposal.agentId);
       if (!row || row.revision !== proposal.revision || isTerminalAgent(row.state)) {
         this.deps.journal("voice.control_refused", "Agent changed since the proposal; not executed.");
-        this.speakAnswer(`${proposal.agentName} changed while I was waiting. Ask me again to ${proposal.action.slice(6)} it.`, "host_facts", speakTurn);
+        this.speakAnswer(`${proposal.agentName} changed while I was waiting. Ask me again to ${proposal.action.split(".")[1]} it.`, "host_facts", speakTurn);
         return;
       }
     }
@@ -985,34 +1257,44 @@ export class VoiceSessionManager {
     const epoch = this.sessionEpoch;
     const current = () => epoch === this.sessionEpoch && this.snap.open && turn === this.snap.turnId;
     if (proposal.action === "mission.stop") {
-      // T12: a Mission stop goes through its own canonical port, never the agent command. Without that port it is refused truthfully.
+      // T12 F2: a Mission stop goes through its own canonical port, never the agent command. Without that port it is refused truthfully.
       const port = this.deps.agents;
       if (!port.missionStop) {
         this.deps.journal("voice.control_refused", "Mission stop is not available by voice; not executed.");
-        if (current()) this.speakAnswer("I can't stop a Mission by voice here. Use the Windows Host screen.", "host_facts", turn);
+        if (current()) this.answerHost("I can't stop a Mission by voice here. Use the Windows Host screen.", turn);
+        return;
+      }
+      const known = port.facts().missions.find((mission) => mission.id === proposal.agentId);
+      if (!known || MISSION_OVER.includes(known.status)) {
+        this.deps.journal("voice.control_refused", "Mission changed since the proposal; not executed.");
+        if (current()) this.answerHost(`${proposal.agentName} is no longer running. Nothing was changed.`, turn);
         return;
       }
       try {
         await port.missionStop(proposal.agentId);
       } catch {
         this.deps.journal("voice.error", "Mission stop refused.");
-        if (current()) this.speakAnswer(`I couldn't stop ${proposal.agentName}. It was not changed.`, "host_facts", turn);
+        if (current()) this.answerHost(`I couldn't stop ${proposal.agentName}. It was not changed.`, turn);
         return;
       }
-      if (current()) this.speakAnswer(`Stopping ${proposal.agentName} was requested.`, "host_facts", turn);
+      if (!current()) return;
+      // Confirmed from the canonical Mission record, never from the request alone.
+      const row = port.facts().missions.find((mission) => mission.id === proposal.agentId);
+      if (row?.status === "stopped") this.answerHost(`The mission ${proposal.agentName} is stopped.`, turn);
+      else this.answerHost(`I asked for that, but the mission ${proposal.agentName} shows ${row ? humanState(row.status) : "no current state"}. I'm not sure it stopped.`, turn);
       return;
     }
     const before = this.deps.agents.rows().find((item) => item.id === proposal.agentId);
     if (!before || before.revision !== proposal.revision || isTerminalAgent(before.state)) {
       this.deps.journal("voice.control_refused", "Agent changed since the proposal; not executed.");
-      if (current()) this.speakAnswer(`${proposal.agentName} changed while I was waiting. Ask me again to ${proposal.action.slice(6)} it.`, "host_facts", turn);
+      if (current()) this.speakAnswer(`${proposal.agentName} changed while I was waiting. Ask me again to ${proposal.action.split(".")[1]} it.`, "host_facts", turn);
       return;
     }
     try {
       await this.deps.agents.command(proposal.action, proposal.agentId, proposal.revision);
     } catch {
       this.deps.journal("voice.error", `Agent command refused (${proposal.action}).`);
-      if (current()) this.speakAnswer(`I couldn't ${proposal.action.slice(6)} ${proposal.agentName}. It was not changed.`, "host_facts", turn);
+      if (current()) this.speakAnswer(`I couldn't ${proposal.action.split(".")[1]} ${proposal.agentName}. It was not changed.`, "host_facts", turn);
       return;
     }
     if (!current()) {
@@ -1047,7 +1329,7 @@ export class VoiceSessionManager {
     }
     const history = this.history
       .slice(-VOICE_LIMITS.maxHistoryTurns)
-      .map((item) => `User: ${item.user}\nAssistant: ${item.assistant}`)
+      .map((item) => `User: ${item.user}\n${item.host ? "Assistant (Host facts, not a model answer)" : "Assistant"}: ${item.assistant}`)
       .join("\n");
     const prompt = [
       SPOKEN_CHAT_INSTRUCTION,
@@ -2383,6 +2665,31 @@ export function pickCandidate(text: string, candidates: Candidate[]): Candidate 
   if (byName.length === 1) return byName[0];
   for (const [re, index] of ORDINAL_ANSWERS) if (re.test(normalized)) return candidates[index] ?? null;
   return null;
+}
+
+/** T12 F3: Mission states in which a voice draft still waits for the workstation's review (nothing has started). */
+const AWAITING_REVIEW = ["draft", "planning", "waiting_for_approval"];
+
+/** T12 F4: the canonical record a follow-up names: an Agent (with its Mission when it has one) or a Mission. */
+function subjectFor(facts: { agents: AgentFact[]; missions: MissionFact[] }, id: string): FollowUpSubject | null {
+  const agent = facts.agents.find((row) => row.id === id);
+  if (agent) return { kind: "agent", agent, mission: facts.missions.find((row) => row.id === agent.missionId) ?? null };
+  const mission = facts.missions.find((row) => row.id === id);
+  return mission ? { kind: "mission", mission } : null;
+}
+
+function subjectName(subject: FollowUpSubject): string {
+  return subject.kind === "agent" ? subject.agent.name : subject.mission.title;
+}
+
+function subjectCandidate(subject: FollowUpSubject): Candidate {
+  return subject.kind === "agent" ? { id: subject.agent.id, name: subject.agent.name, revision: 0 } : { id: subject.mission.id, name: subject.mission.title, revision: 0 };
+}
+
+/** "A", "A or B", "A, B or C": the spoken alternatives for a pick. */
+function orList(names: string[]): string {
+  if (names.length <= 2) return names.join(" or ");
+  return `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
 }
 
 function uniqueById(rows: Candidate[]): Candidate[] {

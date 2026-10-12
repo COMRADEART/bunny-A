@@ -32,6 +32,8 @@ export const SUSTAINED_PARTIAL_MS = 500;
 const MERGE: [string, string][] = [["mm", "hmm"], ["mm", "hm"], ["uh", "huh"], ["got", "it"], ["i", "see"]];
 const BACKCHANNEL = new Set(["mm_hmm", "mm_hm", "uh_huh", "got_it", "i_see", "mm", "mhm", "mmhmm", "hm", "hmm", "yeah", "yep", "yup", "yes", "ok", "okay", "right", "sure", "alright", "gotcha", "cool"]);
 const HESITATION = new Set(["um", "uh", "er", "ah", "oh"]);
+/** Wordless acknowledgments. Unlike "yes" or "okay" they can never answer a pending confirmation, so alone they are not a turn. */
+const NONVERBAL = new Set(["mm_hmm", "mm_hm", "uh_huh", "mm", "mhm", "mmhmm", "hm", "hmm"]);
 /** Start-of-utterance phrases that mean "stop talking, I am taking the turn". Apostrophes are removed, so "that's" is "thats". */
 const INTERRUPT_PHRASES: string[][] = [["stop"], ["wait"], ["hold", "on"], ["hang", "on"], ["actually"], ["no"], ["excuse", "me"], ["be", "quiet"], ["quiet"], ["thats", "enough"], ["sorry"]];
 
@@ -80,7 +82,8 @@ export class VoiceTurnTaking {
     if (evidence.echo) return this.result("drop", "echo_of_own_speech");
     const tokens = tokenize(evidence.text);
     if (tokens.length === 0) return this.none(evidence.outputActive);
-    if (!evidence.outputActive) return isHesitationOnly(tokens) ? this.result("drop", "hesitation_only") : this.result("accept", "finalized_user_turn");
+    // T12: with nothing playing, a bare hesitation or wordless "mm-hmm" is not a request; it is never sent to the model.
+    if (!evidence.outputActive) return isHesitationOnly(tokens) ? this.result("drop", "hesitation_only") : isNonverbalOnly(tokens) ? this.result("drop", "acknowledgment_only") : this.result("accept", "finalized_user_turn");
     // Output is active: the turn is routed only as an interrupt. Everything else resumes the held reply.
     if (this.interrupted) return this.result("interrupt", "interrupt_already_decided");
     const reliable = evidence.confidence >= VOICE_LIMITS.minFinalConfidence;
@@ -129,6 +132,10 @@ export function isPureBackchannel(tokens: string[]): boolean {
 
 export function isHesitationOnly(tokens: string[]): boolean {
   return tokens.length > 0 && tokens.every((token) => HESITATION.has(token));
+}
+
+export function isNonverbalOnly(tokens: string[]): boolean {
+  return tokens.length > 0 && tokens.every((token) => NONVERBAL.has(token) || HESITATION.has(token));
 }
 
 function startsWithInterrupt(tokens: string[]): boolean {

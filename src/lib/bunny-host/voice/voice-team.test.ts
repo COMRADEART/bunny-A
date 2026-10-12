@@ -23,8 +23,10 @@ test("T11-V01: team questions classify as agent_team with their subject; approva
     assert.equal(intent.kind, "agent_team", said);
     assert.equal(intent.target, subject, said);
   }
+  // T12 F5: "is the mission done" is a Mission completion question (answered from every canonical Mission), not an Agent status.
+  assert.equal(classifyTranscript("is the mission done").kind, "agent_team");
+  assert.equal(classifyTranscript("is the mission done").target, "finished");
   // Existing T10 phrasings keep their meaning.
-  assert.equal(classifyTranscript("is the mission done").kind, "agent_status");
   assert.equal(classifyTranscript("what needs my approval").kind, "agent_approvals");
   // Approving a team plan by voice is refused like every approval.
   assert.equal(classifyTranscript("approve the team plan").kind, "sensitive_refused");

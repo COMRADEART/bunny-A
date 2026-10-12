@@ -222,6 +222,7 @@ export const TURN_KIND_LABEL: Record<VoiceTurnKind, string> = {
   agent_approvals: "Approvals",
   agent_last_mission: "Last mission",
   agent_team: "Agent team",
+  agent_followup: "Agent follow-up",
   agent_control: "Agent control",
   mission_control: "Mission control",
   mission_draft: "Mission draft",

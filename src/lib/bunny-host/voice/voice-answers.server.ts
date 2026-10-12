@@ -10,7 +10,8 @@ import type { Mission, MissionStep } from "../../bunny-missions/types.ts";
 
 export type CheckFact = { name: string; outcome: "passed" | "failed" };
 export type StepFact = { title: string; status: string; model: string | null; checks: CheckFact[]; /** M-A-3 T11: Host label of a team step (role and kind), its owner, and whether a rework replaced it. */ team?: { label: string; agentId: string | null; superseded: boolean; dormant: boolean } };
-export type MissionFact = { id: string; title: string; status: string; updatedAt: number; steps: StepFact[] };
+/** T12 F5: `origin` names who created the Mission ("voice:workstation" for a spoken draft); absent in older facts. */
+export type MissionFact = { id: string; title: string; status: string; updatedAt: number; origin?: string; steps: StepFact[] };
 export type AgentFact = { id: string; name: string; state: string; missionId: string | null; updatedAt: number; role?: string | null; task?: { kind: string; state: string } | null };
 export type ApprovalFact = { name: string; kind: "task" | "mission_request" };
 
@@ -120,6 +121,9 @@ export function answerTeam(question: string, agents: AgentFact[], missions: Miss
     if (!members.length) return `No ${ROLE_WORD[role] ?? role} agent is active right now.`;
     return members.map((agent) => `${named(agent)} is ${humanState(agent.state)}${agent.task ? `, ${doing(agent)}` : ""}.`).join(" ");
   }
+  // T12 F5: when the newest Mission is a plain (non-team) one, its completion is answered from every canonical Mission.
+  const newest = [...missions].sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+  if (question === "finished" && newest && !newest.steps.some((step) => step.team)) return answerMissionFinished(missions);
   const teamMissions = missions.filter((mission) => mission.steps.some((step) => step.team));
   const mission = [...teamMissions].sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
   if (!mission) return "No agent team mission is recorded.";
@@ -143,24 +147,31 @@ export function hostFactsFrom(input: {
   approvals: () => ApprovalFact[];
   /** Recorded model of a task (null when unknown). */
   taskModel?: (taskId: string) => string | null;
+  /** T12 F5: every canonical Mission record, plain and team, so a Mission's completion is answerable without an Agent. */
+  allMissions?: () => (Mission & { steps: MissionStep[] })[];
 }): { agents: AgentFact[]; missions: MissionFact[]; approvals: ApprovalFact[] } {
   const agents: AgentFact[] = input.agents.map((row) => ({ id: row.id, name: row.name, state: row.state, missionId: row.missionId, updatedAt: row.updatedAt,
     ...(row.team ? { role: row.team.role, task: row.current ? { kind: row.current.kind, state: row.current.state } : null } : {}) }));
   const missions: MissionFact[] = [];
   const seen = new Set<string>();
-  for (const agent of agents) {
-    if (!agent.missionId || seen.has(agent.missionId)) continue;
-    seen.add(agent.missionId);
-    const mission = input.mission(agent.missionId);
-    if (!mission) continue;
+  const add = (mission: Mission & { steps: MissionStep[] }) => {
+    if (seen.has(mission.id)) return;
+    seen.add(mission.id);
     missions.push({
       id: mission.id,
       title: mission.title,
       status: mission.state,
       updatedAt: mission.updatedAt,
+      origin: mission.origin,
       steps: mission.steps.map((step) => stepFact(step, step.taskId && input.taskModel ? input.taskModel(step.taskId) : null)),
     });
+  };
+  for (const agent of agents) {
+    if (!agent.missionId || seen.has(agent.missionId)) continue;
+    const mission = input.mission(agent.missionId);
+    if (mission) add(mission);
   }
+  for (const mission of input.allMissions?.() ?? []) add(mission);
   return { agents, missions, approvals: input.approvals() };
 }
 
@@ -196,4 +207,65 @@ export function pendingApprovalFacts(input: {
     if (agent.state === "WAITING_FOR_USER" || consentPending) facts.push({ name: `${agent.name} agent`, kind: "mission_request" });
   }
   return facts;
+}
+
+/** Mission states that mean the Mission is over (the Host's own terminal set, plus failed). */
+export const MISSION_OVER = ["completed", "failed", "stopped"];
+
+function capitalized(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The step the Mission is working on now, when the record shows one. Never inferred from progress. */
+function currentStepTitle(mission: MissionFact | null): string | null {
+  return mission?.steps.find((step) => step.status === "running" || step.status === "verifying")?.title ?? null;
+}
+
+/** T12 F5: "has the mission finished" for a plain or a team Mission, from every canonical Mission record. */
+export function answerMissionFinished(missions: MissionFact[]): string {
+  if (missions.length === 0) return "No mission is recorded.";
+  const byRecent = [...missions].sort((a, b) => b.updatedAt - a.updatedAt);
+  const mission = byRecent.find((item) => !MISSION_OVER.includes(item.status)) ?? byRecent[0];
+  if (mission.status === "completed") {
+    const checks = mission.steps.flatMap((step) => step.checks);
+    const verified = checks.length === 0 ? "No verification results are recorded for it." : `${checks.length - checks.filter((check) => check.outcome === "failed").length} of ${checks.length} recorded verification checks passed.`;
+    return `The mission ${mission.title} has finished. ${verified}`;
+  }
+  if (mission.status === "failed") return `The mission ${mission.title} has failed.`;
+  if (mission.status === "stopped") return `The mission ${mission.title} was stopped.`;
+  return `The mission ${mission.title} has not finished. It is ${humanState(mission.status)}.`;
+}
+
+/** The Mission a follow-up or a Host answer is about. An Agent subject carries its own Mission when it has one. */
+export type FollowUpSubject = { kind: "agent"; agent: AgentFact; mission: MissionFact | null } | { kind: "mission"; mission: MissionFact };
+
+/**
+ * T12 F4: one resolved follow-up subject, answered from its canonical record only. Nothing is estimated: there is no
+ * percentage, and an unrecorded value is said to be unrecorded.
+ */
+export function answerFollowUp(focus: string, subject: FollowUpSubject): string {
+  const mission: MissionFact | null = subject.mission;
+  const label = subject.kind === "agent" ? subject.agent.name : `the mission ${subject.mission.title}`;
+  const state = subject.kind === "agent" ? subject.agent.state : subject.mission.status;
+  const over = MISSION_OVER.includes(state.toLowerCase()) || isTerminalAgent(state);
+  if (focus === "verification") return mission ? `For the mission ${mission.title}: ${answerVerification(mission)}` : answerVerification(null);
+  if (focus === "finished") {
+    const word = state.toLowerCase();
+    if (word === "completed") return `Yes, ${label} has finished.`;
+    if (word === "failed") return `No, ${label} failed.`;
+    if (word === "stopped") return `No, ${label} was stopped.`;
+    return `No, ${label} is still ${humanState(state)}.`;
+  }
+  if (focus === "running") return over ? `No, ${label} is ${humanState(state)}.` : `Yes, ${label} is still ${humanState(state)}.`;
+  const step = currentStepTitle(mission);
+  const sentences = [`${capitalized(label)} is ${humanState(state)}.`];
+  if (subject.kind === "agent" && subject.agent.task && focus === "doing") sentences.push(`Current task: ${KIND_WORD[subject.agent.task.kind] ?? subject.agent.task.kind}.`);
+  sentences.push(step ? `Current step: ${step}.` : "No current step is recorded.");
+  if (focus === "progress") sentences.push("No progress percentage is recorded.");
+  return sentences.join(" ");
+}
+
+/** T12 F6: names the Mission a verification or model answer describes, and says so when it is not the active one. */
+export function missionLabel(mission: MissionFact): string {
+  return `For the mission ${mission.title}${MISSION_OVER.includes(mission.status) ? " (not the active one)" : ""}: `;
 }

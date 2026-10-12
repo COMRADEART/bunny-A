@@ -72,6 +72,8 @@ async function harness(options: { softBudget?: number; hardBudget?: number; dupl
   const workers: Worker[] = [];
   const outputs = new Map<string, (event: VoiceTaskEvent) => void>();
   const admissions: string[] = [], stops: string[] = [], controls: string[] = [], journal: string[] = [];
+  /** T12: Missions drafted through the canonical port by a spoken request. */
+  const drafted: { objective: string; projectId: string | null }[] = [];
   let count = 0;
   let stopGate: Promise<void> | null = null;
   let releaseStop: () => void = () => undefined;
@@ -109,6 +111,11 @@ async function harness(options: { softBudget?: number; hardBudget?: number; dupl
     agents: {
       rows: () => [{ id: "a1", name: "Builder", state: "RUNNING", revision: 3 }],
       facts: () => ({ agents: [], missions: [], approvals: [] }),
+      draftMission: (input: { objective: string; projectId: string | null }) => {
+        drafted.push(input);
+        return { id: `draft-${drafted.length}`, title: input.objective.slice(0, 40), state: "waiting_for_approval" };
+      },
+      projects: () => [],
       command: async (action: string) => {
         controls.push(action);
       },
@@ -132,6 +139,7 @@ async function harness(options: { softBudget?: number; hardBudget?: number; dupl
     advance,
     admissions,
     stops,
+    drafted,
     controls,
     journal,
     outputs,
@@ -705,6 +713,20 @@ test("T12 hesitation (item 4): 'um' with no output creates no Task and keeps lis
   await h.session.close();
 });
 
+test("T12 acknowledgment: a wordless 'mm-hmm' with no output is dropped, while 'yes' is still a user turn", async () => {
+  const h = await harness();
+  await h.begin();
+  for (const text of ["Mm-hmm.", "uh-huh", "hmm"]) {
+    await h.final(text);
+    assert.equal(h.session.snapshot().turnDecision?.action, "drop", text);
+    assert.equal(h.session.snapshot().turnDecision?.reason, "acknowledgment_only", text);
+  }
+  assert.equal(h.admissions.length, 0, "no model turn for a wordless acknowledgment");
+  await h.final("yes");
+  assert.equal(h.session.snapshot().turnDecision?.action, "accept", "a spoken yes can still answer a pending confirmation");
+  await h.session.close();
+});
+
 test("T12 interrupt (item 4): 'wait, did the tests pass' during output interrupts and is routed once", async () => {
   const h = await harness();
   await h.begin();
@@ -939,9 +961,11 @@ test("T12 controller: echo finals are dropped whether or not output is active", 
   assert.equal(new VoiceTurnTaking().decide({ kind: "final", text: "the moon circles earth", confidence: 1, echo: true, outputActive: true })?.action, "drop");
 });
 
-test("T12 controller: with no output, a hesitation-only final is dropped, and anything else is accepted", () => {
+test("T12 controller: with no output, hesitation or a wordless acknowledgment is dropped; words (even 'yes') are accepted", () => {
   assert.equal(new VoiceTurnTaking().decide({ kind: "final", text: "Um.", confidence: 0.9, echo: false, outputActive: false })?.action, "drop");
-  assert.equal(new VoiceTurnTaking().decide({ kind: "final", text: "uh huh", confidence: 0.9, echo: false, outputActive: false })?.action, "accept");
+  assert.equal(new VoiceTurnTaking().decide({ kind: "final", text: "uh huh", confidence: 0.9, echo: false, outputActive: false })?.action, "drop");
+  assert.equal(new VoiceTurnTaking().decide({ kind: "final", text: "Yes.", confidence: 0.9, echo: false, outputActive: false })?.action, "accept");
+  assert.equal(new VoiceTurnTaking().decide({ kind: "final", text: "okay", confidence: 0.9, echo: false, outputActive: false })?.action, "accept");
   assert.equal(new VoiceTurnTaking().decide({ kind: "final", text: "Explain the moon", confidence: 0.9, echo: false, outputActive: false })?.action, "accept");
 });
 
@@ -1120,4 +1144,52 @@ test("T12 item 10 (round 2): closing during hands-free sends no generation-only 
   const aborts = h.worker().sent.filter((c): c is Extract<WorkerCommand, { op: "capture.abort" }> => c.op === "capture.abort");
   assert.ok(aborts.length >= 1, "the armed input turn was aborted by its own identity");
   assert.ok(aborts.every((c) => c.turn !== undefined), "no generation-only abort names the duplex lane");
+});
+
+// M-A-3 T12 (voice speech stop and Mission drafts over the echo-cancelled lane)
+
+test("T12 F1 duplex: 'stop talking' while Bunny speaks silences her, speaks nothing, and proposes and chats nothing", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Explain the moon");
+  h.speaking();
+  const before = h.session.snapshot();
+  const speaks = () => h.worker().sent.filter((c) => c.op === "speak").length;
+  const spokenBefore = speaks();
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  h.emitInput({ ev: "stt.final", text: "stop talking", confidence: 0.9 });
+  await tick();
+  const snap = h.session.snapshot();
+  assert.ok(h.worker().sent.some((c) => c.op === "speak.cancel" && c.gen === before.generation), "the output generation was cancelled");
+  assert.equal(speaks(), spokenBefore, "nothing new is spoken");
+  assert.equal(snap.proposal, null);
+  assert.equal(h.controls.length, 0);
+  assert.equal(h.admissions.length, 1, "no chat task was started for the stop");
+  assert.equal(snap.playing, false);
+  await h.session.close();
+});
+
+test("T12 F3 echo: an overlapped turn that repeats Bunny's own 'I drafted a Mission' sentence creates nothing", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Explain the moon");
+  h.speaking("I drafted a Mission: Dashboard release notes. It is waiting for review on the Windows Host screen. I can't approve or start it by voice.");
+  h.emitInput({ ev: "vad", state: "speech_start" });
+  h.emitInput({ ev: "stt.final", text: "I drafted a Mission: Dashboard release notes. It is waiting for review on the Windows Host screen.", confidence: 0.9 });
+  await tick();
+  assert.equal(h.drafted.length, 0, "the echo of Bunny's own sentence created no Mission");
+  assert.equal(h.session.snapshot().proposal, null);
+  assert.equal(h.admissions.length, 1, "and no task was started for it");
+  await h.session.close();
+});
+
+test("T12 F3 duplex: a clean spoken draft request drafts one Mission through the port, with no chat", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("prepare a plan for the dashboard project");
+  await tick();
+  assert.deepEqual(h.drafted, [{ objective: "the dashboard project", projectId: null }]);
+  assert.equal(h.admissions.length, 0, "a draft is not a chat question");
+  assert.match(h.session.snapshot().answer ?? "", /^I drafted a Mission: the dashboard project\. It is waiting for review on the Windows Host screen\. I can't approve or start it by voice\./);
+  await h.session.close();
 });

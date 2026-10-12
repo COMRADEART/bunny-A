@@ -413,11 +413,25 @@ export async function startHost(
           },
           approvals: () => approvals,
           taskModel: (taskId) => tasks.find((task) => task.id === taskId)?.model ?? null,
+          // T12 F5: every canonical Mission record, plain and team, so a Mission's completion is answerable without an Agent.
+          allMissions: () => missions.store.missions(40).map((mission) => ({ ...mission, steps: missions.store.steps(mission.id) })),
         });
       },
       command: async (action, id, revision) => {
         await agentCommand(agents, action, { id, revision }, "workstation");
       },
+      // T12: the canonical Mission stop with the workstation actor. Never folded into agent.stop.
+      missionStop: async (missionId) => {
+        await missionCommand(missions, "mission.stop", { id: missionId }, { local: true, actor: "workstation" });
+      },
+      // T12 F3: a spoken Mission DRAFT through the canonical mission.create (fast, local-only). It is not approved or started here.
+      draftMission: async ({ objective, projectId }) => {
+        const result = await missionCommand(missions, "mission.create", { objective, mode: "fast", localOnly: true, projectId }, { local: true, actor: "voice:workstation" });
+        const view = result.mission as { id: string; title: string; state: string };
+        return { id: view.id, title: view.title, state: view.state };
+      },
+      // T12: registered Projects by id and name only, for resolving a spoken Project name.
+      projects: () => missions.tasks.db.projects().map((project) => ({ id: project.id, name: project.name })),
     },
     journal: (type, detail) => manager.emit(db.event(type, null, detail)),
   });

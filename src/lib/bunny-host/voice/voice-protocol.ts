@@ -150,6 +150,7 @@ export type VoiceTurnKind =
   | "mission_control" // T12: "stop the mission" -> screen-confirmed mission.stop proposal (never folded into agent.stop)
   | "mission_draft" // T12: "prepare a plan for X" -> a Mission DRAFT via canonical mission.create; approval/start stay on screen
   | "speech_stop" // T12: "stop", "wait", "be quiet", "stop talking": silences Bunny's speech only; never an Agent or Mission control
+  | "agent_followup" // T12: "did it finish?", "what about the second one?": a Host-facts follow-up resolved against the last referent
   | "open_ui" // open Agentic workspace / show results
   | "confirm" // spoken confirmation of a pending voice proposal (pause only)
   | "cancel" // "never mind" / "cancel"

@@ -14,6 +14,8 @@ export type VoiceIntent = {
   ordinal: number | null;
   /** Normalized transcript after wake-word and filler removal. */
   normalized: string;
+  /** T12 F4: what a follow-up asks about (finished, running, progress, doing, verification); absent otherwise. */
+  focus?: string;
 };
 
 const WAKE = /^(?:(?:hey|ok|okay)\s+)?(?:bunny|bunnie|bunni|honey bunny)\b[\s,.!?:]*/;
@@ -187,6 +189,7 @@ const TEAM_ROLE_WHAT = /\bwhat(?: is|'s| are) (?:the |my )?(?:planning|planner|r
 // "is the mission done" stays the T10 status answer; only has/did forms and questions naming the team come here.
 const TEAM_FINISHED = /\b(?:has|have|did) (?:the |my )?(?:team|mission|agents|team mission)\b.{0,12}\b(?:finish|finished|complete|completed|end|ended|done)\b|\bis (?:the |my )?team\b.{0,12}\b(?:finished|done|complete|completed)\b/;
 const TEAM_FAILED = [/\b(?:which|what|any) (?:tasks?|steps?)\b.{0,12}\b(?:failed|fail|failing)\b/, /\bdid (?:any|the) (?:tasks?|steps?) fail\b/];
+const MISSION_DONE = /\b(?:has|have|did|is|are|was|were|does) (?:the |my |that |this )?missions?\b.{0,20}\b(?:finish|finished|finishing|complete|completed|done|stopped|ended|over)\b/;
 function teamQuestion(normalized: string): string | null {
   if (TEAM_COUNT.test(normalized)) return "count";
   if (TEAM_ROLE_WHO.test(normalized) || TEAM_ROLE_WHAT.test(normalized)) {
@@ -195,6 +198,8 @@ function teamQuestion(normalized: string): string | null {
     return role ? `role:${role}` : null;
   }
   if (TEAM_FAILED.some((re) => re.test(normalized))) return "failed";
+  // T12 F5: "is the mission done" is a completion question too; the answer reads every canonical Mission (see answerTeam).
+  if (MISSION_DONE.test(normalized) && !/\b(team|agents?)\b/.test(normalized)) return "finished";
   if (TEAM_FINISHED.test(normalized)) return "finished";
   return null;
 }
@@ -210,6 +215,8 @@ const REDIRECT = [
   /\b(tell|ask|make|have|get) (the |my |bunny |it |that )?(agent|bunny|it|them)\b.{0,30}\b(to|that|and)\b/,
   // Any instruction addressed to the agent itself ("have the agent build the docs instead") is a redirect.
   /\b(tell|ask|make|have|get|order|instruct|direct) (the |my |this |that )?agents?\b/,
+  // T12 F7: a named role or a qualified agent is addressed too ("ask the implementation agent to ...", "tell the tester to ...").
+  /\b(tell|ask|have|get|order|instruct|direct)\s+(?:the|my|this|that|our)\s+(?:[\w'-]+\s+){0,2}?(?:agents?|testers?|reviewers?|planners?|researchers?|implementers?|documenters?|coordinators?)\b/,
   /\bchange the plan\b/,
   /\bredirect\b/,
   /\binstead,? (do|make|build|try|write|change|use)\b/,
@@ -275,39 +282,150 @@ function targetOf(rest: string): { target: string; ordinal: number | null } {
   return { target: cleaned, ordinal };
 }
 
+/**
+ * T12 F1: "stop talking" phrasings silence Bunny's speech only. The bare words and the objects talking, speaking, that and
+ * "this" are speech stops; anything that names an Agent or a Mission is a control and is classified below.
+ */
+const SPEECH_STOP_SILENCE = /^(?:wait|hold on|hang on|be quiet|quiet|shush|stop talking|stop speaking|stop that|stop this|that's enough|enough|never mind that)(?:\s+(?:please|now|a (?:second|moment|sec)|for a (?:second|moment|sec)))?$/;
+/** T12 F1: "stop" and "stop it" alone are ambiguous: the session asks whether to silence Bunny or stop an Agent, and executes nothing. */
+const SPEECH_STOP_AMBIGUOUS = /^stop(?: it)?(?:\s+(?:please|now))?$/;
+
+function speechStop(normalized: string, proposalPending: boolean): "silence" | "ambiguous" | null {
+  // R4 D2: with a proposal pending, "never mind that" is still the cancel of that proposal.
+  if (proposalPending && normalized === "never mind that") return null;
+  if (SPEECH_STOP_AMBIGUOUS.test(normalized)) return "ambiguous";
+  return SPEECH_STOP_SILENCE.test(normalized) ? "silence" : null;
+}
+
+/** T12 F2: a Mission named by its noun. Any Agent noun in the same utterance keeps it an Agent control. */
+const AGENT_NOUN = /\b(agents?|tasks?|team members?|tester|reviewer|planner|researcher|implementer|documenter|coordinator|implementation|testing|reviewing|planning)\b/;
+const MISSION_CONTROL = /^(?:stop|cancel|abort|end|kill|terminate)\s+(?:(?:the|my|this|that|current|active|running|ongoing)\s+)*(?:([\w'-]+)\s+)?(?:mission|missions)\b\s*(.*)$/;
+
+/** The target words of a Mission control ("alpha" for "stop the mission alpha"), or null when the utterance is not one. */
+function missionControlRest(normalized: string): string | null {
+  const match = MISSION_CONTROL.exec(normalized);
+  if (!match || AGENT_NOUN.test(normalized)) return null;
+  return `${match[1] ?? ""} ${match[2] ?? ""}`;
+}
+
+/**
+ * T12 F3: a spoken request to DRAFT a Mission ("prepare a plan for the dashboard project"). It is judged before the
+ * mission-noun and release rules, which it passes by its own wording. A question, an Agent addressee, an authority claim,
+ * or any approve, run, start, launch, deploy, publish, push or delete word keeps it refused or redirected. Returns the
+ * objective (3-200 characters) or null.
+ */
+const DRAFT = /\b(prepare|draft|sketch|outline|write up|make|create|plan)\s+(?:(?:a|an|the|my|me|new|another)\s+)*(?:plan|mission|missions)\b\s*(?:(?:for|to|about|that|on|of)\s+)?(.+)$/;
+const DRAFT_SUBJECT_WORDS = /\b(release|releases|mission|missions|delegate)\b/g;
+/**
+ * T12 F3 (round 2): a draft that also asks to start, begin, proceed, go live, activate, enable, launch, run, execute, approve,
+ * deploy, publish, push or delete is refused. The mission-noun rule is not enough on its own: "create a mission and start it"
+ * loses its noun to the subject-word strip, so the action words are judged on the whole wording.
+ */
+const DRAFT_ACTION = /\b(start|starts|starting|begin|begins|proceed|proceeds|go live|activate|activates|enable|enables|launch|launches|run|runs|execute|executes|approve|approves|deploy|deploys|publish|publishes|push|pushes|delete|deletes)\b/;
+
+function draftObjective(normalized: string): string | null {
+  if (QUESTION.test(normalized)) return null;
+  const match = DRAFT.exec(normalized);
+  if (!match) return null;
+  const objective = match[2].replace(/[\s.!?,;:]+$/, "").trim();
+  if (objective.length < 3 || objective.length > 200) return null;
+  if (AGENT_NOUN.test(normalized)) return null;
+  if (DRAFT_ACTION.test(normalized)) return null;
+  if (AUTHORITY.some((re) => re.test(normalized))) return null;
+  // The draft's own nouns are its subject, not authority; every other rule judges the rest of the wording as usual.
+  if (isSensitive(normalized.replace(DRAFT_SUBJECT_WORDS, " "))) return null;
+  return objective;
+}
+
+/**
+ * T12 F4: follow-up questions about the last Host-facts subject. "Did it finish?" and "what about the second one?" are Host
+ * facts, never chat. The subject itself is resolved by the session against live rows; this only reads the wording.
+ */
+const ORDINAL_WORD = "(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)";
+const ORDINAL_FOLLOW_A = new RegExp(String.raw`^(?:and |what about |how about )(?:the )?${ORDINAL_WORD}(?: one| agent| mission| task)?\b`);
+const ORDINAL_FOLLOW_B = new RegExp(String.raw`^(?:is|are|did|has|have|was|were) (?:the )?${ORDINAL_WORD} (?:one|agent|mission|task)\b`);
+const PRONOUN = String.raw`(?:it|that|this|they|them|those|these|that one|this one)`;
+const PRONOUN_FOLLOW: RegExp[] = [
+  new RegExp(String.raw`\b(?:did|has|have) ${PRONOUN} (?:finish|finished|complete|completed|end|ended|stop|stopped)\b`),
+  new RegExp(String.raw`\bis ${PRONOUN} (?:still )?(?:done|finished|complete|completed|running|working|paused|stopped)\b`),
+  new RegExp(String.raw`\bhow far along (?:is|are) ${PRONOUN}\b`),
+  new RegExp(String.raw`\bwhat(?:'s| is| are) ${PRONOUN} (?:doing|up to|working on)\b`),
+  new RegExp(String.raw`\b(?:did|do|does) (?:the )?(?:tests?|checks?|verification|build|typecheck|suite) (?:pass|passed|passing|fail|failed|failing) for ${PRONOUN}\b`),
+];
+const NAME_FOLLOW = /^(?:and |what about |how about )(?:the )?([a-z][\w'-]*(?: [\w'-]+){0,2})$/;
+const NOT_A_NAME = /^(?:you|it|that|this|them|they|we|me|now|then|there|here|else|the rest|everything|tests?|build|weather|time|price)$/;
+
+type FollowUp = { focus: string; ordinal: number | null; name: string };
+
+/** What the follow-up asks about: finished, running, progress, doing or verification. */
+function followUpFocus(text: string): string {
+  if (/\bhow far\b/.test(text)) return "progress";
+  if (/\b(tests?|checks?|verification|build|typecheck|suite|pass|passed|fail|failed)\b/.test(text)) return "verification";
+  if (/\b(doing|up to|working on)\b/.test(text)) return "doing";
+  if (/\b(still running|running|still working|working|going|paused|stopped)\b/.test(text)) return "running";
+  return "finished";
+}
+
+function followUp(normalized: string): FollowUp | null {
+  const ordinal = ORDINAL_FOLLOW_A.exec(normalized) ?? ORDINAL_FOLLOW_B.exec(normalized);
+  if (ordinal) return { focus: followUpFocus(normalized), ordinal: ordinalOf(ordinal[1]), name: "" };
+  if (PRONOUN_FOLLOW.some((re) => re.test(normalized))) return { focus: followUpFocus(normalized), ordinal: null, name: "" };
+  const named = NAME_FOLLOW.exec(normalized);
+  if (named && !NOT_A_NAME.test(named[1])) return { focus: followUpFocus(normalized), ordinal: null, name: named[1] };
+  return null;
+}
+
 export function classifyTranscript(
   transcript: string,
   options: { proposalPending?: boolean } = {},
 ): VoiceIntent {
   const normalized = normalizeTranscript(transcript);
-  const make = (kind: VoiceTurnKind, target = "", ordinal: number | null = null): VoiceIntent => ({ kind, target, ordinal, normalized });
+  const make = (kind: VoiceTurnKind, target = "", ordinal: number | null = null, focus?: string): VoiceIntent => ({ kind, target, ordinal, normalized, ...(focus ? { focus } : {}) });
   if (!normalized) return make("empty");
+  const pending = options.proposalPending === true;
   // fixcheck#0: the filler stripper removes a leading "ok"/"okay", so "okay it" is checked on the raw wording too.
   const raw = transcript.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim().replace(/[\s.!?,;:]+$/, "");
+  // T12 F3: a Mission draft is judged before the sensitive mission-noun rules (see draftObjective).
+  const draft = draftObjective(normalized);
+  if (draft !== null) return make("mission_draft", draft);
+  // T12 F3 (round 2): a draft request that also asks to start or approve it is refused, never chatted or drafted.
+  if (!QUESTION.test(normalized) && DRAFT.test(normalized) && DRAFT_ACTION.test(normalized)) return make("sensitive_refused");
   // V41: a free-form redirect of a running agent is explicitly unsupported; authority claims inside it are still refused.
   if (!QUESTION.test(normalized) && REDIRECT.some((re) => re.test(normalized)) && !AUTHORITY.some((re) => re.test(normalized) || re.test(raw))) return make("redirect_unsupported");
   if (isSensitive(normalized) || (!QUESTION.test(normalized) && isSensitive(raw))) return make("sensitive_refused");
   // R4 D2: with a proposal pending, a turn that opens with a refusal ("No, what is the agent doing?") still cancels it, as
   // it did before the barge-in lead word was dropped; the question that follows is not answered in that turn.
-  if (options.proposalPending && NEGATION_LEAD.test(normalizeTranscript(transcript, false))) return make("cancel");
-  if (options.proposalPending && (CONFIRM.test(normalized) || isConfirmLead(normalized))) return make("confirm");
+  if (pending && NEGATION_LEAD.test(normalizeTranscript(transcript, false))) return make("cancel");
+  if (pending && (CONFIRM.test(normalized) || isConfirmLead(normalized))) return make("confirm");
+  // T12 F1: a speech stop is classified before any control or chat; it silences Bunny and nothing else.
+  const speech = speechStop(normalized, pending);
+  if (speech) return make("speech_stop", speech);
+  // T12 F2: "stop/cancel/abort/end the mission" never becomes an Agent stop.
+  const missionRest = missionControlRest(normalized);
+  if (missionRest !== null) {
+    const { target, ordinal } = targetOf(missionRest);
+    return make("mission_control", target, ordinal);
+  }
   const stop = stopRest(normalized);
   if (stop !== null) {
     const { target, ordinal } = targetOf(stop);
     return make("agent_control", target, ordinal);
   }
   if (CANCEL.test(normalized)) return make("cancel");
-  if (CONFIRM.test(normalized) && !options.proposalPending) return make("confirm");
+  if (CONFIRM.test(normalized) && !pending) return make("confirm");
   if (OPEN_UI.some((re) => re.test(normalized))) return make("open_ui");
   const team = teamQuestion(normalized);
   if (team) return make("agent_team", team);
+  // T12 F4: follow-ups resolve against the last Host-facts subject; they are never chat.
+  const follow = followUp(normalized);
+  if (follow) return make("agent_followup", follow.name, follow.ordinal, follow.focus);
   if (STATUS.some((re) => re.test(normalized))) return make("agent_status");
   if (VERIFY.some((re) => re.test(normalized))) return make("agent_verification");
   if (MODEL.some((re) => re.test(normalized))) return make("agent_model");
   if (APPROVALS.some((re) => re.test(normalized))) return make("agent_approvals");
   if (LAST_MISSION.some((re) => re.test(normalized))) return make("agent_last_mission");
   // "yes pause it" without a pending proposal is an ordinary control phrase; the leading "yes" is only a lead-in.
-  const control = CONTROL.exec(options.proposalPending ? normalized : normalized.replace(LEAD_YES, ""));
+  const control = CONTROL.exec(pending ? normalized : normalized.replace(LEAD_YES, ""));
   if (control) {
     const { target, ordinal } = targetOf(control[2] ?? "");
     return make("agent_control", target, ordinal);
