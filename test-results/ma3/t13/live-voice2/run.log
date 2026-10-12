@@ -1,0 +1,32 @@
+[10s] dev server ready true
+[29s] MARK a-closed 
+[29s] CHECK a1-closed-sleeping PASS Host companion before any session
+[31s] MARK a-open open status=200
+[31s] CHECK a2-open-ready PASS session opened, companion READY
+[32s] MARK b-typed-turn status=200 turnId=t1-typed-a5188ae3
+[48s] MARK b-playback-ended ended=true
+[48s] CHECK b1-thinking-before-speaking PASS 
+[48s] CHECK b2-speaking-from-worker-playback PASS playing=true confirmed by worker
+[48s] CHECK b3-ready-after-playback-idle PASS 
+[49s] MARK c-typed-long status=200
+[51s] MARK c-interrupt status=200
+[52s] CHECK c1-interrupted-expression FAIL companion right after the interrupt receipt
+[52s] CHECK c2-playing-false-after-cancel PASS worker confirmed playback stopped
+[52s] CHECK c3-no-speaking-after-cancel PASS no companion SPEAKING sample after the interrupt returned
+[52s] MARK d-listen-start status=200
+[55s] MARK d-listen-end status=200
+[56s] CHECK d1-listening-only-when-capture-confirmed PASS capturing=true confirmed by worker
+[57s] CHECK d2-muted-mic-inactive PASS app mute (Host session flag), not the Windows endpoint
+[62s] MARK e-handsfree status=200 active=true
+[64s] MARK e-typed-while-handsfree status=200
+[71s] CHECK e1-handsfree-listening PASS duplex.active confirmed by worker
+[71s] CHECK e2-listening-while-speaking PASS capturing && playing confirmed
+[71s] MARK e-handsfree-stopped 
+[71s] CHECK e3-handsfree-stopped PASS hands-free ended by session close
+[72s] CHECK a3-closed-sleeping-again PASS after session close
+[72s] MARK f-host-stop 
+[82s] CHECK f1-web-disconnected PASS 
+[85s] CHECK x1-no-speaking-without-playback PASS companion SPEAKING requires worker playback
+[85s] CHECK x2-no-listening-without-capture PASS companion LISTENING requires worker capture
+[85s] CHECK x3-mic-not-active-while-muted PASS mic never reported capturing while app muted
+[85s] DONE checks=18 pass=17 fail=1 notTested=0 leakedWorkers=0

@@ -1,0 +1,18 @@
+20:08:24.536 agents {"A":"07d4988c-d2ef-4ee1-955e-afa9f4d03ee8","B":"92aabe46-ec74-4890-95ef-1fee04102dfe","C":"cf6ab160-7a35-4b7e-97b5-315c53c418e2","D":"974c67be-450e-4789-b9d9-0707eb36fb0d","E":"d37ae1a5-915f-47e1-baca-3afbc23d3764","F":"d6d6b038-d569-4682-a008-ad32776ccd69","G":"855b01d1-e9a7-4946-8e8e-6308b77da92f","H":"4eb2cc12-296e-4304-a857-d3f8bb609fd2"}
+20:08:24.536 PASS eight real user Agents created through agent.create {"created":8}
+20:08:24.570 PASS personal_agents.configure {"1":"07d4988c-d2ef-4ee1-955e-afa9f4d03ee8","2":"92aabe46-ec74-4890-95ef-1fee04102dfe","3":"cf6ab160-7a35-4b7e-97b5-315c53c418e2","4":"974c67be-450e-4789-b9d9-0707eb36fb0d"} 
+20:08:25.012 PASS agent.start A 
+20:08:25.517 PASS agent.start B 
+20:08:26.020 PASS agent.start C 
+20:08:26.517 PASS agent.start D 
+20:08:26.919 PASS A (research, no verification) reaches COMPLETED with unverified steps {"state":"COMPLETED","label":"Completed · 6 unverified","basis":{"kind":"mission-result","verifiedSteps":0,"unverifiedSteps":6}}
+20:08:26.919 PASS B (write + compare) is VERIFIED from the Host mission result {"state":"VERIFIED","label":"Completed and verified","basis":{"kind":"mission-result","verifiedSteps":1,"unverifiedSteps":0}}
+20:08:26.919 PASS C (terminal.exec test) asks permission: WAITING_FOR_USER {"state":"WAITING_FOR_USER","label":"Needs you","basis":{"kind":"agent-state","agentState":"WAITING_FOR_USER"}}
+20:08:26.919 PASS D (delete) asks permission: WAITING_FOR_USER {"state":"WAITING_FOR_USER","label":"Needs you","basis":{"kind":"agent-state","agentState":"WAITING_FOR_USER"}}
+20:08:26.946 island launched by this run, pid 31008
+20:08:52.127 checkpoint cp1-first-load-waiting "chat strip [[\"sword\",\"WAITING_FOR_USER\",null],[\"chakra\",\"WAITING_FOR_USER\",null],[\"spear\",\"VERIFIED\",null],[\"gada\",\"COMPLETED\",null]]; cue deltas []"
+20:08:56.129 PASS nothing auto-grants: C and D still WAITING_FOR_USER after 4 s with no answer {"C":"WAITING_FOR_USER","D":"WAITING_FOR_USER"}
+20:08:56.175 PASS mission.respond allow_once on C 
+20:09:16.264 FAIL wait: C TESTING after allow_once {"timeoutMs":20000}
+20:09:16.264 FAIL C leaves WAITING_FOR_USER only after the Host acknowledged (ackAt precedes first non-waiting poll) {"ackAt":32703,"firstTesting":null}
+20:09:29.315 checkpoint cp2-testing "chat strip [[\"chakra\",\"WAITING_FOR_USER\",null],[\"sword\",\"WAITING_FOR_USER\",null],[\"spear\",\"VERIFIED\",null],[\"gada\",\"COMPLETED\",null]]; cue deltas []"

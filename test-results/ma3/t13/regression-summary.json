@@ -1,0 +1,86 @@
+{
+  "sourceCommit": "8145377880fa4ab330238db827fa488430b2328d",
+  "runFolder": "test-results/ma3/t13/regression-clean-final",
+  "baseline": {
+    "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+    "distinct": 1995
+  },
+  "parts": {
+    "scripts": {
+      "tests": 440,
+      "pass": 440,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "library": {
+      "tests": 1408,
+      "pass": 1408,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "agent": {
+      "tests": 58,
+      "pass": 58,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "ui": {
+      "tests": 358,
+      "pass": 358,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "total": 2264,
+  "npmTestTotal": 1906,
+  "distinct": 2264,
+  "newDistinct": 269,
+  "baselineRetained": 1995,
+  "baselineRetainedExact": 1991,
+  "baselineRevised": [
+    {
+      "suite": "scripts",
+      "from": "V49: indicator layout is bounded (at most 3 chips plus one overflow chip) and counts overflow exactly",
+      "to": "V49: indicator layout is bounded (at most 4 weapon chips plus one overflow chip) and counts overflow exactly",
+      "reason": "The T13 directive explicitly replaces the three-provider strip with exactly four Personal Agent weapons. Bounded overflow and exact counting remain tested."
+    },
+    {
+      "suite": "scripts",
+      "from": "V47/V48: the indicator axis follows the notch orientation (a column beside a horizontal notch, a row above a vertical one)",
+      "to": "V47/V48: the indicator axis follows the notch orientation (ONE row beside a horizontal notch, ONE column above a vertical one)",
+      "reason": "The locked T13 geometry requires one connected row to the left for top/bottom and one column above for left/right. Orientation and placement remain tested with the new contract."
+    },
+    {
+      "suite": "scripts",
+      "from": "T11 chips: team members are lettered by role and their tooltip names role, state and their own task",
+      "to": "T13 chips: team members get no letter; their tooltip names role, state and their own task",
+      "reason": "T13 explicitly prohibits internal workers from appearing as character identities. The same real PowerShell tooltip function still checks role, state and task, and now refuses a letter identity."
+    },
+    {
+      "suite": "scripts",
+      "from": "T11 chips: the notch draws chips from the shared facts, never a second lettering rule",
+      "to": "T13 strip: the notch draws weapon characters from the slot contract, never letters or team members",
+      "reason": "The new Personal Agent slot contract is the only character source; the revised test rejects the old internal-Agent and lettering path. This is an explicit UI-contract replacement, not an unchanged assertion."
+    }
+  ],
+  "baselineMissing": [],
+  "exits": [
+    "pretest exit=0 ms=3837",
+    "scripts exit=0 ms=217933 rerun=after-local-license-staging",
+    "library exit=0 ms=566017",
+    "agent exit=0 ms=176078",
+    "ui exit=0 ms=951",
+    "typecheck exit=0 ms=13502",
+    "lint exit=0 ms=9792",
+    "build exit=0 ms=5503"
+  ],
+  "result": "PASS"
+}

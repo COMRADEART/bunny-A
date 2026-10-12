@@ -1,0 +1,766 @@
+{
+  "classification": "LIVE: independent corrected run, disposable real Host 43861, real filesystem and shell-free terminal capabilities, genuine web UI on isolated dev 8096. No model provider configured and no native UI automated.",
+  "beganAt": "2026-10-12T20:32:04.980Z",
+  "finishedAt": "2026-10-12T20:32:37.004Z",
+  "fatal": "Error: Did not admit C\n    at answerToRunning (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/live-agentic/final-live.mjs:56:9)\n    at async file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/live-agentic/final-live.mjs:163:13",
+  "summary": {
+    "passed": 23,
+    "failed": 0,
+    "total": 23
+  },
+  "checks": [
+    {
+      "name": "Explicitly propose bounded Agentic consent for C",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicitly propose bounded Agentic consent for E",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicitly propose bounded Agentic consent for H",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Seven durable user Agents created through real Host API",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Host accepts real slot bindings",
+      "ok": true,
+      "detail": {
+        "1": "84a0f0ee-d2cb-4ad5-bbfd-958ae0633451",
+        "2": "087d9d67-4c92-420a-8165-fa9654ee1bc3",
+        "3": "9e6f7958-f058-42c7-a8a5-cbe50595d144",
+        "4": "62138642-8d86-4670-a137-fba9f2d6554e"
+      }
+    },
+    {
+      "name": "agent.start A accepted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start B accepted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start D accepted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start C accepted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Unverified read settles COMPLETED without VERIFIED",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Write and compare VERIFIED is derived from Mission result",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Test and destructive delete both require explicit review",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "First page shows real completed and waiting Host states",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Initial verified load does not celebrate",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "No UI or Host action auto-grants pending consent",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicit allow_once accepted for C terminal.exec",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicit allow_once accepted for C terminal.exec",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicit allow_once accepted for C terminal.exec",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicit allow_once accepted for C terminal.exec",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicit allow_once accepted for C terminal.exec",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicit allow_once accepted for C terminal.exec",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicit allow_once accepted for C terminal.exec",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicit allow_once accepted for C terminal.exec",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "commands": [
+    {
+      "action": "mission.configure",
+      "data": {
+        "enabled": true
+      },
+      "sentAt": 1791837125811,
+      "ackAt": 1791837125860,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-A",
+        "objective": "Live independent A",
+        "steps": [
+          {
+            "role": "Read seed without verification",
+            "objective": "Read seed without verification",
+            "access": "read",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.read",
+              "params": {
+                "path": "seed.txt"
+              }
+            },
+            "verification": []
+          }
+        ]
+      },
+      "sentAt": 1791837125861,
+      "ackAt": 1791837125934,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-B",
+        "objective": "Live independent B",
+        "steps": [
+          {
+            "role": "Write and compare",
+            "objective": "Write and compare",
+            "access": "write",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.write",
+              "params": {
+                "path": "out.txt",
+                "content": "hello",
+                "overwrite": true
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.compare",
+                "params": {
+                  "path": "out.txt",
+                  "content": "hello"
+                },
+                "expect": {
+                  "field": "matches",
+                  "equals": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "sentAt": 1791837125934,
+      "ackAt": 1791837126011,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-C",
+        "objective": "Live independent C",
+        "steps": [
+          {
+            "role": "Run real Node tests",
+            "objective": "Run real Node tests",
+            "access": "read",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "terminal.exec",
+              "params": {
+                "command": "node",
+                "args": [
+                  "--test",
+                  "live.test.mjs"
+                ]
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.exists",
+                "params": {
+                  "path": "live.test.mjs"
+                },
+                "expect": {
+                  "field": "exists",
+                  "equals": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "sentAt": 1791837126011,
+      "ackAt": 1791837126100,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-D",
+        "objective": "Live independent D",
+        "steps": [
+          {
+            "role": "Await deletion approval",
+            "objective": "Await deletion approval",
+            "access": "write",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.delete",
+              "params": {
+                "path": "seed.txt"
+              }
+            },
+            "verification": []
+          }
+        ]
+      },
+      "sentAt": 1791837126100,
+      "ackAt": 1791837126188,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-E",
+        "objective": "Live independent E",
+        "steps": [
+          {
+            "role": "Run real Node tests",
+            "objective": "Run real Node tests",
+            "access": "read",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "terminal.exec",
+              "params": {
+                "command": "node",
+                "args": [
+                  "--test",
+                  "live.test.mjs"
+                ]
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.exists",
+                "params": {
+                  "path": "live.test.mjs"
+                },
+                "expect": {
+                  "field": "exists",
+                  "equals": true
+                }
+              }
+            ]
+          },
+          {
+            "role": "Write after resume",
+            "objective": "Write after resume",
+            "access": "write",
+            "dependsOn": [
+              0
+            ],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.write",
+              "params": {
+                "path": "after-resume.txt",
+                "content": "resumed",
+                "overwrite": true
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.compare",
+                "params": {
+                  "path": "after-resume.txt",
+                  "content": "resumed"
+                },
+                "expect": {
+                  "field": "matches",
+                  "equals": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "sentAt": 1791837126188,
+      "ackAt": 1791837126285,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-F",
+        "objective": "Live independent F",
+        "steps": [
+          {
+            "role": "Await deletion for stop demo",
+            "objective": "Await deletion for stop demo",
+            "access": "write",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.delete",
+              "params": {
+                "path": "seed2.txt"
+              }
+            },
+            "verification": []
+          }
+        ]
+      },
+      "sentAt": 1791837126285,
+      "ackAt": 1791837126394,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-H",
+        "objective": "Live independent H",
+        "steps": [
+          {
+            "role": "Run real Node tests",
+            "objective": "Run real Node tests",
+            "access": "read",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "terminal.exec",
+              "params": {
+                "command": "node",
+                "args": [
+                  "--test",
+                  "live.test.mjs"
+                ]
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.exists",
+                "params": {
+                  "path": "live.test.mjs"
+                },
+                "expect": {
+                  "field": "exists",
+                  "equals": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "sentAt": 1791837126394,
+      "ackAt": 1791837126497,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.authorization.propose",
+      "data": {
+        "id": "9e6f7958-f058-42c7-a8a5-cbe50595d144"
+      },
+      "sentAt": 1791837126498,
+      "ackAt": 1791837126529,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.authorization.propose",
+      "data": {
+        "id": "b2f8215d-1893-4f7d-b3ea-c3657cadeabb"
+      },
+      "sentAt": 1791837126529,
+      "ackAt": 1791837126571,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.authorization.propose",
+      "data": {
+        "id": "66c001bf-f465-430c-ba3f-0716a4c25e74"
+      },
+      "sentAt": 1791837126571,
+      "ackAt": 1791837126618,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "personal_agents.configure",
+      "data": {
+        "slots": [
+          {
+            "slot": 1,
+            "weapon": "gada",
+            "displayName": "Gada",
+            "description": "",
+            "purpose": "",
+            "style": "concise",
+            "responsibilities": [],
+            "agentId": "84a0f0ee-d2cb-4ad5-bbfd-958ae0633451",
+            "active": true
+          },
+          {
+            "slot": 2,
+            "weapon": "spear",
+            "displayName": "Spear",
+            "description": "",
+            "purpose": "",
+            "style": "concise",
+            "responsibilities": [],
+            "agentId": "087d9d67-4c92-420a-8165-fa9654ee1bc3",
+            "active": true
+          },
+          {
+            "slot": 3,
+            "weapon": "chakra",
+            "displayName": "Vishnu Chakra",
+            "description": "",
+            "purpose": "",
+            "style": "concise",
+            "responsibilities": [],
+            "agentId": "9e6f7958-f058-42c7-a8a5-cbe50595d144",
+            "active": true
+          },
+          {
+            "slot": 4,
+            "weapon": "sword",
+            "displayName": "Sword",
+            "description": "",
+            "purpose": "",
+            "style": "concise",
+            "responsibilities": [],
+            "agentId": "62138642-8d86-4670-a137-fba9f2d6554e",
+            "active": true
+          }
+        ],
+        "expectRevision": 0
+      },
+      "sentAt": 1791837126636,
+      "ackAt": 1791837126668,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "data": {
+        "id": "84a0f0ee-d2cb-4ad5-bbfd-958ae0633451"
+      },
+      "sentAt": 1791837126692,
+      "ackAt": 1791837126805,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "data": {
+        "id": "087d9d67-4c92-420a-8165-fa9654ee1bc3"
+      },
+      "sentAt": 1791837126960,
+      "ackAt": 1791837127066,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "data": {
+        "id": "62138642-8d86-4670-a137-fba9f2d6554e"
+      },
+      "sentAt": 1791837127425,
+      "ackAt": 1791837127518,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "data": {
+        "id": "9e6f7958-f058-42c7-a8a5-cbe50595d144",
+        "revision": 1
+      },
+      "sentAt": 1791837127669,
+      "ackAt": 1791837127774,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "data": {
+        "requestId": "d6c867d9-1757-4ac3-bed4-d75fe60d4471",
+        "decision": "allow_once"
+      },
+      "sentAt": 1791837152094,
+      "ackAt": 1791837152148,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "data": {
+        "requestId": "9322f738-a4d8-47f1-92f9-87fa9613a649",
+        "decision": "allow_once"
+      },
+      "sentAt": 1791837152517,
+      "ackAt": 1791837152567,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "data": {
+        "requestId": "d399bf50-07b6-401c-a14a-696174acf2d9",
+        "decision": "allow_once"
+      },
+      "sentAt": 1791837152970,
+      "ackAt": 1791837153019,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "data": {
+        "requestId": "09198f54-7586-482f-8b42-ba9d346a72e3",
+        "decision": "allow_once"
+      },
+      "sentAt": 1791837153398,
+      "ackAt": 1791837153442,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "data": {
+        "requestId": "b7247767-3edb-4254-8402-13f7dd25d57a",
+        "decision": "allow_once"
+      },
+      "sentAt": 1791837153810,
+      "ackAt": 1791837153873,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "data": {
+        "requestId": "4cd40b9b-7f83-458e-8e00-88b00594d334",
+        "decision": "allow_once"
+      },
+      "sentAt": 1791837154255,
+      "ackAt": 1791837154303,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "data": {
+        "requestId": "0ecf5be0-1854-4b2f-aaed-6e1595d05933",
+        "decision": "allow_once"
+      },
+      "sentAt": 1791837154693,
+      "ackAt": 1791837154757,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "data": {
+        "requestId": "6b7d1e9d-5797-4f33-938c-40fd86281fc6",
+        "decision": "allow_once"
+      },
+      "sentAt": 1791837155146,
+      "ackAt": 1791837155200,
+      "status": 200,
+      "error": null
+    }
+  ],
+  "ids": {
+    "A": "84a0f0ee-d2cb-4ad5-bbfd-958ae0633451",
+    "B": "087d9d67-4c92-420a-8165-fa9654ee1bc3",
+    "C": "9e6f7958-f058-42c7-a8a5-cbe50595d144",
+    "D": "62138642-8d86-4670-a137-fba9f2d6554e",
+    "E": "b2f8215d-1893-4f7d-b3ea-c3657cadeabb",
+    "F": "8e6e8c02-30ef-4d23-92a0-9fbae7728757",
+    "H": "66c001bf-f465-430c-ba3f-0716a4c25e74"
+  },
+  "shots": [
+    {
+      "name": "01-first-load",
+      "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\final-live\\shots\\01-first-load.png",
+      "hostSlots": [
+        {
+          "slot": 1,
+          "state": "COMPLETED"
+        },
+        {
+          "slot": 2,
+          "state": "VERIFIED"
+        },
+        {
+          "slot": 3,
+          "state": "WAITING_FOR_USER"
+        },
+        {
+          "slot": 4,
+          "state": "WAITING_FOR_USER"
+        }
+      ],
+      "weapons": [
+        {
+          "weapon": "chakra",
+          "state": "WAITING_FOR_USER",
+          "slot": null,
+          "cue": null,
+          "alt": "Vishnu Chakra, Needs you"
+        },
+        {
+          "weapon": "sword",
+          "state": "WAITING_FOR_USER",
+          "slot": null,
+          "cue": null,
+          "alt": "Sword, Needs you"
+        },
+        {
+          "weapon": "spear",
+          "state": "VERIFIED",
+          "slot": null,
+          "cue": null,
+          "alt": "Spear, Completed and verified"
+        },
+        {
+          "weapon": "gada",
+          "state": "COMPLETED",
+          "slot": null,
+          "cue": null,
+          "alt": "Gada, Completed"
+        },
+        {
+          "weapon": "gada",
+          "state": "COMPLETED",
+          "slot": "1",
+          "cue": null,
+          "alt": "Gada, Completed"
+        },
+        {
+          "weapon": "spear",
+          "state": "VERIFIED",
+          "slot": "2",
+          "cue": null,
+          "alt": "Spear, Completed and verified"
+        },
+        {
+          "weapon": "chakra",
+          "state": "WAITING_FOR_USER",
+          "slot": "3",
+          "cue": null,
+          "alt": "Vishnu Chakra, Needs you"
+        },
+        {
+          "weapon": "sword",
+          "state": "WAITING_FOR_USER",
+          "slot": "4",
+          "cue": null,
+          "alt": "Sword, Needs you"
+        }
+      ],
+      "cues": [
+        {
+          "at": 1791837148450,
+          "kind": "data-state",
+          "weapon": null,
+          "state": "SLEEPING",
+          "cue": null
+        }
+      ],
+      "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals 4 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Live independent C Vishnu Chakra · 0 of 1 step · 0 verified Needs you Live independent D Sword · 0 of 1 step · 0 verified Needs you Live independent B Spear · 1 of 1 step · 1 verified Completed Live independent A Gada · 1 of 1 step · 0 verified Completed Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 1 unverified Spear Completed and verified Vishnu Chakra Needs you Sword Needs you REVIEWS 4 reviews waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+      "overflowX": false,
+      "brokenImages": []
+    }
+  ],
+  "browserErrors": [],
+  "notTested": [
+    "Native WPF window close/minimize continuity, docking, multi-monitor, taskbar, and native reduced motion: native computer APIs disabled in this session.",
+    "Live provider-reported CODING/PLANNING/RESEARCHING/VERIFYING animations: no provider configured in disposable Host; prior unit/state fixtures remain simulation evidence.",
+    "Physical phone, iOS safe areas, microphone, real voice speaker/input, and real remote tunnel/device approval: unavailable configurations."
+  ],
+  "cleanup": {
+    "browserClosed": true,
+    "ownDevTreeStopped": true,
+    "hostStopped": true,
+    "credentialsCleared": true
+  },
+  "originalEvidencePreserved": [
+    "results.json",
+    "timeline.json",
+    "scenario.mjs",
+    "capture.mjs",
+    "shots/",
+    "cp/"
+  ]
+}

@@ -1,0 +1,35 @@
+import { startHost } from "./host.mjs";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+const h = await startHost(43861, "probe2");
+const log = (...a) => console.log(new Date().toISOString().slice(11, 23), ...a);
+const r = (x) => JSON.stringify(x).slice(0, 300);
+writeFileSync(join(h.workspace, "seed.txt"), "seed");
+writeFileSync(join(h.workspace, "t.test.mjs"), "import test from 'node:test';\nimport assert from 'node:assert/strict';\ntest('sleepy', async () => { await new Promise(r => setTimeout(r, 4000)); assert.equal(1, 1); });\n");
+await h.api("mission.configure", { enabled: true });
+const mk = async (name, steps) => { const a = await h.api("agent.create", { name, objective: name, steps }); if (a.status !== 200) log("CREATE FAIL", name, r(a.body)); return a.body.snapshot.agents.agents.find(x => x.name === name).id; };
+const ids = {};
+ids.write = await mk("Write verified", [
+  { role: "Write", objective: "Write out.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: "out.txt", content: "hello", overwrite: true } }, dependsOn: [], verification: [{ kind: "capability", action: "filesystem.compare", params: { path: "out.txt", content: "hello" }, expect: { field: "matches", equals: true } }] },
+]);
+ids.bad = await mk("Write failing check", [
+  { role: "Write", objective: "Write bad.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: "bad.txt", content: "hello", overwrite: true } }, dependsOn: [], verification: [{ kind: "capability", action: "filesystem.compare", params: { path: "bad.txt", content: "NOT-hello" }, expect: { field: "matches", equals: true } }] },
+]);
+ids.test = await mk("Test runner", [
+  { role: "Test", objective: "Run node tests", access: "read", executor: { kind: "capability", action: "terminal.exec", params: { command: "node --test", args: ["t.test.mjs"] } }, dependsOn: [], verification: [] },
+]);
+ids.del = await mk("Delete ask", [
+  { role: "Read", objective: "Read seed", access: "read", executor: { kind: "capability", action: "filesystem.read", params: { path: "seed.txt" } }, dependsOn: [], verification: [] },
+  { role: "Delete", objective: "Delete seed", access: "write", executor: { kind: "capability", action: "filesystem.delete", params: { path: "seed.txt" } }, dependsOn: [0], verification: [] },
+]);
+for (const [k, id] of Object.entries(ids)) { const s = await h.api("agent.start", { id }); log("start", k, s.status, s.status !== 200 ? r(s.body) : ""); }
+for (let i = 0; i < 40; i++) {
+  await new Promise(r => setTimeout(r, 300));
+  const s = await h.state();
+  const row = Object.entries(ids).map(([k, id]) => { const a = s.agents.agents.find(x => x.id === id); return `${k}:${a?.state}/${a?.authorization?.pending?.length ?? 0}/req${s.missions?.missions?.find(m=>m.id===a?.missionId)?.requests?.filter(q=>q.resolution===null).length ?? 0}`; }).join("  ");
+  log(row);
+}
+const s = await h.state();
+for (const [k, id] of Object.entries(ids)) { const a = s.agents.agents.find(x => x.id === id); log(k, a?.state, a?.failure, r(s.personalAgents ? "" : "")); }
+const m = s.missions?.missions ?? []; log("missions", m.length, r(m.map(x => ({ t: x.title, st: x.state, res: x.result, reqs: x.requests?.length }))));
+await h.stop();

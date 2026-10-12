@@ -1,0 +1,4231 @@
+{
+  "lane": "live-agentic",
+  "classification": "LIVE: disposable real Host 43860 (real Host code, real filesystem/terminal capabilities, no model provider), polled via GET /state",
+  "hostPid": 39172,
+  "port": 43860,
+  "ids": {
+    "A": "a642daae-4341-4d1e-bee1-d58b4d10f9ee",
+    "B": "2df358be-7aec-4081-a959-a6628f442f8c",
+    "C": "e2d3c54b-ce73-4c45-8857-b1ad688b6f6f",
+    "D": "5a3e826a-fdb3-41ae-8e83-e5556b966a59",
+    "E": "b79c57b5-b697-484d-b411-3bd28322638f",
+    "F": "d02b90e5-b124-48d7-8ad6-2306d8e1345e",
+    "G": "cb5277fb-3584-4803-83d7-b1066f7f8bdf",
+    "H": "8310d3a5-ee24-4efc-b59b-a44e68fcba4d"
+  },
+  "polls": 1388,
+  "pollErrors": 0,
+  "durationMs": 459297,
+  "checks": [
+    {
+      "name": "eight real user Agents created through agent.create",
+      "ok": true,
+      "detail": {
+        "created": 8
+      }
+    },
+    {
+      "name": "personal_agents.configure {\"1\":\"a642daae-4341-4d1e-bee1-d58b4d10f9ee\",\"2\":\"2df358be-7aec-4081-a959-a6628f442f8c\",\"3\":\"e2d3c54b-ce73-4c45-8857-b1ad688b6f6f\",\"4\":\"5a3e826a-fdb3-41ae-8e83-e5556b966a59\"}",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start A",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start B",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start C",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start D",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "A (research, no verification) reaches COMPLETED with unverified steps",
+      "ok": true,
+      "detail": {
+        "state": "COMPLETED",
+        "label": "Completed · 6 unverified",
+        "basis": {
+          "kind": "mission-result",
+          "verifiedSteps": 0,
+          "unverifiedSteps": 6
+        }
+      }
+    },
+    {
+      "name": "B (write + compare) is VERIFIED from the Host mission result",
+      "ok": true,
+      "detail": {
+        "state": "VERIFIED",
+        "label": "Completed and verified",
+        "basis": {
+          "kind": "mission-result",
+          "verifiedSteps": 1,
+          "unverifiedSteps": 0
+        }
+      }
+    },
+    {
+      "name": "C (terminal.exec test) asks permission: WAITING_FOR_USER",
+      "ok": true,
+      "detail": {
+        "state": "WAITING_FOR_USER",
+        "label": "Needs you",
+        "basis": {
+          "kind": "agent-state",
+          "agentState": "WAITING_FOR_USER"
+        }
+      }
+    },
+    {
+      "name": "D (delete) asks permission: WAITING_FOR_USER",
+      "ok": true,
+      "detail": {
+        "state": "WAITING_FOR_USER",
+        "label": "Needs you",
+        "basis": {
+          "kind": "agent-state",
+          "agentState": "WAITING_FOR_USER"
+        }
+      }
+    },
+    {
+      "name": "nothing auto-grants: C and D still WAITING_FOR_USER after 4 s with no answer",
+      "ok": true,
+      "detail": {
+        "C": "WAITING_FOR_USER",
+        "D": "WAITING_FOR_USER"
+      }
+    },
+    {
+      "name": "mission.respond allow_once on C",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "mission.respond allow_once on C",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "wait: C TESTING after allow_once",
+      "ok": false,
+      "detail": {
+        "timeoutMs": 20000
+      }
+    },
+    {
+      "name": "C leaves WAITING_FOR_USER only after the Host acknowledged (ackAt precedes first non-waiting poll)",
+      "ok": false,
+      "detail": {
+        "firstTesting": null
+      }
+    },
+    {
+      "name": "wait: C VERIFIED",
+      "ok": false,
+      "detail": {
+        "timeoutMs": 60000
+      }
+    },
+    {
+      "name": "C reaches VERIFIED (test ran, verification passed) while the page stays open",
+      "ok": false,
+      "detail": null
+    },
+    {
+      "name": "personal_agents.configure {\"2\":\"b79c57b5-b697-484d-b411-3bd28322638f\"}",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start E",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "E asks permission before its test step",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "mission.respond allow_once on E",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "mission.respond allow_once on E",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "wait: E TESTING",
+      "ok": false,
+      "detail": {
+        "timeoutMs": 20000
+      }
+    },
+    {
+      "name": "E TESTING is derived from the terminal.exec test command",
+      "ok": false,
+      "detail": null
+    },
+    {
+      "name": "agent.pause accepted by the Host",
+      "ok": false,
+      "detail": "A finished agent cannot be paused."
+    },
+    {
+      "name": "wait: E PAUSED",
+      "ok": false,
+      "detail": {
+        "timeoutMs": 20000
+      }
+    },
+    {
+      "name": "E shows PAUSED from Host AgentState PAUSED",
+      "ok": false,
+      "detail": null
+    },
+    {
+      "name": "agent.resume accepted by the Host",
+      "ok": false,
+      "detail": "The agent is not paused."
+    },
+    {
+      "name": "wait: E finished",
+      "ok": false,
+      "detail": {
+        "timeoutMs": 90000
+      }
+    },
+    {
+      "name": "E resumes and finishes",
+      "ok": false,
+      "detail": null
+    },
+    {
+      "name": "personal_agents.configure {\"3\":\"8310d3a5-ee24-4efc-b59b-a44e68fcba4d\"}",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start H",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "H (background runner) waits for permission before the UI is closed",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "mission.respond allow_once on H",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "mission.respond allow_once on H",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "wait: H COMPLETED with UI closed",
+      "ok": false,
+      "detail": {
+        "timeoutMs": 90000
+      }
+    },
+    {
+      "name": "with the UI closed the Host keeps the Mission running to completion",
+      "ok": false,
+      "detail": {
+        "state": "FAILED"
+      }
+    },
+    {
+      "name": "mission.respond deny on D",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "denied delete ends the Agent FAILED (Host AgentState FAILED)",
+      "ok": true,
+      "detail": {
+        "presentation": {
+          "state": "FAILED",
+          "label": "Failed",
+          "basis": {
+            "kind": "agent-state",
+            "agentState": "FAILED"
+          }
+        },
+        "failure": "AUTHORITY_LOST"
+      }
+    },
+    {
+      "name": "personal_agents.configure {\"4\":\"d02b90e5-b124-48d7-8ad6-2306d8e1345e\"}",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start F",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "F (delete ask) waits for the user",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.stop accepted by the Host",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "stopped Agent shows STOPPED from Host AgentState",
+      "ok": true,
+      "detail": {
+        "state": "STOPPED",
+        "label": "Stopped",
+        "basis": {
+          "kind": "agent-state",
+          "agentState": "STOPPED"
+        }
+      }
+    },
+    {
+      "name": "agent.start G",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "G (failing verification) settles at a Host-recorded state",
+      "ok": true,
+      "detail": {
+        "state": "WAITING_FOR_USER",
+        "failure": null
+      }
+    }
+  ],
+  "unscriptedReadWriteAsks": [],
+  "responses": [
+    {
+      "action": "personal_agents.configure",
+      "at": "2026-10-12T20:10:34.923Z",
+      "assignments": {
+        "1": "a642daae-4341-4d1e-bee1-d58b4d10f9ee",
+        "2": "2df358be-7aec-4081-a959-a6628f442f8c",
+        "3": "e2d3c54b-ce73-4c45-8857-b1ad688b6f6f",
+        "4": "5a3e826a-fdb3-41ae-8e83-e5556b966a59"
+      },
+      "status": 200,
+      "revision": 1,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "key": "A",
+      "at": "2026-10-12T20:10:35.368Z",
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "key": "B",
+      "at": "2026-10-12T20:10:35.851Z",
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "key": "C",
+      "at": "2026-10-12T20:10:36.338Z",
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "key": "D",
+      "at": "2026-10-12T20:10:36.810Z",
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "key": "C",
+      "requestId": "4fd78730-5766-4ee9-b807-90958b258150",
+      "decision": "allow_once",
+      "sentAt": 33569,
+      "ackAt": 33614,
+      "status": 200,
+      "error": null,
+      "at": "2026-10-12T20:11:07.466Z"
+    },
+    {
+      "action": "mission.respond",
+      "key": "C",
+      "requestId": "2a446cee-0fdb-4e87-a024-fc731df1f09f",
+      "decision": "allow_once",
+      "sentAt": 34427,
+      "ackAt": 34460,
+      "status": 200,
+      "error": null,
+      "at": "2026-10-12T20:11:08.312Z"
+    },
+    {
+      "action": "personal_agents.configure",
+      "at": "2026-10-12T20:12:56.308Z",
+      "assignments": {
+        "2": "b79c57b5-b697-484d-b411-3bd28322638f"
+      },
+      "status": 200,
+      "revision": 2,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "key": "E",
+      "at": "2026-10-12T20:12:56.752Z",
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "key": "E",
+      "requestId": "59474914-deba-4c1b-87e4-7017c920d1f4",
+      "decision": "allow_once",
+      "sentAt": 144175,
+      "ackAt": 144222,
+      "status": 200,
+      "error": null,
+      "at": "2026-10-12T20:12:58.074Z"
+    },
+    {
+      "action": "mission.respond",
+      "key": "E",
+      "requestId": "a0dba28e-adcd-4208-85ed-13c0544899fa",
+      "decision": "allow_once",
+      "sentAt": 145038,
+      "ackAt": 145092,
+      "status": 200,
+      "error": null,
+      "at": "2026-10-12T20:12:58.944Z"
+    },
+    {
+      "action": "agent.pause",
+      "key": "E",
+      "at": "2026-10-12T20:13:19.802Z",
+      "status": 400,
+      "error": "A finished agent cannot be paused."
+    },
+    {
+      "action": "agent.resume",
+      "key": "E",
+      "at": "2026-10-12T20:13:55.326Z",
+      "status": 400,
+      "error": "The agent is not paused."
+    },
+    {
+      "action": "personal_agents.configure",
+      "at": "2026-10-12T20:15:25.443Z",
+      "assignments": {
+        "3": "8310d3a5-ee24-4efc-b59b-a44e68fcba4d"
+      },
+      "status": 200,
+      "revision": 3,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "key": "H",
+      "at": "2026-10-12T20:15:25.884Z",
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "mission.respond",
+      "key": "H",
+      "requestId": "3fefbd08-5b0a-45b8-bc31-ece66dba674d",
+      "decision": "allow_once",
+      "sentAt": 307869,
+      "ackAt": 307922,
+      "status": 200,
+      "error": null,
+      "at": "2026-10-12T20:15:41.774Z"
+    },
+    {
+      "action": "mission.respond",
+      "key": "H",
+      "requestId": "f570471a-55ed-4167-be94-083fd7d95fa4",
+      "decision": "allow_once",
+      "sentAt": 308729,
+      "ackAt": 308778,
+      "status": 200,
+      "error": null,
+      "at": "2026-10-12T20:15:42.631Z"
+    },
+    {
+      "action": "mission.respond",
+      "key": "D",
+      "requestId": "c96324fe-e610-47b8-b7f4-4de98e6d1b2f",
+      "decision": "deny",
+      "sentAt": 417733,
+      "ackAt": 417804,
+      "status": 200,
+      "error": null,
+      "at": "2026-10-12T20:17:31.656Z"
+    },
+    {
+      "action": "personal_agents.configure",
+      "at": "2026-10-12T20:17:45.184Z",
+      "assignments": {
+        "4": "d02b90e5-b124-48d7-8ad6-2306d8e1345e"
+      },
+      "status": 200,
+      "revision": 4,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "key": "F",
+      "at": "2026-10-12T20:17:45.638Z",
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.stop",
+      "key": "F",
+      "at": "2026-10-12T20:17:46.007Z",
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "key": "G",
+      "at": "2026-10-12T20:17:59.089Z",
+      "status": 200,
+      "error": null
+    }
+  ],
+  "checkpoints": [
+    {
+      "name": "cp1-first-load-waiting",
+      "captured": true,
+      "at": "2026-10-12T20:10:46.354Z",
+      "summary": "chat strip [[\"sword\",\"WAITING_FOR_USER\",null],[\"chakra\",\"WAITING_FOR_USER\",null],[\"spear\",\"VERIFIED\",null],[\"gada\",\"COMPLETED\",null]]; cue deltas []",
+      "pages": [
+        {
+          "view": "chat (live page)",
+          "file": ".\\shots\\cp1-first-load-waiting-chat.png",
+          "weapon": [
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": null,
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": null,
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": null,
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": null,
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/favicon.svg",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 2 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Delete request Sword · 1 of 2 steps · 1 verified Needs you Test runner Vishnu Chakra · 0 of 1 step · 0 verified Needs you File writer Spear · 1 of 1 step · 1 verified Completed Research pass Gada · 6 of 6 steps · 0 verified Completed Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Completed and verified Vishnu Chakra Needs you Sword Needs you REVIEWS 2 reviews waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verifi",
+          "cueDeltasSinceLastCheckpoint": [
+            {
+              "t": 1791835847118,
+              "kind": "data-state",
+              "value": "SLEEPING",
+              "weapon": null,
+              "state": "SLEEPING",
+              "slot": null
+            }
+          ]
+        },
+        {
+          "view": "agents",
+          "file": ".\\shots\\cp1-first-load-waiting-agents.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed (Mission result: 0 verified, 6 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified (Mission result: 1 verified, 0 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you (Host state: waiting for user)",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you (Host state: waiting for user)",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.pose5.png",
+            "/bunny-a/characters/spear.pose5.png",
+            "/bunny-a/characters/chakra.pose1.png",
+            "/bunny-a/characters/sword.pose1.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 2 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Agents Personal Agent Studio Name your four Agents and choose the characters that stand for them. Names and looks never change what an Agent may do. Permissions stay where they are. Your four Personal Agents Revision 1 Gada Gada Completed Research pass Edit slot 1 Spear Spear Completed and verified File writer Edit slot 2 Vishnu Chakra Vishnu Chakra Needs you Test runner Edit slot 3 Sword Sword Needs you Delete request Edit slot 4 Other agents Paused runner · created Stop target · created Verification mismatch · created Background runner · created Internal team members appear only inside a Mission, as neutral rows. They are never weapons. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Completed and verified Vishnu Chakra Needs you Sword Needs you REVIEWS 2 reviews waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "missions",
+          "file": ".\\shots\\cp1-first-load-waiting-missions.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 2 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Missions Missions Persistent work on your Host. Closing this window does not stop a Mission; you stay in control. New Agent New Agent team 0 Working 2 Needs attention 0 Paused 2 Completed 0 Failed Agent status All Agents Needs attention Running Waiting for user Waiting for dependency Paused Completed Failed Stopped Delete request Delete request No Task currently admitted Before waiting on you Needs you Attention required 04:10 PM Test runner Test runner No Task currently admitted Before waiting on you Needs you Attention required 04:10 PM File writer File writer No Task currently admitted After Bunny verified Completed 04:10 PM Research pass Research pass No Task currently admitted After a task finished Completed 04:10 PM Background runner Background runner No Task currently admitted No verified checkpoint yet Created 04:10 PM Verification mismatch Verification mismatch No Task currently admitted No verified checkpoint yet Created 04:10 PM Stop target Stop target No Task currently admitted No verified checkpoint yet Created 04:10 PM Paused runner Paused runner No Task currently admitted No verified checkpoint yet Created 04:10 PM 8 Agents in this Host snapshot Previous Next Recent Missions Accepted Host records · closing this window does not stop a Mission Bac",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "files",
+          "file": ".\\shots\\cp1-first-load-waiting-files.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 2 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Files Files from your Missions Results your Host produced, grouped by what Bunny-A verified. Verified files open here. Verified by Bunny-A out.txt File writer · source file · 5 B No Project owns this file, so it cannot be opened from here. Open Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Completed and verified Vishnu Chakra Needs you Sword Needs you REVIEWS 2 reviews waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        }
+      ],
+      "island": {
+        "captured": true,
+        "pid": 18152,
+        "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp1-first-load-waiting-island.png"
+      },
+      "errors": [],
+      "hostSlotsAtRequest": [
+        {
+          "slot": 1,
+          "state": "COMPLETED",
+          "label": "Completed · 6 unverified"
+        },
+        {
+          "slot": 2,
+          "state": "VERIFIED",
+          "label": "Completed and verified"
+        },
+        {
+          "slot": 3,
+          "state": "WAITING_FOR_USER",
+          "label": "Needs you"
+        },
+        {
+          "slot": 4,
+          "state": "WAITING_FOR_USER",
+          "label": "Needs you"
+        }
+      ]
+    },
+    {
+      "name": "cp2-testing",
+      "captured": true,
+      "at": "2026-10-12T20:11:29.169Z",
+      "summary": "chat strip [[\"chakra\",\"FAILED\",\"failed\"],[\"sword\",\"WAITING_FOR_USER\",null],[\"spear\",\"VERIFIED\",null],[\"gada\",\"COMPLETED\",null]]; cue deltas [{\"t\":1791835868514,\"kind\":\"data-cue\",\"value\":\"failed\",\"weapon\":\"chakra\",\"state\":\"FAILED\",\"slot\":null},{\"t\":1791835868514,\"kind\":\"data-cue\",\"value\":\"failed\",\"weapon\":\"chakra\",\"state\":\"FAILED\",\"slot\":\"3\"},{\"t\":1791835869434,\"kind\":\"data-cue\",\"value\":null,\"weapon\":\"chakra\",\"state\":\"FAILED\",\"slot\":\"3\"}]",
+      "pages": [
+        {
+          "view": "chat (live page)",
+          "file": ".\\shots\\cp2-testing-chat.png",
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": null,
+              "cue": "failed",
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": null,
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": null,
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": null,
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/favicon.svg",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Last updated 04:11 PM Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Test runner Vishnu Chakra · 0 of 1 step · 0 verified Failed Delete request Sword · 1 of 2 steps · 1 verified Needs you File writer Spear · 1 of 1 step · 1 verified Completed Research pass Gada · 6 of 6 steps · 0 verified Completed Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Completed and verified Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified",
+          "cueDeltasSinceLastCheckpoint": [
+            {
+              "t": 1791835868513,
+              "kind": "data-state",
+              "value": "FAILED",
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": null
+            },
+            {
+              "t": 1791835868513,
+              "kind": "data-state",
+              "value": "FAILED",
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3"
+            },
+            {
+              "t": 1791835868514,
+              "kind": "data-cue",
+              "value": "failed",
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": null
+            },
+            {
+              "t": 1791835868514,
+              "kind": "data-cue",
+              "value": "failed",
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3"
+            },
+            {
+              "t": 1791835869434,
+              "kind": "data-cue",
+              "value": null,
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3"
+            }
+          ]
+        },
+        {
+          "view": "agents",
+          "file": ".\\shots\\cp2-testing-agents.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed (Mission result: 0 verified, 6 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified (Mission result: 1 verified, 0 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you (Host state: waiting for user)",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.pose5.png",
+            "/bunny-a/characters/spear.pose5.png",
+            "/bunny-a/characters/chakra.pose1.png",
+            "/bunny-a/characters/sword.pose1.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Agents Personal Agent Studio Name your four Agents and choose the characters that stand for them. Names and looks never change what an Agent may do. Permissions stay where they are. Your four Personal Agents Revision 1 Gada Gada Completed Research pass Edit slot 1 Spear Spear Completed and verified File writer Edit slot 2 Vishnu Chakra Vishnu Chakra Failed Test runner Edit slot 3 Sword Sword Needs you Delete request Edit slot 4 Other agents Paused runner · created Stop target · created Verification mismatch · created Background runner · created Internal team members appear only inside a Mission, as neutral rows. They are never weapons. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Completed and verified Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "missions",
+          "file": ".\\shots\\cp2-testing-missions.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Missions Missions Persistent work on your Host. Closing this window does not stop a Mission; you stay in control. New Agent New Agent team 0 Working 2 Needs attention 0 Paused 2 Completed 1 Failed Agent status All Agents Needs attention Running Waiting for user Waiting for dependency Paused Completed Failed Stopped Test runner Test runner No Task currently admitted After a task finished Failed Attention required 04:11 PM Delete request Delete request No Task currently admitted Before waiting on you Needs you Attention required 04:10 PM File writer File writer No Task currently admitted After Bunny verified Completed 04:10 PM Research pass Research pass No Task currently admitted After a task finished Completed 04:10 PM Background runner Background runner No Task currently admitted No verified checkpoint yet Created 04:10 PM Verification mismatch Verification mismatch No Task currently admitted No verified checkpoint yet Created 04:10 PM Stop target Stop target No Task currently admitted No verified checkpoint yet Created 04:10 PM Paused runner Paused runner No Task currently admitted No verified checkpoint yet Created 04:10 PM 8 Agents in this Host snapshot Previous Next Recent Missions Accepted Host records · closing this window does not stop a Mission Backgr",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "files",
+          "file": ".\\shots\\cp2-testing-files.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Files Files from your Missions Results your Host produced, grouped by what Bunny-A verified. Verified files open here. Verified by Bunny-A out.txt File writer · source file · 5 B No Project owns this file, so it cannot be opened from here. Open Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Completed and verified Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        }
+      ],
+      "island": {
+        "captured": true,
+        "pid": 18152,
+        "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp2-testing-island.png"
+      },
+      "errors": [],
+      "hostSlotsAtRequest": [
+        {
+          "slot": 1,
+          "state": "COMPLETED",
+          "label": "Completed · 6 unverified"
+        },
+        {
+          "slot": 2,
+          "state": "VERIFIED",
+          "label": "Completed and verified"
+        },
+        {
+          "slot": 3,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 4,
+          "state": "WAITING_FOR_USER",
+          "label": "Needs you"
+        }
+      ]
+    },
+    {
+      "name": "cp3-c-verified-live",
+      "captured": true,
+      "at": "2026-10-12T20:12:43.300Z",
+      "summary": "chat strip [[\"chakra\",\"FAILED\",\"failed\"],[\"sword\",\"WAITING_FOR_USER\",null],[\"spear\",\"VERIFIED\",null],[\"gada\",\"COMPLETED\",null]]; cue deltas []",
+      "pages": [
+        {
+          "view": "chat (live page)",
+          "file": ".\\shots\\cp3-c-verified-live-chat.png",
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": null,
+              "cue": "failed",
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": null,
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": null,
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": null,
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/favicon.svg",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Last updated 04:12 PM Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Test runner Vishnu Chakra · 0 of 1 step · 0 verified Failed Delete request Sword · 1 of 2 steps · 1 verified Needs you File writer Spear · 1 of 1 step · 1 verified Completed Research pass Gada · 6 of 6 steps · 0 verified Completed Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Completed and verified Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified",
+          "cueDeltasSinceLastCheckpoint": []
+        },
+        {
+          "view": "agents",
+          "file": ".\\shots\\cp3-c-verified-live-agents.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed (Mission result: 0 verified, 6 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified (Mission result: 1 verified, 0 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you (Host state: waiting for user)",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.pose5.png",
+            "/bunny-a/characters/spear.pose5.png",
+            "/bunny-a/characters/chakra.pose1.png",
+            "/bunny-a/characters/sword.pose1.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Agents Personal Agent Studio Name your four Agents and choose the characters that stand for them. Names and looks never change what an Agent may do. Permissions stay where they are. Your four Personal Agents Revision 1 Gada Gada Completed Research pass Edit slot 1 Spear Spear Completed and verified File writer Edit slot 2 Vishnu Chakra Vishnu Chakra Failed Test runner Edit slot 3 Sword Sword Needs you Delete request Edit slot 4 Other agents Paused runner · created Stop target · created Verification mismatch · created Background runner · created Internal team members appear only inside a Mission, as neutral rows. They are never weapons. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Completed and verified Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "missions",
+          "file": ".\\shots\\cp3-c-verified-live-missions.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Missions Missions Persistent work on your Host. Closing this window does not stop a Mission; you stay in control. New Agent New Agent team 0 Working 2 Needs attention 0 Paused 2 Completed 1 Failed Agent status All Agents Needs attention Running Waiting for user Waiting for dependency Paused Completed Failed Stopped Test runner Test runner No Task currently admitted After a task finished Failed Attention required 04:11 PM Delete request Delete request No Task currently admitted Before waiting on you Needs you Attention required 04:10 PM File writer File writer No Task currently admitted After Bunny verified Completed 04:10 PM Research pass Research pass No Task currently admitted After a task finished Completed 04:10 PM Background runner Background runner No Task currently admitted No verified checkpoint yet Created 04:10 PM Verification mismatch Verification mismatch No Task currently admitted No verified checkpoint yet Created 04:10 PM Stop target Stop target No Task currently admitted No verified checkpoint yet Created 04:10 PM Paused runner Paused runner No Task currently admitted No verified checkpoint yet Created 04:10 PM 8 Agents in this Host snapshot Previous Next Recent Missions Accepted Host records · closing this window does not stop a Mission Backgr",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "files",
+          "file": ".\\shots\\cp3-c-verified-live-files.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "VERIFIED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Completed and verified",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 2 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Files Files from your Missions Results your Host produced, grouped by what Bunny-A verified. Verified files open here. Verified by Bunny-A out.txt File writer · source file · 5 B No Project owns this file, so it cannot be opened from here. Open Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Completed and verified Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        }
+      ],
+      "island": {
+        "captured": true,
+        "pid": 18152,
+        "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp3-c-verified-live-island.png"
+      },
+      "errors": [],
+      "hostSlotsAtRequest": [
+        {
+          "slot": 1,
+          "state": "COMPLETED",
+          "label": "Completed · 6 unverified"
+        },
+        {
+          "slot": 2,
+          "state": "VERIFIED",
+          "label": "Completed and verified"
+        },
+        {
+          "slot": 3,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 4,
+          "state": "WAITING_FOR_USER",
+          "label": "Needs you"
+        }
+      ]
+    },
+    {
+      "name": "cp4-paused",
+      "captured": true,
+      "at": "2026-10-12T20:13:40.091Z",
+      "summary": "chat strip [[\"spear\",\"FAILED\",\"failed\"],[\"chakra\",\"FAILED\",\"failed\"],[\"sword\",\"WAITING_FOR_USER\",null]]; cue deltas [{\"t\":1791835979122,\"kind\":\"data-cue\",\"value\":\"failed\",\"weapon\":\"spear\",\"state\":\"FAILED\",\"slot\":null},{\"t\":1791835979122,\"kind\":\"data-cue\",\"value\":\"failed\",\"weapon\":\"spear\",\"state\":\"FAILED\",\"slot\":\"2\"},{\"t\":1791835980035,\"kind\":\"data-cue\",\"value\":null,\"weapon\":\"spear\",\"state\":\"FAILED\",\"slot\":\"2\"}]",
+      "pages": [
+        {
+          "view": "chat (live page)",
+          "file": ".\\shots\\cp4-paused-chat.png",
+          "weapon": [
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": null,
+              "cue": "failed",
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": null,
+              "cue": "failed",
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": null,
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/favicon.svg",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 3 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Paused runner Spear · 1 of 3 steps · 1 verified Failed Test runner Vishnu Chakra · 0 of 1 step · 0 verified Failed Delete request Sword · 1 of 2 steps · 1 verified Needs you File writer 1 of 1 step · 1 verified Completed Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueDeltasSinceLastCheckpoint": [
+            {
+              "t": 1791835976482,
+              "kind": "data-state",
+              "value": "IDLE",
+              "weapon": "spear",
+              "state": "IDLE",
+              "slot": "2"
+            },
+            {
+              "t": 1791835977109,
+              "kind": "data-state",
+              "value": "WAITING_FOR_USER",
+              "weapon": "spear",
+              "state": "WAITING_FOR_USER",
+              "slot": "2"
+            },
+            {
+              "t": 1791835979120,
+              "kind": "data-state",
+              "value": "FAILED",
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": null
+            },
+            {
+              "t": 1791835979120,
+              "kind": "data-state",
+              "value": "FAILED",
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2"
+            },
+            {
+              "t": 1791835979122,
+              "kind": "data-cue",
+              "value": "failed",
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": null
+            },
+            {
+              "t": 1791835979122,
+              "kind": "data-cue",
+              "value": "failed",
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2"
+            },
+            {
+              "t": 1791835980035,
+              "kind": "data-cue",
+              "value": null,
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2"
+            }
+          ]
+        },
+        {
+          "view": "agents",
+          "file": ".\\shots\\cp4-paused-agents.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed (Mission result: 0 verified, 6 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you (Host state: waiting for user)",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.pose5.png",
+            "/bunny-a/characters/spear.pose1.png",
+            "/bunny-a/characters/chakra.pose1.png",
+            "/bunny-a/characters/sword.pose1.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 3 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Agents Personal Agent Studio Name your four Agents and choose the characters that stand for them. Names and looks never change what an Agent may do. Permissions stay where they are. Your four Personal Agents Revision 2 Gada Gada Completed Research pass Edit slot 1 Spear Spear Failed Paused runner Edit slot 2 Vishnu Chakra Vishnu Chakra Failed Test runner Edit slot 3 Sword Sword Needs you Delete request Edit slot 4 Other agents File writer · completed Stop target · created Verification mismatch · created Background runner · created Internal team members appear only inside a Mission, as neutral rows. They are never weapons. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "missions",
+          "file": ".\\shots\\cp4-paused-missions.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 3 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Missions Missions Persistent work on your Host. Closing this window does not stop a Mission; you stay in control. New Agent New Agent team 0 Working 3 Needs attention 0 Paused 2 Completed 2 Failed Agent status All Agents Needs attention Running Waiting for user Waiting for dependency Paused Completed Failed Stopped Paused runner Paused runner No Task currently admitted After a task finished Failed Attention required 04:12 PM Test runner Test runner No Task currently admitted After a task finished Failed Attention required 04:11 PM Delete request Delete request No Task currently admitted Before waiting on you Needs you Attention required 04:10 PM File writer File writer No Task currently admitted After Bunny verified Completed 04:10 PM Research pass Research pass No Task currently admitted After a task finished Completed 04:10 PM Background runner Background runner No Task currently admitted No verified checkpoint yet Created 04:10 PM Verification mismatch Verification mismatch No Task currently admitted No verified checkpoint yet Created 04:10 PM Stop target Stop target No Task currently admitted No verified checkpoint yet Created 04:10 PM 8 Agents in this Host snapshot Previous Next Recent Missions Accepted Host records · closing this window does not stop a M",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "files",
+          "file": ".\\shots\\cp4-paused-files.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 3 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Files Files from your Missions Results your Host produced, grouped by what Bunny-A verified. Verified files open here. Verified by Bunny-A out.txt File writer · source file · 5 B No Project owns this file, so it cannot be opened from here. Open Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        }
+      ],
+      "island": {
+        "captured": true,
+        "pid": 18152,
+        "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp4-paused-island.png"
+      },
+      "errors": [],
+      "hostSlotsAtRequest": [
+        {
+          "slot": 1,
+          "state": "COMPLETED",
+          "label": "Completed · 6 unverified"
+        },
+        {
+          "slot": 2,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 3,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 4,
+          "state": "WAITING_FOR_USER",
+          "label": "Needs you"
+        }
+      ]
+    },
+    {
+      "name": "cp5-before-close",
+      "captured": true,
+      "at": "2026-10-12T20:15:26.079Z",
+      "summary": "chat strip [[\"chakra\",\"WAITING_FOR_USER\",null],[\"spear\",\"FAILED\",\"failed\"],[\"sword\",\"WAITING_FOR_USER\",null]]; cue deltas []",
+      "pages": [
+        {
+          "view": "chat (live page)",
+          "file": ".\\shots\\cp5-before-close-chat.png",
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": null,
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": null,
+              "cue": "failed",
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": null,
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/favicon.svg",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals 2 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Background runner Vishnu Chakra · 0 of 1 step · 0 verified Needs you Paused runner Spear · 1 of 3 steps · 1 verified Failed Test runner 0 of 1 step · 0 verified Failed Delete request Sword · 1 of 2 steps · 1 verified Needs you Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Needs you Sword Needs you REVIEWS 2 reviews waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueDeltasSinceLastCheckpoint": [
+            {
+              "t": 1791836125589,
+              "kind": "data-state",
+              "value": "IDLE",
+              "weapon": "chakra",
+              "state": "IDLE",
+              "slot": "3"
+            },
+            {
+              "t": 1791836126077,
+              "kind": "data-state",
+              "value": "WAITING_FOR_USER",
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3"
+            }
+          ]
+        },
+        {
+          "view": "agents",
+          "file": ".\\shots\\cp5-before-close-agents.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed (Mission result: 0 verified, 6 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you (Host state: waiting for user)",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you (Host state: waiting for user)",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.pose5.png",
+            "/bunny-a/characters/spear.pose1.png",
+            "/bunny-a/characters/chakra.pose1.png",
+            "/bunny-a/characters/sword.pose1.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals 2 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Agents Personal Agent Studio Name your four Agents and choose the characters that stand for them. Names and looks never change what an Agent may do. Permissions stay where they are. Your four Personal Agents Revision 3 Gada Gada Completed Research pass Edit slot 1 Spear Spear Failed Paused runner Edit slot 2 Vishnu Chakra Vishnu Chakra Needs you Background runner Edit slot 3 Sword Sword Needs you Delete request Edit slot 4 Other agents File writer · completed Test runner · failed Stop target · created Verification mismatch · created Internal team members appear only inside a Mission, as neutral rows. They are never weapons. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Needs you Sword Needs you REVIEWS 2 reviews waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "missions",
+          "file": ".\\shots\\cp5-before-close-missions.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals 2 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Missions Missions Persistent work on your Host. Closing this window does not stop a Mission; you stay in control. New Agent New Agent team 0 Working 4 Needs attention 0 Paused 2 Completed 2 Failed Agent status All Agents Needs attention Running Waiting for user Waiting for dependency Paused Completed Failed Stopped Background runner Background runner No Task currently admitted Before waiting on you Needs you Attention required 04:15 PM Paused runner Paused runner No Task currently admitted After a task finished Failed Attention required 04:12 PM Test runner Test runner No Task currently admitted After a task finished Failed Attention required 04:11 PM Delete request Delete request No Task currently admitted Before waiting on you Needs you Attention required 04:10 PM File writer File writer No Task currently admitted After Bunny verified Completed 04:10 PM Research pass Research pass No Task currently admitted After a task finished Completed 04:10 PM Verification mismatch Verification mismatch No Task currently admitted No verified checkpoint yet Created 04:10 PM Stop target Stop target No Task currently admitted No verified checkpoint yet Created 04:10 PM 8 Agents in this Host snapshot Previous Next Recent Missions Accepted Host records · closing this window d",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "files",
+          "file": ".\\shots\\cp5-before-close-files.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "WAITING_FOR_USER",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals 2 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Files Files from your Missions Results your Host produced, grouped by what Bunny-A verified. Verified files open here. Verified by Bunny-A out.txt File writer · source file · 5 B No Project owns this file, so it cannot be opened from here. Open Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Needs you Sword Needs you REVIEWS 2 reviews waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        }
+      ],
+      "island": {
+        "captured": true,
+        "pid": 18152,
+        "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp5-before-close-island.png"
+      },
+      "errors": [],
+      "hostSlotsAtRequest": [
+        {
+          "slot": 1,
+          "state": "COMPLETED",
+          "label": "Completed · 6 unverified"
+        },
+        {
+          "slot": 2,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 3,
+          "state": "WAITING_FOR_USER",
+          "label": "Needs you"
+        },
+        {
+          "slot": 4,
+          "state": "WAITING_FOR_USER",
+          "label": "Needs you"
+        }
+      ]
+    },
+    {
+      "name": "cp6-close-ui",
+      "captured": true,
+      "at": "2026-10-12T20:15:38.884Z",
+      "summary": "web page closed (browser context closed)",
+      "cueBeforeClose": [
+        {
+          "t": 1791835847118,
+          "kind": "data-state",
+          "value": "SLEEPING",
+          "weapon": null,
+          "state": "SLEEPING",
+          "slot": null
+        },
+        {
+          "t": 1791835868513,
+          "kind": "data-state",
+          "value": "FAILED",
+          "weapon": "chakra",
+          "state": "FAILED",
+          "slot": null
+        },
+        {
+          "t": 1791835868513,
+          "kind": "data-state",
+          "value": "FAILED",
+          "weapon": "chakra",
+          "state": "FAILED",
+          "slot": "3"
+        },
+        {
+          "t": 1791835868514,
+          "kind": "data-cue",
+          "value": "failed",
+          "weapon": "chakra",
+          "state": "FAILED",
+          "slot": null
+        },
+        {
+          "t": 1791835868514,
+          "kind": "data-cue",
+          "value": "failed",
+          "weapon": "chakra",
+          "state": "FAILED",
+          "slot": "3"
+        },
+        {
+          "t": 1791835869434,
+          "kind": "data-cue",
+          "value": null,
+          "weapon": "chakra",
+          "state": "FAILED",
+          "slot": "3"
+        },
+        {
+          "t": 1791835976482,
+          "kind": "data-state",
+          "value": "IDLE",
+          "weapon": "spear",
+          "state": "IDLE",
+          "slot": "2"
+        },
+        {
+          "t": 1791835977109,
+          "kind": "data-state",
+          "value": "WAITING_FOR_USER",
+          "weapon": "spear",
+          "state": "WAITING_FOR_USER",
+          "slot": "2"
+        },
+        {
+          "t": 1791835979120,
+          "kind": "data-state",
+          "value": "FAILED",
+          "weapon": "spear",
+          "state": "FAILED",
+          "slot": null
+        },
+        {
+          "t": 1791835979120,
+          "kind": "data-state",
+          "value": "FAILED",
+          "weapon": "spear",
+          "state": "FAILED",
+          "slot": "2"
+        },
+        {
+          "t": 1791835979122,
+          "kind": "data-cue",
+          "value": "failed",
+          "weapon": "spear",
+          "state": "FAILED",
+          "slot": null
+        },
+        {
+          "t": 1791835979122,
+          "kind": "data-cue",
+          "value": "failed",
+          "weapon": "spear",
+          "state": "FAILED",
+          "slot": "2"
+        },
+        {
+          "t": 1791835980035,
+          "kind": "data-cue",
+          "value": null,
+          "weapon": "spear",
+          "state": "FAILED",
+          "slot": "2"
+        },
+        {
+          "t": 1791836125589,
+          "kind": "data-state",
+          "value": "IDLE",
+          "weapon": "chakra",
+          "state": "IDLE",
+          "slot": "3"
+        },
+        {
+          "t": 1791836126077,
+          "kind": "data-state",
+          "value": "WAITING_FOR_USER",
+          "weapon": "chakra",
+          "state": "WAITING_FOR_USER",
+          "slot": "3"
+        }
+      ],
+      "preShot": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp6-close-ui.png"
+    },
+    {
+      "name": "cp7-reopen-after-background",
+      "captured": true,
+      "at": "2026-10-12T20:17:15.043Z",
+      "summary": "reopened; strip [[\"chakra\",\"FAILED\",null],[\"spear\",\"FAILED\",null],[\"sword\",\"WAITING_FOR_USER\",null]]",
+      "pages": [
+        {
+          "view": "chat",
+          "file": ".\\shots\\cp7-reopen-after-background-chat.png",
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": null,
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": null,
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": null,
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/favicon.svg",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Background runner Vishnu Chakra · 0 of 1 step · 0 verified Failed Paused runner Spear · 1 of 3 steps · 1 verified Failed Test runner 0 of 1 step · 0 verified Failed Delete request Sword · 1 of 2 steps · 1 verified Needs you Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "agents",
+          "file": ".\\shots\\cp7-reopen-after-background-agents.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed (Mission result: 0 verified, 6 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you (Host state: waiting for user)",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.pose5.png",
+            "/bunny-a/characters/spear.pose1.png",
+            "/bunny-a/characters/chakra.pose1.png",
+            "/bunny-a/characters/sword.pose1.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Agents Personal Agent Studio Name your four Agents and choose the characters that stand for them. Names and looks never change what an Agent may do. Permissions stay where they are. Your four Personal Agents Revision 3 Gada Gada Completed Research pass Edit slot 1 Spear Spear Failed Paused runner Edit slot 2 Vishnu Chakra Vishnu Chakra Failed Background runner Edit slot 3 Sword Sword Needs you Delete request Edit slot 4 Other agents File writer · completed Test runner · failed Stop target · created Verification mismatch · created Internal team members appear only inside a Mission, as neutral rows. They are never weapons. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "missions",
+          "file": ".\\shots\\cp7-reopen-after-background-missions.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Missions Missions Persistent work on your Host. Closing this window does not stop a Mission; you stay in control. New Agent New Agent team 0 Working 4 Needs attention 0 Paused 2 Completed 3 Failed Agent status All Agents Needs attention Running Waiting for user Waiting for dependency Paused Completed Failed Stopped Background runner Background runner No Task currently admitted After a task finished Failed Attention required 04:15 PM Paused runner Paused runner No Task currently admitted After a task finished Failed Attention required 04:12 PM Test runner Test runner No Task currently admitted After a task finished Failed Attention required 04:11 PM Delete request Delete request No Task currently admitted Before waiting on you Needs you Attention required 04:10 PM File writer File writer No Task currently admitted After Bunny verified Completed 04:10 PM Research pass Research pass No Task currently admitted After a task finished Completed 04:10 PM Verification mismatch Verification mismatch No Task currently admitted No verified checkpoint yet Created 04:10 PM Stop target Stop target No Task currently admitted No verified checkpoint yet Created 04:10 PM 8 Agents in this Host snapshot Previous Next Recent Missions Accepted Host records · closing this window does",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "files",
+          "file": ".\\shots\\cp7-reopen-after-background-files.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Needs you",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Files Files from your Missions Results your Host produced, grouped by what Bunny-A verified. Verified files open here. Verified by Bunny-A out.txt File writer · source file · 5 B No Project owns this file, so it cannot be opened from here. Open Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Needs you REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        }
+      ],
+      "island": {
+        "captured": true,
+        "pid": 46428,
+        "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp7-reopen-after-background-island.png"
+      },
+      "errors": []
+    },
+    {
+      "name": "cp8-failed",
+      "captured": true,
+      "at": "2026-10-12T20:17:32.606Z",
+      "summary": "chat strip [[\"sword\",\"FAILED\",\"failed\"],[\"chakra\",\"FAILED\",null],[\"spear\",\"FAILED\",null]]; cue deltas [{\"t\":1791836251815,\"kind\":\"data-cue\",\"value\":\"failed\",\"weapon\":\"sword\",\"state\":\"FAILED\",\"slot\":null},{\"t\":1791836251815,\"kind\":\"data-cue\",\"value\":\"failed\",\"weapon\":\"sword\",\"state\":\"FAILED\",\"slot\":\"4\"}]",
+      "pages": [
+        {
+          "view": "chat (live page)",
+          "file": ".\\shots\\cp8-failed-chat.png",
+          "weapon": [
+            {
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": null,
+              "cue": "failed",
+              "alt": "Sword, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": null,
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": null,
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": "4",
+              "cue": "failed",
+              "alt": "Sword, Failed",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/favicon.svg",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Delete request Sword · 1 of 2 steps · 1 verified Failed Background runner Vishnu Chakra · 0 of 1 step · 0 verified Failed Paused runner Spear · 1 of 3 steps · 1 verified Failed Test runner 0 of 1 step · 0 verified Failed Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Failed REVIEWS Nothing waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueDeltasSinceLastCheckpoint": [
+            {
+              "t": 1791836235718,
+              "kind": "data-state",
+              "value": "SLEEPING",
+              "weapon": null,
+              "state": "SLEEPING",
+              "slot": null
+            },
+            {
+              "t": 1791836251814,
+              "kind": "data-state",
+              "value": "FAILED",
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": null
+            },
+            {
+              "t": 1791836251814,
+              "kind": "data-state",
+              "value": "FAILED",
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": "4"
+            },
+            {
+              "t": 1791836251815,
+              "kind": "data-cue",
+              "value": "failed",
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": null
+            },
+            {
+              "t": 1791836251815,
+              "kind": "data-cue",
+              "value": "failed",
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": "4"
+            }
+          ]
+        },
+        {
+          "view": "agents",
+          "file": ".\\shots\\cp8-failed-agents.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed (Mission result: 0 verified, 6 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Failed",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.pose5.png",
+            "/bunny-a/characters/spear.pose1.png",
+            "/bunny-a/characters/chakra.pose1.png",
+            "/bunny-a/characters/sword.pose1.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Agents Personal Agent Studio Name your four Agents and choose the characters that stand for them. Names and looks never change what an Agent may do. Permissions stay where they are. Your four Personal Agents Revision 3 Gada Gada Completed Research pass Edit slot 1 Spear Spear Failed Paused runner Edit slot 2 Vishnu Chakra Vishnu Chakra Failed Background runner Edit slot 3 Sword Sword Failed Delete request Edit slot 4 Other agents File writer · completed Test runner · failed Stop target · created Verification mismatch · created Internal team members appear only inside a Mission, as neutral rows. They are never weapons. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Failed REVIEWS Nothing waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "missions",
+          "file": ".\\shots\\cp8-failed-missions.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Failed",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Missions Missions Persistent work on your Host. Closing this window does not stop a Mission; you stay in control. New Agent New Agent team 0 Working 4 Needs attention 0 Paused 2 Completed 4 Failed Agent status All Agents Needs attention Running Waiting for user Waiting for dependency Paused Completed Failed Stopped Delete request Delete request No Task currently admitted After a task finished Failed Attention required 04:17 PM Background runner Background runner No Task currently admitted After a task finished Failed Attention required 04:15 PM Paused runner Paused runner No Task currently admitted After a task finished Failed Attention required 04:12 PM Test runner Test runner No Task currently admitted After a task finished Failed Attention required 04:11 PM File writer File writer No Task currently admitted After Bunny verified Completed 04:10 PM Research pass Research pass No Task currently admitted After a task finished Completed 04:10 PM Verification mismatch Verification mismatch No Task currently admitted No verified checkpoint yet Created 04:10 PM Stop target Stop target No Task currently admitted No verified checkpoint yet Created 04:10 PM 8 Agents in this Host snapshot Previous Next Recent Missions Accepted Host records · closing this window does not ",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "files",
+          "file": ".\\shots\\cp8-failed-files.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Failed",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Files Files from your Missions Results your Host produced, grouped by what Bunny-A verified. Verified files open here. Verified by Bunny-A out.txt File writer · source file · 5 B No Project owns this file, so it cannot be opened from here. Open Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Failed REVIEWS Nothing waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        }
+      ],
+      "island": {
+        "captured": true,
+        "pid": 46428,
+        "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp8-failed-island.png"
+      },
+      "errors": [],
+      "hostSlotsAtRequest": [
+        {
+          "slot": 1,
+          "state": "COMPLETED",
+          "label": "Completed · 6 unverified"
+        },
+        {
+          "slot": 2,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 3,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 4,
+          "state": "FAILED",
+          "label": "Failed"
+        }
+      ]
+    },
+    {
+      "name": "cp9-stopped",
+      "captured": true,
+      "at": "2026-10-12T20:17:46.370Z",
+      "summary": "chat strip [[\"sword\",\"STOPPED\",null],[\"chakra\",\"FAILED\",null],[\"spear\",\"FAILED\",null]]; cue deltas [{\"t\":1791836252792,\"kind\":\"data-cue\",\"value\":null,\"weapon\":\"sword\",\"state\":\"FAILED\",\"slot\":\"4\"}]",
+      "pages": [
+        {
+          "view": "chat (live page)",
+          "file": ".\\shots\\cp9-stopped-chat.png",
+          "weapon": [
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": null,
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": null,
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": null,
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/favicon.svg",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Stop target Sword · 0 of 1 step · 0 verified Stopped Delete request 1 of 2 steps · 1 verified Failed Background runner Vishnu Chakra · 0 of 1 step · 0 verified Failed Paused runner Spear · 1 of 3 steps · 1 verified Failed Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Stopped REVIEWS Nothing waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueDeltasSinceLastCheckpoint": [
+            {
+              "t": 1791836252792,
+              "kind": "data-cue",
+              "value": null,
+              "weapon": "sword",
+              "state": "FAILED",
+              "slot": "4"
+            },
+            {
+              "t": 1791836265342,
+              "kind": "data-state",
+              "value": "IDLE",
+              "weapon": "sword",
+              "state": "IDLE",
+              "slot": "4"
+            },
+            {
+              "t": 1791836265807,
+              "kind": "data-state",
+              "value": "WAITING_FOR_USER",
+              "weapon": "sword",
+              "state": "WAITING_FOR_USER",
+              "slot": "4"
+            },
+            {
+              "t": 1791836266173,
+              "kind": "data-state",
+              "value": "STOPPED",
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": null
+            },
+            {
+              "t": 1791836266173,
+              "kind": "data-state",
+              "value": "STOPPED",
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4"
+            }
+          ]
+        },
+        {
+          "view": "agents",
+          "file": ".\\shots\\cp9-stopped-agents.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed (Mission result: 0 verified, 6 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped (Host state: stopped)",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.pose5.png",
+            "/bunny-a/characters/spear.pose1.png",
+            "/bunny-a/characters/chakra.pose1.png",
+            "/bunny-a/characters/sword.pose1.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Agents Personal Agent Studio Name your four Agents and choose the characters that stand for them. Names and looks never change what an Agent may do. Permissions stay where they are. Your four Personal Agents Revision 4 Gada Gada Completed Research pass Edit slot 1 Spear Spear Failed Paused runner Edit slot 2 Vishnu Chakra Vishnu Chakra Failed Background runner Edit slot 3 Sword Sword Stopped Stop target Edit slot 4 Other agents File writer · completed Test runner · failed Delete request · failed Verification mismatch · created Internal team members appear only inside a Mission, as neutral rows. They are never weapons. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Stopped REVIEWS Nothing waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "missions",
+          "file": ".\\shots\\cp9-stopped-missions.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Missions Missions Persistent work on your Host. Closing this window does not stop a Mission; you stay in control. New Agent New Agent team 0 Working 4 Needs attention 0 Paused 2 Completed 4 Failed Agent status All Agents Needs attention Running Waiting for user Waiting for dependency Paused Completed Failed Stopped Delete request Delete request No Task currently admitted After a task finished Failed Attention required 04:17 PM Background runner Background runner No Task currently admitted After a task finished Failed Attention required 04:15 PM Paused runner Paused runner No Task currently admitted After a task finished Failed Attention required 04:12 PM Test runner Test runner No Task currently admitted After a task finished Failed Attention required 04:11 PM Stop target Stop target No Task currently admitted Before waiting on you Stopped 04:17 PM File writer File writer No Task currently admitted After Bunny verified Completed 04:10 PM Research pass Research pass No Task currently admitted After a task finished Completed 04:10 PM Verification mismatch Verification mismatch No Task currently admitted No verified checkpoint yet Created 04:10 PM 8 Agents in this Host snapshot Previous Next Recent Missions Accepted Host records · closing this window does not stop ",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "files",
+          "file": ".\\shots\\cp9-stopped-files.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 4 Agents Projects Files Approvals Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Files Files from your Missions Results your Host produced, grouped by what Bunny-A verified. Verified files open here. Verified by Bunny-A out.txt File writer · source file · 5 B No Project owns this file, so it cannot be opened from here. Open Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Stopped REVIEWS Nothing waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        }
+      ],
+      "island": {
+        "captured": true,
+        "pid": 46428,
+        "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp9-stopped-island.png"
+      },
+      "errors": [],
+      "hostSlotsAtRequest": [
+        {
+          "slot": 1,
+          "state": "COMPLETED",
+          "label": "Completed · 6 unverified"
+        },
+        {
+          "slot": 2,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 3,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 4,
+          "state": "STOPPED",
+          "label": "Stopped"
+        }
+      ]
+    },
+    {
+      "name": "cp10-final",
+      "captured": true,
+      "at": "2026-10-12T20:17:59.767Z",
+      "summary": "chat strip [[\"sword\",\"STOPPED\",null],[\"chakra\",\"FAILED\",null]]; cue deltas []",
+      "pages": [
+        {
+          "view": "chat (live page)",
+          "file": ".\\shots\\cp10-final-chat.png",
+          "weapon": [
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": null,
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": null,
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/favicon.svg",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 5 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Monday, October 12 Good afternoon What would you like to do today? Ask Bunny What do you want Bunny to do? Task description Deep Research Create PDF Build Website Fast Balanced Deep Project Auto Route Auto Codex · unavailable Claude · unavailable Ollama · unavailable OpenCode · unavailable Cline · unavailable Cursor · unavailable Local only Off Ctrl + Enter to route Route task Web Files Code Voice Create a project Analyze code Fix errors Research anything Manage files Recent Missions All Missions Verification mismatch 0 of 1 step · 0 verified Needs you Stop target Sword · 0 of 1 step · 0 verified Stopped Delete request 1 of 2 steps · 1 verified Failed Background runner Vishnu Chakra · 0 of 1 step · 0 verified Failed Recent ordinary Tasks Start a conversation. Replies and outcomes come from the supported Host Task path. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Stopped REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueDeltasSinceLastCheckpoint": []
+        },
+        {
+          "view": "agents",
+          "file": ".\\shots\\cp10-final-agents.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed (Mission result: 0 verified, 6 unverified)",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed (Host state: failed)",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped (Host state: stopped)",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.pose5.png",
+            "/bunny-a/characters/spear.pose1.png",
+            "/bunny-a/characters/chakra.pose1.png",
+            "/bunny-a/characters/sword.pose1.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 5 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Agents Personal Agent Studio Name your four Agents and choose the characters that stand for them. Names and looks never change what an Agent may do. Permissions stay where they are. Your four Personal Agents Revision 4 Gada Gada Completed Research pass Edit slot 1 Spear Spear Failed Paused runner Edit slot 2 Vishnu Chakra Vishnu Chakra Failed Background runner Edit slot 3 Sword Sword Stopped Stop target Edit slot 4 Other agents File writer · completed Test runner · failed Delete request · failed Verification mismatch · waiting for user Internal team members appear only inside a Mission, as neutral rows. They are never weapons. Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Stopped REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "missions",
+          "file": ".\\shots\\cp10-final-missions.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/sword.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 5 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Missions Missions Persistent work on your Host. Closing this window does not stop a Mission; you stay in control. New Agent New Agent team 0 Working 5 Needs attention 0 Paused 2 Completed 4 Failed Agent status All Agents Needs attention Running Waiting for user Waiting for dependency Paused Completed Failed Stopped Verification mismatch Verification mismatch No Task currently admitted Before waiting on you Needs you Attention required 04:17 PM Delete request Delete request No Task currently admitted After a task finished Failed Attention required 04:17 PM Background runner Background runner No Task currently admitted After a task finished Failed Attention required 04:15 PM Paused runner Paused runner No Task currently admitted After a task finished Failed Attention required 04:12 PM Test runner Test runner No Task currently admitted After a task finished Failed Attention required 04:11 PM Stop target Stop target No Task currently admitted Before waiting on you Stopped 04:17 PM File writer File writer No Task currently admitted After Bunny verified Completed 04:10 PM Research pass Research pass No Task currently admitted After a task finished Completed 04:10 PM 8 Agents in this Host snapshot Previous Next Recent Missions Accepted Host records · closing this win",
+          "cueLogOnFirstLoad": 1
+        },
+        {
+          "view": "files",
+          "file": ".\\shots\\cp10-final-files.png",
+          "overflowX": false,
+          "weapon": [
+            {
+              "weapon": "gada",
+              "state": "COMPLETED",
+              "slot": "1",
+              "cue": null,
+              "alt": "Gada, Completed",
+              "view": null
+            },
+            {
+              "weapon": "spear",
+              "state": "FAILED",
+              "slot": "2",
+              "cue": null,
+              "alt": "Spear, Failed",
+              "view": null
+            },
+            {
+              "weapon": "chakra",
+              "state": "FAILED",
+              "slot": "3",
+              "cue": null,
+              "alt": "Vishnu Chakra, Failed",
+              "view": null
+            },
+            {
+              "weapon": "sword",
+              "state": "STOPPED",
+              "slot": "4",
+              "cue": null,
+              "alt": "Sword, Stopped",
+              "view": null
+            }
+          ],
+          "companion": [
+            {
+              "state": "SLEEPING",
+              "cue": null,
+              "alt": "Bunny is Sleeping"
+            }
+          ],
+          "images": [
+            "/favicon.svg",
+            "/bunny-a/characters/bunny.sleeping.png",
+            "/bunny-a/characters/gada.compact.png",
+            "/bunny-a/characters/spear.compact.png",
+            "/bunny-a/characters/chakra.compact.png",
+            "/bunny-a/characters/sword.compact.png"
+          ],
+          "text": "Skip to content BunnyA Chat Missions 5 Agents Projects Files Approvals 1 Activity Settings SYSTEM Models Devices Work stays with your Host. Host connected Light appearance Your personal workspace Live · Updated just now Files Files from your Missions Results your Host produced, grouped by what Bunny-A verified. Verified files open here. Verified by Bunny-A out.txt File writer · source file · 5 B No Project owns this file, so it cannot be opened from here. Open Verification failed bad.txt Verification mismatch · source file · 5 B Not verified yet, so it cannot be opened from here. Open bad.txt Verification mismatch · source file · 5 B Not verified yet, so it cannot be opened from here. Open bad.txt Verification mismatch · source file · 5 B Not verified yet, so it cannot be opened from here. Open Context PERSONAL AGENTS Gada Completed · 6 unverified Spear Failed Vishnu Chakra Failed Sword Stopped REVIEWS 1 review waiting for you HOST Live MODEL ACTIVITY Nothing is running on your Host. SYSTEM CPU not reported Memory 0% used GPU not reported Live sample QUICK ACTIONS New chat Open Activity Closing this window does not stop a Mission. Work continues on your Host. Bunny-A Host authority · independently verified results",
+          "cueLogOnFirstLoad": 1
+        }
+      ],
+      "island": {
+        "captured": true,
+        "pid": 46428,
+        "file": "C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\shots\\cp10-final-island.png"
+      },
+      "errors": [],
+      "hostSlotsAtRequest": [
+        {
+          "slot": 1,
+          "state": "COMPLETED",
+          "label": "Completed · 6 unverified"
+        },
+        {
+          "slot": 2,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 3,
+          "state": "FAILED",
+          "label": "Failed"
+        },
+        {
+          "slot": 4,
+          "state": "STOPPED",
+          "label": "Stopped"
+        }
+      ]
+    }
+  ],
+  "finalSlots": [
+    {
+      "slot": 1,
+      "weapon": "gada",
+      "agent": "Research pass",
+      "presentation": {
+        "state": "COMPLETED",
+        "label": "Completed · 6 unverified",
+        "basis": {
+          "kind": "mission-result",
+          "verifiedSteps": 0,
+          "unverifiedSteps": 6
+        }
+      },
+      "progress": {
+        "completed": 6,
+        "total": 6,
+        "verified": 0
+      },
+      "result": {
+        "verifiedSteps": 0,
+        "unverifiedSteps": 6
+      },
+      "pendingApprovals": 0
+    },
+    {
+      "slot": 2,
+      "weapon": "spear",
+      "agent": "Paused runner",
+      "presentation": {
+        "state": "FAILED",
+        "label": "Failed",
+        "basis": {
+          "kind": "agent-state",
+          "agentState": "FAILED"
+        }
+      },
+      "progress": {
+        "completed": 1,
+        "total": 3,
+        "verified": 1
+      },
+      "result": null,
+      "pendingApprovals": 0
+    },
+    {
+      "slot": 3,
+      "weapon": "chakra",
+      "agent": "Background runner",
+      "presentation": {
+        "state": "FAILED",
+        "label": "Failed",
+        "basis": {
+          "kind": "agent-state",
+          "agentState": "FAILED"
+        }
+      },
+      "progress": {
+        "completed": 0,
+        "total": 1,
+        "verified": 0
+      },
+      "result": null,
+      "pendingApprovals": 0
+    },
+    {
+      "slot": 4,
+      "weapon": "sword",
+      "agent": "Stop target",
+      "presentation": {
+        "state": "STOPPED",
+        "label": "Stopped",
+        "basis": {
+          "kind": "agent-state",
+          "agentState": "STOPPED"
+        }
+      },
+      "progress": {
+        "completed": 0,
+        "total": 1,
+        "verified": 0
+      },
+      "result": null,
+      "pendingApprovals": 0
+    }
+  ],
+  "agentStates": [
+    {
+      "name": "Research pass",
+      "state": "COMPLETED",
+      "failure": null
+    },
+    {
+      "name": "File writer",
+      "state": "COMPLETED",
+      "failure": null
+    },
+    {
+      "name": "Test runner",
+      "state": "FAILED",
+      "failure": "TASK_FAILED"
+    },
+    {
+      "name": "Delete request",
+      "state": "FAILED",
+      "failure": "AUTHORITY_LOST"
+    },
+    {
+      "name": "Paused runner",
+      "state": "FAILED",
+      "failure": "TASK_FAILED"
+    },
+    {
+      "name": "Stop target",
+      "state": "STOPPED",
+      "failure": null
+    },
+    {
+      "name": "Verification mismatch",
+      "state": "WAITING_FOR_USER",
+      "failure": null
+    },
+    {
+      "name": "Background runner",
+      "state": "FAILED",
+      "failure": "TASK_FAILED"
+    }
+  ],
+  "islandLog": [
+    {
+      "at": "2026-10-12T20:10:37.251Z",
+      "event": "launched",
+      "pid": 18152
+    },
+    {
+      "at": "2026-10-12T20:15:39.408Z",
+      "event": "closed",
+      "pid": 18152
+    },
+    {
+      "at": "2026-10-12T20:17:14.971Z",
+      "event": "launched",
+      "pid": 46428
+    }
+  ]
+}

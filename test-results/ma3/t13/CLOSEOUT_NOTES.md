@@ -1,0 +1,31 @@
+# T13 closeout verification notes
+
+Final source: `8145377880fa4ab330238db827fa488430b2328d`; implementation pin before the two native compatibility repairs: `5152e937eae57895eaf8dd55ad44f99c6f44911d`.
+
+## Evidence classification and corrections
+
+- `live-agentic/final-live/results.json`: **40/40 LIVE checks**, genuine disposable Host, filesystem and shell-free Node tests, real web projection. Includes finite permission review, pause/admission hold/resume, verified outcomes, stop/deny, and completion with the entire browser context closed. This rerun waits for actual rendered state rather than assuming a fixed delay. Earlier attempts remain diagnostic evidence and are not counted as passing.
+- `live-agentic/attempt5-poll-window`: premature animation captures during concurrent development work. The final rerun proves the actual state and one-shot transitions; this earlier run's failures are not silently erased.
+- `live-agentic/aborted-final-live4-agentic-scope`: an explicit delegated Node script scope does not bind `node --test <file>`. `allow_once` cannot enlarge that scope. This is a preexisting conservative scope restriction; repeated one-time asks are a known UX limitation. The final demo uses the supported reviewed-plan path. No authority gate was loosened.
+- `live-notch/live-dock-receipts.json`: **18/18 earlier-source native checks** with a real disposable Host. Pointer-release positions were synthetic; recorded keyboard/fallback details identify what actually happened. One monitor at 150% scaling was available. These are not multi-monitor or final-source keyboard acceptance.
+- `native-peer-check.json`: **software-unit verification** of the current product Button factory, standard WPF automation control type, Name, Tab stop and Invoke pattern. No visible desktop window or key input was automated. The supported Windows tool did not expose the development overlay in its returned window inventory, so final physical Tab/Enter/Space/minimize checks remain **NOT TESTED**.
+- Native HAPPY precedence, same-Agent verification, rebind/reconnect cue suppression, reduced-motion level freeze, removed-chip cleanup and visibility/minimize gates were re-read by the root after the separate reviewer authored repairs. This is a source/test cross-check, not an external independent release audit.
+- `live-voice/results.json` and `verifier-reanalysis.json`: preserve the historical real-worker run. The raw Host interruption failure was corrected from the timeline at +20 ms; the web showed Speaking until 626 ms after the external Host cancellation receipt. The cached two-second render clock caused a separate READY blip and was fixed. New native HAPPY precedence and protected delayed-reply checks are covered by software tests. A fresh final-source acoustic/human interruption trial was **NOT TESTED**. No universal cancellation-latency claim is made.
+- `phone/final/report-live.json`: prior portrait coverage at 320/375/390/430 widths; landscape failures were real and repaired by giving the companion the full viewport instead of the desktop sidebar column. Final landscape Home/Settings were operated using the supported browser tool: width 844, no root overflow or undersized visible buttons in Settings. Those captures used an offline gateway context; final smoke captures use real disposable Host data.
+- `phone/final/report-pairing.json` and `report-host-changed.json`: the expected states were **not reached** in the workstation simulation. They do not prove paired-device revocation, pairing or Host-change UX. Device policy/model tests remain separate; physical phone, LAN and internet transport are **NOT TESTED**.
+- Final development and exact Windows-package browser smoke passes are console-clean, show content in both viewports, and report **no divergence**. The generic Vercel preview's initial Connecting render is preserved as a diagnostic; the Windows package was verified through the same Node HTTP middleware adapter used by its gateway. No deployed Vercel service is claimed.
+- Browser phone captures on loopback are **workstation context**; a Talk to Bunny button there is not a physical-phone voice claim. Device-context policy shows “Voice is available on your PC.”
+
+## Performance and visual approval
+
+Earlier measured headless active animation windows were about 25–26 FPS versus 57.7 FPS with animation artificially paused. Earlier native CPU averages were 28.07% of one core collapsed, 38.02% expanded and 6.04% with Motion Off; the historical minimized sample remained 18.59% before the new hidden-motion fix. These are historical measurements on one configuration, not a 60 FPS guarantee or a final minimized-cost measurement.
+
+The supplied board is the creative source. Its Companion States helmet/ears/visor character is the selected Bunny; Gada, Spear, Vishnu Chakra and Sword retain the board's weapon silhouettes. Character art was cropped/matted and composed locally, not regenerated or published. Still transforms and effect layers provide motion; paid Higgsfield loops were unavailable to the original session. Final visual acceptance is **provisional**: no high-fidelity design approval from the user was recorded. T14's independent integration/release audit has not started.
+
+## Regression setup
+
+The first archive run lacked Git clone metadata and the gitignored whisper dependencies; it also caught a non-ASCII native comment and an obsolete source assertion. The two source issues were repaired. A clean detached managed checkout supplied the existing pinned whisper files. The first script lane there lacked the local Node license; the existing license was copied byte-for-byte. Failed runs are retained separately. Final distinct regression accounting uses one successful log per suite from the same source pin; focused tests are not added again.
+
+## Production boundary
+
+Read-only observations preserve the installed v26 release/file manifest and Host/gateway process identities. Between the original session observation and resumption, four background journal events and provider-observation rows changed; these are disclosed rather than claiming an invariant live database. No installation, migration, production restart, tunnel activation, Startup/credential change, push or deployment was performed.

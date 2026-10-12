@@ -1,0 +1,26 @@
+[
+  {
+    "suite": "scripts",
+    "from": "V49: indicator layout is bounded (at most 3 chips plus one overflow chip) and counts overflow exactly",
+    "to": "V49: indicator layout is bounded (at most 4 weapon chips plus one overflow chip) and counts overflow exactly",
+    "reason": "The T13 directive explicitly replaces the three-provider strip with exactly four Personal Agent weapons. Bounded overflow and exact counting remain tested."
+  },
+  {
+    "suite": "scripts",
+    "from": "V47/V48: the indicator axis follows the notch orientation (a column beside a horizontal notch, a row above a vertical one)",
+    "to": "V47/V48: the indicator axis follows the notch orientation (ONE row beside a horizontal notch, ONE column above a vertical one)",
+    "reason": "The locked T13 geometry requires one connected row to the left for top/bottom and one column above for left/right. Orientation and placement remain tested with the new contract."
+  },
+  {
+    "suite": "scripts",
+    "from": "T11 chips: team members are lettered by role and their tooltip names role, state and their own task",
+    "to": "T13 chips: team members get no letter; their tooltip names role, state and their own task",
+    "reason": "T13 explicitly prohibits internal workers from appearing as character identities. The same real PowerShell tooltip function still checks role, state and task, and now refuses a letter identity."
+  },
+  {
+    "suite": "scripts",
+    "from": "T11 chips: the notch draws chips from the shared facts, never a second lettering rule",
+    "to": "T13 strip: the notch draws weapon characters from the slot contract, never letters or team members",
+    "reason": "The new Personal Agent slot contract is the only character source; the revised test rejects the old internal-Agent and lettering path. This is an explicit UI-contract replacement, not an unchanged assertion."
+  }
+]
