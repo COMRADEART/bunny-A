@@ -56,6 +56,8 @@ function voiceCollapseKey(transcript: string): string {
 }
 /** T12-AUTH-04: "pause the mission" has no voice answer; Missions are paused per Agent or on the Windows Host screen. */
 export const MISSION_PAUSE_TEXT = "Missions are paused and resumed per Agent, or on the Windows Host screen. Nothing was changed.";
+/** T12: speech at least this long is recognized by the worker (shorter bursts end as stt.none too_short without a decode). */
+const MIN_RECOGNIZED_SPEECH_MS = 250;
 /** T12 AEC-02: a turn whose speech starts this soon after Bunny's output stopped is still the output's tail, not a new turn. */
 const OUTPUT_OVERLAP_TAIL_MS = 300;
 /** T12 AEC-02: how many recent output windows are kept for the overlap check. */
@@ -1722,8 +1724,20 @@ export class VoiceSessionManager {
     hold.cancelResume?.();
     hold.cancelResume = this.schedule(() => {
       hold.cancelResume = null;
-      if (this.hold === hold) this.resumeHeld("no_interrupt_evidence");
+      if (this.hold !== hold) return;
+      // T12 live finding (human trial 4): a short question is decoded 1.5-3 s after it ends, later than this deadline, so the
+      // old answer resumed over the user before their words were known. Real speech (not a short burst) whose recognition has
+      // not reported yet keeps the reply held; its final, its none, or heldMaxMs decides. A cough or click still resumes here.
+      if (this.awaitingRecognition(hold)) return;
+      this.resumeHeld("no_interrupt_evidence");
     }, VOICE_LIMITS.heldResumeMs);
+  }
+
+  /** Whether the hold's owning input turn spoke for real (beyond a short burst) and its recognition has not reported yet. */
+  private awaitingRecognition(hold: Hold): boolean {
+    const owner = this.inputFor(hold.inputTurn, hold.inputGen);
+    if (!owner || owner.dropped || this.finalized.has(owner.turn)) return false;
+    return owner.controller.speechMs >= MIN_RECOGNIZED_SPEECH_MS;
   }
 
   /**

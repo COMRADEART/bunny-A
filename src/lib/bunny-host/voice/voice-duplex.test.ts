@@ -674,6 +674,43 @@ test("T12 hold (item 3): a 200 ms burst during output resumes the reply on the b
   await h.session.close();
 });
 
+test("T12 live trial 4: real speech whose recognition is late keeps the reply held past heldResumeMs; the late question interrupts", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final();
+  h.speaking();
+  const gen = h.session.snapshot().generation;
+  const admitted = h.admissions.length;
+  h.emitInput({ ev: "vad", state: "speech_start", onsetMono: 50, mono: 60 });
+  h.emitInput({ ev: "level", rms: 0.02, peak: 0.04, speech: true, speechMs: 900 });
+  h.emitInput({ ev: "vad", state: "speech_end", speechMs: 900 });
+  h.advance(VOICE_LIMITS.heldResumeMs + 1500);
+  assert.equal(h.session.snapshot().outputHeld, true, "the reply waits for the user's words, not for the resume timer");
+  assert.ok(!pauses(h.worker()).some((c) => !c.on && c.gen === gen), "no pause-off was sent before recognition reported");
+  h.emitInput({ ev: "stt.final", text: "What is two plus two?", confidence: 0.85 });
+  await tick();
+  assert.equal(h.session.snapshot().lastBargeIn?.outcome, "interrupted");
+  assert.ok(!pauses(h.worker()).some((c) => !c.on && c.gen === gen), "the old answer never resumes");
+  assert.equal(h.admissions.length, admitted + 1, "the late question is routed exactly once");
+  await h.session.close();
+});
+
+test("T12 live trial 4: the late-recognition hold is still bounded by heldMaxMs (cancel, never a stale resume)", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final();
+  h.speaking();
+  const gen = h.session.snapshot().generation;
+  h.emitInput({ ev: "vad", state: "speech_start", onsetMono: 50, mono: 60 });
+  h.emitInput({ ev: "level", rms: 0.02, peak: 0.04, speech: true, speechMs: 900 });
+  h.emitInput({ ev: "vad", state: "speech_end", speechMs: 900 });
+  h.advance(VOICE_LIMITS.heldMaxMs + 10);
+  assert.equal(h.session.snapshot().outputHeld, false);
+  assert.equal(h.session.snapshot().lastBargeIn?.outcome, "interrupted");
+  assert.ok(!pauses(h.worker()).some((c) => !c.on && c.gen === gen), "never resumed stale");
+  await h.session.close();
+});
+
 test("T12 hold: without an end marker, a held reply resumes at heldResumeMs after the last activity and not before", async () => {
   const h = await harness();
   await h.begin();
