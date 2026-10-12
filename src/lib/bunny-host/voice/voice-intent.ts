@@ -281,18 +281,23 @@ const DEVICE_ACTION: RegExp[] = [
  * "Saved to your desktop."). General statements ("Word saves it once a file has been saved"), denials ("I deleted nothing")
  * and figurative uses ("I opened with the main point", "I ran the numbers", "I set up a plan") are not claims.
  */
-const ACTION_WORD = new RegExp(`^(?:open|sav|delet|remov|send|sent|email|e-mail|text|messag|call|phon|launch|install|uninstall|reinstall|approv|execut|run|ran|start|stop|paus|resum|clos|end|enabl|disabl|turn|shut|switch|restart|reboot|deploy|push|publish|merg|commit|shar|copi|copy|backed|backing|kill|terminat|clear|empti|empty|refresh|post|order|bought|buy|purchas|pay|paid|transfer|set|book|schedul|add|creat|upload|download|mut|unmut|renam|mov|archiv|forward|repli|reply|print|revert|wip|format|updat|upgrad|configur|chang|cancel|grant|submit|lock|unlock|activat|deactivat|reset|fil)(?:e|es|ed|d|s|ing|ied|ies|y|ped|ping|ted|ting|led|ling|red|ring|ned|ning)?$`);
+const ACTION_WORD = new RegExp(`^(?:open|sav|delet|remov|send|sent|email|e-mail|text|messag|call|phon|launch|install|uninstall|reinstall|approv|execut|run|ran|start|stop|paus|resum|clos|end|enabl|disabl|turn|shut|switch|restart|reboot|deploy|push|publish|merg|commit|shar|copi|copy|backed|backing|kill|terminat|clear|empti|empty|refresh|post|order|bought|buy|purchas|pay|paid|transfer|set|book|schedul|add|creat|upload|download|mut|unmut|renam|mov|archiv|forward|repli|reply|print|revert|wip|format|updat|upgrad|configur|chang|cancel|grant|submit|lock|unlock|activat|deactivat|reset|fil|confirm|reject|halt|authori[sz]|resolv|deni|deny|dismiss|accept|declin|abort|suspend|block|unblock|permit|cut|pull|put|handl|gave|give|giv)(?:e|es|ed|d|s|ing|ied|ies|y|ped|ping|ted|ting|led|ling|red|ring|ned|ning|en)?$`);
 // Words that end the search for Bunny's verb: a negation or a hypothetical makes the clause no claim.
-const CLAIM_STOP = /^(?:'d|not|n't|never|no|cannot|can't|couldn't|can|could|would|wouldn't|should|shouldn't|might|may|must|don't|didn't|doesn't|won't|haven't|hasn't|hadn't|isn't|aren't|wasn't|unable|if|whether|to|recommend|suggest|think|believe|know|see|understand|like|love|want|need|hope|wish|feel)$/;
+const CLAIM_STOP = /^(?:'d|not|n't|never|no|cannot|can't|couldn't|can|could|would|wouldn't|should|shouldn't|might|may|must|don't|didn't|doesn't|won't|haven't|hasn't|hadn't|isn't|aren't|wasn't|unable|if|whether|recommend|suggest|think|believe|know|see|understand|like|love|want|need|hope|wish|feel|used|try|tried|trying)$/;
 // Fillers allowed between Bunny and the verb ("I've just gone ahead and paused it", "I have, in fact, shut it down").
-const CLAIM_FILLER = /^(?:'ve|'ll|'m|'re|have|has|had|am|is|are|was|were|will|shall|just|already|now|then|also|went|gone|go|going|got|get|did|do|ahead|and|in|fact|actually|successfully|quickly|finally|instead|for|you)$/;
+const CLAIM_FILLER = /^(?:'ve|'ll|'m|'re|have|has|had|am|is|are|was|were|been|will|shall|just|already|now|then|also|went|gone|go|going|got|get|did|do|ahead|and|in|fact|actually|successfully|quickly|finally|instead|for|you|to|managed|able|right|away)$/;
 // Figurative or non-action uses after the verb ("opened with", "ran into", "ended up", "changed my mind", "set up a plan").
-const NOT_ACTION_AFTER = /^(?:nothing|none|no|neither|with|into|across|up|out|over|through|the numbers|my mind|attention)\b/;
+const NOT_ACTION_AFTER = /^(?:nothing|none|no|neither|with|into|across|up|out|over|through|together|forward|the numbers|my mind|attention|a lot|some thought|it this way|it simply|it like)\b/;
 const BUNNY = /^(?:i|we|bunny|i've|i'll|i'm|i'd|we've|we'll|we're|we'd)$/;
-const DONE_SUBJECT = "(?:the|your|my|this|that) (?:[\\w'-]+ )?(?:agents?|missions?|tasks?|team|timers?|alarms?|reminders?|emails?|messages?|texts?|files?|folders?|documents?|notes?|apps?|session|voice|server|process|commits?|branch|meetings?|events?|appointments?|orders?|requests?|reports?|drafts?|backups?|updates?|approvals?|permissions?)";
-const DONE_PARTICIPLE = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled|set|booked|added|scheduled|updated|granted|muted|unmuted|turned (?:on|off)|switched (?:on|off)|shut down|restarted|deployed|pushed|published|merged|shared|copied|backed up|cleared|emptied|posted|ordered|paid|transferred|uploaded|downloaded|e-?mailed|texted|forwarded|submitted|finished|completed|made|renamed|moved|archived|printed)";
+const DONE_SUBJECT = "(?:(?:the|your|my|this|that) )?(?:[\\w'-]+ )?(?:agents?|missions?|tasks?|team|timers?|alarms?|reminders?|emails?|messages?|texts?|files?|folders?|documents?|notes?|apps?|session|voice|server|process|commits?|branch|meetings?|events?|appointments?|orders?|requests?|reports?|drafts?|backups?|updates?|approvals?|permissions?|deploy(?:ment)?s?|builds?)(?: [\\w'-]+){0,4}?";
+const DONE_PARTICIPLE = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled|set|booked|added|scheduled|updated|granted|muted|unmuted|turned (?:on|off)|switched (?:on|off)|shut down|restarted|deployed|pushed|published|merged|shared|copied|backed up|cleared|emptied|posted|ordered|paid|transferred|uploaded|downloaded|e-?mailed|texted|forwarded|submitted|finished|completed|made|renamed|moved|archived|printed|terminated|killed|halted|aborted|suspended|rejected|denied|confirmed|resolved|authori[sz]ed|accepted|declined|blocked|handled|taken care of)";
 const GENERAL_AFTER = "(?!\\s+(?:automatically|by default|by most|by many|by the (?:app|system|editor)|when|whenever|once|if|unless|until|before|after|every|each|regularly|periodically))";
 const DONE_CLAIMS: RegExp[] = [
+  // Round 6: elliptical completions ("Finished.", "Consider it done.", "It's all taken care of.", "I've taken care of it.").
+  /^(?:finished|done and dusted|consider it done|(?:it'?s|that'?s|it is|that is|everything is|everything'?s) (?:all )?(?:taken care of|handled|sorted(?: out)?|done)|all (?:taken care of|handled|sorted|done))[\s.!]*$/,
+  /\b(?:i|we|bunny)(?:'ve| have| has| just| already)* (?:taken care of|handled|sorted out|dealt with) (?:it|that|this|them|everything|the)\b/,
+  // Round 6: Bunny doing something to any object right now ("Opening the report for you now.", "Launching Word for you.").
+  /^(?:opening|sending|launching|restarting|starting|stopping|pausing|saving|deleting|closing|ending|emailing|e-mailing|scheduling|creating|deploying|pushing|approving|cancell?ing|running|installing|uninstalling|uploading|downloading|forwarding|posting|booking|ordering|muting|shutting) (?:the |a |an |your |my )?[\w'-]+(?: [\w'-]+){0,3}? (?:for you|now|right now|right away|immediately)\b/,
   // "The agent has stopped.", "Your reminder has been created for 9 AM.", "The timer is set for five minutes."
   new RegExp(`\\b${DONE_SUBJECT}(?:'s| has| have| had| is| are| was| were| got)?(?: now| just| already| all| been| successfully)* ${DONE_PARTICIPLE}\\b${GENERAL_AFTER}`),
   // "It's been saved.", "It has been sent."
@@ -332,16 +337,20 @@ function bunnyActs(clause: string): boolean {
   return false;
 }
 
+/** Round 6: a Host-state phrase inside a question, a negation or a condition reports nothing as done. */
+const DONE_QUALIFIED = /\b(?:can't|cannot|not|whether|if|unless|don't|doesn't|unknown|unclear|check|once|when|until|after|before|ask|see if|find out)\b/;
+
 export function claimsAction(text: string): boolean {
   const t = text.toLowerCase().replace(/[’`]/g, "'").replace(/[—–]/g, ",").replace(/\s+/g, " ").trim();
   for (const sentence of t.split(/(?<=[.!?])\s+/)) {
     // The whole sentence too, so a parenthetical ("I have, in fact, shut it down") never splits Bunny from its verb.
     if (bunnyActs(sentence.replace(/[,;:]/g, " "))) return true;
+    if (DONE_CLAIMS.some((re) => re.test(sentence.trim()) && !DONE_QUALIFIED.test(sentence))) return true;
     // Every clause is judged on its own, so a lead-in ("Good news,", "Alright then,") never hides a claim.
     for (const raw of sentence.split(/[,;:]\s*/)) {
       const clause = raw.trim().replace(/^(?:(?:and|so|then|now|well|okay|ok|sure|alright|right|yes|yeah|great|perfect|done|good news)\s+)+/, "");
       if (!clause) continue;
-      if (bunnyActs(clause) || DONE_CLAIMS.some((re) => re.test(clause))) return true;
+      if (bunnyActs(clause) || DONE_CLAIMS.some((re) => re.test(clause) && !DONE_QUALIFIED.test(clause))) return true;
     }
   }
   return false;

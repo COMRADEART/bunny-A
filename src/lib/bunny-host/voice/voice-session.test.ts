@@ -2114,3 +2114,20 @@ test("T12 live: an ordinary model answer is untouched by the claim guard", async
   assert.equal(h.session.snapshot().answerSource, "model");
   assert.ok(!h.worker.ofOp("speak").some((command) => command.text === SPOKEN_ACTION_CLAIM_TEXT));
 });
+
+test("T12 review r6: a claim split across two streamed chunks is still replaced", async () => {
+  const h = setup();
+  await h.open();
+  await h.session.listenStart();
+  h.worker.emit({ ev: "stt.final", turn: h.session.snapshot().turnId, gen: h.session.snapshot().generation, text: "Tell me something nice.", confidence: 0.9 });
+  await h.flush();
+  h.chat.text("task-1", "Okay, sure, I have finally");
+  h.advance(600);
+  await h.flush();
+  h.chat.text("task-1", " shut the agent down. It is quiet now.");
+  h.chat.done("task-1");
+  await h.flush();
+  const spoken = h.worker.ofOp("speak").map((command) => command.text);
+  assert.ok(spoken.includes(SPOKEN_ACTION_CLAIM_TEXT), `the second half was replaced (${JSON.stringify(spoken)})`);
+  assert.ok(!spoken.some((text) => /shut the agent down/i.test(text)), "the claim's second half is never spoken");
+});

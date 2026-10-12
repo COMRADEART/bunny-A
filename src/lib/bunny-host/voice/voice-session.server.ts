@@ -68,12 +68,13 @@ const FRAGMENT_WAIT_MS = 2500;
 const FRAGMENT_MAX_MS = 9000;
 const UNFINISHED_LAST_WORD = /\b(?:and|but|or|because|if|a|an|the|my|your|our|their|to|for|of|about|with|from|into|um|uh|er|erm)$/;
 /**
- * T12 live re-check: a duplex final that would only reach the chat model and ends on a word that cannot end a sentence
- * (or on whisper's trailing ellipsis) is unfinished. Anything that is not chat (a stop, a close, a refusal, a status
- * question, a confirm) is never held.
+ * T12 live re-check: a duplex final that would reach the chat model or draft a Mission, and ends on a word that cannot end
+ * a sentence (or on whisper's trailing ellipsis), is unfinished (review round 6: "Prepare a plan for the" is a draft whose
+ * objective is "the"). Anything else (a stop, a close, a refusal, a status question, a confirm, a control) is never held.
  */
 function isUnfinishedChat(text: string, proposalPending: boolean): boolean {
-  if (classifyTranscript(text, { proposalPending }).kind !== "chat") return false;
+  const kind = classifyTranscript(text, { proposalPending }).kind;
+  if (kind !== "chat" && kind !== "mission_draft") return false;
   const trimmed = text.trim();
   if (/(?:\.\.\.|…)$/.test(trimmed)) return true;
   const words = trimmed.toLowerCase().replace(/[’`]/g, "'").replace(/[\s.!?,;:]+$/, "");
@@ -148,7 +149,7 @@ type Clarification =
   | { purpose: "followup"; focus: string; candidates: Candidate[]; expiresAt: number };
 /** T12 F4: the ids a Host-facts answer named, in spoken order. Ids only: the state is always read again from live rows. */
 type Referent = { kind: "agents" | "missions"; ids: string[]; missionId: string | null; at: number; hostEpoch: string };
-type Inference = { taskId: string; turn: string; gen: number; chunker: VoiceChunker; spoken: string[]; done: boolean; received: boolean; claimBlocked?: boolean };
+type Inference = { taskId: string; turn: string; gen: number; chunker: VoiceChunker; spoken: string[]; done: boolean; received: boolean; claimBlocked?: boolean; tail?: string };
 /** T12: a reply held on speech onset. Keyed by output generation: a resume or a stale timer can never touch newer speech. */
 type Hold = { turn: string; gen: number; inputTurn: string; inputGen: number; cancelResume: (() => void) | null; cancelMax: (() => void) | null };
 /** T12: how the Host received a transcript: from the duplex lane, a push-to-talk capture, or typed text. */
@@ -254,7 +255,7 @@ export class VoiceSessionManager {
   /** T12: whether Bunny's output was audible when the transcript being accepted was heard, before the turn settled to PROCESSING. */
   private outputAtFinal = false;
   /** T12 live re-check: an unfinished duplex sentence waiting for its continuation (see holdFragment). */
-  private fragment: { text: string; turn: string; confidence: number; meta: TurnMeta; cancel: (() => void) | null } | null = null;
+  private fragment: { text: string; turn: string; confidence: number; meta: TurnMeta; depth: number; cancel: (() => void) | null } | null = null;
   /** T12 F4: the last Host-facts list of Agents or Missions. Cleared on close. */
   private referent: Referent | null = null;
   /** T12 F3: when a spoken Mission draft was last attempted (the rate limit between drafts). */
@@ -675,6 +676,8 @@ export class VoiceSessionManager {
 
   /** Interrupts speech, and capture if open. Never touches agents or missions (V29). */
   interrupt(source: InterruptSource = "button"): VoiceSnapshot {
+    // Review round 6: a pressed or spoken interrupt cuts an unfinished sentence too.
+    this.dropFragment("interrupted");
     if (this.duplexActive()) {
       // T12-AUD-04: the duplex lane keeps its microphone and its own turn ids. Output is cancelled on its own generation;
       // only the armed input turn is aborted (with its turn and gen), and a fresh input turn is armed.
@@ -1567,7 +1570,12 @@ export class VoiceSessionManager {
    */
   private sendModelChunk(current: Inference, chunk: SpokenChunk) {
     if (current.claimBlocked) return;
-    if (claimsAction(chunk.text)) {
+    // Review round 6: the chunker may release a first chunk mid-sentence (H1) or cut a sentence over 400 characters, so a
+    // claim split across two chunks is judged with the unfinished tail of the previous chunk.
+    const tail = current.tail ?? "";
+    const claims = claimsAction(chunk.text) || (tail !== "" && claimsAction(`${tail} ${chunk.text}`));
+    current.tail = (/[^.!?]*$/.exec(chunk.text)?.[0] ?? "").trim().slice(-300);
+    if (claims) {
       current.claimBlocked = true;
       this.deps.journal("voice.turn", "A spoken answer claimed an action the voice model cannot take; it was replaced.");
       this.sendChunk(current, { ...chunk, text: SPOKEN_ACTION_CLAIM_TEXT });
@@ -1992,6 +2000,8 @@ export class VoiceSessionManager {
 
   /** Worker exit or budget end: the duplex lane, its grant and any held reply end with the worker. */
   private endDuplexWithWorker(reason: DuplexEnd) {
+    // Review round 6: a held fragment never outlives the worker that heard it.
+    this.dropFragment("the voice worker stopped");
     if (this.duplexLane()) this.recordDuplexStop(reason);
     this.revokeGrant();
     this.clearHold("interrupted", reason);
@@ -2073,7 +2083,8 @@ export class VoiceSessionManager {
    */
   private stopDuplex(reason: DuplexEnd = "user", opts: StopOptions = {}): Promise<void> {
     // Review round 5: a held spoken fragment never outlives its lane (mute, mode switch, error, relaunch, close).
-    this.dropFragment(`hands-free stopped (${reason})`);
+    // Review round 6: a soft-budget relaunch keeps the lane's held words (the user is mid-sentence, not stopped).
+    if (reason !== "relaunch") this.dropFragment(`hands-free stopped (${reason})`);
     if (this.duplexStopping) return this.duplexStopping;
     const token = this.duplexToken;
     if (token !== null) this.recordDuplexStop(reason);
@@ -2174,7 +2185,8 @@ export class VoiceSessionManager {
       cancelDeadline: null,
     };
     this.snap.inputTurnId = turn;
-    this.snap.partial = null;
+    // Review round 6: held words stay visible while Bunny waits for the rest of the sentence.
+    this.snap.partial = this.fragment ? this.fragment.text.slice(0, VOICE_LIMITS.maxTranscriptChars) : null;
     if (this.fsm.state === "IDLE") this.setState("ARMING");
     // Not re-armed here: a silent turn ends on its own (no speech) and re-arming per turn would keep a quiet room open forever.
     this.tryWorker({ op: "capture.start", turn, gen, device: -1, endpointing: "vad", maxMs: VOICE_LIMITS.maxTurnCaptureMs, duplex: true, session: this.duplexToken ?? undefined });
@@ -2448,8 +2460,13 @@ export class VoiceSessionManager {
       confidence = Math.min(confidence, held.confidence);
       meta = { source: "duplex", overlapped: meta.overlapped || held.meta.overlapped, speechMs: (meta.speechMs ?? 0) + (held.meta.speechMs ?? 0), fromFragment: true };
       this.deps.journal("voice.turn", "An unfinished spoken sentence was joined with its continuation.");
+      // Review round 6: a joined sentence that is still unfinished ("Prepare a" + "plan for the") waits again (at most twice).
+      if (held.depth < 2 && isUnfinishedChat(text, false)) {
+        this.holdFragment(text, turn, confidence, meta, held.depth + 1);
+        return;
+      }
     } else if (isUnfinishedChat(text, this.voiceConfirmable())) {
-      this.holdFragment(text, turn, confidence, meta);
+      this.holdFragment(text, turn, confidence, meta, 0);
       return;
     }
     this.acceptFinal(text, turn, confidence, meta);
@@ -2459,7 +2476,7 @@ export class VoiceSessionManager {
    * Holds an unfinished sentence (chat-bound, ending on a word that cannot end a sentence) for its continuation. It is
    * routed alone when the user does not start speaking again within FRAGMENT_WAIT_MS, or once FRAGMENT_MAX_MS has passed.
    */
-  private holdFragment(text: string, turn: string, confidence: number, meta: TurnMeta) {
+  private holdFragment(text: string, turn: string, confidence: number, meta: TurnMeta, depth: number) {
     const since = this.now();
     const check = () => {
       const fragment = this.fragment;
@@ -2475,7 +2492,7 @@ export class VoiceSessionManager {
       this.snap.turnId = turn;
       this.acceptFinal(text, turn, confidence, { ...meta, fromFragment: true });
     };
-    this.fragment = { text, turn, confidence, meta, cancel: this.schedule(check, FRAGMENT_WAIT_MS) };
+    this.fragment = { text, turn, confidence, meta, depth, cancel: this.schedule(check, FRAGMENT_WAIT_MS) };
     this.snap.partial = text.slice(0, VOICE_LIMITS.maxTranscriptChars);
     this.deps.journal("voice.turn", "Waiting for the rest of an unfinished spoken sentence.");
   }

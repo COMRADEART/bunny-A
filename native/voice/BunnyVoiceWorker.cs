@@ -1378,6 +1378,8 @@ internal sealed class AmbientFloor
     int burstCount;
     // Round 5: silent output frames skipped before the burst window opens (at most BurstLeadMaxFrames).
     int burstLead;
+    // Round 6: silent output frames skipped before the session's first seed (at most BurstLeadMaxFrames).
+    int seedLead;
     bool burstSampled;
     readonly double[] seedRing = new double[ResidualSeedFrames];
     readonly double[] seedSort = new double[ResidualSeedFrames];
@@ -1468,7 +1470,9 @@ internal sealed class AmbientFloor
                 // and only frames inside the learning band are averaged in.
                 if (output)
                 {
-                    PushSeedLocked(rms);
+                    // Round 6: the first seed also skips a quiet lead-in (AEC latency, TTS lead-in) of up to 1 s.
+                    if (residualSeeded || rms >= ResidualLearnLow || seedLead >= BurstLeadMaxFrames) PushSeedLocked(rms);
+                    else seedLead++;
                     // Round 5: the window opens at the burst's first audible frame; a silent lead-in of up to 1 s is skipped.
                     // A quiet device (all output frames silent) opens it after 1 s and learns its quiet level.
                     if (!burstSampled && burstCount == 0 && rms < ResidualLearnLow && burstLead < BurstLeadMaxFrames) burstLead++;
@@ -4173,6 +4177,13 @@ internal static class SelfTest
         int longLeadOnsetFrames = 0;
         for (int f = 0; f < 40; f++) { longLead.Observe(0.0012, false, true); if (0.0012 > longLead.OnsetThreshold) longLeadOnsetFrames++; }
         r["reseedLongLeadInEchoOverThreshold"] = longLeadOnsetFrames;
+        // (f) Round 6: the session's FIRST reply opens with 5 frames of 1e-4 (AEC latency) before a 0.0012 echo: the first seed
+        // skips the quiet lead-in, so the echo never crosses the onset threshold.
+        AmbientFloor firstLead = new AmbientFloor(AmbientFloor.MinFloor);
+        for (int f = 0; f < 5; f++) firstLead.Observe(0.0001, false, true);
+        int firstLeadOver = 0;
+        for (int f = 0; f < 60; f++) { firstLead.Observe(0.0012, false, true); if (f >= 5 && 0.0012 > firstLead.OnsetThreshold) firstLeadOver++; }
+        r["firstSeedLeadInEchoOverThreshold"] = firstLeadOver;
 
         // T12 live endpointing: the split phrases from the endurance session, plus finished and empty partials.
         string[] endpointProbe = { "Prepare approach and prepare.", "Prepare a.", "Open notes and...", "write about matrix.",

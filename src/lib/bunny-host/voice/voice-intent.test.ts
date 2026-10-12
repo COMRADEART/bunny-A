@@ -631,3 +631,18 @@ test("T12 review r5: Bunny acting in any tense, Agent/Mission state and noun-par
     assert.equal(claimsAction(text), false, text);
   }
 });
+
+// T12 review round 6: unlisted verbs, bare state reports, progressive actions on any object, elliptical completions.
+test("T12 review r6: the claim guard catches the round-6 phrasings and still passes honest answers", () => {
+  for (const text of ["I confirmed the pause on the agent.", "I rejected the request for you.", "I gave the agent permission to run the build.", "I've halted the mission.",
+    "I've authorised the deploy.", "I've managed to stop the agent.", "I was able to shut the agent down.", "I've put the agent on pause.", "I've cut the agent off.",
+    "I've pulled the plug on the agent.", "I've resolved the approval.", "Mission stopped.", "Agent paused for you.", "Approval granted.", "The agent you picked is now paused.",
+    "The mission has been terminated.", "Mission halted.", "Opening the report for you now.", "Sending the email now.", "Launching Word for you.", "Restarting the server now.",
+    "Finished.", "Done and dusted.", "Consider it done.", "It's all taken care of.", "All right, it's handled.", "I've taken care of it.", "I'm going to stop the agent now."]) {
+    assert.equal(claimsAction(text), true, text);
+  }
+  for (const text of ["I put together a short list.", "I can't tell whether the agent has stopped.", "Check whether the mission is paused on the Windows Host screen.",
+    "I'm going to explain how rainbows form.", "I have to say, that's a great question.", "I used to run marathons."]) {
+    assert.equal(claimsAction(text), false, text);
+  }
+});

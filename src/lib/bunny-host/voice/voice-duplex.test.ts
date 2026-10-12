@@ -1672,3 +1672,37 @@ test("T12 review r5: a fragment built turn never confirms, and mute drops a held
   await m.session.close();
   await h.session.close();
 });
+
+test("T12 review r6: a three-part sentence waits again, worker exit and interrupt drop held words, and held words stay visible", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Prepare a");
+  assert.equal(h.session.snapshot().partial, "Prepare a", "the held words are shown while waiting");
+  h.advance(700);
+  await h.final("plan for the");
+  h.advance(700);
+  await h.final("dashboard project.");
+  await tick();
+  await tick();
+  assert.equal(h.drafted.length, 1);
+  assert.match(h.drafted[0].objective, /dashboard project/, "one draft with the whole objective");
+  await h.session.close();
+  const w = await harness();
+  await w.begin();
+  await w.final("Tell me about the");
+  w.worker().emit({ ev: "bye" });
+  w.advance(10_000);
+  await tick();
+  await tick();
+  assert.equal(w.admissions.length, 0, "a worker exit drops the held words; nothing is submitted");
+  await w.session.close();
+  const i = await harness();
+  await i.begin();
+  await i.final("Tell me about the");
+  i.session.interrupt("button");
+  i.advance(700);
+  await i.final("dashboard");
+  await tick();
+  assert.equal(i.session.snapshot().finalTranscript, "dashboard", "an interrupt cut the unfinished sentence");
+  await i.session.close();
+});
