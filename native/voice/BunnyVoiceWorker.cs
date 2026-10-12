@@ -907,7 +907,9 @@ internal sealed class WaveOut : IWaveOut
             string code = r == Native.MMSYSERR_ALLOCATED ? "DEVICE_BUSY" : (r == Native.WAVERR_BADFORMAT ? "FORMAT_UNSUPPORTED" : "DEVICE_UNAVAILABLE");
             throw new VoiceFault(code, "waveOutOpen failed: " + Native.MmErrorName(r));
         }
-        if (reference != null && !string.Equals(AecSource.EndpointId(h), reference, StringComparison.OrdinalIgnoreCase))
+        // T12 live finding: the endpoint-id query is answered for a device index, not for an opened HWAVEOUT on this driver
+        // (it returns no id), so the binding is re-checked by the index the stream was opened on. A reorder still refuses.
+        if (reference != null && !AecSource.RenderIdentityMatches(device, reference, AecSource.RenderEndpointId))
         {
             Native.waveOutClose(h);
             throw new VoiceFault("AEC_UNAVAILABLE", "opened output differs from the echo reference");
@@ -918,7 +920,7 @@ internal sealed class WaveOut : IWaveOut
     public void Submit(Chunk c)
     {
         string reference = Program.RenderReference;
-        if (reference != null && !string.Equals(AecSource.EndpointId(handle), reference, StringComparison.OrdinalIgnoreCase))
+        if (reference != null && !AecSource.RenderIdentityMatches(device, reference, AecSource.RenderEndpointId))
             throw new VoiceFault("AEC_UNAVAILABLE", "submitted output differs from the echo reference");
         c.Data = Marshal.AllocHGlobal(c.Pcm.Length);
         Marshal.Copy(c.Pcm, 0, c.Data, c.Pcm.Length);
@@ -1002,7 +1004,7 @@ internal sealed class WaveOut : IWaveOut
 // it is never replaced with a raw-microphone fallback. All COM and keepalive handles belong to one audio thread.
 [ComImport, Guid("745057C7-F353-4F2D-A7EE-58434477730E")]
 internal class AudioAecCom { }
-[ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-C0A9B9A0BCA6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+[ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface AecDeviceCollection
 {
     [PreserveSig] int GetCount(out uint count);
@@ -1048,7 +1050,7 @@ internal interface AecMediaObject
     [PreserveSig] int FreeStreamingResources();
     [PreserveSig] int GetInputStatus(uint index, out uint flags);
     [PreserveSig] int ProcessInput(uint index, IntPtr buffer, uint flags, long timestamp, long duration);
-    [PreserveSig] int ProcessOutput(uint flags, uint count, [In, Out] AecOutput[] buffers, out uint status);
+    [PreserveSig] int ProcessOutput(uint flags, uint count, [In, Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 1)] AecOutput[] buffers, out uint status);
     [PreserveSig] int Lock(int locked);
 }
 [ComVisible(true), Guid("59EFF8B9-938C-4A26-82F2-95CB84CDC837"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -1195,19 +1197,20 @@ internal sealed class AecSource : IFrameSource
 
     public AecSource(Func<bool> cancelled)
     {
+        string step = "privacy and mute";
         try
         {
             Checkpoint(cancelled);
             if (Endpoints.MicPrivacy() == "deny") throw new VoiceFault("PERMISSION_DENIED", "Windows microphone privacy denies capture");
             if (Endpoints.Read(1).Muted == true) throw new VoiceFault("ENDPOINT_MUTED", "Windows microphone is muted");
             Checkpoint(cancelled);
-            int mic = DefaultIndex(1, out InputId);
+            step = "capture endpoint index"; int mic = DefaultIndex(1, out InputId);
             Checkpoint(cancelled);
-            int render = DefaultIndex(0, out OutputId);
+            step = "render endpoint index"; int render = DefaultIndex(0, out OutputId);
             Checkpoint(cancelled);
-            RenderDevice = RenderIndex(OutputId);
+            step = "render waveOut binding"; RenderDevice = RenderIndex(OutputId);
             Checkpoint(cancelled);
-            keepalive = WaveOut.Open(RenderDevice);
+            step = "render keepalive open"; keepalive = WaveOut.Open(RenderDevice);
             for (int i = 0; i < SilenceBuffers; i++)
             {
                 silences[i] = new Chunk();
@@ -1215,11 +1218,11 @@ internal sealed class AecSource : IFrameSource
                 keepalive.Submit(silences[i]);
             }
             Checkpoint(cancelled);
-            instance = new AudioAecCom();
-            dmo = (AecMediaObject)instance;
-            Property(2, 3, 0); // VT_I4 SINGLE_CHANNEL_AEC; not NS/AGC-only mode.
-            Property(3, 11, 1); // VT_BOOL source mode
-            Property(4, 3, (render << 16) | mic);
+            step = "DSP creation"; instance = new AudioAecCom();
+            step = "DSP media object"; dmo = (AecMediaObject)instance;
+            step = "system mode property"; Property(2, 3, 0); // VT_I4 SINGLE_CHANNEL_AEC; not NS/AGC-only mode.
+            step = "source mode property"; Property(3, 11, 1); // VT_BOOL source mode
+            step = "device index property"; Property(4, 3, (render << 16) | mic);
             // Leave proven Windows AEC/AES/noise defaults intact; no registry timestamp statistics are enabled.
             WaveFormatEx wave = Native.Format();
             IntPtr format = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(WaveFormatEx)));
@@ -1231,16 +1234,18 @@ internal sealed class AecSource : IFrameSource
                     subtype = new Guid("00000001-0000-0010-8000-00AA00389B71"),
                     fixedSize = 1, sampleSize = 2, format = new Guid("05589F81-C356-11CE-BF01-00AA0055595A"),
                     formatSize = (uint)Marshal.SizeOf(typeof(WaveFormatEx)), formatData = format };
-                Check(dmo.SetOutputType(0, ref media, 0));
+                step = "output type"; Check(dmo.SetOutputType(0, ref media, 0));
                 Checkpoint(cancelled);
-                Check(dmo.AllocateStreamingResources());
+                step = "streaming resources"; Check(dmo.AllocateStreamingResources());
             }
             finally { Marshal.FreeHGlobal(format); }
-            buffer = new AecBuffer();
+            step = "output buffer"; buffer = new AecBuffer();
             bufferInterface = Marshal.GetComInterfaceForObject(buffer, typeof(AecBufferPort));
             output[0].buffer = bufferInterface;
         }
-        catch { Close(); throw; }
+        catch (VoiceFault) { Close(); throw; }
+        // T12: a setup failure names its step and HRESULT, so a live device failure is diagnosable without a debugger.
+        catch (Exception e) { Close(); throw new VoiceFault("AEC_UNAVAILABLE", "AEC setup failed at " + step + ": " + e.GetType().Name + " 0x" + e.HResult.ToString("X8")); }
     }
     public int Read(byte[] frame)
     {
@@ -1334,11 +1339,16 @@ internal sealed class AmbientFloor
     public const double MinFloor = 0.0002, MaxFloor = 0.005;
     public const int WindowFrames = 25;
     public const double AttackAlpha = 0.1, ReleaseAlpha = 0.2, ResidualAlpha = 0.05;
-    public const double ResidualGain = 2.0, ResidualFloor = 0.002, ResidualCap = 0.003;
+    // T12 live calibration (Intel SST array + Realtek speakers, 40% volume): the DSP's own-speech residual measured
+    // p95 1.8e-5 and max 8e-5 RMS while human double-talk measured 0.003-0.016 RMS. A 0.002 floor made the output-time
+    // threshold 0.004 and absorbed the user's first syllables (1.7 s detection); 0.0003 keeps a >10x margin over the measured
+    // residual and stays far below speech. Echo onsets that still happen only pause output: the Host's echo gate drops them.
+    public const double ResidualGain = 2.0, ResidualFloor = 0.0003, ResidualCap = 0.003;
     public const double ResidualSilentFraction = 0.5, ResidualAdaptGain = 1.5;
     // Round 2: the band the EMA learns from is absolute (not relative to the floor-based basis). Its upper edge is
     // ResidualAdaptGain x ResidualCap, so the learning band reaches the cap's echo level (AEC-05 verifier round 2).
     public const double ResidualLearnLow = ResidualSilentFraction * ResidualFloor;
+    // Absolute ceiling of anything the residual may learn from. The live band is narrower: see LearnHighLocked.
     public const double ResidualLearnHigh = ResidualAdaptGain * ResidualCap;
     public const int ResidualSeedFrames = 5;
     // Round 2: the pre-roll taint ceiling. An output-window frame at or above this level is user speech, not our echo: the
@@ -1381,6 +1391,12 @@ internal sealed class AmbientFloor
     double EffectiveLocked()
     {
         return Math.Min(ResidualCap, Math.Max(ResidualFloor, residual));
+    }
+
+    // Caller holds gate. The upper edge of what the residual may learn from: near the current residual, never above the cap band.
+    double LearnHighLocked()
+    {
+        return Math.Min(ResidualLearnHigh, ResidualAdaptGain * Math.Max(ResidualFloor, residual));
     }
 
     // Caller holds gate.
@@ -1434,15 +1450,17 @@ internal sealed class AmbientFloor
                 // ambient estimate. T12 (AEC-01/05): the residual is never seeded from one frame, silence does not decay it,
                 // and only frames inside the learning band are averaged in.
                 if (output) PushSeedLocked(rms);
-                if (seedCount == ResidualSeedFrames)
+                if (seedCount == ResidualSeedFrames && !residualSeeded)
                 {
-                    // Round 2: seed once from the multi-frame median. Afterwards, a median above the learning band means the
-                    // echo is louder than the EMA can follow from here (a quiet start), so the residual jumps to the cap.
-                    double median = SeedMedianLocked();
-                    if (!residualSeeded) { residual = Math.Min(ResidualCap, median); residualSeeded = true; }
-                    else if (median > ResidualLearnHigh) residual = ResidualCap;
+                    // Round 2: seed once from the multi-frame median of the first output frames.
+                    residual = Math.Min(ResidualCap, SeedMedianLocked());
+                    residualSeeded = true;
                 }
-                if (rms >= ResidualLearnLow && rms <= ResidualLearnHigh)
+                // T12 live calibration: the residual only follows frames close to itself (a relative band), and there is no
+                // "jump to the cap". Measured user double-talk passes the DSP at 10-100x the residual, so a jump or a wide band
+                // learned the user's own first syllables and hid the barge-in. A louder echo is followed gradually.
+                // The lower edge is relative too: a paused (silent) device or a quiet gap can never pull the residual down.
+                if (residualSeeded && rms >= ResidualSilentFraction * Math.Max(ResidualFloor, residual) && rms <= LearnHighLocked())
                     residual = Math.Min(ResidualCap, residual + (rms - residual) * ResidualAlpha);
                 return;
             }
@@ -1616,7 +1634,7 @@ internal sealed class DuplexInput
             reason = "error";
             VoiceFault fault = e as VoiceFault;
             Guard.Emit(Out.Ev("duplex.error", "session", session, "code", fault != null ? fault.Code : "AEC_UNAVAILABLE",
-                "message", fault != null ? fault.Message : "AEC source failed: " + e.GetType().Name));
+                "message", fault != null ? fault.Message : "AEC source failed: " + e.GetType().Name + " in " + (e.TargetSite != null ? e.TargetSite.DeclaringType.Name + "." + e.TargetSite.Name : "?") + " " + (e.Message.Length > 120 ? e.Message.Substring(0, 120) : e.Message)));
         }
         finally
         {
@@ -4038,6 +4056,20 @@ internal static class SelfTest
         int userOverEcho = -1;
         for (int f = 0; f < 100; f++) if (user.Feed(0.008, int.MaxValue) == Vad.SpeechStart && userOverEcho < 0) userOverEcho = f;
         r["aecUserOverEchoOnset"] = userOverEcho;
+
+        // T12 live calibration case, from the measured device (test-results/ma3/t12/probes/human-doubletalk-levels-2.txt):
+        // AEC ambient 0.00046, own-speech residual about 0.00005 while output plays, human double-talk 0.003-0.016. The
+        // output-time threshold must stay below 0.003 and a 0.003 talker must start a turn within 10 frames; the residual alone
+        // must never start one.
+        Vad live = new Vad(true, 0.00046);
+        live.SetOutputActive(true);
+        int liveEchoOnsets = 0;
+        for (int f = 0; f < 200; f++) if (live.Feed(f % 7 == 0 ? 0.00008 : 0.00002, int.MaxValue) == Vad.SpeechStart) liveEchoOnsets++;
+        r["aecLiveResidualOnsets"] = liveEchoOnsets;
+        r["aecLiveOutputThreshold"] = live.Threshold;
+        int liveUser = -1;
+        for (int f = 0; f < 50; f++) if (live.Feed(0.003, int.MaxValue) == Vad.SpeechStart && liveUser < 0) liveUser = f;
+        r["aecLiveUserOnset"] = liveUser;
 
         // The model itself: 200 frames of user speech at 0.008 that no turn is attached to, under output, must not lift the
         // residual or the threshold above what the echo supports (AEC-05). Standalone Vads stop observing after onset, so
