@@ -4,6 +4,8 @@ import { CommandRefusedError } from "./failure.server.ts";
 import type { ActionManifest, RiskClass } from "../bunny-missions/types.ts";
 import type { HostSnapshot, SnapshotViewer } from "./contracts.ts";
 import type { OrchTask } from "../orch/types.ts";
+import type { ProjectDetail } from "./project-types.ts";
+import { publicTask } from "./presentation.ts";
 import { isRemoteOllamaTag } from "../orch/exec.server.ts";
 
 /**
@@ -373,6 +375,7 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
   const kept = new Set([...active, ...recent].map((task) => task.id));
   return {
     ...snapshot,
+    projects: (snapshot.projects ?? []).map((project) => ({ ...project, path: "[Project folder on the Windows Host]" })),
     devices: (snapshot.devices ?? [])
       .filter((device) => device.id === principal.id)
       .map((device) => ({ ...device, expiresAt: principal.expiresAt, lastSeenAt: presence.lastSeen(principal.id) })),
@@ -404,23 +407,40 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
               .filter((agent) => FINISHED_AGENT.has(agent.state))
               .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id))
               .slice(0, DEVICE_AGENT_HISTORY),
-          ],
+          ].map((agent) => ({ ...agent, authorization: agent.authorization ? { ...agent.authorization, roots: agent.authorization.roots.map(() => "[Project folder on the Windows Host]"), commands: agent.authorization.commands.map((command) => ({ ...command, cwd: "[Project folder on the Windows Host]" })) } : agent.authorization })),
         }
       : snapshot.agents,
   };
 }
 
 type SnapshotMission = NonNullable<HostSnapshot["missions"]>["missions"][number];
-function deviceTeamMission(mission: SnapshotMission): SnapshotMission {
+function deviceTeamMission<T extends Pick<SnapshotMission, "root" | "requestedScope" | "team"> & Partial<Pick<SnapshotMission, "steps" | "artifacts" | "teamView" | "planning" | "recovery">>>(mission: T): T {
   const rejected = (list: { at: number; reasons: string[] }[]) => list.map((entry) => ({ at: entry.at, reasons: [REJECTION_DEVICE_LABEL] }));
   return {
     ...mission,
     root: "[Project folder on the Windows Host]",
-    ...(mission.requestedScope ? { requestedScope: { ...mission.requestedScope, projectRoots: mission.requestedScope.projectRoots.map(() => "[Project folder on the Windows Host]") } } : {}),
+    ...(mission.planning ? { planning: { ...mission.planning, rationale: ["Plan details are retained on the Windows Host."] } } : {}),
+    ...(mission.recovery ? { recovery: { ...mission.recovery, detail: "Recovery details are retained on the Windows Host." } } : {}),
+    ...(mission.requestedScope ? { requestedScope: { ...mission.requestedScope, projectRoots: mission.requestedScope.projectRoots.map(() => "[Project folder on the Windows Host]"), filesystem: { read: mission.requestedScope.filesystem.read.map(() => "[Project folder on the Windows Host]"), write: mission.requestedScope.filesystem.write.map(() => "[Project folder on the Windows Host]") } } } : {}),
+    ...(mission.steps ? { steps: mission.steps.map((step) => ({ ...step, scope: { ...step.scope, root: step.scope.root === null ? null : "[Project folder on the Windows Host]" }, workspace: null })) } : {}),
     ...(mission.artifacts ? { artifacts: mission.artifacts.map((artifact) => ({ ...artifact, location: { kind: artifact.location.kind, mediaType: artifact.location.mediaType } as typeof artifact.location })) } : {}),
     ...(mission.team ? { team: { ...mission.team, revisionNote: null, browserFixture: null, offerFiles: [], rejected: rejected(mission.team.rejected) } } : {}),
     ...(mission.teamView ? { teamView: { ...mission.teamView, rejected: rejected(mission.teamView.rejected),
       findings: mission.teamView.findings.map((review) => ({ ...review, findings: review.findings.map((finding) => ({ ...finding, summary: "Advisory Reviewer finding (full text on the Windows Host)." })) })) } } : {}),
+  };
+}
+
+/** Project read endpoints use the same privacy boundary as device snapshots, including retained team metadata. */
+export function deviceProjectDetail(detail: ProjectDetail): ProjectDetail {
+  const folder = "[Project folder on the Windows Host]";
+  return {
+    ...detail,
+    project: { ...detail.project, path: folder },
+    missions: detail.missions.map((mission) => deviceTeamMission(mission)),
+    tasks: detail.tasks.map((task) => publicTask(deviceTask(task))),
+    agents: detail.agents.map((agent) => ({ ...agent, authorization: agent.authorization ? { ...agent.authorization, roots: agent.authorization.roots.map(() => folder), commands: agent.authorization.commands.map((command) => ({ ...command, cwd: folder })) } : agent.authorization })),
+    workspaces: detail.workspaces.map((workspace) => ({ ...workspace, root: { ...workspace.root, path: folder }, scratch: { ...workspace.scratch, path: folder }, workspaceRoot: { ...workspace.workspaceRoot, path: folder }, ownershipMarker: "[Ownership evidence on the Windows Host]" })),
+    artifacts: detail.artifacts.map((artifact) => ({ ...artifact, location: { kind: artifact.location.kind, mediaType: artifact.location.mediaType } as typeof artifact.location })),
   };
 }
 
@@ -473,7 +493,7 @@ const REJECTION_DEVICE_LABEL = "Bunny's plan validation rejected this proposal (
 /** What a paired device sees instead of a spoken voice turn's prompt (privacy#0). */
 export const VOICE_TURN_DEVICE_LABEL = "Voice question (workstation)";
 
-export function deviceTask<T extends Pick<OrchTask, "prompt" | "routingPrompt" | "mission"> & { cwd?: string; pid?: number | null; processTree?: unknown; processTreeAt?: number | null; sessionId?: string | null }>(task: T): T {
+export function deviceTask<T extends Pick<OrchTask, "prompt" | "routingPrompt" | "mission"> & { constraints?: OrchTask["constraints"]; cwd?: string; pid?: number | null; processTree?: unknown; processTreeAt?: number | null; sessionId?: string | null }>(task: T): T {
   // privacy#0: a voice turn's prompt carries spoken history and Bunny's earlier answers, and its routingPrompt is the spoken
   // transcript. Only the in-process voice path sets routingPrompt on a direct (non-mission) task, so such a task is a voice
   // turn: neither field reaches a device. Mission steps keep their objective, as before.
@@ -483,6 +503,7 @@ export function deviceTask<T extends Pick<OrchTask, "prompt" | "routingPrompt" |
     ...(task.mission ? { prompt: task.routingPrompt ?? "Mission step (Bunny's full prompt stays on the Host)." } : {}),
     ...(voiceTurn ? { prompt: VOICE_TURN_DEVICE_LABEL, routingPrompt: VOICE_TURN_DEVICE_LABEL } : {}),
     cwd: undefined,
+    ...(task.constraints ? { constraints: { ...task.constraints, workingDirectory: undefined } } : {}),
     pid: null,
     processTree: null,
     processTreeAt: null,

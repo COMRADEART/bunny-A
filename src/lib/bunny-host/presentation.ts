@@ -428,33 +428,10 @@ export function projectHostActivity(
 }
 
 /** Gateway export: activity fields contain summaries before crossing into the browser. The private journal stays intact. */
-export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
+/** Shared public task projection for dashboard and paired-device Project reads. */
+export function publicTask(task: OrchTask): OrchTask {
   return {
-    ...snapshot,
-    health: snapshot.health
-      ? {
-          ...snapshot.health,
-          reason: hostHealthMessage(snapshot.health),
-          lastFatal: snapshot.health.lastFatal
-            ? {
-                ...snapshot.health.lastFatal,
-                reason: "Previous Host failure. Old execution was not resumed.",
-              }
-            : null,
-        }
-      : undefined,
-    events: snapshot.events.map((event) => ({
-      ...event,
-      // M-A-3 T4: lifecycle rows keep their raw JSON out of the browser; the agent panel carries them.
-      detail: isAgentLifecycle(event)
-        ? "Agent lifecycle event; see the agents panel."
-        : publicEventDetail(
-            event.type,
-            event.detail,
-            snapshot.tasks.find((task) => task.id === event.taskId),
-          ),
-    })),
-    tasks: snapshot.tasks.map((task) => ({
+
       ...task,
       // The Host stores an untyped provider transcript here, not a reviewed public result.
       output: "",
@@ -493,7 +470,36 @@ export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
           ? { ...task.progress, current: null, source: "Provider plan" }
           : task.progress,
       processTree: null,
+  };
+}
+
+export function dashboardSnapshot(snapshot: HostSnapshot): HostSnapshot {
+  return {
+    ...snapshot,
+    health: snapshot.health
+      ? {
+          ...snapshot.health,
+          reason: hostHealthMessage(snapshot.health),
+          lastFatal: snapshot.health.lastFatal
+            ? {
+                ...snapshot.health.lastFatal,
+                reason: "Previous Host failure. Old execution was not resumed.",
+              }
+            : null,
+        }
+      : undefined,
+    events: snapshot.events.map((event) => ({
+      ...event,
+      // M-A-3 T4: lifecycle rows keep their raw JSON out of the browser; the agent panel carries them.
+      detail: isAgentLifecycle(event)
+        ? "Agent lifecycle event; see the agents panel."
+        : publicEventDetail(
+            event.type,
+            event.detail,
+            snapshot.tasks.find((task) => task.id === event.taskId),
+          ),
     })),
+    tasks: snapshot.tasks.map(publicTask),
     missions: snapshot.missions
       ? {
           ...snapshot.missions,

@@ -46,6 +46,7 @@ test("PA-01: generic Mission commands and direct manager approval cannot bypass 
     for (const action of ["mission.approve", "mission.start", "mission.plan", "mission.replan"])
       await assert.rejects(() => missionCommand(env.missions, action, { id: missionId, plan: reference }, { local: true, actor: "workstation" }), /Coordinator/);
     assert.equal(missionOf(env, missionId).state, "waiting_for_approval");
+    await assert.rejects(() => missionCommand(env.missions, "mission.get", { id: missionId }, { local: false, actor: "device:phone" }), /Windows Host/);
     await approvePlan(env, coordinatorId, missionId);
     assert.equal(missionOf(env, missionId).state, "running");
   } finally { await env.cleanup(); }
@@ -66,6 +67,8 @@ test("SURF-01/02/03/05: device projections withhold team working text, rejection
     const deviceMission = projected.missions!.missions[0];
     assert.equal(deviceMission.root, "[Project folder on the Windows Host]");
     assert.ok(deviceMission.requestedScope!.projectRoots.every((root) => root === "[Project folder on the Windows Host]"));
+    assert.ok([...deviceMission.requestedScope!.filesystem.read, ...deviceMission.requestedScope!.filesystem.write].every((root) => root === "[Project folder on the Windows Host]"));
+    assert.ok(deviceMission.steps.every((step) => step.workspace === null && (step.scope.root === null || step.scope.root === "[Project folder on the Windows Host]")));
     assert.ok((deviceMission.artifacts ?? []).every((artifact) => !("path" in artifact.location)));
     const text = JSON.stringify({ team: deviceMission.team, view: deviceMission.teamView });
     for (const privateText of ["PRIVATE_REVISION", "PLANNER_ECHO", "127.0.0.1:9876"])

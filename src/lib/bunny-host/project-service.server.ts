@@ -9,6 +9,7 @@ import type { OrchTask } from "../orch/types.ts";
 import type { Mission, Artifact } from "../bunny-missions/types.ts";
 import { contained, noLinks } from "./project-paths.server.ts";
 import { privateHostPath } from "../bunny-missions/paths.server.ts";
+import { deviceProjectDetail } from "./device-authority.server.ts";
 
 /** Bounded projections and reference checks over canonical owners, not a second Mission/artifact store. */
 export class ProjectService {
@@ -39,20 +40,24 @@ export class ProjectService {
         throw new Error("Invalid Project input.");
       return value;
     };
-    if (action === "project.list")
-      return this.list({
+    if (action === "project.list") {
+      const page = this.list({
         search: data.search == null ? "" : String(data.search),
         filter: data.filter as ProjectQuery["filter"],
         sort: data.sort as ProjectQuery["sort"],
         offset: data.offset as number,
         limit: data.limit as number,
       });
-    if (action === "project.get")
-      return this.detail(
+      return local ? page : { ...page, projects: page.projects.map((project) => ({ ...project, path: "[Project folder on the Windows Host]" })) };
+    }
+    if (action === "project.get") {
+      const detail = this.detail(
         text(data.id, 200),
         data.offset == null ? 0 : Number(data.offset),
         data.limit == null ? 50 : Number(data.limit),
       );
+      return local ? detail : deviceProjectDetail(detail);
+    }
     if (action === "project.artifact")
       return this.artifact(text(data.projectId, 200), text(data.artifactId, 200));
     if (action === "project.repository") {

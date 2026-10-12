@@ -86,7 +86,12 @@ export async function missionCommand(missions: MissionManager, action: string, d
       }
       return { mission: await missions.respond(id(data.requestId), data.decision, access.actor, options) };
     }
-    case "mission.get": { const view = missions.get(id(data.id)); return { data: access.local ? view : missions.deviceMissionData(view) }; }
+    case "mission.get": {
+      const view = missions.get(id(data.id));
+      if (!access.local && view.mission.team)
+        throw new WorkstationRequiredError("Detailed team working material is available on the Windows Host; use the phone's team overview to supervise it.");
+      return { data: access.local ? view : missions.deviceMissionData(view) };
+    }
     case "mission.revoke_batch": return { mission: missions.revokeBatch(id(data.missionId), id(data.batchId), access.actor) };
     // M-A-3 T9R-F02 (D2): staged paired-device changes are reviewed on the Windows Host only (never in REMOTE).
     case "mission.staging.list": {
