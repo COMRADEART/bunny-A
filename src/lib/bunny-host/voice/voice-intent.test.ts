@@ -616,3 +616,18 @@ test("T12 review r4: a sensitive instruction to a qualified agent stays a refusa
   }
   assert.equal(kind("make the reviewer agent check the documents"), "redirect_unsupported");
 });
+
+// T12 review round 5 (re-check of 6aa99ba): the subject-based guard.
+test("T12 review r5: Bunny acting in any tense, Agent/Mission state and noun-participle fragments are claims; negated, hypothetical and figurative uses are not", () => {
+  for (const text of ["I've turned it off.", "Alright, I've turned it off.", "I have, in fact, shut it down.", "I went and deleted it.", "I've gone ahead and paused the agent.",
+    "I've gone and paused it.", "Bunny stopped the research agent.", "Bunny has emailed the report.", "The agent has stopped.", "The mission has paused.",
+    "I'm emailing the report now.", "Okay, I'm emailing it to Sam.", "I'm running the script now.", "Email sent.", "Emailed to Sam.", "Saved to your desktop.",
+    "Reminder set for nine.", "Okay. Reminder created for nine.", "I'll stop it now.", "I've backed up your files."]) {
+    assert.equal(claimsAction(text), true, text);
+  }
+  for (const text of ["I can't do that by voice.", "I think you should save it first.", "I'd add that rainbows need rain.", "If I opened it, it would show the menu.",
+    "I clearly remember that one.", "I'm a voice assistant.", "I recommend saving your work often.", "I'm here to help.", "We started with the basics.",
+    "I can open the agentic workspace for you if you ask.", "Paris is the capital of France. It is also the largest city.", "It's done on the Windows Host screen."]) {
+    assert.equal(claimsAction(text), false, text);
+  }
+});

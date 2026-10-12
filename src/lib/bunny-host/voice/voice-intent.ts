@@ -274,44 +274,74 @@ const DEVICE_ACTION: RegExp[] = [
 ];
 
 /**
- * T12 live + review rounds 3/4: model text that claims Bunny acted. The spoken-chat model is tool-free, so such a sentence is
- * never true; the session replaces it (see SPOKEN_ACTION_CLAIM_TEXT). Every clause is judged (so "Good news, I've saved it."
- * or "So I've saved it." is caught), with a broad verb list. A general statement ("Word saves it once a file has been saved",
- * "The document has been saved automatically by most editors"), a denial ("I deleted nothing") and figurative uses ("I opened
- * with the main point", "I ran the numbers") are not claims.
+ * T12 live + review rounds 3-5: model text that claims something was done. The spoken-chat model is tool-free and has no Host
+ * facts, so such a sentence is never true; the session replaces it (see SPOKEN_ACTION_CLAIM_TEXT). Round 5 judges by subject
+ * rather than by phrase lists: in every clause, Bunny ("I", "we", "Bunny") doing an action in any tense is a claim unless it is
+ * negated or hypothetical; so is an Agent, Mission or user item reported as done ("The agent has stopped.", "Email sent.",
+ * "Saved to your desktop."). General statements ("Word saves it once a file has been saved"), denials ("I deleted nothing")
+ * and figurative uses ("I opened with the main point", "I ran the numbers", "I set up a plan") are not claims.
  */
-// Claims an action whatever the object ("I've emailed the report", "I opened Notepad").
-const CLAIM_STRONG = "(?:opened|saved|deleted|removed|sent|e-?mailed|texted|messaged|called|phoned|launched|installed|uninstalled|reinstalled|approved|executed|granted|uploaded|downloaded|cancell?ed|booked|scheduled|submitted|muted|unmuted|activated|deactivated|restarted|rebooted|deployed|pushed|published|merged|committed|shared|copied|backed up|killed|terminated|cleared|emptied|refreshed|posted|ordered|bought|purchased|paid|transferred|stopped|paused|resumed|closed|ended|enabled|disabled|shut down|switched (?:on|off)|turned (?:on|off)|renamed|moved|reset|logged (?:in|out)|signed (?:in|out)|unlocked|locked|archived|forwarded|replied|played|recorded|printed|reverted|rolled back|overwrote|overwritten|wiped|formatted|updated|upgraded|configured|changed)";
-// Claims an action only with an action object ("I've set a reminder", "I added it", "I started the agent").
-const CLAIM_WEAK = "(?:set|added|put|started|ran|created|made|wrote|written|filed|noted|marked|flagged|saved up)";
-const CLAIM_OBJECT = "(?:it|that|this|them|those|these|everything|all of (?:it|them)|(?:(?:a|an|the|your|my|that|this|a new|the new)\\s+)?(?:[\\w'-]+\\s+)?(?:agents?|missions?|tasks?|files?|folders?|documents?|notes?|notepad|apps?|applications?|programs?|timers?|alarms?|reminders?|events?|meetings?|appointments?|table|order|messages?|emails?|mail|texts?|requests?|commands?|settings?|session|voice|microphone|mic|browser|chrome|window|tab|page|website|playlist|music|song|calendar|permissions?|approvals?|desktop|server|process|commit|branch|repo|repository|database|cache|trash|backup))\\b";
-// Not a claim after the verb: a denial, or a figurative use ("opened with", "launched into", "ran into").
-const NOT_CLAIM_AFTER = "(?!\\s+(?:nothing|none|no\\b|neither|up\\b|attention|with\\b|into\\b|across\\b|out of\\b|the numbers|through the|over the idea|my mind))";
-const CLAIM_ING = "(?:ending|closing|opening|stopping|pausing|saving|starting|launching|deleting|approving|sending|setting|creating|cancell?ing|resuming|restarting|deploying|pushing|turning (?:on|off)|shutting down|switching (?:on|off))";
-const CLAIM_PARTICIPLE = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled|set|booked|added|scheduled|updated|granted|muted|unmuted|turned (?:on|off)|switched (?:on|off)|shut down|restarted|deployed|pushed|published|merged|shared|copied|backed up|cleared|emptied|posted|ordered|paid|transferred|uploaded|downloaded|emailed|texted|forwarded)";
-// General statements about how things work are not claims ("is saved automatically", "has been saved by most editors").
+const ACTION_WORD = new RegExp(`^(?:open|sav|delet|remov|send|sent|email|e-mail|text|messag|call|phon|launch|install|uninstall|reinstall|approv|execut|run|ran|start|stop|paus|resum|clos|end|enabl|disabl|turn|shut|switch|restart|reboot|deploy|push|publish|merg|commit|shar|copi|copy|backed|backing|kill|terminat|clear|empti|empty|refresh|post|order|bought|buy|purchas|pay|paid|transfer|set|book|schedul|add|creat|upload|download|mut|unmut|renam|mov|archiv|forward|repli|reply|print|revert|wip|format|updat|upgrad|configur|chang|cancel|grant|submit|lock|unlock|activat|deactivat|reset|fil)(?:e|es|ed|d|s|ing|ied|ies|y|ped|ping|ted|ting|led|ling|red|ring|ned|ning)?$`);
+// Words that end the search for Bunny's verb: a negation or a hypothetical makes the clause no claim.
+const CLAIM_STOP = /^(?:'d|not|n't|never|no|cannot|can't|couldn't|can|could|would|wouldn't|should|shouldn't|might|may|must|don't|didn't|doesn't|won't|haven't|hasn't|hadn't|isn't|aren't|wasn't|unable|if|whether|to|recommend|suggest|think|believe|know|see|understand|like|love|want|need|hope|wish|feel)$/;
+// Fillers allowed between Bunny and the verb ("I've just gone ahead and paused it", "I have, in fact, shut it down").
+const CLAIM_FILLER = /^(?:'ve|'ll|'m|'re|have|has|had|am|is|are|was|were|will|shall|just|already|now|then|also|went|gone|go|going|got|get|did|do|ahead|and|in|fact|actually|successfully|quickly|finally|instead|for|you)$/;
+// Figurative or non-action uses after the verb ("opened with", "ran into", "ended up", "changed my mind", "set up a plan").
+const NOT_ACTION_AFTER = /^(?:nothing|none|no|neither|with|into|across|up|out|over|through|the numbers|my mind|attention)\b/;
+const BUNNY = /^(?:i|we|bunny|i've|i'll|i'm|i'd|we've|we'll|we're|we'd)$/;
+const DONE_SUBJECT = "(?:the|your|my|this|that) (?:[\\w'-]+ )?(?:agents?|missions?|tasks?|team|timers?|alarms?|reminders?|emails?|messages?|texts?|files?|folders?|documents?|notes?|apps?|session|voice|server|process|commits?|branch|meetings?|events?|appointments?|orders?|requests?|reports?|drafts?|backups?|updates?|approvals?|permissions?)";
+const DONE_PARTICIPLE = "(?:opened|saved|created|closed|ended|deleted|removed|sent|launched|installed|approved|cancell?ed|executed|started|stopped|paused|resumed|enabled|disabled|set|booked|added|scheduled|updated|granted|muted|unmuted|turned (?:on|off)|switched (?:on|off)|shut down|restarted|deployed|pushed|published|merged|shared|copied|backed up|cleared|emptied|posted|ordered|paid|transferred|uploaded|downloaded|e-?mailed|texted|forwarded|submitted|finished|completed|made|renamed|moved|archived|printed)";
 const GENERAL_AFTER = "(?!\\s+(?:automatically|by default|by most|by many|by the (?:app|system|editor)|when|whenever|once|if|unless|until|before|after|every|each|regularly|periodically))";
-const ACTION_CLAIM: RegExp[] = [
-  // "I've saved it", "So I've saved it", "Sure thing, I've stopped the research agent", "I went ahead and paused it"
-  new RegExp(`\\b(?:i|we)(?:'ve|'d| have| had| just| already| now| then| went ahead and| have now| have just| have already)*\\s+(?:${CLAIM_STRONG}\\b${NOT_CLAIM_AFTER}|${CLAIM_WEAK}(?: (?:up|on|off|down|ahead))? ${CLAIM_OBJECT})`),
-  // A clause that opens with the verb: "Paused the agent.", "Opened it for you.", "Stopped it."
-  new RegExp(`^(?:${CLAIM_STRONG}|${CLAIM_WEAK})(?: (?:up|on|off|down))? (?:it|that|this|them|the|your|a|an)\\b`),
-  // "I'm opening Notepad now", "Ending voice now.", "Closing voice.", "ending the voice session"
-  new RegExp(`\\b(?:i'?m|i am|we'?re|we are)(?: now| just)? ${CLAIM_ING}\\b`),
-  new RegExp(`^${CLAIM_ING} (?:it|that|this|them|now|voice|the voice|your|the session|this session|the agent|the mission)\\b(?!\\s+(?:is|are|was|can|could|takes|will|would|may|might|should)\\b)`),
-  // "Your reminder has been created for 9 AM.", "It's been saved.", "The timer is set for five minutes."
-  new RegExp(`\\b(?:it|that|this|everything|all|(?:the|your|my) [\\w'-]+(?: [\\w'-]+)?)(?:'s| has| have| had)(?: now| just| already)? been ${CLAIM_PARTICIPLE}\\b${GENERAL_AFTER}`),
-  new RegExp(`\\b(?:it|that|this|everything|(?:the|your|my) [\\w'-]+(?: [\\w'-]+)?)(?:'s| is| was| are| were)(?: now| all)? ${CLAIM_PARTICIPLE}\\b${GENERAL_AFTER}(?=\\s+(?:for|to|on|in|at|now|successfully|as requested)\\b|[\\s.!]*$)`),
-  // A bare outcome as the whole clause: "Done.", "Stopped.", "Confirm, paused.", "All set."
-  /^(?:(?:it'?s|it is|that'?s|that is|all|agent|the agent)\s+)?(?:done|all set|paused|stopped|approved|resumed|started|cancell?ed|saved|opened|closed|deleted|executed|granted|sent)[\s.!]*$/,
+const DONE_CLAIMS: RegExp[] = [
+  // "The agent has stopped.", "Your reminder has been created for 9 AM.", "The timer is set for five minutes."
+  new RegExp(`\\b${DONE_SUBJECT}(?:'s| has| have| had| is| are| was| were| got)?(?: now| just| already| all| been| successfully)* ${DONE_PARTICIPLE}\\b${GENERAL_AFTER}`),
+  // "It's been saved.", "It has been sent."
+  new RegExp(`\\b(?:it|that|this|everything|all)(?:'s| has| have| had) (?:now |just |already )?been ${DONE_PARTICIPLE}\\b${GENERAL_AFTER}`),
+  // "It's paused now.", "That is saved to your desktop."
+  new RegExp(`^(?:it|that|this|everything)(?:'s| is| was)(?: now| all)? ${DONE_PARTICIPLE}\\b${GENERAL_AFTER}(?=\\s+(?:for|to|on|in|at|now|successfully|as requested)\\b|[\\s.!]*$)`),
+  // "Email sent.", "Reminder set for nine.", "Saved to your desktop.", "Emailed to Sam."
+  new RegExp(`^(?:the |your |my )?(?:[\\w'-]+ )?(?:emails?|messages?|texts?|reminders?|alarms?|timers?|files?|folders?|notes?|documents?|meetings?|events?|appointments?|orders?|requests?|reports?|drafts?|backups?|commits?|updates?) ${DONE_PARTICIPLE}\\b(?=\\s+(?:for|to|on|in|at)\\b|[\\s.!]*$)`),
+  new RegExp(`^${DONE_PARTICIPLE} (?:it |that |them )?(?:to|for|on|in)\\b`),
+  // "Done.", "All set.", "Confirm, paused.", "Stopped."
+  /^(?:(?:it'?s|it is|that'?s|that is|all|agent|the agent)\s+)?(?:done|all set|paused|stopped|approved|resumed|started|cancell?ed|saved|opened|closed|deleted|executed|granted|sent|scheduled|booked)[\s.!]*$/,
+  // A clause that opens with Bunny's own past action: "Paused the agent.", "Opened it for you.", "Stopped it."
+  new RegExp(`^${DONE_PARTICIPLE} (?:it|that|this|them|the|your|a|an)\\b`),
+  // "Ending voice now.", "Closing voice.", "ending the voice session"
+  /^(?:ending|closing|opening|stopping|pausing|saving|starting|launching|deleting|approving|sending|e-?mailing|setting|creating|cancell?ing|resuming|restarting|deploying|pushing|scheduling|muting|renaming|sharing|running) (?:it|that|this|them|now|voice|the voice|your|the session|this session|the agent|the mission)\b(?!\s+(?:is|are|was|can|could|takes|will|would|may|might|should)\b)/,
 ];
+
+/** True when Bunny is the subject of an action verb in this clause (any tense), not negated or hypothetical. */
+function bunnyActs(clause: string): boolean {
+  const words = clause.replace(/[^a-z0-9'\s-]/g, " ").replace(/\b(i|we)'(ve|ll|m|d|re)\b/g, "$1 '$2").split(/\s+/).filter(Boolean);
+  for (let i = 0; i < words.length; i++) {
+    if (!BUNNY.test(words[i])) continue;
+    // A hypothetical or conditional ("if I opened it", "once we save it") is not a claim.
+    if (i > 0 && /^(?:if|when|once|whenever|unless|before|after|until|should|whether)$/.test(words[i - 1])) continue;
+    for (let j = i + 1; j < Math.min(words.length, i + 8); j++) {
+      const w = words[j];
+      if (CLAIM_STOP.test(w)) break;
+      if (CLAIM_FILLER.test(w)) continue;
+      if (ACTION_WORD.test(w)) {
+        const rest = words.slice(j + 1).join(" ");
+        if (NOT_ACTION_AFTER.test(rest) && !/^back(?:ed|ing)$/.test(w)) break;
+        return true;
+      }
+      break;
+    }
+  }
+  return false;
+}
+
 export function claimsAction(text: string): boolean {
   const t = text.toLowerCase().replace(/[’`]/g, "'").replace(/[—–]/g, ",").replace(/\s+/g, " ").trim();
   for (const sentence of t.split(/(?<=[.!?])\s+/)) {
+    // The whole sentence too, so a parenthetical ("I have, in fact, shut it down") never splits Bunny from its verb.
+    if (bunnyActs(sentence.replace(/[,;:]/g, " "))) return true;
     // Every clause is judged on its own, so a lead-in ("Good news,", "Alright then,") never hides a claim.
     for (const raw of sentence.split(/[,;:]\s*/)) {
-      const clause = raw.trim().replace(/^(?:(?:and|so|then|now|well|okay|ok|sure|alright|right|yes|yeah)\s+)+/, "");
-      if (clause && ACTION_CLAIM.some((re) => re.test(clause))) return true;
+      const clause = raw.trim().replace(/^(?:(?:and|so|then|now|well|okay|ok|sure|alright|right|yes|yeah|great|perfect|done|good news)\s+)+/, "");
+      if (!clause) continue;
+      if (bunnyActs(clause) || DONE_CLAIMS.some((re) => re.test(clause))) return true;
     }
   }
   return false;

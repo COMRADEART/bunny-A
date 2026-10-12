@@ -798,6 +798,7 @@ test("T12-native review round 3: a seed taken while the user talked over the fir
   assert.ok(r.reseedNextReplyThreshold <= 0.0007, `the next reply's echo-only seed lowers it to the floor band (${r.reseedNextReplyThreshold})`);
   assert.ok(r.reseedLaterTalkThreshold <= 0.0007, `talking over a later reply's first frames does not raise it (${r.reseedLaterTalkThreshold})`);
   assert.ok(r.reseedLeadInThreshold > 0.0012, `a quiet lead-in never pins the residual below a loud steady echo (${r.reseedLeadInThreshold})`);
+  assert.equal(r.reseedLongLeadInEchoOverThreshold, 0, "after a 400 ms silent lead-in the loud echo never crosses the onset threshold");
 });
 
 test("T12-native endpointing ignores whisper's trailing full stop and waits longer after a word that cannot end a sentence", { skip }, async () => {

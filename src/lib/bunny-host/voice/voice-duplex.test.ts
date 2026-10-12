@@ -1616,3 +1616,59 @@ test("T12 live re-check: an unfinished sentence with no continuation is routed a
   await s.session.close();
   assert.equal(s.admissions.length, 0, "closing drops a held fragment; nothing reaches the model");
 });
+
+// T12 review round 5 (re-check of 6aa99ba): a held fragment can never confirm, never swallow a control, never outlive its lane.
+test("T12 review r5: typed input drops a held fragment, so stale words can never confirm a newer proposal", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Yes, do it...");
+  assert.equal(h.admissions.length, 0, "held");
+  await h.session.text("pause the Builder agent");
+  await tick();
+  assert.ok(h.session.snapshot().proposal, "the typed control made a proposal");
+  h.advance(10_000);
+  await tick();
+  await tick();
+  assert.deepEqual(h.controls, [], "nothing was executed");
+  assert.ok(h.session.snapshot().proposal, "the proposal still waits");
+  assert.ok(h.journal.some((line) => line.includes("dropped: another input arrived")));
+  await h.session.close();
+});
+
+test("T12 review r5: a spoken control after a held fragment is routed on its own, never joined into chat", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.final("Can you tell me about the");
+  h.advance(800);
+  await h.final("stop the Builder agent");
+  await tick();
+  assert.equal(h.session.snapshot().turnKind, "agent_control");
+  assert.equal(h.session.snapshot().finalTranscript, "stop the Builder agent");
+  assert.ok(h.session.snapshot().proposal, "a stop proposal, as for an unheld stop");
+  assert.equal(h.admissions.length, 0, "nothing reached the chat model");
+  await h.session.close();
+});
+
+test("T12 review r5: a fragment built turn never confirms, and mute drops a held fragment", async () => {
+  const h = await harness();
+  await h.begin();
+  await h.session.text("pause the Builder agent");
+  await tick();
+  assert.ok(h.session.snapshot().proposal);
+  h.advance(6000);
+  await h.final("Yes and");
+  h.advance(800);
+  await h.final("do it now please");
+  await tick();
+  assert.deepEqual(h.controls, [], "a joined turn cannot confirm the proposal");
+  const m = await harness();
+  await m.begin();
+  await m.final("Tell me about the");
+  m.session.mute(true);
+  m.advance(10_000);
+  await tick();
+  await tick();
+  assert.equal(m.admissions.length, 0, "muting dropped the held words; they never reach the model");
+  await m.session.close();
+  await h.session.close();
+});

@@ -152,7 +152,7 @@ type Inference = { taskId: string; turn: string; gen: number; chunker: VoiceChun
 /** T12: a reply held on speech onset. Keyed by output generation: a resume or a stale timer can never touch newer speech. */
 type Hold = { turn: string; gen: number; inputTurn: string; inputGen: number; cancelResume: (() => void) | null; cancelMax: (() => void) | null };
 /** T12: how the Host received a transcript: from the duplex lane, a push-to-talk capture, or typed text. */
-export type TurnMeta = { source: "duplex" | "push_to_talk" | "typed"; overlapped: boolean; speechMs: number | null };
+export type TurnMeta = { source: "duplex" | "push_to_talk" | "typed"; overlapped: boolean; speechMs: number | null; /** Review round 5: built from a held unfinished sentence; it can never confirm. */ fromFragment?: boolean };
 /** T12: one input turn of the echo-cancelled lane, with its own controller, identity and recognition deadline. */
 type InputTurn = { turn: string; gen: number; timing: VoiceTiming; controller: VoiceTurnTaking; overlapped: boolean; speechOpen: boolean; dropped: boolean; cancelDeadline: (() => void) | null };
 /** T12: one chunk of Bunny's own speech, kept for the echo gate from the time it was sent until it stopped playing. */
@@ -815,6 +815,8 @@ export class VoiceSessionManager {
 
   /** Accepts one final transcript for a turn. Callers gate duplicates (V09, V10) before this point. */
   private acceptFinal(text: string, turn: string, confidence = 1, meta: TurnMeta = TYPED_META) {
+    // Review round 5: typed and push-to-talk input never joins a held spoken fragment; the fragment is dropped.
+    if (meta.source !== "duplex") this.dropFragment("another input arrived");
     this.turnMeta = meta;
     this.outputAtFinal = this.outputActive();
     this.expireProposal();
@@ -846,7 +848,9 @@ export class VoiceSessionManager {
     }
     // authz#0: the SENSITIVE classification runs before a pending clarification may consume the final. A clarification
     // answer is then taken only for an exact candidate name or a bare ordinal (see pickCandidate).
-    const intent = classifyTranscript(text, { proposalPending: this.voiceConfirmable() });
+    // Review round 5: words held from before a proposal existed can never answer it, so a fragment-built turn is classified
+    // as if nothing were pending, and a confirm from it is refused below.
+    const intent = classifyTranscript(text, { proposalPending: this.voiceConfirmable() && !meta.fromFragment });
     // R3-session#1: whether anything was pending is decided before a clarification is consumed, so a bare "cancel"
     // that drops a pending name choice truthfully says it was cancelled.
     this.pendingAtTurn = !!this.snap.proposal || !!this.clarification || !!this.snap.clarification;
@@ -856,6 +860,12 @@ export class VoiceSessionManager {
       this.snap.turnKind = intent.kind;
       this.deps.journal("voice.turn", `Turn classified as ${intent.kind} but not acted on: recognizer confidence too low.`);
       this.speakAnswer("I'm not sure I heard that right, so I won't change anything. Please say it again, or use the button on screen.", "host_facts", turn);
+      return;
+    }
+    if (meta.fromFragment && intent.kind === "confirm") {
+      this.snap.turnKind = "confirm";
+      this.deps.journal("voice.turn", "A confirm built from an unfinished spoken sentence was not acted on.");
+      this.answerHost("To confirm, say confirm again after I finish, or use the screen.", turn);
       return;
     }
     this.snap.turnKind = intent.kind;
@@ -2062,6 +2072,8 @@ export class VoiceSessionManager {
    * with its own turn and gen, and a held reply is resumed on its own generation. The reason is recorded (a receipt).
    */
   private stopDuplex(reason: DuplexEnd = "user", opts: StopOptions = {}): Promise<void> {
+    // Review round 5: a held spoken fragment never outlives its lane (mute, mode switch, error, relaunch, close).
+    this.dropFragment(`hands-free stopped (${reason})`);
     if (this.duplexStopping) return this.duplexStopping;
     const token = this.duplexToken;
     if (token !== null) this.recordDuplexStop(reason);
@@ -2426,11 +2438,15 @@ export class VoiceSessionManager {
     // endpointing could not know the sentence was unfinished. A held fragment is joined with the next final here; the joined
     // text is classified from scratch, overlapped if either part was, at the lower confidence of the two.
     const held = this.fragment;
-    if (held) {
+    if (held && classifyTranscript(text, { proposalPending: this.voiceConfirmable() }).kind !== "chat") {
+      // Review round 5: a continuation that is itself a stop, a close, a control or a question is routed on its own; the
+      // unfinished words before it are dropped, never joined into chat.
+      this.dropFragment("the next words were a command or a question of their own");
+    } else if (held) {
       this.clearFragment();
       text = `${held.text.replace(/[\s.!?,;:…]+$/, "")} ${text}`.slice(0, VOICE_LIMITS.maxTranscriptChars);
       confidence = Math.min(confidence, held.confidence);
-      meta = { source: "duplex", overlapped: meta.overlapped || held.meta.overlapped, speechMs: (meta.speechMs ?? 0) + (held.meta.speechMs ?? 0) };
+      meta = { source: "duplex", overlapped: meta.overlapped || held.meta.overlapped, speechMs: (meta.speechMs ?? 0) + (held.meta.speechMs ?? 0), fromFragment: true };
       this.deps.journal("voice.turn", "An unfinished spoken sentence was joined with its continuation.");
     } else if (isUnfinishedChat(text, this.voiceConfirmable())) {
       this.holdFragment(text, turn, confidence, meta);
@@ -2457,11 +2473,18 @@ export class VoiceSessionManager {
       if (this.closing || !this.snap.open) return;
       this.deps.journal("voice.turn", "An unfinished spoken sentence had no continuation; routed as heard.");
       this.snap.turnId = turn;
-      this.acceptFinal(text, turn, confidence, meta);
+      this.acceptFinal(text, turn, confidence, { ...meta, fromFragment: true });
     };
     this.fragment = { text, turn, confidence, meta, cancel: this.schedule(check, FRAGMENT_WAIT_MS) };
     this.snap.partial = text.slice(0, VOICE_LIMITS.maxTranscriptChars);
     this.deps.journal("voice.turn", "Waiting for the rest of an unfinished spoken sentence.");
+  }
+
+  private dropFragment(reason: string) {
+    if (!this.fragment) return;
+    this.clearFragment();
+    this.snap.partial = null;
+    this.deps.journal("voice.turn", `An unfinished spoken sentence was dropped: ${reason}.`);
   }
 
   private clearFragment() {

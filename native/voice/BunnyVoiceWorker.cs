@@ -1370,9 +1370,14 @@ internal sealed class AmbientFloor
     // T12 review rounds 3/4: every output burst re-samples its first BurstSeedFrames output frames once and the median replaces
     // the residual (see Observe).
     public const int BurstSeedFrames = 25;
+    // Round 5: more audible frames than a pre-onset burst of user speech can supply (an onset needs 6 frames above threshold).
+    public const int BurstAudibleMin = 8;
+    public const int BurstLeadMaxFrames = 50;
     readonly double[] burstRing = new double[BurstSeedFrames];
     readonly double[] burstSort = new double[BurstSeedFrames];
     int burstCount;
+    // Round 5: silent output frames skipped before the burst window opens (at most BurstLeadMaxFrames).
+    int burstLead;
     bool burstSampled;
     readonly double[] seedRing = new double[ResidualSeedFrames];
     readonly double[] seedSort = new double[ResidualSeedFrames];
@@ -1452,7 +1457,7 @@ internal sealed class AmbientFloor
                 {
                     hold--;
                     // The burst is over (held 1.5 s past the last audible frame): the next burst samples afresh.
-                    if (hold == 0) { burstCount = 0; burstSampled = false; }
+                    if (hold == 0) { burstCount = 0; burstLead = 0; burstSampled = false; }
                 }
             }
             if (speaking) return;
@@ -1464,7 +1469,10 @@ internal sealed class AmbientFloor
                 if (output)
                 {
                     PushSeedLocked(rms);
-                    if (!burstSampled && burstCount < BurstSeedFrames) burstRing[burstCount++] = rms;
+                    // Round 5: the window opens at the burst's first audible frame; a silent lead-in of up to 1 s is skipped.
+                    // A quiet device (all output frames silent) opens it after 1 s and learns its quiet level.
+                    if (!burstSampled && burstCount == 0 && rms < ResidualLearnLow && burstLead < BurstLeadMaxFrames) burstLead++;
+                    else if (!burstSampled && burstCount < BurstSeedFrames) burstRing[burstCount++] = rms;
                 }
                 if (seedCount == ResidualSeedFrames && !residualSeeded)
                 {
@@ -1477,9 +1485,19 @@ internal sealed class AmbientFloor
                     // Review rounds 3/4: each burst's first 500 ms of output (frames while the user is in speech are never
                     // observed) replaces the residual by its median, in either direction. A quiet lead-in or the user's
                     // ~120 ms before an onset is a minority of these frames, so neither pins the residual.
-                    Array.Copy(burstRing, burstSort, BurstSeedFrames);
-                    Array.Sort(burstSort);
-                    residual = Math.Min(ResidualCap, burstSort[BurstSeedFrames / 2]);
+                    // Round 5: when at least BurstAudibleMin frames carry audible echo (at or above ResidualLearnLow), the
+                    // residual is the median of those frames, so a silent lead-in of any length cannot pull it to the floor
+                    // under a loud steady echo. Otherwise (a quiet device, or only the user's few pre-onset frames are loud)
+                    // it is the median of the whole window.
+                    int audible = 0;
+                    for (int k = 0; k < BurstSeedFrames; k++) if (burstRing[k] >= ResidualLearnLow) burstSort[audible++] = burstRing[k];
+                    if (audible < BurstAudibleMin)
+                    {
+                        Array.Copy(burstRing, burstSort, BurstSeedFrames);
+                        audible = BurstSeedFrames;
+                    }
+                    Array.Sort(burstSort, 0, audible);
+                    residual = Math.Min(ResidualCap, burstSort[audible / 2]);
                     burstSampled = true;
                 }
                 // T12 live calibration: the residual only follows frames close to itself (a relative band), and there is no
@@ -4122,15 +4140,16 @@ internal static class SelfTest
         for (int f = 0; f < 50; f++) if (live.Feed(0.003, int.MaxValue) == Vad.SpeechStart && liveUser < 0) liveUser = f;
         r["aecLiveUserOnset"] = liveUser;
 
-        // T12 review rounds 3/4. (a) The user talks (0.004) over the first frames of the session's first reply: the 5-frame
+        // T12 review rounds 3-5. (a) The user talks (0.004) over the first frames of the session's first reply: the 5-frame
         // seed is the user's voice and the threshold is pinned high. (b) The next reply carries only the measured echo (5e-5):
-        // its 500 ms burst median lowers the residual again. (c) The user's ~120 ms before an onset over a later reply (6
-        // frames), then frames while in speech (never observed), then echo: the burst median stays at the echo level.
+        // a quiet device opens its burst window after 1 s of silent output, and that 500 ms median lowers the residual again.
+        // (c) The user's ~120 ms before an onset over a later reply (6 frames), then frames while in speech (never observed),
+        // then echo: the burst median stays at the echo level.
         AmbientFloor pin = new AmbientFloor(AmbientFloor.MinFloor);
         for (int f = 0; f < 10; f++) pin.Observe(0.004, false, true);
         r["reseedPinnedThreshold"] = pin.OnsetThreshold;
         for (int f = 0; f < AmbientFloor.ResidualHoldFrames + 5; f++) pin.Observe(0.0001, false, false);
-        for (int f = 0; f < 30; f++) pin.Observe(0.00005, false, true);
+        for (int f = 0; f < 80; f++) pin.Observe(0.00005, false, true);
         r["reseedNextReplyThreshold"] = pin.OnsetThreshold;
         for (int f = 0; f < AmbientFloor.ResidualHoldFrames + 5; f++) pin.Observe(0.0001, false, false);
         for (int f = 0; f < 6; f++) pin.Observe(0.004, false, true);
@@ -4145,6 +4164,15 @@ internal static class SelfTest
         for (int f = 0; f < 5; f++) lead.Observe(0.00005, false, true);
         for (int f = 0; f < 30; f++) lead.Observe(0.0012, false, true);
         r["reseedLeadInThreshold"] = lead.OnsetThreshold;
+        // (e) Round 5: the same loud echo after a 400 ms (20-frame) silent lead-in: still followed, never pinned at the floor.
+        AmbientFloor longLead = new AmbientFloor(AmbientFloor.MinFloor);
+        for (int f = 0; f < 30; f++) longLead.Observe(0.0012, false, true);
+        for (int f = 0; f < AmbientFloor.ResidualHoldFrames + 5; f++) longLead.Observe(0.0001, false, false);
+        for (int f = 0; f < 20; f++) longLead.Observe(0.00005, false, true);
+        for (int f = 0; f < 40; f++) longLead.Observe(0.0012, false, true);
+        int longLeadOnsetFrames = 0;
+        for (int f = 0; f < 40; f++) { longLead.Observe(0.0012, false, true); if (0.0012 > longLead.OnsetThreshold) longLeadOnsetFrames++; }
+        r["reseedLongLeadInEchoOverThreshold"] = longLeadOnsetFrames;
 
         // T12 live endpointing: the split phrases from the endurance session, plus finished and empty partials.
         string[] endpointProbe = { "Prepare approach and prepare.", "Prepare a.", "Open notes and...", "write about matrix.",
