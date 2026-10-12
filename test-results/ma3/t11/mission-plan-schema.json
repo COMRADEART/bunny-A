@@ -1,0 +1,569 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bunny team plan (bunny.team-plan.v1)",
+  "description": "Generated from outputGrammar(\"plan\", offer) for a representative offer (files/requirement ids are per offer). This grammar constrains the Planner model's reply; it is NOT the trust boundary: validateTeamPlan re-validates every plan (graph, roles, paths, coverage, budgets).",
+  "representativeOffer": {
+    "objective": "example",
+    "outputDir": "out",
+    "requirements": [
+      {
+        "id": "R1",
+        "text": "Summary",
+        "check": {
+          "kind": "html_id",
+          "value": "summary"
+        },
+        "target": "html"
+      },
+      {
+        "id": "R2",
+        "text": "Items",
+        "check": {
+          "kind": "dataset_values"
+        },
+        "target": "html"
+      },
+      {
+        "id": "R3",
+        "text": "Usage",
+        "check": {
+          "kind": "markdown_heading",
+          "value": "Usage"
+        },
+        "target": "markdown"
+      }
+    ],
+    "files": [
+      "data/inventory.csv"
+    ],
+    "git": true,
+    "limits": {
+      "maxAgents": 5,
+      "maxTasks": 12,
+      "maxConcurrentSteps": 3,
+      "maxConcurrentModelSteps": 2,
+      "maxPlanRevisions": 2,
+      "maxReworkRounds": 1
+    },
+    "stepLimit": 19
+  },
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "enum": [
+        "bunny.team-plan.v1"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "researcher"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "observe"
+                ]
+              },
+              "objective": {
+                "type": "string"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "path": {
+                "type": "string",
+                "enum": [
+                  "data/inventory.csv"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "kind",
+              "objective",
+              "dependsOn",
+              "path"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "researcher"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "observe"
+                ]
+              },
+              "objective": {
+                "type": "string"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "git_log"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "kind",
+              "objective",
+              "dependsOn",
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "researcher",
+                  "implementer"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "generate_json"
+                ]
+              },
+              "objective": {
+                "type": "string"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "schema": {
+                "type": "string",
+                "enum": [
+                  "dashboard-dataset.v1"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "kind",
+              "objective",
+              "dependsOn",
+              "schema"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "researcher",
+                  "documenter"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "generate_markdown"
+                ]
+              },
+              "objective": {
+                "type": "string"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "kind",
+              "objective",
+              "dependsOn"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "implementer"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "generate_html"
+                ]
+              },
+              "objective": {
+                "type": "string"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "requirements": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "R1",
+                    "R2",
+                    "R3"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "kind",
+              "objective",
+              "dependsOn"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "researcher",
+                  "implementer",
+                  "documenter"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "write_file"
+                ]
+              },
+              "objective": {
+                "type": "string"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "target": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,47}\\.(json|md|html)$"
+              },
+              "content": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "kind",
+              "objective",
+              "dependsOn",
+              "target",
+              "content"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "reviewer"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "review"
+                ]
+              },
+              "objective": {
+                "type": "string"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "subject": {
+                "type": "string"
+              },
+              "requirements": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "R1",
+                    "R2",
+                    "R3"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "kind",
+              "objective",
+              "dependsOn",
+              "subject"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "tester"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "verify_output"
+                ]
+              },
+              "objective": {
+                "type": "string"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "subject": {
+                "type": "string"
+              },
+              "requirements": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "R1",
+                    "R2",
+                    "R3"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "role",
+              "kind",
+              "objective",
+              "dependsOn",
+              "subject",
+              "requirements"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "version",
+    "summary",
+    "tasks"
+  ],
+  "additionalProperties": false,
+  "hostRules": [
+    "unknown fields rejected",
+    "task ids t1..t99, unique",
+    "dependsOn <= 8, acyclic, known ids, no self-dependency",
+    "role must be assignable and allowed the kind",
+    "observe: one offered file or git_log",
+    "write_file: plain target name (.json/.md/.html), one writer per file, content = a dependency of the matching generator kind",
+    "review/verify_output subject = a write_file dependency; verify_output only on .html/.md",
+    "every user requirement covered by a verify_output on its file type",
+    "dataset_values requirements need the page generator to depend on generate_json",
+    "tasks <= maxTasks, distinct member roles <= maxAgents, 1 + tasks + 3*verifies*maxReworkRounds <= Mission step limit"
+  ],
+  "example": {
+    "version": "bunny.team-plan.v1",
+    "summary": "Read the inputs, build each deliverable, save it, review it and have Bunny verify it.",
+    "tasks": [
+      {
+        "id": "t1",
+        "role": "researcher",
+        "kind": "observe",
+        "objective": "Read the project file the objective names.",
+        "dependsOn": [],
+        "path": "data/inventory.csv"
+      },
+      {
+        "id": "t2",
+        "role": "researcher",
+        "kind": "generate_json",
+        "objective": "Turn the input into the structured dataset.",
+        "dependsOn": [
+          "t1"
+        ],
+        "schema": "dashboard-dataset.v1"
+      },
+      {
+        "id": "t3",
+        "role": "implementer",
+        "kind": "generate_html",
+        "objective": "Build the offline page from the verified input.",
+        "dependsOn": [
+          "t2"
+        ],
+        "requirements": [
+          "R1",
+          "R2"
+        ]
+      },
+      {
+        "id": "t4",
+        "role": "implementer",
+        "kind": "write_file",
+        "objective": "Save the page.",
+        "dependsOn": [
+          "t3"
+        ],
+        "target": "index.html",
+        "content": "t3"
+      },
+      {
+        "id": "t5",
+        "role": "reviewer",
+        "kind": "review",
+        "objective": "Review the saved page against the requirements.",
+        "dependsOn": [
+          "t4"
+        ],
+        "subject": "t4",
+        "requirements": [
+          "R1",
+          "R2"
+        ]
+      },
+      {
+        "id": "t6",
+        "role": "tester",
+        "kind": "verify_output",
+        "objective": "Have Bunny verify the page.",
+        "dependsOn": [
+          "t4",
+          "t5"
+        ],
+        "subject": "t4",
+        "requirements": [
+          "R1",
+          "R2"
+        ]
+      },
+      {
+        "id": "t7",
+        "role": "documenter",
+        "kind": "generate_markdown",
+        "objective": "Write the Markdown document from the verified input.",
+        "dependsOn": [
+          "t1"
+        ]
+      },
+      {
+        "id": "t8",
+        "role": "documenter",
+        "kind": "write_file",
+        "objective": "Save the document.",
+        "dependsOn": [
+          "t7"
+        ],
+        "target": "README.md",
+        "content": "t7"
+      },
+      {
+        "id": "t9",
+        "role": "tester",
+        "kind": "verify_output",
+        "objective": "Have Bunny verify the document.",
+        "dependsOn": [
+          "t8"
+        ],
+        "subject": "t8",
+        "requirements": [
+          "R3"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "classification": "SIMULATED model, real AgentWorkspaceStore/ProjectContextResolver",
+  "tests": [
+    "✔ M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release",
+    "✔ M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release",
+    "✔ baked identity does not need a workspace filesystem",
+    "✔ R2-truth#0 the first snapshot without an intent seeds the floor, so the first intent after start opens the workspace once",
+    "✔ this workspace's auth schema copy is byte-identical to its source",
+    "✔ reads the app env from a workspace",
+    "✔ callTool in the workspace preview vs deployed",
+    "✔ T2: claimed current version with missing workspace-write is unsupported",
+    "✔ MA1: Codex mission write argv keeps workspace-write without user extensions; direct tasks are unchanged",
+    "✔ T7 P21/P23 durable workspace creation is idempotent and independent between Agents",
+    "✔ T7 P47/P48 cleanup never deletes an unowned or active workspace",
+    "✔ T7 workspace manifest substitution blocks admission",
+    "✔ T7 workspace disk quota and entry bounds fail closed",
+    "✔ A04 covered workspace write: real adapter writes and independently reads back",
+    "✔ workspace locks: readers share, writers are exclusive, nested folders conflict",
+    "✔ parallel writers on one workspace are serialized by the exclusive lock",
+    "✔ M25: a member's scratch is its own; another member is refused, even in the same team",
+    "✔ M62: the planner's file offer excludes private and Host material and the output folder"
+  ],
+  "live": {
+    "members": 113,
+    "note": "Every member received its own scratch workspace (agent_workspaces); team writes landed only in each Mission's fresh output folder (capability-runs.json paths)."
+  }
+}

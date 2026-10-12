@@ -1,0 +1,258 @@
+{
+  "mission": "Project overview team 9",
+  "missionId": "a4c46139-d5b8-423e-8c3d-39f8c8e19d37",
+  "phase": "review",
+  "state": "waiting_for_approval",
+  "planReference": "team:10e33464c4529f4ca55e192350f3584f08c2a919a445583ff4a2c1dfae42af3d",
+  "planRevisions": 1,
+  "rejected": [
+    {
+      "at": 1791767116300,
+      "reasons": [
+        "team plan output failed: t7.subject must be a write_file task.",
+        "team plan output failed: t8.subject must be a write_file task.",
+        "team plan output failed: t9.subject must be a write_file task.",
+        "team plan output failed: Requirement R1 is not verified by any verify_output task on a .md file."
+      ]
+    }
+  ],
+  "members": [
+    {
+      "agentId": "7c51c3b8-8434-40c9-a999-db5443a0958a",
+      "role": "planner"
+    },
+    {
+      "agentId": "b9424f62-7bd5-4364-a3dc-6ec09036bdcc",
+      "role": "researcher"
+    },
+    {
+      "agentId": "bbf6b191-5a8d-4d3b-ab32-8065fab71ef1",
+      "role": "implementer"
+    },
+    {
+      "agentId": "9c7d126f-a331-45e6-baed-21dac556ea77",
+      "role": "reviewer"
+    },
+    {
+      "agentId": "da67dcbe-7c6d-4768-aa67-f93eae62aac9",
+      "role": "tester"
+    },
+    {
+      "agentId": "9bd0bd4a-a499-459f-8267-13aabed76d39",
+      "role": "documenter"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "plan",
+      "role": "planner",
+      "kind": "plan",
+      "objective": "Propose a bounded team plan for the objective as one JSON document.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t1",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the project file the objective names.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t2",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the project's Git history.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t3",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the offline page with an overview section and verify it against the requirements R2 and R3.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page to index.html.",
+      "dependsOn": [
+        "t3"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t5",
+      "role": "reviewer",
+      "kind": "review",
+      "objective": "Review the saved HTML page against the requirements R2 and R3.",
+      "dependsOn": [
+        "t4"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t6",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the HTML page against the requirements R2 and R3.",
+      "dependsOn": [
+        "t4",
+        "t5"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t7",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Write the Markdown document from the verified input.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t8",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the Markdown document to README.md.",
+      "dependsOn": [
+        "t7"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t9",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the document against the requirement R1.",
+      "dependsOn": [
+        "t8"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": [
+        "R1"
+      ]
+    },
+    {
+      "key": "t3_r1",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the offline page with an overview section and verify it against the requirements R2 and R3.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page to index.html.",
+      "dependsOn": [
+        "t3_r1"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t6_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the HTML page against the requirements R2 and R3.",
+      "dependsOn": [
+        "t4_r1",
+        "t5"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t7_r1",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Write the Markdown document from the verified input.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t8_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the Markdown document to README.md.",
+      "dependsOn": [
+        "t7_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t9_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the document against the requirement R1.",
+      "dependsOn": [
+        "t8_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": [
+        "R1"
+      ]
+    }
+  ]
+}

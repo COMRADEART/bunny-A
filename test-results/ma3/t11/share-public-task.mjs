@@ -1,0 +1,13 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+const path='src/lib/bunny-host/presentation.ts';
+let source=readFileSync(path,'utf8');
+const start=source.indexOf('    tasks: snapshot.tasks.map((task) => ({',source.indexOf('export function dashboardSnapshot'));
+const end=source.indexOf('    missions: snapshot.missions',start);
+if(start<0||end<0)throw Error('Public task projection boundaries missing');
+const block=source.slice(start,end);
+const body=block.slice(block.indexOf('({')+2,block.lastIndexOf('})),')).trimEnd();
+const helper='/** Shared public task projection for dashboard and paired-device Project reads. */\nexport function publicTask(task: OrchTask): OrchTask {\n  return {\n'+body+'\n  };\n}\n\n';
+source=source.slice(0,start)+'    tasks: snapshot.tasks.map(publicTask),\n'+source.slice(end);
+const insertion=source.indexOf('export function dashboardSnapshot');
+source=source.slice(0,insertion)+helper+source.slice(insertion);
+writeFileSync(path,source);

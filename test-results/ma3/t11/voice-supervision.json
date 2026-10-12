@@ -1,0 +1,185 @@
+{
+  "live": {
+    "classification": "LIVE disposable Host voice session; typed turns (no microphone capture), answers from canonical Host facts, spoken on the default output",
+    "probes": [
+      {
+        "label": "during B and C",
+        "at": 1791766076189,
+        "turns": [
+          {
+            "text": "How many agents are working?",
+            "status": 200,
+            "turnKind": "agent_team",
+            "answerSource": "host_facts",
+            "answer": "3 agents are working: the Researcher agent, building the dataset; the Researcher agent, writing Markdown; the Implementer agent, building the dataset.",
+            "canonical": {
+              "working": [
+                {
+                  "role": "researcher",
+                  "task": "generate_json"
+                },
+                {
+                  "role": "researcher",
+                  "task": "generate_markdown"
+                },
+                {
+                  "role": "implementer",
+                  "task": "generate_json"
+                }
+              ],
+              "testers": [
+                "WAITING_FOR_DEPENDENCY",
+                "WAITING_FOR_DEPENDENCY"
+              ]
+            }
+          },
+          {
+            "text": "Which agent is testing?",
+            "status": 200,
+            "turnKind": "agent_team",
+            "answerSource": "host_facts",
+            "answer": "the Tester agent is waiting for dependency, having Bunny check the requirements. the Tester agent is waiting for dependency, having Bunny check the requirements.",
+            "canonical": {
+              "working": [
+                {
+                  "role": "researcher",
+                  "task": "generate_json"
+                },
+                {
+                  "role": "researcher",
+                  "task": "generate_markdown"
+                },
+                {
+                  "role": "implementer",
+                  "task": "generate_json"
+                }
+              ],
+              "testers": [
+                "WAITING_FOR_DEPENDENCY",
+                "WAITING_FOR_DEPENDENCY"
+              ]
+            }
+          },
+          {
+            "text": "What is the planning agent doing?",
+            "status": 200,
+            "turnKind": "agent_team",
+            "answerSource": "host_facts",
+            "answer": "the Planner agent is waiting for dependency, planning. the Planner agent is waiting for dependency, planning.",
+            "canonical": {
+              "working": [
+                {
+                  "role": "researcher",
+                  "task": "generate_json"
+                },
+                {
+                  "role": "researcher",
+                  "task": "generate_markdown"
+                },
+                {
+                  "role": "implementer",
+                  "task": "generate_json"
+                }
+              ],
+              "testers": [
+                "WAITING_FOR_DEPENDENCY",
+                "WAITING_FOR_DEPENDENCY"
+              ]
+            }
+          },
+          {
+            "text": "Has the mission finished?",
+            "status": 200,
+            "turnKind": "agent_team",
+            "answerSource": "host_facts",
+            "answer": "The team mission Build an offline team directory page from data/team.csv and a Markdown onboardin has not finished. It is running, with 1 of 8 tasks completed.",
+            "canonical": {
+              "working": [
+                {
+                  "role": "researcher",
+                  "task": "generate_json"
+                }
+              ],
+              "testers": [
+                "WAITING_FOR_DEPENDENCY",
+                "WAITING_FOR_DEPENDENCY"
+              ]
+            }
+          },
+          {
+            "text": "Which tasks failed?",
+            "status": 200,
+            "turnKind": "agent_team",
+            "answerSource": "host_facts",
+            "answer": "No task of Build an offline team directory page from data/team.csv and a Markdown onboardin has failed.",
+            "canonical": {
+              "working": [
+                {
+                  "role": "researcher",
+                  "task": "generate_json"
+                }
+              ],
+              "testers": [
+                "WAITING_FOR_DEPENDENCY",
+                "WAITING_FOR_DEPENDENCY"
+              ]
+            }
+          },
+          {
+            "text": "Approve the team plan.",
+            "status": 200,
+            "turnKind": "sensitive_refused",
+            "answerSource": "refusal",
+            "answer": "I can't do that by voice. Approvals, permissions and commands are reviewed on the Windows Host screen.",
+            "canonical": {
+              "working": [
+                {
+                  "role": "researcher",
+                  "task": "generate_markdown"
+                },
+                {
+                  "role": "implementer",
+                  "task": "generate_html"
+                }
+              ],
+              "testers": [
+                "WAITING_FOR_DEPENDENCY"
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "tests": [
+    "✔ T10-XG-06: rollback refuses a paused Mission with a live desktop grant, even outside the snapshot page",
+    "✔ T10-whisper a release with the pin is closed only when every pinned runtime file, the shim and the model are present",
+    "✔ T10-T6-04: revocation ends an already authenticated Host SSE before future delivery",
+    "✔ T10-T6-04: revocation ends an already authenticated task SSE before future delivery",
+    "✔ T10-T6-04: revoking one device preserves workstation and independently paired streams",
+    "✔ V31 T10-SUP#3 one pending ask is one item: an agent waiting on its Mission's unresolved request is not counted twice",
+    "✔ V41 T10-SUP#1 a redirect with a generic action word is redirect_unsupported; authority claims inside a redirect stay refused",
+    "✔ V33 T10-SUP#2 'stop the current mission' targets the single active agent, not an agent named 'current'",
+    "✔ T10-whisper a launch-time whisper fallback is a visible non-fatal notice and the session stays usable",
+    "✔ T10-whisper a worker STT_UNAVAILABLE after ready is a notice, not a session failure",
+    "✔ T10-whisper the ready event names the engine that is actually running (whisper or SAPI)",
+    "✔ T11-V01: team questions classify as agent_team with their subject; approvals stay never-by-voice",
+    "✔ T11-V02: answers are Host facts with Host labels; planner prose never reaches speech",
+    "✔ T11-V03: hostFactsFrom carries role and own task, and reports a shared team Mission once",
+    "✔ T11-V04: naming what is let through is an approval; thinking something through is not",
+    "✔ T11-V05 (review SURF-04): going ahead with, passing or revising a plan is refused by voice; questions stay questions",
+    "✔ T10-whisper a fully verified pinned runtime selects whisper with absolute paths and a bounded thread count",
+    "✔ T10-whisper one changed byte in a runtime DLL selects SAPI with a reason and no whisper flags",
+    "✔ T10-whisper a changed shim is refused against the build record",
+    "✔ T10-whisper a same-size model change is refused against the pin even after a cached pass",
+    "✔ T10-whisper a release layout refuses whisper when the manifest omits a whisper file",
+    "✔ T10-whisper a release manifest that lists a whisper file with a different hash is refused",
+    "✔ T10-whisper an unlisted file in the runtime folder is refused: nothing loads a DLL by name",
+    "✔ T10-whisper a pinned source with no staged runtime selects SAPI with a reason; a source without a pin selects SAPI silently",
+    "✔ T10-whisper a missing pinned file is named in the reason",
+    "✔ T10-whisper the thread count is half the processors, clamped to 2..4",
+    "✔ T10-whisper a real contained whisper fixture turn ends in stt.final from whisper.cpp",
+    "✔ T10-XG-13: Host restart invalidates a pending request; explicit retry creates a fresh decision",
+    "✔ T10-XG-05: restart discards a one-time decision that has not begun GUI execution"
+  ]
+}

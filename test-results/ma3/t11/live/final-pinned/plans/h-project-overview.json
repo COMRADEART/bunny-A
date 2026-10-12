@@ -1,0 +1,256 @@
+{
+  "mission": "Project overview team",
+  "missionId": "4baa2596-26f0-42eb-b7a9-82b339168e3c",
+  "phase": "review",
+  "state": "waiting_for_approval",
+  "planReference": "team:a0a0f41ffa50064abc05bec1d2434eeab6e6303fda90b2cf9196ad66e4e30a0f",
+  "planRevisions": 1,
+  "rejected": [
+    {
+      "at": 1791766596878,
+      "reasons": [
+        "team plan output failed: The plan has 13 tasks",
+        "the limit is 12."
+      ]
+    }
+  ],
+  "members": [
+    {
+      "agentId": "901be801-0398-4572-81d7-ebaabd64ed13",
+      "role": "planner"
+    },
+    {
+      "agentId": "378d2ab9-de41-43a4-842c-933321e5e4d0",
+      "role": "researcher"
+    },
+    {
+      "agentId": "bc83be5f-aa3b-43ee-a9d2-24e038a1ff08",
+      "role": "implementer"
+    },
+    {
+      "agentId": "3a202eba-a395-4708-b12d-b83c3f21c7a3",
+      "role": "reviewer"
+    },
+    {
+      "agentId": "de39082a-37f9-4a82-8609-eba51c4c7136",
+      "role": "tester"
+    },
+    {
+      "agentId": "3c84b5ec-9a9f-426c-b931-681aef770672",
+      "role": "documenter"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "plan",
+      "role": "planner",
+      "kind": "plan",
+      "objective": "Propose a bounded team plan for the objective as one JSON document.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t1",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the project file the objective names.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t2",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the project's Git history.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t3",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the offline page from the verified input.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the page.",
+      "dependsOn": [
+        "t3"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t5",
+      "role": "reviewer",
+      "kind": "review",
+      "objective": "Review the saved page against the requirements.",
+      "dependsOn": [
+        "t4"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t6",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the page.",
+      "dependsOn": [
+        "t4",
+        "t5"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t7",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Write the Markdown document from the verified input.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t8",
+      "role": "documenter",
+      "kind": "write_file",
+      "objective": "Save the document.",
+      "dependsOn": [
+        "t7"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t9",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the document.",
+      "dependsOn": [
+        "t8"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": [
+        "R1"
+      ]
+    },
+    {
+      "key": "t3_r1",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the offline page from the verified input.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the page.",
+      "dependsOn": [
+        "t3_r1"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t6_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the page.",
+      "dependsOn": [
+        "t4_r1",
+        "t5"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t7_r1",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Write the Markdown document from the verified input.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t8_r1",
+      "role": "documenter",
+      "kind": "write_file",
+      "objective": "Save the document.",
+      "dependsOn": [
+        "t7_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t9_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the document.",
+      "dependsOn": [
+        "t8_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": [
+        "R1"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,262 @@
+{
+  "mission": "Service latency team 8",
+  "missionId": "07d1ee8b-0529-4044-90a5-c8223ecbffc9",
+  "phase": "review",
+  "state": "waiting_for_approval",
+  "planReference": "team:e77987e5c0960bf6928cee79df7c6b16e52a8aa787a438392f312013e6aa9a9c",
+  "planRevisions": 4,
+  "rejected": [
+    {
+      "at": 1791766977596,
+      "reasons": [
+        "team plan output failed: t5 writes service-latency-8.md from t2 (generate_json)",
+        "the content must come from a generate_markdown task."
+      ]
+    },
+    {
+      "at": 1791766993382,
+      "reasons": [
+        "team plan output failed: t6 writes service-latency-8.md from t5 (generate_html)",
+        "the content must come from a generate_markdown task."
+      ]
+    },
+    {
+      "at": 1791767008646,
+      "reasons": [
+        "team plan output failed: t6 writes service-latency-8.md from t5 (generate_html)",
+        "the content must come from a generate_markdown task."
+      ]
+    },
+    {
+      "at": 1791767036444,
+      "reasons": [
+        "team plan output failed: t6 and t4 both write service-latency-8.html",
+        "one writer per file.",
+        "team plan output failed: t8 and t6 both write service-latency-8.html",
+        "one writer per file.",
+        "team plan output failed: t11 writes service-latency-8.md from t10 (generate_html)",
+        "the content must come from a generate_markdown task.",
+        "team plan output failed: Requirement R1 is not verified by any verify_output task on a .html file.",
+        "team plan output failed: Requirement R2 is not verified by any verify_output task on a .html file.",
+        "team plan output failed: Requirement R3 is not verified by any verify_output task on a .html file.",
+        "team plan output failed: Requirement R4 is not verified by any verify_output task on a .md file."
+      ]
+    }
+  ],
+  "members": [
+    {
+      "agentId": "e5280b4b-9269-498b-99fe-290f696db986",
+      "role": "planner"
+    },
+    {
+      "agentId": "5f9beda5-8d75-4ccc-bf6d-28cc4d9ffca2",
+      "role": "researcher"
+    },
+    {
+      "agentId": "8f4c21ab-bad7-4943-b25c-4d94fe734ba6",
+      "role": "implementer"
+    },
+    {
+      "agentId": "401972e3-1204-43bc-8ca2-f20afe5933eb",
+      "role": "tester"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "plan",
+      "role": "planner",
+      "kind": "plan",
+      "objective": "Propose a bounded team plan for the objective as one JSON document.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t1",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the project file the objective names.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t2",
+      "role": "implementer",
+      "kind": "generate_json",
+      "objective": "Turn the input into the structured dataset.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t3",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the offline page from the verified input.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the page.",
+      "dependsOn": [
+        "t3"
+      ],
+      "dormant": false,
+      "target": "service-latency-8.html",
+      "requirements": null
+    },
+    {
+      "key": "t5",
+      "role": "researcher",
+      "kind": "generate_markdown",
+      "objective": "Write the Markdown document from the verified input.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t6",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the document.",
+      "dependsOn": [
+        "t5"
+      ],
+      "dormant": false,
+      "target": "service-latency-8.md",
+      "requirements": null
+    },
+    {
+      "key": "t7",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the page.",
+      "dependsOn": [
+        "t4"
+      ],
+      "dormant": false,
+      "target": "service-latency-8.html",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t8",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the document.",
+      "dependsOn": [
+        "t6"
+      ],
+      "dormant": false,
+      "target": "service-latency-8.md",
+      "requirements": [
+        "R4"
+      ]
+    },
+    {
+      "key": "t3_r1",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the offline page from the verified input.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the page.",
+      "dependsOn": [
+        "t3_r1"
+      ],
+      "dormant": true,
+      "target": "service-latency-8.html",
+      "requirements": null
+    },
+    {
+      "key": "t7_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the page.",
+      "dependsOn": [
+        "t4_r1"
+      ],
+      "dormant": true,
+      "target": "service-latency-8.html",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t5_r1",
+      "role": "researcher",
+      "kind": "generate_markdown",
+      "objective": "Write the Markdown document from the verified input.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t6_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the document.",
+      "dependsOn": [
+        "t5_r1"
+      ],
+      "dormant": true,
+      "target": "service-latency-8.md",
+      "requirements": null
+    },
+    {
+      "key": "t8_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the document.",
+      "dependsOn": [
+        "t6_r1"
+      ],
+      "dormant": true,
+      "target": "service-latency-8.md",
+      "requirements": [
+        "R4"
+      ]
+    }
+  ]
+}

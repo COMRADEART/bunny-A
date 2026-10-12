@@ -1,0 +1,31 @@
+{"probe":"HANDOFF-01","state":"waiting_for_user","tester":"failed"}
+✔ HANDOFF-01: requirements verifier must refuse a corrupt producer before claiming changed disk bytes verified (7502.8171ms)
+{"probe":"HANDOFF-03","state":"completed","reworkLaunched":true,"corruptedReviewDelivered":true}
+✖ HANDOFF-03: rework must revalidate advisory Reviewer artifact integrity before transferring it (9128.0604ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16948.4204
+
+✖ failing tests:
+
+test at test-results\ma3\t11\review-handoff\handoff-probes.test.ts:63:1
+✖ HANDOFF-03: rework must revalidate advisory Reviewer artifact integrity before transferring it (9128.0604ms)
+  AssertionError [ERR_ASSERTION]: Corrupt Reviewer bytes must never reach the rework model
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t11/review-handoff/handoff-probes.test.ts:81:12)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

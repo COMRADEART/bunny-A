@@ -1,0 +1,225 @@
+{
+  "mission": "Budget review team 10",
+  "missionId": "832ba1d5-51bf-4286-a094-8648f07a8819",
+  "phase": "review",
+  "state": "waiting_for_approval",
+  "planReference": "team:fc5c276a791d0371d2cb7c82d01ae6afa4bd47c0d0f5fe94abc9b16edea39d0c",
+  "planRevisions": 0,
+  "rejected": [],
+  "members": [
+    {
+      "agentId": "ac4309a5-894c-4e1d-a98a-00f03ea75eb7",
+      "role": "planner"
+    },
+    {
+      "agentId": "ea27480d-4d65-432f-87e2-9e01fe64f460",
+      "role": "researcher"
+    },
+    {
+      "agentId": "1fba83cf-1635-495e-8077-9573da0aa265",
+      "role": "implementer"
+    },
+    {
+      "agentId": "1b027742-71fe-494c-ae0c-ea04d5eabc18",
+      "role": "tester"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "plan",
+      "role": "planner",
+      "kind": "plan",
+      "objective": "Propose a bounded team plan for the objective as one JSON document.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t1",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the budget.csv file.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t2",
+      "role": "implementer",
+      "kind": "generate_json",
+      "objective": "Generate the JSON dataset from the budget.csv file.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t3",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the HTML page from the JSON dataset.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page.",
+      "dependsOn": [
+        "t3"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t5",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the HTML page.",
+      "dependsOn": [
+        "t4"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t6",
+      "role": "researcher",
+      "kind": "generate_markdown",
+      "objective": "Generate the Markdown summary from the JSON dataset.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t7",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the Markdown summary.",
+      "dependsOn": [
+        "t6"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t8",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the Markdown summary.",
+      "dependsOn": [
+        "t7"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": [
+        "R4"
+      ]
+    },
+    {
+      "key": "t3_r1",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the HTML page from the JSON dataset.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page.",
+      "dependsOn": [
+        "t3_r1"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t5_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the HTML page.",
+      "dependsOn": [
+        "t4_r1"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t6_r1",
+      "role": "researcher",
+      "kind": "generate_markdown",
+      "objective": "Generate the Markdown summary from the JSON dataset.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t7_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the Markdown summary.",
+      "dependsOn": [
+        "t6_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t8_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the Markdown summary.",
+      "dependsOn": [
+        "t7_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": [
+        "R4"
+      ]
+    }
+  ]
+}
