@@ -5,6 +5,7 @@ import type { ActionManifest, RiskClass } from "../bunny-missions/types.ts";
 import type { HostSnapshot, SnapshotViewer } from "./contracts.ts";
 import type { OrchTask } from "../orch/types.ts";
 import type { ProjectDetail } from "./project-types.ts";
+import { connectionDeviceView } from "./connections.ts";
 import { publicTask } from "./presentation.ts";
 import { isRemoteOllamaTag } from "../orch/exec.server.ts";
 
@@ -414,7 +415,7 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
     // M-A-3 T13.1: credential state, provider limits and usage are workstation-owner settings.
     intelligence: undefined,
     connections: undefined,
-    deviceConnections:snapshot.connections?.accounts.map(row=>({catalog:row.catalog,name:row.catalog,mode:row.mode,label:row.mode,status:row.status,usableForTasks:row.dispatch&&row.lifecycle==="active"&&row.consent.allowTasks&&["signed_in","not_required"].includes(row.session)&&row.tool==="ready",billing:row.billing,lastCheckedAt:row.lastCheckedAt})),
+    deviceConnections: snapshot.connections?.accounts.map(connectionDeviceView),
   };
 }
 

@@ -22,3 +22,18 @@ test("T13.2 UI [STATIC VERIFIED] payment and failure labels do not claim free ac
   assert.equal(ACCOUNT_STATUS.unsupported, "Unsupported");
   assert.ok(!JSON.stringify(BILLING_LABEL).includes("free"));
 });
+
+test("T13.2 UI [SIMULATED] a signed-in native account with a blocked budget never claims Task eligibility", () => {
+  const row = {
+    session: "signed_in",
+    entitlement: "plan_reported",
+    tool: "ready",
+    dispatch: true,
+    lifecycle: "active",
+    status: "budget_blocked",
+    consent: { allowTasks: true },
+  } as ConnectionView;
+  const facts = accountFacts(row);
+  assert.equal(facts[0].value, "signed in");
+  assert.equal(facts[3].value, "Budget blocked");
+});

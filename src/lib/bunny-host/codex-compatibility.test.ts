@@ -186,6 +186,14 @@ test("T2/T13.2: direct legacy task retains workspace authority with a pinned nat
     assert.equal(args[args.indexOf("--sandbox") + 1], "workspace-write");
     assert.equal(args[args.indexOf("-c") + 1], 'model_provider="openai"');
     assert.ok(args.includes("--ignore-user-config") && args.includes("--ignore-rules"));
+    assert.deepEqual(args, [
+      "exec", "--json", "-c", 'model_provider="openai"', "--sandbox", "workspace-write",
+      "--ignore-user-config", "--ignore-rules", ...(process.platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : []),
+      "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
+      "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
+      "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
+      "--skip-git-repo-check", "--cd", env.dir, "--model", "fixture", "-",
+    ], "exact direct argv preserves the closed native surface");
     assert.deepEqual(args.slice(-6), ["--skip-git-repo-check", "--cd", env.dir, "--model", "fixture", "-"]);
     assert.deepEqual(codexLaunchArgs(task), JSON.parse(lines[0]).argv);
   } finally { env.cleanup(); }

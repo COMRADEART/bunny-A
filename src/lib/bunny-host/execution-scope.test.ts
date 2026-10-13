@@ -32,6 +32,14 @@ function assertScopedIsolation(args: string[], sandbox: "read-only" | "workspace
 function assertLegacyCodexArgs(args: string[], task: OrchTask, platform = process.platform) {
   // T13.2 also isolates direct tasks: preserve workspace authority while pinning provider/configuration.
   assertWriteIsolation(args, platform);
+  assert.deepEqual(args, [
+    "exec", "--json", "-c", 'model_provider="openai"', "--sandbox", "workspace-write",
+    "--ignore-user-config", "--ignore-rules", ...(platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : []),
+    "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
+    "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
+    "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
+    "--skip-git-repo-check", "--cd", task.cwd, "--model", task.model, "-",
+  ], "the entire independent direct vector rejects extra flags and outside roots");
   assert.deepEqual(args.slice(-6), ["--skip-git-repo-check", "--cd", task.cwd, "--model", task.model, "-"]);
   assert.equal(args[args.indexOf("--cd") + 1], task.cwd);
   assert.equal(args[args.indexOf("--model") + 1], task.model);

@@ -8,6 +8,7 @@ import { startHost } from "./http.server.ts";
 import { providerBase } from "./adapters.server.ts";
 import { TestProtector } from "./jev-secrets.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
+import type { ConnectionView } from "./connections.ts";
 import type { OrchTask } from "../orch/types.ts";
 
 test("T13.2 R07 [SIMULATED] Jev enabled through actual Host cannot move Claude data to Codex without destination approval", async () => {
@@ -238,6 +239,24 @@ test("T13.2 A07/A08 [SIMULATED] real Host denies every phone credential and prov
       "ciphertext",
     ])
       assert.ok(!text.includes(forbidden), forbidden);
+    const native = (await h.state()).connections.accounts.find(
+      (row: ConnectionView) => row.id === "anthropic:native_cli:default",
+    );
+    const cap = await h.command("connections.consent.set", {
+      id: native.id,
+      consent: { ...native.consent, maxRequestsPerDay: 0 },
+    });
+    assert.equal(cap.status, 200);
+    const cappedPhone = (await h.state(phone)).deviceConnections.find(
+      (row: { catalog: string; mode: string }) =>
+        row.catalog === "anthropic" && row.mode === "native_cli",
+    );
+    assert.equal(cappedPhone.status, "budget_blocked");
+    assert.equal(
+      cappedPhone.usableForTasks,
+      false,
+      "actual paired HTTP state must not claim budget-blocked eligibility",
+    );
     const review = await h.command("connections.review_request", {}, phone);
     assert.equal(review.status, 200, JSON.stringify(review.body));
   } finally {

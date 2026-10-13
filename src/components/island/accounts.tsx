@@ -179,7 +179,11 @@ function AccountCard({ entry, rows }: { entry: CatalogEntry; rows: ConnectionVie
             disabled={busy || !store.canAct()}
             onClick={() => void act("connections.signin.start", { accountHint: hint })}
           >
-            Sign in with provider
+            {row.session === "signed_in"
+              ? "Connect another account"
+              : row.status === "reconnect_required"
+                ? "Reconnect with provider"
+                : "Sign in with provider"}
           </button>
         </div>
       ) : null}
@@ -259,6 +263,67 @@ function AccountCard({ entry, rows }: { entry: CatalogEntry; rows: ConnectionVie
             ))}
           </select>
         </label>
+      ) : null}
+      {row.dispatch ? (
+        <div className="account-connect" key={`${row.id}-limits-${row.consent.revision}`}>
+          <label htmlFor={`${base}-requests`}>
+            Daily Task starts (optional)
+            <input
+              id={`${base}-requests`}
+              type="number"
+              min="0"
+              step="1"
+              max="10000"
+              defaultValue={row.consent.maxRequestsPerDay ?? ""}
+              placeholder="No Task-start cap"
+              disabled={busy || !store.canAct()}
+              onBlur={(e) => {
+                if (!e.currentTarget.validity.valid) {
+                  e.currentTarget.reportValidity();
+                  return;
+                }
+                const value = e.target.value === "" ? null : Number(e.target.value);
+                if (
+                  value !== row.consent.maxRequestsPerDay &&
+                  (value === null || (Number.isSafeInteger(value) && value >= 0 && value <= 10000))
+                )
+                  changeConsent({ maxRequestsPerDay: value });
+              }}
+            />
+          </label>
+          {row.mode === "native_cli" ? (
+            <label htmlFor={`${base}-cost`}>
+              Strict daily cost ceiling (USD, optional)
+              <input
+                id={`${base}-cost`}
+                type="number"
+                min="0"
+                step="0.01"
+                max="10000"
+                defaultValue={row.consent.maxUsdPerDay ?? ""}
+                placeholder="No monetary ceiling"
+                disabled={busy || !store.canAct()}
+                onBlur={(e) => {
+                  if (!e.currentTarget.validity.valid) {
+                    e.currentTarget.reportValidity();
+                    return;
+                  }
+                  const value = e.target.value === "" ? null : Number(e.target.value);
+                  if (
+                    value !== row.consent.maxUsdPerDay &&
+                    (value === null || (Number.isFinite(value) && value >= 0 && value <= 10000))
+                  )
+                    changeConsent({ maxUsdPerDay: value, strictBudget: true });
+                }}
+              />
+            </label>
+          ) : null}
+          <p className="caption">
+            Limits save when you leave the field. Task starts count Bunny dispatches, not the native
+            client's internal model requests. A strict monetary ceiling blocks native Tasks when
+            price or spend is unknown. Provider-managed extra usage stays on the provider site.
+          </p>
+        </div>
       ) : null}
       <div className="account-actions">
         <button
@@ -373,6 +438,10 @@ export function RoutingPrivacy() {
           max={365}
           defaultValue={policy.retentionDays}
           onBlur={(e) => {
+            if (!e.currentTarget.validity.valid) {
+              e.currentTarget.reportValidity();
+              return;
+            }
             const days = Number(e.target.value);
             if (days !== policy.retentionDays) update({ retentionDays: days });
           }}

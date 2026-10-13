@@ -4,6 +4,7 @@ import { HostDatabase } from "./persistence.server.ts";
 import { ConnectionRegistry } from "./connections.server.ts";
 import {
   CONNECTION_CATALOG,
+  connectionDeviceView,
   DEFAULT_ROUTING_POLICY,
   evaluateDispatch,
   maskIdentity,
@@ -246,6 +247,19 @@ test("T13.2 A08/A09 [SIMULATED] phone and Agent principals cannot mutate connect
 test("T13.2 A07/A08 [SIMULATED] device projection contains no identity, workspace, key status or handles", () => {
   const f = fixture();
   try {
+    const native = f.registry
+      .views()
+      .find((row) => row.catalog === "anthropic" && row.mode === "native_cli")!;
+    for (const entitlement of [
+      "not_entitled",
+      "billing_problem",
+      "exhausted",
+      "rate_limited",
+    ] as const)
+      assert.equal(
+        connectionDeviceView({ ...native, status: "connected", entitlement }).usableForTasks,
+        false,
+      );
     const state = JSON.stringify(f.registry.deviceView());
     for (const field of [
       "accountFingerprint",
@@ -547,6 +561,13 @@ test("T13.2 R11 [SIMULATED] actual fresh-dispatch wrapper admits the first cappe
     assert.equal((await first.done).ok, true);
     assert.equal(spawns, 1);
     assert.equal(f.registry.evaluate(r).ok, false);
+    assert.equal(f.registry.views().find((row) => row.id === id)?.status, "budget_blocked");
+    assert.equal(
+      f.registry
+        .deviceView()
+        .find((row) => row.catalog === "anthropic" && row.mode === "native_cli")?.usableForTasks,
+      false,
+    );
   } finally {
     f.close();
   }

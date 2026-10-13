@@ -1,5 +1,6 @@
 import {
   CONNECTION_CATALOG,
+  connectionDisplayEligibility,
   VENDOR_LABEL,
   type ConnectionView,
   type DeviceConnectionView,
@@ -33,14 +34,11 @@ export function accountFacts(row: ConnectionView) {
     {
       label: "Usable for Tasks",
       value:
-        row.dispatch &&
-        row.consent.allowTasks &&
-        row.lifecycle === "active" &&
-        row.tool === "ready" &&
-        ["signed_in", "not_required"].includes(row.session) &&
-        !["rate_limited", "exhausted", "not_entitled", "billing_problem"].includes(row.entitlement)
-          ? "Allowed, subject to Task approval"
-          : "Unavailable",
+        row.status === "budget_blocked"
+          ? "Budget blocked"
+          : connectionDisplayEligibility(row)
+            ? "Allowed, subject to Task approval"
+            : "Unavailable",
     },
   ];
 }

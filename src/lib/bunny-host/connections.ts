@@ -843,6 +843,39 @@ export type ConnectionView = {
   identitySource: "provider_status" | "legacy_adapter" | "none";
 };
 
+/** Display eligibility only; actual dispatch always goes through the Host gate with Task/project consent. */
+export function connectionDisplayEligibility(row: ConnectionView): boolean {
+  return (
+    row.dispatch &&
+    row.lifecycle === "active" &&
+    row.consent.allowTasks &&
+    row.tool === "ready" &&
+    ["signed_in", "not_required"].includes(row.session) &&
+    (row.vendor === "local" || !!row.accountFingerprint) &&
+    !["rate_limited", "exhausted", "not_entitled", "billing_problem"].includes(row.entitlement) &&
+    ![
+      "budget_blocked",
+      "rate_limited",
+      "not_entitled",
+      "reconnect_required",
+      "unsupported",
+    ].includes(row.status)
+  );
+}
+/** Explicit nonsecret projection shared by registry/voice and the actual paired-phone HTTP snapshot. */
+export function connectionDeviceView(row: ConnectionView): DeviceConnectionView {
+  return {
+    catalog: row.catalog,
+    name: catalogEntry(row.catalog).name,
+    mode: row.mode,
+    label: catalogMode(row.catalog, row.mode)!.label,
+    status: row.status,
+    usableForTasks: connectionDisplayEligibility(row),
+    billing: row.billing,
+    lastCheckedAt: row.lastCheckedAt,
+  };
+}
+
 /** A cross-vendor (or cross-account) move Bunny refused to make on its own. Nothing is sent to `to` until the owner approves. */
 export type ProposedSwitch = {
   from: { provider: ProviderId; vendor: Vendor };

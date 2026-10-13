@@ -8,6 +8,7 @@ import {
   catalogEntry,
   catalogMode,
   connectionId,
+  connectionDeviceView,
   defaultConsent,
   defaultModeFor,
   evaluateDispatch,
@@ -219,6 +220,7 @@ export class ConnectionRegistry {
     return structuredClone(this.selectedPolicy);
   }
   views() {
+    const usage = this.usage();
     return [...this.records.values()].map((row) => {
       const key = this.options.db.db
         .prepare("SELECT protector,updated_at FROM connection_credentials WHERE connection_id=?")
@@ -233,8 +235,24 @@ export class ConnectionRegistry {
       else if (row.session === "signed_out") status = "sign_in_required";
       else if (row.entitlement === "rate_limited" || row.entitlement === "exhausted")
         status = "rate_limited";
+      const tasksToday = usage.requestsToday[row.id] ?? 0;
+      if (
+        row.lifecycle === "active" &&
+        row.dispatch &&
+        row.consent.allowTasks &&
+        row.tool === "ready" &&
+        ["signed_in", "not_required"].includes(row.session) &&
+        !["rate_limited", "exhausted", "not_entitled", "billing_problem"].includes(
+          row.entitlement,
+        ) &&
+        ((row.consent.maxRequestsPerDay !== null && tasksToday >= row.consent.maxRequestsPerDay) ||
+          (!["api_billed", "metered_credits", "unknown"].includes(row.billing) &&
+            row.consent.maxUsdPerDay !== null))
+      )
+        status = "budget_blocked";
       return structuredClone({
         ...row,
+        tasksToday,
         status,
         credential: key
           ? { present: true, updatedAt: key.updated_at, protection: key.protector }
@@ -243,21 +261,7 @@ export class ConnectionRegistry {
     });
   }
   deviceView(): DeviceConnectionView[] {
-    return this.views().map((row) => ({
-      catalog: row.catalog,
-      name: catalogEntry(row.catalog).name,
-      mode: row.mode,
-      label: catalogMode(row.catalog, row.mode)!.label,
-      status: row.status,
-      usableForTasks:
-        row.dispatch &&
-        row.lifecycle === "active" &&
-        row.consent.allowTasks &&
-        ["signed_in", "not_required"].includes(row.session) &&
-        row.tool === "ready",
-      billing: row.billing,
-      lastCheckedAt: row.lastCheckedAt,
-    }));
+    return this.views().map(connectionDeviceView);
   }
   snapshot(): ConnectionsSnapshot {
     return {
