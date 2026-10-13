@@ -205,7 +205,7 @@ test("workspace locks: readers share, writers are exclusive, nested folders conf
 });
 
 // ── integration through the real TaskManager ────────────────────────────────
-test("model steps flow through TaskManager with delegated approval; direct approval is unchanged", async () => {
+test("model steps flow through TaskManager with delegated approval; direct user approval pins its connection", async () => {
   const env = await setup();
   try {
     const direct = env.tasks.submit({ prompt: "Direct task", mode: "balanced" });
@@ -223,7 +223,8 @@ test("model steps flow through TaskManager with delegated approval; direct appro
     assert.ok(!env.db.taskEvents(child.id).some((e) => e.type === "approval.accepted"), "no fake user click");
     env.tasks.approve(direct.id);
     assert.ok(env.db.taskEvents(direct.id).some((e) => e.type === "approval.accepted"));
-    assert.equal(env.db.get(direct.id).approval, undefined, "direct task records keep their original shape");
+    assert.equal(env.db.get(direct.id).approval?.kind, "user", "direct approval stays a user approval");
+    assert.equal(env.db.get(direct.id).connectionRoute?.provider, direct.provider, "direct approval pins the exact provider");
     assert.equal(env.db.get(direct.id).mission, undefined);
     env.launched[0].finish({ ok: true, output: "The module routes tasks.", exitCode: 0 });
     await until(() => env.missions.mission(view.id).state === "completed", "mission completion");
@@ -249,7 +250,7 @@ for (const provider of ["codex", "claude"] as const) test(`MA0R: custom read sco
     const envelope = env.missions.store.authorization(approved.authorizationId!)!;
     assert.deepEqual(envelope.providers.sessions?.steps, [{ stepId: view.steps[0].id, scope: { access: "read" } }]);
     assert.equal(envelope.filesystem.write.length, 0);
-    if (provider === "codex") assert.equal(codexLaunchArgs(child)[3], "read-only");
+    if (provider === "codex") assert.equal(codexLaunchArgs(child)[codexLaunchArgs(child).indexOf("--sandbox") + 1], "read-only");
     else {
       const args = claudeLaunchArgs(child, "test-session");
       assert.equal(args[args.indexOf("--tools") + 1], "Read");
@@ -276,11 +277,11 @@ test("MA0R: explicit Research write scope has write/shell authority; unscoped di
     await until(() => env.launched.length === 1, "writer");
     const child = env.launched[0].task;
     assert.deepEqual(child.executionScope, { access: "write" });
-    assert.equal(codexLaunchArgs(child)[3], "workspace-write");
+    assert.equal(codexLaunchArgs(child)[codexLaunchArgs(child).indexOf("--sandbox") + 1], "workspace-write");
     assert.ok(claudeLaunchArgs(child, "session").includes("acceptEdits"));
     const direct = env.tasks.submit({ prompt: "Direct", mode: "fast" });
     assert.equal(direct.executionScope, undefined);
-    assert.equal(codexLaunchArgs(direct)[3], "workspace-write");
+    assert.equal(codexLaunchArgs(direct)[codexLaunchArgs(direct).indexOf("--sandbox") + 1], "workspace-write");
     const directArgs = claudeLaunchArgs(direct, "session", "win32");
     assert.equal(directArgs[directArgs.indexOf("--allowedTools") + 1], "Read,Write,Edit,Bash,PowerShell");
     assert.ok(!directArgs.includes("--restricted"));
@@ -620,7 +621,7 @@ test("a child outside the envelope waits for the user; approving it launches it 
     await env.missions.respond(request.id, "allow_once", "workstation");
     await until(() => env.launched.length === 1, "launch after explicit approval");
     const child = env.db.get(env.launched[0].task.id);
-    assert.equal(child.approval, undefined, "recorded as the user's own approval, not a delegated one");
+    assert.equal(child.approval?.kind, "user", "recorded as the user's own approval, not a delegated one");
     assert.ok(env.db.taskEvents(child.id).some((e) => e.type === "approval.accepted"));
     env.launched[0].finish({ ok: true, output: "done" });
     await until(() => env.missions.mission(view.id).state === "completed", "completion");
