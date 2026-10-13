@@ -35,12 +35,14 @@ if ($env:BUNNY_DPAPI_MODE -eq 'protect') {
 /** Real Windows DPAPI through Windows PowerShell; the secret travels base64-encoded on stdin, never argv or env. */
 export class DpapiProtector implements SecretProtector {
   readonly kind = "dpapi" as const;
+  private readonly entropy: string;
+  constructor(entropy = "Bunny-A/TypeSafe-Jev/credential/v1") { this.entropy=entropy; }
   private run(mode: "protect" | "unprotect", input: string): Promise<string> {
     return new Promise((resolve, reject) => {
       if (process.platform !== "win32") return reject(new Error("Windows secret protection is unavailable on this platform."));
       const child = execFile(
         systemTool("powershell.exe"),
-        ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", DPAPI_SCRIPT],
+        ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", DPAPI_SCRIPT.replace("Bunny-A/TypeSafe-Jev/credential/v1", this.entropy.replace(/'/g, "''"))],
         { windowsHide: true, timeout: 20_000, maxBuffer: 64 * 1024, env: { ...process.env, BUNNY_DPAPI_MODE: mode } },
         (error, stdout) => {
           if (error) reject(new Error("Windows secret protection failed."));

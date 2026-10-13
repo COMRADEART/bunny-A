@@ -40,7 +40,7 @@ function Setting({
 }
 export function Settings() {
   const store = useIsland();
-  const [group, setGroup] = useState<Group>("Appearance");
+  const [group, setGroup] = useState<Group>(store.accountFocus ? "AI & Models" : "Appearance");
   const [notification, setNotification] = useState("");
   const choice = <K extends keyof Appearance>(
     key: K,
@@ -84,6 +84,19 @@ export function Settings() {
           <h1>Make Bunny feel like yours.</h1>
         </div>
       </div>
+      {store.host !== "online" &&
+      typeof window !== "undefined" &&
+      ["127.0.0.1", "localhost"].includes(window.location.hostname) ? (
+        <div className="offline-note">
+          <p>
+            A pairing from an earlier test can prevent this browser from connecting to the
+            workstation.
+          </p>
+          <button className="button" onClick={() => void store.clearStalePairing()}>
+            Clear stale browser pairing
+          </button>
+        </div>
+      ) : null}
       <div className="settings-layout">
         <nav className="settings-nav glass" aria-label="Settings groups">
           {GROUPS.map((g) => (
@@ -281,7 +294,10 @@ export function Settings() {
                     : "Unavailable"}
                 </span>
               </Setting>
-              <Setting label="Design preview" detail="A labelled preview of the character and glass system with fixture data. Not live Host data.">
+              <Setting
+                label="Design preview"
+                detail="A labelled preview of the character and glass system with fixture data. Not live Host data."
+              >
                 <button className="btn secondary" onClick={() => store.setSheet("design-preview")}>
                   Open design preview
                 </button>

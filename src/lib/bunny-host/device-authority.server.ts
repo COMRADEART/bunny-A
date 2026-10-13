@@ -55,6 +55,7 @@ export type DeviceRight = "read" | "supervise" | "answer" | "chat" | "self";
  * the canonical mission/agent command paths; "self" actions only ever target the calling device.
  */
 export const DEVICE_RIGHTS: Readonly<Record<string, DeviceRight>> = {
+  "connections.review_request": "chat",
   "agent.list": "read",
   "agent.get": "read",
   "mission.get": "read",
@@ -412,6 +413,8 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
       : snapshot.agents,
     // M-A-3 T13.1: credential state, provider limits and usage are workstation-owner settings.
     intelligence: undefined,
+    connections: undefined,
+    deviceConnections:snapshot.connections?.accounts.map(row=>({catalog:row.catalog,name:row.catalog,mode:row.mode,label:row.mode,status:row.status,usableForTasks:row.dispatch&&row.lifecycle==="active"&&row.consent.allowTasks&&["signed_in","not_required"].includes(row.session)&&row.tool==="ready",billing:row.billing,lastCheckedAt:row.lastCheckedAt})),
   };
 }
 
@@ -502,6 +505,8 @@ export function deviceTask<T extends Pick<OrchTask, "prompt" | "routingPrompt" |
   const voiceTurn = !task.mission && task.routingPrompt !== undefined;
   return {
     ...task,
+    connectionRoute: undefined,
+    proposedRoute: undefined,
     ...(task.mission ? { prompt: task.routingPrompt ?? "Mission step (Bunny's full prompt stays on the Host)." } : {}),
     ...(voiceTurn ? { prompt: VOICE_TURN_DEVICE_LABEL, routingPrompt: VOICE_TURN_DEVICE_LABEL } : {}),
     cwd: undefined,

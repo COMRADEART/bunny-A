@@ -143,6 +143,7 @@ export type VoiceState =
 export type VoiceMode = "push_to_talk" | "hands_free";
 
 export type VoiceTurnKind =
+  | "account"
   | "chat" // ordinary question -> existing router under local tool-free constraint
   | "agent_status"
   | "agent_verification"
@@ -304,7 +305,7 @@ export type VoiceSnapshot = {
   proposal: VoiceProposal | null;
   clarification: { question: string; candidates: { id: string; name: string }[]; expiresAt: number } | null;
   /** One-shot UI request the clients may honor (open a workspace); carries no authority. */
-  uiIntent: { seq: number; kind: "open_agentic" | "open_agent" | "open_approvals"; agentId: string | null } | null;
+  uiIntent: { seq: number; kind: "open_agentic" | "open_agent" | "open_approvals" | "open_accounts"; agentId: string | null } | null;
   devices: { input: VoiceEndpointState | null; output: VoiceEndpointState | null; micPrivacy: "allow" | "deny" | "unknown" };
   engines: { stt: string | null; tts: string | null; local: true };
   error: { code: VoiceErrorCode | "WORKER_EXITED" | "WORKER_INTEGRITY" | "NOT_WINDOWS"; message: string } | null;

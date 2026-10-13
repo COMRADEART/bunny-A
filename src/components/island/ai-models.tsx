@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Cpu, Cloud, Eye, EyeOff, KeyRound, ShieldCheck } from "lucide-react";
 import { useIsland } from "@/store/use-island";
+import { ConnectedAccounts, RoutingPrivacy } from "./accounts";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import type { JevPolicy } from "@/lib/bunny-host/intelligence";
 import {
@@ -19,7 +20,7 @@ import {
   type Tone,
 } from "./intelligence-model";
 
-const SECTIONS = ["Connections", "Routing preferences", "Privacy & usage"] as const;
+const SECTIONS = ["Connected Accounts", "Local & advice", "Routing & Privacy", "Routing preferences", "Usage & limits"] as const;
 type Section = (typeof SECTIONS)[number];
 const REVEAL_MS = 20_000;
 
@@ -65,7 +66,7 @@ function Facts({ items, label }: { items: Distinction[]; label: string }) {
 
 export function AiModelsSettings() {
   const store = useIsland();
-  const [section, setSection] = useState<Section>("Connections");
+  const [section, setSection] = useState<Section>("Connected Accounts");
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const base = useId();
   const intelligence = store.intelligence;
@@ -104,7 +105,7 @@ export function AiModelsSettings() {
         ))}
       </div>
       <div role="tabpanel" id={`${base}-panel-${SECTIONS.indexOf(section)}`} aria-labelledby={`${base}-tab-${SECTIONS.indexOf(section)}`} tabIndex={0} className="ai-panel">
-        {section === "Routing preferences" ? (
+        {section === "Connected Accounts" ? <ConnectedAccounts /> : section === "Routing & Privacy" ? <RoutingPrivacy /> : section === "Routing preferences" ? (
           <RoutingPreferences key={JSON.stringify(intelligence?.jev.thresholds ?? null)} intelligence={intelligence} />
         ) : !intelligence ? (
           <p className="caption">
@@ -112,7 +113,7 @@ export function AiModelsSettings() {
               ? "Model connections and API keys are managed on the workstation (Windows Host)."
               : "AI & Models connections need the updated Bunny Host."}
           </p>
-        ) : section === "Connections" ? (
+        ) : section === "Local & advice" ? (
           <Connections intelligence={intelligence} />
         ) : (
           <PrivacyUsage key={JSON.stringify(intelligence.jev.limits)} intelligence={intelligence} />

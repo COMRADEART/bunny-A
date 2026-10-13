@@ -115,6 +115,7 @@ export type CandidateInput = {
   empirical?: (provider: ProviderId, model: string | null) => number | null;
   /** M-A-3 T13.1: Laya benchmark gate; returns an exclusion reason for an unbenchmarked Laya model. */
   layaGate?: (model: string, taskClass: string) => string | null;
+  connectionGate?: (provider: ProviderId, model: string | null) => string | null;
 };
 
 const rankFor = (profile: ModelRoutingProfile | null, taskClass: RoutingTaskClass): number => {
@@ -479,6 +480,8 @@ export function buildCandidates(input: CandidateInput): RoutingCandidate[] {
         score_components: null, final_score: null,
       };
       const exclusions = hardExclusions({ provider, record: shape.record, candidateKind: shape.kind, requirements, constraints, modelOverride });
+      const connectionReason = input.connectionGate?.(provider.id, shape.record?.model ?? null);
+      if (connectionReason) exclusions.push(connectionReason);
       if (shape.record && input.layaGate) {
         const layaReason = input.layaGate(shape.record.model, requirements.task_class);
         if (layaReason) exclusions.push(layaReason);

@@ -142,6 +142,7 @@ export type VoiceSessionDeps = {
   workerStdinHardBudget?: number;
   chat: VoiceChatPort;
   agents: VoiceAgentPort;
+  accounts?: () => import("../connections.ts").DeviceConnectionView[];
   /** Journal: a type and a coarse detail. Never transcripts, answers, audio or device secrets (V52). */
   journal: (type: string, detail: string) => void;
   now?: () => number;
@@ -980,6 +981,11 @@ export class VoiceSessionManager {
 
   private async dispatch(intent: VoiceIntent, turn: string, transcript: string) {
     switch (intent.kind) {
+      case "account": {
+        if(intent.focus==="connect") {this.setUi("open_accounts",intent.target);this.answerHost("I opened AI account settings on your PC. Sign in with the provider there. I will never ask you to speak a password, code or API key.",turn);}
+        else {const rows=this.deps.accounts?.().filter(row=>row.catalog===intent.target)??[];this.answerHost(rows.length?rows.map(row=>`${row.name}: ${row.status.replaceAll("_"," ")}; ${row.usableForTasks?"Task permission available, subject to approval":"not available for Tasks"}.`).join(" "):"Account status is unavailable. Check AI account settings on your PC.",turn);}
+        return;
+      }
       case "empty":
         this.settleIdle();
         return;
@@ -2996,7 +3002,7 @@ export class VoiceSessionManager {
     this.snap.answerSource = source;
   }
 
-  private setUi(kind: "open_agentic" | "open_agent" | "open_approvals", agentId: string | null) {
+  private setUi(kind: "open_agentic" | "open_agent" | "open_approvals" | "open_accounts", agentId: string | null) {
     this.snap.uiIntent = { seq: ++this.uiSeq, kind, agentId };
   }
 

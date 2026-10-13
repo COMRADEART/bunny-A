@@ -357,9 +357,13 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
   const cloud = usesCloudModel(task);
   const conflict = conflictsWithLocalOnly(task);
   const canAct = store.canAct();
+  const accountRoute=task.proposedRoute;
+  const accountRows=store.connections?.accounts??[];
+  const reviewedAccount=accountRows.find(row=>row.id===accountRoute?.connectionId);
+  const accountStale=!!accountRoute&&(!reviewedAccount||reviewedAccount.epoch!==accountRoute.connectionEpoch||reviewedAccount.accountFingerprint!==accountRoute.accountFingerprint||reviewedAccount.consent.revision!==accountRoute.consentRevision);
   const remote = directApprovalVerdict(task, store.viewer);
   const ready =
-    !conflict && canAct && remote.allowed && ["ready", "busy"].includes(provider.availability);
+    !conflict && !accountStale && canAct && remote.allowed && ["ready", "busy"].includes(provider.availability);
   const action = async (type: "run" | "stop") => {
     setPending(true);
     try {
@@ -396,6 +400,7 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
         The provider may use files and commands within its existing permissions. External effects
         follow provider policy; Bunny capability approvals remain separate.
       </p>
+      {!phone&&accountRoute?<div className="caption"><strong>Approved account and billing mode</strong><p>{accountStale?"The account or its permission changed. Select the route again before approval.":`${reviewedAccount?.maskedIdentity??"This PC"} · ${accountRoute.mode.replaceAll("_"," ")} · ${reviewedAccount?.billing.replaceAll("_"," ")}`}</p>{accountRoute.destinationBindings?.filter(pin=>pin.connectionId!==accountRoute.connectionId).length?<><strong>Previously allowed cloud destinations for this Task</strong><ul>{accountRoute.destinationBindings.filter(pin=>pin.connectionId!==accountRoute.connectionId).map(pin=>{const row=accountRows.find(r=>r.id===pin.connectionId);return <li key={pin.connectionId}>{row?.catalog??"Provider"} · {row?.accountFingerprint===pin.accountFingerprint?row.maskedIdentity??"Local device":"Account changed; new review required"} · {pin.mode.replaceAll("_"," ")}</li>;})}</ul></>:<p>Cloud provider switching is off for this Task.</p>}</div>:null}
       {cloud ? (
         <p className="caption">{task.model} · runs through Ollama’s cloud service.</p>
       ) : null}

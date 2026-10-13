@@ -307,7 +307,7 @@ test("K04 [SIMULATED] the saved secret is absent from every snapshot the Host se
 
 test("K07 [STATIC] only the Host's TypeSafe adapter and manager can reach credential storage; no Agent, Mission or voice module imports it", () => {
   const root = join(import.meta.dirname, "..", "..");
-  const allowed = new Set(["lib/bunny-host/jev-secrets.server.ts", "lib/bunny-host/typesafe-jev.server.ts", "lib/bunny-host/manager.server.ts", "lib/bunny-host/http.server.ts"]);
+  const allowed = new Set(["lib/bunny-host/jev-secrets.server.ts", "lib/bunny-host/connections.server.ts", "lib/bunny-host/typesafe-jev.server.ts", "lib/bunny-host/manager.server.ts", "lib/bunny-host/http.server.ts"]);
   const offenders = sourceFiles(root)
     .map((file) => ({ file: relative(root, file).replaceAll("\\", "/"), text: readFileSync(file, "utf8") }))
     .filter(({ file, text }) => /jev-secrets\.server|JevSecretStore|jev_credentials/.test(text) && !allowed.has(file))

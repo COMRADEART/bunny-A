@@ -271,6 +271,7 @@ export async function startHost(
     voice?: { workerExtraArgs?: string[] };
     /** M-A-3 T13.1 test-only intelligence seams (fake transport/protector). Never reachable from HTTP. */
     intelligence?: ManagerOptions["intelligence"];
+    connections?: ManagerOptions["connections"];
   } = {},
 ) {
   const paths = hostStatePaths(options.dataDirectory);
@@ -316,6 +317,7 @@ export async function startHost(
     containment,
     workspaceRoot,
     ...(options.intelligence ? { intelligence: options.intelligence } : {}),
+    ...(options.connections ? { connections:options.connections } : {}),
   });
   containment.options.persist = (type, detail, owner) =>
     manager.emit(db.event(type, owner.taskId ?? null, detail, owner.missionId ?? null));
@@ -513,6 +515,7 @@ export async function startHost(
       // T12: registered Projects by id and name only, for resolving a spoken Project name.
       projects: () => missions.tasks.db.projects().map((project) => ({ id: project.id, name: project.name })),
     },
+    accounts:()=>manager.connections.deviceView(),
     journal: (type, detail) => manager.emit(db.event(type, null, detail)),
   });
   /** The snapshot as one principal may see it: Host identity and viewer for all, the device projection for devices. */
@@ -733,6 +736,14 @@ export async function startHost(
         // Device principals never reach here: assertDeviceAction refuses every voice action (default-deny).
         if (device) throw new WorkstationRequiredError("Voice requires the workstation on the Windows Host.");
         extra = { voice: await voiceCommand(voice, input.action, data) };
+      } else if (typeof input.action === "string" && input.action.startsWith("connections.")) {
+        if(input.action==="connections.review_request") {
+          manager.emit(db.event("connections.review_requested",null,"A paired viewer requested an account review on the Windows workstation."));
+        } else {
+          if(!local)throw new WorkstationRequiredError("AI accounts, credentials and provider permissions are managed on the Windows workstation.");
+          await manager.connections.command(input.action,data,actor);
+          if(["connections.check","connections.resume","connections.accept_account"].includes(input.action))await manager.discover();
+        }
       } else if (typeof input.action === "string" && MISSION_ACTIONS.has(input.action))
         extra = await missionCommand(missions, input.action, data, { local, actor });
       else if (typeof input.action === "string" && input.action.startsWith("project.")) {

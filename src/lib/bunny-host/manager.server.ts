@@ -33,6 +33,9 @@ import { JevSecretStore, type SecretProtector } from "./jev-secrets.server.ts";
 import { JevService, type FetchLike } from "./typesafe-jev.server.ts";
 import { applyDecisionAdvice, buildDecisionState, candidateKey, isLayaModel, layaExclusion, type DecisionAdvice } from "./intelligence.ts";
 import type { IntelligenceSnapshot } from "./intelligence-snapshot.ts";
+import { ConnectionRegistry, type ConnectionSeams } from "./connections.server.ts";
+import { locate, systemContext } from "./discovery.server.ts";
+import { consentedVendorsFor, vendorFor, type ApprovedRoute } from "./connections.ts";
 
 export type TaskOutputEvent = { text: string } | { done: true; state: string };
 
@@ -55,6 +58,7 @@ function possiblyAlive(expected: ProcessInfo, rows: ProcessInfo[]): boolean {
   return !known(expected.createdAt) || !known(current.createdAt) || current.createdAt === expected.createdAt;
 }
 export type ManagerOptions = {
+  connections?: ConnectionSeams;
   workspaceRoot?: string;
   /** Folder for raw provider transcripts (one JSONL file per task); null disables them. */
   sessionDirectory?: string | null;
@@ -71,6 +75,7 @@ export type ManagerOptions = {
 };
 
 export class TaskManager {
+  connections: ConnectionRegistry;
   projects: ProjectRegistry;
   workspaceRootConfigured: boolean;
   db: HostDatabase;
@@ -174,6 +179,8 @@ export class TaskManager {
     this.laya = new LayaRegistry(db, options.intelligence?.layaRuntime);
     this.jevSecrets = new JevSecretStore(db, options.intelligence?.jevProtector);
     this.jev = new JevService(db, this.jevSecrets, { sessionId: this.instanceId, fetchFn: options.intelligence?.jevFetch, now: options.intelligence?.now });
+    this.connections = new ConnectionRegistry({db,sessionId:this.instanceId,locate:id=>locate(systemContext(this.providerPaths()),id).launch,...options.connections,emit:(type,detail)=>this.emit(db.event(type,null,detail))});
+    this.connections.onRevoked((connectionId,reason)=>{ for (const id of this.sessions.keys()) if (db.get(id).connectionRoute?.connectionId===connectionId) this.stopInBackground(id,reason); });
     this.sessionDirectory = options.sessionDirectory ?? null;
     this.readProcesses = options.processTable ?? processTable;
     this.dataDirectory = options.dataDirectory ?? null;
@@ -228,7 +235,7 @@ export class TaskManager {
    */
   /** Set at Host shutdown: restart/unreadable/job watchers stop instead of touching a closed database. */
   disposed = false;
-  dispose() { this.disposed = true; }
+  dispose() { this.disposed = true; this.connections.close(); }
   /** Restart holds by Mission/Task: a new provider session for the same work waits while a prior one may survive. */
   restartSurvivorMission = new Map<string, { missionId: string | null; taskId: string | null }>();
   /** Why a provider launch for this task must wait for an interrupted earlier session, or null (review round 1, RESTART-04). */
@@ -474,6 +481,7 @@ export class TaskManager {
     await this.discover();
   }
   live(): ProviderLive[] {
+    this.connections.ingestProviderLive(this.registry.list(),id=>this.adapters.find(a=>a.id===id)?.connectionIdentity?.());
     const active = [...this.sessions.keys()].map((id) => this.db.get(id));
     return this.registry.list().map((provider) => {
       const mine = active.filter((task) => task.provider === provider.id);
@@ -519,6 +527,7 @@ export class TaskManager {
       modelCapabilities: this.modelCapabilities.snapshot(),
       providerUsage: this.providerUsage.snapshot(),
       intelligence: this.intelligenceSnapshot(),
+      connections: this.connections.snapshot(),
     };
   }
   configureThermal(cpuWarn: number, gpuWarn: number, autoStop: boolean) {
@@ -688,7 +697,7 @@ export class TaskManager {
     try {
       const routingText = input.routingPrompt ?? input.prompt;
       const constraints = inferredConstraints(routingText, input.constraints);
-      const pipeline = this.routingPipeline({ routingText, mode: input.mode, providers: this.live(), constraints, override: input.override, modelOverride: input.modelOverride });
+      const pipeline = this.routingPipeline({ projectId:input.projectId??null, routingText, mode: input.mode, providers: this.live(), constraints, override: input.override, modelOverride: input.modelOverride });
       const eligibleKeys = pipeline.selection.order.map((candidate) => candidateKey(candidate.provider_id, candidate.model_id));
       if (eligibleKeys.length < 2) return null;
       const state = buildDecisionState({ taskClass: pipeline.requirements.task_class, eligibleKeys, mode: input.mode, privacy: this.jev.policy.privacy, taskDescription: routingText });
@@ -711,6 +720,7 @@ export class TaskManager {
     override?: ProviderId | "auto";
     modelOverride?: string | null;
     taskType?: string;
+    projectId?: string | null;
   }) {
     const requirements = classifyRequirements({
       prompt: input.routingText,
@@ -730,6 +740,7 @@ export class TaskManager {
       mode: input.mode,
       empirical: (provider) => this.db.learned(provider, input.taskType ?? "general"),
       layaGate: (model, taskClass) => (!isLayaModel(model) ? null : !this.laya.enabled ? `Laya routing is turned off in Settings; ${model} is not eligible.` : layaExclusion(model, taskClass, this.laya.benchmarks(model))),
+      connectionGate: (provider,model)=>{ const gate=this.connections.evaluate({kind:"advice",provider,model,projectId:input.projectId??null,origin:"workstation",route:null});return gate.ok?null:gate.reason; },
     });
     const selection = selectRoutingCandidate({ candidates, requirements });
     return { requirements, candidates, selection, modelSnapshot, usage };
@@ -879,6 +890,8 @@ export class TaskManager {
     const live = this.live();
     const deviceApproved = this.deviceApproved.has(task.id);
     for (const next of order) {
+      const gate=this.connections.evaluate({kind:"reroute",provider:next.provider_id,model:next.model_id,projectId:task.projectId,origin:task.connectionRoute?.approvedBy??"workstation",route:task.connectionRoute??task.proposedRoute??null});
+      if(!gate.ok){this.emit(this.db.event("routing.consent_denied",task.id,gate.reason));continue;}
       if (isCurrent(next.provider_id, next.model_id) || attempted(next.provider_id, next.model_id))
         continue;
       // A provider default could resolve to a hosted tag, so a device-approved task needs an exact local model.
@@ -1096,7 +1109,9 @@ export class TaskManager {
       if (advice) assistanceRecord = { source: "jev", recommended: advice.recommendedKey, confidence: advice.confidence, action: outcome.action, reason: outcome.reason, answeredBy: advice.answeredBy };
       if (outcome.action === "accept" && outcome.finalKey !== routerKey) {
         const chosen = pipeline.selection.order.find((candidate) => candidateKey(candidate.provider_id, candidate.model_id) === outcome.finalKey);
-        if (chosen) {
+        const consentGate=chosen?this.connections.evaluate({kind:"advice",provider:chosen.provider_id,model:chosen.model_id,projectId:project?.id??null,origin:"workstation",route:null,routerVendor:vendorFor(selection.provider_id,selection.model_id,this.registry.get(selection.provider_id)?.remoteModels)}):null;
+        if(consentGate&&!consentGate.ok){if(assistanceRecord){assistanceRecord.action="reject";assistanceRecord.reason=consentGate.reason;}this.emit(this.db.event("routing.consent_denied",null,consentGate.reason));}
+        if (chosen && consentGate?.ok) {
           routed = { provider: chosen.provider_id, model: chosen.model_id ?? (chosen.provider_id === decision.recommended_provider ? decision.recommended_model : "auto"), effort: chosen.effort_native };
           decision.recommended_provider = routed.provider;
           decision.recommended_model = routed.model;
@@ -1194,7 +1209,7 @@ export class TaskManager {
     );
     return this.update(
       routing,
-      { state: "waiting_for_approval", activity: "Waiting for approval" },
+      { state: "waiting_for_approval", activity: "Waiting for approval", proposedRoute:this.connections.bind(routing.provider,routing.model,"workstation",routing.projectId,routing.mission?routing.constraints?.providerAllowlist??[]:[]) },
       "approval.required",
       decision.reason,
     );
@@ -1264,6 +1279,7 @@ export class TaskManager {
       {
         provider,
         model: routed.model,
+        proposedRoute: this.connections.bind(provider,routed.model,"workstation",task.projectId,task.mission?task.constraints?.providerAllowlist??[]:[]),
         ...(routed.effort ? { effort: routed.effort } : { effort: null }),
         decision,
         manual: true,
@@ -1415,6 +1431,11 @@ export class TaskManager {
     const task = this.db.get(id);
     if (task.state !== "waiting_for_approval")
       throw new Error("Task is not awaiting approval; duplicate launches are refused.");
+    const proposed = task.proposedRoute;
+    if (!proposed) throw new CommandRefusedError("STALE_AUTHORITY: route this Task against a verified connection and approve again.");
+    const approvedBy = this.deviceApproved.has(id) ? "device" : approval.kind === "mission" ? "mission" : approvalEvent === "approval.voice_tool_free" ? "voice" : "workstation";
+    const approvedRoute: ApprovedRoute = {...proposed,approvedBy,approvedAt:Date.now(),consentedVendors:consentedVendorsFor(proposed.vendor,task.mission?task.constraints?.providerAllowlist:null)};
+
     const survivor = this.restartSurvivorRefusal(task);
     if (survivor) throw new Error(survivor);
     if (task.projectId) {
@@ -1445,6 +1466,8 @@ export class TaskManager {
       throw new Error(
         `Executor is no longer eligible: ${task.model} is not local inference and this task is local-only. Route again.`,
       );
+    const approvalGate=this.connections.evaluate({kind:"launch",provider:task.provider,model:task.model,projectId:task.projectId,origin:approvedBy,route:approvedRoute});
+    if(!approvalGate.ok)throw new CommandRefusedError(`${approvalGate.code}: ${approvalGate.reason}`);
     // M-A-3 T3 §17/§20: cached discovery is not launch authority. Only pipeline-engaged tasks
     // revalidate here; the pre-T3 legacy path (fact-less fallback) keeps its exact behavior.
     // MANUAL selections fail clearly (§27); AUTO reroutes within the recorded fallback order (§28).
@@ -1508,6 +1531,9 @@ export class TaskManager {
     // M-A-3 T9R-F01: a launch-time reroute may have changed provider or model; the session that actually starts
     // passes the Mission scope check again (this also spends a trusted-desktop grant exactly once).
     const final = this.db.get(id);
+    const finalGate=this.connections.evaluate({kind:"launch",provider:final.provider,model:final.model,projectId:final.projectId,origin:approvedBy,route:approvedRoute});
+    if(!finalGate.ok)throw new CommandRefusedError(`${finalGate.code}: ${finalGate.reason}`);
+    const dispatchRoute={...approvedRoute,provider:final.provider,vendor:finalGate.vendor,connectionId:finalGate.connectionId,mode:finalGate.mode,accountFingerprint:finalGate.accountFingerprint,connectionEpoch:finalGate.epoch,consentRevision:finalGate.consentRevision};
     if (final.mission) {
       const outside = this.missionScopeCheck ? this.missionScopeCheck(final, "check") : "mission scope validator is unavailable";
       if (outside) throw new Error(`Outside mission execution scope: ${outside}`);
@@ -1525,7 +1551,8 @@ export class TaskManager {
         state: "launching",
         startedAt: Date.now(),
         activity: "Starting",
-        ...(approval.kind === "mission" ? { approval } : {}),
+        approval,
+        connectionRoute:dispatchRoute,
       },
       approvalEvent,
       approvalDetail,
@@ -1575,6 +1602,22 @@ export class TaskManager {
     // M-A-3 T3 §22: one hooks object shared by the initial launch and every relaunch; each
     // handler re-reads the live task record, so provider/model reroutes flow through unrebound.
     const adapterHooks: AdapterHooks = {
+      beforeDispatch:async()=>{
+        await this.registry.refresh({force:true});
+        this.live();
+        const current=this.db.get(id);
+        if(this.disposed||this.stopping.has(id)||TERMINAL.includes(current.state))throw new Error("Task stopped before dispatch.");
+        const gate=this.connections.evaluate({kind:"launch",provider:current.provider,model:current.model,projectId:current.projectId,origin:current.connectionRoute?.approvedBy??"workstation",route:current.connectionRoute??null});
+        if(!gate.ok)throw new CommandRefusedError(`${gate.code}: ${gate.reason}`);
+        connectionReservation=this.connections.recordDispatch(gate.connectionId,id);
+      },
+      childEnvironment:()=>{
+        const current=this.db.get(id);
+        const gate=this.connections.evaluate({kind:"launch",provider:current.provider,model:current.model,projectId:current.projectId,origin:current.connectionRoute?.approvedBy??"workstation",route:current.connectionRoute??null},connectionReservation?{id:connectionReservation,taskId:id}:null);
+        if(!gate.ok)throw new CommandRefusedError(`${gate.code}: ${gate.reason}`);
+        return this.connections.childEnvironment();
+      },
+      billingSource:(source)=>{const current=this.db.get(id);if(current.connectionRoute&&this.connections.observeBillingSource(current.connectionRoute.connectionId,source)==="mismatch")throw new Error("billing_mode_mismatch: the native client selected an API billing source.");},
       owner: { dataDirectory: this.dataDirectory, hostGeneration: this.instanceId, taskId: id, missionId: task.mission?.missionId ?? null, agentId: this.missionTaskAgent?.(task) ?? this.agentForMission(task.mission?.missionId ?? null) },
       event: (type, detail) => {
         // Output that arrived first is written first, so the latest activity is really the latest.
@@ -1644,6 +1687,7 @@ export class TaskManager {
     };
     let runtimeTimer: ReturnType<typeof setTimeout> | null = null;
     /** T3 §22/§24: one bounded relaunch — fresh authority snapshot, same hooks, per-attempt runtime budget. Returns null when the target cannot honor the same envelope. */
+    let connectionReservation:number|null=null;
     const startSession = (
       target: { provider: ProviderId; model: string; effort: string | null },
       options: { detail: string; bumpReroutes: boolean },
@@ -1665,6 +1709,8 @@ export class TaskManager {
         if (!targetAdapter) return null;
         const rerouting = current.provider !== target.provider || current.model !== target.model;
         const targetTask = { ...current, provider: target.provider, model: target.model, effort: target.effort ?? null };
+        const gate=this.connections.evaluate({kind:rerouting?"reroute":"retry",provider:target.provider,model:target.model,projectId:current.projectId,origin:current.connectionRoute?.approvedBy??"workstation",route:current.connectionRoute??null});
+        if(!gate.ok){this.emit(this.db.event("routing.consent_denied",id,gate.reason));return null;}
         if (targetTask.mission) {
           // M-A-3 T9R-F01: every relaunch is a new session start, so it spends a trusted-desktop grant like a launch.
           const outside =
@@ -1689,6 +1735,7 @@ export class TaskManager {
             ...(current.state === "verifying" ? { state: "running" } : {}),
             provider: target.provider,
             model: target.model,
+            connectionRoute:current.connectionRoute?{...current.connectionRoute,provider:target.provider,vendor:gate.vendor,connectionId:gate.connectionId,mode:gate.mode,accountFingerprint:gate.accountFingerprint,connectionEpoch:gate.epoch,consentRevision:gate.consentRevision}:null,
             ...(target.effort ? { effort: target.effort } : { effort: null }),
             ...(rerouting
               ? {
@@ -1717,9 +1764,11 @@ export class TaskManager {
         );
         // Adapters receive a detached, immutable authority snapshot, never the persisted task object.
         const adapterTask = structuredClone(retried);
+        delete adapterTask.connectionRoute; delete adapterTask.proposedRoute;
         if (adapterTask.executionScope) Object.freeze(adapterTask.executionScope);
         if (adapterTask.mission) Object.freeze(adapterTask.mission);
         Object.freeze(adapterTask);
+        connectionReservation=null;
         const nextSession = targetAdapter.launch(adapterTask, adapterHooks);
         this.sessions.set(id, nextSession);
         return nextSession;
@@ -1739,6 +1788,7 @@ export class TaskManager {
     try {
       // Adapters receive a detached, immutable authority snapshot, never the persisted task object.
       const adapterTask = structuredClone(launching);
+      delete adapterTask.connectionRoute; delete adapterTask.proposedRoute;
       if (adapterTask.executionScope) Object.freeze(adapterTask.executionScope);
       if (adapterTask.mission) Object.freeze(adapterTask.mission);
       Object.freeze(adapterTask);
@@ -1797,6 +1847,7 @@ export class TaskManager {
         }[] = [];
         for (;;) {
           const result = await session.done;
+          if(connectionReservation!==null)this.connections.settle(connectionReservation,result.ok);
           this.missionAttemptSettled?.(this.db.get(id), result.ok);
           flush();
           this.stopTree(id);

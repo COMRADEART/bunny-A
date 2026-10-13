@@ -216,6 +216,7 @@ export function clarificationView(
 }
 
 export const TURN_KIND_LABEL: Record<VoiceTurnKind, string> = {
+  account: "AI account settings",
   chat: "Question",
   agent_status: "Agent status",
   agent_verification: "Verification",
@@ -394,8 +395,9 @@ export type UiSeen = { epoch: string; seq: number } | null;
  * open_approvals also opens the Agentic sheet: there is no approvals sheet, and the per-task Approval view lives on the
  * decision sheet keyed by a task id that the intent does not carry, so it cannot be addressed from here.
  */
-export type UiTarget = { sheet: "agentic"; agentFocus: string | null };
+export type UiTarget = { sheet: "agentic" | "settings"; agentFocus: string | null; accountFocus?: import("../../lib/bunny-host/connections.ts").CatalogId | null };
 export function uiTargetFor(kind: NonNullable<VoiceSnapshot["uiIntent"]>["kind"], agentId: string | null): UiTarget {
+  if(kind==="open_accounts")return {sheet:"settings",agentFocus:null,accountFocus:agentId as import("../../lib/bunny-host/connections.ts").CatalogId|null};
   if (kind === "open_approvals") return { sheet: "agentic", agentFocus: null };
   return { sheet: "agentic", agentFocus: agentId };
 }

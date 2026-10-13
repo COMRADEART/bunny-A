@@ -1,3 +1,4 @@
+import { scrubChildEnvironment } from "./connections.ts";
 import { spawn } from "node:child_process";
 import type { UsageWindow } from "../orch/types.ts";
 import { trackOwnedChild } from "./owned-processes.server.ts";
@@ -40,7 +41,7 @@ async function containedTransport(command:string,args:string[],onData:(chunk:Buf
   };
   try {
     group=new OwnedProcessGroup(command,process.cwd(),{action:"provider.probe"});
-    group.spawn(command,args,process.cwd(),process.env,out.name,err.name,true);
+    group.spawn(command,args,process.cwd(),scrubChildEnvironment(process.env).env,out.name,err.name,true);
   } catch(error) {await close().catch(()=>{});throw error;}
   const owned=group;
   poll=setInterval(()=>{try {if(owned.inspect().exitCode!==null) onExit();} catch {onExit();}},100);
@@ -48,7 +49,7 @@ async function containedTransport(command:string,args:string[],onData:(chunk:Buf
 }
 // Official stdio app-server methods, verified against this installed CLI's
 // generated schema. No account secrets or raw authentication payloads escape.
-export async function probeCodexCatalog(command:string,prefix:string[]=[]):Promise<{model:string|null;models:string[];usageWindows:UsageWindow[];limited:boolean;usageRead:boolean}> {
+export async function probeCodexCatalog(command:string,prefix:string[]=[],readAccount=false):Promise<{model:string|null;models:string[];usageWindows:UsageWindow[];limited:boolean;usageRead:boolean;account?:{type:string;email:string|null;planType:string|null}|null}> {
   const pending=new Map<number,{resolve:(value:unknown)=>void;reject:(error:Error)=>void}>();let sequence=0,buffer="";
   const fail=(error:Error)=>{for(const row of pending.values()) row.reject(error);pending.clear();};
   let transport:Transport|null=null;
@@ -57,10 +58,10 @@ export async function probeCodexCatalog(command:string,prefix:string[]=[]):Promi
     try {const message=JSON.parse(line);const row=pending.get(message.id);if(row){pending.delete(message.id);if(message.error) row.reject(new Error("Codex catalog/usage method unavailable."));else row.resolve(message.result);}} catch { /* Diagnostics are not protocol events. */ }
   }};
   const exited=()=>fail(new Error("Codex app-server exited during discovery."));
-  const args=[...prefix,"app-server","--stdio"];
+  const args=[...prefix,"app-server","--stdio","-c",'model_provider="openai"'];
   if(process.platform==="win32") transport=await containedTransport(command,args,onData,exited);
   else {
-    const child=trackOwnedChild(spawn(command,args,{windowsHide:true,shell:false,stdio:["pipe","pipe","pipe"]}));
+    const child=trackOwnedChild(spawn(command,args,{env:scrubChildEnvironment(process.env).env,windowsHide:true,shell:false,stdio:["pipe","pipe","pipe"]}));
     child.once("error",fail);child.once("exit",exited);
     child.stderr.on("data",()=>{});child.stdin.on("error",()=>{});
     child.stdout.on("error",fail);child.stderr.on("error",fail);child.stdout.on("data",onData);
@@ -72,15 +73,18 @@ export async function probeCodexCatalog(command:string,prefix:string[]=[]):Promi
   try {
     await request("initialize",{clientInfo:{name:"bunny_a_host",version:"0.2.0"},capabilities:{experimentalApi:false}});
     channel.write('{"method":"initialized","params":{}}\n');
-    const [models,usage]=await Promise.all([
+    const [models,usage,accountResult]=await Promise.all([
       request("model/list",{includeHidden:false}).catch(()=>null),
       request("account/rateLimits/read",{}).catch(()=>null),
+      readAccount ? request("account/read",{refreshToken:false}).catch(()=>null) : Promise.resolve(null),
     ]);
     const catalogue=models as {data?:{model:string;isDefault?:boolean;hidden?:boolean}[]}|null;
     const visible=(catalogue?.data ?? []).filter(m=>!m.hidden);
     const model=visible.find(m=>m.isDefault)?.model ?? visible[0]?.model ?? null;
     const limits=usage as {rateLimits?:Bucket;rateLimitsByLimitId?:Record<string,Bucket>;ordinaryUsageAllowed?:boolean}|null;
     const usageWindows=codexUsageWindows(limits?.rateLimitsByLimitId?.codex ?? limits?.rateLimits);
-    return {model,models:visible.map(m=>m.model),usageWindows,limited:limits?.ordinaryUsageAllowed === false,usageRead:!!limits};
+    const a=(accountResult as {account?:{type?:unknown;email?:unknown;planType?:unknown}}|null)?.account;
+    const account=a&&typeof a.type==="string"?{type:a.type,email:typeof a.email==="string"?a.email:null,planType:typeof a.planType==="string"?a.planType:null}:null;
+    return {model,models:visible.map(m=>m.model),usageWindows,limited:limits?.ordinaryUsageAllowed === false,usageRead:!!limits,...(readAccount?{account}:{})};
   } finally {clearTimeout(timeout);await channel.close();}
 }

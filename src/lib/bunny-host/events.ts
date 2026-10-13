@@ -9,6 +9,7 @@ export const AGENT_EVENTS = [
 ] as const;
 
 export type NormalizedEvent = {
+  billingSource?: string;
   /** Empty when the provider event only carries output, a session id or a model. */
   type: string;
   detail: string;
@@ -193,6 +194,7 @@ export function normalizedTool(name: string): string {
 export class ClaudeNormalizer {
   normalize(event: Record<string, unknown>): NormalizedEvent[] {
     const out: NormalizedEvent[] = [];
+    if (event.type === "system" && event.subtype === "init") out.push({ type: "", detail: "", billingSource: typeof event.apiKeySource === "string" ? event.apiKeySource : "unknown" });
     if (typeof event.session_id === "string") out.push({ type: "", detail: "", sessionId: event.session_id });
     // The init message names the model; the process spawn already produced agent.started.
     if (typeof event.model === "string") out.push({ type: "", detail: "", model: event.model });
