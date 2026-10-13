@@ -528,17 +528,12 @@ export const useIsland = create<Island>((set, get) => {
         await runPress(pressOpened(press, !!get().voice?.open));
       } else if (effect.type === "listen_start") {
         ensureVoicePolling();
-        const { snapshot, outcome } = await voiceCallOutcome(
-          "voice.listen.start",
-          pressListenPayload(),
-        );
+        // prettier-ignore
+        const { snapshot, outcome } = await voiceCallOutcome("voice.listen.start", pressListenPayload());
         // The release is bound to the turn this start was answered with, never to an earlier snapshot.
         pressTurn = snapshot?.turnId ?? null;
-        const started: StartOutcome = snapshot
-          ? "started"
-          : outcome === "refused"
-            ? "refused"
-            : "unknown";
+        // prettier-ignore
+        const started: StartOutcome = snapshot ? "started" : outcome === "refused" ? "refused" : "unknown";
         await runPress(pressStarted(press, started));
       } else {
         // Bound to the turn this press started: the Host ignores a late release for an older turn. An unknown start
