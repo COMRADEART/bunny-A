@@ -1,0 +1,200 @@
+{
+  "generatedAt": "2026-10-13T04:53:35.116Z",
+  "sourceCommit": "aa134f5efb6748f21ec9a5fe4eae83f4c2d8d86f",
+  "labelledSet": {
+    "size": 32,
+    "classes": [
+      "general",
+      "research",
+      "extraction",
+      "math",
+      "reasoning",
+      "coding",
+      "repository_coding",
+      "structured_generation"
+    ],
+    "note": "Author-labelled; measures agreement with these labels only."
+  },
+  "router": {
+    "category": "LIVE VERIFIED (deterministic code)",
+    "total": 32,
+    "correct": 22,
+    "accuracy": 0.6875,
+    "bins": [
+      {
+        "range": "0-0.25",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      },
+      {
+        "range": "0.25-0.5",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      },
+      {
+        "range": "0.5-0.75",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      },
+      {
+        "range": "0.75-0.9",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      },
+      {
+        "range": "0.9-1",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      }
+    ],
+    "expectedCalibrationError": null,
+    "latencyMs": {
+      "p50": 0.005,
+      "p95": 0.385
+    },
+    "confidence": "BunnyRouter emits no probability; calibration not applicable."
+  },
+  "localModel": {
+    "category": "LIVE VERIFIED",
+    "model": "qwen2.5-coder:7b",
+    "coldStartMs": 5592,
+    "unparsed": 0,
+    "total": 32,
+    "correct": 25,
+    "accuracy": 0.78125,
+    "bins": [
+      {
+        "range": "0-0.25",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      },
+      {
+        "range": "0.25-0.5",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      },
+      {
+        "range": "0.5-0.75",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      },
+      {
+        "range": "0.75-0.9",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      },
+      {
+        "range": "0.9-1",
+        "count": 0,
+        "accuracy": null,
+        "meanConfidence": null
+      }
+    ],
+    "expectedCalibrationError": null,
+    "latencyMs": {
+      "p50": 341,
+      "p95": 461
+    }
+  },
+  "laya": {
+    "discovery": "LIVE VERIFIED",
+    "runtime": "Ollama on 127.0.0.1:11434",
+    "installedModels": [
+      "deepseek-v4.1-flash:cloud",
+      "huihui_ai/qwen2.5-abliterate:7b",
+      "huihui_ai/qwen3-abliterated:30b",
+      "huihui_ai/Qwen3.8-abliterated:27b",
+      "qwen2.5-coder:7b"
+    ],
+    "status": "missing",
+    "layaModels": 0,
+    "detail": "No Laya model is installed in the local runtime. Bunny keeps routing with the other models.",
+    "layaInference": "NOT TESTED (no Laya model is installed on this Host)",
+    "pipelineStandIn": {
+      "model": "qwen2.5-coder:7b",
+      "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+      "category": "LIVE VERIFIED (pipeline only, not Laya)",
+      "results": [
+        {
+          "taskClass": "general",
+          "passed": true,
+          "matched": 2,
+          "checks": 2,
+          "latencyMs": 497,
+          "outputs": [
+            "BUNNY-LAYA-OK",
+            "READY"
+          ]
+        },
+        {
+          "taskClass": "math",
+          "passed": false,
+          "matched": 0,
+          "checks": 2,
+          "latencyMs": 375,
+          "outputs": [
+            "54",
+            "9"
+          ]
+        },
+        {
+          "taskClass": "extraction",
+          "passed": true,
+          "matched": 2,
+          "checks": 2,
+          "latencyMs": 502,
+          "outputs": [
+            "4471",
+            "Lisbon"
+          ]
+        },
+        {
+          "taskClass": "reasoning",
+          "passed": true,
+          "matched": 2,
+          "checks": 2,
+          "latencyMs": 395,
+          "outputs": [
+            "Ola",
+            "Pen"
+          ]
+        }
+      ],
+      "loadedBytes": 4176373349
+    }
+  },
+  "typesafeJev": {
+    "live": "NOT TESTED (no authorized TypeSafe credential was provided)",
+    "accuracy": null,
+    "latencyMs": null,
+    "calibration": null
+  },
+  "combined": {
+    "live": "NOT TESTED (requires hosted advice)",
+    "note": "With no advice the combined pipeline is BunnyRouter's choice by construction (Local Decision Policy)."
+  },
+  "adviceSafety": {
+    "category": "SIMULATED",
+    "trials": 5000,
+    "outcomes": {
+      "accept": 265,
+      "fallback": 1076,
+      "clarify": 323,
+      "rejected": 2764,
+      "router": 572
+    },
+    "falseEligibility": 0,
+    "widenedLocalityOrTools": 0,
+    "fallbackRate": 0.947,
+    "meanDecisionValidationUs": 1.83
+  }
+}

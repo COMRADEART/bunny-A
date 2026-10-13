@@ -1,0 +1,23 @@
+{
+  "classification": "LIVE read-only observation before and after the T13.1 package acceptance",
+  "before": "2026-10-13T04:57:56.034Z",
+  "after": "2026-10-13T04:59:12.865Z",
+  "installedRelease": {
+    "before": "Bunny-A-Windows-MA3-T13-FINAL-TEST",
+    "after": "Bunny-A-Windows-MA3-T13-FINAL-TEST",
+    "unchanged": true
+  },
+  "installJsonUnchanged": true,
+  "releaseManifestUnchanged": true,
+  "listenersUnchanged": true,
+  "processesUnchanged": true,
+  "startupShortcutUnchanged": true,
+  "audioUnchanged": true,
+  "tablesWithChangedRows": [
+    "events",
+    "providers",
+    "sqlite_sequence"
+  ],
+  "tableNote": "The running production Host writes its own journal and telemetry; changed rows there are its normal activity, not a T13.1 write. T13.1 opened the production database read-only only.",
+  "discrepancy": "The brief states the installed production release remains Bunny-A-Windows-v26-MA2-R1. The live install record names Bunny-A-Windows-MA3-T13-FINAL-TEST (installedAt 2026-10-12T23:28:45Z, sourceCommit 8145377880fa4ab330238db827fa488430b2328d). That install predates this T13.1 session (started 2026-10-13T03:28Z) and no install, migration or launcher command was run in it. T13.1 left it exactly as found."
+}

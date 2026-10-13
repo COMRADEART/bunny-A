@@ -1,0 +1,20 @@
+{
+  "classification": "LIVE VERIFIED. Dev renders: DISPOSABLE Host (port 43891, temp state) + loopback dashboard dev server (127.0.0.1:8093) at final source aa134f5efb6748f21ec9a5fe4eae83f4c2d8d86f. Package renders: the exact Windows test package's built dashboard (127.0.0.1:8081) against a DISPOSABLE Host started from the package's own runtime (port 43892). Production 43119/8084 untouched.",
+  "sourceCommit": "aa134f5efb6748f21ec9a5fe4eae83f4c2d8d86f",
+  "phases": {
+    "fresh": "defaults: Laya missing on this PC, hosted decisions off, no key, daily allowance 0 (6 renders, light, desktop 1366x900 + phone 390x844)",
+    "saved": "fixture key saved via the owner command with real Windows DPAPI; hosted decisions on; metadata sharing on; small limits (12 renders, light + dark, desktop + phone)",
+    "package": "exact Windows test package; fixture key saved with real DPAPI; hosted decisions off; Test connection refused locally (12 renders, light + dark, desktop + phone)"
+  },
+  "typesafeCalls": 0,
+  "checks": {
+    "shotsFresh": "shots-fresh.json: 6/6 no overflow, no console errors, tab focus + aria-selected follow ArrowRight, tabpanel aria-labelledby, key not in DOM/storage",
+    "shotsSaved": "shots-saved.json: 12/12 same checks",
+    "shotsPackage": "shots-package.json: 12/12 same checks (see package-acceptance.json P09)",
+    "keyForm": "key-form-probe.json: password field, autocomplete off, Show reveals with aria-pressed, auto-hides after 20 s, Save clears the field and returns to the mask, key absent from DOM/storage/console",
+    "atRest": "plaintext fixture key absent from every file of the disposable Host state directories and from Host/dev-server/preview process output",
+    "uiFixesFromScreenshotPass": ["API key icon rendered on its own line (svg display:block) -> inline-flex", "duplicate 'API key' label -> 'Paste your TypeSafe API key' / 'New TypeSafe API key'", "input-tokens field clipped 200000 -> wider .ai-limit inputs"]
+  },
+  "visuallyInspected": ["ai-models-package-connections-desktop-light.png", "ai-models-package-privacy-phone-dark.png", "ai-models-saved-connections-desktop-dark.png", "ai-models-fresh-routing-phone-light.png"],
+  "notShown": "No screenshot shows a revealed key; 'Connected' never appears because no authorized TypeSafe key/network test was run (live provider compatibility NOT TESTED)."
+}
