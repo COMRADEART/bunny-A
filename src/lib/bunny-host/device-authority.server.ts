@@ -410,6 +410,8 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
           ].map((agent) => ({ ...agent, authorization: agent.authorization ? { ...agent.authorization, roots: agent.authorization.roots.map(() => "[Project folder on the Windows Host]"), commands: agent.authorization.commands.map((command) => ({ ...command, cwd: "[Project folder on the Windows Host]" })) } : agent.authorization })),
         }
       : snapshot.agents,
+    // M-A-3 T13.1: credential state, provider limits and usage are workstation-owner settings.
+    intelligence: undefined,
   };
 }
 

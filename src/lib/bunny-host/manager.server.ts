@@ -13,7 +13,7 @@ import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapt
 import { PolicyEngine } from "./learning.server.ts";
 import { classifyRequirements, effortRequirement, type TaskRequirements ,
 } from "../orch/router-requirements.ts";
-import { ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, type RoutingDecisionRecord, type RoutingFailureTaxonomy ,
+import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, type RoutingDecisionRecord, type RoutingFailureTaxonomy ,
 } from "./routing.server.ts";
 import { RoutingDecisionStore } from "./routing-store.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
@@ -28,6 +28,11 @@ import { ProjectRegistry } from "./project-registry.server.ts";
 import { deviceMayLaunch } from "./device-authority.server.ts";
 import { PERSONAL_AGENTS_SETTING, PERSONAL_AGENTS_SCHEMA, defaultPersonalAgentsConfig, parsePersonalAgentsConfig, validatePersonalAgentSlots, type PersonalAgentSlotConfig, type PersonalAgentsConfig } from "./personal-agents.ts";
 import { isRemoteOllamaTag } from "../orch/exec.server.ts";
+import { LayaRegistry, type LayaRuntime } from "./laya.server.ts";
+import { JevSecretStore, type SecretProtector } from "./jev-secrets.server.ts";
+import { JevService, type FetchLike } from "./typesafe-jev.server.ts";
+import { applyDecisionAdvice, buildDecisionState, candidateKey, isLayaModel, layaExclusion, type DecisionAdvice } from "./intelligence.ts";
+import type { IntelligenceSnapshot } from "./intelligence-snapshot.ts";
 
 export type TaskOutputEvent = { text: string } | { done: true; state: string };
 
@@ -61,6 +66,8 @@ export type ManagerOptions = {
   modelRegistry?: ModelCapabilityRegistry;
   /** M-A-3 T9R-F04: Host state folder; provider-session job records live in runtime/provider-sessions. */
   dataDirectory?: string | null;
+  /** M-A-3 T13.1 test seams for intelligence services; production uses Ollama, real fetch and Windows DPAPI. */
+  intelligence?: { layaRuntime?: LayaRuntime; jevFetch?: FetchLike; jevProtector?: SecretProtector; now?: () => number };
 };
 
 export class TaskManager {
@@ -75,6 +82,10 @@ export class TaskManager {
   providerUsage: ProviderUsageService;
   /** M-A-3 T3: safe persistence for routing decisions and the bounded attempt trail behind them. */
   routingStore: RoutingDecisionStore;
+  /** M-A-3 T13.1: Laya discovery and the optional TypeSafe Jev decision service (advisory only). */
+  laya: LayaRegistry;
+  jevSecrets: JevSecretStore;
+  jev: JevService;
   bus = new EventEmitter();
   /** M-A-3 T9R (DEV-01): direct tasks a paired device approved; their reroutes stay on local tool-free inference. */
   private readonly deviceApproved = new Set<string>();
@@ -160,6 +171,9 @@ export class TaskManager {
       },
     });
     this.routingStore = new RoutingDecisionStore(db);
+    this.laya = new LayaRegistry(db, options.intelligence?.layaRuntime);
+    this.jevSecrets = new JevSecretStore(db, options.intelligence?.jevProtector);
+    this.jev = new JevService(db, this.jevSecrets, { sessionId: this.instanceId, fetchFn: options.intelligence?.jevFetch, now: options.intelligence?.now });
     this.sessionDirectory = options.sessionDirectory ?? null;
     this.readProcesses = options.processTable ?? processTable;
     this.dataDirectory = options.dataDirectory ?? null;
@@ -498,6 +512,7 @@ export class TaskManager {
       thermal: this.thermal,
       modelCapabilities: this.modelCapabilities.snapshot(),
       providerUsage: this.providerUsage.snapshot(),
+      intelligence: this.intelligenceSnapshot(),
     };
   }
   configureThermal(cpuWarn: number, gpuWarn: number, autoStop: boolean) {
@@ -597,6 +612,86 @@ export class TaskManager {
     );
     return project;
   }
+  /** M-A-3 T13.1: secret-free intelligence projection for snapshots and Settings. */
+  intelligenceSnapshot(): IntelligenceSnapshot {
+    const ollama = this.live().find((provider) => provider.id === "ollama");
+    const runtimeUp = !!ollama && ["ready", "busy"].includes(ollama.availability);
+    return {
+      version: 1,
+      router: "BunnyRouter",
+      laya: this.laya.snapshot(this.modelCapabilities.snapshot(), runtimeUp),
+      jev: this.jev.snapshot(),
+      localDecisionPolicy: { label: "Local Decision Policy", detail: "BunnyRouter's deterministic eligibility, scores and rules on this computer. It is always active and is not TypeSafe Jev." },
+      lastAssistance: this.lastAssistance,
+    };
+  }
+  /** M-A-3 T13.1 workstation-owner settings. The HTTP layer refuses every one of these for paired devices. */
+  configureIntelligence(raw: unknown) {
+    const policy = this.jev.configure(raw);
+    this.emit(this.db.event("intelligence.configured", null, `Hosted decisions ${policy.enabled ? "on" : "off"}; metadata sharing ${policy.privacy.allowDecisionMetadata ? "allowed" : "off"}; request text ${policy.privacy.allowTaskDescription ? "allowed" : "off"}; ${policy.limits.maxRequestsPerDay} requests per day.`));
+  }
+  async saveIntelligenceKey(apiKey: unknown) {
+    if (typeof apiKey !== "string") throw new CommandRefusedError("Enter a valid API key.");
+    try {
+      await this.jev.saveKey(apiKey);
+    } catch (error) {
+      throw new CommandRefusedError(error instanceof Error ? error.message : "The API key was not saved.");
+    }
+    this.emit(this.db.event("intelligence.credential_saved", null, "TypeSafe API key saved with Windows protection. It has not been tested."));
+  }
+  removeIntelligenceKey() {
+    const had = this.jevSecrets.hasCredential();
+    this.jev.removeKey();
+    this.emit(this.db.event("intelligence.credential_removed", null, had ? "TypeSafe API key removed." : "No TypeSafe API key was saved."));
+  }
+  async testIntelligenceConnection(decisionTest: boolean) {
+    const result = await this.jev.testConnection({ decisionTest });
+    this.emit(this.db.event("intelligence.tested", null, `TypeSafe connection test: ${result.state}${result.lastTest?.inferenceVerified ? "; decision inference verified" : "; decision inference not tested"}.`));
+  }
+  configureLaya(enabled: unknown) {
+    if (typeof enabled !== "boolean") throw new CommandRefusedError("Choose whether Laya may be used.");
+    this.laya.setEnabled(enabled);
+    this.emit(this.db.event("intelligence.laya_configured", null, `Laya routing ${enabled ? "allowed" : "turned off"}.`));
+  }
+  /** Starts the local benchmark and returns; the snapshot shows it running and the journal records the result. */
+  benchmarkLaya(model: unknown): Promise<void> {
+    if (typeof model !== "string" || !model || model.length > 200) throw new CommandRefusedError("Choose an installed Laya model.");
+    let run: Promise<import("./intelligence.ts").LayaBenchmark[]>;
+    try {
+      run = this.laya.startBenchmark(model, this.modelCapabilities.snapshot());
+    } catch (error) {
+      throw new CommandRefusedError(error instanceof Error ? error.message : "The Laya benchmark could not run.");
+    }
+    this.emit(this.db.event("intelligence.laya_benchmarked", null, `Laya ${model}: local benchmark started.`));
+    return run.then(
+      (rows) => this.emit(this.db.event("intelligence.laya_benchmarked", null, `Laya ${model}: ${rows.filter((row) => row.passed).length} of ${rows.length} local benchmarks passed.`)),
+      () => this.emit(this.db.event("intelligence.laya_benchmarked", null, `Laya ${model}: the local benchmark did not finish.`)),
+    ).catch(() => undefined); // the Host may be closing; the run is simply not reported
+  }
+  /** Last decision-assistance outcome, for Settings (no prompt text, no secret). */
+  private lastAssistance: IntelligenceSnapshot["lastAssistance"] = null;
+  /**
+   * M-A-3 T13.1: optional hosted decision assistance for one would-be direct Task. Advisory only:
+   * BunnyRouter validates the advice in submit(). Every failure (off, no key, sharing off, budget,
+   * network, cancellation) returns null and local routing proceeds unchanged. Manual model choices
+   * and Mission-delegated work never consult it.
+   */
+  async assistDecision(input: SubmitTask, signal?: AbortSignal): Promise<DecisionAdvice | null> {
+    if (!this.jev.usable()) return null;
+    if ((input.override && input.override !== "auto") || input.modelOverride) return null;
+    try {
+      const routingText = input.routingPrompt ?? input.prompt;
+      const constraints = inferredConstraints(routingText, input.constraints);
+      const pipeline = this.routingPipeline({ routingText, mode: input.mode, providers: this.live(), constraints, override: input.override, modelOverride: input.modelOverride });
+      const eligibleKeys = pipeline.selection.order.map((candidate) => candidateKey(candidate.provider_id, candidate.model_id));
+      if (eligibleKeys.length < 2) return null;
+      const state = buildDecisionState({ taskClass: pipeline.requirements.task_class, eligibleKeys, mode: input.mode, privacy: this.jev.policy.privacy, taskDescription: routingText });
+      return (await this.jev.advise({ state, eligibleKeys, signal })).advice;
+    } catch (error) {
+      this.lastAssistance = { at: Date.now(), source: "local", action: "router", detail: `Hosted decision unavailable (${error instanceof Error ? error.message.slice(0, 160) : "error"}); Local Decision Policy used.`, recommended: null, confidence: null };
+      return null;
+    }
+  }
   /**
    * M-A-3 T3: one deterministic FILTER-then-SCORE candidate pass (§1/§8/§12). It extends — never
    * replaces — BunnyRouter: the legacy RouteDecision above stays in the task record, and this pass
@@ -628,6 +723,7 @@ export class TaskManager {
       modelOverride: input.modelOverride,
       mode: input.mode,
       empirical: (provider) => this.db.learned(provider, input.taskType ?? "general"),
+      layaGate: (model, taskClass) => (!isLayaModel(model) ? null : !this.laya.enabled ? `Laya routing is turned off in Settings; ${model} is not eligible.` : layaExclusion(model, taskClass, this.laya.benchmarks(model))),
     });
     const selection = selectRoutingCandidate({ candidates, requirements });
     return { requirements, candidates, selection, modelSnapshot, usage };
@@ -673,6 +769,7 @@ export class TaskManager {
     pipeline: ReturnType<TaskManager["routingPipeline"]>;
     reroutes?: number;
     terminalNote?: string;
+    assistance?: RoutingDecisionRecord["assistance"];
   }): RoutingDecisionRecord {
     return safeDecisionRecord({
       id: input.id,
@@ -691,6 +788,7 @@ export class TaskManager {
         status: provider.status,
       })),
       terminalNote: input.terminalNote,
+      assistance: input.assistance,
     });
   }
   /** §5 clarity: the readable reasons a pipeline pass produced no eligible candidate. */
@@ -973,6 +1071,35 @@ export class TaskManager {
         effort: null,
       };
     }
+    // M-A-3 T13.1: hosted decision assistance is one advisory input. BunnyRouter validates it against the eligible
+    // set and refuses any switch that widens locality or tool access; manual choices and Mission work never use it.
+    let assistanceRecord: RoutingDecisionRecord["assistance"] = null;
+    if (selection) {
+      const routerKey = candidateKey(selection.provider_id, selection.model_id);
+      const advice = !delegated && routingMode === "auto" ? (input.decisionAssistance ?? null) : null;
+      const outcome = applyDecisionAdvice({
+        routerKey,
+        eligible: pipeline.selection.order.map((candidate) => ({ key: candidateKey(candidate.provider_id, candidate.model_id), local: candidate.local_or_cloud === "local", tools: ADAPTER_TOOL_CONTRACTS[candidate.provider_id] !== false })),
+        advice,
+        thresholds: this.jev.policy.thresholds,
+        currentGeneration: this.jev.generation,
+      });
+      if (advice) assistanceRecord = { source: "jev", recommended: advice.recommendedKey, confidence: advice.confidence, action: outcome.action, reason: outcome.reason, answeredBy: advice.answeredBy };
+      if (outcome.action === "accept" && outcome.finalKey !== routerKey) {
+        const chosen = pipeline.selection.order.find((candidate) => candidateKey(candidate.provider_id, candidate.model_id) === outcome.finalKey);
+        if (chosen) {
+          routed = { provider: chosen.provider_id, model: chosen.model_id ?? (chosen.provider_id === decision.recommended_provider ? decision.recommended_model : "auto"), effort: chosen.effort_native };
+          decision.recommended_provider = routed.provider;
+          decision.recommended_model = routed.model;
+          decision.effort_mode = routed.effort;
+          decision.selection_reason = outcome.reason;
+        }
+      }
+      if (advice) {
+        decision.decision_assistance = { source: "jev", action: outcome.action, confidence: advice.confidence };
+        this.lastAssistance = { at: Date.now(), source: "jev", action: outcome.action, detail: outcome.reason, recommended: advice.recommendedKey, confidence: advice.confidence };
+      }
+    }
     const task: OrchTask = {
       id: crypto.randomUUID(),
       ...(delegated
@@ -1021,6 +1148,7 @@ export class TaskManager {
         missionId: delegated?.missionId ?? null,
         routingMode,
         pipeline,
+        assistance: assistanceRecord,
         ...(selection
           ? {}
           : { terminalNote: "No model facts on this Host; BunnyRouter provider decision stands." }),
@@ -1043,6 +1171,8 @@ export class TaskManager {
           task.mission?.missionId ?? null,
         ),
       );
+      if (assistanceRecord)
+        this.emit(this.db.event("routing.assisted", task.id, `Hosted decision assistance (${assistanceRecord.answeredBy ?? "TypeSafe Jev"}): ${assistanceRecord.action}. ${assistanceRecord.reason}`, task.mission?.missionId ?? null));
     }
     const routing = this.update(
       task,

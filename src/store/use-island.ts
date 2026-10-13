@@ -28,6 +28,8 @@ import {
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
 import type { PersonalAgentsSnapshot } from "@/lib/bunny-host/personal-agents";
+import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
+import type { JevPolicy } from "@/lib/bunny-host/intelligence";
 import { deepLinkFromSearch, type ShellSheet } from "@/components/island/nav-model";
 import type { VoiceMode, VoiceSnapshot } from "@/lib/bunny-host/voice/voice-protocol";
 import {
@@ -251,6 +253,18 @@ type Island = Preferences & {
     expectRevision: number | null,
     onRefused?: (caption: string) => void,
   ) => Promise<boolean>;
+  /** M-A-3 T13.1 Laya and TypeSafe Jev state (workstation only; null on paired devices and older Hosts). */
+  intelligence: IntelligenceSnapshot | null;
+  /**
+   * M-A-3 T13.1 AI & Models settings. Each resolves true only on the Host's acknowledgment. The API key is passed
+   * straight to the Host command and never stored in this store, preferences or any browser storage.
+   */
+  configureIntelligence: (policy: JevPolicy, onRefused?: (caption: string) => void) => Promise<boolean>;
+  saveIntelligenceKey: (apiKey: string, onRefused?: (caption: string) => void) => Promise<boolean>;
+  removeIntelligenceKey: (onRefused?: (caption: string) => void) => Promise<boolean>;
+  testIntelligence: (decisionTest: boolean, onRefused?: (caption: string) => void) => Promise<boolean>;
+  configureLaya: (enabled: boolean, onRefused?: (caption: string) => void) => Promise<boolean>;
+  benchmarkLaya: (model: string, onRefused?: (caption: string) => void) => Promise<boolean>;
   configureMissions: (patch: { enabled?: boolean; triggersEnabled?: boolean }) => void;
   hydrate: () => void;
   refreshOllama: () => Promise<void>;
@@ -642,6 +656,7 @@ export const useIsland = create<Island>((set, get) => {
       missions: snapshot.missions ?? null,
       agents: snapshot.agents ?? null,
       personalAgents: snapshot.personalAgents ?? null,
+      intelligence: snapshot.intelligence ?? null,
       providerUsage: snapshot.providerUsage ?? null,
       modelCapabilities: snapshot.modelCapabilities ?? null,
       cpuWarn: snapshot.thermal?.cpuWarn ?? 90,
@@ -698,6 +713,7 @@ export const useIsland = create<Island>((set, get) => {
       pairingRequired: true,
       agents: null,
       personalAgents: null,
+      intelligence: null,
       voice: null,
       voiceReceivedAt: 0,
       voicePressing: false,
@@ -1025,6 +1041,7 @@ export const useIsland = create<Island>((set, get) => {
     missions: null,
     agents: null,
     personalAgents: null,
+    intelligence: null,
     providerUsage: null,
     modelCapabilities: null,
     hostHealth: null,
@@ -1099,6 +1116,18 @@ export const useIsland = create<Island>((set, get) => {
       const result = await command("personal_agents.configure", { slots, expectRevision }, null, onRefused);
       return result !== null;
     },
+    configureIntelligence: async (policy, onRefused) =>
+      (await command("intelligence.configure", { policy }, "intelligence", onRefused)) !== null,
+    saveIntelligenceKey: async (apiKey, onRefused) =>
+      (await command("intelligence.credential.save", { apiKey }, "intelligence", onRefused)) !== null,
+    removeIntelligenceKey: async (onRefused) =>
+      (await command("intelligence.credential.remove", {}, "intelligence", onRefused)) !== null,
+    testIntelligence: async (decisionTest, onRefused) =>
+      (await command("intelligence.test", decisionTest ? { decisionTest: true, confirmBillable: true } : {}, "intelligence", onRefused)) !== null,
+    configureLaya: async (enabled, onRefused) =>
+      (await command("intelligence.laya.configure", { enabled }, "laya", onRefused)) !== null,
+    benchmarkLaya: async (model, onRefused) =>
+      (await command("intelligence.laya.benchmark", { model }, "laya", onRefused)) !== null,
     configureMissions: (patch) => {
       void command("mission.configure", patch);
     },

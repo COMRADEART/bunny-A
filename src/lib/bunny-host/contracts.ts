@@ -53,9 +53,11 @@ export type HostSnapshot = {
   agents?: AgentSnapshot;
   /** M-A-3 T13 Personal Agent slots projected onto live Host facts (presentation only). Optional: older clients ignore it. */
   personalAgents?: import("./personal-agents.ts").PersonalAgentsSnapshot;
+  /** M-A-3 T13.1 Laya/Jev intelligence state (no secrets; credential existence only). Absent for paired devices. */
+  intelligence?: import("./intelligence-snapshot.ts").IntelligenceSnapshot;
 };
 /** `routingPrompt` and `modelOverride` are set in-process by the caller that knows the selection context; HTTP validates both. */
-export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; /** M-A-3 T3 §27: MANUAL exact-model selection; only honored where a real model surface exists. */ modelOverride?: string | null; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };
+export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; /** M-A-3 T3 §27: MANUAL exact-model selection; only honored where a real model surface exists. */ modelOverride?: string | null; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope; /** M-A-3 T13.1: Host-owned decision assistance (advisory only); never accepted from HTTP bodies. */ decisionAssistance?: import("./intelligence.ts").DecisionAdvice | null };
 export type AdapterResult = { ok: boolean; output: string; error?: string; stopped?: boolean; exitCode?: number | null };
 export type AdapterHooks = {
   event: (type: string, detail: string) => void;

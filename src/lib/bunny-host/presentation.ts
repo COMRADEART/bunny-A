@@ -170,6 +170,14 @@ const LABELS: Record<string, string> = {
   "mission.team.seeded": "Test fault injected (recorded)",
   // M-A-3 T13 Personal Agent slots (presentation only).
   "personal_agents.configured": "Personal Agents updated",
+  // M-A-3 T13.1 AI & Models settings and advisory routing provenance.
+  "routing.assisted": "Decision assistance reviewed",
+  "intelligence.configured": "AI & Models settings updated",
+  "intelligence.credential_saved": "API key saved",
+  "intelligence.credential_removed": "API key removed",
+  "intelligence.tested": "Connection tested",
+  "intelligence.laya_configured": "Laya preference updated",
+  "intelligence.laya_benchmarked": "Laya benchmarked",
 };
 export const publicEventLabel = (type: string) => LABELS[type] ?? "Activity recorded";
 /**

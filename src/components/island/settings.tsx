@@ -4,11 +4,12 @@ import { liveProviders, useIsland, type Appearance } from "@/store/use-island";
 import { NAMES, ProviderStatus } from "./ui";
 import { Pairing } from "./phone";
 import { MissionSettings } from "./mission";
+import { AiModelsSettings } from "./ai-models";
 
 const GROUPS = [
   "General",
   "Providers",
-  "Models",
+  "AI & Models",
   "Privacy and permissions",
   "Workspace",
   "Devices",
@@ -147,37 +148,8 @@ export function Settings() {
                 </Setting>
               ))}
             </>
-          ) : group === "Models" ? (
-            <>
-              <Setting
-                label="Approval before launch"
-                detail="Every new route waits for an explicit Run action."
-              >
-                <span className="caption">Required by Host</span>
-              </Setting>
-              <Setting label="Next Task depth">
-                <select
-                  aria-label="Default task depth"
-                  value={store.mode}
-                  onChange={(e) => store.setMode(e.target.value as "fast" | "balanced" | "deep")}
-                >
-                  <option value="fast">Fast</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="deep">Deep</option>
-                </select>
-              </Setting>
-              <Setting label="Local only" detail="A hard routing constraint for your next task.">
-                <button
-                  className="switch"
-                  role="switch"
-                  aria-checked={store.localOnly}
-                  aria-label="Local-only routing"
-                  onClick={() => store.setLocalOnly(!store.localOnly)}
-                >
-                  <span />
-                </button>
-              </Setting>
-            </>
+          ) : group === "AI & Models" ? (
+            <AiModelsSettings />
           ) : group === "Privacy and permissions" ? (
             <MissionSettings />
           ) : group === "Workspace" ? (

@@ -110,6 +110,8 @@ export type RouteDecision = {
   reroutes?: number;
   /** M-A-3 T3 §5/§19: the router's own reason for the model selection (distinct from the legacy route reason). */
   selection_reason?: string;
+  /** M-A-3 T13.1: present only when hosted decision assistance was consulted; advisory provenance, never authority. */
+  decision_assistance?: { source: "jev"; action: string; confidence: number | null };
   /** M-A-3 T3 §18/§19: the safe candidate subset the island view may show (the shape §18 persists, capped). */
   candidates?: {
     provider_id: ProviderId;

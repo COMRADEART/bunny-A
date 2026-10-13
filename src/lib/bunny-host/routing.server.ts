@@ -113,6 +113,8 @@ export type CandidateInput = {
   modelOverride?: string | null;
   mode: Mode;
   empirical?: (provider: ProviderId, model: string | null) => number | null;
+  /** M-A-3 T13.1: Laya benchmark gate; returns an exclusion reason for an unbenchmarked Laya model. */
+  layaGate?: (model: string, taskClass: string) => string | null;
 };
 
 const rankFor = (profile: ModelRoutingProfile | null, taskClass: RoutingTaskClass): number => {
@@ -477,6 +479,10 @@ export function buildCandidates(input: CandidateInput): RoutingCandidate[] {
         score_components: null, final_score: null,
       };
       const exclusions = hardExclusions({ provider, record: shape.record, candidateKind: shape.kind, requirements, constraints, modelOverride });
+      if (shape.record && input.layaGate) {
+        const layaReason = input.layaGate(shape.record.model, requirements.task_class);
+        if (layaReason) exclusions.push(layaReason);
+      }
       if (exclusions.length) {
         candidate.eligibility = "excluded";
         candidate.exclusion_reasons = exclusions;
@@ -512,11 +518,13 @@ export type RoutingDecisionRecord = {
   fallback_order: { provider_id: ProviderId; model_id: string | null; score: number }[];
   reroutes: number;
   terminal_note?: string;
+  /** M-A-3 T13.1: hosted decision-assistance provenance, present only when hosted advice was consulted (never authority, never a secret). */
+  assistance?: { source: "jev"; recommended: string | null; confidence: number | null; action: string; reason: string; answeredBy: string | null } | null;
 };
 
 const CANDIDATE_CAP = 24;
 /** Serializes the safe record from live candidates (caps and trims nothing user-private). */
-export function safeDecisionRecord(input: { id: string; taskId: string; missionId: string | null; routingMode: "auto" | "manual"; requirements: TaskRequirements; candidates: RoutingCandidate[]; selection: { selected: RoutingCandidate | null; order: RoutingCandidate[]; reason: string }; policyVersion: string; createdAt: number; reroutes?: number; snapshotProviders?: ModelCapabilityProviderSnapshot[]; usageStatuses?: { provider: ProviderId; status: UsageState }[]; terminalNote?: string }): RoutingDecisionRecord {
+export function safeDecisionRecord(input: { id: string; taskId: string; missionId: string | null; routingMode: "auto" | "manual"; requirements: TaskRequirements; candidates: RoutingCandidate[]; selection: { selected: RoutingCandidate | null; order: RoutingCandidate[]; reason: string }; policyVersion: string; createdAt: number; reroutes?: number; snapshotProviders?: ModelCapabilityProviderSnapshot[]; usageStatuses?: { provider: ProviderId; status: UsageState }[]; terminalNote?: string; assistance?: RoutingDecisionRecord["assistance"] }): RoutingDecisionRecord {
   const { candidates, selection, snapshotProviders, usageStatuses } = input;
   const cap = (list: RoutingCandidate[]) => list.slice(0, CANDIDATE_CAP).map((candidate) => ({
     provider_id: candidate.provider_id, model_id: candidate.model_id, candidate_kind: candidate.candidate_kind,
@@ -542,6 +550,7 @@ export function safeDecisionRecord(input: { id: string; taskId: string; missionI
     fallback_order: selection.order.slice(0, CANDIDATE_CAP).map((candidate) => ({ provider_id: candidate.provider_id, model_id: candidate.model_id, score: candidate.final_score ?? 0 })),
     reroutes: input.reroutes ?? 0,
     ...(input.terminalNote ? { terminal_note: input.terminalNote } : {}),
+    ...(input.assistance ? { assistance: input.assistance } : {}),
   };
 }
 

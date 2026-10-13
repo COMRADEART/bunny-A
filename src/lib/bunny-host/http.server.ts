@@ -4,7 +4,8 @@ import { randomBytes, createHash, timingSafeEqual, randomUUID } from "node:crypt
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { HostDatabase } from "./persistence.server.ts";
-import { TaskManager } from "./manager.server.ts";
+import { TaskManager, type ManagerOptions } from "./manager.server.ts";
+import { API_KEY_SHAPE } from "./jev-secrets.server.ts";
 import { sampleHost } from "../orch/telemetry.server.ts";
 import { validateVerifySpec, verifyTask } from "./verification.server.ts";
 import type { Mode, OrchTask, Project, ProviderId, TaskConstraints } from "../orch/types.ts";
@@ -268,6 +269,8 @@ export async function startHost(
     sample?: () => Promise<HostSample>;
     /** M-A-3 T10 test-only voice worker flags (fixture input, null output). Never reachable from HTTP. */
     voice?: { workerExtraArgs?: string[] };
+    /** M-A-3 T13.1 test-only intelligence seams (fake transport/protector). Never reachable from HTTP. */
+    intelligence?: ManagerOptions["intelligence"];
   } = {},
 ) {
   const paths = hostStatePaths(options.dataDirectory);
@@ -312,6 +315,7 @@ export async function startHost(
     dataDirectory,
     containment,
     workspaceRoot,
+    ...(options.intelligence ? { intelligence: options.intelligence } : {}),
   });
   containment.options.persist = (type, detail, owner) =>
     manager.emit(db.event(type, owner.taskId ?? null, detail, owner.missionId ?? null));
@@ -747,9 +751,40 @@ export async function startHost(
             // A paired device queues chat for review; folders and verification checks are workstation settings.
             if (device && (submitted.verify || submitted.constraints.workingDirectory))
               throw new WorkstationRequiredError("Task folders and verification checks are set on the workstation (Windows Host).");
-            task = manager.submit(submitted);
+            // M-A-3 T13.1: optional, owner-enabled hosted advice. Null (the common case) leaves routing unchanged;
+            // the Host fetches it itself, so no client field can supply or shape it.
+            const decisionAssistance = await manager.assistDecision(submitted);
+            task = manager.submit({ ...submitted, decisionAssistance });
             break;
           }
+          case "intelligence.configure":
+            if (!local) throw new WorkstationRequiredError("AI & Models settings can only be changed on the workstation (Windows Host).");
+            manager.configureIntelligence(data.policy);
+            break;
+          case "intelligence.credential.save":
+            if (local && typeof data.apiKey === "string" && API_KEY_SHAPE.test(data.apiKey.trim())) registerDiagnosticSecret(data.apiKey.trim());
+            if (!local) throw new WorkstationRequiredError("API keys can only be managed on the workstation (Windows Host).");
+            await manager.saveIntelligenceKey(data.apiKey);
+            break;
+          case "intelligence.credential.remove":
+            if (!local) throw new WorkstationRequiredError("API keys can only be managed on the workstation (Windows Host).");
+            manager.removeIntelligenceKey();
+            break;
+          case "intelligence.test":
+            if (!local) throw new WorkstationRequiredError("Connection tests run on the workstation (Windows Host).");
+            if (data.decisionTest !== undefined && typeof data.decisionTest !== "boolean") throw new CommandRefusedError("Invalid connection test option.");
+            if (data.decisionTest && data.confirmBillable !== true) throw new CommandRefusedError("A decision test is billable; confirm it explicitly.");
+            await manager.testIntelligenceConnection(data.decisionTest === true);
+            break;
+          case "intelligence.laya.configure":
+            if (!local) throw new WorkstationRequiredError("AI & Models settings can only be changed on the workstation (Windows Host).");
+            manager.configureLaya(data.enabled);
+            break;
+          case "intelligence.laya.benchmark":
+            if (!local) throw new WorkstationRequiredError("Laya benchmarks run on the workstation (Windows Host).");
+            // Refusals throw synchronously; the run continues on the Host and reports through the snapshot and journal.
+            void manager.benchmarkLaya(data.model);
+            break;
           case "approve": {
             const id = text(data.id, 200);
             if (device) {
