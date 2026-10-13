@@ -344,6 +344,12 @@ between T13 closeout and the start of T13.1. T13.1 left production exactly as fo
 5. **Package acceptance used the development state layout.** The installed layout was deliberately not exercised.
 6. **Installed production is T13-FINAL-TEST, not MA2-R1** (section 14). This needs the owner's attention; it was not
    changed here.
+7. **Cross-vendor hosted switches are allowed.** Accepted advice may move a hosted Task to a different hosted provider
+   that BunnyRouter already found eligible (for example Claude to Codex), when it adds no tools. Locality and tools
+   are never widened, but the Task then goes to a different third party. A same-vendor rule was not added after the
+   final regression; it is a candidate follow-up.
+8. **No retention policy for `jev_usage`.** Rows are indexed by time and only the current day is counted, but old
+   rows are never pruned.
 
 ## 16. Evidence
 
