@@ -1,0 +1,32 @@
+{
+  "gate": "M-A-2 T9",
+  "recordedAt": "2026-10-06T11:30:00Z",
+  "release": "Bunny-A-Windows-v17-T9",
+  "version": "17.0.0-T9",
+  "pin": {
+    "path": "install/release-pin.json",
+    "gitBlob": "committed as e550ed0 (T9: pin the candidate to the window-owner scope source)",
+    "sourceCommit": "e9604fefe3b8ab23f8fe6072ff302db3e63a8d15",
+    "baselineCommit": "f1934bda6b0d33f27bef198e8967a69f6eb329ff",
+    "gate9ImplementationCommit": "3f5375d5a81c86d01bfea75e85b5a44bee962483",
+    "gate9ImplementationFollowUp": "e9604fefe3b8ab23f8fe6072ff302db3e63a8d15"
+  },
+  "pinMatch": true,
+  "pinMatchBasis": "the packaging script validates the pin against the real git graph and the built manifest; package run 1 failed (PACKAGE_EXIT=1) while the pin carried a hand-mistyped sourceCommit suffix, run 2 passed (PACKAGE_EXIT=0) after the id was corrected from `git rev-parse` and committed (df89b26), run 3 passed (PACKAGE_EXIT=0) after the truthful-TTL journal follow-up was committed (73d9382) and the pin advanced, run 4 passed (PACKAGE_EXIT=0) after the window-owner scope fix (e9604fe) and its pin advance (e550ed0) — exact-source packaging is enforced by the script itself",
+  "package": {
+    "zipPath": "releases/Bunny-A-Windows-v17-T9.zip",
+    "sha256File": "releases/Bunny-A-Windows-v17-T9.zip.sha256",
+    "zipSha256": "7f5fd629143ad4b2f21122a8beebc91e7f0a8b2e09418b9b880a85c8860eddfc",
+    "sha256FileMatchesRecomputed": true,
+    "zipBytes": 36251045,
+    "buildLog": "test-results/ma2-gate9/windows-build2.log",
+    "exitCode": 0
+  },
+  "repackageHistory": [
+    { "run": 1, "result": "PACKAGE_EXIT=1 — packaging refused the pin: sourceCommit id was mistyped (one character invented); no artifacts kept" },
+    { "run": 2, "result": "PACKAGE_EXIT=0 — pin corrected (commit df89b26) and the candidate was rebuilt from the exact pinned source; that zip (871f496b…) and the unzipped folder were archived as -pin-df02410 when run 3 replaced them" },
+    { "run": 3, "result": "PACKAGE_EXIT=0 — truthful-TTL follow-up (73d9382) and the pin advance (a0211eb) repackaged from the exact pinned source; that zip (335b40b4…) and the unzipped folder were archived as -pin-73d9382 when run 4 replaced them" },
+    { "run": 4, "result": "PACKAGE_EXIT=0 — window-owner scope fix (e9604fe, the live UWP finding) and the pin advance (e550ed0) repackaged from the exact pinned source; the packaged manifest's sourceCommit was re-read from the zip and matches the pin; zip + recomputed sha256 sidecar verified above" }
+  ],
+  "installerNext": "scripts/install-bunny-release.ps1 into a staging install root with the disposable state copy; production is not touched"
+}

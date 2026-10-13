@@ -1,0 +1,267 @@
+{
+  "round": 3,
+  "verdicts": [
+    {
+      "id": "LENS-A-REGRESSION-SEARCH",
+      "kind": "NONE",
+      "severity": "NONE",
+      "issue": "No REGRESSION found: no fixture where HEAD classifies EXECUTION_RELEVANT/UNKNOWN and the working tree classifies PHONE_SAFE_*. The working-tree diff only touches consumerOf (readOnlyStatement, statementsSpanLines, commentLine, computedName, globNamesLeaf, non-shell RUNS_GLOB branch, package.json rest line); every change I traced is additive refusal or a narrower exemption.",
+      "evidence": "Corpus: 607 consumer fixtures (Makefile, build.sh, build.ps1, build.cmd, justfile, Dockerfile, ci.yml, .pre-commit-config.yaml, package.json, tox.ini, noxfile.py, mkdocs.yml, pytest.ini, pyproject.toml, setup.cfg, plus multi-line and comment cases) x 4 destinations (notes.md, docs/guide.md, data/x.csv, notes/readme.txt) = 2428 HEAD-vs-WT pairs: REGRESSION=0; wtSafe=1649, headSafe=2060 (WT strictly narrower). Random fuzz of 2500 shell/Makefile/cmd/ps1/justfile/ci/package.json/tox lines x 4 destinations = 10000 pairs: REGRESSIONS=0, wtSafe=7517, headSafe=9370. Probe scripts: C:\\Users\\allam\\AppData\\Local\\Temp\\claude\\C--Users-allam-Documents-new-bun-router\\a62fc04b-9e6f-4319-b7f7-44e7b997d5f5\\scratchpad\\f03audit\\run.mjs, probe2.mjs; HEAD copy scratchpad\\head-authz.server.ts (imports rewritten to absolute file URLs). Results in f03audit\\results.json. Test suite f03-followup.test.ts was NOT run (read-only constraint).",
+      "tests_run": "not run (read-only)",
+      "lens": "A",
+      "disposition": "CONFIRMED: no regression; re-run after the round-3 fixes below"
+    },
+    {
+      "id": "NB-1-PY-GLOB-LINE-RUNNER-LINE",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "A non-shell program file collects the destination by glob on one line and runs it on another line. The non-shell branch only flags a line containing both a RUNS_GLOB keyword and a glob, so the glob line (no runner keyword) and the runner line (no glob) are each judged safe. Claimed scope: non-shell config/program globs that run or collect files.",
+      "evidence": "build.py = \"import glob\\nfiles = glob.glob('*.md')\\nos.system('node r.js ' + files[0])\\n\" with destination notes.md -> WT PHONE_SAFE_DOCUMENT, HEAD PHONE_SAFE_DOCUMENT. Variant without any runner keyword (\"files = glob.glob('*.md')\\nrender_all(files)\") is also PHONE_SAFE in both. Real Python code would collect notes.md and pass it to node.",
+      "probe": "probe3.mjs case 'py build.py glob + runner separate lines'",
+      "lens": "A",
+      "disposition": "FIXED: a program source whose string literal globs the destination name is a consumer"
+    },
+    {
+      "id": "NB-2-MAKE-SUFFIX-RULE",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "A Make suffix rule (.md.html:) is an implicit rule over every .md file, with no glob, name or computed token on any line, so the shell-run check never sees the destination. The new rules claim the pattern form %.md (computedName) but not the equivalent suffix-rule syntax.",
+      "evidence": "Makefile = \".md.html:\\n\\tnode render.js $< > $@\\nall: x.html\\n\" with destination notes.md -> WT PHONE_SAFE_DOCUMENT, HEAD PHONE_SAFE_DOCUMENT. Control: the %.html: %.md form is correctly refused (WT EXECUTION_RELEVANT).",
+      "probe": "probe3.mjs cases 'Makefile .md.html suffix' and 'Makefile %.html: %.md (control)'",
+      "lens": "A",
+      "disposition": "FIXED: make suffix rules and .SUFFIXES with the extension"
+    },
+    {
+      "id": "NB-3-UNNAMED-TOOL-GLOB-IN-NON-SHELL-CONFIG",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "LOW",
+      "issue": "In non-shell config (tox.ini, noxfile.py) an extension glob passed to a tool whose name is not in RUNS_GLOB is exempt, because the non-shell branch requires a RUNS_GLOB keyword on the line. Tox and nox do not shell-expand, so the real effect depends on the tool globbing itself.",
+      "evidence": "tox.ini = \"[testenv]\\ncommands = mytool *.md\\n\" -> WT PHONE_SAFE_DOCUMENT, HEAD PHONE_SAFE_DOCUMENT. noxfile.py session.run('mytool *.md') -> WT PHONE_SAFE_DOCUMENT, HEAD PHONE_SAFE_DOCUMENT. Control: 'commands = node r.js *.md' is refused in both. Same gap for pytest.ini 'addopts = --mytool-glob=*.md'.",
+      "probe": "probe3.mjs 'tox commands mytool *.md', probe2.mjs NB-2",
+      "lens": "A",
+      "disposition": "FIXED: tox commands / commands_pre / commands_post collect"
+    },
+    {
+      "id": "NB-4-SHELL-BRACE-AND-VARIABLE-EXTENSION",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "LOW",
+      "issue": "Shell brace expansion or a variable in the extension names notes.md without the literal extension and without a glob, so computedName (which requires the extension text inside the braces or a word ending in .md) does not fire. Brace alternatives are a claimed form.",
+      "evidence": "build.sh = \"node render.js notes.m{d,x}\\n\" (bash expands to notes.md) -> WT PHONE_SAFE_DOCUMENT, HEAD PHONE_SAFE_DOCUMENT. \"node render.js notes.{m,}d\" -> both PHONE_SAFE. \"node render.js notes.m$E\" -> both PHONE_SAFE. Controls refused in both: notes.{md,txt}, $(N).md, %N%.md, n\"\"otes.md (WT only, HEAD allowed), notes`.md (WT only), notes.md^ (cmd), gu\\ide.md and notes\\.md in a Makefile.",
+      "probe": "probe3.mjs sh-brace/var cases; probe4.mjs",
+      "lens": "A",
+      "disposition": "FIXED for braces (bash-style expansion); the variable-in-extension form (notes.m$E) is the variable class below"
+    },
+    {
+      "id": "NB-5-NON-SHELL-BRACE-COMMA-SPLIT",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "LOW",
+      "issue": "In non-shell config the named() helper splits words on commas, so a brace alternative {notes,x}.md is split into fragments and never reaches globNamesLeaf or computedName. The shell-run branch and package.json rest line do refuse the same form, so the non-shell branch is inconsistent with the claim. Real-tool effect is limited: tox does not brace-expand (its own {} syntax differs) and pytest's doctest_glob uses fnmatch (no braces).",
+      "evidence": "tox.ini = \"[testenv]\\ncommands = node r.js {notes,x}.md\\n\" -> WT PHONE_SAFE_DOCUMENT, HEAD PHONE_SAFE_DOCUMENT. pytest.ini = \"[pytest]\\ndoctest_glob = {notes,x}.md\\n\" -> both PHONE_SAFE. Control 'commands = node r.js notes.{md,txt}' is refused in both. Same form in package.json is refused (computedName).",
+      "probe": "probe4.mjs",
+      "lens": "A",
+      "disposition": "FIXED: comma lists split outside braces"
+    },
+    {
+      "id": "PA-1-READ-ONLY-CLAIMED-TOOLS-LOAD-PROJECT-CODE",
+      "kind": "PRE_EXISTING",
+      "severity": "LOW",
+      "issue": "Tools in the read-only allow-list (prettier --write, eslint, textlint, remark, markdownlint -r <module>, git add) load plugins or configs or filter drivers from the project, so the destination can be processed by project code. This is the disclosed D1 residual (a tool that consumes by default without naming) and is identical in HEAD and WT, so it is outside the new claims.",
+      "evidence": "build.cmd / Makefile / tox.ini lines 'prettier --write *.md', 'eslint *.md', 'textlint *.md', 'git add *.md' are PHONE_SAFE_DOCUMENT in both HEAD and WT. 'prettier --plugin ./p.js --write *.md' is refused in both (allow-list works).",
+      "probe": "probe2.mjs / run.mjs both-safe rows",
+      "lens": "A",
+      "disposition": "RESIDUAL (disclosed D1 class): tools that load project config/plugins by default"
+    },
+    {
+      "id": "PA-2-PRE-COMMIT-PASS-FILENAMES",
+      "kind": "PRE_EXISTING",
+      "severity": "LOW",
+      "issue": "A pre-commit hook with a files regex and default pass_filenames runs an entry on every matching .md file without naming it. Not a glob or name form the new rules claim; identical in HEAD and WT.",
+      "evidence": ".pre-commit-config.yaml with entry: node render.js and files: '\\.md$' -> WT PHONE_SAFE_DOCUMENT, HEAD PHONE_SAFE_DOCUMENT.",
+      "probe": "probe2.mjs NB-5",
+      "lens": "A",
+      "disposition": "RESIDUAL (disclosed D1 class): consumes matching files by default without a glob"
+    },
+    {
+      "id": "FP-1-BLOCK-SCALAR-DISABLES-EXEMPTIONS",
+      "kind": "NONE",
+      "severity": "LOW",
+      "issue": "False-positive explosion: any YAML file with a block scalar (run: |, the normal GitHub Actions layout) sets spanning=true for the whole file, which removes the read-only exemption for every glob line in it. Common CI lint steps like prettier --check \"**/*.md\" are now refused for notes.md where HEAD allowed them.",
+      "evidence": ".github/workflows/ci.yml = \"name: ci\\njobs:\\n  lint:\\n    steps:\\n      - run: |\\n          npm ci\\n          npx prettier --check \\\"**/*.md\\\"\\n\" -> WT EXECUTION_RELEVANT, HEAD PHONE_SAFE_DOCUMENT.",
+      "probe": "probe2.mjs NB-7",
+      "lens": "A",
+      "disposition": "FIXED: literal blocks (run: |) keep newlines; only folded and multi-line plain scalars span"
+    },
+    {
+      "id": "FP-2-APOSTROPHE-IN-QUOTED-STRING",
+      "kind": "NONE",
+      "severity": "LOW",
+      "issue": "False positive: an apostrophe inside a double-quoted string (\"Don't stop\", \"it's linting\") gives an odd single-quote count on that line, which sets spanning=true for the file and removes the read-only exemption for all glob lines in it. The quote check does not account for quotes nested in other quotes.",
+      "evidence": "build.ps1 = \"Write-Host \\\"Don't stop\\\"\\nprettier --check *.md\\n\" -> WT EXECUTION_RELEVANT, HEAD PHONE_SAFE_DOCUMENT. Makefile = \"lint:\\n\\t@echo \\\"it's linting\\\"\\n\\tprettier --check *.md\\n\" -> WT EXECUTION_RELEVANT, HEAD PHONE_SAFE_DOCUMENT.",
+      "probe": "probe2.mjs FP-1, FP-2",
+      "lens": "A",
+      "disposition": "FIXED: quote-aware line scan"
+    },
+    {
+      "id": "FP-3-INLINE-COMMENT-AND-PACKAGE-JSON-FILES",
+      "kind": "NONE",
+      "severity": "LOW",
+      "issue": "Two smaller over-refusals. (a) An inline # comment after a read-only command is refused because # is in UNSAFE_SHELL_LINE. (b) package.json non-script content (for example a files array of *.md) is judged as a never-exempt line, so a published-files list refuses notes.md.",
+      "evidence": "build.sh = \"prettier --check *.md # lint\\n\" -> WT EXECUTION_RELEVANT, HEAD PHONE_SAFE_DOCUMENT. package.json = {\"name\":\"x\",\"files\":[\"*.md\"],\"scripts\":{\"t\":\"echo ok\"}} -> WT EXECUTION_RELEVANT, HEAD PHONE_SAFE_DOCUMENT.",
+      "probe": "probe2.mjs FP-3, FP-4",
+      "lens": "A",
+      "disposition": "FIXED: unquoted trailing comment set aside on safe lines; inert package.json keys (files, ...) excluded"
+    },
+    {
+      "id": "V1-rem-at-regression-shape",
+      "kind": "REGRESSION",
+      "severity": "NONE",
+      "issue": "Literal regression signature (HEAD EXECUTION_RELEVANT, working tree PHONE_SAFE) for build.cmd line '@rem node render.js *.md'. The working-tree result is correct: real cmd.exe does not execute the @rem line (it printed nothing), the following echo ran. HEAD over-flagged because it did not treat '@rem' as a comment. Not a security regression; reviewer should confirm the shape is intentional.",
+      "evidence": "Harness: build.cmd '@rem node render.js *.md' -> head=EXECUTION_RELEVANT, wt=PHONE_SAFE_DOCUMENT. cmd.exe /d /c on a batch with '@rem node render.js *.md' then 'echo ECHO_SAFE_LINE': only ECHO_SAFE_LINE printed. Also cmd 'rem&echo X', '@rem&echo X', 'rem.echo X', '(rem) & echo X' and ':: a) & echo X' inside parens did NOT execute the echo (no comment bypass found in cmd).",
+      "lens": "B",
+      "disposition": "INTENDED: @rem is a cmd comment (verifier confirmed with cmd.exe)"
+    },
+    {
+      "id": "V2-brace-forms-miss-md",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "computedName's brace rule only fires when the extension appears as a contiguous token (md) or the word ends with .md. Brace alternatives that split the extension (notes.m{d,}, notes.m{,d}, nested notes.{m{d,x},txt}) expand to notes.md in sh but are PHONE_SAFE. Brace form is explicitly claimed by the new rules.",
+      "evidence": "build.sh 'node render.js notes.m{d,}' -> WT PHONE_SAFE_DOCUMENT (HEAD also PHONE_SAFE). build.sh 'node render.js notes.m{,d}' -> WT PHONE_SAFE_DOCUMENT. build.sh 'node render.js notes.{m{d,x},txt}' -> WT PHONE_SAFE_DOCUMENT. Real bash: 'echo notes.m{d,}' printed 'notes.md notes.m'; 'echo notes.{m,}d' printed 'notes.md notes.d'. Control 'node render.js notes{,.md}' -> WT EXECUTION_RELEVANT.",
+      "lens": "B",
+      "disposition": "FIXED: bash-style brace expansion"
+    },
+    {
+      "id": "V3-command-substitution-with-space",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "Claimed form $(N).md is caught only when the substitution has no whitespace. $(echo notes).md and $(printf notes).md split on whitespace, and computedName's special-char set does not include parentheses, so the word never ends with .md and carries no flagged char.",
+      "evidence": "build.sh 'node render.js $(echo notes).md' -> WT PHONE_SAFE_DOCUMENT (HEAD also). Real bash: 'echo $(echo notes).md' printed 'notes.md'. Controls: 'node render.js $(N).md' and 'node render.js $N.md' -> WT EXECUTION_RELEVANT.",
+      "lens": "B",
+      "disposition": "FIXED: ( ) count as computed-name characters"
+    },
+    {
+      "id": "V4-glob-class-and-escape-not-ending-md",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "globNamesLeaf gets POSIX classes wrong (the ']' search starts at i+2 and '[[:alpha:]]' is mistranslated), and computedName only inspects words that end in .md. Glob words that end in .m? or similar and use a POSIX class or a backslash-escaped literal therefore pass as PHONE_SAFE, even though bash expands them to notes.md.",
+      "evidence": "build.sh 'node render.js [[:alpha:]]otes.m?' -> WT PHONE_SAFE_DOCUMENT (HEAD also). Real bash: 'echo [[:alpha:]]otes.m?' printed 'notes.md'. Control 'node render.js [a-z]otes.m?' -> WT EXECUTION_RELEVANT. build.sh 'node render.js n\\otes.m?' (single backslash in file) -> WT PHONE_SAFE_DOCUMENT; referenceText turns the backslash into '/', so the word becomes 'n/otes.m?' and never matches the leaf.",
+      "lens": "B",
+      "disposition": "FIXED: POSIX classes fail closed; escapes checked on raw text"
+    },
+    {
+      "id": "V5-backslash-escaped-literal-name",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "In sh, a backslash escape spells a literal destination name. referenceText converts every backslash to '/', so tokenIn, computedName and globNamesLeaf never see the real name. Escaped literals that name the destination are PHONE_SAFE. The new escape rule (globNamesLeaf/computedName) does not cover this.",
+      "evidence": "build.sh 'node render.js n\\otes.md' -> WT PHONE_SAFE_DOCUMENT (HEAD also). build.sh 'node render.js notes\\.md' -> WT PHONE_SAFE_DOCUMENT. build.sh 'node render.js notes.m\\d' -> WT PHONE_SAFE_DOCUMENT. Real bash: 'echo n\\otes.md' and 'echo notes\\.md' each printed 'notes.md'.",
+      "lens": "B",
+      "disposition": "FIXED: escapedName on raw text"
+    },
+    {
+      "id": "V6-variable-joined-extension",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "computedName recognises a computed destination only when the word literally ends in .<ext> (or the extension is a literal token). A destination assembled from two variables, with the extension in a variable (sh $N$E or $N.$E; cmd %N%%E% or %N%.%E%), is PHONE_SAFE. The claimed family is $N.md / %N%.md, and the extension-by-variable form is the same computed-name class. Requires a pre-existing consumer script.",
+      "evidence": "build.sh 'N=notes' / 'E=.md' / 'node render.js $N$E' -> WT PHONE_SAFE_DOCUMENT (HEAD also). build.cmd 'set N=notes' / 'set E=.md' / 'node render.js %N%%E%' -> WT PHONE_SAFE_DOCUMENT (HEAD also). Real bash: 'N=notes; E=.md; echo $N$E' printed 'notes.md'. Controls 'node render.js $N.md' and 'node render.js $(N).md' -> WT EXECUTION_RELEVANT.",
+      "lens": "B",
+      "disposition": "RESIDUAL (disclosed D1 class): a name assembled only from variables ($N$E) is not evaluated"
+    },
+    {
+      "id": "V7-cmd-caret-escape",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "In cmd, '^' escapes the next character, so 'notes.m^d' is the destination 'notes.md'. The classifier does not treat '^' as a name form, so the token 'notes.md' is not seen and the line is PHONE_SAFE. The new computed/aliased-name rules do not cover caret.",
+      "evidence": "build.cmd 'node render.js notes.m^d' -> WT PHONE_SAFE_DOCUMENT (HEAD also). Real cmd.exe: a batch line 'echo notes.m^d' printed 'notes.md'. Control 'node render.js notes.md' -> WT EXECUTION_RELEVANT.",
+      "lens": "B",
+      "disposition": "FIXED: caret escapes checked on raw text"
+    },
+    {
+      "id": "V8-8dot3-trailing-dot-or-space",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "The 8.3 rule requires the word to end in .md. Windows path normalisation strips trailing dots and spaces, so 'archit~1.md.' and 'archit~1.md ' name the 8.3 alias of architecture-decisions.md but are PHONE_SAFE. The trailing-dot/space form was not probed against a live Win32 path (classification only); the trailing-char mechanism is standard Win32 normalisation.",
+      "evidence": "build.sh 'node render.js archit~1.md.' with destination architecture-decisions.md -> WT PHONE_SAFE_DOCUMENT (HEAD also). build.sh 'node render.js ARCHIT~1.MD.' -> WT PHONE_SAFE_DOCUMENT. Control 'node render.js archit~1.md' (no trailing char) -> WT EXECUTION_RELEVANT; 'node render.js archit~1.md ' (trailing space) -> WT EXECUTION_RELEVANT.",
+      "lens": "B",
+      "disposition": "FIXED: trailing dots/spaces stripped before name and 8.3 checks"
+    },
+    {
+      "id": "V9-powershell-block-comment-close",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "HIGH",
+      "issue": "commentLine treats any line starting with '#' as a comment in .ps1. In PowerShell, '#>' ends a block comment, and any code after it on that line runs. A runner placed after '#>' is hidden from the classifier and the line is PHONE_SAFE. Judged against the commentLine rule (PowerShell block comments are explicitly in its hunt list).",
+      "evidence": "build.ps1 '<#' newline '#>node render.js *.md' -> WT PHONE_SAFE_DOCUMENT (HEAD also). Control 'node render.js *.md' alone -> WT EXECUTION_RELEVANT. Real powershell.exe -File on '<#' newline '#>Write-Output RAN_PS_AFTER_BLOCK' printed 'RAN_PS_AFTER_BLOCK' (code after #> executes; analogous to the runner).",
+      "lens": "B",
+      "disposition": "FIXED (the one HIGH): a #> line is code; lines with <# or #> are never exempt"
+    },
+    {
+      "id": "V10-function-shadows-read-only-program",
+      "kind": "PRE_EXISTING",
+      "severity": "LOW",
+      "issue": "readOnlyStatement exempts a line whose program is a bare read-only name, but a shell function (or alias) of that name defined elsewhere in the same consumer redirects the call to a runner. This is shell semantics the classifier does not model (the disclosed D1 residual class). The consumer must already contain the function, so device writes cannot create it alone. Both HEAD and WT are PHONE_SAFE.",
+      "evidence": "build.sh 'ls() { node render.js \"$@\"; }' + 'ls *.md' -> WT PHONE_SAFE_DOCUMENT (HEAD also). Real sh: shadow.sh with 'ls() { echo SHADOW_RAN \"$@\"; }' + 'ls *.md' printed 'SHADOW_RAN notes.md' (the function ran instead of ls). Same for 'git() {...}' + 'git add *.md'.",
+      "lens": "B",
+      "disposition": "RESIDUAL (disclosed D1 class): shell functions/aliases shadowing a read-only tool name"
+    },
+    {
+      "id": "V11-pytest-python-files-glob",
+      "kind": "NEW_RULE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "The non-shell config rule gates on RUNS_GLOB (doctest, python, node, ...). The pytest collection setting python_files does not contain a RUNS keyword, so a '*.md' glob in it is never flagged. The new rule claims config globs that collect files; pytest collects python_files matches as Python test modules. Classification verified; execution by pytest was not run.",
+      "evidence": "pytest.ini '[pytest]' + 'python_files = *.md' -> WT PHONE_SAFE_DOCUMENT (HEAD also). pyproject.toml '[tool.pytest.ini_options]' + 'python_files = [\"*.md\"]' -> WT PHONE_SAFE_DOCUMENT. Control 'doctest_glob = *.m?' -> WT EXECUTION_RELEVANT.",
+      "lens": "B",
+      "disposition": "FIXED: python_files / python_classes collect"
+    },
+    {
+      "id": "FP-gha-first-word-yaml-list",
+      "kind": "NONE",
+      "severity": "LOW",
+      "issue": "False positive: a read-only lint or format step in a GitHub workflow refuses every .md destination its glob matches, because the YAML list prefix ('- run:') makes the first word of the statement '-' or 'run:', which is never a read-only program. Common layout (markdownlint or prettier --check in CI). A run: | block also sets statementsSpanLines and refuses every glob in the file.",
+      "evidence": ".github/workflows/ci.yml '- run: npx prettier --check \"**/*.md\"' -> WT EXECUTION_RELEVANT (HEAD PHONE_SAFE). '- run: |' + '  npx markdownlint-cli2 \"**/*.md\"' -> WT EXECUTION_RELEVANT (HEAD PHONE_SAFE).",
+      "lens": "B",
+      "disposition": "FIXED: YAML list/key prefix stripped before judging"
+    },
+    {
+      "id": "FP-package-json-options-and-hash",
+      "kind": "NONE",
+      "severity": "LOW",
+      "issue": "False positive: common read-only lint or format scripts are refused because SAFE_OPTION is a closed allow-list (--ignore, --log-level are not listed) and '#' anywhere on the line is an unsafe-line character (a quoted ignore pattern such as \"#node_modules\" trips it).",
+      "evidence": "package.json scripts.lint 'markdownlint \\'**/*.md\\' --ignore node_modules' -> WT EXECUTION_RELEVANT (HEAD PHONE_SAFE). scripts.fmt 'prettier --write \"**/*.md\" --log-level warn' -> WT EXECUTION_RELEVANT. scripts.lint 'markdownlint-cli2 \"**/*.md\" \"#node_modules\"' -> WT EXECUTION_RELEVANT.",
+      "lens": "B",
+      "disposition": "FIXED: SAFE_OPTION extended (ignore, log-level, ...); quoted # is not a comment or unsafe"
+    },
+    {
+      "id": "FP-lint-staged-md-glob",
+      "kind": "NONE",
+      "severity": "LOW",
+      "issue": "False positive: any lint-staged markdown entry refuses every .md destination it matches, even when its command is a read-only formatter, because package.json non-script content is never exempt.",
+      "evidence": "package.json {\"lint-staged\": {\"*.md\": \"prettier --write\"}} -> WT EXECUTION_RELEVANT (HEAD PHONE_SAFE).",
+      "lens": "B",
+      "disposition": "FIXED: lint-staged entries judged as shell lines (command glob)"
+    },
+    {
+      "id": "NONE-probed-without-bypass",
+      "kind": "NONE",
+      "severity": "NONE",
+      "issue": "Probes that did not produce a bypass, so the new rules hold for them: cmd comments rem&, rem., (rem)&, :: a)&, @rem& (none execute); combined short flag -lc, --opt=value, and 'git -c' and 'git  add' forms are refused (conservative); CRLF backslash continuation, '|' trailing pipe, YAML '|+' and '>2-' block scalars, and a lone-CR line are refused; 'git\\tadd' refused.",
+      "evidence": "Probes listed in the other verdicts. cmd.exe runs confirmed the comment behaviour (the rem line printed nothing, and the following echo ran). Several YAML indicator and CRLF cases were classified EXECUTION_RELEVANT in the working tree. Not probed: YAML tag-before-indicator (run: !!str |), which may be a gap but produced no executable payload in analysis.",
+      "lens": "B",
+      "disposition": "recorded"
+    }
+  ],
+  "postRepairAudit": {
+    "corpus": {
+      "fixtures": 607,
+      "pairs": 2428,
+      "regressions": 0,
+      "threw": 0,
+      "workingTreeSafe": 1626,
+      "headSafe": 2060
+    },
+    "fuzz": {
+      "pairs": 10000,
+      "headRefusedNowSafe": 4,
+      "note": "all 4 have the glob only inside a trailing # comment (e.g. \"diff # {md,txt} *.md\"); the shell never runs comment text, so these are corrected over-refusals, not security regressions"
+    },
+    "scripts": "review/f03-regression-audit/run.mjs, probe2.mjs (written by verification round 3; HEAD copy path is session scratch)",
+    "ranAfterRepairs": true
+  }
+}

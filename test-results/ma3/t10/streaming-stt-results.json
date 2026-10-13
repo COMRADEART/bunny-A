@@ -1,0 +1,281 @@
+{
+  "classification": "LIVE human speech on the real microphone; text/confidence/level receipts only (no audio)",
+  "engine": {
+    "engine": "whisper.cpp v1.9.4",
+    "recognizer": "ggml-base.en",
+    "culture": "en",
+    "local": true
+  },
+  "guidedSessions": {
+    "sapiBaseline": {
+      "classification": "LIVE human speech, real microphone + real speakers (prompts spoken by Bunny); text/level receipts only, no audio retained",
+      "phrases": 10,
+      "finals": 10,
+      "exactOrNear": 0,
+      "meanWer": 0.95,
+      "meanConfidence": 0.048
+    },
+    "whisperFinal": {
+      "classification": "LIVE human speech, real microphone + real speakers (prompts spoken by Bunny); text/level receipts only, no audio retained",
+      "engine": {
+        "engine": "whisper.cpp v1.9.4",
+        "recognizer": "ggml-base.en",
+        "culture": "en",
+        "local": true
+      },
+      "phrases": 10,
+      "finals": 10,
+      "exactOrNear": 8,
+      "meanWer": 0.167,
+      "meanConfidence": 0.751
+    },
+    "files": [
+      "live/human-stt-session-1.json",
+      "live/human-stt-session-2-whisper.json",
+      "live/human-stt-session-3-whisper-raw.json",
+      "live/human-stt-session-4-whisper-paced.json",
+      "live/human-stt-session-5-whisper-beep.json"
+    ]
+  },
+  "islandConversation": {
+    "file": "live-e2e-conversation.json",
+    "turns": [
+      {
+        "final": "What is my agent doing?",
+        "partialsSeen": 2
+      },
+      {
+        "final": "Did the test pass?",
+        "partialsSeen": 2
+      },
+      {
+        "final": "Tell me a story about a rabbit.",
+        "partialsSeen": 3
+      },
+      {
+        "final": "Stop what is the capital of France?",
+        "partialsSeen": 2
+      },
+      {
+        "final": "What is the capital of France?",
+        "partialsSeen": 2
+      }
+    ],
+    "captureEndToFinal": [
+      {
+        "turnId": "t1-319d6e16",
+        "captureEndToFinalMs": 1717
+      },
+      {
+        "turnId": "t2-2f8546f9",
+        "captureEndToFinalMs": 1978
+      },
+      {
+        "turnId": "t3-4f44f055",
+        "captureEndToFinalMs": 1372
+      },
+      {
+        "turnId": "t4-d7e75759",
+        "captureEndToFinalMs": 983
+      },
+      {
+        "turnId": "t5-cdaa3ad7",
+        "captureEndToFinalMs": 1896
+      }
+    ]
+  },
+  "partialsNeverActedOn": [
+    {
+      "suite": "scripts",
+      "name": "V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V07 V08 a partial transcript is displayed and never acted on",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V08 partial not executed: partial text is a draft only while capturing, and never a final",
+      "result": "PASS"
+    }
+  ],
+  "deterministic": [
+    {
+      "suite": "scripts",
+      "name": "T10-whisper a release with the pin is closed only when every pinned runtime file, the shim and the model are present",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "V11 silence never becomes a command: stt.none no_speech, no final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "V12 noise-only input fails safely: vad noise_only and no final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "whisper: the staged runtime and model match native/voice/whisper-pin.json and the build record",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "whisper: silence never becomes a final (no VAD onset, so stt.none no_speech)",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "whisper: noise-only input never becomes a final with words",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "whisper: capture.abort that lands during the final decode never emits a final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V07 V08 a partial transcript is displayed and never acted on",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V09 V10 one Task per final: a duplicate or corrected final for the same turn creates nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V11 silence is not fabricated as a command and returns to IDLE",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V12 noise-only audio fails safely with no Task and no command",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a launch-time whisper fallback is a visible non-fatal notice and the session stays usable",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a worker STT_UNAVAILABLE after ready is a notice, not a session failure",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper the ready event names the engine that is actually running (whisper or SAPI)",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a fully verified pinned runtime selects whisper with absolute paths and a bounded thread count",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper one changed byte in a runtime DLL selects SAPI with a reason and no whisper flags",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a changed shim is refused against the build record",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a same-size model change is refused against the pin even after a cached pass",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a release layout refuses whisper when the manifest omits a whisper file",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a release manifest that lists a whisper file with a different hash is refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper an unlisted file in the runtime folder is refused: nothing loads a DLL by name",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a pinned source with no staged runtime selects SAPI with a reason; a source without a pin selects SAPI silently",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a missing pinned file is named in the reason",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper the thread count is half the processors, clamped to 2..4",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-whisper a real contained whisper fixture turn ends in stt.final from whisper.cpp",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V07 recognized speech from actual audio: Listening only while the worker confirms capture and fresh",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V09 final bound to correct turn: a stale-generation final is not shown as the current draft",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V10 recognition correction does not duplicate a Task: planUiIntent honors each seq once",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V11 silence not fabricated as command: an empty turn is no command and shows no transcript",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V12 noise-only fails safely: noise-only sessions stay Ready with flat bars when not capturing",
+      "result": "PASS"
+    }
+  ],
+  "limitations": [
+    "English only (ggml-base.en)",
+    "interim partials are weaker than finals and display-only",
+    "a cold first decode includes model load"
+  ]
+}

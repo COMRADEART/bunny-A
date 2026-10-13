@@ -1,0 +1,319 @@
+✔ T7 P01/P02 registration preserves user files, and repeated canonical registration preserves identity (318.1411ms)
+✔ T7 P03 explicit empty project creates a separate Bunny-owned root (339.1377ms)
+✔ T7 P05/P06 duplicate names and repository markers never merge roots (288.8854ms)
+✖ T7 P07 missing roots fail closed and become NEEDS_RELINK (282.1162ms)
+✔ T7 P08 relink requires explicit confirmation and current revision (297.337ms)
+✔ T7 relink cannot take another registered Project root (294.7491ms)
+✔ T7 P09 rename affects metadata only (292.6543ms)
+✔ T7 P10/P11/P12 archive and restore retain identities and user files (302.4803ms)
+✔ T7 P13 favorite persists in canonical record (295.5109ms)
+✔ T7 P14 name description and tags participate in search (285.026ms)
+✔ T7 P15 archive favorite and Active filters use real records (288.4631ms)
+✔ T7 P16 sorting uses stable deterministic tie breaks (282.1719ms)
+✔ T7 P19 large lists and hostile page bounds stay bounded (805.0188ms)
+✖ T7 P21/P23 durable workspace creation is idempotent and independent between Agents (366.1612ms)
+✖ T7 P24 Agent A cannot consume Agent B scratch or manifest (356.0551ms)
+✖ T7 P25/P26 cross-project roots require explicit current resource scope (345.0256ms)
+✖ T7 P27 path prefix cousins and traversal are not containment (346.2303ms)
+✖ T7 P28 junction substitution is rejected before context or registration (286.9ms)
+✖ T7 P29 directory replacement after registration requires relink (283.5045ms)
+✔ T7 P30 private Host authority files cannot be context (312.448ms)
+✖ T7 P31/P32 context records canonical binding and provenance without raw content (362.0075ms)
+✖ T7 P33 explicit file count and context bytes are bounded (396.2787ms)
+✖ T7 P34/P35 private files and README authority claims cannot grant context (355.4624ms)
+✖ T7 context drift catches changed file and Git branch metadata (350.0431ms)
+✖ T7 P47/P48 cleanup never deletes an unowned or active workspace (357.2777ms)
+✖ T7 workspace manifest substitution blocks admission (350.151ms)
+✖ T7 workspace disk quota and entry bounds fail closed (341.5277ms)
+✔ T7 P51/P52 additive migration preserves legacy IDs and files and repeats safely (318.7563ms)
+✔ T7 P53 malformed legacy records are preserved and quarantined (300.0935ms)
+✔ T7 duplicate historical roots require review without merging their IDs (306.759ms)
+✔ T7 stale metadata updates cannot corrupt concurrent records (289.2095ms)
+✔ T7 Windows device UNC ADS and trailing-dot aliases are refused (291.0752ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 18
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10855.2098
+
+✖ failing tests:
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P07 missing roots fail closed and become NEEDS_RELINK (282.1162ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-mxmYYo\a' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-mxmYYo\old-a'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:40:74
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-mxmYYo\\a',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-mxmYYo\\old-a'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P21/P23 durable workspace creation is idempotent and independent between Agents (366.1612ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-bXg1gr\workspace\agents\15ac9937-82b1-4eee-92cc-45e702a0c64b\.creating-b7f7b0f4-af0e-4416-8256-c38b4a000afd' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-bXg1gr\workspace\agents\15ac9937-82b1-4eee-92cc-45e702a0c64b\8358329e-1f11-4183-9de6-c6db05290e0e'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:50:164
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-bXg1gr\\workspace\\agents\\15ac9937-82b1-4eee-92cc-45e702a0c64b\\.creating-b7f7b0f4-af0e-4416-8256-c38b4a000afd',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-bXg1gr\\workspace\\agents\\15ac9937-82b1-4eee-92cc-45e702a0c64b\\8358329e-1f11-4183-9de6-c6db05290e0e'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P24 Agent A cannot consume Agent B scratch or manifest (356.0551ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-BETsga\workspace\agents\3e0df8ee-e2fe-4dc2-8c18-4c51c126eb99\.creating-409dc81f-c645-406c-aeac-71b9edd3171f' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-BETsga\workspace\agents\3e0df8ee-e2fe-4dc2-8c18-4c51c126eb99\9d21897c-c6bd-4cd1-88b8-9ccb90405e88'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:51:139
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-BETsga\\workspace\\agents\\3e0df8ee-e2fe-4dc2-8c18-4c51c126eb99\\.creating-409dc81f-c645-406c-aeac-71b9edd3171f',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-BETsga\\workspace\\agents\\3e0df8ee-e2fe-4dc2-8c18-4c51c126eb99\\9d21897c-c6bd-4cd1-88b8-9ccb90405e88'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P25/P26 cross-project roots require explicit current resource scope (345.0256ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-ZO8hvd\workspace\agents\0fdf5729-773f-4337-8be9-ccaa95a4fdfb\.creating-ee2432a7-b9e3-4253-8b25-ebe8f11a5a07' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-ZO8hvd\workspace\agents\0fdf5729-773f-4337-8be9-ccaa95a4fdfb\738e4627-4417-470c-8db4-856e7a752084'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:52:124
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-ZO8hvd\\workspace\\agents\\0fdf5729-773f-4337-8be9-ccaa95a4fdfb\\.creating-ee2432a7-b9e3-4253-8b25-ebe8f11a5a07',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-ZO8hvd\\workspace\\agents\\0fdf5729-773f-4337-8be9-ccaa95a4fdfb\\738e4627-4417-470c-8db4-856e7a752084'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P27 path prefix cousins and traversal are not containment (346.2303ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-Ikupl2\workspace\agents\6f2d1935-b0bb-4548-b8e9-51cfc33f936d\.creating-5aea1b5f-0a35-449e-9a6f-da7f1041374a' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-Ikupl2\workspace\agents\6f2d1935-b0bb-4548-b8e9-51cfc33f936d\d2b449ae-1363-4bd6-817c-2138e38df9d6'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:53:168
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-Ikupl2\\workspace\\agents\\6f2d1935-b0bb-4548-b8e9-51cfc33f936d\\.creating-5aea1b5f-0a35-449e-9a6f-da7f1041374a',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-Ikupl2\\workspace\\agents\\6f2d1935-b0bb-4548-b8e9-51cfc33f936d\\d2b449ae-1363-4bd6-817c-2138e38df9d6'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P28 junction substitution is rejected before context or registration (286.9ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-XSgplE\b' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-XSgplE\junction'
+      at symlinkSync (node:fs:1877:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:54:130
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-XSgplE\\b',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-XSgplE\\junction'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P29 directory replacement after registration requires relink (283.5045ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-iLY1Xa\a' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-iLY1Xa\previous'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:55:81
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-iLY1Xa\\a',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-iLY1Xa\\previous'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P31/P32 context records canonical binding and provenance without raw content (362.0075ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-HF8t59\workspace\agents\2ecffba4-620c-49ba-97e5-919af6315e00\.creating-2ec5b4c2-a2f6-41cd-af59-5c63ab9fb0bb' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-HF8t59\workspace\agents\2ecffba4-620c-49ba-97e5-919af6315e00\fbe39ef4-0f84-4eb1-8064-db44dbfe5e77'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:57:133
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-HF8t59\\workspace\\agents\\2ecffba4-620c-49ba-97e5-919af6315e00\\.creating-2ec5b4c2-a2f6-41cd-af59-5c63ab9fb0bb',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-HF8t59\\workspace\\agents\\2ecffba4-620c-49ba-97e5-919af6315e00\\fbe39ef4-0f84-4eb1-8064-db44dbfe5e77'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P33 explicit file count and context bytes are bounded (396.2787ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-gZk9Gc\workspace\agents\d1e93571-01e7-4afd-80bc-3cfbc37dda28\.creating-0b59f58f-4853-45ff-b4fb-86abc08acc33' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-gZk9Gc\workspace\agents\d1e93571-01e7-4afd-80bc-3cfbc37dda28\b8ed0d44-9678-4c6c-b0b3-ab2c83863941'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:58:110
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-gZk9Gc\\workspace\\agents\\d1e93571-01e7-4afd-80bc-3cfbc37dda28\\.creating-0b59f58f-4853-45ff-b4fb-86abc08acc33',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-gZk9Gc\\workspace\\agents\\d1e93571-01e7-4afd-80bc-3cfbc37dda28\\b8ed0d44-9678-4c6c-b0b3-ab2c83863941'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P34/P35 private files and README authority claims cannot grant context (355.4624ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-2re9qq\workspace\agents\7b3e84d9-965a-471e-825e-5ade30e168ab\.creating-582ddc95-2910-430a-9ddd-0c0fd0dabb27' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-2re9qq\workspace\agents\7b3e84d9-965a-471e-825e-5ade30e168ab\c9e2f570-2e63-4da3-ad81-db7ed8b156f0'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:59:127
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-2re9qq\\workspace\\agents\\7b3e84d9-965a-471e-825e-5ade30e168ab\\.creating-582ddc95-2910-430a-9ddd-0c0fd0dabb27',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-2re9qq\\workspace\\agents\\7b3e84d9-965a-471e-825e-5ade30e168ab\\c9e2f570-2e63-4da3-ad81-db7ed8b156f0'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 context drift catches changed file and Git branch metadata (350.0431ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-FGaO7f\workspace\agents\715bf922-2bc1-4fc4-8bcd-b884a69c878b\.creating-cdd417ec-c74e-4dba-a2e0-ab684cb0805f' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-FGaO7f\workspace\agents\715bf922-2bc1-4fc4-8bcd-b884a69c878b\f6ffee1d-baa2-43e5-9f9a-cac9a04257c8'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:60:115
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-FGaO7f\\workspace\\agents\\715bf922-2bc1-4fc4-8bcd-b884a69c878b\\.creating-cdd417ec-c74e-4dba-a2e0-ab684cb0805f',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-FGaO7f\\workspace\\agents\\715bf922-2bc1-4fc4-8bcd-b884a69c878b\\f6ffee1d-baa2-43e5-9f9a-cac9a04257c8'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 P47/P48 cleanup never deletes an unowned or active workspace (357.2777ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-cHl1p4\workspace\agents\3c8e1055-5b9c-424b-b82e-fea20981f679\.creating-a30b4788-805c-4735-ad9b-49b83ebf2fb6' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-cHl1p4\workspace\agents\3c8e1055-5b9c-424b-b82e-fea20981f679\4c88bc18-fe20-4744-9f04-72ad363d51fb'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:61:127
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-cHl1p4\\workspace\\agents\\3c8e1055-5b9c-424b-b82e-fea20981f679\\.creating-a30b4788-805c-4735-ad9b-49b83ebf2fb6',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-cHl1p4\\workspace\\agents\\3c8e1055-5b9c-424b-b82e-fea20981f679\\4c88bc18-fe20-4744-9f04-72ad363d51fb'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 workspace manifest substitution blocks admission (350.151ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-PcWWPG\workspace\agents\c8bc3ad6-b5b5-4f0f-a4f0-43834d1f8bd9\.creating-f20684bc-c111-421e-aec3-a1084ab8ac62' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-PcWWPG\workspace\agents\c8bc3ad6-b5b5-4f0f-a4f0-43834d1f8bd9\2153d73f-c0a3-4405-89a7-6b231074011c'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:62:115
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-PcWWPG\\workspace\\agents\\c8bc3ad6-b5b5-4f0f-a4f0-43834d1f8bd9\\.creating-f20684bc-c111-421e-aec3-a1084ab8ac62',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-PcWWPG\\workspace\\agents\\c8bc3ad6-b5b5-4f0f-a4f0-43834d1f8bd9\\2153d73f-c0a3-4405-89a7-6b231074011c'
+  }
+
+test at src\lib\bunny-host\project-workspace.test.ts:35:79
+✖ T7 workspace disk quota and entry bounds fail closed (341.5277ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-odyo2O\workspace\agents\dbbf1e78-2703-4cc6-9ea4-2c1a87277881\.creating-ac7db0a1-777c-4a4c-bd28-d157e0d89edd' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\AC\Temp\bunny-t7-unit-odyo2O\workspace\agents\dbbf1e78-2703-4cc6-9ea4-2c1a87277881\9774df67-854e-4457-b64f-2bfa5e62c037'
+      at renameSync (node:fs:1013:11)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:56:7
+      at HostDatabase.transaction (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/persistence.server.ts:46:68)
+      at AgentWorkspaceStore.acquire (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-workspace.server.ts:36:22)
+      at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:63:116
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:35:125)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-odyo2O\\workspace\\agents\\dbbf1e78-2703-4cc6-9ea4-2c1a87277881\\.creating-ac7db0a1-777c-4a4c-bd28-d157e0d89edd',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{9d233468-f323-4322-a361-d3ac40a3627e}\\AC\\Temp\\bunny-t7-unit-odyo2O\\workspace\\agents\\dbbf1e78-2703-4cc6-9ea4-2c1a87277881\\9774df67-854e-4457-b64f-2bfa5e62c037'
+  }

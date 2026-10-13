@@ -1,0 +1,377 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "derivedBy": "assemble-evidence.mjs",
+  "rows": [
+    {
+      "id": "J29",
+      "title": "Normal Stop terminates the correct owned Job",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts; live Stop scenario"
+    },
+    {
+      "id": "J30",
+      "title": "Stop preserves unrelated processes",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "unrelated same-image fixture survives"
+    },
+    {
+      "id": "J31",
+      "title": "Stop cannot kill by stale PID alone",
+      "classification": "STATIC+LIVE",
+      "result": "PASS",
+      "evidence": "termination only via the session's own job handle"
+    },
+    {
+      "id": "J42",
+      "title": "Pause does not falsely claim termination",
+      "classification": "STATIC+REGRESSION",
+      "result": "PASS",
+      "evidence": "Agent pause semantics unchanged (T4 tests); only Stop terminates jobs"
+    },
+    {
+      "id": "J43",
+      "title": "Hold blocks unsafe downstream actions",
+      "classification": "LIVE+REGRESSION",
+      "result": "PASS",
+      "evidence": "sessions/lingering feed liveCodeExecutions (F01 hold, F02 promotion); done waits for accounting"
+    }
+  ],
+  "tests": [
+    {
+      "test": "F04 J29-J31/J42",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 J29/J43/J42",
+      "result": "PASS"
+    },
+    {
+      "test": "F04 R1-STOP-3",
+      "result": "PASS"
+    }
+  ],
+  "live": [
+    {
+      "round": 1,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670543276,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    },
+    {
+      "round": 2,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670569954,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    },
+    {
+      "round": 3,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670596309,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    },
+    {
+      "round": 4,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670623254,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    },
+    {
+      "round": 5,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670651250,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    },
+    {
+      "round": 6,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670678338,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    },
+    {
+      "round": 7,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670704911,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    },
+    {
+      "round": 8,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670730873,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    },
+    {
+      "round": 9,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670757289,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    },
+    {
+      "round": 10,
+      "result": "PASS",
+      "step": {
+        "step": 6,
+        "title": "after Stop",
+        "ownedRemaining": 0,
+        "rootAlive": false,
+        "taskState": "stopped",
+        "stopCleanup": {
+          "status": "complete",
+          "inspectedAt": 1791670784217,
+          "unresolvedProcessCount": 0,
+          "terminationFailures": 0
+        },
+        "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job when it was terminated ended with it, including any descendant whose parent had exited.",
+        "jobRecord": {
+          "containment": "empty",
+          "activeProcesses": 0,
+          "closed": true,
+          "state": "stopped",
+          "terminatedAtEnd": 26
+        },
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true,
+          "providerLikeStillListed": true
+        },
+        "agentState": "WAITING_FOR_USER",
+        "providerLaunches": 1
+      }
+    }
+  ]
+}

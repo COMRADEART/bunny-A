@@ -1,0 +1,171 @@
+{
+  "rows": [
+    {
+      "id": "E30",
+      "title": "Phone self-sign-out invalidates unconsumed approvals",
+      "initialConditions": "unused phone answer; staged change",
+      "operation": "device.revoke {} with the phone token",
+      "expected": "INVALIDATED_BY_SIGNOUT; nothing written",
+      "evidenceType": "real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E30:",
+          "names": [
+            "F02-E30: phone self sign-out invalidates its staged changes and never lets a late answer write"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F01-7",
+          "names": [
+            "F01-7: workstation revocation of a device ends every outstanding approval it granted"
+          ],
+          "result": "PASS"
+        },
+        {
+          "type": "LIVE disposable Host (real HTTP, pairing, SQLite, Agent consent, fs.watch)",
+          "file": "live-staging-acceptance.json",
+          "steps": [
+            15,
+            16
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E31",
+      "title": "Sign-out preserves completed action evidence",
+      "initialConditions": "completed phone-approved Mission",
+      "operation": "Sign-out",
+      "expected": "Mission, events, runs, promoted content intact",
+      "evidenceType": "real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E31:",
+          "names": [
+            "F02-E31: sign-out preserves a completed Mission, its events, runs and promoted content"
+          ],
+          "result": "PASS"
+        },
+        {
+          "type": "LIVE disposable Host (real HTTP, pairing, SQLite, Agent consent, fs.watch)",
+          "file": "live-staging-acceptance.json",
+          "steps": [
+            17
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E32",
+      "title": "Sign-out does not revoke independent owner approvals",
+      "initialConditions": "workstation-granted envelope",
+      "operation": "Phone sign-out",
+      "expected": "Envelope unrevoked; Mission keeps running",
+      "evidenceType": "real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E32:",
+          "names": [
+            "F02-E32: sign-out leaves workstation-granted envelopes and workstation Missions running"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T9R F-02: workstation revocation",
+          "names": [
+            "T9R F-02: workstation revocation ends Mission approvals the lost device granted, including a failed Mission's Retry"
+          ],
+          "result": "PASS"
+        },
+        {
+          "type": "LIVE disposable Host (real HTTP, pairing, SQLite, Agent consent, fs.watch)",
+          "file": "live-staging-acceptance.json",
+          "steps": [
+            17
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E33",
+      "title": "Owner device revocation invalidates pending device approvals",
+      "initialConditions": "pending staged change and answers",
+      "operation": "Workstation device.revoke {id}",
+      "expected": "INVALIDATED_BY_DEVICE_REVOCATION",
+      "evidenceType": "real HTTP disposable Host (startHost, real pairing and bearer tokens) + in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E33:",
+          "names": [
+            "F02-E33: workstation revocation invalidates a device's pending staged change and approvals"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-R2-4:",
+          "names": [
+            "F02-R2-4: on device revocation an unadmitted answer is INVALIDATED, an admitted one keeps CONSUMED, and neither authorizes anything further"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E34",
+      "title": "Re-pairing cannot revive old approvals",
+      "initialConditions": "revoked device",
+      "operation": "Re-pair (new id), replay old ids",
+      "expected": "Refused",
+      "evidenceType": "real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E34:",
+          "names": [
+            "F02-E34: a re-paired device with a new id cannot revive old approvals or staged changes"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E49",
+      "title": "Device SSE stops delivering after revocation",
+      "initialConditions": "open device streams",
+      "operation": "Sign-out and revocation",
+      "expected": "Closed; nothing further delivered",
+      "evidenceType": "real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E49:",
+          "names": [
+            "F02-E49: device SSE streams close and deliver nothing after sign-out or revocation"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T10-T6-04: revocation ends an already authenticated Host SSE",
+          "names": [
+            "T10-T6-04: revocation ends an already authenticated Host SSE before future delivery"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+
+> test:ui
+> node --experimental-strip-types --test src/components/island/*.test.ts
+
+✔ T5: duplicate replay keeps stable activity IDs and does not notify twice (3.9779ms)
+✔ T5: late snapshot cannot overwrite a newer canonical view (0.4697ms)
+✔ T5: late already-known event does not replace its sequence identity (0.6948ms)
+✔ T5: retention gap discards UI history and marks canonical resync (0.4754ms)
+✔ T5: a new Host instance accepts reset cursor without reconstructing old work (0.527ms)
+✔ T5: a fast restart requests full canonical history even without connection loss (0.3538ms)
+✔ T5: full reconnect still detects a gap from the last known cursor (0.3358ms)
+✔ T5: a 500-event backlog resumes the delivered cursor instead of skipping history (2.3395ms)
+✔ T5: obsolete pending capability rows are replaced by canonical records (0.4389ms)
+✔ T5: agent role survives provider reroute (0.7515ms)
+✔ T5: compact worker strip defaults to three and keeps attention visible (0.6552ms)
+✔ T5: invalid or invented Mission progress stays indeterminate (0.3449ms)
+✔ T5: unknown Codex version is visibly Mission restricted (0.2544ms)
+✔ T4: every one of the eleven agent states has a product label, terminals read as finished (2.2962ms)
+✔ T4: rows order needs-you first, active next, finished last, newest first inside a band (1.7595ms)
+✔ T4: honesty per row — paused/controllable flags, generation and last checkpoint are shown (0.4878ms)
+✔ T4: the cap hides the overflow honestly with +N, never silently (0.3523ms)
+✔ T4: no Host answers yet — the panel renders nothing rather than an empty block (0.2247ms)
+✔ T4: control truth follows the runtime's refusals — only non-terminal states command, resume only paused (0.2772ms)
+✔ T4: checkpoint boundaries have human labels for all eight reconstruction points (0.2253ms)
+✔ the Bar focuses a mission that needs the user, then a running one; nothing when disabled (1.4206ms)
+✔ completion state shows briefly, then the Bar collapses back (0.2531ms)
+✔ progress text comes from step counts only, never elapsed time (0.221ms)
+✔ agent rows: glyphs per role, at most four with +N, attention first when truncated (1.2682ms)
+✔ agent detail: provider activity from the child task; progress only from a published finite plan (0.5147ms)
+✔ approval card summarizes the requested scope truthfully (0.4172ms)
+✔ MA0R: approval explains read/write agent authority, shell access, bounded sessions and separate external approval (0.3845ms)
+✔ MA0R: approval wording distinguishes one capability action from matching actions in this skill run (0.2404ms)
+✔ MA1: a stopped or skipped step never reads as running (0.4146ms)
+✔ T9: the batch button states what it allows, how many, where and how long (0.3546ms)
+✔ T9: the offer lines name covered actions with truthful counts and what is never covered (0.7119ms)
+✔ T9: the batch status line reports the canonical count and each ended reason truthfully (0.4327ms)
+✔ orb motion is semantic and offline takes precedence (1.1788ms)
+✔ journey never claims unreported independent verification (0.495ms)
+✔ path weights are normalized only from finite real routing scores (1.2591ms)
+✔ replay cannot leak future output, verification or artifacts while scrubbing (1.1533ms)
+✔ private reasoning and ambiguous untyped logs are not exposed (0.9045ms)
+✔ Ollama cloud activity never claims the model executes locally (0.2049ms)
+✔ progress needs finite integer steps, never elapsed time or a provider percentage (1.387ms)
+✔ elapsed uses actual session boundaries and freezes at finish (0.3314ms)
+✔ missing sensors remain unavailable and gaps remain in telemetry history (1.1926ms)
+✔ thermal warnings require fresh measured temperatures and a reachable Host (0.4796ms)
+✔ cloud and unknown Ollama models cannot be presented as local inference (0.5396ms)
+✔ a file claim requires independent Host verification; prose never creates a file manifest (0.4478ms)
+✔ routing facts show auto/manual, provider defaults and candidate counts without inventing availability (0.4306ms)
+✔ rerouted reflects live reroute truth; unknown stays unknown for legacy tasks (0.408ms)
+✔ usageFor reads one provider's record and returns null when absent (1.1064ms)
+✔ relativeAge formats just now, minutes, hours and days; missing stamps are 'never' (0.2214ms)
+✔ checkedLine reports the last examination time, never an observation as evidence (0.1864ms)
+✔ resetIn formats future resets and stays null for past or unknown ones (0.1848ms)
+✔ usageWindowLine reads '41% used · resets in 3h 12m · Provider reported' with per-value source (0.261ms)
+✔ usageHeadline shows the leading window's utilisation or the visible state (0.2508ms)
+✔ usageChipLabel distinguishes Ollama's local telemetry from provider quota states (0.1894ms)
+✔ all five usage states have visible labels and nothing else is named (1.7546ms)
+✔ usageWindowReset prefers the relative span and falls back to the absolute time or description (17.0677ms)
+✔ modelsDiscovered counts a provider's probed models and stays null when nothing was discovered (0.3195ms)
+ℹ tests 56
+ℹ suites 0
+ℹ pass 56
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 312.4345

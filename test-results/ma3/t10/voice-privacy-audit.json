@@ -1,0 +1,73 @@
+{
+  "noRawAudio": {
+    "secretScan": {
+      "result": "PASS",
+      "audioFilesFound": 0,
+      "filesScanned": 97
+    },
+    "tests": [
+      {
+        "suite": "scripts",
+        "name": "no raw audio, transcripts or credentials are written to logs or files by the voice layer",
+        "result": "PASS"
+      },
+      {
+        "suite": "scripts",
+        "name": "V52 stdout carries only bounded JSON events with no audio-looking payload",
+        "result": "PASS"
+      },
+      {
+        "suite": "library",
+        "name": "V52 the journal never contains transcript or answer text",
+        "result": "PASS"
+      },
+      {
+        "suite": "ui",
+        "name": "V52 no raw audio in logs/evidence: the view model carries only text and numbers, never audio payloads",
+        "result": "PASS"
+      }
+    ]
+  },
+  "journalCarriesNoTranscripts": [
+    {
+      "suite": "library",
+      "name": "T10 H11 a full voice turn over the Host HTTP surface journals no transcript or answer text",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V52 the journal never contains transcript or answer text",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "R1-races#7 a voice turn whose handler throws is journaled and settles; no unhandled rejection reaches the Host",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10 R4 a second close while one is in flight still journals its own label",
+      "result": "PASS"
+    }
+  ],
+  "workerEnvironmentAllowlist": [
+    {
+      "suite": "library",
+      "name": "T10 H6 provider keys, tokens and Bunny settings never reach the worker environment",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10 H6 the allowlist itself holds no secret-shaped name",
+      "result": "PASS"
+    }
+  ],
+  "devicePromptRedaction": [
+    {
+      "suite": "library",
+      "name": "R1-privacy#0 a paired device never receives a voice turn's prompt, its spoken history or its transcript",
+      "result": "PASS"
+    }
+  ],
+  "identity": "Speech is never identity: voice actions are workstation-only (Bearer workstation token); paired devices are refused before data is read."
+}

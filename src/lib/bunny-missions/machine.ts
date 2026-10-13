@@ -109,6 +109,7 @@ export function retryVerdict(category: FailureCategory, attempts: number, maxRet
     case "dependency_failed": return no("A dependency failed; this step is blocked.");
     case "invalid_plan": return no("The plan is invalid; replan instead.");
     case "host_restart": return no("The Host restarted; the old provider stream cannot be resumed. A fresh retry needs the user.", true);
+    case "host_failure": return no("An unexpected Host boundary failed; automatic retry is refused.", true);
     case "workspace_conflict": return budgetLeft ? { retry: true, reroute: false, waitForUser: false, reason: "Workspace busy; retry after the lock clears." } : no("Workspace stayed locked.", true);
     case "provider_rate_limited":
     case "provider_unavailable": return budgetLeft ? { retry: true, reroute: true, waitForUser: false, reason: "Reroute to another eligible provider." } : no("No retry budget left for rerouting.", true);

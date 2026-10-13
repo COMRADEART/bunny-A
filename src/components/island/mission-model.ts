@@ -1,6 +1,8 @@
 import type { OrchTask } from "../../lib/orch/types.ts";
 import type { MissionProgress, MissionSnapshot, MissionState, MissionStep, MissionView, StepState } from "../../lib/bunny-missions/types.ts";
+import { batchButtonLabel, batchOfferLines, batchStatusLabel, targetLabelOf } from "../../lib/bunny-missions/batch-labels.ts";
 import { finitePlan } from "./ui-model.ts";
+import { publicEventLabel } from "../../lib/bunny-host/presentation.ts";
 
 /** Missions the Bar treats as live: they get the expanded strip. */
 export const LIVE_MISSION: MissionState[] = ["planning", "waiting_for_approval", "ready", "running", "waiting_for_user", "verifying"];
@@ -32,13 +34,14 @@ export function progressLabel(progress: MissionProgress): string {
   return `${progress.completed} / ${progress.total} steps`;
 }
 export function progressFraction(progress: MissionProgress): number | null {
-  if (progress.kind === "weighted") return progress.totalWeight > 0 ? progress.completedWeight / progress.totalWeight : null;
-  return progress.total > 0 ? progress.completed / progress.total : null;
+  const completed=progress.kind === "weighted" ? progress.completedWeight : progress.completed;
+  const total=progress.kind === "weighted" ? progress.totalWeight : progress.total;
+  return Number.isFinite(total) && Number.isFinite(completed) && total>0 && completed>=0 && completed<=total ? completed/total : null;
 }
 
 export type AgentRow = { stepId: string; role: string; state: StepState; glyph: string; activity: string; provider: string | null; deterministic: boolean };
 /** Agent indicators for the Bar: running and attention-worthy steps first, at most `max` rows plus a "+N" count. */
-export function agentRows(mission: MissionView, tasks: OrchTask[], max = 4): { rows: AgentRow[]; more: number } {
+export function agentRows(mission: MissionView, tasks: OrchTask[], max = 3): { rows: AgentRow[]; more: number } {
   const order: StepState[] = ["waiting_for_approval", "running", "verifying", "failed", "ready", "pending", "blocked", "completed", "skipped", "stopped"];
   const rows = mission.steps.map((step) => {
     const task = step.taskId ? tasks.find((item) => item.id === step.taskId) ?? null : null;
@@ -52,14 +55,16 @@ export function agentRows(mission: MissionView, tasks: OrchTask[], max = 4): { r
 /** Latest normalized activity: the child task's own event for model steps, the capability/skill for deterministic ones. */
 export function stepActivity(step: MissionStep, task: OrchTask | null): string {
   if (step.state === "waiting_for_approval") return "Needs your permission";
-  if (step.state === "failed") return step.failure ? `Failed: ${step.failure.category.replaceAll("_", " ")}` : "Failed";
+  if (step.state === "failed") return ["host_restart","host_failure"].includes(step.failure?.category ?? "") ? "Interrupted · retry available" : step.failure ? `Failed: ${step.failure.category.replaceAll("_", " ")}` : "Failed";
   if (step.state === "blocked") return "Blocked by a failed dependency";
-  if (step.state === "completed") return step.result?.verified ? "Verified by Bunny" : "Done";
+  if (step.state === "stopped") return "Stopped";
+  if (step.state === "skipped") return "Skipped";
+  if (step.state === "completed") return step.result?.verified ? "Step completed · verified by Bunny" : "Step completed · not independently verified";
   if (step.state === "pending" || step.state === "ready") return step.evidence.some((line) => line.startsWith("waiting for workspace")) ? "Waiting for the workspace" : "Waiting";
   if (step.state === "verifying") return "Bunny is checking the result";
   if (step.executor.kind === "capability") return `Running ${step.executor.action}`;
   if (step.executor.kind === "skill") return `Running skill ${step.executor.skillId}`;
-  return task?.latestEvent?.label ?? "Working…";
+  return task?.latestEvent ? publicEventLabel(task.latestEvent.type) : "Provider turn running";
 }
 
 export type AgentDetail = {
@@ -112,3 +117,6 @@ export function scopeSummary(mission: MissionView): string[] {
 export function permissionLabel(mission: MissionView, stepId: string): string {
   return mission.steps.find((step) => step.id === stepId)?.executor.kind === "skill" ? "Allow this skill run" : "Allow once";
 }
+
+/** Re-exports so the components keep one import surface for batch display truth. */
+export { batchButtonLabel, batchOfferLines, batchStatusLabel, targetLabelOf };

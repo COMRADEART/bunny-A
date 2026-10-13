@@ -1,0 +1,53 @@
+✔ T7 P01/P02 registration preserves user files, and repeated canonical registration preserves identity (270.255ms)
+✔ T7 P03 explicit empty project creates a separate Bunny-owned root (273.1808ms)
+✔ T7 P05/P06 duplicate names and repository markers never merge roots (259.5492ms)
+✔ T7 P07 missing roots fail closed and become NEEDS_RELINK (256.4099ms)
+✔ T7 P08 relink requires explicit confirmation and current revision (259.5092ms)
+✔ T7 relink cannot take another registered Project root (258.7677ms)
+✔ T7 P09 rename affects metadata only (259.1038ms)
+✔ T7 P10/P11/P12 archive and restore retain identities and user files (261.6663ms)
+✔ T7 P13 favorite persists in canonical record (263.1722ms)
+✔ T7 P14 name description and tags participate in search (260.3543ms)
+✔ T7 P15 archive favorite and Active filters use real records (274.828ms)
+✔ T7 P16 sorting uses stable deterministic tie breaks (270.0942ms)
+✔ T7 P19 large lists and hostile page bounds stay bounded (794.8178ms)
+✔ T7 P21/P23 durable workspace creation is idempotent and independent between Agents (390.6142ms)
+✔ T7 P24 Agent A cannot consume Agent B scratch or manifest (367.3483ms)
+✔ T7 P25/P26 cross-project roots require explicit current resource scope (387.9246ms)
+✔ T7 P27 path prefix cousins and traversal are not containment (340.3195ms)
+✔ T7 P28 junction substitution is rejected before context or registration (276.0653ms)
+✔ T7 P29 directory replacement after registration requires relink (277.8602ms)
+✔ T7 P30 private Host authority files cannot be context (289.7568ms)
+✔ T7 P31/P32 context records canonical binding and provenance without raw content (398.5504ms)
+✔ T7 P33 explicit file count and context bytes are bounded (364.1707ms)
+✔ T7 P34/P35 private files and README authority claims cannot grant context (359.9866ms)
+✔ T7 context drift catches changed file and Git branch metadata (438.0096ms)
+✔ T7 P47/P48 cleanup never deletes an unowned or active workspace (320.6498ms)
+✔ T7 workspace manifest substitution blocks admission (362.8879ms)
+✔ T7 workspace disk quota and entry bounds fail closed (405.0028ms)
+✔ T7 P51/P52 additive migration preserves legacy IDs and files and repeats safely (319.6331ms)
+✔ T7 P53 malformed legacy records are preserved and quarantined (305.0972ms)
+✔ T7 duplicate historical roots require review without merging their IDs (340.3252ms)
+✔ T7 stale metadata updates cannot corrupt concurrent records (273.0786ms)
+✔ T7 Windows device UNC ADS and trailing-dot aliases are refused (298.9902ms)
+✔ T7 hard-linked files cannot cross Project resource boundaries (442.1832ms)
+✔ T7 repository drift between Tasks requires a fresh reviewed consent revision (481.6925ms)
+✔ T7 interrupted migration rolls back original rows and can be retried (318.1492ms)
+✖ T7 P36/P37 same Project uses independent per-Task T3 model choices (simulated probes, actual router) (423.0218ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 35
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12400.4843
+
+✖ failing tests:
+
+test at src\lib\bunny-host\project-workspace.test.ts:426:1
+✖ T7 P36/P37 same Project uses independent per-Task T3 model choices (simulated probes, actual router) (423.0218ms)
+  TypeError: manager.close is not a function
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/project-workspace.test.ts:438:13)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7)

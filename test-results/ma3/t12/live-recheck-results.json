@@ -1,0 +1,100 @@
+{
+  "classification": "LIVE human speech, hands-free on the real microphone and speakers, disposable Host",
+  "runs": [
+    {
+      "source": "live/live-recheck-1.json",
+      "turns": [
+        {
+          "heard": "Prepare to",
+          "kind": "chat",
+          "answer": ""
+        },
+        {
+          "heard": "plan for dashboard project.",
+          "kind": "chat",
+          "answer": "Sure, let's plan for the dashboard project. What are the key elements you want to include in the dashboard?"
+        },
+        {
+          "heard": "Is Anita scrunning?",
+          "kind": "chat",
+          "answer": "She is indeed scrunning."
+        },
+        {
+          "heard": "Is Anita Scrudley?",
+          "kind": "chat",
+          "answer": "She is indeed Scrudley."
+        },
+        {
+          "heard": "is a neat task of running.",
+          "kind": "chat",
+          "answer": "That's a nice way to describe it. Running really does feel smooth!"
+        },
+        {
+          "heard": "It's a data screen.",
+          "kind": "chat",
+          "answer": "Great, a data screen focuses on presenting data clearly."
+        },
+        {
+          "heard": "Open notes and say a bit too well on the desktop.",
+          "kind": "device_action_unsupported",
+          "answer": "I can't do things on this computer by voice. I can answer questions, report on your agents, or draft a Mission."
+        },
+        {
+          "heard": "How would you running any tasks?",
+          "kind": "sensitive_refused",
+          "answer": "I can't do that by voice. Approvals, permissions and commands are reviewed on the Windows Host screen."
+        },
+        {
+          "heard": "Are you running in it?",
+          "kind": "agent_status",
+          "answer": "No agent is running right now."
+        },
+        {
+          "heard": "End voice please.",
+          "kind": "voice_close",
+          "answer": ""
+        }
+      ],
+      "closedBy": "voice_command",
+      "voiceMissions": [],
+      "workerPidsAfterClose": []
+    },
+    {
+      "source": "live/live-recheck-2.json",
+      "turns": [
+        {
+          "heard": "prepare plan for the dashboard project",
+          "kind": "mission_draft",
+          "answer": "I drafted a Mission: the dashboard project. It is waiting for review on the Windows Host screen. I can't approve or start it by voice. It uses the default works"
+        },
+        {
+          "heard": "Tell me about the weather on Mars.",
+          "kind": "chat",
+          "answer": "The weather on Mars can vary, with temperatures ranging from about -80°F (-62°C) during the coldest winter nights to as high as 70°F (21°C) during summer days a"
+        },
+        {
+          "heard": "End voice please.",
+          "kind": "voice_close",
+          "answer": ""
+        }
+      ],
+      "closedBy": "voice_command",
+      "voiceMissions": [
+        {
+          "title": "the dashboard project",
+          "state": "waiting_for_approval",
+          "authorizationId": null
+        }
+      ],
+      "workerPidsAfterClose": []
+    }
+  ],
+  "fragmentJoinExercisedLive": false,
+  "findings": [
+    "spoken 'End voice, please.' closed voice in both runs (voice_command), no worker left",
+    "computer action got the fixed answer; status question answered from Host facts",
+    "run 1 still split 'Prepare to' / 'plan for dashboard project.' (no whisper partial at the pause) -> Host-side join in 6aa99ba",
+    "run 2: both hesitant sentences arrived as single turns; the join was not exercised live (journal)",
+    "'Is any task running?' misheard 4 times by whisper base.en (recognition limit)"
+  ]
+}

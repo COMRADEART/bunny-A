@@ -1,0 +1,45 @@
+{
+  "classification": "STATIC VERIFIED",
+  "states": [
+    {
+      "state": "PROPOSED",
+      "behavior": "Host-only construction; immediately persisted WAITING_FOR_USER",
+      "evidence": "focused-complete.log"
+    },
+    {
+      "state": "WAITING_FOR_USER",
+      "behavior": "No admission; exact revision required for canonical consent; restart returns here",
+      "evidence": "focused-complete.log"
+    },
+    {
+      "state": "ACTIVE",
+      "behavior": "Canonical MA0 id, Agent/Mission/step/project, generation, risk/resource and atomic budget checks",
+      "evidence": "focused-complete.log"
+    },
+    {
+      "state": "PAUSED",
+      "behavior": "No new admission; Resume revalidates current consent; admitted effects remain",
+      "evidence": "focused-complete.log"
+    },
+    {
+      "state": "EXPIRED",
+      "behavior": "Wall clock expiry refuses real admission; action/provider runtime limited to remaining time",
+      "evidence": "focused-complete.log"
+    },
+    {
+      "state": "REVOKED",
+      "behavior": "Persisted before Stop and before new admission; no restoration",
+      "evidence": "focused-complete.log"
+    },
+    {
+      "state": "EXHAUSTED",
+      "behavior": "Finite admission count prevents next action; successful Mission may finalize COMPLETED",
+      "evidence": "focused-complete.log"
+    },
+    {
+      "state": "COMPLETED",
+      "behavior": "Historical audit only; cannot resurrect",
+      "evidence": "focused-complete.log"
+    }
+  ]
+}

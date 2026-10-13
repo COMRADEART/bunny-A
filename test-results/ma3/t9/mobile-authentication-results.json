@@ -1,0 +1,103 @@
+{
+  "result": "PASS within disposable fixture",
+  "classification": "LIVE canonical Windows Host and built gateway; SIMULATED loopback TLS proxy, browser origin and lost-ack injection",
+  "tests": [
+    {
+      "id": "F01/F11",
+      "title": "Independent device identity and finite authority",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T02:47:30.314Z",
+      "observed": {
+        "viewer": {
+          "kind": "device",
+          "deviceId": "c07de3a6-83fe-4991-9fbd-eec626b8accb",
+          "name": "T9 independently paired client",
+          "role": "paired-device",
+          "pairedAt": 1791514050242,
+          "expiresAt": 1794106050242,
+          "lastSeenAt": 1791514050319,
+          "rights": [
+            "agent.authorization.approve",
+            "agent.authorization.deny",
+            "agent.authorization.revoke",
+            "agent.get",
+            "agent.list",
+            "agent.pause",
+            "agent.resume",
+            "agent.stop",
+            "approve",
+            "device.revoke",
+            "inbox.ack",
+            "mission.approve",
+            "mission.get",
+            "mission.respond",
+            "mission.revoke_batch",
+            "mission.start",
+            "mission.stop",
+            "operation.status",
+            "project.artifact",
+            "project.get",
+            "project.list",
+            "stop",
+            "submit",
+            "task.feedback"
+          ]
+        },
+        "identity": {
+          "hostId": "473dbb27-080a-459f-ab26-7bdaa259e6af",
+          "epoch": "8933ba7b-83c7-4192-9c57-694653f8f204",
+          "startedAt": 1791513768634
+        },
+        "cookieAttributes": {
+          "httpOnly": true,
+          "secure": true,
+          "sameSite": "Strict",
+          "path": "/",
+          "maxAge": 31536000
+        }
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F08",
+      "title": "Certificate trust fails closed",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T02:47:30.341Z",
+      "observed": {
+        "error": "DEPTH_ZERO_SELF_SIGNED_CERT",
+        "certificateBypass": false,
+        "systemTrustModified": false
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F02/F10/F31",
+      "title": "Authentication and origin failures are enforced",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T02:47:30.347Z",
+      "observed": {
+        "unknown": "AUTH_REQUIRED",
+        "crossSiteStatus": 403,
+        "anonymousStreamStatus": 401,
+        "canonicalPause": false
+      },
+      "result": "PASS"
+    },
+    {
+      "id": "F03/F44/F46/F47",
+      "title": "Self-revocation removes future control and artifact authority",
+      "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+      "startedAt": "2026-10-09T02:47:31.282Z",
+      "observed": {
+        "signOutStatus": 200,
+        "subsequentRead": "DEVICE_REVOKED",
+        "subsequentCommand": "DEVICE_REVOKED",
+        "automaticRepair": false
+      },
+      "result": "PASS"
+    }
+  ],
+  "browserEnrollment": "SIMULATED: test-only HTTP loopback adapter seeds a real paired cookie",
+  "physicalPairingUi": "NOT TESTED",
+  "productionPhoneCredential": "NOT TESTED"
+}

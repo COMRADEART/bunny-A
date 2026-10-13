@@ -1,4 +1,5 @@
 import type { Mode, ProviderId, ProviderExecutionScope, TaskProgress, VerifySpec } from "../orch/types.ts";
+import type { MissionTeam, StepTeam, TeamOutputContract, TeamRole } from "./team.ts";
 
 /**
  * Bunny-A M-A-0 mission contracts. A mission sits above TaskManager: it owns a bounded step graph,
@@ -43,6 +44,7 @@ export type FailureCategory =
   | "timeout"
   | "workspace_conflict"
   | "host_restart"
+  | "host_failure"
   | "user_stopped"
   | "budget_exceeded"
   | "invalid_plan";
@@ -53,7 +55,18 @@ export type RiskClass = "READ" | "WRITE" | "EXECUTE" | "EXTERNAL_SIDE_EFFECT" | 
 /** Persistent permission choices. The data model supports all of them; M-A-0 enforces them in decisions. */
 export type GrantPolicy = "always_allow" | "allow_for_mission" | "ask_every_time" | "read_only" | "never_allow";
 
-export type PermissionDecision = { decision: "allow" | "ask" | "deny"; reason: string; risk: RiskClass };
+export type PermissionDecision = {
+  decision: "allow" | "ask" | "deny"; reason: string; risk: RiskClass;
+  /** Set when an approval batch rescued the ask; admission consumes from it. */ batch?: { id: string };
+  /** M-A-3 T9R-F01: the ask exceeds remote authority; only the trusted workstation may allow it, never a batch. */
+  desktopRequired?: boolean;
+  /** M-A-3 T9R-F01: the exact operation a desktop answer to this ask would cover (Host-computed). */
+  desktopOperation?: DesktopOperation;
+  /** M-A-3 T9R-F01: paired-device-authorized changes the workstation reviews by answering this ask. */
+  remoteReview?: string[];
+  /** M-A-3 T9R-F01: the trusted-desktop grant (its request id) this allow relies on; admission consumes it. */
+  desktopGrant?: { id: string };
+};
 
 export type Budget = {
   /** Child tasks routed to a cloud provider. */
@@ -85,6 +98,8 @@ export type MissionConfig = {
 
 /** What the user approved for one mission. Child work outside it stops and asks. */
 export type AuthorizationEnvelope = {
+  /** T5 adjunct; canonical policy remains this envelope plus the Host's current revision. */
+  agentic?: { id: string; revision: number };
   id: string;
   missionId: string;
   grantedAt: number;
@@ -96,9 +111,15 @@ export type AuthorizationEnvelope = {
   capabilities: string[];
   providers: {
     execution: boolean; allow: ProviderId[] | null; localOnly: boolean;
-    /** Optional on pre-remediation JSON. Missing authority never permits delegated model launches. */
-    sessions?: { steps: { stepId: string; scope: ProviderExecutionScope }[]; maxSessions: number; writeIncludesShell: true };
+    /**
+     * Optional on pre-remediation JSON. Missing authority never permits delegated model launches.
+     * M-A-3 T9R-F01: `writeIncludesShell` is false on an envelope a paired device granted; such an envelope
+     * never launches a shell-capable provider session without a trusted-desktop grant for that exact session.
+     */
+    sessions?: { steps: { stepId: string; scope: ProviderExecutionScope }[]; maxSessions: number; writeIncludesShell: boolean };
   };
+  /** M-A-3 T9R-F01: where this approval came from. Absent on older JSON; derived from `grantedBy` then (fail closed). */
+  authority?: EnvelopeAuthority;
   filesystem: { read: string[]; write: string[] };
   browser: { enabled: boolean; domains: string[] | "public" };
   terminal: { enabled: boolean; commands: string[]; executables?: { command: string; file: string; prefix: string[] }[] };
@@ -111,16 +132,68 @@ export type AuthorizationEnvelope = {
   revokedAt: number | null;
 };
 export type GitAction = "status" | "diff" | "log" | "commit" | "worktree" | "merge";
+/**
+ * M-A-3 T9R-F01: the tool authority a provider session actually runs with.
+ * tool_free: text generation only (Ollama). read_tools: file reading only, no command execution (Claude read).
+ * shell: the session can run commands or code (Claude write, Codex in any sandbox mode).
+ */
+export type SessionAuthority = "tool_free" | "read_tools" | "shell";
+/**
+ * Who granted an envelope. A remote (paired-device) grant is capped: provider sessions stay within
+ * `sessionCeiling` and code-executing actions need a trusted-desktop grant for the exact operation.
+ */
+export type EnvelopeAuthority =
+  | { kind: "workstation" }
+  | { kind: "remote"; actor: string; sessionCeiling: SessionAuthority[]; codeExecution: "desktop_only" };
+/** The exact operation a trusted-desktop grant covers; compared field for field before use. */
+export type DesktopOperation =
+  | { kind: "provider_session"; provider: string; model: string; effort: string | null; access: string; cwd: string; sessionAuthority: SessionAuthority | "unknown" }
+  | { kind: "capability"; action: string; digest: string; cwd: string; executable: { file: string; prefix: string[] } | null; files?: Record<string, string> };
+/**
+ * M-A-3 T9R-F01: a trusted-desktop authorization. Minted only when the authenticated workstation answers
+ * allow_once to a Host request marked `desktopRequired`. It is bound to this Host and boot epoch, to the
+ * exact Mission/Agent/step/Task, plan and envelope, and to one exact operation. It expires quickly, is
+ * used at most `maxUses` times and is void once revoked. A paired device can never mint or use one.
+ */
+export type DesktopGrant = {
+  id: string;
+  requestId: string;
+  hostId: string;
+  epoch: string;
+  missionId: string;
+  agentId: string | null;
+  stepId: string;
+  taskId: string | null;
+  planReference: string;
+  authorizationId: string;
+  operation: DesktopOperation;
+  /** Host-wide count of project-mutating capability runs at approval time. */
+  mutationSequence: number;
+  grantedBy: "workstation";
+  grantedAt: number;
+  expiresAt: number;
+  maxUses: number;
+  uses: number;
+  revokedAt: number | null;
+};
 
 /** Requested scope shown before approval; becomes the envelope when approved. */
-export type ScopeRequest = Omit<AuthorizationEnvelope, "id" | "missionId" | "grantedAt" | "grantedBy" | "expiresAt" | "revokedAt">;
+export type ScopeRequest = Omit<AuthorizationEnvelope, "id" | "missionId" | "grantedAt" | "grantedBy" | "expiresAt" | "revokedAt" | "agentic">;
 
 export type VerificationCriterion =
+  | { kind: "capability"; action: string; params: Record<string, JsonValue>; expect: { field: string; equals?: JsonValue; contains?: string } }
+  | { kind: "capability_run"; expectExit: number; stdoutIncludes: string }
   | { kind: "task_spec"; spec: VerifySpec }
   | { kind: "file_exists"; path: string; contains?: string }
   | { kind: "command"; command: string; args: string[]; expectExit: number; timeoutMs?: number }
   | { kind: "artifact"; type: ArtifactType }
-  | { kind: "git_diff_nonempty" };
+  | { kind: "git_diff_nonempty" }
+  /** M-A-3 T11: Host extraction + check of a team model step's canonical output. */
+  | { kind: "team_output"; contract: TeamOutputContract }
+  /** M-A-3 T11: the file on disk carries exactly the bytes of the verified source step's canonical artifact. */
+  | { kind: "team_file"; path: string; fromStep: string }
+  /** M-A-3 T11: the user's requirements, checked by the Host on the real delivered file. */
+  | { kind: "team_requirements"; path: string; requirements: string[]; datasetStep: string | null };
 
 /** Plain JSON, so mission records cross the Host → UI server-function boundary unchanged. */
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -153,6 +226,9 @@ export type StepAccounting = {
 };
 
 export type MissionStep = {
+  crossApp?: import("./cross-app.ts").CrossAppMetadata;
+  /** M-A-3 T11: owning Agent, role, task kind, handoff inputs and rework lineage of a team step. */
+  team?: StepTeam;
   id: string;
   missionId: string;
   index: number;
@@ -179,7 +255,7 @@ export type MissionStep = {
   capabilityRunId: string | null;
   workspace: string | null;
   attempts: StepAttempt[];
-  result: { summary: string; artifactIds: string[]; verified: boolean | null; verification: string[] } | null;
+  result: { summary: string; artifactIds: string[]; verified: boolean | null; verification: string[]; outputRef?: string; verificationRunIds?: string[] } | null;
   evidence: string[];
   failure: { category: FailureCategory; detail: string } | null;
   accounting: StepAccounting;
@@ -192,6 +268,8 @@ export type MissionStep = {
 };
 
 export type PermissionRequest = {
+  /** Exact Host-offered T5 scope; never accepted from model/client parameters. */
+  agentic?: { fingerprint: string; revision: number; generation: string; resource: string };
   id: string;
   missionId: string;
   stepId: string;
@@ -200,8 +278,106 @@ export type PermissionRequest = {
   reason: string;
   createdAt: number;
   resolvedAt: number | null;
-  resolution: "allow_once" | "deny" | null;
+  resolution: "allow_once" | "allow_batch" | "deny" | null;
   resolvedBy: string | null;
+  /** Host-computed offer of one small bounded batch covering this ask; absent = no batch button. */
+  batchOffer: PermissionBatchOffer | null;
+  /** M-A-3 T9 projection only (never stored): whether a paired device may answer this exact ask. */
+  remote?: RemoteAnswer;
+  /** M-A-3 T9R-F01: Host-set; only the trusted workstation may allow this ask. */
+  desktopRequired?: boolean;
+  /** M-A-3 T9R-F01: Host-computed exact operation the workstation's allow_once binds to. */
+  desktopOperation?: DesktopOperation;
+  /** M-A-3 T9R-F01: ids of paired-device-authorized changes this workstation answer acknowledges. */
+  remoteReview?: string[];
+  /** M-A-3 T9R-F01: the Task, envelope and plan in force when the Host asked; a grant is minted only against these. */
+  desktopBinding?: { taskId: string | null; authorizationId: string; planReference: string; mutationSequence?: number };
+  /** M-A-3 T9R-F01: the exact-operation grant minted by the workstation's allow_once. */
+  desktopGrant?: DesktopGrant;
+  /**
+   * M-A-3 T9R-F02 (D2): a Host-raised request to promote one staged paired-device change into the project. Only a
+   * current workstation allow_once promotes, and only these exact bytes (stagingId + contentHash) to this destination.
+   */
+  promotion?: { stagingId: string; contentHash: string; contentSize: number; destination: string; classification: string };
+  /**
+   * M-A-3 T9R-F02 (section 12): why an answered request no longer authorizes anything. OFFERED / APPROVED / DENIED
+   * derive from `resolution`; the first recorded end state wins and is never rewritten.
+   */
+  lifecycle?: { state: ApprovalLifecycleState; at: number; by: string; reason: string };
+};
+export type ApprovalLifecycleState =
+  | "CONSUMED" | "EXPIRED" | "WITHDRAWN" | "INVALIDATED_BY_SCOPE_CHANGE" | "INVALIDATED_BY_SIGNOUT"
+  | "INVALIDATED_BY_DEVICE_REVOCATION" | "INVALIDATED_BY_HOST_RESTART";
+/** M-A-3 T9: the Host's own verdict on a paired-device answer; the phone never re-derives policy. */
+export type RemoteAnswer = {
+  answerable: boolean; reason: string | null;
+  /** M-A-3 T9R-F01: what a remote approval of this plan leaves for trusted-desktop approval on the Windows Host. */
+  desktopFollowUp?: string | null;
+  /** M-A-3 T9R-F01: a device may grant only the Host-offered small batch here, not a single allow. */
+  batchOnly?: boolean;
+};
+
+/**
+ * One ephemeral, mission-scoped bounded desktop batch (Gate T9). Created only from a Host-computed
+ * offer attached to a real permission request; it never outlives its envelope, never carries more
+ * authority than the offer stated, and ends on stop, replan, expiry, exhaustion, scope mismatch or
+ * Host restart (`batchEpoch` marks the Host boot it belongs to).
+ */
+export type ApprovalBatch = {
+  id: string;
+  missionId: string;
+  authorizationId: string;
+  family: string;
+  actions: string[];
+  riskCeiling: RiskClass;
+  target: { app: string | null; processId: number | null; title: string | null };
+  targetTier: "process" | "app";
+  maxActions: number;
+  usedCount: number;
+  observedPid: number | null;
+  observedPidFrom: "params" | "post-run" | null;
+  batchEpoch: string;
+  createdAt: number;
+  createdBy: string;
+  expiresAt: number;
+  status: "active" | "ended";
+  endAt: number | null;
+  endReason: "exhausted" | "expired" | "revoked" | "scope_mismatch" | "mission_ended" | "host_restart" | null;
+  endBy: string | null;
+  originStepId: string;
+  /** Digests of concrete Host-planned operations, keyed by their owning step. No input values. */
+  operations?: { stepId: string; digest: string }[];
+  /** Exact native window + process lifetime observed before any covered window mutation. */
+  windowIdentity?: { handle: string; processId: number; processStartedAt: string; contentProcessId?: number; contentStartedAt?: string };
+};
+
+/** What the Host proposes when a permission request comes from a small, predictable desktop sequence. */
+export type PermissionBatchOffer = {
+  family: "computer";
+  actions: string[];
+  /** Expected executions per covered action in one pass; sum ≤ maxActions. Read-only entries count 0. */
+  counts: Record<string, number>;
+  maxActions: number;
+  ttlMs: number;
+  riskCeiling: "EXECUTE";
+  targetLabel: string;
+  /** The bound target the batch will live inside (strictest identity available at grant time). */
+  target: { app: string | null; processId: number | null; title: string | null };
+  targetTier: "process" | "app";
+  /** Read-only covered actions (never consume the budget). */
+  readOnly: string[];
+  operations?: { stepId: string; digest: string }[];
+};
+
+export type BatchView = {
+  id: string;
+  maxActions: number;
+  usedCount: number;
+  targetLabel: string;
+  createdAt: number;
+  expiresAt: number;
+  status: "active" | "ended";
+  endReason: ApprovalBatch["endReason"];
 };
 
 export type MissionProgress =
@@ -220,6 +396,10 @@ export type MissionAccounting = {
 };
 
 export type Mission = {
+  /** M-A-3 T9R-F01: the paired device that started or resumed this Mission (its changes are reviewed as such). */
+  deviceDriven?: string;
+  /** M-A-3 T11: present on a multi-Agent Team Mission. */
+  team?: MissionTeam;
   id: string;
   title: string;
   objective: string;
@@ -247,7 +427,53 @@ export type Mission = {
   accounting: MissionAccounting;
 };
 
-export type MissionView = Mission & { steps: MissionStep[]; progress: MissionProgress; requests: PermissionRequest[]; artifacts: ArtifactSummary[] };
+export type MissionView = Mission & { steps: MissionStep[]; progress: MissionProgress; requests: PermissionRequest[]; artifacts: ArtifactSummary[]; batch: BatchView | null;
+  /** M-A-3 T9: digest of the reviewed plan; a paired device binds mission.approve to it so a replanned scope is never approved unseen. */
+  planReference?: string;
+  /** M-A-3 T9: whether a paired device may approve this pending plan (Host verdict). */
+  remote?: RemoteAnswer;
+  /** M-A-3 T11: Team projection (members, handoffs, findings) from canonical rows. */
+  teamView?: TeamView;
+};
+
+/**
+ * M-A-3 T11: one cross-Agent transfer of a verified artifact reference. A record of data movement only: it never
+ * carries a grant, credential, path authority or executable permission.
+ */
+export type Handoff = {
+  id: string;
+  missionId: string;
+  sourceAgentId: string | null;
+  destinationAgentId: string | null;
+  sourceStepId: string;
+  destinationStepId: string;
+  destinationAttempt: number;
+  artifactId: string;
+  artifactSha256: string;
+  artifactType: ArtifactType;
+  purpose: "context" | "content" | "review_subject";
+  state: "DELIVERED" | "REFUSED";
+  reason: string | null;
+  createdAt: number;
+};
+export type TeamView = {
+  coordinatorAgentId: string;
+  phase: "planning" | "review" | "executing" | "ended";
+  outputDir: string;
+  limits: MissionTeam["limits"];
+  requirements: { id: string; text: string; target: "html" | "markdown" }[];
+  members: { agentId: string; role: TeamRole }[];
+  planRevisions: number;
+  reworkRounds: number;
+  proposal: MissionTeam["proposal"];
+  rejected: MissionTeam["rejected"];
+  handoffs: Handoff[];
+  findings: { stepId: string; agentId: string | null; verdict: string; findings: { requirement: string | null; severity: string; summary: string; confirmedByHost: boolean | null }[] }[];
+  /** Bunny's own verdict per user requirement, from the latest Tester check that covered it (null: not checked yet). */
+  requirementResults: { id: string; text: string; passed: boolean | null; detail: string | null; stepId: string | null; round: number | null }[];
+  /** The exact reference the Coordinator approves the reviewed execution plan by (review phase only). */
+  planReference: string | null;
+};
 
 export type ArtifactType =
   | "source_file"
@@ -368,7 +594,7 @@ export type CapabilityManifest = {
 
 export type CapabilityStatus = CapabilityManifest & { availability: CapabilityAvailability; detail: string; checkedAt: number | null };
 
-export type CapabilityRunStatus = "succeeded" | "failed" | "denied" | "unavailable" | "unconfigured" | "unsupported" | "timeout" | "interrupted" | "running";
+export type CapabilityRunStatus = "succeeded" | "failed" | "denied" | "unavailable" | "unconfigured" | "unsupported" | "timeout" | "interrupted" | "running" | "stopped";
 
 export type CapabilityResult = {
   ok: boolean;
@@ -384,6 +610,7 @@ export type CapabilityResult = {
 };
 
 export type CapabilityRun = {
+  outputRef?: string;
   cleanup?: { attempted: boolean; ok: boolean; detail: string };
   id: string;
   action: string;

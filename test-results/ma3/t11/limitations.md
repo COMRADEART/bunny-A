@@ -1,0 +1,12 @@
+# T11 limitations
+
+- All live team inference used one routed local Ollama model. Other eligible models were observed, but hosted-provider diversity and multi-Agent Claude/Codex inference were not exercised.
+- The RTX 4050 laptop has one 6 GB GPU. Distinct Agent requests overlap; Ollama queues GPU generation. This is concurrent admission and real canonical work, not proof of simultaneous GPU inference.
+- Local Ollama is an independently managed HTTP service and is not Windows Job-contained. Native contained provider fixtures and the packaged provider/child test passed separately.
+- Physical phone, LAN, internet tunnel and Windows reboot/logon persistence remain NOT TESTED. T9 limitations remain open.
+- T11 voice supervision used typed turns in a real disposable voice session and real output playback; it did not repeat microphone capture or complete hands-free acoustic barge-in. T10 voice limitations remain.
+- The packaged gateway uses the protected production gateway port and was not started there. Packaged Host startup, real planning, native containment, voice worker and shutdown were tested on a disposable listener.
+- Several 80-row matrix cases are static or scripted-model fixtures. Rows without a direct final assertion are explicitly NOT TESTED; the matrix never claims 80 live cases.
+- The separate generic Vercel preview renders cleanly but cannot act as this native workstation gateway. Desktop QA uses the actual node-middleware build and has no render divergence from dev.
+- The administrative dashboard retains the platform share-card placeholder. No new custom branding was required or generated.
+- The main integrated Mission advisory Reviewer missed the seeded missing id. The Host independently caught it and repaired it. A separate source-pinned real-model focused review reported blocking R1, the Host confirmed the failed check, and the Mission completed after rework. Advisory review remains fallible and never decides canonical success.

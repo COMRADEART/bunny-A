@@ -1,0 +1,4 @@
+import {spawn} from 'node:child_process';import{once}from'node:events';import{openSync,closeSync,writeFileSync}from'node:fs';import{join,resolve}from'node:path';
+const rec=resolve('test-results/ma2-final-remediation-r1'),exe=join(process.env.LOCALAPPDATA,'Bunny-A-R1-stage/releases/Bunny-A-Windows-v26-MA2-R1/runtime/node.exe'),entry=join(rec,'ui-gateway.mjs');
+const out=openSync(join(rec,'ui-gateway.log'),'a'),err=openSync(join(rec,'ui-gateway-error.log'),'a');
+try{const child=spawn(exe,[entry],{cwd:rec,windowsHide:true,detached:true,stdio:['ignore',out,err]});await once(child,'spawn');writeFileSync(join(rec,'ui-gateway-owner.json'),JSON.stringify({recordedAt:new Date().toISOString(),classification:'DISPOSABLE LIVE',pid:child.pid,exe,entry,port:8089,ownedByThisRemediation:true},null,2)+'\n');child.unref();}finally{closeSync(out);closeSync(err);}

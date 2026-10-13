@@ -1,6 +1,7 @@
 import type { HostEvent } from "../../lib/bunny-host/contracts.ts";
 import type { HostPresence, OrchTask, RouteDecision, TaskState } from "../../lib/orch/types.ts";
-import { TERMINAL, usesCloudModel } from "./ui-model.ts";
+import { TERMINAL } from "./ui-model.ts";
+import { publicEventDetail, publicEventLabel, taskStatus } from "../../lib/bunny-host/presentation.ts";
 
 export type OrbState =
   "idle" | "listening" | "routing" | "working" | "waiting" | "completed" | "failed" | "offline";
@@ -75,37 +76,10 @@ export function taskJourney(
 // The backend can normalize a provider's reasoning event. Its private text is never UI activity.
 export const isPrivateEvent = (type: string) => /thinking|reasoning/i.test(type);
 export function activityLabel(type: string) {
-  const labels: Record<string, string> = {
-    "task.created": "Submitted",
-    "task.routed": "Routed",
-    "approval.required": "Approval required",
-    "task.approved": "Approved",
-    "agent.starting": "Starting",
-    "agent.started": "Agent started",
-    "agent.reading": "Read",
-    "agent.editing": "Edit",
-    "agent.command": "Run",
-    "agent.testing": "Test",
-    "agent.searching": "Search",
-    "agent.building": "Build",
-    "agent.rendering": "Render",
-    "agent.output": "Provider output",
-    "agent.planning": "Plan",
-    "agent.verifying": "Verify",
-    "verification.completed": "Verification result",
-    "task.completed": "Complete",
-    "task.failed": "Failed",
-    "task.stopped": "Stopped",
-    "agent.waiting_for_input": "Needs input",
-    "agent.waiting_for_approval": "Needs approval",
-  };
-  return isPrivateEvent(type)
-    ? "Working"
-    : (labels[type] ?? type.replace(/^(agent|task)\./, "").replaceAll("_", " "));
+  return publicEventLabel(type);
 }
 export function activityDetail(type: string, detail: string, task?: OrchTask) {
-  if (isPrivateEvent(type)) return "Provider is working.";
-  return task && usesCloudModel(task) ? detail.replace(/Stays on this machine\.\s*/g, "") : detail;
+  return publicEventDetail(type,detail,task);
 }
 export function routeStrengths(decision?: RouteDecision | null) {
   const scores = (decision?.scores ?? []).filter((s) => Number.isFinite(s.score));
@@ -137,7 +111,7 @@ export function publicTaskLogs(task: OrchTask, events: HostEvent[]) {
       line: matching
         ? activityDetail(matching.type, log.line, task)
         : knownHostRecord
-          ? activityDetail("host.log", log.line, task)
+          ? /^Execution active\./.test(log.line) ? "Execution active. Progress indeterminate until the provider publishes a plan." : "Host activity recorded. Details omitted from public activity."
           : "Activity detail unavailable (untyped Host log).",
     };
   });
@@ -172,7 +146,7 @@ export function replayRecords(task: OrchTask, events: HostEvent[]): ReplayRecord
       key: "submitted",
       at: task.createdAt,
       type: "task.created",
-      detail: task.prompt,
+      detail: "Task submitted.",
       source: "task",
     });
   if (task.startedAt != null && !records.some((e) => e.type === "agent.started"))
@@ -188,7 +162,7 @@ export function replayRecords(task: OrchTask, events: HostEvent[]): ReplayRecord
       key: "finished",
       at: task.finishedAt,
       type: `task.${task.state}`,
-      detail: task.error ?? task.verification?.detail ?? "Provider process ended.",
+      detail: taskStatus(task).label + ". " + taskStatus(task).verification,
       source: "task",
     });
   return records

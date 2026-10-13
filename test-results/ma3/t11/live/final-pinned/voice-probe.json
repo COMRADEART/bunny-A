@@ -1,0 +1,152 @@
+{
+  "classification": "LIVE disposable Host voice session; typed turns (no microphone capture), answers from canonical Host facts, spoken on the default output",
+  "probes": [
+    {
+      "label": "during B and C",
+      "at": 1791766076189,
+      "turns": [
+        {
+          "text": "How many agents are working?",
+          "status": 200,
+          "turnKind": "agent_team",
+          "answerSource": "host_facts",
+          "answer": "3 agents are working: the Researcher agent, building the dataset; the Researcher agent, writing Markdown; the Implementer agent, building the dataset.",
+          "canonical": {
+            "working": [
+              {
+                "role": "researcher",
+                "task": "generate_json"
+              },
+              {
+                "role": "researcher",
+                "task": "generate_markdown"
+              },
+              {
+                "role": "implementer",
+                "task": "generate_json"
+              }
+            ],
+            "testers": [
+              "WAITING_FOR_DEPENDENCY",
+              "WAITING_FOR_DEPENDENCY"
+            ]
+          }
+        },
+        {
+          "text": "Which agent is testing?",
+          "status": 200,
+          "turnKind": "agent_team",
+          "answerSource": "host_facts",
+          "answer": "the Tester agent is waiting for dependency, having Bunny check the requirements. the Tester agent is waiting for dependency, having Bunny check the requirements.",
+          "canonical": {
+            "working": [
+              {
+                "role": "researcher",
+                "task": "generate_json"
+              },
+              {
+                "role": "researcher",
+                "task": "generate_markdown"
+              },
+              {
+                "role": "implementer",
+                "task": "generate_json"
+              }
+            ],
+            "testers": [
+              "WAITING_FOR_DEPENDENCY",
+              "WAITING_FOR_DEPENDENCY"
+            ]
+          }
+        },
+        {
+          "text": "What is the planning agent doing?",
+          "status": 200,
+          "turnKind": "agent_team",
+          "answerSource": "host_facts",
+          "answer": "the Planner agent is waiting for dependency, planning. the Planner agent is waiting for dependency, planning.",
+          "canonical": {
+            "working": [
+              {
+                "role": "researcher",
+                "task": "generate_json"
+              },
+              {
+                "role": "researcher",
+                "task": "generate_markdown"
+              },
+              {
+                "role": "implementer",
+                "task": "generate_json"
+              }
+            ],
+            "testers": [
+              "WAITING_FOR_DEPENDENCY",
+              "WAITING_FOR_DEPENDENCY"
+            ]
+          }
+        },
+        {
+          "text": "Has the mission finished?",
+          "status": 200,
+          "turnKind": "agent_team",
+          "answerSource": "host_facts",
+          "answer": "The team mission Build an offline team directory page from data/team.csv and a Markdown onboardin has not finished. It is running, with 1 of 8 tasks completed.",
+          "canonical": {
+            "working": [
+              {
+                "role": "researcher",
+                "task": "generate_json"
+              }
+            ],
+            "testers": [
+              "WAITING_FOR_DEPENDENCY",
+              "WAITING_FOR_DEPENDENCY"
+            ]
+          }
+        },
+        {
+          "text": "Which tasks failed?",
+          "status": 200,
+          "turnKind": "agent_team",
+          "answerSource": "host_facts",
+          "answer": "No task of Build an offline team directory page from data/team.csv and a Markdown onboardin has failed.",
+          "canonical": {
+            "working": [
+              {
+                "role": "researcher",
+                "task": "generate_json"
+              }
+            ],
+            "testers": [
+              "WAITING_FOR_DEPENDENCY",
+              "WAITING_FOR_DEPENDENCY"
+            ]
+          }
+        },
+        {
+          "text": "Approve the team plan.",
+          "status": 200,
+          "turnKind": "sensitive_refused",
+          "answerSource": "refusal",
+          "answer": "I can't do that by voice. Approvals, permissions and commands are reviewed on the Windows Host screen.",
+          "canonical": {
+            "working": [
+              {
+                "role": "researcher",
+                "task": "generate_markdown"
+              },
+              {
+                "role": "implementer",
+                "task": "generate_html"
+              }
+            ],
+            "testers": [
+              "WAITING_FOR_DEPENDENCY"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

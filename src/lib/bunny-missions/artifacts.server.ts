@@ -11,7 +11,7 @@ export const sha256 = (value: string | Buffer) => createHash("sha256").update(va
 function hashFile(path: string): Promise<string> {
   return new Promise((resolveHash, reject) => {
     const hash = createHash("sha256"); const stream = createReadStream(path);
-    stream.on("data", (chunk) => hash.update(chunk)); stream.on("error", reject); stream.on("end", () => resolveHash(hash.digest("hex")));
+    stream.on("data", (chunk) => {try {hash.update(chunk);} catch(error) {stream.destroy();reject(error);}}); stream.on("error", reject); stream.on("end", () => {try {resolveHash(hash.digest("hex"));} catch(error) {reject(error);}});
   });
 }
 

@@ -1,0 +1,146 @@
+{
+  "classification": "LIVE SAPI synthesis played on the real default output device",
+  "islandConversationPlayback": [
+    {
+      "turnId": "t1-319d6e16",
+      "finalToFirstTtsReadyMs": 107,
+      "finalToFirstPlaybackMs": 543,
+      "finalToCompletedMs": 3013
+    },
+    {
+      "turnId": "t2-2f8546f9",
+      "finalToFirstTtsReadyMs": 13,
+      "finalToFirstPlaybackMs": 397,
+      "finalToCompletedMs": 3378
+    },
+    {
+      "turnId": "t3-4f44f055",
+      "finalToFirstTtsReadyMs": 10862,
+      "finalToFirstPlaybackMs": 11441,
+      "finalToCompletedMs": null
+    },
+    {
+      "turnId": "t4-d7e75759",
+      "finalToFirstTtsReadyMs": 8,
+      "finalToFirstPlaybackMs": 112,
+      "finalToCompletedMs": 2584
+    },
+    {
+      "turnId": "t5-cdaa3ad7",
+      "finalToFirstTtsReadyMs": 1044,
+      "finalToFirstPlaybackMs": 1431,
+      "finalToCompletedMs": 4049
+    }
+  ],
+  "playbackCalibration": [
+    {
+      "turn": "pb-1",
+      "gapBeforeMs": 0,
+      "readyToStartedMs": 533,
+      "audioMs": 2540,
+      "errors": []
+    },
+    {
+      "turn": "pb-2",
+      "gapBeforeMs": 1000,
+      "readyToStartedMs": 1,
+      "audioMs": 2715,
+      "errors": []
+    },
+    {
+      "turn": "pb-3",
+      "gapBeforeMs": 6000,
+      "readyToStartedMs": 390,
+      "audioMs": 2690,
+      "errors": []
+    }
+  ],
+  "chunkOrderAndCancel": [
+    {
+      "suite": "scripts",
+      "name": "V18 speech chunks play strictly in seq order on the null sink",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "V19 V20 speak.cancel stops audible playback and nothing from that gen starts afterwards",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "V21 a late speak with an old gen after cancel never plays",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V18 TTS chunks are ordered with strictly increasing seq from 0",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V18 chunks split at sentence boundaries once at least 40 chars are speakable",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V18 a delta stream split inside words yields the same ordered text as the whole answer",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V18 an unclosed code fence at the end of the answer is dropped, not read",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V06 V18 hard split keeps every chunk at or under the 400 char limit on word boundaries",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V21 a self-transition is not a transition and is refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V17 V18 playback confirmed by the worker moves the session to SPEAKING with truthful playing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V19 V20 barge-in: generation advances, speech is cancelled at the old gen, the voice turn's inference is stopped",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V21 late model deltas and worker playback events from the cancelled generation never restart speech",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V17 TTS playback works: real playback truth reads Speaking, and only then",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V18 TTS chunks in order: the answer text is shown whole and not reordered by the view model",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V20 pending chunks do not resume: nothing reads Speaking unless the playback flag is set",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V21 late model callbacks do not restart playback: a finished session never reads Speaking",
+      "result": "PASS"
+    }
+  ],
+  "outputDevice": {
+    "name": "Speakers (Realtek(R) Audio)",
+    "muted": false,
+    "volume": 0.46000000834465027,
+    "present": true
+  }
+}

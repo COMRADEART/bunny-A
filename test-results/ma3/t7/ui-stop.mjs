@@ -1,0 +1,2 @@
+import {readFileSync,writeFileSync} from 'node:fs';import assert from 'node:assert/strict';import {resolve,relative,join} from 'node:path';
+const f=JSON.parse(readFileSync('test-results/ma3/t7/ui-fixture.json','utf8'));assert.equal(resolve(f.cleanupSignal),resolve(join(f.parent,'close-ui-host')));assert.ok(f.parent.includes('bunny-t7-ui-'));assert.ok(!relative(f.parent,f.data).startsWith('..'));writeFileSync(f.cleanupSignal,'close the disposable UI Host');console.log('Owned UI Host close signal saved.');

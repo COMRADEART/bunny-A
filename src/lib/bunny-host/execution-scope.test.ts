@@ -5,24 +5,32 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CodexAdapter, ClaudeAdapter, codexLaunchArgs, providerBase } from "./adapters.server.ts";
 import { systemContext } from "./discovery.server.ts";
+import { fixtureSecurity } from "./testing/codex.test.ts";
+import { ModelCapabilityRegistry } from "./model-capability.server.ts";
 import { HostDatabase } from "./persistence.server.ts";
 import { TaskManager } from "./manager.server.ts";
 import { MissionManager } from "../bunny-missions/manager.server.ts";
 import type { AdapterHooks, ProviderAdapter } from "./contracts.ts";
 import type { OrchTask, ProviderExecutionScope } from "../orch/types.ts";
 
-function assertReadIsolation(args: string[], platform = process.platform) {
-  assert.equal(args[args.indexOf("--sandbox") + 1], "read-only");
+function assertReadIsolation(args: string[], platform = process.platform) { assertScopedIsolation(args, "read-only", platform); }
+/** M-A-1: a scoped write step keeps workspace-write but none of the user's extensions or account tools. */
+function assertWriteIsolation(args: string[], platform = process.platform) { assertScopedIsolation(args, "workspace-write", platform); }
+function assertScopedIsolation(args: string[], sandbox: "read-only" | "workspace-write", platform = process.platform) {
+  assert.equal(args[args.indexOf("--sandbox") + 1], sandbox);
   assert.ok(args.includes("--ignore-user-config"), "all user-configured MCP/plugin/integration definitions are omitted");
   assert.ok(args.includes("--ignore-rules"), "user/project execpolicy cannot expand execution authority");
   const overrides = args.flatMap((arg, index) => arg === "-c" || arg === "--config" ? [args[index + 1]] : []);
-  assert.deepEqual(overrides, platform === "win32" ? ['windows.sandbox="elevated"'] : [], "only trusted platform sandbox configuration is restored");
+  assert.deepEqual(overrides, [...(platform === "win32" ? ['windows.sandbox="elevated"'] : []), 'web_search="disabled"'], "only trusted platform sandbox configuration is restored; web search is off");
+  // Literal list, independent of the production constant: features whose tools ignore config.toml (M-A-1 live evidence).
+  const disabled = args.flatMap((arg, index) => arg === "--disable" ? [args[index + 1]] : []);
+  assert.deepEqual(disabled, ["apps", "plugins", "remote_plugin", "multi_agent", "multi_agent_v2", "image_generation", "browser_use", "browser_use_external", "computer_use", "tool_suggest", "hooks", "skill_mcp_dependency_install"], "account apps, plugins and tool-adding defaults are switched off");
   assert.ok(!args.includes("--profile") && !args.includes("-p") && !args.includes("--enable"), "no user profile or extension is re-enabled");
   assert.ok(!args.includes("--approve-for-me") && !args.includes("--dangerously-bypass-approvals-and-sandbox"));
 }
 
 function assertLegacyCodexArgs(args: string[], task: OrchTask) {
-  // Exact pre-R1 argv, independent of the production helper.
+  // Exact pre-R1 argv for unscoped direct tasks, independent of the production helper.
   assert.deepEqual(args, ["exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check", "--cd", task.cwd, "--model", task.model, "-"]);
 }
 
@@ -34,6 +42,11 @@ for (const provider of ["codex", "claude"] as const) for (const access of [undef
   const adapter = provider === "codex" ? new CodexAdapter(() => systemContext()) : new ClaudeAdapter(() => systemContext());
   adapter.launchTarget = { command: process.execPath, args: [script], path: script, kind: "node-script", source: "disposable fixture" };
   adapter.detected = { ...providerBase(provider), installed: true, authenticated: true, availability: "ready" };
+  if (adapter instanceof CodexAdapter && access) {
+    const fixture = await fixtureSecurity(script);
+    adapter.ctx = () => fixture.ctx; adapter.security = fixture.gate;
+    adapter.detected.securityCompatibility = fixture.profile;
+  }
   const lines: string[] = [];
   const hooks: AdapterHooks = { event: () => {}, session: () => {}, output: () => {}, raw: (stream, line) => { if (stream === "stdout") lines.push(line); } };
   const task = { id: "fixture", provider, model: "fixture-model", prompt: "Echo arguments only", cwd: directory, ...(access ? { executionScope: { access } as ProviderExecutionScope, mission: { missionId: "fixture-mission", stepId: "fixture-step" } } : {}) } as OrchTask;
@@ -43,6 +56,7 @@ for (const provider of ["codex", "claude"] as const) for (const access of [undef
     const args = (JSON.parse(lines.find((line) => line.includes('"argv"'))!) as { argv: string[] }).argv;
     if (provider === "codex") {
       if (access === "read") assertReadIsolation(args);
+      else if (access === "write") assertWriteIsolation(args);
       else assertLegacyCodexArgs(args, task);
     }
     else {
@@ -59,10 +73,37 @@ for (const provider of ["codex", "claude"] as const) for (const access of [undef
 for (const platform of ["win32", "linux", "darwin"] as const) test(`MA0R2: Codex read isolation restores only the ${platform} sandbox policy`, () => {
   const read = { cwd: "/fixture", model: "fixture-model", executionScope: { access: "read" } } as OrchTask;
   assertReadIsolation(codexLaunchArgs(read, platform), platform);
-  for (const access of [undefined, "write"] as const) {
-    const task = { ...read, executionScope: access ? { access } : undefined } as OrchTask;
-    assertLegacyCodexArgs(codexLaunchArgs(task, platform), task);
-  }
+  assertWriteIsolation(codexLaunchArgs({ ...read, executionScope: { access: "write" } } as OrchTask, platform), platform);
+  const legacy = { ...read, executionScope: undefined } as OrchTask;
+  assertLegacyCodexArgs(codexLaunchArgs(legacy, platform), legacy);
+});
+
+test("MA1: Codex read argv is the exact contract verified against live codex-cli 0.153.4 sessions", () => {
+  // A live read Mission with only the R1 flags registered 228 ChatGPT connector tools (codex_apps) and a
+  // remote-plugin MCP server; this exact argv registered none (test-results/ma1/codex-read).
+  const read = { cwd: "C:\\fixture", model: "fixture-model", executionScope: { access: "read" } } as OrchTask;
+  assert.deepEqual(codexLaunchArgs(read, "win32"), [
+    "exec", "--json", "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules", "-c", 'windows.sandbox="elevated"',
+    "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
+    "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
+    "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
+    "--skip-git-repo-check", "--cd", "C:\\fixture", "--model", "fixture-model", "-",
+  ]);
+});
+
+test("MA1: Codex mission write argv keeps workspace-write without user extensions; direct tasks are unchanged", () => {
+  // A live write Mission with the pre-R1 argv spawned node_repl, the computer-use REPL and a plugin MCP server
+  // directly under codex.exe, outside the sandbox runner (test-results/ma1/codex-write).
+  const write = { cwd: "C:\\fixture", model: "fixture-model", executionScope: { access: "write" } } as OrchTask;
+  assert.deepEqual(codexLaunchArgs(write, "win32"), [
+    "exec", "--json", "--sandbox", "workspace-write", "--ignore-user-config", "--ignore-rules", "-c", 'windows.sandbox="elevated"',
+    "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
+    "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
+    "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
+    "--skip-git-repo-check", "--cd", "C:\\fixture", "--model", "fixture-model", "-",
+  ]);
+  const direct = { cwd: "C:\\fixture", model: "fixture-model" } as OrchTask;
+  assert.deepEqual(codexLaunchArgs(direct, "win32"), ["exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check", "--cd", "C:\\fixture", "--model", "fixture-model", "-"]);
 });
 
 const until = async (check: () => boolean, label: string, detail?: () => unknown) => {
@@ -89,8 +130,9 @@ process.stdin.resume(); process.stdin.on('end',()=>{
   if(attempt<=${failures}) {console.error('fixture provider crashed');process.exitCode=1;}
 });\n`);
   const db = new HostDatabase(join(directory, "host.sqlite"));
-  const codex = new CodexAdapter(() => systemContext());
-  const live = { ...providerBase("codex"), installed: true, authenticated: true, availability: "ready" as const, capabilities: ["text", "filesystem", "terminal"], models: ["fixture-model"], current_model: "fixture-model" };
+  const security = await fixtureSecurity(script);
+  const codex = new CodexAdapter(() => security.ctx, security.gate);
+  const live = { ...providerBase("codex"), installed: true, authenticated: true, availability: "ready" as const, capabilities: ["text", "filesystem", "terminal"], models: ["fixture-model"], current_model: "fixture-model", securityCompatibility: security.profile };
   codex.detected = live;
   codex.launchTarget = { command: process.execPath, args: [script], path: script, kind: "node-script", source: "disposable fixture" };
   codex.detect = async () => live;
@@ -104,7 +146,8 @@ process.stdin.resume(); process.stdin.on('end',()=>{
   } });
   let claudeAvailable = true;
   const claude: ProviderAdapter = { id: "claude", detect: async () => ({ ...live, id: "claude", name: "Claude fixture", availability: claudeAvailable ? "ready" : "offline" }), launch: () => { throw new Error("Claude stand-in must be retargeted before launch"); } };
-  const tasks = new TaskManager(db, root, withClaude ? [codex, claude] : [codex]);
+  // M-A-3 T3 legacy-parity: probe nothing, so MA0R2 asserts the pre-T3 model surface, not this machine's catalogue.
+  const tasks = new TaskManager(db, root, withClaude ? [codex, claude] : [codex], { modelRegistry: new ModelCapabilityRegistry(db, { availableProviders: () => [] }) });
   await tasks.discover();
   const missions = new MissionManager(tasks, { dataDirectory: directory, adapters: [] });
   missions.configure({ enabled: true }, "test");

@@ -1,0 +1,229 @@
+{
+  "mission": "Project overview team 14",
+  "missionId": "3e31f200-b1f2-458e-9cbe-7a45a9cbe0ab",
+  "phase": "review",
+  "state": "waiting_for_approval",
+  "planReference": "team:4c93a4c995136c1a488e6497ed5896b5294485757229a9199b061c389dd144ce",
+  "planRevisions": 0,
+  "rejected": [],
+  "members": [
+    {
+      "agentId": "30a8b467-095f-4c39-883e-cb71b52b373f",
+      "role": "planner"
+    },
+    {
+      "agentId": "8d9b82d5-4e88-42f0-9d1e-fed9dcdd97c0",
+      "role": "researcher"
+    },
+    {
+      "agentId": "d600d94b-b3db-4ef1-a705-9bb4cd2094f4",
+      "role": "implementer"
+    },
+    {
+      "agentId": "16497c47-581b-4016-9bab-dddcfd94e4f7",
+      "role": "tester"
+    },
+    {
+      "agentId": "38d23b21-f088-4ddf-97a3-5b04c301d416",
+      "role": "documenter"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "plan",
+      "role": "planner",
+      "kind": "plan",
+      "objective": "Propose a bounded team plan for the objective as one JSON document.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t1",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the .md file for the project overview.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t2",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the Git history for the project overview.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t3",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Create the HTML page from the .md file and the Git history.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page to index.html.",
+      "dependsOn": [
+        "t3"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t5",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny check the HTML page against the requirements.",
+      "dependsOn": [
+        "t4",
+        "t3"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t6",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Create the Markdown project overview from the .md file and the Git history.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t7",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the Markdown document to README.md.",
+      "dependsOn": [
+        "t6"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t8",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny check the Markdown document against the requirements.",
+      "dependsOn": [
+        "t7"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": [
+        "R1"
+      ]
+    },
+    {
+      "key": "t3_r1",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Create the HTML page from the .md file and the Git history.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page to index.html.",
+      "dependsOn": [
+        "t3_r1"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t5_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny check the HTML page against the requirements.",
+      "dependsOn": [
+        "t4_r1",
+        "t3"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t6_r1",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Create the Markdown project overview from the .md file and the Git history.",
+      "dependsOn": [
+        "t1",
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t7_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the Markdown document to README.md.",
+      "dependsOn": [
+        "t6_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t8_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny check the Markdown document against the requirements.",
+      "dependsOn": [
+        "t7_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": [
+        "R1"
+      ]
+    }
+  ]
+}

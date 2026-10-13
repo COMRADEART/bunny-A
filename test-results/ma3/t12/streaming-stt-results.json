@@ -1,0 +1,334 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "scripts",
+      "test": "V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "manual endpointing finalizes only on capture.end",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V11 silence never becomes a command: stt.none no_speech, no final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V12 noise-only input fails safely: vad noise_only and no final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T10 endpointing: recognizer evidence keeps no_speech from firing and bounds the turn end",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T10 stop decision: rejected-only recognizer text is stt.none rejected, never a final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "native#2 abandoned recognizers: raw audio is zeroed and released, and the ledger refuses past its bound",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "native#6 the finalize decision reads the onset state published during capture, not a value set at thread exit",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-native#0 a recognizer whose start throws is disposed before the error propagates, so the turn holds no engine",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native VT-09 the finalizing turns stay abortable through a bounded list, so a new capture can attach",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "whisper: silence never becomes a final (no VAD onset, so stt.none no_speech)",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "whisper: noise-only input never becomes a final with words",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "whisper: capture.abort that lands during the final decode never emits a final",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4 checkpoints: parse-then-read, monotonic revisions, and the 200-per-run trim keeps the newest",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: discovery hash cache invalidates a file replacement and the final check rejects it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: retargeting the resolved path during metadata checks prevents final spawn",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T7 P08 relink requires explicit confirmation and current revision",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T7 repository drift between Tasks requires a fresh reviewed consent revision",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F04 R4-R3-1/FINAL-1: a throwing native terminate or event hook never escapes Stop and never strands accounting",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/Resume reissue asks at the current revision",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "IR-H1 real TaskManager Stop: final-failure",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native fixture: a wrong session cannot attach recognition to another continuous source",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native fixture: duplex stopped acknowledges recognition detachment before push-to-talk fallback",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native: a 180 ms burst in a duplex turn ends as speech_end short and stt.none too_short, with no decode",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native VT-09: the next duplex input turn attaches as soon as the previous capture stops, and the finalizing turn keeps its own terminal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 VT-08: the next input turn is armed at the previous capture's stop, and the finalizing turn's final is accepted exactly once",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 item 9: a recognition deadline drops only that input turn, resumes any held reply, and keeps the session open",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 item 9: a held reply is released once recognition gives up on its turn, and it is resumed, not cancelled",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 forged or revised finals never create a second Task",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 echo (item 1): a partial and a final of the exact sentence being spoken never interrupt or create a Task",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 live trial 4: real speech whose recognition is late keeps the reply held past heldResumeMs; the late question interrupts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 live trial 4: the late-recognition hold is still bounded by heldMaxMs (cancel, never a stale resume)",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 classifier: a partial alone never implies an interruption or a command",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: a partial interrupts only with an interrupt phrase after 180 ms, or two content words after 500 ms",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: partial echo never interrupts, and partials without output never interrupt",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: a final during output that is backchannel or hesitation resumes; a reliable non-backchannel final interrupts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: a final made only of lexicon words resumes even when it is long, and never interrupts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: echo finals are dropped whether or not output is active",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 controller: an empty final and stt.none resume during output and accept otherwise; a decided interrupt never resumes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 hold ownership (round 2): an older finalizing turn never cancels a newer turn's pause, and the newer turn still releases it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 AEC-03 controller: a final during output interrupts only on an interrupt phrase after 180 ms or sustained speech after 500 ms",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V07 V08 a partial transcript is displayed and never acted on",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V09 V10 one Task per final: a duplicate or corrected final for the same turn creates nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "a revision change after proposing re-proposes instead of executing the stale state",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "typed fallback enters the same final-turn path and is flagged by its turn id",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H8 a non-streaming answer with no deltas is spoken from the recorded final output",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H8 an empty final output speaks nothing and says no answer",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V39 V40 a barely-heard final (confidence below the floor) is never routed: no Task, no proposal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-races#6 the first-final guard keeps a bounded set of recent turns across a long session",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-authz#3 a proposal whose agent revision moved on is refused before any canonical command runs",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10-whisper a worker STT_UNAVAILABLE after ready is a notice, not a session failure",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 Part-B a press during TRANSCRIBING waits for the previous final, then starts its own turn (never DEVICE_BUSY)",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V54 a real synthesized fixture turn ends in stt.final through the worker protocol",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10-whisper a real contained whisper fixture turn ends in stt.final from whisper.cpp",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A21 concurrent final allowance: at most one real action admitted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A32 stale revision refused after scope reduction",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A44 routing/provider selection never edits authorization revision or roots",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E22: a device answer carrying a stale authorization revision is refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V07 recognized speech from actual audio: Listening only while the worker confirms capture and fresh",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V08 partial not executed: partial text is a draft only while capturing, and never a final",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V09 final bound to correct turn: a stale-generation final is not shown as the current draft",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V10 recognition correction does not duplicate a Task: planUiIntent honors each seq once",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "engine": "Local whisper.cpp v1.9.4, base.en",
+    "accuracy": "stt-accuracy.json",
+    "commandAdmission": "Unstable partials are never privileged commands."
+  },
+  "limitations": [
+    "English only; recorded double-talk and status-phrase recognition errors remain."
+  ]
+}

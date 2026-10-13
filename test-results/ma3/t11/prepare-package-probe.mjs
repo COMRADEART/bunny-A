@@ -1,0 +1,27 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+let code=readFileSync('test-results/ma3/t10/package-boot.mjs','utf8').replaceAll('t10','t11').replaceAll('T10','T11');
+code=code.replace('let packagedVoice=null;','let packagedVoice=null;let packagedTeam=null;');
+const anchor=" const opened=await command('voice.session.open'";
+const at=code.indexOf(anchor);
+if(at<0)throw Error('Package probe insertion point missing');
+const teamProbe=String.raw`
+ const project=join(parent,'offline-project');mkdirSync(project);writeFileSync(join(project,'notes.md'),'# Disposable package project\n');
+ assert.equal((await command('mission.configure',{enabled:true,limits:{maxSteps:20}})).status,200);
+ const added=await command('project.add',{name:'T11 packaged project',path:project});assert.equal(added.status,200);
+ const created=await command('agent.create',{projectId:added.body.data.id,name:'Packaged team',objective:'Create an offline HTML dashboard and Markdown usage guide from notes.md.',team:{outputDir:'result',requirements:[{id:'R1',text:'Summary section',check:{kind:'html_id',value:'summary'}},{id:'R2',text:'Usage section',check:{kind:'markdown_heading',value:'Usage'}}]}});
+ assert.equal(created.status,200,JSON.stringify(created.body));
+ const initial=created.body.snapshot.agents.agents;assert.equal(initial.length,2);assert.deepEqual(initial.map(a=>a.team.role).sort(),['coordinator','planner']);
+ const coordinator=initial.find(a=>a.team.role==='coordinator');
+ assert.equal((await command('agent.start',{id:coordinator.id})).status,200);
+ const deadlineTeam=Date.now()+240000;let teamState;
+ do{await new Promise(done=>setTimeout(done,500));const current=await fetch('http://127.0.0.1:'+port+'/state',{headers:{authorization:'Bearer '+ready.token}});teamState=await current.json();}while(Date.now()<deadlineTeam&&!teamState.missions.missions.some(m=>m.id===coordinator.missionId&&m.teamView?.phase==='review'));
+ const mission=teamState.missions.missions.find(m=>m.id===coordinator.missionId);assert.equal(mission.teamView.phase,'review','packaged real planner produced a Host-validated plan');
+ const modelTasks=teamState.tasks.filter(t=>t.mission?.missionId===mission.id);assert.ok(modelTasks.some(t=>t.provider==='ollama'&&t.state==='completed'));
+ const members=teamState.agents.agents.filter(a=>a.missionId===mission.id);assert.ok(members.length>=4);assert.equal(new Set(members.map(a=>a.id)).size,members.length);
+ packagedTeam={result:'PASS',classification:'LIVE actual packaged Host, real local Ollama planning, Host validation and durable distinct Agents; execution plan deliberately left unapproved',missionId:mission.id,phase:mission.teamView.phase,members:members.map(a=>({id:a.id,role:a.team.role})),plannerTasks:modelTasks.map(t=>({id:t.id,provider:t.provider,model:t.model,state:t.state})),planReference:mission.teamView.planReference};
+ assert.equal((await command('agent.stop',{id:coordinator.id})).status,200);
+`;
+code=code.slice(0,at)+teamProbe+code.slice(at);
+code=code.replace('validation,after,packagedVoice,packagedContainedProvider','validation,after,packagedTeam,packagedVoice,packagedContainedProvider');
+writeFileSync('test-results/ma3/t11/package-boot.mjs',code);
+console.log('Prepared source-pinned T11 packaged Team Mission probe.');

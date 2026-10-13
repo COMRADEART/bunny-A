@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "0a5988c5eef7e6beae3d1622529e2c638cca7788",
+  "roles": [
+    {
+      "role": "workstation",
+      "establishedBy": "master credential and actual local gateway/Host boundary",
+      "rights": "Existing owner rights; local consent gates remain enforced"
+    },
+    {
+      "role": "paired-device",
+      "establishedBy": "Host-issued per-device credential, never request actor headers",
+      "rights": "Read redacted state; Pause/Resume/Stop; answer exact eligible Host offers; Deny/revoke; bounded local tool-free inference; verified Project artifacts; own sign-out",
+      "refused": "Agent creation/start/initial delegation, authorization proposal/adjustment, arbitrary tools/shell/apps, provider administration, pairing codes, other device revocation, root or budget expansion, hosted/tool-capable provider execution"
+    }
+  ],
+  "ownerRoleForge": "refused",
+  "evidence": [
+    "security-regression-fixed.log",
+    "remote-protocol-results.json"
+  ]
+}

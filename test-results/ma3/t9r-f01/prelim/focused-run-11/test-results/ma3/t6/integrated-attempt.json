@@ -1,0 +1,1817 @@
+{
+  "classification": "DISPOSABLE LIVE VERIFIED",
+  "passed": true,
+  "agentId": "0328c9da-f734-43c5-9569-85c5ce30f332",
+  "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+  "steps": [
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "befe824b-221c-491c-8d5e-88f407cb348f",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 0,
+      "role": "Inspect",
+      "objective": "Inspect",
+      "dependsOn": [],
+      "requiredCapabilities": [
+        "filesystem.read"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "filesystem.read",
+        "params": {
+          "path": "instruction.txt"
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "filesystem.compare",
+          "params": {
+            "path": "instruction.txt",
+            "content": "T6 approved result\n"
+          },
+          "expect": {
+            "field": "matches",
+            "equals": true
+          }
+        }
+      ],
+      "maxRetries": 2,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "3e496cab-f835-4f83-afd4-633d92c2e6fc",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584203143,
+          "finishedAt": 1791584203384,
+          "taskId": null,
+          "capabilityRunId": "3e496cab-f835-4f83-afd4-633d92c2e6fc",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "Read 19 bytes from C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project\\instruction.txt.",
+        "artifactIds": [
+          "f13ddbca-6765-446b-b0ea-ffdfa93a6010",
+          "bfae13d8-7d5d-456a-9761-d4e4fa695c86"
+        ],
+        "verified": true,
+        "verification": [
+          "filesystem.compare matches: passed (independent capability observation)"
+        ],
+        "outputRef": "f13ddbca-6765-446b-b0ea-ffdfa93a6010",
+        "verificationRunIds": [
+          "b05375af-e998-4bf0-9209-9b53c793d994"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 113,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584203143,
+      "finishedAt": 1791584203384
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "4027f867-d9e9-45a1-8b00-c0b7655b5428",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 1,
+      "role": "Repository",
+      "objective": "Repository",
+      "dependsOn": [
+        "befe824b-221c-491c-8d5e-88f407cb348f"
+      ],
+      "requiredCapabilities": [
+        "git.status"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "git.status",
+        "params": {}
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "git.status",
+          "params": {},
+          "expect": {
+            "field": "clean",
+            "equals": true
+          }
+        }
+      ],
+      "maxRetries": 2,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "88893723-7d2c-40f3-b5e7-f9ec2e2b0b56",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584203430,
+          "finishedAt": 1791584204069,
+          "taskId": null,
+          "capabilityRunId": "88893723-7d2c-40f3-b5e7-f9ec2e2b0b56",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "master: clean.",
+        "artifactIds": [
+          "496384b6-82e3-41b4-a653-9336f49bcef1",
+          "38af4ce7-a665-4f2b-8257-7bd47bc9e191"
+        ],
+        "verified": true,
+        "verification": [
+          "git.status clean: passed (independent capability observation)"
+        ],
+        "outputRef": "496384b6-82e3-41b4-a653-9336f49bcef1",
+        "verificationRunIds": [
+          "3406aa0d-293c-4546-8734-df4a8a41286a"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 312,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584203430,
+      "finishedAt": 1791584204069
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": [
+          {
+            "parameter": "content",
+            "field": "text",
+            "stepId": "befe824b-221c-491c-8d5e-88f407cb348f"
+          }
+        ]
+      },
+      "id": "987f22e5-8e6b-4e49-987d-be955eb9606f",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 2,
+      "role": "Edit",
+      "objective": "Edit",
+      "dependsOn": [
+        "4027f867-d9e9-45a1-8b00-c0b7655b5428",
+        "befe824b-221c-491c-8d5e-88f407cb348f"
+      ],
+      "requiredCapabilities": [
+        "filesystem.write"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "write",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "filesystem.write",
+        "params": {
+          "path": "result.txt",
+          "content": "",
+          "overwrite": true
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "filesystem.compare",
+          "params": {
+            "path": "result.txt",
+            "content": "T6 approved result\n"
+          },
+          "expect": {
+            "field": "matches",
+            "equals": true
+          }
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "ab14adb5-d4a7-4fed-b974-d60632620e34",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584204122,
+          "finishedAt": 1791584204396,
+          "taskId": null,
+          "capabilityRunId": "ab14adb5-d4a7-4fed-b974-d60632620e34",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "Wrote 19 bytes to C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project\\result.txt.",
+        "artifactIds": [
+          "18ec7bf5-290c-4bcf-877e-5d39142777d9",
+          "fa8425d1-e81d-46c0-a5c2-d5afaaa130e9",
+          "a9151bce-e82c-4028-bbd3-cc388ef719c0"
+        ],
+        "verified": true,
+        "verification": [
+          "filesystem.compare matches: passed (independent capability observation)"
+        ],
+        "outputRef": "18ec7bf5-290c-4bcf-877e-5d39142777d9",
+        "verificationRunIds": [
+          "04b9f774-91fc-4d12-b86c-56600767637d"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 136,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584204122,
+      "finishedAt": 1791584204396
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "8748a088-7b36-4e25-b06d-99531f059100",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 3,
+      "role": "Check",
+      "objective": "Check",
+      "dependsOn": [
+        "987f22e5-8e6b-4e49-987d-be955eb9606f"
+      ],
+      "requiredCapabilities": [
+        "terminal.exec"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "terminal.exec",
+        "params": {
+          "command": "node",
+          "args": [
+            "check.mjs"
+          ],
+          "timeoutMs": 30000
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability_run",
+          "expectExit": 0,
+          "stdoutIncludes": "T6 CHECK PASS"
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "55c5fc9e-aaf5-4263-9b76-a8f724714f69",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584204454,
+          "finishedAt": 1791584205078,
+          "taskId": null,
+          "capabilityRunId": "55c5fc9e-aaf5-4263-9b76-a8f724714f69",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "node check.mjs exited 0.",
+        "artifactIds": [
+          "d88d02c1-d22f-4e71-978c-bad5d1ec8415",
+          "861ddbbb-e952-4689-a127-22c606ec7f56"
+        ],
+        "verified": true,
+        "verification": [
+          "Owned terminal exit/output: passed"
+        ],
+        "outputRef": "d88d02c1-d22f-4e71-978c-bad5d1ec8415",
+        "verificationRunIds": []
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 579,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584204454,
+      "finishedAt": 1791584205078
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "1a9efd3a-7eb7-47d9-afa1-8aaa43394d04",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 4,
+      "role": "Browser",
+      "objective": "Browser",
+      "dependsOn": [
+        "8748a088-7b36-4e25-b06d-99531f059100"
+      ],
+      "requiredCapabilities": [
+        "browser.navigate"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "browser.navigate",
+        "params": {
+          "url": "http://127.0.0.1:62075/"
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "browser.read",
+          "params": {},
+          "expect": {
+            "field": "text",
+            "contains": "T6 browser verified"
+          }
+        }
+      ],
+      "maxRetries": 2,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "ea5c92ff-3b17-4020-b5f6-cb968832c356",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584206085,
+          "finishedAt": 1791584206639,
+          "taskId": null,
+          "capabilityRunId": "ea5c92ff-3b17-4020-b5f6-cb968832c356",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "Opened T6 fixture (200).",
+        "artifactIds": [
+          "63e82645-01ab-46c3-9553-75ce789647ca",
+          "8a3e2ca9-13f7-4c55-bce8-d2380b5415d6",
+          "4895e9ea-4030-45ed-8a63-74998cd6e95a"
+        ],
+        "verified": true,
+        "verification": [
+          "browser.read text: passed (independent capability observation)"
+        ],
+        "outputRef": "63e82645-01ab-46c3-9553-75ce789647ca",
+        "verificationRunIds": [
+          "f400953a-205d-4133-9907-c50326d9e6ee"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 455,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584206085,
+      "finishedAt": 1791584206639
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "037f14ee-f445-4490-b6f5-c94f8e5cdbc5",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 5,
+      "role": "Acquire",
+      "objective": "Acquire",
+      "dependsOn": [
+        "1a9efd3a-7eb7-47d9-afa1-8aaa43394d04"
+      ],
+      "requiredCapabilities": [
+        "computer.open_app"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "computer.open_app",
+        "params": {
+          "app": "calculator"
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "computer.read_calculator",
+          "params": {
+            "title": "Calculator"
+          },
+          "expect": {
+            "field": "result",
+            "contains": "Display is"
+          }
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "88fecd89-14ac-4ce8-ad9d-16928bcce088",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584206713,
+          "finishedAt": 1791584210314,
+          "taskId": null,
+          "capabilityRunId": "88fecd89-14ac-4ce8-ad9d-16928bcce088",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "Reused the verified Calculator target.",
+        "artifactIds": [
+          "5e8c7d3f-5175-46c1-bc88-c44e9bfb2b55",
+          "b48c1275-b01b-4e4a-a72e-15d267d4b1d0"
+        ],
+        "verified": true,
+        "verification": [
+          "computer.read_calculator result: passed (independent capability observation)"
+        ],
+        "outputRef": "5e8c7d3f-5175-46c1-bc88-c44e9bfb2b55",
+        "verificationRunIds": [
+          "95d85c2f-57e6-4ff5-95ac-cce2f56551de"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 1686,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584206713,
+      "finishedAt": 1791584210314
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "7e4f82f6-48b9-46a9-a4eb-98c4da829bf7",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 6,
+      "role": "Focus",
+      "objective": "Focus",
+      "dependsOn": [
+        "037f14ee-f445-4490-b6f5-c94f8e5cdbc5"
+      ],
+      "requiredCapabilities": [
+        "computer.focus_window"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "computer.focus_window",
+        "params": {
+          "title": "Calculator"
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "computer.read_calculator",
+          "params": {
+            "title": "Calculator"
+          },
+          "expect": {
+            "field": "result",
+            "contains": "Display is"
+          }
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "891bf6cd-1e35-4f43-977b-3f9253b6eaa6",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584210386,
+          "finishedAt": 1791584214377,
+          "taskId": null,
+          "capabilityRunId": "891bf6cd-1e35-4f43-977b-3f9253b6eaa6",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "Focused \"Calculator\".",
+        "artifactIds": [
+          "3c904b89-676c-449b-a0c4-77d1bc799cbc",
+          "975958e8-94a0-4154-9eae-8cda51318e51"
+        ],
+        "verified": true,
+        "verification": [
+          "computer.read_calculator result: passed (independent capability observation)"
+        ],
+        "outputRef": "3c904b89-676c-449b-a0c4-77d1bc799cbc",
+        "verificationRunIds": [
+          "6fe9ed69-8010-4b26-99a1-fb12e35dbf7c"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 2315,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584210386,
+      "finishedAt": 1791584214377
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "80a993a3-e237-46a1-82a1-bbaafb5a22eb",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 7,
+      "role": "Clear",
+      "objective": "Clear",
+      "dependsOn": [
+        "7e4f82f6-48b9-46a9-a4eb-98c4da829bf7"
+      ],
+      "requiredCapabilities": [
+        "computer.invoke_control"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "computer.invoke_control",
+        "params": {
+          "title": "Calculator",
+          "automationId": "clearButton"
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "computer.read_calculator",
+          "params": {
+            "title": "Calculator"
+          },
+          "expect": {
+            "field": "result",
+            "contains": "Display is 0"
+          }
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "fc923e65-01e9-4584-959a-654e6e5804e2",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584214474,
+          "finishedAt": 1791584217801,
+          "taskId": null,
+          "capabilityRunId": "fc923e65-01e9-4584-959a-654e6e5804e2",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "invoke on \"Clear\".",
+        "artifactIds": [
+          "01eebdda-0bb5-464d-8a09-ec580caec05d",
+          "8c36b6e9-8340-4f9c-8db5-0fa99c725bc5"
+        ],
+        "verified": true,
+        "verification": [
+          "computer.read_calculator result: passed (independent capability observation)"
+        ],
+        "outputRef": "01eebdda-0bb5-464d-8a09-ec580caec05d",
+        "verificationRunIds": [
+          "9ebdcf06-dc5a-4247-8784-78bd9955dd32"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 1671,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584214474,
+      "finishedAt": 1791584217801
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "9b708420-5255-4524-9d7e-5cbd6b086949",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 8,
+      "role": "Enter",
+      "objective": "Enter",
+      "dependsOn": [
+        "80a993a3-e237-46a1-82a1-bbaafb5a22eb"
+      ],
+      "requiredCapabilities": [
+        "computer.invoke_control"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "read",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "computer.invoke_control",
+        "params": {
+          "title": "Calculator",
+          "automationId": "num2Button"
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "computer.read_calculator",
+          "params": {
+            "title": "Calculator"
+          },
+          "expect": {
+            "field": "result",
+            "contains": "Display is 2"
+          }
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "a85e0171-baba-44de-a604-d630ffd0fa17",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584217891,
+          "finishedAt": 1791584221266,
+          "taskId": null,
+          "capabilityRunId": "a85e0171-baba-44de-a604-d630ffd0fa17",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "invoke on \"Two\".",
+        "artifactIds": [
+          "3123da08-02cb-4d04-933d-d47f03e7dc4f",
+          "d1426405-11a4-4e8b-b92d-8d238d0f7ee0"
+        ],
+        "verified": true,
+        "verification": [
+          "computer.read_calculator result: passed (independent capability observation)"
+        ],
+        "outputRef": "3123da08-02cb-4d04-933d-d47f03e7dc4f",
+        "verificationRunIds": [
+          "0f828299-22f1-43be-8c42-9b7e019a0081"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 1650,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584217891,
+      "finishedAt": 1791584221266
+    },
+    {
+      "crossApp": {
+        "version": "ma3.cross-app.v1",
+        "inputs": []
+      },
+      "id": "807f66a4-36af-4fd4-8dc4-3be065ae944f",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "index": 9,
+      "role": "Report",
+      "objective": "Report",
+      "dependsOn": [
+        "9b708420-5255-4524-9d7e-5cbd6b086949"
+      ],
+      "requiredCapabilities": [
+        "filesystem.write"
+      ],
+      "reasoning": "none",
+      "preferences": {},
+      "scope": {
+        "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+        "access": "write",
+        "isolation": "shared"
+      },
+      "providerConstraints": {},
+      "modelConstraint": null,
+      "executor": {
+        "kind": "capability",
+        "action": "filesystem.write",
+        "params": {
+          "path": "acceptance.txt",
+          "content": "All cross-app postconditions verified. Calculator result 2."
+        }
+      },
+      "expectedArtifacts": [],
+      "verification": [
+        {
+          "kind": "capability",
+          "action": "filesystem.compare",
+          "params": {
+            "path": "acceptance.txt",
+            "content": "All cross-app postconditions verified. Calculator result 2."
+          },
+          "expect": {
+            "field": "matches",
+            "equals": true
+          }
+        }
+      ],
+      "maxRetries": 0,
+      "timeoutMs": 600000,
+      "weight": null,
+      "state": "completed",
+      "taskId": null,
+      "capabilityRunId": "81ff1c05-f34c-488f-af73-aac822132459",
+      "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project",
+      "attempts": [
+        {
+          "attempt": 1,
+          "startedAt": 1791584221382,
+          "finishedAt": 1791584221677,
+          "taskId": null,
+          "capabilityRunId": "81ff1c05-f34c-488f-af73-aac822132459",
+          "provider": null,
+          "outcome": "completed",
+          "category": null,
+          "detail": "completed"
+        }
+      ],
+      "result": {
+        "summary": "Wrote 59 bytes to C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project\\acceptance.txt.",
+        "artifactIds": [
+          "3b27724b-f09b-4956-977a-fbce7dbbad6b",
+          "e00b55e9-4bd0-43aa-93aa-094deceb82ff",
+          "dc9a84e4-af35-4f3f-a353-95be9d0e6bbd"
+        ],
+        "verified": true,
+        "verification": [
+          "filesystem.compare matches: passed (independent capability observation)"
+        ],
+        "outputRef": "3b27724b-f09b-4956-977a-fbce7dbbad6b",
+        "verificationRunIds": [
+          "4e49548b-4d8b-4f56-8f97-6fe5d6602184"
+        ]
+      },
+      "evidence": [],
+      "failure": null,
+      "accounting": {
+        "runtimeMs": 135,
+        "local": true,
+        "provider": null,
+        "model": null,
+        "inputTokens": null,
+        "outputTokens": null,
+        "deterministic": true
+      },
+      "pendingRequestId": null,
+      "pendingPhase": null,
+      "approvedOnce": null,
+      "startedAt": 1791584221382,
+      "finishedAt": 1791584221677
+    }
+  ],
+  "runs": [
+    {
+      "id": "3e496cab-f835-4f83-afd4-633d92c2e6fc",
+      "action": "filesystem.read",
+      "capability": "filesystem",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "befe824b-221c-491c-8d5e-88f407cb348f",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 03c48b32-604e-4ed7-bb70-08e67e9087d1.",
+      "params": {
+        "path": "instruction.txt"
+      },
+      "status": "succeeded",
+      "summary": "Read 19 bytes from C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project\\instruction.txt.",
+      "evidence": [
+        "Read C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project\\instruction.txt (19 bytes)"
+      ],
+      "artifactIds": [
+        "f13ddbca-6765-446b-b0ea-ffdfa93a6010"
+      ],
+      "startedAt": 1791584203205,
+      "finishedAt": 1791584203266,
+      "durationMs": 61,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "f13ddbca-6765-446b-b0ea-ffdfa93a6010"
+    },
+    {
+      "id": "b05375af-e998-4bf0-9209-9b53c793d994",
+      "action": "filesystem.compare",
+      "capability": "filesystem",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "befe824b-221c-491c-8d5e-88f407cb348f",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 03c48b32-604e-4ed7-bb70-08e67e9087d1.",
+      "params": {
+        "path": "instruction.txt",
+        "content": "[19 characters]"
+      },
+      "status": "succeeded",
+      "summary": "Current file content independently observed.",
+      "evidence": [
+        "SHA-256 4e0fa7ebceddd47357336a6789b6e51f4a02ab78ab83eb93f5d3bc568955f3b7"
+      ],
+      "artifactIds": [
+        "bfae13d8-7d5d-456a-9761-d4e4fa695c86"
+      ],
+      "startedAt": 1791584203307,
+      "finishedAt": 1791584203365,
+      "durationMs": 58,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "bfae13d8-7d5d-456a-9761-d4e4fa695c86"
+    },
+    {
+      "id": "88893723-7d2c-40f3-b5e7-f9ec2e2b0b56",
+      "action": "git.status",
+      "capability": "git",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "4027f867-d9e9-45a1-8b00-c0b7655b5428",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 03c48b32-604e-4ed7-bb70-08e67e9087d1.",
+      "params": {},
+      "status": "succeeded",
+      "summary": "master: clean.",
+      "evidence": [
+        "git status in C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project"
+      ],
+      "artifactIds": [
+        "496384b6-82e3-41b4-a653-9336f49bcef1"
+      ],
+      "startedAt": 1791584203489,
+      "finishedAt": 1791584203750,
+      "durationMs": 261,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "496384b6-82e3-41b4-a653-9336f49bcef1"
+    },
+    {
+      "id": "3406aa0d-293c-4546-8734-df4a8a41286a",
+      "action": "git.status",
+      "capability": "git",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "4027f867-d9e9-45a1-8b00-c0b7655b5428",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 03c48b32-604e-4ed7-bb70-08e67e9087d1.",
+      "params": {},
+      "status": "succeeded",
+      "summary": "master: clean.",
+      "evidence": [
+        "git status in C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project"
+      ],
+      "artifactIds": [
+        "38af4ce7-a665-4f2b-8257-7bd47bc9e191"
+      ],
+      "startedAt": 1791584203786,
+      "finishedAt": 1791584204049,
+      "durationMs": 263,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "38af4ce7-a665-4f2b-8257-7bd47bc9e191"
+    },
+    {
+      "id": "ab14adb5-d4a7-4fed-b974-d60632620e34",
+      "action": "filesystem.write",
+      "capability": "filesystem",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "987f22e5-8e6b-4e49-987d-be955eb9606f",
+      "risk": "WRITE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 03c48b32-604e-4ed7-bb70-08e67e9087d1.",
+      "params": {
+        "path": "result.txt",
+        "content": "[19 characters]",
+        "overwrite": true
+      },
+      "status": "succeeded",
+      "summary": "Wrote 19 bytes to C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project\\result.txt.",
+      "evidence": [
+        "Wrote and read back C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project\\result.txt; before 9160d4be34c8695bd172a76c7c7966587ea5a4d991ad22c87b2b91af54aa9ebb; after 4e0fa7ebceddd47357336a6789b6e51f4a02ab78ab83eb93f5d3bc568955f3b7"
+      ],
+      "artifactIds": [
+        "18ec7bf5-290c-4bcf-877e-5d39142777d9",
+        "fa8425d1-e81d-46c0-a5c2-d5afaaa130e9"
+      ],
+      "startedAt": 1791584204199,
+      "finishedAt": 1791584204268,
+      "durationMs": 69,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "18ec7bf5-290c-4bcf-877e-5d39142777d9"
+    },
+    {
+      "id": "04b9f774-91fc-4d12-b86c-56600767637d",
+      "action": "filesystem.compare",
+      "capability": "filesystem",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "987f22e5-8e6b-4e49-987d-be955eb9606f",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 03c48b32-604e-4ed7-bb70-08e67e9087d1.",
+      "params": {
+        "path": "result.txt",
+        "content": "[19 characters]"
+      },
+      "status": "succeeded",
+      "summary": "Current file content independently observed.",
+      "evidence": [
+        "SHA-256 4e0fa7ebceddd47357336a6789b6e51f4a02ab78ab83eb93f5d3bc568955f3b7"
+      ],
+      "artifactIds": [
+        "a9151bce-e82c-4028-bbd3-cc388ef719c0"
+      ],
+      "startedAt": 1791584204313,
+      "finishedAt": 1791584204374,
+      "durationMs": 61,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "a9151bce-e82c-4028-bbd3-cc388ef719c0"
+    },
+    {
+      "id": "55c5fc9e-aaf5-4263-9b76-a8f724714f69",
+      "action": "terminal.exec",
+      "capability": "terminal",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "8748a088-7b36-4e25-b06d-99531f059100",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 03c48b32-604e-4ed7-bb70-08e67e9087d1.",
+      "params": {
+        "command": "node",
+        "args": [
+          "check.mjs"
+        ],
+        "timeoutMs": 30000
+      },
+      "status": "succeeded",
+      "summary": "node check.mjs exited 0.",
+      "evidence": [
+        "node check.mjs in C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project → exit 0 after 113 ms"
+      ],
+      "artifactIds": [
+        "d88d02c1-d22f-4e71-978c-bad5d1ec8415",
+        "861ddbbb-e952-4689-a127-22c606ec7f56"
+      ],
+      "startedAt": 1791584204640,
+      "finishedAt": 1791584205050,
+      "durationMs": 410,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "d88d02c1-d22f-4e71-978c-bad5d1ec8415"
+    },
+    {
+      "id": "ea5c92ff-3b17-4020-b5f6-cb968832c356",
+      "action": "browser.navigate",
+      "capability": "browser",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "1a9efd3a-7eb7-47d9-afa1-8aaa43394d04",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "url": "http://127.0.0.1:62075/"
+      },
+      "status": "succeeded",
+      "summary": "Opened T6 fixture (200).",
+      "evidence": [
+        "http://127.0.0.1:62075/ · \"T6 fixture\" · 2026-10-09T22:16:46.540Z",
+        "Mission-owned browser session d35b1b88-38fc-4c29-8a10-0946001a19bb"
+      ],
+      "artifactIds": [
+        "63e82645-01ab-46c3-9553-75ce789647ca"
+      ],
+      "startedAt": 1791584206139,
+      "finishedAt": 1791584206548,
+      "durationMs": 409,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "63e82645-01ab-46c3-9553-75ce789647ca"
+    },
+    {
+      "id": "f400953a-205d-4133-9907-c50326d9e6ee",
+      "action": "browser.read",
+      "capability": "browser",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "1a9efd3a-7eb7-47d9-afa1-8aaa43394d04",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {},
+      "status": "succeeded",
+      "summary": "Read 83 characters from T6 fixture.",
+      "evidence": [
+        "http://127.0.0.1:62075/ · \"T6 fixture\" · 2026-10-09T22:16:46.604Z",
+        "Mission-owned browser session d35b1b88-38fc-4c29-8a10-0946001a19bb"
+      ],
+      "artifactIds": [
+        "8a3e2ca9-13f7-4c55-bce8-d2380b5415d6",
+        "4895e9ea-4030-45ed-8a63-74998cd6e95a"
+      ],
+      "startedAt": 1791584206574,
+      "finishedAt": 1791584206616,
+      "durationMs": 42,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "8a3e2ca9-13f7-4c55-bce8-d2380b5415d6"
+    },
+    {
+      "id": "88fecd89-14ac-4ce8-ad9d-16928bcce088",
+      "action": "computer.open_app",
+      "capability": "computer",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "037f14ee-f445-4490-b6f5-c94f8e5cdbc5",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "app": "calculator"
+      },
+      "status": "succeeded",
+      "summary": "Reused the verified Calculator target.",
+      "evidence": [
+        "computer.open_app via UI Automation at 2026-10-09T22:16:48.403Z",
+        "Calculator target reuse_existing: {\"handle\":\"790004\",\"processId\":10088,\"processStartedAt\":\"639270365907246455\",\"contentProcessId\":2468,\"contentStartedAt\":\"639271275524176623\"}"
+      ],
+      "artifactIds": [
+        "5e8c7d3f-5175-46c1-bc88-c44e9bfb2b55"
+      ],
+      "startedAt": 1791584206768,
+      "finishedAt": 1791584208407,
+      "durationMs": 1639,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "5e8c7d3f-5175-46c1-bc88-c44e9bfb2b55"
+    },
+    {
+      "id": "95d85c2f-57e6-4ff5-95ac-cce2f56551de",
+      "action": "computer.read_calculator",
+      "capability": "computer",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "037f14ee-f445-4490-b6f5-c94f8e5cdbc5",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "title": "Calculator"
+      },
+      "status": "succeeded",
+      "summary": "Calculator result: Display is 2.",
+      "evidence": [
+        "computer.read_calculator via UI Automation at 2026-10-09T22:16:50.281Z",
+        "Calculator target reused: {\"handle\":\"790004\",\"processId\":10088,\"processStartedAt\":\"639270365907246455\",\"contentProcessId\":2468,\"contentStartedAt\":\"639271275524176623\"}"
+      ],
+      "artifactIds": [
+        "b48c1275-b01b-4e4a-a72e-15d267d4b1d0"
+      ],
+      "startedAt": 1791584208433,
+      "finishedAt": 1791584210295,
+      "durationMs": 1862,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "b48c1275-b01b-4e4a-a72e-15d267d4b1d0"
+    },
+    {
+      "id": "891bf6cd-1e35-4f43-977b-3f9253b6eaa6",
+      "action": "computer.focus_window",
+      "capability": "computer",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "7e4f82f6-48b9-46a9-a4eb-98c4da829bf7",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "title": "Calculator"
+      },
+      "status": "succeeded",
+      "summary": "Focused \"Calculator\".",
+      "evidence": [
+        "computer.focus_window via UI Automation at 2026-10-09T22:16:52.706Z",
+        "Calculator target reused: {\"handle\":\"790004\",\"processId\":10088,\"processStartedAt\":\"639270365907246455\",\"contentProcessId\":2468,\"contentStartedAt\":\"639271275524176623\"}"
+      ],
+      "artifactIds": [
+        "3c904b89-676c-449b-a0c4-77d1bc799cbc"
+      ],
+      "startedAt": 1791584210423,
+      "finishedAt": 1791584212710,
+      "durationMs": 2287,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "3c904b89-676c-449b-a0c4-77d1bc799cbc"
+    },
+    {
+      "id": "6fe9ed69-8010-4b26-99a1-fb12e35dbf7c",
+      "action": "computer.read_calculator",
+      "capability": "computer",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "7e4f82f6-48b9-46a9-a4eb-98c4da829bf7",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "title": "Calculator"
+      },
+      "status": "succeeded",
+      "summary": "Calculator result: Display is 2.",
+      "evidence": [
+        "computer.read_calculator via UI Automation at 2026-10-09T22:16:54.340Z",
+        "Calculator target reused: {\"handle\":\"790004\",\"processId\":10088,\"processStartedAt\":\"639270365907246455\",\"contentProcessId\":2468,\"contentStartedAt\":\"639271275524176623\"}"
+      ],
+      "artifactIds": [
+        "975958e8-94a0-4154-9eae-8cda51318e51"
+      ],
+      "startedAt": 1791584212738,
+      "finishedAt": 1791584214354,
+      "durationMs": 1616,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "975958e8-94a0-4154-9eae-8cda51318e51"
+    },
+    {
+      "id": "fc923e65-01e9-4584-959a-654e6e5804e2",
+      "action": "computer.invoke_control",
+      "capability": "computer",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "80a993a3-e237-46a1-82a1-bbaafb5a22eb",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "title": "Calculator",
+        "automationId": "clearButton"
+      },
+      "status": "succeeded",
+      "summary": "invoke on \"Clear\".",
+      "evidence": [
+        "computer.invoke_control via UI Automation at 2026-10-09T22:16:56.139Z",
+        "Calculator target reused: {\"handle\":\"790004\",\"processId\":10088,\"processStartedAt\":\"639270365907246455\",\"contentProcessId\":2468,\"contentStartedAt\":\"639271275524176623\"}"
+      ],
+      "artifactIds": [
+        "01eebdda-0bb5-464d-8a09-ec580caec05d"
+      ],
+      "startedAt": 1791584214511,
+      "finishedAt": 1791584216153,
+      "durationMs": 1642,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "01eebdda-0bb5-464d-8a09-ec580caec05d"
+    },
+    {
+      "id": "9ebdcf06-dc5a-4247-8784-78bd9955dd32",
+      "action": "computer.read_calculator",
+      "capability": "computer",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "80a993a3-e237-46a1-82a1-bbaafb5a22eb",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "title": "Calculator"
+      },
+      "status": "succeeded",
+      "summary": "Calculator result: Display is 0.",
+      "evidence": [
+        "computer.read_calculator via UI Automation at 2026-10-09T22:16:57.767Z",
+        "Calculator target reused: {\"handle\":\"790004\",\"processId\":10088,\"processStartedAt\":\"639270365907246455\",\"contentProcessId\":2468,\"contentStartedAt\":\"639271275524176623\"}"
+      ],
+      "artifactIds": [
+        "8c36b6e9-8340-4f9c-8db5-0fa99c725bc5"
+      ],
+      "startedAt": 1791584216179,
+      "finishedAt": 1791584217781,
+      "durationMs": 1602,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "8c36b6e9-8340-4f9c-8db5-0fa99c725bc5"
+    },
+    {
+      "id": "a85e0171-baba-44de-a604-d630ffd0fa17",
+      "action": "computer.invoke_control",
+      "capability": "computer",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "9b708420-5255-4524-9d7e-5cbd6b086949",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "title": "Calculator",
+        "automationId": "num2Button"
+      },
+      "status": "succeeded",
+      "summary": "invoke on \"Two\".",
+      "evidence": [
+        "computer.invoke_control via UI Automation at 2026-10-09T22:16:59.536Z",
+        "Calculator target reused: {\"handle\":\"790004\",\"processId\":10088,\"processStartedAt\":\"639270365907246455\",\"contentProcessId\":2468,\"contentStartedAt\":\"639271275524176623\"}"
+      ],
+      "artifactIds": [
+        "3123da08-02cb-4d04-933d-d47f03e7dc4f"
+      ],
+      "startedAt": 1791584217934,
+      "finishedAt": 1791584219549,
+      "durationMs": 1615,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "3123da08-02cb-4d04-933d-d47f03e7dc4f"
+    },
+    {
+      "id": "0f828299-22f1-43be-8c42-9b7e019a0081",
+      "action": "computer.read_calculator",
+      "capability": "computer",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "9b708420-5255-4524-9d7e-5cbd6b086949",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "title": "Calculator"
+      },
+      "status": "succeeded",
+      "summary": "Calculator result: Display is 2.",
+      "evidence": [
+        "computer.read_calculator via UI Automation at 2026-10-09T22:17:01.228Z",
+        "Calculator target reused: {\"handle\":\"790004\",\"processId\":10088,\"processStartedAt\":\"639270365907246455\",\"contentProcessId\":2468,\"contentStartedAt\":\"639271275524176623\"}"
+      ],
+      "artifactIds": [
+        "d1426405-11a4-4e8b-b92d-8d238d0f7ee0"
+      ],
+      "startedAt": 1791584219578,
+      "finishedAt": 1791584221242,
+      "durationMs": 1664,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "d1426405-11a4-4e8b-b92d-8d238d0f7ee0"
+    },
+    {
+      "id": "81ff1c05-f34c-488f-af73-aac822132459",
+      "action": "filesystem.write",
+      "capability": "filesystem",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "807f66a4-36af-4fd4-8dc4-3be065ae944f",
+      "risk": "WRITE",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "path": "acceptance.txt",
+        "content": "[59 characters]"
+      },
+      "status": "succeeded",
+      "summary": "Wrote 59 bytes to C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project\\acceptance.txt.",
+      "evidence": [
+        "Wrote and read back C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t6-disposable-yKOo1e\\project\\acceptance.txt; before absent; after 9fbb77293e11016a12886f33f2b378040853929cd6282073107217b602ca2912"
+      ],
+      "artifactIds": [
+        "3b27724b-f09b-4956-977a-fbce7dbbad6b",
+        "e00b55e9-4bd0-43aa-93aa-094deceb82ff"
+      ],
+      "startedAt": 1791584221456,
+      "finishedAt": 1791584221526,
+      "durationMs": 70,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "3b27724b-f09b-4956-977a-fbce7dbbad6b"
+    },
+    {
+      "id": "4e49548b-4d8b-4f56-8f97-6fe5d6602184",
+      "action": "filesystem.compare",
+      "capability": "filesystem",
+      "missionId": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "stepId": "807f66a4-36af-4fd4-8dc4-3be065ae944f",
+      "risk": "READ",
+      "decision": "allow",
+      "decisionReason": "Inside mission authorization 4ea0323a-b6d4-41be-8138-6d5b6dc4d485.",
+      "params": {
+        "path": "acceptance.txt",
+        "content": "[59 characters]"
+      },
+      "status": "succeeded",
+      "summary": "Current file content independently observed.",
+      "evidence": [
+        "SHA-256 9fbb77293e11016a12886f33f2b378040853929cd6282073107217b602ca2912"
+      ],
+      "artifactIds": [
+        "dc9a84e4-af35-4f3f-a353-95be9d0e6bbd"
+      ],
+      "startedAt": 1791584221584,
+      "finishedAt": 1791584221654,
+      "durationMs": 70,
+      "origin": "mission:ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "outputRef": "dc9a84e4-af35-4f3f-a353-95be9d0e6bbd"
+    }
+  ],
+  "admissions": [
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "befe824b-221c-491c-8d5e-88f407cb348f",
+      "capability": "filesystem.read",
+      "resource_reference": "53e133d8b73c51dc09c879db07d51e829f74601f80fe809a71a40bc0c273646b",
+      "attempt_kind": "action",
+      "id": "ff723f2b-eb34-486d-9574-fa31c181e9f6",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 1,
+      "host_generation": "b2258f68-f4ef-4f70-8cf7-7d9bce45f318",
+      "admitted_at": 1791584203227,
+      "finished_at": 1791584203271,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "befe824b-221c-491c-8d5e-88f407cb348f",
+      "capability": "filesystem.compare",
+      "resource_reference": "32eec4e528dfd03b153644fd1128060e81e8b743b3de583ee11b567020921cfd",
+      "attempt_kind": "action",
+      "id": "c1821d73-af82-45b9-9753-932c250a41d6",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 1,
+      "host_generation": "b2258f68-f4ef-4f70-8cf7-7d9bce45f318",
+      "admitted_at": 1791584203327,
+      "finished_at": 1791584203371,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "4027f867-d9e9-45a1-8b00-c0b7655b5428",
+      "capability": "git.status",
+      "resource_reference": "d7d98f927fdf8515deaa8ee611c3e3b07146ab4fb370255a1fb048713c017670",
+      "attempt_kind": "action",
+      "id": "b61a77d4-0104-4892-86fb-52044a85c292",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 1,
+      "host_generation": "b2258f68-f4ef-4f70-8cf7-7d9bce45f318",
+      "admitted_at": 1791584203503,
+      "finished_at": 1791584203756,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "4027f867-d9e9-45a1-8b00-c0b7655b5428",
+      "capability": "git.status",
+      "resource_reference": "d7d98f927fdf8515deaa8ee611c3e3b07146ab4fb370255a1fb048713c017670",
+      "attempt_kind": "action",
+      "id": "b3178b1e-f15f-41c2-915f-1840bb6d0d6b",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 1,
+      "host_generation": "b2258f68-f4ef-4f70-8cf7-7d9bce45f318",
+      "admitted_at": 1791584203804,
+      "finished_at": 1791584204055,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "987f22e5-8e6b-4e49-987d-be955eb9606f",
+      "capability": "filesystem.write",
+      "resource_reference": "301220595178ef4fbbcc4f497ed59bc797a1168f6ca5608447eef3777540d845",
+      "attempt_kind": "action",
+      "id": "6aaa5c8b-6480-454c-970b-b0dc34fd4de6",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 1,
+      "host_generation": "b2258f68-f4ef-4f70-8cf7-7d9bce45f318",
+      "admitted_at": 1791584204222,
+      "finished_at": 1791584204274,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "987f22e5-8e6b-4e49-987d-be955eb9606f",
+      "capability": "filesystem.compare",
+      "resource_reference": "e082a2964af3ef2d031213a9d83748bd62e2f2146509ca1df509e9f0bbd32910",
+      "attempt_kind": "action",
+      "id": "97db57d6-d1af-4a9b-9c1a-473f3d24b61e",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 1,
+      "host_generation": "b2258f68-f4ef-4f70-8cf7-7d9bce45f318",
+      "admitted_at": 1791584204338,
+      "finished_at": 1791584204379,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "8748a088-7b36-4e25-b06d-99531f059100",
+      "capability": "terminal.exec",
+      "resource_reference": "f8ad7e5c3e1ab5da039a4a2861a05d3593832b1822662a0f2c2cf18c8ea8796c",
+      "attempt_kind": "action",
+      "id": "1721c68e-8c42-4b49-89db-49e5e4e89f8c",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 1,
+      "host_generation": "b2258f68-f4ef-4f70-8cf7-7d9bce45f318",
+      "admitted_at": 1791584204777,
+      "finished_at": 1791584205056,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "1a9efd3a-7eb7-47d9-afa1-8aaa43394d04",
+      "capability": "browser.navigate",
+      "resource_reference": "c611be15ed2e226b8289128d9623072e671263e4f839adc900c50c181fd861bc",
+      "attempt_kind": "action",
+      "id": "ca15f5d9-fbba-4eac-917b-9668bf2d151e",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584206142,
+      "finished_at": 1791584206554,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "1a9efd3a-7eb7-47d9-afa1-8aaa43394d04",
+      "capability": "browser.read",
+      "resource_reference": "e881ee3f0a5234fdeabe79a3d70b227eeca91b78d23d4cfc0ef5a7d7acb4aa47",
+      "attempt_kind": "action",
+      "id": "f397e6d5-8a16-48cc-94cc-86f4aa81e90c",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584206577,
+      "finished_at": 1791584206622,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "037f14ee-f445-4490-b6f5-c94f8e5cdbc5",
+      "capability": "computer.open_app",
+      "resource_reference": "350c090a6a6c997ef85b642aee01919341b980192f9aee77612db1471c423f74",
+      "attempt_kind": "action",
+      "id": "37dcd005-92d3-432c-8b26-981576fa6b0d",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584206770,
+      "finished_at": 1791584208414,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "037f14ee-f445-4490-b6f5-c94f8e5cdbc5",
+      "capability": "computer.read_calculator",
+      "resource_reference": "189dc674b4f33c4f3a92ffa1d8727fca50708c1781c0557440b06e5e59c46566",
+      "attempt_kind": "action",
+      "id": "f85e877a-f1e2-43c6-875a-5daad784c959",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584208435,
+      "finished_at": 1791584210300,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "7e4f82f6-48b9-46a9-a4eb-98c4da829bf7",
+      "capability": "computer.focus_window",
+      "resource_reference": "136ed8ddeadcb9f1c1ddbfd241867b1a62199be74b09fa45a80188c3f392b0a7",
+      "attempt_kind": "action",
+      "id": "97d55d98-2a8d-495d-b285-2d5f699c2c73",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584210426,
+      "finished_at": 1791584212716,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "7e4f82f6-48b9-46a9-a4eb-98c4da829bf7",
+      "capability": "computer.read_calculator",
+      "resource_reference": "189dc674b4f33c4f3a92ffa1d8727fca50708c1781c0557440b06e5e59c46566",
+      "attempt_kind": "action",
+      "id": "c34ef83c-70fa-4670-a243-211d9cbbd2bb",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584212742,
+      "finished_at": 1791584214361,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "80a993a3-e237-46a1-82a1-bbaafb5a22eb",
+      "capability": "computer.invoke_control",
+      "resource_reference": "bddede52f62ce3eaaaa8db2ac1d5fb0822776f7974b8fbb4c45df74abcb2f8fd",
+      "attempt_kind": "action",
+      "id": "533a5f69-4fa7-466a-9f73-c37578bc0fd2",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584214513,
+      "finished_at": 1791584216160,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "80a993a3-e237-46a1-82a1-bbaafb5a22eb",
+      "capability": "computer.read_calculator",
+      "resource_reference": "189dc674b4f33c4f3a92ffa1d8727fca50708c1781c0557440b06e5e59c46566",
+      "attempt_kind": "action",
+      "id": "388bd706-95fd-46b1-a0b3-07850364bdd8",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584216181,
+      "finished_at": 1791584217786,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "9b708420-5255-4524-9d7e-5cbd6b086949",
+      "capability": "computer.invoke_control",
+      "resource_reference": "5133bbe60d5e5395dc674c87ee38643959e819765cec1fbe38b98d4ff8863b05",
+      "attempt_kind": "action",
+      "id": "f54f1cf9-c9db-4d21-aead-fd642d4c7206",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584217936,
+      "finished_at": 1791584219558,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "9b708420-5255-4524-9d7e-5cbd6b086949",
+      "capability": "computer.read_calculator",
+      "resource_reference": "189dc674b4f33c4f3a92ffa1d8727fca50708c1781c0557440b06e5e59c46566",
+      "attempt_kind": "action",
+      "id": "35b84943-55ea-42fb-a147-daad4b0a996e",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584219580,
+      "finished_at": 1791584221250,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "807f66a4-36af-4fd4-8dc4-3be065ae944f",
+      "capability": "filesystem.write",
+      "resource_reference": "2faf5c5d6f075114187073bcee9593b4a73d42422854214bacbd43d17e5b008e",
+      "attempt_kind": "action",
+      "id": "c5578db7-82cf-4435-a3c9-6b9e4c7dcef8",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584221478,
+      "finished_at": 1791584221533,
+      "outcome": "COMPLETED"
+    },
+    {
+      "agent_id": "0328c9da-f734-43c5-9569-85c5ce30f332",
+      "mission_id": "ae2127be-d6d9-4d3c-8d81-7947cdd9d5a1",
+      "task_id": null,
+      "step_id": "807f66a4-36af-4fd4-8dc4-3be065ae944f",
+      "capability": "filesystem.compare",
+      "resource_reference": "b8310b2b42da01f72294241d86fa5e4676ae5e226f193b5e489c4f4f618c3f16",
+      "attempt_kind": "action",
+      "id": "1c43e35b-bbd2-433a-9a52-54d132c30e63",
+      "envelope_id": "83a0fb8c-3232-4369-81b8-0a5cd198c454",
+      "revision": 2,
+      "host_generation": "636ffd69-7b38-4f7a-b31e-8e1285329537",
+      "admitted_at": 1791584221617,
+      "finished_at": 1791584221660,
+      "outcome": "COMPLETED"
+    }
+  ],
+  "output": "Bunny-A Host ready on loopback (636ffd69-7b38-4f7a-b31e-8e1285329537).\n"
+}

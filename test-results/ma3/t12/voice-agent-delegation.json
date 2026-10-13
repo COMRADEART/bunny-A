@@ -1,0 +1,126 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "scripts",
+      "test": "V45: closing the Island releases voice (voice.session.close) and never calls agent.* or mission.*",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 wiring: a voice draft is a canonical mission.create that waits for review and is never started",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3 echo: an overlapped turn that repeats Bunny's own 'I drafted a Mission' sentence creates nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3 duplex: a clean spoken draft request drafts one Mission through the port, with no chat",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r7: a cut-off draft that timed out creates nothing, and a worker-reported mute drops held words",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3: a draft request is mission_draft with its objective; approve, run or start wording stays refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3 round 2: a draft that also says start, begin, proceed, go live, activate or enable is sensitive_refused, never drafted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12-AUTH-01: inflected destructive drafts are sensitive_refused, never mission_draft",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12-AUTH-01: the same destructive words without a draft prefix are refused on the chat path too",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F2: without the Mission port the stop is refused truthfully and nothing is proposed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3: 'prepare a plan for the dashboard project' drafts a Mission through the port and says the exact sentence",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3: no matching Project drafts into the default workspace, and says so",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3: drafts are rate-limited, then allowed again after the interval",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3: at most maxPendingVoiceDrafts voice drafts may await review at once",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3: a refused or absent draft port says nothing was created",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F3: a draft heard below the control confidence is not made",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 hostile: override, approve-all and owner claims never draft, propose or stop anything",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RES-01: three waiting voice drafts are counted even behind 41 newer Missions, so a fourth spoken draft is refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "M04: a well-formed plan validates into roles and an ESTIMATED cost; Host-built drafts carry the authority",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V08 partial not executed: partial text is a draft only while capturing, and never a final",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V09 final bound to correct turn: a stale-generation final is not shown as the current draft",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V37 voice cannot widen Mission scope: a proposal confirmation is limited to pause, resume or stop",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 new turn kinds have plain labels: mission control, mission draft and stopped speaking",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "operation": "Existing MissionManager draft only, AWAITING_REVIEW; no spoken approval or execution grant.",
+    "canonicalLiveTeam": "Final packaged Team Mission planned with actual Ollama, then deliberately left unapproved."
+  },
+  "limitations": []
+}

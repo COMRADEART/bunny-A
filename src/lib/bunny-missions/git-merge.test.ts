@@ -133,3 +133,23 @@ test("MA0R: capability and mission cancellation wait for real merge cleanup; no 
     await missions.tick(view.id); assert.equal(missions.store.runs({ missionId: view.id }).length, 1, "cancelled step was not retried");
   } finally { await missions.close(); db.close(); repo.dispose(); }
 });
+
+test("MA1: a Bunny merge left by a Host crash is named, with its cleanup, and never touched; a stale lock is explained", async () => {
+  const repo = repository();
+  try {
+    const marker = `Bunny merge transaction ${crypto.randomUUID()}`;
+    git(repo.root, "merge", "--no-ff", "--no-commit", "-m", `Merge bunny/test\n\n${marker}`, "bunny/test");
+    const lock = join(repo.root, ".git", "bunny-merge.lock"); writeFileSync(lock, marker);
+    const mergeHead = readFileSync(join(repo.root, ".git", "MERGE_HEAD"), "utf8"); const before = git(repo.root, "status", "--porcelain=v1");
+    const left = await mergeTransaction("bunny/test", repo.root, repo.context);
+    assert.equal(left.ok, false); assert.equal(left.errorCategory, "workspace_conflict");
+    assert.ok(left.summary.includes(`An interrupted ${marker} is still in progress`), left.summary);
+    assert.ok(left.summary.includes("git merge --abort") && left.summary.includes(lock), left.summary);
+    assert.equal(readFileSync(join(repo.root, ".git", "MERGE_HEAD"), "utf8"), mergeHead); assert.equal(readFileSync(lock, "utf8"), marker);
+    assert.equal(git(repo.root, "status", "--porcelain=v1"), before);
+    git(repo.root, "merge", "--abort");
+    const stale = await mergeTransaction("bunny/test", repo.root, repo.context);
+    assert.equal(stale.ok, false); assert.match(stale.summary, /A Bunny merge lock is present .*interrupted one left the lock behind/);
+    assert.equal(readFileSync(lock, "utf8"), marker, "the lock is not removed by Bunny"); assert.equal(git(repo.root, "rev-parse", "HEAD"), repo.head);
+  } finally { repo.dispose(); }
+});

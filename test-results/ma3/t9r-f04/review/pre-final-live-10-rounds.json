@@ -1,0 +1,2378 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "classification": "LIVE",
+  "startedAt": "2026-10-10T17:10:46.316Z",
+  "finishedAt": "2026-10-10T17:14:21.804Z",
+  "headCommit": "9e647196824b2a0c41cf8424f47e4614cea3343c",
+  "workingTreeChanges": [
+    "M native/README.md",
+    " M native/bunny-owned-process.c",
+    " M scripts/package-bunny-desktop.ps1",
+    " M src/lib/bunny-host/adapters.server.ts",
+    " M src/lib/bunny-host/codex-probe.server.ts",
+    " M src/lib/bunny-host/contracts.ts",
+    " M src/lib/bunny-host/http.server.ts",
+    " M src/lib/bunny-host/manager.server.ts",
+    " M src/lib/bunny-host/owned-process-group.server.ts",
+    " M src/lib/bunny-host/verification.server.ts",
+    " M src/lib/bunny-missions/capabilities/process.server.ts",
+    "?? scripts/fixtures/f04-job-wrapper.c",
+    "?? scripts/fixtures/f04-process-fixture.c",
+    "?? src/lib/bunny-host/provider-containment.test.ts"
+  ],
+  "rounds": 10,
+  "passed": 20,
+  "failed": 0,
+  "results": [
+    {
+      "scenario": "stop",
+      "round": 1,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 54483,
+          "hostPid": 34820,
+          "hostGeneration": "203cd03c-339a-497d-b6fe-83d04a00c44c"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "e12d026f-fc01-4b77-b2e3-cfd41ffca93b",
+          "agentMissionId": "bcd6834b-9735-40f9-95ad-b9c3766726b2",
+          "agentProviderRefusal": "Mission bcd6834b-9735-40f9-95ad-b9c3766726b2 request 68ee4dec-b4d6-482a-9c20-2016c4e34f4e: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "505a3c46-d63e-4e2f-a223-5cb0aa6a40b9",
+          "projectId": "cbebf14b-207e-49f0-9d85-a6de16414470"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "95032d16-b3cd-4951-a6ed-a444797b7ebf",
+          "rootPid": 28940,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "c8a70762-bb24-4aa3-bfde-4c71a14f9e7f",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 62,
+            "recordedMembers": 62
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 24640,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            34768,
+            18444
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652251165,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 1,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 54491,
+          "hostPid": 10828,
+          "hostGeneration": "29afd5c2-a5bb-4804-bfae-a407a7d61d84"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "c4625808-15eb-4b9d-b437-ee88f674cf87",
+          "agentMissionId": "aeb04103-a6ff-4477-b790-90d5923446a3",
+          "agentProviderRefusal": "Mission aeb04103-a6ff-4477-b790-90d5923446a3 request 3fc5f638-e94b-4c6c-aa8b-544573b8ad51: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "c5150f90-e256-4477-a806-65be4b70a46e",
+          "projectId": "656a93e4-c7a3-42d4-9b38-0e233933295b",
+          "taskId": "4aab25bd-7c68-4098-9e02-6c11fe7f4242",
+          "rootPid": 5112
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 28964,
+              "createdAt": "2026-10-10T17:10:55.4184590Z"
+            },
+            {
+              "pid": 24116,
+              "createdAt": "2026-10-10T17:10:55.4271250Z"
+            },
+            {
+              "pid": 12404,
+              "createdAt": "2026-10-10T17:10:55.4310830Z"
+            },
+            {
+              "pid": 33952,
+              "createdAt": "2026-10-10T17:10:55.4337350Z"
+            },
+            {
+              "pid": 3040,
+              "createdAt": "2026-10-10T17:10:55.4344360Z"
+            },
+            {
+              "pid": 1896,
+              "createdAt": "2026-10-10T17:10:55.4359990Z"
+            },
+            {
+              "pid": 15200,
+              "createdAt": "2026-10-10T17:10:55.4362820Z"
+            },
+            {
+              "pid": 12380,
+              "createdAt": "2026-10-10T17:10:55.4412120Z"
+            },
+            {
+              "pid": 29568,
+              "createdAt": "2026-10-10T17:10:55.4438120Z"
+            },
+            {
+              "pid": 6752,
+              "createdAt": "2026-10-10T17:10:55.4492520Z"
+            },
+            {
+              "pid": 20460,
+              "createdAt": "2026-10-10T17:10:55.4499450Z"
+            },
+            {
+              "pid": 23984,
+              "createdAt": "2026-10-10T17:10:55.4616920Z"
+            },
+            {
+              "pid": 22980,
+              "createdAt": "2026-10-10T17:10:55.4732640Z"
+            },
+            {
+              "pid": 24276,
+              "createdAt": "2026-10-10T17:10:55.5226120Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 5112,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "24420fe8-284e-44ab-a990-ea22d1d127da",
+            "recordedMembers": 44,
+            "activeProcesses": 46
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 925,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 32628,
+          "hostGeneration": "99d7f2c5-cc96-4336-84da-999bea92a010",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 24420fe8-284e-44ab-a990-ea22d1d127da, generation 29afd5c2-a5bb-4804-bfae-a407a7d61d84); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session 24420fe8-284e-44ab-a990-ea22d1d127da: none of its 45 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    },
+    {
+      "scenario": "stop",
+      "round": 2,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 52418,
+          "hostPid": 32324,
+          "hostGeneration": "4ed32711-dabc-4c7a-bdad-c937159bcb3e"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "7feb6a74-00e7-4a26-b355-2ff277801a9c",
+          "agentMissionId": "10ba79a7-c9d9-48eb-bb07-4c15eefe9723",
+          "agentProviderRefusal": "Mission 10ba79a7-c9d9-48eb-bb07-4c15eefe9723 request b02e0684-1204-47c3-bd73-b86fc140d981: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "ed621c3e-2824-4d43-acd5-12bb86529b21",
+          "projectId": "91c59070-655c-458a-a00c-fe70e12f4542"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "029affd5-9896-4392-805c-379c876eb0de",
+          "rootPid": 28136,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "dbbc7dc1-819a-479e-bf3c-f0b73dba791c",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 54,
+            "recordedMembers": 54
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 22508,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            31552,
+            15868
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652269872,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 2,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 59836,
+          "hostPid": 36768,
+          "hostGeneration": "db0e1826-235b-4b02-9ee8-722334a46e56"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "02045e56-2e5c-4922-8f73-6151ae88d9be",
+          "agentMissionId": "889a9b72-c0ed-4545-9b32-5f19bc7b674f",
+          "agentProviderRefusal": "Mission 889a9b72-c0ed-4545-9b32-5f19bc7b674f request 0d46321b-d66e-4668-a00b-3ddab13e6179: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "7f469432-06dd-46f2-bca8-59ef5a6bddc5",
+          "projectId": "8913ef75-0cfb-4461-9b40-939e9b5a9777",
+          "taskId": "aa259f3c-4001-41b5-a6d3-39ddeaa8950e",
+          "rootPid": 29640
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 6940,
+              "createdAt": "2026-10-10T17:11:14.1061820Z"
+            },
+            {
+              "pid": 29208,
+              "createdAt": "2026-10-10T17:11:14.1158320Z"
+            },
+            {
+              "pid": 33728,
+              "createdAt": "2026-10-10T17:11:14.1193820Z"
+            },
+            {
+              "pid": 29952,
+              "createdAt": "2026-10-10T17:11:14.1216200Z"
+            },
+            {
+              "pid": 7240,
+              "createdAt": "2026-10-10T17:11:14.1254270Z"
+            },
+            {
+              "pid": 28736,
+              "createdAt": "2026-10-10T17:11:14.1260050Z"
+            },
+            {
+              "pid": 32332,
+              "createdAt": "2026-10-10T17:11:14.1324790Z"
+            },
+            {
+              "pid": 15556,
+              "createdAt": "2026-10-10T17:11:14.1324930Z"
+            },
+            {
+              "pid": 35572,
+              "createdAt": "2026-10-10T17:11:14.1376250Z"
+            },
+            {
+              "pid": 27560,
+              "createdAt": "2026-10-10T17:11:14.1441690Z"
+            },
+            {
+              "pid": 35632,
+              "createdAt": "2026-10-10T17:11:14.1441760Z"
+            },
+            {
+              "pid": 32704,
+              "createdAt": "2026-10-10T17:11:14.1541540Z"
+            },
+            {
+              "pid": 34144,
+              "createdAt": "2026-10-10T17:11:14.1655630Z"
+            },
+            {
+              "pid": 28412,
+              "createdAt": "2026-10-10T17:11:14.2087130Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 29640,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "d557821b-1e92-433e-8f4e-b10c24af1131",
+            "recordedMembers": 53,
+            "activeProcesses": 54
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 1104,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 4636,
+          "hostGeneration": "0d397812-d560-41dd-a0ae-a50aa7cf86a4",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation d557821b-1e92-433e-8f4e-b10c24af1131, generation db0e1826-235b-4b02-9ee8-722334a46e56); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session d557821b-1e92-433e-8f4e-b10c24af1131: none of its 54 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    },
+    {
+      "scenario": "stop",
+      "round": 3,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 59909,
+          "hostPid": 10044,
+          "hostGeneration": "57b2523d-220c-4c59-922b-4d17d32b3722"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "9750666c-6410-4e81-9b0b-f00f833eeff4",
+          "agentMissionId": "3df5e33e-1aa8-45e4-9eea-faff00dd8aa5",
+          "agentProviderRefusal": "Mission 3df5e33e-1aa8-45e4-9eea-faff00dd8aa5 request d488e6ef-44f9-4062-9df1-d9aaf47bf49f: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "03ff1212-747c-49ae-9b0d-b754760df372",
+          "projectId": "f53ad118-be7d-4fd1-958d-219eb89d7eaf"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "71040291-385a-48f6-8abc-6fc6d29d5ef7",
+          "rootPid": 30476,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "a2e63a86-13b3-4eee-9caf-940c9648cd55",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 26,
+            "recordedMembers": 26
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 31548,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            30312,
+            26476
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652289101,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 3,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 51430,
+          "hostPid": 12880,
+          "hostGeneration": "8695bbbf-61cb-45be-a5fd-ad9e3f94355f"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "2a7e9c7d-5de0-476e-ab69-27b8308f857d",
+          "agentMissionId": "f5fb149c-efed-42f1-858a-52f4835027da",
+          "agentProviderRefusal": "Mission f5fb149c-efed-42f1-858a-52f4835027da request 34a78227-0555-48f0-a50f-dfa53f995bcb: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "67b8ea21-0b6d-4419-b417-5458b6950261",
+          "projectId": "bd06bc97-ead5-423b-98fd-cfca54f38c6f",
+          "taskId": "58d44d41-b9be-4925-b615-b5c62e2996f2",
+          "rootPid": 31800
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 30228,
+              "createdAt": "2026-10-10T17:11:33.5635220Z"
+            },
+            {
+              "pid": 30200,
+              "createdAt": "2026-10-10T17:11:33.5711420Z"
+            },
+            {
+              "pid": 32252,
+              "createdAt": "2026-10-10T17:11:33.5761390Z"
+            },
+            {
+              "pid": 8848,
+              "createdAt": "2026-10-10T17:11:33.5779240Z"
+            },
+            {
+              "pid": 13696,
+              "createdAt": "2026-10-10T17:11:33.5794290Z"
+            },
+            {
+              "pid": 24384,
+              "createdAt": "2026-10-10T17:11:33.5805220Z"
+            },
+            {
+              "pid": 29232,
+              "createdAt": "2026-10-10T17:11:33.5827170Z"
+            },
+            {
+              "pid": 29644,
+              "createdAt": "2026-10-10T17:11:33.5856630Z"
+            },
+            {
+              "pid": 20384,
+              "createdAt": "2026-10-10T17:11:33.5883260Z"
+            },
+            {
+              "pid": 31896,
+              "createdAt": "2026-10-10T17:11:33.5915880Z"
+            },
+            {
+              "pid": 15388,
+              "createdAt": "2026-10-10T17:11:33.5932360Z"
+            },
+            {
+              "pid": 36476,
+              "createdAt": "2026-10-10T17:11:33.6016140Z"
+            },
+            {
+              "pid": 5616,
+              "createdAt": "2026-10-10T17:11:33.6180650Z"
+            },
+            {
+              "pid": 30688,
+              "createdAt": "2026-10-10T17:11:33.6604710Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 31800,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "067ca263-5c12-4919-bfc2-88dd9900f7e1",
+            "recordedMembers": 26,
+            "activeProcesses": 26
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 987,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 26120,
+          "hostGeneration": "13c1a77f-764a-49b7-9a19-dd7ed0d00d8b",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 067ca263-5c12-4919-bfc2-88dd9900f7e1, generation 8695bbbf-61cb-45be-a5fd-ad9e3f94355f); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session 067ca263-5c12-4919-bfc2-88dd9900f7e1: none of its 27 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    },
+    {
+      "scenario": "stop",
+      "round": 4,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 60748,
+          "hostPid": 24808,
+          "hostGeneration": "b34f0eb3-86de-4cdf-85bf-9164d99ae951"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "aac911f4-d0f1-44ad-b4fa-8830843410bc",
+          "agentMissionId": "3942cd6b-7870-424a-bcaf-5f67122700d3",
+          "agentProviderRefusal": "Mission 3942cd6b-7870-424a-bcaf-5f67122700d3 request bb696ac3-87b4-4a98-a7d0-1fa4c62978f5: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "ec2f1fb6-60c9-4186-a1f4-a932fc271b28",
+          "projectId": "66fcb3d6-0c26-4f66-8da9-b43a647baa3b"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "a00c40ee-c493-4645-b4e2-2f75d8b1a4e6",
+          "rootPid": 29304,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "af4cec8b-a3ea-426c-84d1-e6722bde5bab",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 46,
+            "recordedMembers": 46
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 33808,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            29692,
+            33888
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652322851,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 4,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 50363,
+          "hostPid": 7496,
+          "hostGeneration": "756bbe86-56ed-4b41-91cd-a273aa8ea825"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "221f448d-81da-4711-bcdd-02f8b1ea5f3c",
+          "agentMissionId": "8dc2bf18-1523-4853-9cc5-82f6a529936e",
+          "agentProviderRefusal": "Mission 8dc2bf18-1523-4853-9cc5-82f6a529936e request d38a7ce3-0030-4f3a-a49a-16fce94f7663: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "4c4eb5e0-0e7b-416a-85c0-849356f58483",
+          "projectId": "600a9088-d3a1-4d20-a2f2-368fa9008e51",
+          "taskId": "77188c13-f5a6-481d-9de3-52e1c3fb7f0c",
+          "rootPid": 14356
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 34924,
+              "createdAt": "2026-10-10T17:12:11.9306790Z"
+            },
+            {
+              "pid": 3728,
+              "createdAt": "2026-10-10T17:12:11.9412980Z"
+            },
+            {
+              "pid": 33204,
+              "createdAt": "2026-10-10T17:12:11.9458480Z"
+            },
+            {
+              "pid": 30656,
+              "createdAt": "2026-10-10T17:12:11.9493590Z"
+            },
+            {
+              "pid": 25572,
+              "createdAt": "2026-10-10T17:12:11.9513640Z"
+            },
+            {
+              "pid": 8188,
+              "createdAt": "2026-10-10T17:12:11.9522400Z"
+            },
+            {
+              "pid": 28944,
+              "createdAt": "2026-10-10T17:12:11.9562170Z"
+            },
+            {
+              "pid": 10388,
+              "createdAt": "2026-10-10T17:12:11.9584520Z"
+            },
+            {
+              "pid": 34892,
+              "createdAt": "2026-10-10T17:12:11.9630490Z"
+            },
+            {
+              "pid": 29972,
+              "createdAt": "2026-10-10T17:12:11.9703770Z"
+            },
+            {
+              "pid": 20136,
+              "createdAt": "2026-10-10T17:12:11.9744760Z"
+            },
+            {
+              "pid": 27508,
+              "createdAt": "2026-10-10T17:12:11.9845300Z"
+            },
+            {
+              "pid": 7120,
+              "createdAt": "2026-10-10T17:12:11.9959550Z"
+            },
+            {
+              "pid": 3224,
+              "createdAt": "2026-10-10T17:12:12.0543000Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 14356,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "70f7c2c5-a7cd-4580-a374-2ddcd40373a3",
+            "recordedMembers": 51,
+            "activeProcesses": 51
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 994,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 4792,
+          "hostGeneration": "897f4559-1dce-4e8a-a247-1563abe114ee",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 70f7c2c5-a7cd-4580-a374-2ddcd40373a3, generation 756bbe86-56ed-4b41-91cd-a273aa8ea825); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session 70f7c2c5-a7cd-4580-a374-2ddcd40373a3: none of its 52 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    },
+    {
+      "scenario": "stop",
+      "round": 5,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 55948,
+          "hostPid": 12284,
+          "hostGeneration": "4356a4d2-32a8-4365-8efa-a7df5105dfba"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "8083d095-86da-4545-a351-42afe1e8899e",
+          "agentMissionId": "8329cdd1-bedf-41ed-b399-727690544765",
+          "agentProviderRefusal": "Mission 8329cdd1-bedf-41ed-b399-727690544765 request 76d9f861-e075-4fa6-aba9-68daa078d4af: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "994c4720-d0ce-4f02-9c51-0d86548c41cb",
+          "projectId": "9faf6ff3-fe93-488f-a5be-5fe2aa7b54a0"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "d0694934-4d54-4a32-8723-d0af8231c9c7",
+          "rootPid": 26144,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "a69143d6-76f9-47c9-b594-88dcaa95198a",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 26,
+            "recordedMembers": 26
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 34568,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            12192,
+            3964
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652347517,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 5,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 64836,
+          "hostPid": 29944,
+          "hostGeneration": "b9733144-9eb5-45a4-a892-18e96dc13d58"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "67fc3e49-d761-4497-9685-4fdaa5a4a606",
+          "agentMissionId": "39ec0e52-5389-4614-9433-bfd5a015718a",
+          "agentProviderRefusal": "Mission 39ec0e52-5389-4614-9433-bfd5a015718a request 7dc0178a-e29c-4b49-8fa1-373c2d90e3bf: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "62c242d9-ee07-4588-ab36-c385c4198b68",
+          "projectId": "05549745-6d42-4d13-a984-f789b5d50257",
+          "taskId": "3f53244d-cf27-4ea0-9eaa-6dfae8a0936f",
+          "rootPid": 3596
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 33660,
+              "createdAt": "2026-10-10T17:12:32.1670970Z"
+            },
+            {
+              "pid": 28560,
+              "createdAt": "2026-10-10T17:12:32.1736090Z"
+            },
+            {
+              "pid": 32544,
+              "createdAt": "2026-10-10T17:12:32.1762410Z"
+            },
+            {
+              "pid": 34656,
+              "createdAt": "2026-10-10T17:12:32.1780010Z"
+            },
+            {
+              "pid": 21836,
+              "createdAt": "2026-10-10T17:12:32.1804960Z"
+            },
+            {
+              "pid": 33292,
+              "createdAt": "2026-10-10T17:12:32.1829000Z"
+            },
+            {
+              "pid": 34752,
+              "createdAt": "2026-10-10T17:12:32.1844670Z"
+            },
+            {
+              "pid": 33268,
+              "createdAt": "2026-10-10T17:12:32.1891290Z"
+            },
+            {
+              "pid": 3940,
+              "createdAt": "2026-10-10T17:12:32.1898910Z"
+            },
+            {
+              "pid": 30260,
+              "createdAt": "2026-10-10T17:12:32.1936640Z"
+            },
+            {
+              "pid": 31404,
+              "createdAt": "2026-10-10T17:12:32.1950080Z"
+            },
+            {
+              "pid": 36316,
+              "createdAt": "2026-10-10T17:12:32.2006210Z"
+            },
+            {
+              "pid": 28116,
+              "createdAt": "2026-10-10T17:12:32.2183770Z"
+            },
+            {
+              "pid": 36660,
+              "createdAt": "2026-10-10T17:12:32.2595520Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 3596,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "564bef60-14e2-442c-981f-73a758d1da62",
+            "recordedMembers": 26,
+            "activeProcesses": 26
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 1102,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 20296,
+          "hostGeneration": "53cba5e6-629a-4d63-843f-ab420f2731a4",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 564bef60-14e2-442c-981f-73a758d1da62, generation b9733144-9eb5-45a4-a892-18e96dc13d58); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session 564bef60-14e2-442c-981f-73a758d1da62: none of its 27 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    },
+    {
+      "scenario": "stop",
+      "round": 6,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 56624,
+          "hostPid": 35440,
+          "hostGeneration": "865a4206-6d23-468e-8565-1b37da9e0276"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "b1b197b7-0250-4c3f-9f1c-3f9f779e78f7",
+          "agentMissionId": "f09a4eb2-872c-4816-ad0a-2f857e3215b3",
+          "agentProviderRefusal": "Mission f09a4eb2-872c-4816-ad0a-2f857e3215b3 request 2d8272bb-e6a3-4ff3-9300-61bc6c5b06e5: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "f91ab063-b975-4dbe-a932-aae5482a2132",
+          "projectId": "51c04603-0cec-43b1-ad63-64d2168c54f3"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "1ac48886-da49-449a-937e-9d015c5b7fff",
+          "rootPid": 32984,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "1d7b780b-838f-4f9e-b48c-28394978b227",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 26,
+            "recordedMembers": 26
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 31528,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            18208,
+            33444
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652367695,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 6,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 56645,
+          "hostPid": 12376,
+          "hostGeneration": "f5ec1280-d354-4b5d-a32e-4ea5ffdf3271"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "19a04915-957c-4368-aaa8-766bf20cb149",
+          "agentMissionId": "aa7de3f0-9165-45ea-ae47-6bdf38254a6e",
+          "agentProviderRefusal": "Mission aa7de3f0-9165-45ea-ae47-6bdf38254a6e request 40722bc7-9343-4e69-8899-2d02d2b48e5e: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "97a5dbf8-4831-4af3-8546-ed5ac86fad3e",
+          "projectId": "0d31bb5f-1024-4c11-abd0-4c5d777814b1",
+          "taskId": "9246d599-6197-49b5-8484-adefd0b843cc",
+          "rootPid": 9600
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 22276,
+              "createdAt": "2026-10-10T17:12:52.3600050Z"
+            },
+            {
+              "pid": 32212,
+              "createdAt": "2026-10-10T17:12:52.3678410Z"
+            },
+            {
+              "pid": 31584,
+              "createdAt": "2026-10-10T17:12:52.3717280Z"
+            },
+            {
+              "pid": 12740,
+              "createdAt": "2026-10-10T17:12:52.3741090Z"
+            },
+            {
+              "pid": 8412,
+              "createdAt": "2026-10-10T17:12:52.3779570Z"
+            },
+            {
+              "pid": 6604,
+              "createdAt": "2026-10-10T17:12:52.3784420Z"
+            },
+            {
+              "pid": 10160,
+              "createdAt": "2026-10-10T17:12:52.3807310Z"
+            },
+            {
+              "pid": 12284,
+              "createdAt": "2026-10-10T17:12:52.3832730Z"
+            },
+            {
+              "pid": 30472,
+              "createdAt": "2026-10-10T17:12:52.3867290Z"
+            },
+            {
+              "pid": 1532,
+              "createdAt": "2026-10-10T17:12:52.3943000Z"
+            },
+            {
+              "pid": 33280,
+              "createdAt": "2026-10-10T17:12:52.3957760Z"
+            },
+            {
+              "pid": 20492,
+              "createdAt": "2026-10-10T17:12:52.4027990Z"
+            },
+            {
+              "pid": 9192,
+              "createdAt": "2026-10-10T17:12:52.4110720Z"
+            },
+            {
+              "pid": 7724,
+              "createdAt": "2026-10-10T17:12:52.4500890Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 9600,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "127ea885-7f0d-4f77-be57-6a8d57b70af2",
+            "recordedMembers": 26,
+            "activeProcesses": 26
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 1029,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 29756,
+          "hostGeneration": "fd5ad2e4-0062-4126-8488-354a33722e3d",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 127ea885-7f0d-4f77-be57-6a8d57b70af2, generation f5ec1280-d354-4b5d-a32e-4ea5ffdf3271); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session 127ea885-7f0d-4f77-be57-6a8d57b70af2: none of its 27 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    },
+    {
+      "scenario": "stop",
+      "round": 7,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 65132,
+          "hostPid": 21424,
+          "hostGeneration": "7e71727b-7b8b-43f5-904d-2f9123d6de86"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "1075da11-ab30-4fee-9f0d-ee20431e1009",
+          "agentMissionId": "440ecbb4-f626-480c-b9f7-92a3aa896931",
+          "agentProviderRefusal": "Mission 440ecbb4-f626-480c-b9f7-92a3aa896931 request 67575b27-ec7c-4834-af2f-f858e1e05557: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "58140c04-f4c2-4e25-8901-788f468f7ef0",
+          "projectId": "8f6a1816-8f5e-454b-b49c-90cec2deafda"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "bed45c2a-a6cb-4a8c-976d-15950c4e8c55",
+          "rootPid": 15616,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "182f3634-fb0d-4c25-ba9b-0dcf227a4b18",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 26,
+            "recordedMembers": 26
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 24768,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            8408,
+            15264
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652387590,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 7,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 59532,
+          "hostPid": 7552,
+          "hostGeneration": "59ea036b-929e-4bea-aebc-c74fc0969b85"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "c4c9fe32-3058-4ae8-b1db-7fd423c3ae2b",
+          "agentMissionId": "4098ed43-2b62-41d4-a45e-160398a65c26",
+          "agentProviderRefusal": "Mission 4098ed43-2b62-41d4-a45e-160398a65c26 request e9838bf7-7dbb-4d14-91b1-a3fd1067d43f: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "3b71ba81-d536-4fbe-a879-a41a86f39119",
+          "projectId": "4fdb5f41-fc87-4325-b7d3-5961671f5cc9",
+          "taskId": "f15e3100-83b6-42cb-b855-22dc707a8e15",
+          "rootPid": 29096
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 10136,
+              "createdAt": "2026-10-10T17:13:12.1708000Z"
+            },
+            {
+              "pid": 4016,
+              "createdAt": "2026-10-10T17:13:12.1802770Z"
+            },
+            {
+              "pid": 32296,
+              "createdAt": "2026-10-10T17:13:12.1844990Z"
+            },
+            {
+              "pid": 8092,
+              "createdAt": "2026-10-10T17:13:12.1873990Z"
+            },
+            {
+              "pid": 32696,
+              "createdAt": "2026-10-10T17:13:12.1899620Z"
+            },
+            {
+              "pid": 23488,
+              "createdAt": "2026-10-10T17:13:12.1910780Z"
+            },
+            {
+              "pid": 30964,
+              "createdAt": "2026-10-10T17:13:12.1927760Z"
+            },
+            {
+              "pid": 32144,
+              "createdAt": "2026-10-10T17:13:12.1974490Z"
+            },
+            {
+              "pid": 32188,
+              "createdAt": "2026-10-10T17:13:12.1992800Z"
+            },
+            {
+              "pid": 31632,
+              "createdAt": "2026-10-10T17:13:12.2051950Z"
+            },
+            {
+              "pid": 34192,
+              "createdAt": "2026-10-10T17:13:12.2068950Z"
+            },
+            {
+              "pid": 33048,
+              "createdAt": "2026-10-10T17:13:12.2133240Z"
+            },
+            {
+              "pid": 36712,
+              "createdAt": "2026-10-10T17:13:12.2313300Z"
+            },
+            {
+              "pid": 9924,
+              "createdAt": "2026-10-10T17:13:12.2751870Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 29096,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "c6369551-1267-4414-bfdd-d5ce333d8f12",
+            "recordedMembers": 51,
+            "activeProcesses": 51
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 1098,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 33356,
+          "hostGeneration": "7f4465db-9951-4313-8233-48788ebf2a3f",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation c6369551-1267-4414-bfdd-d5ce333d8f12, generation 59ea036b-929e-4bea-aebc-c74fc0969b85); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session c6369551-1267-4414-bfdd-d5ce333d8f12: none of its 52 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    },
+    {
+      "scenario": "stop",
+      "round": 8,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 52568,
+          "hostPid": 32400,
+          "hostGeneration": "8e9cf008-e799-48c7-a12e-4130b4a3f682"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "c62bf9f3-4d36-48b4-b45c-fcf88fa3038e",
+          "agentMissionId": "0302253a-34a3-4e6a-8f77-503765f9c981",
+          "agentProviderRefusal": "Mission 0302253a-34a3-4e6a-8f77-503765f9c981 request 7f76d566-457b-43bf-b051-47085c726708: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "684f353d-67d6-4885-9c2a-c6473c586b2a",
+          "projectId": "70e818ff-1a11-43dc-ab33-03abdd014b69"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "072b437f-eb2c-47fa-b064-75d78b59e58b",
+          "rootPid": 30100,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "b2d02b7a-2110-433b-8881-adbc91637465",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 26,
+            "recordedMembers": 26
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 28692,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            32064,
+            30812
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652407266,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 8,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 52577,
+          "hostPid": 23580,
+          "hostGeneration": "18780a39-c395-4208-989c-63c7d3f2b51f"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "47e59e56-9d87-4956-9f66-7b2cb0f7f438",
+          "agentMissionId": "a92ddbcb-a29b-41b4-80c5-bac58f5a7c42",
+          "agentProviderRefusal": "Mission a92ddbcb-a29b-41b4-80c5-bac58f5a7c42 request a7a34a16-f450-4d94-b2eb-be2294385ea9: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "31abe84e-97e8-44d9-b860-cb4accfbe62c",
+          "projectId": "a06516a9-dda1-4472-b7cf-42d9e6ec5880",
+          "taskId": "8a063669-222a-48ad-98b3-a46cd6d66948",
+          "rootPid": 35212
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 12144,
+              "createdAt": "2026-10-10T17:13:31.8834410Z"
+            },
+            {
+              "pid": 29336,
+              "createdAt": "2026-10-10T17:13:31.8912640Z"
+            },
+            {
+              "pid": 32704,
+              "createdAt": "2026-10-10T17:13:31.8956030Z"
+            },
+            {
+              "pid": 35416,
+              "createdAt": "2026-10-10T17:13:31.8986780Z"
+            },
+            {
+              "pid": 35108,
+              "createdAt": "2026-10-10T17:13:31.9022000Z"
+            },
+            {
+              "pid": 2692,
+              "createdAt": "2026-10-10T17:13:31.9029500Z"
+            },
+            {
+              "pid": 35352,
+              "createdAt": "2026-10-10T17:13:31.9065170Z"
+            },
+            {
+              "pid": 36532,
+              "createdAt": "2026-10-10T17:13:31.9085260Z"
+            },
+            {
+              "pid": 16024,
+              "createdAt": "2026-10-10T17:13:31.9137100Z"
+            },
+            {
+              "pid": 32008,
+              "createdAt": "2026-10-10T17:13:31.9206920Z"
+            },
+            {
+              "pid": 12836,
+              "createdAt": "2026-10-10T17:13:31.9233850Z"
+            },
+            {
+              "pid": 36248,
+              "createdAt": "2026-10-10T17:13:31.9366870Z"
+            },
+            {
+              "pid": 24172,
+              "createdAt": "2026-10-10T17:13:31.9444700Z"
+            },
+            {
+              "pid": 32208,
+              "createdAt": "2026-10-10T17:13:31.9841080Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 35212,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "77d53c62-fa1f-4860-852e-e8597269c1ec",
+            "recordedMembers": 59,
+            "activeProcesses": 59
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 1347,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 10584,
+          "hostGeneration": "9100e1d3-16d9-498b-92da-e571f79ea148",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 77d53c62-fa1f-4860-852e-e8597269c1ec, generation 18780a39-c395-4208-989c-63c7d3f2b51f); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session 77d53c62-fa1f-4860-852e-e8597269c1ec: none of its 60 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    },
+    {
+      "scenario": "stop",
+      "round": 9,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 52648,
+          "hostPid": 31192,
+          "hostGeneration": "e3f1063e-bac8-4522-8651-6e0b3b6a0009"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "041108f6-5487-4891-8da4-30a70456364b",
+          "agentMissionId": "243d7474-723c-43fc-988b-b1c6af1cccf7",
+          "agentProviderRefusal": "Mission 243d7474-723c-43fc-988b-b1c6af1cccf7 request 9610ef8f-541d-4457-ac9f-391658baa8b5: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "bbba8f58-70e1-476b-8c06-6b150c8717fb",
+          "projectId": "a98978be-ec8e-458f-8913-08c940e277e7"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "a4be0148-d720-4d7a-8ab8-35e440663910",
+          "rootPid": 34260,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "c5da9623-8308-4ed5-9dc4-32c842153765",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 26,
+            "recordedMembers": 26
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 33232,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            6624,
+            18636
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652427483,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 9,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 52663,
+          "hostPid": 9652,
+          "hostGeneration": "68317de4-17a2-4733-ad4e-8ca08de65155"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "ca26011d-1773-43c0-8fc1-db50e796e1d1",
+          "agentMissionId": "fa2df54f-12b2-46bf-9803-58b2d2a15f03",
+          "agentProviderRefusal": "Mission fa2df54f-12b2-46bf-9803-58b2d2a15f03 request 6a0093b0-1482-4f44-93dd-80adf3182b95: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "1f573661-34cb-443a-a2d7-4f9134185560",
+          "projectId": "75a35aec-1852-4804-a050-7fef90a80e97",
+          "taskId": "ce7a6a79-6283-4152-a44d-16aa99d74a73",
+          "rootPid": 9708
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 12524,
+              "createdAt": "2026-10-10T17:13:52.0279040Z"
+            },
+            {
+              "pid": 36604,
+              "createdAt": "2026-10-10T17:13:52.0338970Z"
+            },
+            {
+              "pid": 3148,
+              "createdAt": "2026-10-10T17:13:52.0360540Z"
+            },
+            {
+              "pid": 12136,
+              "createdAt": "2026-10-10T17:13:52.0408220Z"
+            },
+            {
+              "pid": 35080,
+              "createdAt": "2026-10-10T17:13:52.0408930Z"
+            },
+            {
+              "pid": 26608,
+              "createdAt": "2026-10-10T17:13:52.0426720Z"
+            },
+            {
+              "pid": 7156,
+              "createdAt": "2026-10-10T17:13:52.0443390Z"
+            },
+            {
+              "pid": 8348,
+              "createdAt": "2026-10-10T17:13:52.0497060Z"
+            },
+            {
+              "pid": 33504,
+              "createdAt": "2026-10-10T17:13:52.0500170Z"
+            },
+            {
+              "pid": 6764,
+              "createdAt": "2026-10-10T17:13:52.0546910Z"
+            },
+            {
+              "pid": 35564,
+              "createdAt": "2026-10-10T17:13:52.0636370Z"
+            },
+            {
+              "pid": 32632,
+              "createdAt": "2026-10-10T17:13:52.0682760Z"
+            },
+            {
+              "pid": 35400,
+              "createdAt": "2026-10-10T17:13:52.0844530Z"
+            },
+            {
+              "pid": 32484,
+              "createdAt": "2026-10-10T17:13:52.1296550Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 9708,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "72f38b5b-15d1-441f-9bdf-ca4b6a542bd0",
+            "recordedMembers": 26,
+            "activeProcesses": 26
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 1065,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 7808,
+          "hostGeneration": "d7685b52-479e-40fb-9d82-de45d6364157",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation 72f38b5b-15d1-441f-9bdf-ca4b6a542bd0, generation 68317de4-17a2-4733-ad4e-8ca08de65155); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session 72f38b5b-15d1-441f-9bdf-ca4b6a542bd0: none of its 27 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    },
+    {
+      "scenario": "stop",
+      "round": 10,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host started",
+          "port": 52699,
+          "hostPid": 23236,
+          "hostGeneration": "0b8c10d6-ec9e-4abb-b587-6a13e532bae8"
+        },
+        {
+          "step": 2,
+          "title": "Agent created, Mission authorized by the workstation and started",
+          "agentId": "b0fdd7c1-2414-4039-9967-bb3995bc751d",
+          "agentMissionId": "d3e1af21-046e-4d0c-af27-b5977065bac9",
+          "agentProviderRefusal": "Mission d3e1af21-046e-4d0c-af27-b5977065bac9 request 1acbf824-a7ec-40da-b562-6bc7596b374d: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "dad2f240-22f5-4cea-8ddd-58beb5f95b20",
+          "projectId": "86794007-dad8-4c10-bce9-9d0875685d4d"
+        },
+        {
+          "step": 3,
+          "title": "provider task admitted and running",
+          "taskId": "307faa1a-fa62-428a-869a-d353cda5ffbf",
+          "rootPid": 21216,
+          "provider": "claude"
+        },
+        {
+          "step": 4,
+          "title": "contained tree observed independently",
+          "fixtureProcessesOwned": 14,
+          "unrelatedPresent": true,
+          "jobRecord": {
+            "operationId": "b11fabb9-b05d-4cf6-9449-baf642dd0896",
+            "limitFlagsKillOnClose": true,
+            "breakaway": false,
+            "activeProcesses": 26,
+            "recordedMembers": 26
+          },
+          "ownedAreRecordedMembers": 14,
+          "breakawayAttempts": [
+            {
+              "error": 0,
+              "pid": 18652,
+              "memberOfBunnyJob": true
+            }
+          ],
+          "silentBreakawayChildren": [
+            36360,
+            11500
+          ],
+          "silentChildrenRecordedInJob": 2
+        },
+        {
+          "step": 5,
+          "title": "authenticated Stop of the provider task",
+          "status": 200
+        },
+        {
+          "step": 6,
+          "title": "after Stop",
+          "ownedRemaining": 0,
+          "rootAlive": false,
+          "taskState": "stopped",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652447223,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "cleanupText": "User stopped the selected task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited.",
+          "jobRecord": {
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "state": "stopped",
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true,
+            "providerLikeStillListed": true
+          },
+          "agentState": "WAITING_FOR_USER",
+          "providerLaunches": 1
+        }
+      ]
+    },
+    {
+      "scenario": "abrupt-host-exit",
+      "round": 10,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "disposable Host A started",
+          "port": 52714,
+          "hostPid": 24184,
+          "hostGeneration": "cc9268d6-cf05-4cef-8a66-1f4cdd08915d"
+        },
+        {
+          "step": 2,
+          "title": "Agent/Mission authorized and provider admitted",
+          "agentId": "c5438bd3-dc3e-4968-9bf0-fe64ce0e1cc0",
+          "agentMissionId": "a1abbd07-a23f-4a82-9ee7-debfe1c7547d",
+          "agentProviderRefusal": "Mission a1abbd07-a23f-4a82-9ee7-debfe1c7547d request 7e0852a4-7c37-4c1b-82a3-eb7a572c77c8: Coder needs permission for provider.execute (EXECUTE): claude for Coder: Workspace provider tools cannot enfo",
+          "missionId": "e9191465-6153-47d6-9d9a-141365840899",
+          "projectId": "b431fa3e-0772-45f1-b6a0-c6cacd813f40",
+          "taskId": "dfd69884-a547-496b-abc0-ab0292621e6d",
+          "rootPid": 28304
+        },
+        {
+          "step": 3,
+          "title": "contained tree running before Host death",
+          "ownedFixtureProcesses": [
+            {
+              "pid": 32684,
+              "createdAt": "2026-10-10T17:14:11.6508190Z"
+            },
+            {
+              "pid": 31904,
+              "createdAt": "2026-10-10T17:14:11.6582410Z"
+            },
+            {
+              "pid": 36516,
+              "createdAt": "2026-10-10T17:14:11.6602390Z"
+            },
+            {
+              "pid": 28188,
+              "createdAt": "2026-10-10T17:14:11.6622110Z"
+            },
+            {
+              "pid": 30360,
+              "createdAt": "2026-10-10T17:14:11.6648430Z"
+            },
+            {
+              "pid": 8976,
+              "createdAt": "2026-10-10T17:14:11.6667570Z"
+            },
+            {
+              "pid": 24356,
+              "createdAt": "2026-10-10T17:14:11.6671130Z"
+            },
+            {
+              "pid": 3668,
+              "createdAt": "2026-10-10T17:14:11.6710890Z"
+            },
+            {
+              "pid": 28812,
+              "createdAt": "2026-10-10T17:14:11.6737550Z"
+            },
+            {
+              "pid": 32076,
+              "createdAt": "2026-10-10T17:14:11.6782750Z"
+            },
+            {
+              "pid": 29688,
+              "createdAt": "2026-10-10T17:14:11.6831850Z"
+            },
+            {
+              "pid": 25160,
+              "createdAt": "2026-10-10T17:14:11.6842480Z"
+            },
+            {
+              "pid": 3132,
+              "createdAt": "2026-10-10T17:14:11.6992170Z"
+            },
+            {
+              "pid": 30564,
+              "createdAt": "2026-10-10T17:14:11.7417720Z"
+            }
+          ],
+          "providerRoot": {
+            "pid": 28304,
+            "alive": true
+          },
+          "jobRecord": {
+            "operationId": "b5b8b95d-6745-4694-a020-510f57161a44",
+            "recordedMembers": 26,
+            "activeProcesses": 26
+          }
+        },
+        {
+          "step": 4,
+          "title": "Host terminated abruptly (taskkill /F); OS observation",
+          "cleanupObservedMs": 1004,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          },
+          "recordStateOnDisk": "running"
+        },
+        {
+          "step": 5,
+          "title": "Host B started on the same SQLite state",
+          "hostPid": 30920,
+          "hostGeneration": "b200bd37-ffaf-4b93-9d03-137713615abe",
+          "newGeneration": true
+        },
+        {
+          "step": 6,
+          "title": "recovery on Host B",
+          "agentPersisted": true,
+          "missionPersisted": true,
+          "missionState": "waiting_for_user",
+          "agentMissionPersisted": true,
+          "taskState": "failed",
+          "taskError": "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.",
+          "providerSessionEvents": [
+            {
+              "type": "provider_session.interrupted",
+              "detail": "Host restarted while a claude session ran in a Bunny-owned Windows job (operation b5b8b95d-6745-4694-a020-510f57161a44, generation cc9268d6-cf05-4cef-8a66-1f4cdd08915d); the kernel ends job members when the last job handle closes. Verifying recorded process identities before this counts as stopped."
+            },
+            {
+              "type": "provider_session.reconciled",
+              "detail": "Interrupted provider session b5b8b95d-6745-4694-a020-510f57161a44: none of its 27 recorded process identities is alive (independent process-table read). No process was killed by this Host."
+            }
+          ],
+          "recordReconciled": {
+            "state": "interrupted",
+            "containment": "empty"
+          },
+          "staleAuthorization": {
+            "state": "WAITING_FOR_USER",
+            "revision": 2
+          },
+          "providerLaunchesBeforeRestart": 1,
+          "providerLaunchesAfterRestart": 1,
+          "ownedProcessesAfterRestart": 0
+        }
+      ]
+    }
+  ]
+}

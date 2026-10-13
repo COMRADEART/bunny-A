@@ -4,18 +4,19 @@ import { liveProviders, useIsland, type Appearance } from "@/store/use-island";
 import { NAMES, ProviderStatus } from "./ui";
 import { Pairing } from "./phone";
 import { MissionSettings } from "./mission";
+import { AiModelsSettings } from "./ai-models";
 
 const GROUPS = [
   "General",
-  "Agents",
-  "Routing",
-  "Missions",
-  "Projects",
-  "Remote access",
+  "Providers",
+  "AI & Models",
+  "Privacy and permissions",
+  "Workspace",
+  "Devices",
   "Notifications",
-  "System monitoring",
+  "Runtime diagnostics",
   "Appearance",
-  "Advanced",
+  "About Bunny",
 ] as const;
 type Group = (typeof GROUPS)[number];
 function Setting({
@@ -103,45 +104,6 @@ export function Settings() {
               <p className="caption">
                 Preferences for this browser. Native Island preferences are available from its menu.
               </p>
-              <Setting label="Island size">
-                {choice("size", [
-                  { value: "compact", label: "Compact" },
-                  { value: "normal", label: "Normal" },
-                  { value: "detailed", label: "Detailed" },
-                ])}
-              </Setting>
-              <Setting label="Island position">
-                {choice("position", [
-                  { value: "left", label: "Top left" },
-                  { value: "center", label: "Top center" },
-                  { value: "right", label: "Top right" },
-                ])}
-              </Setting>
-              <Setting label="Idle content">
-                {choice("idle", [
-                  { value: "providers", label: "Provider usage" },
-                  { value: "temperatures", label: "Temperatures" },
-                  { value: "tasks", label: "Active tasks" },
-                  { value: "clock", label: "Clock" },
-                  { value: "minimal", label: "Minimal" },
-                  { value: "mixed", label: "Mixed · providers + system" },
-                ])}
-              </Setting>
-              <Setting label="Glass strength">
-                {choice("glass", [
-                  { value: "low", label: "Low" },
-                  { value: "medium", label: "Medium" },
-                  { value: "high", label: "High" },
-                ])}
-              </Setting>
-              <Setting label="Auto-collapse" detail="After a finished task">
-                {choice("collapse", [
-                  { value: 5, label: "5 sec" },
-                  { value: 10, label: "10 sec" },
-                  { value: 30, label: "30 sec" },
-                  { value: 0, label: "Never" },
-                ])}
-              </Setting>
               <Setting label="Motion" detail="OS reduced-motion preferences always take priority.">
                 {choice("motion", [
                   { value: "full", label: "Full" },
@@ -156,31 +118,6 @@ export function Settings() {
                   { value: "light", label: "Light" },
                 ])}
               </Setting>
-              <div className="primary-settings">
-                <strong>Primary providers</strong>
-                <p className="caption">Choose up to three for the idle Island.</p>
-                {liveProviders(store).map((p) => (
-                  <label className="provider-checkbox" key={p.id}>
-                    <input
-                      type="checkbox"
-                      checked={store.appearance.primary.includes(p.id)}
-                      disabled={
-                        !store.appearance.primary.includes(p.id) &&
-                        store.appearance.primary.length >= 3
-                      }
-                      onChange={(e) =>
-                        store.setAppearance({
-                          primary: e.target.checked
-                            ? [...store.appearance.primary, p.id]
-                            : store.appearance.primary.filter((id) => id !== p.id),
-                        })
-                      }
-                    />
-                    <span>{NAMES[p.id]}</span>
-                    <ProviderStatus provider={p} />
-                  </label>
-                ))}
-              </div>
             </>
           ) : group === "General" ? (
             <>
@@ -203,7 +140,7 @@ export function Settings() {
                 <span className="caption">{store.drafts.length} saved</span>
               </Setting>
             </>
-          ) : group === "Agents" ? (
+          ) : group === "Providers" ? (
             <>
               {liveProviders(store).map((p) => (
                 <Setting key={p.id} label={NAMES[p.id]} detail={p.detail}>
@@ -211,54 +148,23 @@ export function Settings() {
                 </Setting>
               ))}
             </>
-          ) : group === "Routing" ? (
-            <>
-              <Setting
-                label="Approval before launch"
-                detail="Every new route waits for an explicit Run action."
-              >
-                <span className="caption">Required by Host</span>
-              </Setting>
-              <Setting label="Default depth">
-                <select
-                  aria-label="Default task depth"
-                  value={store.mode}
-                  onChange={(e) => store.setMode(e.target.value as "fast" | "balanced" | "deep")}
-                >
-                  <option value="fast">Fast</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="deep">Deep</option>
-                </select>
-              </Setting>
-              <Setting label="Local only" detail="A hard routing constraint for your next task.">
-                <button
-                  className="switch"
-                  role="switch"
-                  aria-checked={store.localOnly}
-                  aria-label="Local-only routing"
-                  onClick={() => store.setLocalOnly(!store.localOnly)}
-                >
-                  <span />
-                </button>
-              </Setting>
-            </>
-          ) : group === "Missions" ? (
+          ) : group === "AI & Models" ? (
+            <AiModelsSettings />
+          ) : group === "Privacy and permissions" ? (
             <MissionSettings />
-          ) : group === "Projects" ? (
+          ) : group === "Workspace" ? (
             <>
               <p className="caption">Project folders and preferences come from the Host.</p>
               {store.projects.map((p) => (
                 <Setting key={p.id} label={p.name} detail={p.path}>
-                  <span className="caption">
-                    {p.preferred === "auto" ? "Auto" : NAMES[p.preferred]}
-                  </span>
+                  <span className="caption">Router selects per Task</span>
                 </Setting>
               ))}
               <button className="btn secondary" onClick={() => store.setSheet("project")}>
                 Manage projects <ChevronRight size={14} />
               </button>
             </>
-          ) : group === "Remote access" ? (
+          ) : group === "Devices" ? (
             <Pairing compact />
           ) : group === "Notifications" ? (
             <>
@@ -287,7 +193,7 @@ export function Settings() {
                 View notifications <ChevronRight size={14} />
               </button>
             </>
-          ) : group === "System monitoring" ? (
+          ) : group === "Runtime diagnostics" ? (
             <>
               <Setting
                 label="CPU warning"
@@ -350,6 +256,35 @@ export function Settings() {
                 detail="Authentication, process-tree isolation, and persisted sessions remain Host managed."
               >
                 <ShieldCheck size={18} />
+              </Setting>
+              <Setting
+                label="Installed Host"
+                detail={
+                  store.release
+                    ? `${store.release.release} · ${store.release.sourceCommit.slice(0, 12)}`
+                    : "Development Host or build identity unavailable"
+                }
+              >
+                <span className="caption">{store.release?.version ?? "Unavailable"}</span>
+              </Setting>
+              <Setting
+                label="Dashboard build"
+                detail={
+                  store.release?.dashboard
+                    ? `Source ${store.release.dashboard.sourceCommit.slice(0, 12)} · ${store.release.dashboard.assets} packaged assets`
+                    : "Dashboard build identity unavailable"
+                }
+              >
+                <span className="caption">
+                  {store.release?.dashboard?.builtAt
+                    ? new Date(store.release.dashboard.builtAt).toLocaleDateString()
+                    : "Unavailable"}
+                </span>
+              </Setting>
+              <Setting label="Design preview" detail="A labelled preview of the character and glass system with fixture data. Not live Host data.">
+                <button className="btn secondary" onClick={() => store.setSheet("design-preview")}>
+                  Open design preview
+                </button>
               </Setting>
             </>
           )}

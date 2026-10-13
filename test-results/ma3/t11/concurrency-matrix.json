@@ -1,0 +1,34 @@
+{
+  "classification": "LIVE disposable Host, real local Ollama (huihui_ai/qwen2.5-abliterate:7b as routed), disposable Git project",
+  "stepIntervals": 173,
+  "peakConcurrentSteps": {
+    "peak": 4,
+    "at": 1791767642610
+  },
+  "peakWorkingAgents": 6,
+  "peakActiveTeamMissions": 2,
+  "modelCalls": 130,
+  "overlappingModelGenerations": 4,
+  "bounds": {
+    "maxConcurrentStepsPerMission": 3,
+    "maxConcurrentModelStepsPerMission": 2,
+    "maxActiveAgents": 10,
+    "note": "The step/model bounds are per Mission. Ollama serializes generation on the single 6 GB GPU; overlapping requests queue inside Ollama (see receipts' requestedAt/firstTokenAt)."
+  },
+  "tests": [
+    "✔ T3: Mission Stop wins over a concurrent rejected capability with no automatic retry",
+    "✔ Host owns approved concurrent jobs across client snapshots; duplicate approval refused",
+    "✔ T5: concurrent identical actions stay separate without guessed correlation",
+    "✔ T7 stale metadata updates cannot corrupt concurrent records",
+    "✔ F04 J47/J48: concurrent sessions are isolated; stopping A leaves B running",
+    "✔ T9R concurrent desktop and phone approval has one canonical winner and one effect",
+    "✔ V25 R3-session#2 concurrent closes join one close; an open after them gets exactly one live worker",
+    "✔ A21 concurrent final allowance: at most one real action admitted",
+    "✔ T9 stop: ending a mission ends its batch; the concurrent mission's batch and paused work survive untouched",
+    "✔ parallel-ready steps run concurrently; a dependent waits; results pass by reference",
+    "✔ concurrency limit holds parallel agents to the configured maximum",
+    "✔ F01-9: concurrent phone and desktop answers never elevate remote authority"
+  ],
+  "unusedModelTaskIds": 134,
+  "result": "PASS"
+}

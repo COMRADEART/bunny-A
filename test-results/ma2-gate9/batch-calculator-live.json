@@ -1,0 +1,252 @@
+{
+  "ok": true,
+  "before": {
+    "missionId": "157c457e-51bf-4ca7-bfc7-3ab1e304f518",
+    "promptCount": 5
+  },
+  "after": {
+    "missionId": "f29dcba9-92f3-4cc9-ae2e-daa07b5d64db",
+    "promptCount": 1
+  },
+  "offer": {
+    "actions": [
+      "computer.focus_window",
+      "computer.invoke_control",
+      "computer.open_app"
+    ],
+    "counts": {
+      "computer.open_app": 1,
+      "computer.focus_window": 1,
+      "computer.invoke_control": 3
+    },
+    "maxActions": 10,
+    "ttlMs": 120000,
+    "riskCeiling": "EXECUTE",
+    "targetLabel": "Calculator",
+    "target": {
+      "app": "calculator",
+      "processId": null,
+      "title": null
+    },
+    "targetTier": "app",
+    "family": "computer",
+    "readOnly": []
+  },
+  "batchShots": [
+    {
+      "at": 1791304707231,
+      "usedCount": 1,
+      "maxActions": 10,
+      "status": "active"
+    },
+    {
+      "at": 1791304708935,
+      "usedCount": 2,
+      "maxActions": 10,
+      "status": "active"
+    },
+    {
+      "at": 1791304710134,
+      "usedCount": 3,
+      "maxActions": 10,
+      "status": "active"
+    },
+    {
+      "at": 1791304710860,
+      "usedCount": 4,
+      "maxActions": 10,
+      "status": "active"
+    },
+    {
+      "at": 1791304711344,
+      "usedCount": 5,
+      "maxActions": 10,
+      "status": "active"
+    }
+  ],
+  "batchEvents": [
+    {
+      "sequence": 3057,
+      "at": 1791304707165,
+      "type": "approval.batch_started",
+      "taskId": null,
+      "detail": "Small approval batch granted by workstation for Calculator: at most 10 mutating actions within 2 min; covers Bring its window forward, Press one of its buttons, Open its app. It ends at the limit, at expiry, on Stop, on a target mismatch, or with the mission.",
+      "missionId": "f29dcba9-92f3-4cc9-ae2e-daa07b5d64db"
+    },
+    {
+      "sequence": 3061,
+      "at": 1791304707201,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.open_app admitted under the small approval batch: 1 / 10 mutating actions used.",
+      "missionId": "f29dcba9-92f3-4cc9-ae2e-daa07b5d64db"
+    },
+    {
+      "sequence": 3069,
+      "at": 1791304708783,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.focus_window admitted under the small approval batch: 2 / 10 mutating actions used.",
+      "missionId": "f29dcba9-92f3-4cc9-ae2e-daa07b5d64db"
+    },
+    {
+      "sequence": 3077,
+      "at": 1791304709963,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.invoke_control admitted under the small approval batch: 3 / 10 mutating actions used.",
+      "missionId": "f29dcba9-92f3-4cc9-ae2e-daa07b5d64db"
+    },
+    {
+      "sequence": 3085,
+      "at": 1791304710659,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.invoke_control admitted under the small approval batch: 4 / 10 mutating actions used.",
+      "missionId": "f29dcba9-92f3-4cc9-ae2e-daa07b5d64db"
+    },
+    {
+      "sequence": 3093,
+      "at": 1791304711316,
+      "type": "approval.batch_consumed",
+      "taskId": null,
+      "detail": "computer.invoke_control admitted under the small approval batch: 5 / 10 mutating actions used.",
+      "missionId": "f29dcba9-92f3-4cc9-ae2e-daa07b5d64db"
+    },
+    {
+      "sequence": 3100,
+      "at": 1791304711995,
+      "type": "approval.batch_ended",
+      "taskId": null,
+      "detail": "Small approval batch ended with the mission (5 / 10 actions used).",
+      "missionId": "f29dcba9-92f3-4cc9-ae2e-daa07b5d64db"
+    }
+  ],
+  "batchRow": {
+    "id": "4fffd97c-976c-4509-88b0-0e616ed21a05",
+    "usedCount": 5,
+    "maxActions": 10,
+    "status": "ended",
+    "endReason": "mission_ended",
+    "createdBy": "workstation",
+    "endBy": "bunny-mission",
+    "createdAt": 1791304707162,
+    "expiresAt": 1791304827162
+  },
+  "checks": [
+    {
+      "check": "A2 baseline completed under allow-once",
+      "actual": "completed",
+      "pass": true
+    },
+    {
+      "check": "A2: prompts for the 5-mutation sequence WITHOUT batching (§76 before)",
+      "actual": 5,
+      "pass": true
+    },
+    {
+      "check": "the first ask carries the Host-computed offer",
+      "actual": true,
+      "pass": true
+    },
+    {
+      "check": "offer family is computer; every covered action is a computer action",
+      "actual": [
+        "computer",
+        true
+      ],
+      "pass": true
+    },
+    {
+      "check": "covered actions are the sorted, deduped plan actions",
+      "actual": [
+        "computer.focus_window",
+        "computer.invoke_control",
+        "computer.open_app"
+      ],
+      "pass": true
+    },
+    {
+      "check": "offer target is the app-tier Calculator bound",
+      "actual": [
+        "Calculator",
+        "app",
+        "calculator"
+      ],
+      "pass": true
+    },
+    {
+      "check": "offer counts: the ask counts once; the 3 entry executions counted 3 (no double-count)",
+      "actual": [
+        1,
+        1,
+        3,
+        5
+      ],
+      "pass": true
+    },
+    {
+      "check": "offer bound: maxActions min(2×5,12)=10, ttl 120000 ms (2 min), ceiling EXECUTE, no read-only riders",
+      "actual": [
+        10,
+        120000,
+        "EXECUTE",
+        []
+      ],
+      "pass": true
+    },
+    {
+      "check": "allow_batch accepted",
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "check": "B: prompts for the SAME 5-mutation sequence WITH the batch (§76 after)",
+      "actual": 1,
+      "pass": true
+    },
+    {
+      "check": "B: all 5 covered actions ran to completion as runs",
+      "actual": 5,
+      "pass": true
+    },
+    {
+      "check": "B: canonical store row — usedCount 5 / maxActions 10, ended with the mission",
+      "actual": [
+        5,
+        10,
+        "ended",
+        "mission_ended"
+      ],
+      "pass": true
+    },
+    {
+      "check": "B: the live view tracked the count climbing during the mission (never a jump beyond the budget)",
+      "actual": true,
+      "pass": true
+    },
+    {
+      "check": "B: the mission view ends with no batch block",
+      "actual": null,
+      "pass": true
+    },
+    {
+      "check": "journal: batch_started and batch_ended both present",
+      "actual": [
+        true,
+        true
+      ],
+      "pass": true
+    },
+    {
+      "check": "journal truth: names the app bound, states the 2-minute life, no standing language",
+      "actual": [
+        true,
+        true,
+        true
+      ],
+      "pass": true
+    }
+  ],
+  "note": "the LIVE §31 positive example and the §76 metric: same 5-action plan — 5 prompts before, 1 prompt with the batch; the count is canonical (5/10 used, read from the store row)"
+}

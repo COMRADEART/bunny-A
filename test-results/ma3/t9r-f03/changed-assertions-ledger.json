@@ -1,0 +1,23 @@
+{
+  "rule": "No test deleted or skipped; no assertion inverted merely to pass. Every changed legacy assertion is recorded with its original requirement and authorization rationale.",
+  "changes": [
+    {
+      "test": "F01-R6 (LOW): grants are attempt-bound, bound to the Task/plan in force when asked, and never projected to a phone",
+      "file": "src/lib/bunny-missions/remote-authority.test.ts",
+      "originalRequirement": "A trusted-desktop grant covers one attempt: Retry ends an unspent grant.",
+      "before": "Mission state forced to failed with no failed step; retry() threw ('No failed step') and the test relied on revokeDesktopGrants running before that refusal; asserted revokedAt != null.",
+      "after": "A refused Retry (no failed step) is asserted to throw AND to leave the grant untouched; then a failed step is set up and an accepted Retry is asserted to revoke the unspent grant (revokedAt != null).",
+      "authorizationRationale": "F02 round-5 LOW: a refused command must change nothing. The original requirement (a Retry that proceeds ends the grant) is still asserted, on a Retry that actually proceeds; the refused path is now covered by an added stronger assertion."
+    },
+    {
+      "test": "F01-R27 (HIGH): a paired-device change never lands under workstation-approved code that is already running",
+      "file": "src/lib/bunny-missions/remote-authority.test.ts",
+      "originalRequirement": "While workstation-approved code runs, a paired-device change waits (desktop-required hold), the running program sees only Host-reviewed content, and the held change lands only after the workstation allows it.",
+      "before": "The running program slow.mjs lived in the project root and read data/helper.json by name.",
+      "after": "slow.mjs runs from outside the project (env.dir), so the D1 consumer scan cannot see that it reads data/helper.json - exactly the unseen-consumer case the hold protects; every original assertion is unchanged. Added at the end: with slow.mjs inside the project, classifyDeviceWrite('data/helper.json') is EXECUTION_RELEVANT.",
+      "authorizationRationale": "F03 closes the round-5 MEDIUM 'data read by project scripts' for programs inside the project: the promotion of a phone change to data/helper.json is now refused outright when a project program names it, which made the original fixture end at a refused promotion instead of exercising the hold. Moving the program outside keeps the hold property under test; the new behaviour is asserted separately (stronger, not weaker)."
+    }
+  ],
+  "f02TestsUnchanged": "All F02 test files (f02-staging, f02-scope, f02-identity-signout) and the F02 live acceptance test are unchanged and pass against the F03 source.",
+  "newTests": "src/lib/bunny-missions/f03-hardening.test.ts (F03-C1..C6, F03-L1, F03-L3, F03-R1-1..R1-7)"
+}

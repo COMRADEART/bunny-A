@@ -1,14 +1,15 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { execOwnedFile } from "./owned-processes.server.ts";
+import { windowsOwnershipModule } from "./owned-process-group.server.ts";
 import type { ProcessInfo } from "../orch/types.ts";
+import { systemTool } from "./system-tools.server.ts";
 
-const exec = promisify(execFile);
+const exec = execOwnedFile;
 
 /** One snapshot of the OS process table: PID, parent PID, image name and creation time. */
 export async function processTable(): Promise<ProcessInfo[]> {
   if (process.platform === "win32") {
     const script = "Get-CimInstance Win32_Process -Property ProcessId,ParentProcessId,Name,CreationDate | ForEach-Object { '{0}|{1}|{2}|{3}' -f $_.ProcessId,$_.ParentProcessId,$_.Name,$(if ($_.CreationDate) { $_.CreationDate.ToUniversalTime().ToString('o') } else { '' }) }";
-    const { stdout } = await exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 15000, maxBuffer: 16 * 1024 * 1024 });
+    const { stdout } = await exec(systemTool("powershell.exe"), ["-NoProfile", "-NonInteractive", "-Command", script], { windowsHide: true, timeout: 15000, maxBuffer: 16 * 1024 * 1024 });
     return stdout.split(/\r?\n/).filter(Boolean).map((line) => {
       const [pid, ppid, name, created] = line.split("|");
       return { pid: Number(pid), ppid: Number(ppid), name, createdAt: created ? Date.parse(created) : null };
@@ -39,15 +40,27 @@ export function descendants(rows: ProcessInfo[], rootPid: number): ProcessInfo[]
 
 /** Processes from an earlier snapshot that are still alive as the same process (same PID and creation time). */
 export function survivors(before: ProcessInfo[], after: ProcessInfo[]): ProcessInfo[] {
-  return before.filter((old) => after.some((row) => row.pid === old.pid && (old.createdAt === null || row.createdAt === old.createdAt)));
+  return before.filter((old) => sameProcessIdentity(old, after.find((row) => row.pid === old.pid)));
+}
+
+/** A missing birth time cannot establish identity for destructive cleanup. */
+export function sameProcessIdentity(expected: ProcessInfo, current: ProcessInfo | undefined): boolean {
+  return !!current && Number.isSafeInteger(expected.pid) && expected.pid > 0 &&
+    expected.createdAt !== null && Number.isFinite(expected.createdAt) && expected.createdAt > 0 &&
+    current.pid === expected.pid && current.createdAt === expected.createdAt &&
+    !!expected.name && current.name.toLowerCase() === expected.name.toLowerCase();
 }
 
 export function describeTree(tree: ProcessInfo[]): string {
   return tree.map((row) => `${row.name} ${row.pid}`).join(" → ") || "no processes";
 }
 
-/** Ends one specific process that a snapshot proved belongs to an owned session. */
-export async function killProcess(pid: number): Promise<void> {
-  if (process.platform === "win32") await exec("taskkill.exe", ["/PID", String(pid), "/F"], { windowsHide: true, timeout: 5000 });
-  else process.kill(pid, "SIGKILL");
+/** Revalidate the expected lifetime/image on one held kernel handle, then terminate that handle.
+ * An enumeration is corroboration, never permission to kill a bare integer PID.
+ * Platforms without this primitive retain the session's owned Stop and refuse supplemental cleanup.
+ */
+export async function killProcess(identity: ProcessInfo): Promise<void> {
+  if (!sameProcessIdentity(identity, identity) || process.platform !== "win32")
+    throw new Error("Supplemental cleanup refused: current process ownership cannot be verified.");
+  windowsOwnershipModule().terminateVerified(String(identity.pid), String(identity.createdAt), identity.name);
 }

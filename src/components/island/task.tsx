@@ -14,6 +14,7 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import { liveProviders, useIsland } from "@/store/use-island";
+import { directApprovalVerdict, RECONNECT_CAPTION } from "./remote-view-model";
 import type { Mode, OrchTask, ProviderId } from "@/lib/orch/types";
 import { Empty, NAMES, ProviderIcon, ProviderStatus, TaskActivity, TaskBadge } from "./ui";
 import {
@@ -23,6 +24,7 @@ import {
   verifiedFile,
   usesCloudModel,
   conflictsWithLocalOnly,
+  routingFacts,
 } from "./ui-model";
 import {
   ArtifactPreview,
@@ -32,8 +34,10 @@ import {
   TaskReplay,
   ActivityRibbon,
 } from "./motion";
-import { activityDetail, activityLabel, isPrivateEvent, publicTaskLogs } from "./motion-model";
-import { useVoiceInput, VoicePanel } from "./voice";
+import { publicTaskLogs } from "./motion-model";
+import { ActivityTimeline } from "./activity";
+import { taskStatus } from "@/lib/bunny-host/presentation";
+import { VoicePanel } from "./voice";
 
 export function openTask(id: string) {
   useIsland.setState({ decisionTaskId: id, sheet: "task" });
@@ -41,7 +45,7 @@ export function openTask(id: string) {
 /** Task / Mission switch; shown only when the Host reports missions enabled. */
 function ComposeKindToggle() {
   const store = useIsland();
-  if (!store.missions?.enabled) return null;
+  if (!store.missions?.enabled || store.sheet === "chat") return null;
   return (
     <div className="mode-selector compose-kind" aria-label="Request kind">
       {(["task", "mission"] as const).map((kind) => (
@@ -61,9 +65,8 @@ export function Composer({ phone = false }: { phone?: boolean }) {
   const store = useIsland();
   const providers = liveProviders(store);
   const [advanced, setAdvanced] = useState(false);
-  const voice = useVoiceInput();
-  if (voice.state === "listening" || voice.state === "starting")
-    return <VoicePanel state={voice.state} transcript={voice.transcript} onStop={voice.stop} />;
+  // The voice session replaces the composer while it is open; the Host owns the microphone, not this form.
+  if (store.voice?.open) return <VoicePanel />;
   return (
     <form
       className="composer"
@@ -118,8 +121,9 @@ export function Composer({ phone = false }: { phone?: boolean }) {
         <button
           type="button"
           className="voice-button"
-          aria-label="Voice input"
-          onClick={voice.start}
+          aria-label="Start voice session"
+          title="Start voice (processed on this PC)"
+          onClick={() => void store.openVoice("push_to_talk")}
         >
           <Mic size={15} />
         </button>
@@ -287,6 +291,63 @@ export function Routing({ task, pending = true }: { task?: OrchTask; pending?: b
     </div>
   );
 }
+/** M-A-3 T3 §19: the minimal routing summary — provider/model/effort/mode facts, why selected, reroutes; safe candidate details are expandable. */
+export function RoutingSummary({ task }: { task: OrchTask }) {
+  const facts = routingFacts(task);
+  if (!facts.engaged && !task.routingMode) return null; // Legacy tasks keep the existing route facts.
+  return (
+    <div className="routing-facts">
+      <dl className="fact-list">
+        <div>
+          <dt>Routing</dt>
+          <dd>{facts.mode}{facts.candidates ? ` · ${facts.candidates}` : ""}</dd>
+        </div>
+        <div>
+          <dt>Model</dt>
+          <dd>{facts.model}</dd>
+        </div>
+        {facts.engaged || facts.effort ? (
+          <div>
+            <dt>Effort</dt>
+            <dd>{facts.effort ?? "Provider default effort"}</dd>
+          </div>
+        ) : null}
+        {facts.rerouted != null ? (
+          <div>
+            <dt>Rerouted</dt>
+            <dd>{facts.rerouted ? "Yes" : "No"}</dd>
+          </div>
+        ) : null}
+      </dl>
+      {facts.engaged && task.decision.selection_reason ? (
+        <p className="caption">Why selected · {task.decision.selection_reason}</p>
+      ) : null}
+      {facts.engaged && task.decision.candidates?.length ? (
+        <details className="route-candidates">
+          <summary>
+            Model candidates considered <ChevronDown size={12} />
+          </summary>
+          <ul>
+            {task.decision.candidates.map((candidate) => (
+              <li key={`${candidate.provider_id}:${candidate.model_id ?? "provider-default"}`}>
+                <span>{NAMES[candidate.provider_id]}</span>
+                <span className="caption">
+                  {candidate.model_id ?? "Provider default"}
+                  {candidate.eligible
+                    ? ` · eligible${candidate.effort_mode ? ` · effort ${candidate.effort_mode}` : " · provider default effort"}`
+                    : ` · not eligible · ${candidate.exclusion_reasons[0] ?? "hard requirement unsatisfied"}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="caption">
+            Candidate eligibility, not a ranking of success chances.
+          </p>
+        </details>
+      ) : null}
+    </div>
+  );
+}
 export function Approval({ task, phone = false }: { task: OrchTask; phone?: boolean }) {
   const store = useIsland();
   const providers = liveProviders(store);
@@ -295,8 +356,10 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
   const [pending, setPending] = useState(false);
   const cloud = usesCloudModel(task);
   const conflict = conflictsWithLocalOnly(task);
+  const canAct = store.canAct();
+  const remote = directApprovalVerdict(task, store.viewer);
   const ready =
-    !conflict && store.host === "online" && ["ready", "busy"].includes(provider.availability);
+    !conflict && canAct && remote.allowed && ["ready", "busy"].includes(provider.availability);
   const action = async (type: "run" | "stop") => {
     setPending(true);
     try {
@@ -309,6 +372,30 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
     <section className="approval-view">
       <p className="eyebrow">{phone ? "Recommended" : "Your approval"}</p>
       <h2>{phone ? NAMES[task.provider] : `Use ${NAMES[task.provider]}?`}</h2>
+      <p>
+        <strong>{task.title}</strong>
+      </p>
+      <dl className="fact-list">
+        <div>
+          <dt>Workspace</dt>
+          <dd>
+            {store.projects.find((project) => project.id === task.projectId)?.name ??
+              "Default workspace"}
+          </dd>
+        </div>
+        <div>
+          <dt>Folder</dt>
+          <dd>{task.cwd || "Unavailable"}</dd>
+        </div>
+        <div>
+          <dt>Authority</dt>
+          <dd>Direct task · provider permissions</dd>
+        </div>
+      </dl>
+      <p className="caption">
+        The provider may use files and commands within its existing permissions. External effects
+        follow provider policy; Bunny capability approvals remain separate.
+      </p>
       {cloud ? (
         <p className="caption">{task.model} · runs through Ollama’s cloud service.</p>
       ) : null}
@@ -335,6 +422,7 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
         </div>
         <ShieldCheck size={18} />
       </div>
+      <RoutingSummary task={task} />
       <details className="route-explanation">
         <summary>Why this agent</summary>
         <p className="route-reason">
@@ -395,7 +483,7 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
         <button
           type="button"
           className="btn quiet"
-          disabled={pending}
+          disabled={pending || !canAct}
           onClick={() => void action("stop")}
         >
           Cancel
@@ -403,7 +491,7 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
         <button
           type="button"
           className="btn secondary"
-          disabled={pending}
+          disabled={pending || !canAct}
           onClick={() => setChanging(!changing)}
         >
           Change
@@ -419,10 +507,8 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
         </button>
       </div>
       {!ready ? (
-        <p className="caption">
-          {store.host !== "online"
-            ? "Reconnect your workstation to run this task."
-            : provider.detail}
+        <p className="caption control-caption">
+          {!canAct ? RECONNECT_CAPTION : !remote.allowed ? remote.caption : provider.detail}
         </p>
       ) : null}
     </section>
@@ -448,13 +534,11 @@ export function TaskDetail({ now }: { now: number }) {
   const file = verifiedFile(task);
   const progress = finitePlan(task.progress);
   const provider = liveProviders(store).find((p) => p.id === task.provider)!;
-  const events = store.events.filter(
-    (e) =>
-      e.taskId === task.id &&
-      !e.type.startsWith("audit.") &&
-      !["agent.output"].includes(e.type) &&
-      !isPrivateEvent(e.type),
-  );
+  const role = task.mission
+    ? store.missions?.missions
+        .find((mission) => mission.id === task.mission?.missionId)
+        ?.steps.find((step) => step.id === task.mission?.stepId)?.role
+    : null;
   return (
     <article className="task-detail glass">
       <header className="task-detail-header">
@@ -462,27 +546,43 @@ export function TaskDetail({ now }: { now: number }) {
           <ProviderIcon id={task.provider} />
           <div>
             <p className="eyebrow">
+              {role ? `${role} · ` : ""}
               {NAMES[task.provider]} · {elapsed(task, now)}
             </p>
             <h2>{task.title}</h2>
           </div>
         </div>
-        <TaskBadge state={task.state} />
+        <TaskBadge state={task.state} task={task} />
       </header>
       <TaskJourney task={task} />
-      <ActivityRibbon
-        task={task}
-        onOpen={() =>
-          document.getElementById("task-activity")?.scrollIntoView({
-            behavior:
-              store.appearance.motion === "full" &&
-              !window.matchMedia("(prefers-reduced-motion: reduce)").matches
-                ? "smooth"
-                : "instant",
-            block: "nearest",
-          })
-        }
-      />
+      <div
+        className="verification-card"
+        data-passed={task.verification?.passed ?? "unknown"}
+        role="status"
+      >
+        <ShieldCheck size={16} aria-hidden="true" />
+        <div>
+          <strong>{taskStatus(task).verification}</strong>
+          <p className="caption">
+            Provider turns, task completion and independent verification are separate.
+          </p>
+        </div>
+      </div>
+      {isActive(task) ? (
+        <ActivityRibbon
+          task={task}
+          onOpen={() =>
+            document.getElementById("task-activity")?.scrollIntoView({
+              behavior:
+                store.appearance.motion === "full" &&
+                !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+                  ? "smooth"
+                  : "instant",
+              block: "nearest",
+            })
+          }
+        />
+      ) : null}
       {isActive(task) ? <TaskActivity task={task} expanded /> : null}
       {task.error ? (
         <div className="error-card" role="alert">
@@ -496,52 +596,10 @@ export function TaskDetail({ now }: { now: number }) {
           <p>
             {progress.completed} / {progress.total} steps completed
           </p>
-          {progress.current ? <p className="caption">Current step: {progress.current}</p> : null}
         </section>
       ) : null}
       <section id="task-activity">
-        <h3 className="eyebrow">Activity</h3>
-        {events.length ? (
-          <ol className="activity-timeline">
-            {events.map((e) => (
-              <li key={e.sequence}>
-                <time>
-                  {new Date(e.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </time>
-                <span className="timeline-dot" />
-                <div>
-                  <strong>{activityLabel(e.type)}</strong>
-                  <p>{activityDetail(e.type, e.detail, task)}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : task.logs.length ? (
-          <>
-            <p className="caption">Retained Host activity · latest 24 entries</p>
-            <ol className="activity-timeline">
-              {publicTaskLogs(task, store.events)
-                .slice(-24)
-                .map((entry, index) => (
-                  <li key={`${entry.at}-${index}`}>
-                    <time>
-                      {new Date(entry.at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </time>
-                    <span className="timeline-dot" />
-                    <div>
-                      <strong>Host log</strong>
-                      <p>{entry.line}</p>
-                    </div>
-                  </li>
-                ))}
-            </ol>
-          </>
-        ) : (
-          <p className="caption">No activity records retained for this task.</p>
-        )}
+        <ActivityTimeline taskId={task.id} limit={24} />
       </section>
       {file ? (
         <section>
@@ -561,6 +619,7 @@ export function TaskDetail({ now }: { now: number }) {
           Selected: {NAMES[task.provider]}
           {task.manual ? " · manual selection" : ""}
         </p>
+        <RoutingSummary task={task} />
         <p className="caption">
           {usesCloudModel(task)
             ? task.decision.reason.replace("Stays on this machine. ", "")
@@ -579,7 +638,7 @@ export function TaskDetail({ now }: { now: number }) {
             <Folder size={14} />
             {task.cwd || "Working folder unavailable"}
           </span>
-          <span>{task.model || "Model unavailable"}</span>
+          <span>{routingFacts(task).model}</span>
         </div>
       </section>
       {task.output ? (
@@ -603,10 +662,16 @@ export function TaskDetail({ now }: { now: number }) {
           {task.verification ? (
             <p className="verification" data-passed={task.verification.passed}>
               {task.verification.passed ? <Check size={14} /> : <Square size={14} />}{" "}
-              {task.verification.detail}
+              {taskStatus(task).verification}
             </p>
           ) : null}
         </section>
+      ) : null}
+      {!isActive(task) && !task.output ? (
+        <p className="caption">
+          Provider transcripts remain on the Host. Files and independent verification are shown
+          above.
+        </p>
       ) : null}
       <details className="raw-logs">
         <summary>Technical details & logs</summary>
@@ -644,16 +709,18 @@ export function TaskDetail({ now }: { now: number }) {
               <Terminal size={15} />
               Terminal unavailable
             </button>
-            <button className="btn danger" onClick={() => void store.stop(task.id)}>
+            <button className="btn danger" disabled={!store.canAct()} onClick={() => void store.stop(task.id)}>
               <Square size={14} />
               Stop task
             </button>
+            {!store.canAct() && <p className="control-caption">{RECONNECT_CAPTION}</p>}
           </>
         ) : (
           <>
             <button
               className="btn quiet"
               aria-pressed={task.feedback === "positive"}
+              disabled={!store.canAct()}
               onClick={() => store.feedback(task.id, "positive")}
             >
               <ThumbsUp size={14} />
@@ -662,6 +729,7 @@ export function TaskDetail({ now }: { now: number }) {
             <button
               className="btn quiet"
               aria-pressed={task.feedback === "negative"}
+              disabled={!store.canAct()}
               onClick={() => store.feedback(task.id, "negative")}
             >
               <ThumbsDown size={14} />

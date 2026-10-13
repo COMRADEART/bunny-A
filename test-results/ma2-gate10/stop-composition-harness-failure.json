@@ -1,0 +1,661 @@
+{
+  "recordedAt": "2026-10-06T21:40:54.810Z",
+  "classification": "DISPOSABLE LIVE",
+  "error": {
+    "name": "Error",
+    "message": "Composition positive control timed out"
+  },
+  "mission": {
+    "mission": {
+      "id": "925ed580-3835-4b0e-8f03-6b85aeca699f",
+      "title": "T10 Stop provider plus desktop",
+      "objective": "Disposable Stop composition",
+      "request": "Disposable Stop composition",
+      "projectId": null,
+      "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2",
+      "mode": "fast",
+      "state": "running",
+      "origin": "workstation",
+      "createdAt": 1791322838983,
+      "updatedAt": 1791322840164,
+      "startedAt": 1791322839027,
+      "finishedAt": null,
+      "planning": {
+        "planner": "bunny-planner-deterministic-v1",
+        "complexity": "medium",
+        "rationale": [
+          "User-supplied plan; validated and bounded by Bunny."
+        ],
+        "replans": 0,
+        "plannedAt": 1791322838998
+      },
+      "requestedScope": {
+        "projectRoots": [
+          "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2"
+        ],
+        "riskClasses": [
+          "READ",
+          "EXECUTE"
+        ],
+        "capabilities": [
+          "computer.open_app",
+          "filesystem.exists",
+          "filesystem.list",
+          "filesystem.read",
+          "notifications.send"
+        ],
+        "providers": {
+          "execution": true,
+          "allow": null,
+          "localOnly": false,
+          "sessions": {
+            "steps": [
+              {
+                "stepId": "17b6bc08-7a32-42fa-9f5a-96acfb5afb3e",
+                "scope": {
+                  "access": "read"
+                }
+              }
+            ],
+            "maxSessions": 5,
+            "writeIncludesShell": true
+          }
+        },
+        "filesystem": {
+          "read": [
+            "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2"
+          ],
+          "write": []
+        },
+        "browser": {
+          "enabled": false,
+          "domains": "public"
+        },
+        "terminal": {
+          "enabled": false,
+          "commands": [],
+          "executables": []
+        },
+        "git": {
+          "actions": []
+        },
+        "network": {
+          "allowed": false
+        },
+        "computer": {
+          "enabled": true
+        },
+        "budget": {
+          "maxExternalModelCalls": 2,
+          "maxRuntimeMs": 1800000,
+          "maxRetries": 2,
+          "maxTokens": null
+        },
+        "alwaysAsk": [
+          "EXTERNAL_SIDE_EFFECT",
+          "DESTRUCTIVE"
+        ]
+      },
+      "authorizationId": "0586678f-a1f9-451a-a5bf-1c61bc4a2891",
+      "capabilityRequirements": [
+        "computer.open_app",
+        "filesystem.exists",
+        "filesystem.list",
+        "filesystem.read",
+        "notifications.send"
+      ],
+      "providerConstraints": {
+        "localOnly": false
+      },
+      "budget": {
+        "maxExternalModelCalls": 2,
+        "maxRuntimeMs": 1800000,
+        "maxRetries": 2,
+        "maxTokens": null
+      },
+      "retryPolicy": {
+        "maxRetriesPerStep": 2
+      },
+      "verificationRequired": false,
+      "result": null,
+      "failure": null,
+      "recovery": null,
+      "accounting": {
+        "runtimeMs": 0,
+        "externalModelCalls": 1,
+        "localModelCalls": 0,
+        "deterministicSteps": 0,
+        "retries": 0,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokensReported": false
+      },
+      "steps": [
+        {
+          "id": "52799388-fbd1-474b-aa54-97a0da259924",
+          "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f",
+          "index": 0,
+          "role": "Acquire",
+          "objective": "Reuse Calculator",
+          "dependsOn": [],
+          "requiredCapabilities": [
+            "computer.open_app"
+          ],
+          "reasoning": "none",
+          "preferences": {},
+          "scope": {
+            "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2",
+            "access": "read",
+            "isolation": "shared"
+          },
+          "providerConstraints": {},
+          "modelConstraint": null,
+          "executor": {
+            "kind": "capability",
+            "action": "computer.open_app",
+            "params": {
+              "app": "calculator"
+            }
+          },
+          "expectedArtifacts": [],
+          "verification": [],
+          "maxRetries": 2,
+          "timeoutMs": 600000,
+          "weight": null,
+          "state": "completed",
+          "taskId": null,
+          "capabilityRunId": "d3961028-ff6e-4a7a-a06d-2016b4156739",
+          "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2",
+          "attempts": [
+            {
+              "attempt": 1,
+              "startedAt": 1791322839039,
+              "finishedAt": 1791322840119,
+              "taskId": null,
+              "capabilityRunId": "d3961028-ff6e-4a7a-a06d-2016b4156739",
+              "provider": null,
+              "outcome": "completed",
+              "category": null,
+              "detail": "completed"
+            }
+          ],
+          "result": {
+            "summary": "Reused the verified Calculator target.",
+            "artifactIds": [],
+            "verified": null,
+            "verification": []
+          },
+          "evidence": [],
+          "failure": null,
+          "accounting": {
+            "runtimeMs": 1070,
+            "local": true,
+            "provider": null,
+            "model": null,
+            "inputTokens": null,
+            "outputTokens": null,
+            "deterministic": true
+          },
+          "pendingRequestId": null,
+          "pendingPhase": null,
+          "approvedOnce": null,
+          "startedAt": 1791322839040,
+          "finishedAt": 1791322840119
+        },
+        {
+          "id": "17b6bc08-7a32-42fa-9f5a-96acfb5afb3e",
+          "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f",
+          "index": 1,
+          "role": "Provider",
+          "objective": "Harmless owned child",
+          "dependsOn": [
+            "52799388-fbd1-474b-aa54-97a0da259924"
+          ],
+          "requiredCapabilities": [],
+          "reasoning": "standard",
+          "preferences": {},
+          "scope": {
+            "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2",
+            "access": "read",
+            "isolation": "shared"
+          },
+          "providerConstraints": {},
+          "modelConstraint": null,
+          "executor": {
+            "kind": "model"
+          },
+          "expectedArtifacts": [],
+          "verification": [],
+          "maxRetries": 2,
+          "timeoutMs": 600000,
+          "weight": null,
+          "state": "running",
+          "taskId": "b56f5598-d873-455b-8ac1-1382743dfc03",
+          "capabilityRunId": null,
+          "workspace": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2",
+          "attempts": [
+            {
+              "attempt": 1,
+              "startedAt": 1791322840168,
+              "finishedAt": null,
+              "taskId": "b56f5598-d873-455b-8ac1-1382743dfc03",
+              "capabilityRunId": null,
+              "provider": "claude",
+              "outcome": "running",
+              "category": null,
+              "detail": ""
+            }
+          ],
+          "result": null,
+          "evidence": [],
+          "failure": null,
+          "accounting": {
+            "runtimeMs": 0,
+            "local": null,
+            "provider": null,
+            "model": null,
+            "inputTokens": null,
+            "outputTokens": null,
+            "deterministic": false
+          },
+          "pendingRequestId": null,
+          "pendingPhase": null,
+          "approvedOnce": null,
+          "startedAt": 1791322840168,
+          "finishedAt": null
+        },
+        {
+          "id": "df92add3-5a8e-48d3-b482-29bb416594cd",
+          "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f",
+          "index": 2,
+          "role": "Later GUI",
+          "objective": "Must not run after Stop",
+          "dependsOn": [
+            "17b6bc08-7a32-42fa-9f5a-96acfb5afb3e"
+          ],
+          "requiredCapabilities": [
+            "computer.open_app"
+          ],
+          "reasoning": "none",
+          "preferences": {},
+          "scope": {
+            "root": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2",
+            "access": "read",
+            "isolation": "shared"
+          },
+          "providerConstraints": {},
+          "modelConstraint": null,
+          "executor": {
+            "kind": "capability",
+            "action": "computer.open_app",
+            "params": {
+              "app": "calculator"
+            }
+          },
+          "expectedArtifacts": [],
+          "verification": [],
+          "maxRetries": 2,
+          "timeoutMs": 600000,
+          "weight": null,
+          "state": "pending",
+          "taskId": null,
+          "capabilityRunId": null,
+          "workspace": null,
+          "attempts": [],
+          "result": null,
+          "evidence": [],
+          "failure": null,
+          "accounting": {
+            "runtimeMs": 0,
+            "local": null,
+            "provider": null,
+            "model": null,
+            "inputTokens": null,
+            "outputTokens": null,
+            "deterministic": true
+          },
+          "pendingRequestId": null,
+          "pendingPhase": null,
+          "approvedOnce": null,
+          "startedAt": null,
+          "finishedAt": null
+        }
+      ],
+      "progress": {
+        "kind": "steps",
+        "completed": 1,
+        "total": 3,
+        "failed": 0,
+        "running": 1
+      },
+      "requests": [],
+      "artifacts": [],
+      "batch": null
+    },
+    "events": [
+      {
+        "sequence": 3,
+        "at": 1791322838986,
+        "type": "mission.created",
+        "taskId": null,
+        "detail": "Mission \"T10 Stop provider plus desktop\" created by workstation (fast).",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 4,
+        "at": 1791322838990,
+        "type": "mission.planning",
+        "taskId": null,
+        "detail": "Planning with bunny-planner-deterministic-v1.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 5,
+        "at": 1791322838999,
+        "type": "mission.planned",
+        "taskId": null,
+        "detail": "3 step(s): Acquire → Provider → Later GUI. User-supplied plan; validated and bounded by Bunny.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 6,
+        "at": 1791322839002,
+        "type": "mission.approval_required",
+        "taskId": null,
+        "detail": "Mission 925ed580-3835-4b0e-8f03-6b85aeca699f \"T10 Stop provider plus desktop\" needs approval: READ, EXECUTE; capabilities computer.open_app, filesystem.exists, filesystem.list, filesystem.read, notifications.send; up to 2 external model call(s).",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 7,
+        "at": 1791322839017,
+        "type": "approval.mission_envelope",
+        "taskId": null,
+        "detail": "Mission envelope 0586678f-a1f9-451a-a5bf-1c61bc4a2891 by workstation; provider sessions {\"steps\":[{\"stepId\":\"17b6bc08-7a32-42fa-9f5a-96acfb5afb3e\",\"scope\":{\"access\":\"read\"}}],\"maxSessions\":5,\"writeIncludesShell\":true}.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 8,
+        "at": 1791322839021,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "Mission authorization 0586678f-a1f9-451a-a5bf-1c61bc4a2891 granted by workstation: roots C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2; READ, EXECUTE; terminal []; git []; browser off; computer on; expires 2026-10-06T22:10:39.009Z.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 9,
+        "at": 1791322839027,
+        "type": "mission.started",
+        "taskId": null,
+        "detail": "Mission \"T10 Stop provider plus desktop\" started.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 10,
+        "at": 1791322839032,
+        "type": "mission.step.ready",
+        "taskId": null,
+        "detail": "Acquire is ready. (step 52799388-fbd1-474b-aa54-97a0da259924)",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 11,
+        "at": 1791322839040,
+        "type": "mission.step.started",
+        "taskId": null,
+        "detail": "Acquire started (attempt 1, deterministic). (step 52799388-fbd1-474b-aa54-97a0da259924)",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 12,
+        "at": 1791322839045,
+        "type": "capability.requested",
+        "taskId": null,
+        "detail": "computer.open_app requested by mission:925ed580-3835-4b0e-8f03-6b85aeca699f (step 52799388-fbd1-474b-aa54-97a0da259924).",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 13,
+        "at": 1791322839048,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "computer.open_app: Inside mission authorization 0586678f-a1f9-451a-a5bf-1c61bc4a2891.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 14,
+        "at": 1791322839052,
+        "type": "capability.started",
+        "taskId": null,
+        "detail": "computer.open_app started.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 15,
+        "at": 1791322840111,
+        "type": "capability.completed",
+        "taskId": null,
+        "detail": "computer.open_app succeeded: Reused the verified Calculator target.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 16,
+        "at": 1791322840119,
+        "type": "mission.step.completed",
+        "taskId": null,
+        "detail": "Acquire completed (no independent check requested). (step 52799388-fbd1-474b-aa54-97a0da259924)",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 17,
+        "at": 1791322840127,
+        "type": "mission.step.ready",
+        "taskId": null,
+        "detail": "Provider is ready. (step 17b6bc08-7a32-42fa-9f5a-96acfb5afb3e)",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 18,
+        "at": 1791322840138,
+        "type": "task.created",
+        "taskId": "b56f5598-d873-455b-8ac1-1382743dfc03",
+        "detail": "Task created on Bunny-A Host.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 19,
+        "at": 1791322840142,
+        "type": "routing.started",
+        "taskId": "b56f5598-d873-455b-8ac1-1382743dfc03",
+        "detail": "Routing with readiness and hard constraints.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 20,
+        "at": 1791322840146,
+        "type": "approval.required",
+        "taskId": "b56f5598-d873-455b-8ac1-1382743dfc03",
+        "detail": "BunnyRouter. general task, complexity 0.24, mode fast. Cloud executor. Provider is ready. Strong fit for this task type. Hard constraints checked. Confidence is an uncalibrated routing score.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 21,
+        "at": 1791322840152,
+        "type": "approval.delegated",
+        "taskId": "b56f5598-d873-455b-8ac1-1382743dfc03",
+        "detail": "Mission-delegated approval under authorization 0586678f-a1f9-451a-a5bf-1c61bc4a2891 (mission 925ed580-3835-4b0e-8f03-6b85aeca699f, step 17b6bc08-7a32-42fa-9f5a-96acfb5afb3e). The user approved the mission scope, not this individual child task.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 22,
+        "at": 1791322840156,
+        "type": "agent.starting",
+        "taskId": "b56f5598-d873-455b-8ac1-1382743dfc03",
+        "detail": "Claude Code starting in C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 23,
+        "at": 1791322840160,
+        "type": "executor.starting",
+        "taskId": "b56f5598-d873-455b-8ac1-1382743dfc03",
+        "detail": "Execution active. Progress indeterminate until the provider publishes a plan.",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      },
+      {
+        "sequence": 24,
+        "at": 1791322840168,
+        "type": "mission.step.started",
+        "taskId": null,
+        "detail": "Provider started (attempt 1, claude). (step 17b6bc08-7a32-42fa-9f5a-96acfb5afb3e)",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f"
+      }
+    ],
+    "memory": [
+      {
+        "id": "13249840-9507-4e10-bd94-378cf200a01b",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f",
+        "kind": "user_decision",
+        "key": "Mission approved",
+        "value": "workstation approved READ/EXECUTE in C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2 until 2026-10-06T22:10:39.009Z.",
+        "provenance": "user:workstation",
+        "verified": true,
+        "createdAt": 1791322839014
+      }
+    ],
+    "authorization": {
+      "projectRoots": [
+        "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2"
+      ],
+      "riskClasses": [
+        "READ",
+        "EXECUTE"
+      ],
+      "capabilities": [
+        "computer.open_app",
+        "filesystem.exists",
+        "filesystem.list",
+        "filesystem.read",
+        "notifications.send"
+      ],
+      "providers": {
+        "execution": true,
+        "allow": null,
+        "localOnly": false,
+        "sessions": {
+          "steps": [
+            {
+              "stepId": "17b6bc08-7a32-42fa-9f5a-96acfb5afb3e",
+              "scope": {
+                "access": "read"
+              }
+            }
+          ],
+          "maxSessions": 5,
+          "writeIncludesShell": true
+        }
+      },
+      "filesystem": {
+        "read": [
+          "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2"
+        ],
+        "write": []
+      },
+      "browser": {
+        "enabled": false,
+        "domains": "public"
+      },
+      "terminal": {
+        "enabled": false,
+        "commands": [],
+        "executables": []
+      },
+      "git": {
+        "actions": []
+      },
+      "network": {
+        "allowed": false
+      },
+      "computer": {
+        "enabled": true
+      },
+      "budget": {
+        "maxExternalModelCalls": 2,
+        "maxRuntimeMs": 1800000,
+        "maxRetries": 2,
+        "maxTokens": null
+      },
+      "alwaysAsk": [
+        "EXTERNAL_SIDE_EFFECT",
+        "DESTRUCTIVE"
+      ],
+      "id": "0586678f-a1f9-451a-a5bf-1c61bc4a2891",
+      "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f",
+      "grantedAt": 1791322839009,
+      "grantedBy": "workstation",
+      "expiresAt": 1791324639009,
+      "revokedAt": null
+    },
+    "runs": [
+      {
+        "id": "d3961028-ff6e-4a7a-a06d-2016b4156739",
+        "action": "computer.open_app",
+        "capability": "computer",
+        "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f",
+        "stepId": "52799388-fbd1-474b-aa54-97a0da259924",
+        "risk": "EXECUTE",
+        "decision": "allow",
+        "decisionReason": "Inside mission authorization 0586678f-a1f9-451a-a5bf-1c61bc4a2891.",
+        "params": {
+          "app": "calculator"
+        },
+        "status": "succeeded",
+        "summary": "Reused the verified Calculator target.",
+        "evidence": [
+          "computer.open_app via UI Automation at 2026-10-06T21:40:40.110Z",
+          "Calculator target reuse_existing: {\"handle\":\"4458634\",\"processId\":34640,\"processStartedAt\":\"639269006874532721\",\"contentProcessId\":48660,\"contentStartedAt\":\"639269165815372238\"}"
+        ],
+        "artifactIds": [],
+        "startedAt": 1791322839048,
+        "finishedAt": 1791322840110,
+        "durationMs": 1062,
+        "origin": "mission:925ed580-3835-4b0e-8f03-6b85aeca699f"
+      }
+    ]
+  },
+  "ownership": [
+    {
+      "schema": "bunny-owned-operation/1",
+      "operationId": "0b47053c-ef8f-40c6-83fd-c7065051b422",
+      "containerId": "0b47053c-ef8f-40c6-83fd-c7065051b422",
+      "mechanism": "windows-job-object",
+      "missionId": "925ed580-3835-4b0e-8f03-6b85aeca699f",
+      "stepId": "17b6bc08-7a32-42fa-9f5a-96acfb5afb3e",
+      "capabilityRunId": null,
+      "launcherPath": "c:\\Program Files\\nodejs\\node.exe",
+      "launcherPid": 15752,
+      "launcherCreatedAt": 1791322840190,
+      "members": [
+        {
+          "pid": 15752,
+          "createdAt": 1791322840190,
+          "file": "C:\\Program Files\\nodejs\\node.exe"
+        },
+        {
+          "pid": 17008,
+          "createdAt": 1791322840196,
+          "file": "C:\\Windows\\System32\\conhost.exe"
+        }
+      ],
+      "startedAt": 1791322840176,
+      "endedAt": null,
+      "repo": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2",
+      "cwd": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t10-composition-57LMr2",
+      "action": "T10 harmless provider child",
+      "state": "running",
+      "exitCode": null,
+      "killOnClose": true,
+      "breakaway": false,
+      "closed": false
+    }
+  ]
+}

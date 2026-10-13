@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {readFileSync} from 'node:fs';
+import {chain,capStep,createMission,approveMission,waitOpenRequest,respond,getMission,until,saveRecord} from './live-client.ts';
+import {ownedAcquisition} from '../../scripts/t9-calculator-fixture.mjs';
+const rec='test-results/ma2-final-remediation-r1/';
+const inventory=(name:string)=>{execFileSync('powershell.exe',['-NoProfile','-File',rec+'calculator-inventory.ps1','-OutputPath',rec+name],{windowsHide:true});return JSON.parse(readFileSync(rec+name,'utf8').replace(/^\uFEFF/,''));};
+const before=inventory('calculator-setup-before.json');assert.equal(before.count,0,'No unowned user window may be used as a disposable fixture');
+const m=await createMission({title:'R1 sole controlled Calculator fixture',objective:'Harmless native acquire/read fixture; no provider execution',steps:chain([capStep('Acquire','computer.open_app',{app:'calculator'},'Acquire one verified Calculator'),capStep('Acquire again','computer.open_app',{app:'calculator'},'Reuse the same intended target')])});
+await approveMission(m.id);const ask=await waitOpenRequest(m.id);assert.ok(ask.batchOffer);assert.equal((await respond(ask.id,'allow_batch')).status,200);
+const detail=await until(async()=>{const d=await getMission(m.id);return ['completed','failed','stopped'].includes(d.mission.state)?d:null;},'Fixture completion');assert.equal(detail.mission.state,'completed',JSON.stringify(detail.mission.steps.map(s=>s.failure)));
+const after=inventory('calculator-v26-pre.json');assert.equal(after.count,1);const launches=detail.runs.filter(r=>r.action==='computer.open_app'&&(r as any).evidence.some((e:string)=>e.startsWith('Calculator target launched:')));assert.equal(launches.length,1);
+const owned=ownedAcquisition(before,after,{missionId:m.id,capabilityRunId:launches[0].id,test:'R1 explicit sole fixture acquisition'});
+saveRecord('calculator-owned-ledger.json',{preexistingHandles:before.targets.map((t:any)=>t.handle),targets:[owned]});
+saveRecord('calculator-setup.json',{recordedAt:new Date().toISOString(),classification:'DISPOSABLE LIVE',missionId:m.id,requestId:ask.id,launchCount:1,inventory:after,productionUserTargetsBefore:before.count,targetOwnedByThisTest:true,fixtureWillBePreexistingForFollowupWorkflows:true,detail});

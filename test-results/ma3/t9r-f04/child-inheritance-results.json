@@ -1,0 +1,363 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "derivedBy": "assemble-evidence.mjs",
+  "rows": [
+    {
+      "id": "J11",
+      "title": "Child inherits containment",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts; live ownedAreRecordedMembers"
+    },
+    {
+      "id": "J12",
+      "title": "Grandchild inherits containment",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "fixture tree child-with-grandchild"
+    },
+    {
+      "id": "J13",
+      "title": "Short-lived child cannot escape via observation gap",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "membership is kernel-assigned at creation; burst + short-lived fixtures"
+    },
+    {
+      "id": "J14",
+      "title": "Long-lived child terminates with owned Job",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts"
+    },
+    {
+      "id": "J15",
+      "title": "Parent exits before child without losing containment",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "orphan/chain fixtures"
+    },
+    {
+      "id": "J18",
+      "title": "Detached launch contained (no unsupported detached escape)",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "DETACHED_PROCESS|CREATE_NEW_PROCESS_GROUP child is a member"
+    },
+    {
+      "id": "J45",
+      "title": "Job accounting and observed lifecycle agree",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "ActiveProcesses vs Win32_Process; recorded members == OS-observed tree"
+    }
+  ],
+  "tests": [
+    {
+      "test": "F04 J11-J15/J18/J45",
+      "result": "PASS"
+    }
+  ],
+  "live": [
+    {
+      "round": 1,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "ccba445a-ac1a-4e54-b9e7-fbca68fcf9ad",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 63,
+          "recordedMembers": 62
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 34148,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          23880,
+          36732
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    },
+    {
+      "round": 2,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "2d614447-d51f-4ef7-b060-f2e7b44ae32a",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 65,
+          "recordedMembers": 65
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 33348,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          26864,
+          33544
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    },
+    {
+      "round": 3,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "ed7c94cf-7eb9-4c43-a73c-77ece95ddf18",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 49,
+          "recordedMembers": 49
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 24408,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          27872,
+          11616
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    },
+    {
+      "round": 4,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "2cf12833-6872-4fea-88d9-f3a6852932e3",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 55,
+          "recordedMembers": 55
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 19996,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          36792,
+          36180
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    },
+    {
+      "round": 5,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "29aaa499-086a-4ebd-9f22-b5826ee00ea0",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 52,
+          "recordedMembers": 52
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 21532,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          23840,
+          17596
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    },
+    {
+      "round": 6,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "a151fe41-e217-40dc-9b3c-e6432c4728e4",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 71,
+          "recordedMembers": 71
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 22140,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          35544,
+          27332
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    },
+    {
+      "round": 7,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "bf9e84b6-09bf-4150-a75a-2c8b2d1e1988",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 50,
+          "recordedMembers": 49
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 31168,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          26132,
+          25148
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    },
+    {
+      "round": 8,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "3b07c8a0-0352-485e-bcbe-8f096e2b97da",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 52,
+          "recordedMembers": 52
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 25016,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          30508,
+          30912
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    },
+    {
+      "round": 9,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "2b956664-9488-446c-8a16-3a89a59bd7b2",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 67,
+          "recordedMembers": 65
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 28208,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          23644,
+          24048
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    },
+    {
+      "round": 10,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "contained tree observed independently",
+        "fixtureProcessesOwned": 14,
+        "unrelatedPresent": true,
+        "jobRecord": {
+          "operationId": "765e3d0e-083c-441b-8131-d6934cdbbcca",
+          "limitFlagsKillOnClose": true,
+          "breakaway": false,
+          "activeProcesses": 49,
+          "recordedMembers": 49
+        },
+        "ownedAreRecordedMembers": 14,
+        "breakawayAttempts": [
+          {
+            "error": 0,
+            "pid": 35144,
+            "memberOfBunnyJob": true
+          }
+        ],
+        "silentBreakawayChildren": [
+          13636,
+          9068
+        ],
+        "silentChildrenRecordedInJob": 2
+      }
+    }
+  ]
+}

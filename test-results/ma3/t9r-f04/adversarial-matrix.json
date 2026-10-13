@@ -1,0 +1,429 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "generatedFrom": "assemble-evidence.mjs (derived, not hand-asserted)",
+  "passed": 60,
+  "failed": 0,
+  "notTested": 0,
+  "rows": [
+    {
+      "id": "J01",
+      "title": "Job Object successfully created",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts J01-J04/J07; live-containment-acceptance.json"
+    },
+    {
+      "id": "J02",
+      "title": "Required Job limits applied (KILL_ON_JOB_CLOSE only)",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts J16/J17 (limitFlags 0x2000), J08/J10"
+    },
+    {
+      "id": "J03",
+      "title": "Provider starts suspended",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "native launch CREATE_SUSPENDED; windows-job-api-contract.md"
+    },
+    {
+      "id": "J04",
+      "title": "Assigned before resume (JOB_LIST at creation, membership verified)",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "native launch; windows-job-api-contract.md"
+    },
+    {
+      "id": "J05",
+      "title": "Failed assignment prevents execution",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts J05; nested-job-validation.json limit1 (Win32 1816)"
+    },
+    {
+      "id": "J06",
+      "title": "Failed membership verification prevents execution",
+      "classification": "STATIC",
+      "result": "PASS",
+      "evidence": "native: IsProcessInJob false/failure → TerminateProcess on suspended root, launch fails (review round 1 C2)"
+    },
+    {
+      "id": "J07",
+      "title": "Root ownership recorded",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts; runtime/provider-sessions record fields"
+    },
+    {
+      "id": "J08",
+      "title": "Native handle ownership verified",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "job-handle-lifecycle.md; reduced access ASSIGN|QUERY|TERMINATE"
+    },
+    {
+      "id": "J09",
+      "title": "Job handle not inherited",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "kill-on-close fires at Host death (a member holding the handle would prevent it); HANDLE_LIST stdio-only"
+    },
+    {
+      "id": "J10",
+      "title": "No unrelated Job handle leak",
+      "classification": "STATIC",
+      "result": "PASS",
+      "evidence": "no PID/handle/name entry points; duplicate is non-inheritable"
+    },
+    {
+      "id": "J11",
+      "title": "Child inherits containment",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts; live ownedAreRecordedMembers"
+    },
+    {
+      "id": "J12",
+      "title": "Grandchild inherits containment",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "fixture tree child-with-grandchild"
+    },
+    {
+      "id": "J13",
+      "title": "Short-lived child cannot escape via observation gap",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "membership is kernel-assigned at creation; burst + short-lived fixtures"
+    },
+    {
+      "id": "J14",
+      "title": "Long-lived child terminates with owned Job",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts"
+    },
+    {
+      "id": "J15",
+      "title": "Parent exits before child without losing containment",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "orphan/chain fixtures"
+    },
+    {
+      "id": "J16",
+      "title": "Breakaway attempt rejected or contained",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "direct member: ERROR_ACCESS_DENIED; under libuv nested job: child stays in Bunny job (live breakawayAttempts.memberOfBunnyJob)"
+    },
+    {
+      "id": "J17",
+      "title": "Silent breakaway not enabled",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "member-created permissive nested job: children remain members"
+    },
+    {
+      "id": "J18",
+      "title": "Detached launch contained (no unsupported detached escape)",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "DETACHED_PROCESS|CREATE_NEW_PROCESS_GROUP child is a member"
+    },
+    {
+      "id": "J19",
+      "title": "Compatible nested Job",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "nested-job-validation.json (plain, silent, enclosing test job)"
+    },
+    {
+      "id": "J20",
+      "title": "Incompatible nested Job fails closed",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "nested-job-validation.json limit1"
+    },
+    {
+      "id": "J21",
+      "title": "Native helper failure prevents uncontained execution",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "launch failure → refused; integrity failure throws before load (owned-process-group integrity check); no fallback (static test)"
+    },
+    {
+      "id": "J22",
+      "title": "Provider retry cannot bypass containment",
+      "classification": "STATIC+REGRESSION",
+      "result": "PASS",
+      "evidence": "every relaunch is adapter.launch → spawnSession → containedSession; T3 retry tests"
+    },
+    {
+      "id": "J23",
+      "title": "Model reroute cannot bypass containment",
+      "classification": "STATIC+REGRESSION",
+      "result": "PASS",
+      "evidence": "as J22; T3 routing tests"
+    },
+    {
+      "id": "J24",
+      "title": "Shell fallback cannot bypass containment",
+      "classification": "STATIC",
+      "result": "PASS",
+      "evidence": "static test forbids spawn/exec/taskkill in containedSession; no cmd/shell launcher exists"
+    },
+    {
+      "id": "J25",
+      "title": "Provider-default path preserves containment",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "execution-scope tests run real adapter.launch through containedSession"
+    },
+    {
+      "id": "J26",
+      "title": "Existing user-owned provider daemon not killed",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "live unrelatedAlive.providerLike and same-image fixture"
+    },
+    {
+      "id": "J27",
+      "title": "Remote hosted API not reported as Job-contained",
+      "classification": "STATIC",
+      "result": "PASS",
+      "evidence": "Ollama/hosted sessions return no containment(); process-launch-inventory.md"
+    },
+    {
+      "id": "J28",
+      "title": "WSL/external execution not reported as contained",
+      "classification": "STATIC",
+      "result": "PASS",
+      "evidence": "no wsl.exe path; out-of-contract classes documented (native/README.md)"
+    },
+    {
+      "id": "J29",
+      "title": "Normal Stop terminates the correct owned Job",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts; live Stop scenario"
+    },
+    {
+      "id": "J30",
+      "title": "Stop preserves unrelated processes",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "unrelated same-image fixture survives"
+    },
+    {
+      "id": "J31",
+      "title": "Stop cannot kill by stale PID alone",
+      "classification": "STATIC+LIVE",
+      "result": "PASS",
+      "evidence": "termination only via the session's own job handle"
+    },
+    {
+      "id": "J32",
+      "title": "PID reuse does not transfer authority",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "restart reconciliation treats PID-identical, birth-different process as not ours; kills nothing"
+    },
+    {
+      "id": "J33",
+      "title": "HWND/Calculator identity protected",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "x53/x53-stability-matrix.json"
+    },
+    {
+      "id": "J34",
+      "title": "Graceful Host shutdown cleans owned sessions",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "live graceful scenario (host.close via IPC)"
+    },
+    {
+      "id": "J35",
+      "title": "Abrupt Host death cleans contained tree",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "taskkill /F of Host; OS observation"
+    },
+    {
+      "id": "J36",
+      "title": "Abrupt native-helper death has safe documented behaviour",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "helper is in-process: its death is Host death (J35); job-handle-lifecycle.md"
+    },
+    {
+      "id": "J37",
+      "title": "Restart does not revive stale handles",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "records reconciled; no handle API exists"
+    },
+    {
+      "id": "J38",
+      "title": "Restart invalidates old transient consent",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "live staleAuthorization (not ACTIVE)"
+    },
+    {
+      "id": "J39",
+      "title": "Agent identity persists",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "live agentPersisted"
+    },
+    {
+      "id": "J40",
+      "title": "Mission identity persists",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "live missionPersisted"
+    },
+    {
+      "id": "J41",
+      "title": "No duplicate work after recovery",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "effects.log launches unchanged; restartSurvivorRefusal"
+    },
+    {
+      "id": "J42",
+      "title": "Pause does not falsely claim termination",
+      "classification": "STATIC+REGRESSION",
+      "result": "PASS",
+      "evidence": "Agent pause semantics unchanged (T4 tests); only Stop terminates jobs"
+    },
+    {
+      "id": "J43",
+      "title": "Hold blocks unsafe downstream actions",
+      "classification": "LIVE+REGRESSION",
+      "result": "PASS",
+      "evidence": "sessions/lingering feed liveCodeExecutions (F01 hold, F02 promotion); done waits for accounting"
+    },
+    {
+      "id": "J44",
+      "title": "Insufficient containment returns truthful failure",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "state refused, admitted false; error text"
+    },
+    {
+      "id": "J45",
+      "title": "Job accounting and observed lifecycle agree",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "ActiveProcesses vs Win32_Process; recorded members == OS-observed tree"
+    },
+    {
+      "id": "J46",
+      "title": "No uncontrolled helper retains authority after close",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "probes and sessions closed by accounting; no separate helper process"
+    },
+    {
+      "id": "J47",
+      "title": "Concurrent sessions isolated",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts"
+    },
+    {
+      "id": "J48",
+      "title": "Stopping A does not stop B",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "src/lib/bunny-host/provider-containment.test.ts"
+    },
+    {
+      "id": "J49",
+      "title": "Cross-Mission ownership substitution rejected",
+      "classification": "STATIC+REGRESSION",
+      "result": "PASS",
+      "evidence": "jobs are per-session handles bound to task/mission; Stop by task id; restart refusal keyed by mission; T9R cross-missionId tests"
+    },
+    {
+      "id": "J50",
+      "title": "Cross-Project ownership substitution rejected",
+      "classification": "REGRESSION",
+      "result": "PASS",
+      "evidence": "T7/T9R cross-projectId tests"
+    },
+    {
+      "id": "J51",
+      "title": "Phone cannot authorize shell execution",
+      "classification": "REGRESSION",
+      "result": "PASS",
+      "evidence": "remote-authority.test.ts F01 suite"
+    },
+    {
+      "id": "J52",
+      "title": "Desktop execution approval requires exact scope",
+      "classification": "REGRESSION+LIVE",
+      "result": "PASS",
+      "evidence": "T5/F01 tests; live: Agent consent refused provider tools, workstation Mission needed exact approval"
+    },
+    {
+      "id": "J53",
+      "title": "Phone staging/promotion protections effective",
+      "classification": "REGRESSION",
+      "result": "PASS",
+      "evidence": "f02-*.test.ts"
+    },
+    {
+      "id": "J54",
+      "title": "F03 classifier protections effective",
+      "classification": "REGRESSION",
+      "result": "PASS",
+      "evidence": "f03-hardening.test.ts"
+    },
+    {
+      "id": "J55",
+      "title": "Real Calculator X53 passing",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "x53/x53-stability-matrix.json"
+    },
+    {
+      "id": "J56",
+      "title": "No protected production process terminated",
+      "classification": "LIVE (read-only)",
+      "result": "PASS",
+      "evidence": "production-before.json vs production-final.json"
+    },
+    {
+      "id": "J57",
+      "title": "No production state migration",
+      "classification": "LIVE (read-only)",
+      "result": "PASS",
+      "evidence": "table counts and manifest unchanged"
+    },
+    {
+      "id": "J58",
+      "title": "Typecheck/build/lint pass",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "typecheck.log, build.log, lint.log"
+    },
+    {
+      "id": "J59",
+      "title": "Full existing regression retained",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "full-regression.log"
+    },
+    {
+      "id": "J60",
+      "title": "Native test package contains the ownership helper",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "windows-package-results.json (packaged runtime ran a contained provider session)"
+    }
+  ]
+}

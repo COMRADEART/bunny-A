@@ -1,10 +1,10 @@
-import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { promisify } from "node:util";
+import { execOwnedFile } from "../bunny-host/owned-processes.server.ts";
 import { cpus, freemem, totalmem } from "node:os";
 import type { GpuSample, HostSample } from "./types";
+import { pathTool, systemTool } from "../bunny-host/system-tools.server.ts";
 
-const execFileAsync = promisify(execFile);
+const execFileAsync = execOwnedFile;
 
 type CpuTick = { idle: number; total: number };
 let previous: CpuTick | null = null;
@@ -55,15 +55,17 @@ async function detectedWindowsGpus(): Promise<string[]> {
   if(process.platform!=="win32") return [];
   if(windowsGpuNames) return windowsGpuNames;
   try {
-    const {stdout}=await execFileAsync("powershell.exe",["-NoProfile","-Command","Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name | ConvertTo-Json -Compress"],{timeout:4000,windowsHide:true});
+    const {stdout}=await execFileAsync(systemTool("powershell.exe"),["-NoProfile","-Command","Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name | ConvertTo-Json -Compress"],{timeout:4000,windowsHide:true});
     const values=JSON.parse(stdout);windowsGpuNames=(Array.isArray(values) ? values : [values]).filter((v:unknown):v is string=>typeof v === "string");
   } catch { windowsGpuNames=[]; }
   return windowsGpuNames;
 }
 async function nvidia(): Promise<GpuSample[]> {
   try {
+    const tool = pathTool("nvidia-smi");
+    if (!tool) return [];
     const { stdout } = await execFileAsync(
-      "nvidia-smi",
+      tool,
       ["--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw", "--format=csv,noheader,nounits"],
       { timeout: 1500 },
     );

@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {chain,capStep,cmd,createMission,approveMission,waitOpenRequest,respond,getMission,saveRecord,health} from './live-client.ts';
+import {idleCheck} from '../../scripts/bunny-rollback-preflight.mjs';
+import {bearer,STAGE_STATE} from './live-client.ts';
+const open=()=>capStep('Acquire','computer.open_app',{app:'calculator'},'Reuse original Calculator');
+const m=await createMission({title:'T10 active crash boundary',objective:'Disposable crash audit; do not replay GUI action.',steps:chain([open(),capStep('Pause','computer.type',{title:'Calculator',name:'Never execute',text:'T10_PRIVATE_RESTART_PROBE'},'Never approve this separate request'),open()])});
+await approveMission(m.id);const ask=await waitOpenRequest(m.id);assert.equal((await respond(ask.id,'allow_batch')).status,200);await waitOpenRequest(m.id,{action:'computer.type'});const d=await getMission(m.id);assert.ok(d.mission.batch);assert.equal(d.mission.batch!.status,'active');assert.equal(d.mission.batch!.usedCount,1);
+let refusal='';try{await idleCheck(45129,bearer(),STAGE_STATE);}catch(e){refusal=(e as Error).message;}assert.match(refusal,/active-work/);
+saveRecord('restart-active-before.json',{recordedAt:new Date().toISOString(),classification:'DISPOSABLE LIVE',attackIds:['T10-T9-07','T10-XG-05','T10-XG-06'],missionId:m.id,health:await health(),oldRequestId:ask.id,pendingRequestId:d.mission.requests.find(q=>!q.resolvedAt)!.id,runCount:d.runs.length,batch:d.mission.batch,rollbackPreflightRefusal:refusal,detail:d});
+console.log('Active ephemeral grant prepared; actual rollback preflight refuses active work.');

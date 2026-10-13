@@ -1,0 +1,146 @@
+/* DESIGN PREVIEW layout only. Character styling lives in characters.css. */
+
+.dp-root {
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+  color: var(--wc-ink);
+  font: 14px/1.45 ui-sans-serif, system-ui, sans-serif;
+}
+.dp-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  border: 1px dashed #ffb840;
+  background: rgba(255, 184, 64, 0.12);
+}
+.dp-toggle {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.dp-toggle[aria-pressed="true"] {
+  background: rgba(127, 176, 255, 0.2);
+}
+.dp-section {
+  margin-bottom: 36px;
+}
+.dp-section h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+.dp-section h3 {
+  margin: 14px 0 6px;
+  font-size: 14px;
+}
+.dp-note {
+  margin: 0 0 12px;
+  color: var(--wc-muted);
+}
+.dp-root code {
+  font: 12px ui-monospace, Consolas, monospace;
+  color: var(--wc-muted);
+}
+
+.dp-grid-weapons {
+  display: grid;
+  gap: 4px;
+  overflow-x: auto;
+}
+.dp-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) repeat(4, minmax(72px, 1fr));
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(127, 127, 150, 0.2);
+}
+.dp-head {
+  font-weight: 600;
+  color: var(--wc-muted);
+}
+
+.dp-size-row {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(127, 127, 150, 0.2);
+}
+.dp-size-cells {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.dp-size-weapon {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.dp-companion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 12px;
+}
+.dp-companion-cell {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.dp-docks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.dp-dock {
+  margin: 0;
+}
+.dp-screen {
+  position: relative;
+  height: 150px;
+  border-radius: 12px;
+  border: 1px solid rgba(127, 127, 150, 0.4);
+  background: #0a0d16;
+  color: #eef1fa;
+  overflow: hidden;
+}
+.dp-notch,
+.dp-strip-box {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  border-radius: 8px;
+  background: #0b0d14;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.dp-dock[data-dock="top"] .dp-notch { left: 25%; right: 25%; top: 0; height: 28px; border-radius: 0 0 14px 14px; }
+.dp-dock[data-dock="top"] .dp-strip-box { left: 8%; width: 16%; top: 4px; height: 22px; }
+.dp-dock[data-dock="bottom"] .dp-notch { left: 25%; right: 25%; bottom: 0; height: 28px; border-radius: 14px 14px 0 0; }
+.dp-dock[data-dock="bottom"] .dp-strip-box { left: 8%; width: 16%; bottom: 4px; height: 22px; }
+.dp-dock[data-dock="left"] .dp-notch { left: 0; top: 30%; bottom: 30%; width: 28px; writing-mode: vertical-rl; border-radius: 0 14px 14px 0; }
+.dp-dock[data-dock="left"] .dp-strip-box { left: 4px; top: 12%; width: 22px; height: 16%; writing-mode: vertical-rl; }
+.dp-dock[data-dock="right"] .dp-notch { right: 0; top: 30%; bottom: 30%; width: 28px; writing-mode: vertical-rl; border-radius: 14px 0 0 14px; }
+.dp-dock[data-dock="right"] .dp-strip-box { right: 4px; top: 12%; width: 22px; height: 16%; writing-mode: vertical-rl; }
+
+@media (max-width: 640px) {
+  .dp-row {
+    grid-template-columns: 140px repeat(4, 64px);
+  }
+  .dp-root {
+    padding: 16px;
+  }
+}

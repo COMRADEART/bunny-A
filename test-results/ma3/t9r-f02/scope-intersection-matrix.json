@@ -1,0 +1,323 @@
+{
+  "formula": "Effective authority = Host policy ∩ Mission authorization ∩ Agent envelope ∩ device permissions ∩ exact Host-offered operation",
+  "rows": [
+    {
+      "id": "E16",
+      "title": "Narrowed envelope prevents previously offered write",
+      "initialConditions": "Agent consent read+write, write ask offered",
+      "operation": "Owner removes write; phone answers",
+      "expected": "Refused; answered-unused answer INVALIDATED_BY_SCOPE_CHANGE; nothing written",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders) + real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E16a:",
+          "names": [
+            "F02-E16a: narrowing after a write ask was offered refuses the device's allow_once and writes nothing"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-E16b:",
+          "names": [
+            "F02-E16b: narrowing after the device answered but before execution stamps the answer and the step re-asks"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T9 F02 D3 (negative regression)",
+          "names": [
+            "T9 F02 D3 (negative regression): a device cannot answer a write that the owner's narrowed Agent consent no longer covers"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T9R F-02 narrowed consent",
+          "names": [
+            "T9R F-02 narrowed consent: a device answer outside the Agent's current consent is refused and stages nothing"
+          ],
+          "result": "PASS"
+        },
+        {
+          "type": "LIVE disposable Host (real HTTP, pairing, SQLite, Agent consent, fs.watch)",
+          "file": "live-staging-acceptance.json",
+          "steps": [
+            13,
+            14
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E17",
+      "title": "Current in-scope one-time approval remains valid",
+      "initialConditions": "consent keeps write; ask-every-time rule",
+      "operation": "Phone allow_once",
+      "expected": "Staged, then promoted by the workstation",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders) + real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E17:",
+          "names": [
+            "F02-E17: a current in-scope device one-time approval still works: staged, then promoted by the workstation"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-E17a:",
+          "names": [
+            "F02-E17a: an in-scope write with no ask rule runs under consent alone, with no device involvement"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T9 F12-F15/F19-F22/F50 (G2)",
+          "names": [
+            "T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/Resume reissue asks at the current revision"
+          ],
+          "result": "PASS"
+        },
+        {
+          "type": "LIVE disposable Host (real HTTP, pairing, SQLite, Agent consent, fs.watch)",
+          "file": "live-staging-acceptance.json",
+          "steps": [
+            1,
+            2
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E18",
+      "title": "Out-of-envelope one-time approval refused",
+      "initialConditions": "path outside the Mission write roots",
+      "operation": "Phone allow_once",
+      "expected": "Refused",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E18:",
+          "names": [
+            "F02-E18: a device one-time approval for a path outside the Mission write roots is refused"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F01-R18",
+          "names": [
+            "F01-R18 (HIGH): a phone's one-time answer never reaches outside the reviewed envelope; only the workstation's extends roots"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E19",
+      "title": "Cross-Agent approval rejected",
+      "initialConditions": "two Agents",
+      "operation": "Phone answers with forged binding",
+      "expected": "Refused; own answer never transfers",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders) + real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E19:",
+          "names": [
+            "F02-E19: a device cannot answer another Agent's offer through a forged binding; its own answer never transfers"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T9R remote approval cannot substitute agentId",
+          "names": [
+            "T9R remote approval cannot substitute agentId across canonical offers"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E20",
+      "title": "Cross-Mission approval rejected",
+      "initialConditions": "plain Mission and Agent Mission",
+      "operation": "Phone answer transfer attempt",
+      "expected": "Refused",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders) + real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E20:",
+          "names": [
+            "F02-E20: a device answer to a plain Mission's offer never transfers to an Agent Mission"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T9R remote approval cannot substitute missionId",
+          "names": [
+            "T9R remote approval cannot substitute missionId across canonical offers"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E21",
+      "title": "Cross-Project approval rejected",
+      "initialConditions": "two projects",
+      "operation": "Retarget answer",
+      "expected": "Refused; destination stays in the Mission project",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders) + real HTTP disposable Host (startHost, real pairing and bearer tokens)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E21:",
+          "names": [
+            "F02-E21: a device cannot retarget an answer to another project root; the staged destination stays in the Mission project"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "T9R remote approval cannot substitute projectId",
+          "names": [
+            "T9R remote approval cannot substitute projectId across canonical offers"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E22",
+      "title": "Stale authorization revision rejected",
+      "initialConditions": "request.agentic.revision behind",
+      "operation": "Phone answer",
+      "expected": "Refused",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E22:",
+          "names": [
+            "F02-E22: a device answer carrying a stale authorization revision is refused"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E23",
+      "title": "Old Host generation rejected",
+      "initialConditions": "Host restart",
+      "operation": "Answer old offer; held answer",
+      "expected": "Refused; INVALIDATED_BY_HOST_RESTART",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E23a:",
+          "names": [
+            "F02-E23a: a Host restart invalidates a pending device offer; the device cannot answer it afterwards"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-E23b:",
+          "names": [
+            "F02-E23b: a device answer held across a Host restart is stamped INVALIDATED_BY_HOST_RESTART and never executes"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E24",
+      "title": "Expired single-use grant rejected",
+      "initialConditions": "device answer past TTL; desktop grant past 5 min; envelope expired",
+      "operation": "Admission",
+      "expected": "EXPIRED; step re-asks; grant refused",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders) + unit (pure function)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E24a:",
+          "names": [
+            "F02-E24a: an expired device answer is ended as EXPIRED before the step runs, and the step re-asks"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-E24b:",
+          "names": [
+            "F02-E24b: a trusted-desktop grant past its lifetime is refused for the exact operation"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-R1-5:",
+          "names": [
+            "F02-R1-5: a device one-time answer never outlives the Mission authorization it was given under"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E25",
+      "title": "Consumed grant cannot be reused",
+      "initialConditions": "completed device-answered write",
+      "operation": "Retry",
+      "expected": "CONSUMED; Retry asks again",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E25:",
+          "names": [
+            "F02-E25: after the device-answered write completes its request is CONSUMED and the step holds no one-time answer"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-R3-2:",
+          "names": [
+            "F02-R3-2: a device one-time answer is CONSUMED when it authorizes the admitted run (and later clears never relabel it)"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E37",
+      "title": "Scope reduction/admission race serialized",
+      "initialConditions": "device answer",
+      "operation": "Narrowing in the same tick",
+      "expected": "Nothing written",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E37:",
+          "names": [
+            "F02-E37: a device answer and an immediate owner narrowing in the same tick leave nothing written"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    }
+  ]
+}

@@ -1,0 +1,949 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "scripts",
+      "test": "degenerate current verdict fails closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "baselineComparison fails closed on malformed or wrong-shape baselines",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "M-A-1D: the production release pin is the reviewed M-A-1 code candidate",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "MA2 T1: installed Host state fails closed without an explicit path or database",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "MA2 T1: a truncated database and unknown layout fail closed without creating state",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T10-whisper a release with the pin is closed only when every pinned runtime file, the shim and the model are present",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T6 release closure refuses a cross-app package without its browser API and licenses",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V45: closing the Island releases voice (voice.session.close) and never calls agent.* or mission.*",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "the product hotkey is Ctrl+Alt+Space with MOD_NOREPEAT; the test chord is used only with -HotkeyTest; unregistered on close",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#0 holding the mic 600 ms sends one listen.start and one listen.end, and the release Click restarts nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#0 a second tap held 600 ms ends the latched turn and its release Click starts nothing new",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#0 static: the pointer Click is consumed by a flag set on release, not by the mouse-down timestamp",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#1 a release queued before the listen.start is acknowledged binds to that start turn",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#1 a lost listen.start leaves the later release unbound, so it ends whatever capture the Host holds",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#5 closing sends no queued-but-unsent open or listen, and the close lands after the open in flight",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-races#5 static: the window close sends the session close whenever an open or listen was sent or queued",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 UI-02 the WPF talk button is disabled in hands-free, so no release caption can sit on a disabled control",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 lane2 the WPF shortcut press in hands-free is the explicit hands-free start: no hold, no release, no duplex restart",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T9R harness cleanup selects only its explicitly created target, preserving user targets",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "V25 shutdown with an active capture releases everything and exits 0 within 2 s",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "native#0 a stalled playback driver never holds the command loop: cancel, enqueue and shutdown stay bounded",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12 closeout: cancelling while the driver opens never submits the cancelled chunk when Open returns",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "native#2 abandoned recognizers: raw audio is zeroed and released, and the ledger refuses past its bound",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-native#1 the capture thread body is guarded: a protocol write that fails on a closed pipe ends the turn, not the process",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "R2-native#2 a playback chunk whose header never completes is released after the reset, and its device handle is closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "test": "T12-native RC-02 a playback.error for a generation releases its pause: the next chunk of that gen is not paused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "verifies the header token end to end and fails closed without it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A19: an invalid or unreadable checkpoint fails closed before anything else — UNKNOWN, ask_user, CHECKPOINT_INVALID",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4 store: corrupt agent records fail closed instead of reviving garbage",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4 A20 store claim: ONE worker per agent — a second claim is refused until released or expired",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4 A20/store: an expired claim is not authority — TTL lapse releases the agent",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4 runs: generations are ordered lineages; closeRun seals with a reason; latestRun reads the open tip",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A20 runtime claim: exactly one recovery walk runs while a claim is held; released afterwards",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: malformed version \"\" fails closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: malformed version \"0.153.4\" fails closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: malformed version \"codex-cli latest\" fails closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: malformed version \"codex-cli 0.153.4\\nother output\" fails closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: malformed version \"codex-cli 0.153.4-beta\" fails closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: nonzero version metadata fails closed without a model",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: timeout version metadata fails closed without a model",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T3: native provider stream error closes its owned process and unexpected exit cannot succeed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T3: fatal transition is single-winner, refuses new work and has a hard shutdown deadline",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "hard constraints and overrides fail closed; privacy preference does not exclude cloud",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: Stop kills sleep hook tree and closes output pipes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: Stop kills wait-child hook tree and closes output pipes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: Stop kills nested hook tree and closes output pipes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: Stop kills output hook tree and closes output pipes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: successful Git closes job containing exit-child orphan attempt",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: successful Git closes job containing detached orphan attempt",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: hook failure is truthful and closes its job",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: T3 graceful owned-child drain also closes Git job handles",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T4: hard termination closes the Host's sole job handle without callbacks or delayed commit",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T5: interrupted and uncertain cleanup have explicit presentation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T7 P07 missing roots fail closed and become NEEDS_RELINK",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T7 P47/P48 cleanup never deletes an unowned or active workspace",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T7 workspace disk quota and entry bounds fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F04 J35/J09/J46: abrupt Host death (TerminateProcess, no cleanup code) ends the whole contained tree; unrelated survives",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F04 R1-RESTART-01..04/R1-startup: identity gaps fail closed, unreadable records never stop the Host, survivors block relaunch of the same work",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F04 R1-LOW-2/SHUT-1: Mission processes on Windows are always job-owned; shutdown awaits stops in flight",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F04 R3-HOLD-4: an unreadable record that becomes readable is reconciled before its hold is released",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F04 R5-FOLDER: a provider-sessions folder unreadable at startup is released only after every record in it is reconciled",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F04 R5-GEN/SPLIT: a re-read never returns or rewrites this Host's own live records; a failed annotate never skips close",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "a future observation timestamp is rejected outright and invalid reset times fail closed (§18 F)",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T3 §35: a foreign policy_version or corrupt row fails closed to null — never a fabricated decision",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V18 an unclosed code fence at the end of the answer is dropped, not read",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 the first chunk is released at a clause boundary once it has at least 30 speakable chars",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 a short clause before the 30 char minimum is not released as the first chunk",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 with a clock, a first chunk with no boundary is released at a word boundary after 450 ms idle",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 without a clock the word-boundary release stays off: nothing is cut before a boundary",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 the timed release never cuts inside an open code fence",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H1 the total spoken cap and ordering still hold with early release",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native fixture: mute stops continuous source; close leaves zero active Job processes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 native fault: stalled fixture read is bounded by contained worker shutdown",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 idle release (item 6): no speech and no output for duplexIdleMs stops duplex, revokes the grant and journals it without transcripts",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 idle release: speech re-arms the idle timer, so the microphone stays open while the user talks",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 lifecycle (item 7): a worker exit clears all duplex state, the grant and the held reply",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 lifecycle: a push-to-talk press stops duplex with reason user and keeps the grant; the press awaits the release cleanly",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 lifecycle: a close during a pending release keeps the first reason, and the release timer never overwrites a normal close",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 security (AUD-09): missing release acknowledgment settles only the owned worker and keeps capture truth until then",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 security: a late provider stop cannot delay owned microphone worker cleanup",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 item 9: without acknowledgment within 2 s more, the worker is closed as before",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 item 9: a held reply is released once recognition gives up on its turn, and it is resumed, not cancelled",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 mute and close release duplex; old events cannot restart capture or change Agents",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 idle release (round 2): silent turns that end on their own do not keep a quiet room open; 120 s of silence releases the lane",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 hold ownership (round 2): an older finalizing turn never cancels a newer turn's pause, and the newer turn still releases it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12-PRIV-02: a refused hands-free start leaves no grant: muted, and closed sessions take none",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 closeout: mute during a pending stop revokes consent and invalidates suspended starts even after unmute",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-02: a playback error on a held reply releases the worker's pause for that generation before the hold is dropped",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-05: close, mute, duplex.error and capture.error cancel a held reply: the receipt says interrupted, and no pause-off is sent",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-08: a worker-initiated lifetime stop releases a held reply at once, without waiting for the resume timer",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 RC-08 (round 2): a worker mute stop is recorded as a mute release, not an error, and a held reply is interrupted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 live: an idle release leaves no LISTENING state, and a new user start clears the old stop receipt",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r6: a three-part sentence waits again, worker exit and interrupt drop held words, and held words stay visible",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V44 a Host restart never revives a voice session: the new Host starts closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H10 a degraded Host keeps stop, mute, release and state working and refuses starting or speaking",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 live: a spoken request to end voice closes voice; a stop aimed at someone else does not",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 closeout: completion and verification claims require Host facts, including unqualified test success",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r3: an explicit close with inner punctuation still ends voice",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V01 nothing opens at Host start: no worker is launched and the mic is closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V25 close releases the worker: capture, playback and session flags are cleared and shutdown is sent",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 closeout: a pending reset reports bounded wait without claiming reset completion",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "hands-free idle timeout closes the microphone and does not re-arm",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "a worker that exits leaves a WORKER_EXITED error and keeps the session open until close",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V22 a push-to-talk release bound to an older turn never ends a newer capture",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-races#3 a control confirmation that finishes after its session was closed and reopened speaks nothing into the new session",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-races#4 a worker closed while still starting leaves no TIMEOUT behind when its ready timer would have fired",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-races#5 a hands-free re-arm scheduled before close never opens the microphone on a later open",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-containment#0 a worker that exits on its own is settled (its job group closed) before any reopen starts a second worker",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V25 R3-session#2 concurrent closes join one close; an open after them gets exactly one live worker",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 Part-B a press waiting on transcription finds the session closed and starts nothing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 Part-B the close receipt names who ended the session; unknown labels become 'client'",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 R4 a second close while one is in flight still journals its own label",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 live: a spoken 'end voice now' closes the session (labelled voice_command) and never reaches the chat model",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 closeout: streamed completion claims are replaced and later chunks never become speech",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10-whisper a release layout refuses whisper when the manifest omits a whisper file",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10-whisper a release manifest that lists a whisper file with a different hash is refused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V25 close shuts the worker down: its process is gone and its ownership record is closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10 H9 killing the Host process ends the contained worker (kill-on-close, no orphan)",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V54 a release manifest that lists a different hash refuses the worker",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V54 a matching release manifest is accepted",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "native#1 once a release manifest exists it must list this worker with the same hash; a stale entry refuses",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "containment#2 the stdin accounting for the shutdown line is its real byte length",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "containment#0 a poll whose inspection fails is unknown state: the job is terminated and closed before the exit is reported",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A31 tampered persisted envelope fails closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A38 unknown action and risk fail closed in canonical decision",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T9 scope escapes fail closed with a live batch: foreign pid, other app, shell, browser, files, sensitive probes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T9 restart: every batch fails closed twice — the boot epoch refuses immediately and recovery sweeps the rows",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "stale closed native target produces one controlled replacement",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "pre-existing verified target is acquired without launch or cleanup authority",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "production acquisition has no destructive cleanup and validates native/package/content identity",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T6 X49: unknown capability fails closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E49: device SSE streams close and deliver nothing after sign-out or revocation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E50: /state, /events and command results never disclose the Host or device tokens",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E43: a specialized or local model name cannot increase permissions; unknown providers fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E05: unknown purposes (extensionless notes, .mdx, NTFS stream x.md:stream) fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-R1-1: agent instruction names of more tools are AGENT_INSTRUCTIONS; 8.3 and invisible-character names fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-R2-5: answering a promotion whose staged change already ended closes the request and fails the step",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-R3-1: an 8.3 short-name directory never stands in for a script, agent or dot-folder; manifests match case-insensitively; MDX lines and invisible fillers fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-R4-1: files named by agent instructions, CI includes, nested manifests or root CI folders are never phone-safe; equivalent spellings match; oversize consumers fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F03-FOLLOWUP-1 verification: separators, redirections, quotes, program options, paths, env and name globs all fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F03-FOLLOWUP-1 verification 2: multi-line statements, computed names, folder globs, option globs and config globs fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F03-FOLLOWUP-1 verification 3: escapes, braces, PowerShell block-comment ends, suffix rules and collecting configs fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F03-C4: UTF-16 consumers are read; UTF-32 and other NUL-bearing consumers fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F03-R2-2: Retry of a step waiting for promotion closes the attempt that staged the change",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA0R: cleanup failure reports the remaining merge honestly without reset",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA0R: capability and mission cancellation wait for real merge cleanup; no retry follows Stop",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA1: a Bunny merge left by a Host crash is named, with its cleanup, and never touched; a stale lock is explained",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "MA0R migration: old mission JSON stays byte-identical and missing provider authority fails closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-12: session authority classification matches the exact provider launch argv; unknowns fail closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-R22 (LOW): task-runner and hook configs are execution config; network paths fail closed without probing",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "PA-02/PA-03: untrusted task and repair text cannot open or close verified-data fences",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "execution delivers model output and releases its task controller",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "A19: a corrupt checkpoint stops recovery fail-closed; nothing replays and the mission waits for the user",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "A20: a foreign recovery claim blocks the walk; once released, a runtime picks the agent up",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "A05: a scope-violating capability ask lands WAITING_FOR_USER and the allow_once decision releases it",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T8: chunked SSE signal survives multibyte private text and closes exactly once",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T8: client cancellation cancels upstream and releases bridge ownership",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V01 mic inactive by default: a closed session reads Voice is off and no control can listen",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V25 mic resources released on close: a closed session cannot show live level or listening",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V45 closed voice UI does not stop AgentRuntime: a closed snapshot never enables a control that acts on agents",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V50 keyboard/mic controls accessible: push-to-talk is enabled by an open fresh session and the start button is the only closed-state control",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V27 T10: speech into a muted or zero-volume Windows output is disclosed as inaudible; unknown volume is not called muted",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 UI-02 the talk caption in hands-free never says release to finish",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T12 lane2 a closed session shows no hands-free row and no barge-in receipt, even when the Host kept mode and the last receipt",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T10 press with a closed session opens first, then listens once the session is open",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T10 release before the session opens sends no listen and leaves the press released",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T10 release while listen.start is in flight waits for the ack and then ends once",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T10 release after the start is acknowledged sends listen.end immediately",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T10 duplicate release sends nothing the second time",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T10 a refused listen.start releases the press and sends no end",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "R2-races#2 a release while the lost start is in flight still ends the capture, once",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "historicalEndurance": {
+      "voiceWorkerPids": [],
+      "agentsAfterClose": 41,
+      "agentStates": {
+        "COMPLETED": 41
+      },
+      "agenticReopen": {
+        "status": 200,
+        "agents": 41
+      },
+      "workerPidsAfterHostStop": []
+    },
+    "finalPackageVoice": {
+      "result": "PASS",
+      "classification": "LIVE packaged Host, packaged contained voice worker, packaged whisper runtime; typed turn answered from Host facts and played on the real default speakers; no audio retained",
+      "worker": "native/voice/bunny-voice-worker.exe (built from the pinned source in the package build)",
+      "answer": "No agent is running right now.",
+      "answerSource": "host_facts",
+      "engines": {
+        "stt": "whisper.cpp v1.9.4",
+        "tts": "Windows SAPI 5.4 System.Speech",
+        "local": true
+      },
+      "devices": {
+        "input": "Microphone Array (Intel® Smart Sound Technology for Digital Microphones)",
+        "output": "Speakers (Realtek(R) Audio)",
+        "micPrivacy": "allow"
+      },
+      "timing": {
+        "turnId": "t1-typed-2e00a531",
+        "activatedAt": 1791802206544,
+        "captureStartedAt": null,
+        "firstAudioAt": null,
+        "firstPartialAt": null,
+        "speechEndAt": null,
+        "finalAt": 1791802206544,
+        "admittedAt": null,
+        "firstTokenAt": null,
+        "firstTtsReadyAt": 1791802206689,
+        "firstPlaybackAt": 1791802207567,
+        "inferenceCompletedAt": 1791802206582,
+        "completedAt": 1791802210356,
+        "source": "typed",
+        "endpointing": null
+      },
+      "closeSource": "package_acceptance",
+      "workersAfterClose": 0
+    },
+    "finalPackageDuplex": {
+      "result": "PASS",
+      "classification": "LIVE packaged Host and packaged contained worker; real Windows Voice Capture DSP microphone open while the answer played on the real default speakers; no audio retained",
+      "open": {
+        "aec": "Windows Voice Capture DSP/source",
+        "reference": "selected-render-endpoint",
+        "grantExpiresAt": 1791804010933,
+        "mode": "hands_free"
+      },
+      "turn": {
+        "answer": "No agent is running right now.",
+        "answerSource": "host_facts",
+        "playingSamples": 32,
+        "capturingWhilePlayingSamples": 32,
+        "stillActiveAfterReply": true,
+        "firstPlaybackAt": 1791802211801
+      },
+      "closeSource": "package_acceptance",
+      "grantAfterClose": null
+    }
+  },
+  "limitations": [
+    "Only exact test-owned processes were closed."
+  ]
+}

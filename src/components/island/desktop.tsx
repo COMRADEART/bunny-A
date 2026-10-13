@@ -1,3 +1,4 @@
+import { Projects } from "./projects";
 import { useEffect, useState } from "react";
 import {
   Activity,
@@ -16,7 +17,7 @@ import {
   Sun,
 } from "lucide-react";
 import { activeTasks, liveProviders, useIsland, type Sheet } from "@/store/use-island";
-import type { OrchTask, Project, ProviderLive } from "@/lib/orch/types";
+import type { OrchTask, ProviderLive } from "@/lib/orch/types";
 import {
   BunnyMark,
   Empty,
@@ -27,16 +28,19 @@ import {
   ProviderStatus,
   TaskBadge,
   TaskActivity,
+  HostHealthWarning,
 } from "./ui";
-import { elapsed, isActive, todayCount, verifiedFile } from "./ui-model";
+import { elapsed, isActive, todayCount} from "./ui-model";
 import { FloatingIsland } from "./floating";
 import { Composer, openTask, Routing, TaskDetail, Approval } from "./task";
 import { Telemetry } from "./telemetry";
 import { Phone, Pairing } from "./phone";
 import { Settings } from "./settings";
 import { Constellation } from "./motion";
-import { activityDetail, activityLabel, isPrivateEvent } from "./motion-model";
+import { isPrivateEvent } from "./motion-model";
 import { MissionsSection } from "./mission";
+import { AgentsSection } from "./agent";
+import { ActivityTimeline } from "./activity";
 
 const NAV = [
   { id: "today", label: "Home", icon: Monitor },
@@ -133,6 +137,7 @@ export function Island() {
               </button>
             </div>
           </header>
+          <HostHealthWarning />
           <main id="bunny-content" className="phone-content" tabIndex={-1} key={page}>
             {store.submitting ? (
               <div className="glass phone-surface">
@@ -157,7 +162,7 @@ export function Island() {
             ) : page === "extensions" ? (
               <Notifications now={now} />
             ) : page === "project" ? (
-              <Projects now={now} />
+              <Projects />
             ) : page === "tasks" ? (
               <History now={now} />
             ) : page === "constellation" ? (
@@ -228,10 +233,11 @@ export function Island() {
                     : store.pairingRequired
                       ? "Not paired"
                       : store.host === "online"
-                        ? "Host online"
+                        ? store.hostHealth && store.hostHealth.operationalState!=="healthy" ? `Host ${store.hostHealth.operationalState}`
+                          : "Host online"
                         : store.host === "sleeping"
                           ? "Sleeping"
-                          : "Host offline"}
+                          : "Connection unavailable"}
                 </span>
                 <button
                   className="icon-button"
@@ -257,6 +263,7 @@ export function Island() {
                 </button>
               </div>
             </header>
+            <HostHealthWarning />
             <main id="bunny-content" className="desktop-content" tabIndex={-1}>
               <div className="page-enter" key={page}>
                 {page === "today" ? (
@@ -264,7 +271,7 @@ export function Island() {
                 ) : page === "provider" ? (
                   <Agents providers={providers} now={now} />
                 ) : page === "project" ? (
-                  <Projects now={now} />
+                  <Projects />
                 ) : page === "system" ? (
                   <Telemetry />
                 ) : page === "settings" ? (
@@ -371,6 +378,7 @@ function Today({ now }: { now: number }) {
         </button>
       </div>
       <MissionsSection now={now} />
+      <AgentsSection />
       <section className="today-section">
         <div className="section-heading">
           <h2 className="eyebrow">Active</h2>
@@ -410,49 +418,7 @@ function Today({ now }: { now: number }) {
           )}
         </div>
       </section>
-      {store.events.some(
-        (event) => event.taskId && !event.type.startsWith("audit.") && !isPrivateEvent(event.type),
-      ) ? (
-        <section className="home-activity">
-          <div className="section-heading">
-            <h2 className="eyebrow">Recent activity</h2>
-            <span className="caption">From your Host</span>
-          </div>
-          <ol className="activity-timeline">
-            {store.events
-              .filter(
-                (event) =>
-                  event.taskId &&
-                  !event.type.startsWith("audit.") &&
-                  !isPrivateEvent(event.type) &&
-                  event.type !== "agent.output",
-              )
-              .slice(-4)
-              .reverse()
-              .map((event) => (
-                <li key={event.sequence}>
-                  <time>
-                    {new Date(event.at).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </time>
-                  <span className="timeline-dot" />
-                  <div>
-                    <strong>{activityLabel(event.type)}</strong>
-                    <p>
-                      {activityDetail(
-                        event.type,
-                        event.detail,
-                        store.tasks.find((t) => t.id === event.taskId),
-                      )}
-                    </p>
-                  </div>
-                </li>
-              ))}
-          </ol>
-        </section>
-      ) : null}
+      <ActivityTimeline limit={4} />
       <section className="today-section">
         <div className="section-heading">
           <h2 className="eyebrow">Recent</h2>
@@ -623,183 +589,6 @@ function Agents({ providers, now }: { providers: ProviderLive[]; now: number }) 
           >
             Use for next task <ArrowRight size={15} />
           </button>
-        </section>
-      ) : null}
-    </>
-  );
-}
-function Projects({ now }: { now: number }) {
-  const store = useIsland();
-  const [selected, setSelected] = useState<Project | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
-  const [path, setPath] = useState("");
-  const tasks = store.tasks.filter((t) => t.projectId === selected?.id);
-  const files = tasks.flatMap((t) => {
-    const file = verifiedFile(t);
-    return file ? [file] : [];
-  });
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">Projects</p>
-          <h1>A home for your work.</h1>
-          <p>Approved folders, current tasks, and real outcomes.</p>
-        </div>
-        <button className="btn secondary" onClick={() => setAdding(!adding)}>
-          <Plus size={15} />
-          Add project
-        </button>
-      </div>
-      {adding ? (
-        <form
-          className="project-form glass"
-          onSubmit={(e) => {
-            e.preventDefault();
-            store.addProject(name, path);
-            setAdding(false);
-            setName("");
-            setPath("");
-          }}
-        >
-          <label className="field">
-            Project name
-            <input
-              required
-              maxLength={120}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          <label className="field">
-            Approved folder
-            <input
-              required
-              maxLength={1000}
-              value={path}
-              placeholder="C:\Projects\my-project"
-              onChange={(e) => setPath(e.target.value)}
-            />
-          </label>
-          <p className="caption">Agents run in this existing folder after your approval.</p>
-          <button className="btn primary" disabled={store.host !== "online"}>
-            Add project
-          </button>
-        </form>
-      ) : null}
-      <div className="project-grid">
-        {store.projects.map((p) => {
-          const history = store.tasks.filter((t) => t.projectId === p.id);
-          const active = history.filter(isActive).length;
-          const last = history[0];
-          return (
-            <button
-              className="project-card glass"
-              key={p.id}
-              data-selected={selected?.id === p.id}
-              onClick={() => setSelected(p)}
-            >
-              <Folder size={22} />
-              <h2>{p.name}</h2>
-              <p>{p.path}</p>
-              <div>
-                <span>
-                  {active ? `${active} active ${active === 1 ? "task" : "tasks"}` : "Idle"}
-                </span>
-                <span>
-                  {p.preferred === "auto" ? "Auto routing" : `${NAMES[p.preferred]} preferred`}
-                </span>
-              </div>
-              <small>
-                Last activity{" "}
-                {last
-                  ? new Date(last.finishedAt ?? last.startedAt ?? last.createdAt).toLocaleString()
-                  : "not recorded"}
-              </small>
-            </button>
-          );
-        })}
-      </div>
-      {!store.projects.length ? (
-        <Empty
-          title="Give your next task a workspace."
-          detail="Register a folder for repository coding and project context."
-        />
-      ) : null}
-      {selected ? (
-        <section className="project-detail glass">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">Workspace</p>
-              <h2>{selected.name}</h2>
-            </div>
-            <button
-              className="btn secondary"
-              onClick={() => {
-                store.setProjectId(selected.id);
-                store.setSheet("compose");
-              }}
-            >
-              New task <Plus size={15} />
-            </button>
-          </div>
-          <p className="caption">{selected.path}</p>
-          <h3 className="eyebrow">Active tasks</h3>
-          {tasks.filter(isActive).map((t) => (
-            <TaskRow task={t} now={now} key={t.id} />
-          ))}
-          {!tasks.some(isActive) ? <p className="caption">No active tasks.</p> : null}
-          <h3 className="eyebrow">Recent tasks</h3>
-          {tasks
-            .filter((t) => !isActive(t))
-            .slice(0, 5)
-            .map((t) => (
-              <TaskRow task={t} now={now} key={t.id} />
-            ))}
-          <h3 className="eyebrow">Providers used</h3>
-          <p className="caption">
-            {[...new Set(tasks.map((t) => NAMES[t.provider]))].join(" · ") || "No task history"}
-          </p>
-          <h3 className="eyebrow">Verified files</h3>
-          {files.length ? (
-            files.map((f, i) => (
-              <p className="caption" key={`${f.path}-${i}`}>
-                {f.path}
-              </p>
-            ))
-          ) : (
-            <p className="caption">
-              No independently verified file records. A complete changed-file manifest is
-              unavailable.
-            </p>
-          )}
-          <details>
-            <summary>Project configuration</summary>
-            <dl className="fact-list">
-              <div>
-                <dt>Routing preference</dt>
-                <dd>{selected.preferred === "auto" ? "Auto" : NAMES[selected.preferred]}</dd>
-              </div>
-              <div>
-                <dt>Execution folder</dt>
-                <dd>{selected.path}</dd>
-              </div>
-            </dl>
-            <p className="caption">
-              Changing persisted routing preferences is unavailable in the current Host.
-            </p>
-            <button
-              className="btn quiet danger-text"
-              disabled={tasks.some(isActive)}
-              onClick={() => {
-                store.removeProject(selected.id);
-                setSelected(null);
-              }}
-            >
-              Remove project registration
-            </button>
-          </details>
         </section>
       ) : null}
     </>

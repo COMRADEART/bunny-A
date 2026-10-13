@@ -1,0 +1,717 @@
+
+> pretest
+> npm run build:ownership
+
+
+> build:ownership
+> node scripts/build-owned-process.mjs
+
+{"schema":"bunny-native-build/1","architecture":"windows-x64","nodeApi":8,"sourceSha256":"48022a425582aac5ce8a2657525152875df8e3143158198fbd92753e0f4b9706","binarySha256":"54087a9506f999f7f51cceb9da716ec516ef6c64178fae68fc379098e6c390ce","compilerSha256":"f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0","compilerVersion":"gcc.exe (Rev5, Built by MSYS2 project) 16.1.0","flags":["-std=c11","-O2","-Wall","-Wextra","-Werror","-shared","-s","-static-libgcc","-Wl,--no-insert-timestamp","-Wl,--image-base,0x180000000","-Wl,--nxcompat","-Wl,--dynamicbase"]}
+
+> test
+> node --test scripts/*.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/orch/*.test.ts src/lib/bunny-host/agent-machine.test.ts src/lib/bunny-host/agent-replay.test.ts src/lib/bunny-host/agent-store.test.ts src/lib/bunny-host/codex-compatibility.test.ts src/lib/bunny-host/codex-probe.test.ts src/lib/bunny-host/execution-scope.test.ts src/lib/bunny-host/failure.test.ts src/lib/bunny-host/git-helpers-ownership.test.ts src/lib/bunny-host/host.test.ts src/lib/bunny-host/learning.test.ts src/lib/bunny-host/m2.test.ts src/lib/bunny-host/ma2-t10.test.ts src/lib/bunny-host/model-capability.test.ts src/lib/bunny-host/owned-process-group.test.ts src/lib/bunny-host/presentation.test.ts src/lib/bunny-host/provider-usage.test.ts src/lib/bunny-host/release-identity.test.ts src/lib/bunny-host/routing-matrix.test.ts src/lib/bunny-host/routing-store.test.ts src/lib/bunny-host/routing.test.ts src/lib/bunny-host/state-marker.test.ts src/lib/bunny-host/stop-ownership.test.ts src/lib/bunny-host/t3-manager.test.ts src/lib/bunny-missions/*.test.ts && node --experimental-strip-types --test --test-force-exit src/lib/bunny-host/agent-runtime.test.ts src/lib/bunny-host/agent-recovery.test.ts
+
+✔ non-canvas app with no custom card gets a soft BRAND NOTE (utility exception) (6.3417ms)
+✔ non-canvas app with a compliant card is silent (7.2901ms)
+✔ card file without site.json card=custom warns (6.3049ms)
+✔ card file with missing site.json warns for card=custom (5.2073ms)
+✔ card file with invalid site.json warns for card=custom (5.5418ms)
+✔ oversized card warns for non-canvas apps too (6.7507ms)
+✔ canvas app with no card warns 'missing' and missing og:type (5.9537ms)
+✔ canvas card without type still warns for og:type (6.1752ms)
+✔ oversized card warns on the scraper budget (jpg and legacy png) (14.6031ms)
+✔ compliant game (custom card + site.json type + x-banner) is silent (6.2553ms)
+✔ __root.tsx og:type no longer satisfies the canvas gate (7.0795ms)
+✔ oversized x-banner warns on the same scraper budget as og.jpg (6.6606ms)
+✔ legacy png + site.json type still needs the X feed card (6.5362ms)
+✔ siteDeclaresOgTypeGame reads the site contract (0.3174ms)
+✔ a fresh og-pending marker silences the whole gate view (4.773ms)
+✔ a stale og-pending marker is ignored and the warnings return (6.7556ms)
+✔ the marker goes stale on the clock, not on the file (6.905ms)
+✔ no marker means nothing is in flight (2.7232ms)
+✔ parseBrandCheckArgs takes --game, --placeholder-ok and --root, and rejects the rest (0.5342ms)
+✔ cli: a game missing its card reports JSON and exits 1 (143.2267ms)
+✔ cli: a compliant game passes (110.7532ms)
+✔ cli: the task's own marker is reported, not honoured (91.6025ms)
+✔ cli: a bad argument fails with JSON on stderr (91.5445ms)
+✔ cli: a non-game with no card fails too — the pass exists to produce one (100.0494ms)
+✔ cli: --placeholder-ok is how a plain-utility pass reports no card as expected (191.8838ms)
+✔ cli: a non-game with a compliant card passes (100.6431ms)
+✔ SKILL.md and AGENTS.md name the marker path and bound this script uses (1.6003ms)
+✔ the sections that own the brand-task prohibition never affirm a wait (2.1463ms)
+✔ SKILL.md tells the pass to self-check with the flag this CLI accepts (1.4176ms)
+✔ normalizes whitespace before hashing (2.0571ms)
+✔ nullish and blank body text normalize to the empty string (0.2082ms)
+✔ body text prefix is normalized and capped (0.2623ms)
+✔ identical runs do not diverge (1.0005ms)
+✔ status change diverges (0.456ms)
+✔ title change diverges (0.2548ms)
+✔ title comparison is skipped when either side lacks one (0.1758ms)
+✔ canvas disappearing diverges; canvas appearing does not (0.2364ms)
+✔ horizontal overflow appearing diverges; clearing does not (0.2107ms)
+✔ new console errors diverge (0.2547ms)
+✔ errors already present in the baseline do not re-diverge (0.2372ms)
+✔ body text collapse diverges (0.1701ms)
+✔ body text dropping to zero reports collapse (0.1978ms)
+✔ zero-length baseline reports growth via the hash branch, not collapse (0.2319ms)
+✔ hash mismatch with a trivial length delta and same page start is tolerated (0.1021ms)
+✔ hash mismatch with a trivial length delta but changed page start diverges (0.1176ms)
+✔ prefix check is skipped when either side lacks a prefix (0.1569ms)
+✔ length-delta tolerance boundary: 50 tolerated, 51 diverges (500-char baseline) (0.1151ms)
+✔ length-delta floor dominates small baselines: 20 tolerated, 21 diverges (100-char baseline) (0.1009ms)
+✔ collapse boundary: exactly half is 'changed', one below is 'collapsed' (0.1144ms)
+✔ missing baseline viewport diverges (0.1086ms)
+✔ empty or null baseline diverges for every viewport (0.1311ms)
+✔ degenerate current verdict fails closed (0.2594ms)
+✔ multiple signals across viewports all accumulate (0.1271ms)
+✔ baselineComparison round-trips a valid baseline (0.2563ms)
+✔ baselineComparison fails closed on malformed or wrong-shape baselines (0.2708ms)
+✔ parseSmokeArgs defaults (0.2382ms)
+✔ parseSmokeArgs consumes --baseline without shifting positionals (0.0817ms)
+✔ parseSmokeArgs rejects a trailing --baseline flag (0.0642ms)
+✔ parseSmokeArgs supports the --baseline= form (0.0739ms)
+✔ parseSmokeArgs rejects unknown flags instead of treating them as positionals (0.0761ms)
+✔ parseSmokeArgs env fallback and flag precedence (0.0883ms)
+✔ derivedPaths handles .png, .PNG, and extensionless inputs (0.2603ms)
+✔ exitCodeFor: clean run exits 0 (0.1343ms)
+✔ exitCodeFor: errors in any single viewport exit 2 (0.0974ms)
+✔ exitCodeFor: navigation failure in any viewport exits 1, beating errors (0.1264ms)
+✔ exitCodeFor: 4xx boundary and missing status (0.0863ms)
+✔ exitCodeFor: no viewport data is a failure (0.0729ms)
+✔ browser-smoke wires the guard and verdict helpers (0.6951ms)
+✔ browser-smoke file I/O only touches guarded paths (0.69ms)
+✔ defaultScreenshotPath stays inside the allowed output root on each platform (0.1455ms)
+error: could not write config file C:/Users/allam/AppData/Local/Packages/sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}/AC/Temp/bunny-release-pkg-0pwuQB/clone/.git/config: Permission denied
+fatal: could not set 'core.repositoryformatversion' to '0'
+error: could not write config file C:/Users/allam/AppData/Local/Packages/sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}/AC/Temp/bunny-release-install-uze1MD/checkout/.git/config: Permission denied
+fatal: could not set 'core.repositoryformatversion' to '0'
+✔ M-A-1D: the production release pin is the reviewed M-A-1 code candidate (254.8643ms)
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (228.4767ms)
+✖ M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release (36702.7061ms)
+✖ M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release (322.8837ms)
+✖ T10-XG-06: rollback refuses a paused Mission with a live desktop grant, even outside the snapshot page (192.9939ms)
+✖ T10 rollback preflight preserves the idle positive control, and refuses enabled scheduling (124.7574ms)
+✖ T10 rollback preflight refuses orphan grant and interrupted or waiting work independently (139.9465ms)
+error: could not write config file C:/Users/allam/AppData/Local/Packages/sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}/AC/Temp/bunny-state-test-hyfsDY/checkout/.git/config: Permission denied
+fatal: could not set 'core.repositoryformatversion' to '0'
+✔ MA2 T1: the read-only SQLite snapshot includes committed WAL rows (367.3961ms)
+✔ MA2 T1: all 23 tables and non-database files survive migration (450.7291ms)
+✔ MA2 T1: an unexpected changed task field fails preservation (411.3599ms)
+✔ MA2 T1: new telemetry is allowed, but missing historical events fail (431.5677ms)
+✔ MA2 T1: active tasks refuse migration before copy (231.0496ms)
+✔ MA2 T1: active missions refuse migration before copy (225.9143ms)
+✔ MA2 T1: unknown schema refuses migration (227.792ms)
+✔ MA2 T1: an occupied stage is never overwritten (222.6178ms)
+✔ MA2 T1: state cannot be installed inside a Git checkout (194.8503ms)
+✖ MA2 T1: a source directory junction fails preflight (197.6397ms)
+✖ MA2 T1: a target junction cannot hide a repository dependency (196.1751ms)
+✖ MA2 T1: copied hard-linked files become independent files (195.6107ms)
+✖ MA2 T1: git clean in a disposable checkout cannot delete migrated state (379.7354ms)
+✔ MA2 T1: a named-tunnel configuration needs an explicit credential inventory (274.4161ms)
+✖ MA2 T1: the installed tunnel uses application state and rejects a missing or changed client (340.8285ms)
+✔ MA2 T1: installed Host state fails closed without an explicit path or database (203.5861ms)
+✖ MA2 T1: installed Host resolves flat canonical state and moved credentials (334.6125ms)
+✖ MA2 T1: a truncated database and unknown layout fail closed without creating state (340.9347ms)
+✔ MA2 T1: a retired production source cannot become development state (232.9216ms)
+✖ MA2 T1 Windows controller: complete cutover and idempotent retry (528.308ms)
+✖ MA2 T1 Windows controller: after-copy (530.3456ms)
+✖ MA2 T1 Windows controller: after-config (550.5919ms)
+✖ MA2 T1 Windows controller: after-host (565.7924ms)
+✔ T3: disposable tunnel worker crash has three bounded attempts and no Host failure (369.6071ms)
+{"type":"host.degraded","at":1791430077461,"failureClass":"HOST_DEGRADED","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+{"type":"host.subsystem_failed","at":1791430077459,"failureClass":"SUBSYSTEM_FAILURE","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+✔ T3: tunnel output callback rejection is contained and marks transport unavailable (106.7056ms)
+✔ T3: cancelling tunnel backoff never revives stopped work (106.6202ms)
+✔ T3: tunnel development state has no retired checkout fallback (7.0591ms)
+✔ T3: installed entry uses actual global policy and launcher has no crash retry loop (2.2138ms)
+✔ T3: every retired credential launcher refuses before starting a process or creating state (5.8078ms)
+✔ Cloudflare API errors and documentation are never public companion URLs (1.7632ms)
+✔ quick tunnel publishing requires both actual announcement and registered connection (0.3475ms)
+✔ chunked cloudflared output stays unavailable until the full hostname and connection arrive (0.2737ms)
+✔ an announced API service address is rejected even after connection text (0.1801ms)
+✔ named tunnels retain their configured origin and wait for registration (0.1968ms)
+✔ candidate tunnel target is loopback-only without changing the installed default (1.4134ms)
+✔ the child's registration ledger parses register and unregister events with connIndex (1.9748ms)
+✔ startup decisions reconcile a dead worker's stale publication and refuse a live duplicate (0.4801ms)
+✔ a healthy child keeps the supervisor quiet; abort ends the single attempt (401.4238ms)
+✔ zero active edge connections sustained beyond the window stop the owned child and retry (920.7645ms)
+✔ edge-connection churn with a sub-floor active count stops the child exactly as the T6 diagnostic recorded (513.8681ms)
+✔ sustained public failures reach the streak floor while a gateway fault breaks the streak without counting (1014.1906ms)
+✔ a degradation-triggered child exit still counts against the bounded attempt budget (294.6754ms)
+✔ the flag predicate matches src/lib/auth (1.0609ms)
+✔ reads the value a live dev server resolved (0.3365ms)
+✔ a server started without the flag reads as sign-in on (0.1836ms)
+✔ agreement passes (0.243ms)
+✔ divergence fails in either direction (0.2929ms)
+✔ an unobservable dev server is indeterminate, not agreement (0.1563ms)
+✔ a dev server that cannot be reached probes as null (0.2401ms)
+✔ a server without the endpoint probes as null, not as agreement (0.4922ms)
+✔ only a divergence warns the smoke verdict (1.0704ms)
+✔ the build side resolves the template's shipped app-env (2.8037ms)
+✖ the CLI reports rather than silently passing when run via a symlink (7.3164ms)
+✔ desktop runtime refuses unknown hosts and cross-site writes (3.2717ms)
+✔ remote runtime accepts only an explicitly configured HTTPS origin (1.4379ms)
+✔ Android manifest supplies standalone display and both required icon sizes (1.1361ms)
+✔ MA1: the desktop package copies every source folder the native Host imports (172.0942ms)
+✔ injects before </head> (5.3496ms)
+✔ injects the extensions script without a project id (1.4479ms)
+✔ injects project id on the script and meta when provided (0.882ms)
+✔ does not duplicate grok:app_id (2.4348ms)
+✔ omits x:creator tags without both creator values (2.3934ms)
+✔ injects x:creator tags when both creator values are set (1.2766ms)
+✔ escapes x:creator values (0.1858ms)
+✔ does not duplicate x:creator tags (1.8139ms)
+✔ platform chrome overwrites share-card metas and always sets og:title (1.1619ms)
+✔ does not duplicate twitter:card or og:title (1.7156ms)
+✔ a baked site.image is treated as a custom card (1.7547ms)
+✔ baked identity does not need a workspace filesystem (1.5811ms)
+✔ a public card file wins over a baked site without card=custom (2.1632ms)
+✔ public/og.png wins when jpg is absent (2.7822ms)
+✔ resolveOgCardAsset: disk file, then bake, then empty (placeholder) (3.4585ms)
+✔ snapshotOgIdentity stamps card=custom from a public card file (2.1518ms)
+✔ snapshotOgIdentity stamps banner from public/x-banner.jpg (2.2522ms)
+✔ emits x:game:image for a public host when site.banner is set (1.2835ms)
+✔ does not emit x:game:image without a public host or banner (1.5464ms)
+✔ site title Grok App is a real name, not a sentinel (0.9204ms)
+✔ published grok.me slug is still a title fallback (1.3626ms)
+✔ rejects Vercel system hosts as og:image origins (0.1531ms)
+✔ published VITE_PUBLIC_HOSTNAME wins over request Host for og:image (2.0245ms)
+✔ vercel Host without a public hostname emits no og:image (0.7903ms)
+✔ emits og:image for a public host and prefers a custom card (2.1544ms)
+✔ placeholder og:image appends site.color when it is 6-digit hex (3.3271ms)
+✔ document title entities are not double-escaped on og:title (1.4271ms)
+✔ site.json title wins over the host slug (1.1219ms)
+✔ injects into documents with no head element (1.0948ms)
+✔ streaming injector matches </HEAD> case-insensitively (1.4001ms)
+✔ does not duplicate the extensions script (1.4713ms)
+✔ is idempotent (1.8445ms)
+✔ uses the app name in the injected title tag (1.3244ms)
+✔ streaming injector handles </head> split across chunks (1.9402ms)
+✔ streaming injector passes post-head chunks through untouched (1.7785ms)
+✔ streaming injector falls back when no </head> is seen (1.3733ms)
+✔ detects install query (0.2884ms)
+✔ filters non-document paths (0.4612ms)
+✔ strips install params from the app link (0.189ms)
+✔ names the install page from host slug (0.1317ms)
+✔ rejects hosts that are not plain slugs (0.1586ms)
+✔ renders install page markup (1.4555ms)
+✔ escapes host-derived values in the install page (1.5795ms)
+✔ renders the manifest with the per-app name (0.2588ms)
+✔ vite config keeps the nitro serverDir wiring (1.067ms)
+✔ nitro middleware and its bundled assets exist (4.4473ms)
+✔ vite plugin bakes og identity as a virtual module (0.7379ms)
+✔ _migrations keys on basename, not path (1.5107ms)
+✔ a file already applied from another directory does not re-apply (1.1896ms)
+✔ pending migrations are returned in name order (12.4382ms)
+✔ non-.sql entries are dropped (readdir also yields the auth/ directory) (0.2627ms)
+✔ the auth schema ships outside the globbed directory (1.3365ms)
+✔ this workspace's auth schema copy is byte-identical to its source (0.5076ms)
+✔ the copy check reads both files and catches an edit (9.5943ms)
+✔ T4: native ownership builds reproducibly in independent directories (2681.481ms)
+✔ parsePreviewArgs accepts the two actions (2.1027ms)
+✔ parsePreviewArgs rejects missing, unknown and extra arguments (0.3703ms)
+✔ parsePid reads a pidfile and rejects junk (0.2555ms)
+✔ parsePgid reads the pgrp field past a comm containing spaces (0.3409ms)
+✔ parseListenerInodes picks LISTEN sockets on the wanted port only (0.4499ms)
+✔ parseListenerInodes reads the tcp6 dump the same way (0.2452ms)
+✔ looksLikePreviewProcess matches the npm wrapper and its vite child (0.4391ms)
+✔ looksLikePreviewProcess spares the sibling scripts and re-used pids (0.232ms)
+✔ previewOwners trusts port owners and dedupes the pidfile pid (0.2589ms)
+✔ previewOwners adds a pidfile pid whose command line is still the preview (0.2841ms)
+✔ previewOwners drops a stale pidfile pid re-used by another process (0.2034ms)
+✔ previewOwners drops a pidfile pid that no longer exists (0.1298ms)
+✔ previewOwners on a free port with no pidfile signals nothing (0.1234ms)
+✔ stopOutcome fails when a pid survives or the port is still held (0.605ms)
+✔ stopOutcome reports a verified free port (0.2625ms)
+✔ stopOutcome fails on a listener whose owner cannot be attributed (0.1721ms)
+✔ terminatePids SIGTERMs live pids and skips dead ones (0.501ms)
+✔ terminatePids escalates to SIGKILL when SIGTERM is ignored (0.2772ms)
+✔ terminatePids reports a pid that survives SIGKILL as stubborn (0.2919ms)
+✔ terminatePids on a free port signals nothing (0.1302ms)
+✔ preview: a successful sign-out clears the token, then redirects (2.9408ms)
+✔ preview: a rejected sign-out still clears the token and redirects (0.5384ms)
+✔ preview: a sign-out that throws synchronously still clears and redirects (0.3209ms)
+✔ preview: a sign-out that never settles clears and redirects once the wait expires (8.1782ms)
+✔ preview: no bearer means nothing to invalidate, so no request is made (0.517ms)
+✔ preview: a stored bearer is still invalidated server-side (0.352ms)
+✔ deployed: a confirmed sign-out clears the token, then redirects (0.5986ms)
+✔ deployed: a sign-out that never settles throws and does NOT redirect (31.2936ms)
+✔ deployed: a rejected sign-out throws and does NOT redirect (0.7778ms)
+✔ deployed: the timeout is distinguishable from a rejection (31.364ms)
+✔ settleWithin reports the outcome and never rejects (30.5776ms)
+✔ settleWithin waits its full window, then gives up rather than hanging (0.7927ms)
+✔ pre-sign-in: the preview clear gives up at the preview bound (0.6369ms)
+✔ pre-sign-in: a deployed session gets the deployed window, not the preview one (0.473ms)
+✔ pre-sign-in: a failed clear never blocks sign-in (0.449ms)
+✔ pre-sign-in: the preview skips the request when there is no bearer (0.1568ms)
+✔ every sign-out bound comes from one rule (0.0953ms)
+✔ the defaults are bounded, and deployed waits longer than preview (0.3357ms)
+✔ T9R harness cleanup selects only its explicitly created target, preserving user targets (2.0341ms)
+✔ T9R harness refuses user-owned or pre-existing windows even with a plausible PID (1.133ms)
+✔ T9R harness refuses stale PID/native handle and content lifetime (2.4895ms)
+✔ T9R harness refuses ambiguous ownership and unverified package identity (0.5002ms)
+✔ keeps VITE_-prefixed string entries (2.0183ms)
+✔ drops non-VITE keys, non-string values and malformed documents (0.285ms)
+✔ a missing app-env.json is a clean no-op (0.947ms)
+✔ reads the app env from a workspace (3.1257ms)
+✔ an explicit process-env override wins over the file (0.2741ms)
+✔ the template ships auth off (1.1298ms)
+✔ vite loadEnv resolves the wrapped value (2.6353ms)
+✔ the wrapped command runs with the app env applied (182.9229ms)
+✔ the wrapped command sees an explicit override, not the file value (175.0714ms)
+✔ the wrapper propagates the command's exit code (164.4338ms)
+✔ a signal-killed command is never reported as success (175.9799ms)
+✖ the CLI still runs when invoked through a symlinked path (1.7669ms)
+✔ parseWriteAtomicArgs needs exactly a staged file and a target (2.0505ms)
+✔ stagingError refuses a temp inside public/ and a no-op move (0.335ms)
+✖ handOver replaces the target and clears the staged file (5.0427ms)
+✖ handOver creates a missing target directory (5.5953ms)
+✔ an interrupted pass leaves the target on its old bytes, temp-free (4.883ms)
+✔ a failed hand-over creates no directory for the target it never wrote (1.6256ms)
+✔ a staged file on another filesystem is refused, not copied (3.3543ms)
+✖ cli: hands the file over, and refuses a temp staged in public/ (93.5199ms)
+✔ cli: relative paths follow the script's root, not the caller's cwd (90.1293ms)
+✔ every hand-over the og skill prints is one this script accepts (8.2477ms)
+✔ cli: a missing staged file fails without touching the target (111.5277ms)
+ℹ tests 254
+ℹ suites 0
+ℹ pass 232
+ℹ fail 22
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 37653.816
+
+✖ failing tests:
+
+test at scripts\bunny-release.test.mjs:44:1
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (228.4767ms)
+  Error: Command failed: git clone --shared --quiet C:\Users\allam\Documents\new\bun-router\ C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-release-pkg-0pwuQB\clone
+  error: could not write config file C:/Users/allam/AppData/Local/Packages/sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}/AC/Temp/bunny-release-pkg-0pwuQB/clone/.git/config: Permission denied
+  fatal: could not set 'core.repositoryformatversion' to '0'
+  
+      at genericNodeError (node:internal/errors:985:15)
+      at wrappedFn (node:internal/errors:539:14)
+      at checkExecSyncError (node:child_process:925:11)
+      at execFileSync (node:child_process:961:15)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-release.test.mjs:48:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12) {
+    status: 128,
+    signal: null,
+    output: [ null, <Buffer >, <Buffer 65 72 72 6f 72 3a 20 63 6f 75 6c 64 20 6e 6f 74 20 77 72 69 74 65 20 63 6f 6e 66 69 67 20 66 69 6c 65 20 43 3a 2f 55 73 65 72 73 2f 61 6c 6c 61 6d 2f ... 199 more bytes> ],
+    pid: 22644,
+    stdout: <Buffer >,
+    stderr: <Buffer 65 72 72 6f 72 3a 20 63 6f 75 6c 64 20 6e 6f 74 20 77 72 69 74 65 20 63 6f 6e 66 69 67 20 66 69 6c 65 20 43 3a 2f 55 73 65 72 73 2f 61 6c 6c 61 6d 2f ... 199 more bytes>
+  }
+
+test at scripts\bunny-release.test.mjs:112:1
+✖ M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release (36702.7061ms)
+  AssertionError [ERR_ASSERTION]: Bunny-A Host did not become reachable from the installed runtime.
+  At C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-release-launch-I5
+  G807\releases\Bunny-A-Windows-v99\Start-Bunny-Release.ps1:65 char:57
+  + ... rocess.Id) {throw 'Bunny-A Host did not become reachable from the ins ...
+  +                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      + CategoryInfo          : OperationStopped: (Bunny-A Host di...talled runtime.:String) [], RuntimeException
+      + FullyQualifiedErrorId : Bunny-A Host did not become reachable from the installed runtime.
+   
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-release.test.mjs:126:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\bunny-release.test.mjs:155:1
+✖ M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release (322.8837ms)
+  Error: Command failed: git init --quiet C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-release-install-uze1MD\checkout
+  error: could not write config file C:/Users/allam/AppData/Local/Packages/sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}/AC/Temp/bunny-release-install-uze1MD/checkout/.git/config: Permission denied
+  fatal: could not set 'core.repositoryformatversion' to '0'
+  
+      at genericNodeError (node:internal/errors:985:15)
+      at wrappedFn (node:internal/errors:539:14)
+      at checkExecSyncError (node:child_process:925:11)
+      at execFileSync (node:child_process:961:15)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-release.test.mjs:161:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12) {
+    status: 128,
+    signal: null,
+    output: [ null, <Buffer >, <Buffer 65 72 72 6f 72 3a 20 63 6f 75 6c 64 20 6e 6f 74 20 77 72 69 74 65 20 63 6f 6e 66 69 67 20 66 69 6c 65 20 43 3a 2f 55 73 65 72 73 2f 61 6c 6c 61 6d 2f ... 206 more bytes> ],
+    pid: 33988,
+    stdout: <Buffer >,
+    stderr: <Buffer 65 72 72 6f 72 3a 20 63 6f 75 6c 64 20 6e 6f 74 20 77 72 69 74 65 20 63 6f 6e 66 69 67 20 66 69 6c 65 20 43 3a 2f 55 73 65 72 73 2f 61 6c 6c 61 6d 2f ... 206 more bytes>
+  }
+
+test at scripts\bunny-rollback-preflight.test.mjs:18:1
+✖ T10-XG-06: rollback refuses a paused Mission with a live desktop grant, even outside the snapshot page (192.9939ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /active-work.*"missions":1.*"grants":1/. Input:
+  
+  'TypeError: fetch failed'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-rollback-preflight.test.mjs:21:2
+      at async fixture (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-rollback-preflight.test.mjs:16:7)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [TypeError: fetch failed] {
+      [cause]: Error: connect EACCES 127.0.0.1:57614
+          at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1706:16)
+    },
+    expected: /active-work.*"missions":1.*"grants":1/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts\bunny-rollback-preflight.test.mjs:23:1
+✖ T10 rollback preflight preserves the idle positive control, and refuses enabled scheduling (124.7574ms)
+  [TypeError: fetch failed] {
+    [cause]: Error: connect EACCES 127.0.0.1:57616
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1706:16) {
+      errno: -4092,
+      code: 'EACCES',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 57616
+    }
+  }
+
+test at scripts\bunny-rollback-preflight.test.mjs:28:1
+✖ T10 rollback preflight refuses orphan grant and interrupted or waiting work independently (139.9465ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"grants":1/. Input:
+  
+  'TypeError: fetch failed'
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-rollback-preflight.test.mjs:30:2
+      at async fixture (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-rollback-preflight.test.mjs:16:7)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [TypeError: fetch failed] {
+      [cause]: Error: connect EACCES 127.0.0.1:57618
+          at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1706:16)
+    },
+    expected: /"grants":1/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:117:1
+✖ MA2 T1: a source directory junction fails preflight (197.6397ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-Lxz6U2\external' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-Lxz6U2\checkout\.bunny-a\linked'
+      at symlinkSync (node:fs:1877:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:119:46)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-Lxz6U2\\external',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-Lxz6U2\\checkout\\.bunny-a\\linked'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:123:1
+✖ MA2 T1: a target junction cannot hide a repository dependency (196.1751ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-R1hvNe\checkout\.bunny-a' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-R1hvNe\install\state'
+      at symlinkSync (node:fs:1877:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:125:9)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-R1hvNe\\checkout\\.bunny-a',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-R1hvNe\\install\\state'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:129:1
+✖ MA2 T1: copied hard-linked files become independent files (195.6107ms)
+  Error: EPERM: operation not permitted, link 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-E84s7Z\shared.txt' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-E84s7Z\checkout\.bunny-a\extra-evidence.txt'
+      at linkSync (node:fs:1915:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:132:60)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'link',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-E84s7Z\\shared.txt',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-E84s7Z\\checkout\\.bunny-a\\extra-evidence.txt'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:138:1
+✖ MA2 T1: git clean in a disposable checkout cannot delete migrated state (379.7354ms)
+  Error: Command failed: git init --quiet C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-hyfsDY\checkout
+  error: could not write config file C:/Users/allam/AppData/Local/Packages/sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}/AC/Temp/bunny-state-test-hyfsDY/checkout/.git/config: Permission denied
+  fatal: could not set 'core.repositoryformatversion' to '0'
+  
+      at genericNodeError (node:internal/errors:985:15)
+      at wrappedFn (node:internal/errors:539:14)
+      at checkExecSyncError (node:child_process:925:11)
+      at execFileSync (node:child_process:961:15)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:141:48)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12) {
+    status: 128,
+    signal: null,
+    output: [ null, <Buffer >, <Buffer 65 72 72 6f 72 3a 20 63 6f 75 6c 64 20 6e 6f 74 20 77 72 69 74 65 20 63 6f 6e 66 69 67 20 66 69 6c 65 20 43 3a 2f 55 73 65 72 73 2f 61 6c 6c 61 6d 2f ... 201 more bytes> ],
+    pid: 21260,
+    stdout: <Buffer >,
+    stderr: <Buffer 65 72 72 6f 72 3a 20 63 6f 75 6c 64 20 6e 6f 74 20 77 72 69 74 65 20 63 6f 6e 66 69 67 20 66 69 6c 65 20 43 3a 2f 55 73 65 72 73 2f 61 6c 6c 61 6d 2f ... 201 more bytes>
+  }
+
+test at scripts\bunny-state-migration.test.mjs:157:1
+✖ MA2 T1: the installed tunnel uses application state and rejects a missing or changed client (340.8285ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-1qZFnv\install\stage' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-1qZFnv\install\state'
+      at renameSync (node:fs:1013:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:160:26)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-1qZFnv\\install\\stage',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-1qZFnv\\install\\state'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:179:1
+✖ MA2 T1: installed Host resolves flat canonical state and moved credentials (334.6125ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-pFXBHc\install\stage' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-pFXBHc\install\state'
+      at renameSync (node:fs:1013:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:182:26)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-pFXBHc\\install\\stage',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-pFXBHc\\install\\state'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:189:1
+✖ MA2 T1: a truncated database and unknown layout fail closed without creating state (340.9347ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-GoyyCU\install\stage' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-GoyyCU\install\state'
+      at renameSync (node:fs:1013:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:192:26)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-GoyyCU\\install\\stage',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-GoyyCU\\install\\state'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:245:73
+✖ MA2 T1 Windows controller: complete cutover and idempotent retry (528.308ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-WhuG3D\checkout\.bunny-a' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-WhuG3D\install\state\.bunny-a'
+      at symlinkSync (node:fs:1877:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:249:42)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-WhuG3D\\checkout\\.bunny-a',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-WhuG3D\\install\\state\\.bunny-a'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:245:73
+✖ MA2 T1 Windows controller: after-copy (530.3456ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-o4VqAL\checkout\.bunny-a' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-o4VqAL\install\state\.bunny-a'
+      at symlinkSync (node:fs:1877:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:249:42)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-o4VqAL\\checkout\\.bunny-a',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-o4VqAL\\install\\state\\.bunny-a'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:245:73
+✖ MA2 T1 Windows controller: after-config (550.5919ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-B2nQiA\checkout\.bunny-a' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-B2nQiA\install\state\.bunny-a'
+      at symlinkSync (node:fs:1877:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:249:42)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-B2nQiA\\checkout\\.bunny-a',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-B2nQiA\\install\\state\\.bunny-a'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:245:73
+✖ MA2 T1 Windows controller: after-host (565.7924ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-VNSYmT\checkout\.bunny-a' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\bunny-state-test-VNSYmT\install\state\.bunny-a'
+      at symlinkSync (node:fs:1877:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/bunny-state-migration.test.mjs:249:42)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-VNSYmT\\checkout\\.bunny-a',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\bunny-state-test-VNSYmT\\install\\state\\.bunny-a'
+  }
+
+test at scripts\check-auth-invariant.test.mjs:98:1
+✖ the CLI reports rather than silently passing when run via a symlink (7.3164ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\allam\Documents\new\bun-router\scripts' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\auth-invariant-link-DqGni0\scripts'
+      at symlinkSync (node:fs:1877:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/check-auth-invariant.test.mjs:102:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\allam\\Documents\\new\\bun-router\\scripts',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\auth-invariant-link-DqGni0\\scripts'
+  }
+
+test at scripts\with-app-env.test.mjs:116:1
+✖ the CLI still runs when invoked through a symlinked path (1.7669ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\allam\Documents\new\bun-router\scripts' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\app-env-link-Npl52U\scripts'
+      at symlinkSync (node:fs:1877:11)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/with-app-env.test.mjs:120:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\allam\\Documents\\new\\bun-router\\scripts',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\app-env-link-Npl52U\\scripts'
+  }
+
+test at scripts\write-atomic.test.mjs:65:1
+✖ handOver replaces the target and clears the staged file (5.0427ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\write-atomic-oy8mgr\.grok\og.jpg.tmp' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\write-atomic-oy8mgr\public\og.jpg'
+      at renameSync (node:fs:1013:11)
+      at handOver (file:///C:/Users/allam/Documents/new/bun-router/scripts/write-atomic.mjs:59:5)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/write-atomic.test.mjs:72:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\write-atomic-oy8mgr\\.grok\\og.jpg.tmp',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\write-atomic-oy8mgr\\public\\og.jpg'
+  }
+
+test at scripts\write-atomic.test.mjs:78:1
+✖ handOver creates a missing target directory (5.5953ms)
+  Error: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\write-atomic-EWnQTh\.grok\site.json.tmp' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\write-atomic-EWnQTh\src\lib\og\site.json'
+      at renameSync (node:fs:1013:11)
+      at handOver (file:///C:/Users/allam/Documents/new/bun-router/scripts/write-atomic.mjs:59:5)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/write-atomic.test.mjs:83:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'rename',
+    path: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\write-atomic-EWnQTh\\.grok\\site.json.tmp',
+    dest: 'C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\\AC\\Temp\\write-atomic-EWnQTh\\src\\lib\\og\\site.json'
+  }
+
+test at scripts\write-atomic.test.mjs:127:1
+✖ cli: hands the file over, and refuses a temp staged in public/ (93.5199ms)
+  AssertionError [ERR_ASSERTION]: [write-atomic] C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\write-atomic-u3EPpK\.grok\og.jpg.tmp → C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\write-atomic-u3EPpK\public\og.jpg failed: EPERM: operation not permitted, rename 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\write-atomic-u3EPpK\.grok\og.jpg.tmp' -> 'C:\Users\allam\AppData\Local\Packages\sandbox.{36d942c2-d2dd-4b6e-bf35-63ba33a692fd}\AC\Temp\write-atomic-u3EPpK\public\og.jpg'
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/scripts/write-atomic.test.mjs:135:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

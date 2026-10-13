@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { CapabilityBus, CapabilityRequest } from "./capabilities/bus.server.ts";
 import type { MissionStore } from "./store.server.ts";
-import type { CapabilityRun, Skill, SkillStep, SkillValidation } from "./types.ts";
+import type { CapabilityRun, PermissionDecision, Skill, SkillStep, SkillValidation } from "./types.ts";
 
 const builtin = (skill: Omit<Skill, "version" | "provenance" | "status" | "previousVersion" | "reliability" | "createdAt">): Skill => ({ ...skill, version: 1, provenance: "builtin", status: "active", previousVersion: null, reliability: { runs: 0, successes: 0, lastSuccessAt: null, lastFailureAt: null }, createdAt: 0 });
 export const BUILTIN_SKILLS: Skill[] = [
@@ -40,7 +40,7 @@ export type SkillRunResult = {
   ok: boolean; skill: string; version: number; runs: CapabilityRun[]; outputs: unknown[]; artifactIds: string[];
   failure: { step: number; label: string; status: string; summary: string } | null;
   /** Set when the skill reached a step that needs the user's permission; nothing after it ran. */
-  permission: { step: number; action: string; reason: string } | null;
+  permission: ({ step: number; action: string; reason: string } & Partial<Pick<PermissionDecision, "risk" | "desktopRequired" | "desktopOperation" | "remoteReview">>) | null;
   repairNeeded: boolean;
 };
 
@@ -88,7 +88,7 @@ export class SkillLibrary {
     const runs: (CapabilityRun | null)[] = []; const outputs: unknown[] = []; const artifactIds: string[] = [];
     for (const [index, step] of skill.steps.entries()) {
       const outcome = await this.bus.request({ ...request, action: step.action, params: fill(step.params, params) as Record<string, unknown> });
-      if (outcome.decision.decision === "ask") return { ...base, runs: runs.filter(Boolean) as CapabilityRun[], outputs, artifactIds, permission: { step: index, action: step.action, reason: outcome.decision.reason } };
+      if (outcome.decision.decision === "ask") return { ...base, runs: runs.filter(Boolean) as CapabilityRun[], outputs, artifactIds, permission: { step: index, action: step.action, reason: outcome.decision.reason, risk: outcome.decision.risk, desktopRequired: outcome.decision.desktopRequired, desktopOperation: outcome.decision.desktopOperation, remoteReview: outcome.decision.remoteReview } };
       runs.push(outcome.run); outputs.push(outcome.result?.output ?? null); artifactIds.push(...outcome.artifactIds);
       if (!outcome.run || outcome.run.status !== "succeeded") {
         // Unsafe continuation stops here: later steps assumed this one worked.

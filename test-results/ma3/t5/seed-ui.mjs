@@ -1,0 +1,20 @@
+// Fixture-only UI data; credentials are read privately and never printed or saved to evidence.
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+const directory=join(tmpdir(),'bunny-t5-preview-bun-router');
+const credentials=JSON.parse(readFileSync(join(directory,'credentials.json'),'utf8'));
+if(credentials.port!==43145) throw new Error('Not the isolated T5 Host.');
+const command=async(action,data={})=>{const response=await fetch(`http://127.0.0.1:${credentials.port}/command`,{method:'POST',headers:{authorization:`Bearer ${credentials.token}`,'content-type':'application/json'},body:JSON.stringify({action,data})});const body=await response.json();if(!response.ok)throw new Error(body.error);return body;};
+const root=join(directory,'ui-project');mkdirSync(root,{recursive:true});writeFileSync(join(root,'seed.txt'),'UI fixture');writeFileSync(join(root,'check.mjs'),"import {readFileSync} from 'node:fs'; process.exit(readFileSync('result.txt','utf8') === 'checked' ? 0 : 1);");
+await command('mission.configure',{enabled:true});
+const project=await command('project.add',{name:'T5 disposable review',path:root});
+const projectId=project.snapshot.projects.find(p=>p.path===root).id;
+const op=(role,action,params,dependsOn=[])=>({role,objective:role,access:action==='filesystem.write'?'write':'read',executor:{kind:'capability',action,params},dependsOn});
+const name=`T5 permission review ${Date.now()}`;
+const created=await command('agent.create',{name,projectId,objective:'Inspect, edit and check disposable files; ask before deletion',steps:[op('Inspect','filesystem.read',{path:'seed.txt'}),op('Edit','filesystem.write',{path:'result.txt',content:'checked',overwrite:true},[0]),op('Test','terminal.exec',{command:'node',args:['check.mjs']},[1]),op('Boundary','filesystem.delete',{path:'seed.txt'},[2])]});
+const agent=created.agents.agents.find(a=>a.name===name);
+const proposed=await command('agent.authorization.propose',{id:agent.id});
+const result={classification:'DISPOSABLE LIVE VERIFIED',agentId:agent.id,projectId,root,authorization:proposed.agents.agents.find(a=>a.id===agent.id).authorization};
+writeFileSync('test-results/ma3/t5/ui-seed.json',JSON.stringify(result,null,2));
+console.log('Isolated review fixture created.');

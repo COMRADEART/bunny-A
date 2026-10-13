@@ -1,0 +1,1222 @@
+{
+  "gate": "M-A-3 T10",
+  "sourceCommit": "2d5646d5c5a95ab040239b20b034e2c6b0828365",
+  "derivedBy": "build-adversarial-matrix.mjs",
+  "rows": [
+    {
+      "id": "V01",
+      "title": "Microphone inactive by default",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Microphone inactive by default",
+      "observed": "4/4 mapped tests passed",
+      "evidence": [
+        "library: V01 the default session is IDLE and capture cannot start without an explicit ARMING step",
+        "library: V01 V02 the workstation can read voice state without opening a session; nothing is opened at Host start",
+        "library: V01 nothing opens at Host start: no worker is launched and the mic is closed",
+        "ui: V01 mic inactive by default: a closed session reads Voice is off and no control can listen"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V02",
+      "title": "Explicit microphone activation works",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Explicit microphone activation works",
+      "observed": "5/5 mapped tests passed; 5 live spoken turns opened explicitly by the Ctrl+Alt+Space chord",
+      "evidence": [
+        "library: V02 explicit activation goes IDLE -> ARMING -> LISTENING",
+        "library: V01 V02 the workstation can read voice state without opening a session; nothing is opened at Host start",
+        "library: V02 V24 V57 an explicit open either starts contained or reports an honest reason, never a silent success",
+        "library: V02 explicit open launches one worker; a second open returns the same session",
+        "ui: V02 explicit activation: only an open session with a fresh snapshot enables push-to-talk",
+        "live-e2e-conversation.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V03",
+      "title": "Windows permission denial is handled",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Windows permission denial is handled",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "library: V03 V04 device errors route to DEVICE_UNAVAILABLE only from capture-capable states",
+        "library: V03 V04 a permission or device error is truthful: DEVICE_UNAVAILABLE with the worker's code and capturing false",
+        "ui: V03 permission denial handled: micPrivacy deny shows the Windows privacy copy and blocks talk"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V04",
+      "title": "Device unavailable state is truthful",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Device unavailable state is truthful",
+      "observed": "4/4 mapped tests passed",
+      "evidence": [
+        "library: V03 V04 device errors route to DEVICE_UNAVAILABLE only from capture-capable states",
+        "library: V03 V04 a permission or device error is truthful: DEVICE_UNAVAILABLE with the worker's code and capturing false",
+        "ui: V04 device unavailable truthful: DEVICE_UNAVAILABLE disables talk and says so",
+        "ui: V04 device unavailable truthful: endpoint mute and worker mute block talk with exact copy"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V05",
+      "title": "Duplicate microphone streams rejected",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Duplicate microphone streams rejected",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "scripts: V05 a second capture.start while capturing is refused with DEVICE_BUSY",
+        "library: V05 a second listen replaces the first: one capture is outstanding at a time",
+        "ui: V05 duplicate mic streams rejected: talk is disabled while the worker already reports capture"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V06",
+      "title": "Audio buffers are bounded",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Audio buffers are bounded",
+      "observed": "6/6 mapped tests passed",
+      "evidence": [
+        "scripts: V06 total capture is bounded by maxMs and reports the buffered peak",
+        "library: V06 V18 hard split keeps every chunk at or under the 400 char limit on word boundaries",
+        "library: V06 a single token longer than the limit is hard-cut, never dropped",
+        "library: V06 an overlong line is dropped and counted, and the next line still parses",
+        "library: V06 an unterminated buffer beyond the bound is discarded, never grown without limit",
+        "ui: V06 audio buffers bounded: level bars are exactly the requested count and never exceed 1"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V07",
+      "title": "Recognized speech comes from actual audio",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Recognized speech comes from actual audio",
+      "observed": "3/3 mapped tests passed; human speech on the real microphone: 8/10 near-exact, WER 0.167",
+      "evidence": [
+        "scripts: V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD",
+        "library: V07 V08 a partial transcript is displayed and never acted on",
+        "ui: V07 recognized speech from actual audio: Listening only while the worker confirms capture and fresh",
+        "live/human-stt-session-5-whisper-beep.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V08",
+      "title": "Partial transcript is not executed as a command",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Partial transcript is not executed as a command",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "scripts: V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD",
+        "library: V07 V08 a partial transcript is displayed and never acted on",
+        "ui: V08 partial not executed: partial text is a draft only while capturing, and never a final"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V09",
+      "title": "Final transcript is associated with the correct turn",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Final transcript is associated with the correct turn",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "scripts: V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD",
+        "library: V09 V10 one Task per final: a duplicate or corrected final for the same turn creates nothing",
+        "ui: V09 final bound to correct turn: a stale-generation final is not shown as the current draft"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V10",
+      "title": "Recognition correction does not duplicate a Task",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Recognition correction does not duplicate a Task",
+      "observed": "2/2 mapped tests passed",
+      "evidence": [
+        "library: V09 V10 one Task per final: a duplicate or corrected final for the same turn creates nothing",
+        "ui: V10 recognition correction does not duplicate a Task: planUiIntent honors each seq once"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V11",
+      "title": "Silence is not fabricated as a spoken command",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Silence is not fabricated as a spoken command",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "scripts: V11 silence never becomes a command: stt.none no_speech, no final",
+        "library: V11 silence is not fabricated as a command and returns to IDLE",
+        "ui: V11 silence not fabricated as command: an empty turn is no command and shows no transcript"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V12",
+      "title": "Noise-only input fails safely",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Noise-only input fails safely",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "scripts: V12 noise-only input fails safely: vad noise_only and no final",
+        "library: V12 noise-only audio fails safely with no Task and no command",
+        "ui: V12 noise-only fails safely: noise-only sessions stay Ready with flat bars when not capturing"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V13",
+      "title": "Real conversation response is routed correctly",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Real conversation response is routed correctly",
+      "observed": "3/3 mapped tests passed; spoken chat turns routed by the T3 router to a local tool-free Ollama model",
+      "evidence": [
+        "library: V13 V14 a local tool-free question is admitted and its real token deltas are spoken in order",
+        "library: V13 V14 V42 a question that needs tools or a hosted model is not auto-approved and answers the refusal",
+        "ui: V13 conversation routed correctly: a chat route is named by its provider and model",
+        "live-e2e-conversation.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V14",
+      "title": "T3 Task routing is preserved",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "T3 Task routing is preserved",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "library: V13 V14 a local tool-free question is admitted and its real token deltas are spoken in order",
+        "library: V13 V14 V42 a question that needs tools or a hosted model is not auto-approved and answers the refusal",
+        "ui: V14 T3 routing preserved: the route label is taken as reported and never invented"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V15",
+      "title": "Unknown model identity remains UNKNOWN",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Unknown model identity remains UNKNOWN",
+      "observed": "4/4 mapped tests passed",
+      "evidence": [
+        "library: V15 model is reported from the recorded value and never invented",
+        "library: V15 model phrasing maps to agent_model",
+        "library: V15 an unknown or automatic model is reported as UNKNOWN, never invented",
+        "ui: V15 unknown model stays UNKNOWN: UNKNOWN is shown as model unknown, never as a name"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V16",
+      "title": "No unauthorized cloud-audio upload",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "No unauthorized cloud-audio upload",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "library: V16 V38 the session never reads or sends anything but the transcript to the chat port",
+        "library: V16 T10: a local-only task (every voice turn) is refused at launch when the fresh probe reports its tag hosted",
+        "ui: V16 no unauthorized cloud-audio upload: the status copy never claims cloud speech"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V17",
+      "title": "Actual TTS playback works",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Actual TTS playback works",
+      "observed": "2/2 mapped tests passed; every live answer played on the real default speakers (firstPlaybackAt recorded)",
+      "evidence": [
+        "library: V17 V18 playback confirmed by the worker moves the session to SPEAKING with truthful playing",
+        "ui: V17 TTS playback works: real playback truth reads Speaking, and only then",
+        "live-e2e-conversation.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V18",
+      "title": "TTS chunks play in order",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "TTS chunks play in order",
+      "observed": "8/8 mapped tests passed",
+      "evidence": [
+        "scripts: V18 speech chunks play strictly in seq order on the null sink",
+        "library: V18 TTS chunks are ordered with strictly increasing seq from 0",
+        "library: V18 chunks split at sentence boundaries once at least 40 chars are speakable",
+        "library: V18 a delta stream split inside words yields the same ordered text as the whole answer",
+        "library: V18 an unclosed code fence at the end of the answer is dropped, not read",
+        "library: V06 V18 hard split keeps every chunk at or under the 400 char limit on word boundaries",
+        "library: V17 V18 playback confirmed by the worker moves the session to SPEAKING with truthful playing",
+        "ui: V18 TTS chunks in order: the answer text is shown whole and not reordered by the view model"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V19",
+      "title": "Interrupted audio actually stops",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Interrupted audio actually stops",
+      "observed": "5/5 mapped tests passed; spoken barge-in: worker reset 7.6 ms, audible silence 99 ms (Core Audio peak meter)",
+      "evidence": [
+        "scripts: V19 V22 LIVE-B03 push-to-talk barge-in: speak.cancel immediately followed by capture.start opens the capture (no BUSY_PLAYBACK)",
+        "scripts: V19 V20 speak.cancel stops audible playback and nothing from that gen starts afterwards",
+        "library: V19 V20 barge-in: generation advances, speech is cancelled at the old gen, the voice turn's inference is stopped",
+        "library: V19 the worker's speak.cancelled receipt fills the interrupt receipt for the old generation",
+        "ui: V19 interrupted audio stops: Interrupt and barge-in talk are enabled while playing, and the state reads Interrupted after",
+        "live-e2e-conversation.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V20",
+      "title": "Pending synthesized chunks do not resume",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Pending synthesized chunks do not resume",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "scripts: V19 V20 speak.cancel stops audible playback and nothing from that gen starts afterwards",
+        "library: V19 V20 barge-in: generation advances, speech is cancelled at the old gen, the voice turn's inference is stopped",
+        "ui: V20 pending chunks do not resume: nothing reads Speaking unless the playback flag is set"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V21",
+      "title": "Late model callbacks do not restart stale playback",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Late model callbacks do not restart stale playback",
+      "observed": "4/4 mapped tests passed",
+      "evidence": [
+        "scripts: V21 a late speak with an old gen after cancel never plays",
+        "library: V21 a self-transition is not a transition and is refused",
+        "library: V21 late model deltas and worker playback events from the cancelled generation never restart speech",
+        "ui: V21 late model callbacks do not restart playback: a finished session never reads Speaking"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V22",
+      "title": "Rapid interruption does not corrupt turn state",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Rapid interruption does not corrupt turn state",
+      "observed": "6/6 mapped tests passed",
+      "evidence": [
+        "scripts: V19 V22 LIVE-B03 push-to-talk barge-in: speak.cancel immediately followed by capture.start opens the capture (no BUSY_PLAYBACK)",
+        "scripts: V22 rapid cancel and speak cycles keep turn state and gen monotonic",
+        "library: V22 an illegal transition is refused, counted and leaves the state unchanged",
+        "library: V22 rapid interruptions keep the turn state consistent",
+        "library: V22 a push-to-talk release bound to an older turn never ends a newer capture",
+        "ui: V22 newer turn state is kept: an older snapshot cannot replace a newer one, including after a barge-in"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V23",
+      "title": "Two overlapping conversations cannot corrupt each other",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Two overlapping conversations cannot corrupt each other",
+      "observed": "2/2 mapped tests passed",
+      "evidence": [
+        "library: V23 a second question during speech cancels only the first voice turn's inference",
+        "ui: V23 overlapping conversations cannot corrupt each other: a proposal and clarification expire independently"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V24",
+      "title": "Muted microphone captures no new user speech",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Muted microphone captures no new user speech",
+      "observed": "5/5 mapped tests passed",
+      "evidence": [
+        "scripts: V24 mute aborts an active capture and refuses capture.start until unmuted",
+        "library: V02 V24 V57 an explicit open either starts contained or reports an honest reason, never a silent success",
+        "library: V24 voice.mute honours both the clients' {on} field and the {muted} spelling over real HTTP",
+        "library: V24 muted: capture is refused and nothing is captured",
+        "ui: V24 muted mic captures nothing: muted state disables talk and shows the mute copy"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V25",
+      "title": "Microphone resources release on session close",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Microphone resources release on session close",
+      "observed": "11/11 mapped tests passed",
+      "evidence": [
+        "scripts: V25 shutdown with an active capture releases everything and exits 0 within 2 s",
+        "library: V25 capture and playback truth require the worker confirmation and the matching state",
+        "library: V25 close releases the worker: capture, playback and session flags are cleared and shutdown is sent",
+        "library: V25 R3-session#2 concurrent closes join one close; an open after them gets exactly one live worker",
+        "library: V54 V25 the worker is admitted into a Bunny-owned job and the job is observable with kernel accounting",
+        "library: V25 close shuts the worker down: its process is gone and its ownership record is closed",
+        "library: V25 V54 an abrupt termination of the job kills the worker and the process exits",
+        "library: V25 a speak with an immediate speak.cancel produces a cancel receipt for that generation",
+        "library: V54 V25 the worker is verified against its build record before any launch",
+        "library: V25 V54 a refused launch starts nothing and creates no ownership record",
+        "ui: V25 mic resources released on close: a closed session cannot show live level or listening"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V26",
+      "title": "Device disconnection is handled",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Device disconnection is handled",
+      "observed": "2/2 mapped tests passed",
+      "evidence": [
+        "library: V26 an input device lost mid-capture is a truthful DEVICE_UNAVAILABLE, not a silent stop",
+        "ui: V26 input device disconnect handled: DEVICE_LOST copy is shown and talk is still gated by the snapshot"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V27",
+      "title": "Playback-device loss is handled",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Playback-device loss is handled",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "library: V27 a playback error keeps the textual answer and reports the code",
+        "ui: V27 playback device loss handled: playback errors surface and Speaking stops",
+        "ui: V27 T10: speech into a muted or zero-volume Windows output is disclosed as inaudible; unknown volume is not called muted"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V28",
+      "title": "Echo does not cause uncontrolled response loops",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Echo does not cause uncontrolled response loops",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "scripts: V28 capture during playback is refused with BUSY_PLAYBACK (half duplex)",
+        "library: V28 hands-free re-arms only after playback ends, never during playback",
+        "ui: V28 barge-in replaces the old echo gate: talk stays enabled while Bunny speaks or thinks, and only a capturing mic refuses"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V29",
+      "title": "Voice interruption does not stop unrelated Agent work",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Voice interruption does not stop unrelated Agent work",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "library: V29 barge-in applies only where speech is in flight",
+        "library: V29 V34 interrupt never touches agents or missions",
+        "ui: V29 voice interruption does not stop agent work: Interrupt is never a stop-agent control"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V30",
+      "title": "Spoken Agent-status query uses canonical facts",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Spoken Agent-status query uses canonical facts",
+      "observed": "6/6 mapped tests passed; spoken status query answered from Host facts",
+      "evidence": [
+        "library: V30 status names the agent and its real mission and step",
+        "library: V30 no active agent says none is running",
+        "library: V30 several active agents ask for a name instead of guessing",
+        "library: V30 verification phrasing maps to agent_verification",
+        "library: V30 V31 status and verification answers come from canonical facts only",
+        "ui: V30 agent status from canonical facts: status copy comes from the snapshot only",
+        "live-e2e-conversation.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V31",
+      "title": "Spoken verification query reports real outcomes",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Spoken verification query reports real outcomes",
+      "observed": "6/6 mapped tests passed; spoken verification query answered from Host facts (no mission to check)",
+      "evidence": [
+        "library: V31 verification counts only recorded checks and never reports a pending state",
+        "library: V31 with no recorded results the answer says so, and an unverified step is not a pass",
+        "library: V31 T10-SUP#3 one pending ask is one item: an agent waiting on its Mission's unresolved request is not counted twice",
+        "library: V31 R3-session#0 a consent offer on a Mission that also has an unrelated unresolved request is still counted",
+        "library: V30 V31 status and verification answers come from canonical facts only",
+        "ui: V31 verification query real outcomes: verification answers are labelled as Host facts",
+        "live-e2e-conversation.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V32",
+      "title": "Spoken Pause uses existing Host command",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Spoken Pause uses existing Host command",
+      "observed": "4/4 mapped tests passed; live disposable Host: pause proposal executed through agentCommand with id+revision",
+      "evidence": [
+        "library: V32 V33 control phrases map to agent_control with a target and no authority of their own",
+        "library: V32 V33 V35 spoken pause proposes, a spoken confirm executes the canonical agent command, and the answer names the canonical state",
+        "library: V32 V39 a low-confidence spoken control or confirm changes nothing",
+        "ui: V32 spoken Pause uses existing Host command: pause is a proposal with on-screen or voice confirm",
+        "agent-voice-supervision.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V33",
+      "title": "Spoken Stop targets the correct Agent",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Spoken Stop targets the correct Agent",
+      "observed": "6/6 mapped tests passed; live disposable Host: stop targeted the named agent, screen confirmation only",
+      "evidence": [
+        "library: V32 V33 control phrases map to agent_control with a target and no authority of their own",
+        "library: V33 T10-SUP#2 'stop the current mission' targets the single active agent, not an agent named 'current'",
+        "library: V32 V33 V35 spoken pause proposes, a spoken confirm executes the canonical agent command, and the answer names the canonical state",
+        "library: V33 a stop or resume proposal is screen-only: a spoken confirm does nothing",
+        "library: V33 the on-screen confirm executes a stop proposal through the same command path",
+        "ui: V33 spoken Stop targets correct agent: the proposal names the agent it will act on",
+        "agent-voice-supervision.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V34",
+      "title": "Ambiguous Agent reference requires clarification",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Ambiguous Agent reference requires clarification",
+      "observed": "7/7 mapped tests passed",
+      "evidence": [
+        "library: V34 an unqualified control is classified; the session decides whether it is ambiguous",
+        "library: V29 V34 interrupt never touches agents or missions",
+        "library: V34 an ambiguous agent name asks for clarification and the next turn picks by ordinal",
+        "library: V34 an unknown agent name is refused honestly and proposes nothing",
+        "library: V34 with no running agent the answer is none running and nothing is proposed",
+        "library: V34 R3-session#1 a bare cancel that drops a pending name choice says it was cancelled",
+        "ui: V34 ambiguous agent needs clarification: candidates are listed, capped at eight"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V35",
+      "title": "Voice cannot forge Windows-owner identity",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Voice cannot forge Windows-owner identity",
+      "observed": "5/5 mapped tests passed",
+      "evidence": [
+        "library: V35 V36 V37 V39 approval, permission, shell, scope and owner phrasing is sensitive_refused",
+        "library: V35 sensitive wins over control when both match",
+        "library: V32 V33 V35 spoken pause proposes, a spoken confirm executes the canonical agent command, and the answer names the canonical state",
+        "library: V35 V36 V37 V39 V40 sensitive phrasing creates no proposal, no Task and no agent command",
+        "ui: V35 voice cannot forge Windows owner: only the workstation principal can run voice"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V36",
+      "title": "Voice cannot authorize arbitrary shell execution",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Voice cannot authorize arbitrary shell execution",
+      "observed": "5/5 mapped tests passed",
+      "evidence": [
+        "library: V35 V36 V37 V39 approval, permission, shell, scope and owner phrasing is sensitive_refused",
+        "library: V36 V39 R3-intent#0 a request wrapped as a question is still refused; genuine information questions stay chat",
+        "library: V36 R3-intent#1 starting machine or project work is refused; ordinary 'start' chat is not",
+        "library: V35 V36 V37 V39 V40 sensitive phrasing creates no proposal, no Task and no agent command",
+        "ui: V36 voice cannot authorize shell: a typed fallback is trimmed, bounded and never classified here"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V37",
+      "title": "Voice cannot widen Mission scope",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Voice cannot widen Mission scope",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "library: V35 V36 V37 V39 approval, permission, shell, scope and owner phrasing is sensitive_refused",
+        "library: V35 V36 V37 V39 V40 sensitive phrasing creates no proposal, no Task and no agent command",
+        "ui: V37 voice cannot widen Mission scope: a proposal confirmation is limited to pause, resume or stop"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V38",
+      "title": "Voice cannot bypass phone restrictions",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Voice cannot bypass phone restrictions",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "library: V38 V53 a paired device is refused every voice action, before anything is read or dispatched",
+        "library: V16 V38 the session never reads or sends anything but the transcript to the chat port",
+        "ui: V38 voice cannot bypass phone restrictions: paired devices get the workstation-only copy"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V39",
+      "title": "Audio prompt injection does not grant authority",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Audio prompt injection does not grant authority",
+      "observed": "7/7 mapped tests passed",
+      "evidence": [
+        "library: V35 V36 V37 V39 approval, permission, shell, scope and owner phrasing is sensitive_refused",
+        "library: V39 V40 approve-by-voice stays refused even with a pending confirmation",
+        "library: V36 V39 R3-intent#0 a request wrapped as a question is still refused; genuine information questions stay chat",
+        "library: V35 V36 V37 V39 V40 sensitive phrasing creates no proposal, no Task and no agent command",
+        "library: V39 V40 a barely-heard final (confidence below the floor) is never routed: no Task, no proposal",
+        "library: V32 V39 a low-confidence spoken control or confirm changes nothing",
+        "ui: V39 audio prompt injection grants nothing: a clarification or proposal is display only"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V40",
+      "title": "Recorded/replayed speech is not treated as owner authentication",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Recorded/replayed speech is not treated as owner authentication",
+      "observed": "4/4 mapped tests passed",
+      "evidence": [
+        "library: V39 V40 approve-by-voice stays refused even with a pending confirmation",
+        "library: V35 V36 V37 V39 V40 sensitive phrasing creates no proposal, no Task and no agent command",
+        "library: V39 V40 a barely-heard final (confidence below the floor) is never routed: no Task, no proposal",
+        "ui: V40 replayed speech is not owner auth: a stale proposal past its expiry is not shown"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V41",
+      "title": "Agent Talk/Redirect is genuine or explicitly unavailable",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Agent Talk/Redirect is genuine or explicitly unavailable",
+      "observed": "4/4 mapped tests passed",
+      "evidence": [
+        "library: V41 redirecting a running agent is redirect_unsupported",
+        "library: V41 T10-SUP#1 a redirect with a generic action word is redirect_unsupported; authority claims inside a redirect stay refused",
+        "library: V41 redirecting a running agent is explicitly unavailable and creates no Task",
+        "ui: V41 Talk/Redirect explicitly unavailable: redirect_unsupported never offers a proposal"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V42",
+      "title": "Ordinary chat is not silently converted to Agentic execution",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Ordinary chat is not silently converted to Agentic execution",
+      "observed": "2/2 mapped tests passed",
+      "evidence": [
+        "library: V13 V14 V42 a question that needs tools or a hosted model is not auto-approved and answers the refusal",
+        "ui: V42 chat not converted to Agentic: a chat answer never opens an agent view"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V43",
+      "title": "Voice activity state survives UI reconnect correctly",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Voice activity state survives UI reconnect correctly",
+      "observed": "1/1 mapped tests passed",
+      "evidence": [
+        "ui: V43 voice state survives UI reconnect: a parsed dashboard snapshot is the same truth and stale reads reconnect"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V44",
+      "title": "Host restart does not revive stale voice approvals",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Host restart does not revive stale voice approvals",
+      "observed": "2/2 mapped tests passed",
+      "evidence": [
+        "library: V44 a Host restart never revives a voice session: the new Host starts closed",
+        "ui: V44 Host restart does not revive stale voice approvals: a Host epoch change drops the held proposal"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V45",
+      "title": "Closed voice UI does not terminate AgentRuntime",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Closed voice UI does not terminate AgentRuntime",
+      "observed": "3/3 mapped tests passed",
+      "evidence": [
+        "scripts: V45: closing the Island releases voice (voice.session.close) and never calls agent.* or mission.*",
+        "library: V45 closing voice does not call any agent command",
+        "ui: V45 closed voice UI does not stop AgentRuntime: a closed snapshot never enables a control that acts on agents"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V46",
+      "title": "Glass Notch correctly displays live voice state",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Glass Notch correctly displays live voice state",
+      "observed": "4/4 mapped tests passed; real WPF Island rendered voice states on all four edges",
+      "evidence": [
+        "scripts: V46: Listening requires worker capture AND a fresh poll; otherwise the panel says Reconnecting",
+        "scripts: V46: Speaking is shown only from snapshot.playing, and only one branch produces it",
+        "scripts: V46: the level meter is driven only by snapshot.level with a freshness check, never by a timer or random value",
+        "ui: V46 notch shows live voice state: a fresh capture reads Listening and is live",
+        "notch/placement-receipts.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V47",
+      "title": "Working Agent indicators appear left of horizontal notch",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Working Agent indicators appear left of horizontal notch",
+      "observed": "5/5 mapped tests passed",
+      "evidence": [
+        "scripts: V47-V49: every edge, work area, size and offset places the notch fully inside the WorkArea",
+        "scripts: V47: top and bottom are horizontal with agent indicators LEFT of the body",
+        "scripts: V47/V48: the indicator axis follows the notch orientation (a column beside a horizontal notch, a row above a vertical one)",
+        "scripts: V47/V48: the vertical size is swapped before placement (length along the edge, thickness across it)",
+        "ui: V47 agent indicators left of horizontal notch: UI intent is one-shot and names the agent to open"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V48",
+      "title": "Working Agent indicators appear at top of vertical notch",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Working Agent indicators appear at top of vertical notch",
+      "observed": "4/4 mapped tests passed",
+      "evidence": [
+        "scripts: V48: left and right are vertical with agent indicators at the TOP of the body",
+        "scripts: V47/V48: the indicator axis follows the notch orientation (a column beside a horizontal notch, a row above a vertical one)",
+        "scripts: V47/V48: the vertical size is swapped before placement (length along the edge, thickness across it)",
+        "ui: V48 agent indicators top of vertical notch: a stale uiIntent after reload does not navigate"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V49",
+      "title": "Notch remains within usable screen bounds",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Notch remains within usable screen bounds",
+      "observed": "5/5 mapped tests passed",
+      "evidence": [
+        "scripts: V47-V49: every edge, work area, size and offset places the notch fully inside the WorkArea",
+        "scripts: V49: indicator layout is bounded (at most 3 chips plus one overflow chip) and counts overflow exactly",
+        "scripts: V49: the DPI-scaled 1536x816 work area (125%) keeps the default top notch centred and on-screen",
+        "scripts: V49: the bottom notch sits above the taskbar edge with the same margin as the top",
+        "ui: V49 notch within usable bounds: the status copy is short enough for the notch and carries no newlines"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V50",
+      "title": "Keyboard/microphone controls are accessible",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Keyboard/microphone controls are accessible",
+      "observed": "2/2 mapped tests passed; product chord Ctrl+Alt+Space registered and drove listen.start/end on the real Island",
+      "evidence": [
+        "scripts: V50: every voice control has an AutomationProperties.Name in the Visual XAML",
+        "ui: V50 keyboard/mic controls accessible: push-to-talk is enabled by an open fresh session and the start button is the only closed-state control",
+        "notch/hotkey-product-receipt.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V51",
+      "title": "Reduced-motion behavior works",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Reduced-motion behavior works",
+      "observed": "2/2 mapped tests passed",
+      "evidence": [
+        "scripts: V51: the voice layer adds no decorative animation (reduced motion and high contrast stay quiet)",
+        "ui: V51 reduced motion: the level bars are pure data and stay deterministic for the same snapshot"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V52",
+      "title": "No raw private audio in evidence or logs",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "No raw private audio in evidence or logs",
+      "observed": "3/3 mapped tests passed; secret and audio scan: PASS, audio files 0",
+      "evidence": [
+        "scripts: V52 stdout carries only bounded JSON events with no audio-looking payload",
+        "library: V52 the journal never contains transcript or answer text",
+        "ui: V52 no raw audio in logs/evidence: the view model carries only text and numbers, never audio payloads",
+        "secret-scan.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V53",
+      "title": "T5/F01–F04 authorization protections remain intact",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "T5/F01–F04 authorization protections remain intact",
+      "observed": "229/229 mapped tests passed",
+      "evidence": [
+        "library: F04 J01-J04/J07: provider root is created suspended inside its job, prompt delivered exactly, record persisted",
+        "library: F04 J11-J15/J18/J45: children, grandchildren, short-lived, detached and orphaned descendants are members and end with the session",
+        "library: F04 J16/J17: explicit breakaway is refused by the kernel; a member's own permissive nested job cannot leave Bunny's job",
+        "library: F04 J29-J31/J42: Stop terminates the exact job by handle; unrelated same-image process survives; result is kernel accounting",
+        "library: F04 J05/J21/J44: an admission failure refuses execution and starts nothing; no fallback launcher exists",
+        "library: F04 J47/J48: concurrent sessions are isolated; stopping A leaves B running",
+        "library: F04 J35/J09/J46: abrupt Host death (TerminateProcess, no cleanup code) ends the whole contained tree; unrelated survives",
+        "library: F04 J29/J43/J42: TaskManager Stop reports kernel-verified job emptiness; the job is live code until then",
+        "library: F04 J37-J41/J32: restart reconciles interrupted job records by full identity, kills nothing, and holds while identity is alive",
+        "library: F04 J08/J10: the native job handle carries no SET_ATTRIBUTES right and the module exposes no PID/handle-based job API",
+        "library: F04 R1-BYPASS-1: verification never runs a python.exe planted in (or on PATH inside) the task folder; the real one runs in a job",
+        "library: F04 R1-BYPASS-2: the Codex app-server probe runs in a job with interactive stdin and leaves nothing behind",
+        "library: F04 R1-STOP-3/NATIVE-1/STOP-1: Stop before admission is not admitted; native terminate does not block; done waits for accounting",
+        "library: F04 R1-RESTART-01..04/R1-startup: identity gaps fail closed, unreadable records never stop the Host, survivors block relaunch of the same work",
+        "library: F04 R1-LOW-2/SHUT-1: Mission processes on Windows are always job-owned; shutdown awaits stops in flight",
+        "library: F04 R2-L1: restart absence is recorded as absent_after_restart, never kernel 'empty'; an empty table read is not absence",
+        "library: F04 R2-L3/L4: Host verification jobs count as live code while open; a refused native launch is recorded as refused",
+        "library: F04 R3-BYPASS-CWD-1: Host tools are launched by absolute path; no bare system-tool name remains in Host source",
+        "library: F04 R3-HOLD-4: an unreadable record that becomes readable is reconciled before its hold is released",
+        "library: F04 R3-R2-01/R2-03: a parseable malformed record is held, never a startup failure; alias-style reparse entries resolve",
+        "library: F04 R4-R3-1/FINAL-1: a throwing native terminate or event hook never escapes Stop and never strands accounting",
+        "library: F04 R4-R3-2: a PATH folder inside the working folder whose name starts with '..' is still inside",
+        "library: F04 R4-R3-3: a reconcile failure in the unreadable-record hold keeps the hold and retries",
+        "library: F04 R5-FOLDER: a provider-sessions folder unreadable at startup is released only after every record in it is reconciled",
+        "library: F04 R5-GEN/SPLIT: a re-read never returns or rewrites this Host's own live records; a failed annotate never skips close",
+        "library: T9 F01/F02/F05/F11: device identity is per credential, projected, and never the owner",
+        "library: T9 F04: absolute lifetime and idle bound are enforced by the Host; presence never extends the lifetime",
+        "library: T9 F02 D3 (negative regression): a device cannot answer a write that the owner's narrowed Agent consent no longer covers",
+        "library: V38 V53 a paired device is refused every voice action, before anything is read or dispatched",
+        "library: T9R-F01: a phone keeps the Calculator batch where a single allow would exceed remote authority (batch-only verdict)",
+        "library: F02-E26: phone body identity fields never become workstation authority in SQLite",
+        "library: F02-E27: forged headers and unpaired or non-bearer credentials never gain workstation authority",
+        "library: F02-E27: the gateway refuses local classification with relay headers or a device cookie",
+        "library: F02-E28: a paired phone cannot answer a promotion or read staged changes",
+        "library: F02-E29: a workstation approval promotes the exact staged bytes; a revoked device token is refused",
+        "library: F02-E30: phone self sign-out invalidates its staged changes and never lets a late answer write",
+        "library: F02-E31: sign-out preserves a completed Mission, its events, runs and promoted content",
+        "library: F02-E32: sign-out leaves workstation-granted envelopes and workstation Missions running",
+        "library: F02-E33: workstation revocation invalidates a device's pending staged change and approvals",
+        "library: F02-E34: a re-paired device with a new id cannot revive old approvals or staged changes",
+        "library: F02-E35: a device answer racing its own sign-out lands at most once and never writes",
+        "library: F02-E36: a device answer racing a workstation revocation never writes",
+        "library: F02-E38: a Host restart invalidates staged changes and the old approval stays dead",
+        "library: F02-E49: device SSE streams close and deliver nothing after sign-out or revocation",
+        "library: F02-E50: /state, /events and command results never disclose the Host or device tokens",
+        "library: F02-E16a: narrowing after a write ask was offered refuses the device's allow_once and writes nothing",
+        "library: F02-E16b: narrowing after the device answered but before execution stamps the answer and the step re-asks",
+        "library: F02-E37: a device answer and an immediate owner narrowing in the same tick leave nothing written",
+        "library: F02-E39a: Stop before admission blocks a device-answered write; nothing is written",
+        "library: F02-E39b: Stop after a device answer was staged withdraws the staged change; the project is untouched",
+        "library: F02-E17a: an in-scope write with no ask rule runs under consent alone, with no device involvement",
+        "library: F02-E17: a current in-scope device one-time approval still works: staged, then promoted by the workstation",
+        "library: F02-E18: a device one-time approval for a path outside the Mission write roots is refused",
+        "library: F02-E19: a device cannot answer another Agent's offer through a forged binding; its own answer never transfers",
+        "library: F02-E20: a device answer to a plain Mission's offer never transfers to an Agent Mission",
+        "library: F02-E21: a device cannot retarget an answer to another project root; the staged destination stays in the Mission project",
+        "library: F02-E22: a device answer carrying a stale authorization revision is refused",
+        "library: F02-E23a: a Host restart invalidates a pending device offer; the device cannot answer it afterwards",
+        "library: F02-E23b: a device answer held across a Host restart is stamped INVALIDATED_BY_HOST_RESTART and never executes",
+        "library: F02-E24a: an expired device answer is ended as EXPIRED before the step runs, and the step re-asks",
+        "library: F02-E24b: a trusted-desktop grant past its lifetime is refused for the exact operation",
+        "library: F02-E25: after the device-answered write completes its request is CONSUMED and the step holds no one-time answer",
+        "library: F02-E40: a device one-time answer cannot authorize shell through a Claude write, and no Codex route is reachable from it",
+        "library: F02-E41: a device one-time answer to a terminal command or code execution is refused even inside an approved Mission",
+        "library: F02-E42: a tool-free Ollama step cannot be rerouted into shell: the device answer is refused for a Claude route",
+        "library: F02-E43: a specialized or local model name cannot increase permissions; unknown providers fail closed",
+        "library: F02-E44: a provider reroute after a device-approved read does not carry that answer into a write",
+        "library: F02-E01: a phone's safe .md document is staged, the project is untouched, and workstation promotion completes it",
+        "library: F02-E02: execution-sensitive JSON (package.json, root x.json, .vscode/settings.json) is refused as not phone-safe",
+        "library: F02-E03: .github/workflows/ci.yml cannot receive a phone write at all",
+        "library: F02-E04: AGENTS.md, CLAUDE.md and .claude/x.md are refused as AGENT_INSTRUCTIONS",
+        "library: F02-E05: unknown purposes (extensionless notes, .mdx, NTFS stream x.md:stream) fail closed",
+        "library: F02-E06: path traversal ('../x.md') is refused and nothing lands outside the project",
+        "library: F02-E07: a junction destination and a hard-linked destination are refused (UNKNOWN); a junction created after staging blocks promotion",
+        "library: F02-E07b: a junction created AFTER staging makes promotion refuse; the outside folder stays untouched",
+        "library: F02-E08: a promotion request for Mission A cannot promote Mission A's staging into Mission B",
+        "library: F02-E09: a Mission read or list of the private staging folder is refused even with a broad root",
+        "library: F02-E10: staged bytes rewritten on disk after staging make promotion refuse FAILED; the destination stays untouched",
+        "library: F02-E11: a destination created after staging, or edited after staging, makes promotion refuse; the file is not overwritten",
+        "library: F02-E12: a recursive watcher on the project sees no change while the phone write is staged",
+        "library: F02-E13: the same watcher sees the change only after the workstation promotes it",
+        "library: F02-E14: a phone cannot answer the promotion, and the device projection carries no promotion or content",
+        "library: F02-E15: content over 8192 bytes is promoted only after workstation inspection; devices cannot inspect",
+        "library: F02-ST1: a Host restart invalidates a STAGED change (content kept), fails the step; Retry re-stages and promotion works once",
+        "library: F02-ST2: a PROMOTED change plus Retry never writes or stages the same bytes twice",
+        "library: F02-ST3: Stop withdraws a STAGED change; nothing reaches the project",
+        "library: F02-ST4: a workstation deny rejects the staged change and fails the step with permission_denied",
+        "library: F02-E45: a phone-written document cannot become execution input: the dependent terminal step never sees it and still needs the workstation",
+        "library: F02-E46: promotion is bound to the exact bytes: a tampered request contentHash is refused and nothing is written",
+        "library: F02-E47: a phone code/config change needs the Windows Host; a workstation allow_once stages it, and the promotion still refuses a non-phone-safe destination",
+        "library: F02-E48: while a change is staged, Mission reads and lists of the private staging folder fail even when the workstation allows the ask",
+        "library: F02-E47c: a promotion advances the Host mutation sequence, so a trusted-desktop grant approved before it is void",
+        "library: F02-E48b: with a project root that contains the Host data folder, no Mission reads Host database, credentials or staging",
+        "library: F02-ST5: classifyDeviceWrite matrix: documents and data are phone-safe; code, CI, agent, config, unknown and alias forms are not",
+        "library: F02-R1-1: agent instruction names of more tools are AGENT_INSTRUCTIONS; 8.3 and invisible-character names fail closed",
+        "library: F02-R1-3: a device write never stages into private Host state, even when the project root contains the Host data folder",
+        "library: F02-R1-4: only a step's own write executor can be staged; a write from a skill or a check is refused",
+        "library: F02-R1-5: a device one-time answer never outlives the Mission authorization it was given under",
+        "library: F02-R1-6: the Host mutation sequence never decreases when a promotion fails after it started, and the destination is listed for review",
+        "library: F02-R2-1: every dot-folder inside the project (known agent tools and unknown ones) is never phone-safe",
+        "library: F02-R2-2: the review text shows every invisible, bidirectional, format and separator code point as an escape",
+        "library: F02-R2-3: a one-time answer behind a failed step always gets an end state (CONSUMED: it authorized the failed run)",
+        "library: F02-R2-4: on device revocation an unadmitted answer is INVALIDATED, an admitted one keeps CONSUMED, and neither authorizes anything further",
+        "library: F02-R2-5: answering a promotion whose staged change already ended closes the request and fails the step",
+        "library: F02-R2-6: a promotion interrupted by a Host restart is reconciled from disk and, if it did not land, listed for review",
+        "library: F02-R3-1: an 8.3 short-name directory never stands in for a script, agent or dot-folder; manifests match case-insensitively; MDX lines and invisible fillers fail closed",
+        "library: F02-R3-2: a device one-time answer is CONSUMED when it authorizes the admitted run (and later clears never relabel it)",
+        "library: F02-R3-3: Retry of a Mission waiting for promotion withdraws the staged change and stages it again for a fresh review",
+        "library: F02-R3-4: the full-content inspection is escaped like the preview",
+        "library: F02-R3-5: Stop ends an unused one-time answer with a WITHDRAWN end state",
+        "library: F02-R4-1: files named by agent instructions, CI includes, nested manifests or root CI folders are never phone-safe; equivalent spellings match; oversize consumers fail closed",
+        "library: F02-R4-2: site-generator and config-named data, requirements-style names, installer directives, ESM without spaces and variation selectors are never phone-safe",
+        "library: F02-R4-3: a Retry refused at the attempt ceiling changes nothing: the staged change and its promotion request stay",
+        "library: F02-R4-4: a consumed one-time answer never re-arms a skill run",
+        "library: F02-R4-5: Stop ends a failed step's unused one-time answer (WITHDRAWN)",
+        "library: F03-FOLLOWUP-1: a read-only word in an argument, comment, substitution or earlier pipe stage never exempts a runner",
+        "library: F03-FOLLOWUP-1: genuinely read-only statements and pipelines stay exempt",
+        "library: F03-FOLLOWUP-1 verification: separators, redirections, quotes, program options, paths, env and name globs all fail closed",
+        "library: F03-FOLLOWUP-1 verification 2: multi-line statements, computed names, folder globs, option globs and config globs fail closed",
+        "library: F03-FOLLOWUP-1 verification 3: escapes, braces, PowerShell block-comment ends, suffix rules and collecting configs fail closed",
+        "library: F03-FOLLOWUP-1: package.json scripts run under cmd.exe on Windows, where # is not a comment",
+        "library: F03-FOLLOWUP-1 verification 4: cmd REM delimiters, executable package.json keys, folder-qualified escapes",
+        "library: F03-C1: glob, quoted and variable spellings in CI and install steps make the destination non-phone-safe",
+        "library: F03-C2: folder-level tool configuration and executable documentation make the folder's documents non-phone-safe",
+        "library: F03-C3: consumers of any name are scanned (Dockerfile variants, compose overrides, Procfile, Cirrus, Semaphore, VS Code tasks)",
+        "library: F03-C4: UTF-16 consumers are read; UTF-32 and other NUL-bearing consumers fail closed",
+        "library: F03-C5: ordinary projects keep their unreferenced notes, docs and data phone-writable",
+        "library: F03-C6: folder names are matched literally (regex metacharacters escaped)",
+        "library: F03-L1: promotion re-classifies the exact staged bytes, so program-like content never passes at promotion",
+        "library: F03-L3: Replan ends the replaced steps' unused one-time answers (WITHDRAWN)",
+        "library: F03-R1-1: default test discovery, doctest prompts and requirement lines are never phone-safe",
+        "library: F03-R1-2: install files of any name, and shell or CI scripts anywhere in the project, are consumers",
+        "library: F03-R1-3: quoted, option, list and brace folder values and computed file names under a literal folder are references",
+        "library: F03-R1-4: a glob of the destination's extension on a line that runs or collects files is a reference",
+        "library: F03-R1-5: prose, variable names and descriptions never refuse an unreferenced folder",
+        "library: F03-R1-6: editor test downloads, Visual Studio state and binary dot-folder files do not block phone writes; UTF-16 without a BOM is read",
+        "library: F03-R1-7: Replan withdraws unused answers but never rewrites a completed step's CONSUMED answer",
+        "library: F03-R2-1: a phone write to a file an in-project program reads is refused before staging (end to end)",
+        "library: F03-R2-2: Retry of a step waiting for promotion closes the attempt that staged the change",
+        "library: F03-R2-3: Markdown site generators and test plugins that build or run every page make those pages non-phone-safe",
+        "library: F03-R2-4: script blocks that note apps, VitePress, MDX or HTML pipelines run are never phone-safe",
+        "library: F03-R2-5: in shell-run text any glob of the destination's extension counts unless the line names a read-only tool",
+        "library: F03-R2-6: extensionless shebang scripts, escaped JSON paths and consumers inside linked folders are read",
+        "library: F03-R2-7: ordinary binaries, generated pages, large files and tool caches do not block phone writes",
+        "library: F03-R2-8: tabular data whose cells look like spreadsheet formulas carries a warning",
+        "library: F03-R3-1: brace, bare and any-extension globs are references; a read-only tool earlier on a line exempts only its own command",
+        "library: F03-R3-2: installer-directive files of any document name and encoding are consumers; direct-reference requirement lines are install input",
+        "library: F03-R3-3: notebooks are program consumers (cell sources), including large ones",
+        "library: F03-R3-4: JS hex and braced escapes are decoded; MkDocs docs_dir '.' covers the whole project; Mercurial hooks are read",
+        "library: F03-R3-5: executable note fences inside list items or blockquotes; NUL-bearing dot-folder files are still searched",
+        "library: MA0R/T9R-F01: phone approval keeps the Host-owned scope, ignores client scope overrides and never carries shell authority",
+        "library: F01-1: a phone-approved bounded file operation runs without any extra prompt",
+        "library: F01-2: a phone cannot authorize a claude write session (shell); it stays a workstation-only ask",
+        "library: F01-3: a phone cannot authorize a codex write session (shell); it stays a workstation-only ask",
+        "library: F01-3: a phone cannot authorize a codex read session (shell); it stays a workstation-only ask",
+        "library: F01-2b: the trusted workstation answer launches exactly that session once, with its exact argv",
+        "library: F01-4: a phone-approved Ollama session cannot reroute or fall back to Claude/Codex tool execution",
+        "library: F01-4b: remote routing prefers in-ceiling providers so benign reads need no prompt",
+        "library: F01-5: Retry never reuses a denied shell approval, and a spent grant never covers the retried session",
+        "library: F01-6: replanning a bounded task into shell execution requires separate authorization; old grants die",
+        "library: F01-T: terminal commands in a phone-approved Mission run only under an exact single-use workstation grant",
+        "library: F01-T2: a device never answers code-execution asks even inside a workstation-approved Mission",
+        "library: F01-T3: remote authority classifies interpreters, Git hooks, Git metadata, arbitrary windows and unknown risk as desktop-only",
+        "library: F01-T4: Git reads under remote authority never run repository-configured programs (external diff)",
+        "library: F01-T5: re-consent of an Agent with bound scripts is a workstation-only answer",
+        "library: F01-7: workstation revocation of a device ends every outstanding approval it granted",
+        "library: F01-11: a forged desktop-origin claim on a remote transport is denied (Host and gateway)",
+        "library: F01-8: a Host restart rejects stale remote approvals and trusted-desktop grants from the earlier epoch",
+        "library: F01-9: concurrent phone and desktop answers never elevate remote authority",
+        "library: F01-10: a trusted-desktop grant cannot be replayed for another target, command, folder, Mission, plan, Task, Host or epoch",
+        "library: F01-12: session authority classification matches the exact provider launch argv; unknowns fail closed",
+        "library: F01-R1 (BLOCKER): Git metadata aliases (8.3 GIT~1, trailing dot/space) and execution-config files are desktop-only remotely",
+        "library: F01-R2 (MEDIUM): a git.diff ref can never be an option that re-enables textconv or external diff",
+        "library: F01-R3 (MEDIUM): remote Calculator operations must name the Calculator window; a pid alone is not an identity",
+        "library: F01-R4 (HIGH/MEDIUM): a grant is spent only at the last refusal point, every session start spends it, and a refused launch does not burn it",
+        "library: F01-R5 (MEDIUM): a phone cannot start a workstation-approved Mission that can run code; remote-approved ones it may",
+        "library: F01-R6 (LOW): grants are attempt-bound, bound to the Task/plan in force when asked, and never projected to a phone",
+        "library: F01-R7 (LOW): any forwarded-proto marker is remote; unmarked non-workstation envelopes are remote; scripts are content-bound",
+        "library: F01-R8 (HIGH): execution-config files are desktop-only under every name: 8.3 aliases, NTFS streams, trailing dots",
+        "library: F01-R9 (HIGH/MEDIUM): a terminal grant binds option-named files and is voided by any later project change",
+        "library: F01-R10 (MEDIUM/LOW): device answers never extend an expired envelope; device views carry no grant records; start judges real providers",
+        "library: F01-R11 (MEDIUM): a phone cannot resume an Agent whose consent includes bound scripts; Pause stays available",
+        "library: F01-R12 (MEDIUM): while a trusted-desktop execution runs, Mission changes in its folder wait (no rewrite under the approval)",
+        "library: F01-R13 (LOW): a one-time allowance never outlives revocation; Retry and restart drop old one-time allowances",
+        "library: F01-R14 (LOW): gateway refuses workstation authentication for any relay marker or device cookie spelling",
+        "library: F01-R15 (MEDIUM): the workstation prompt for code execution lists files paired-device authority changed in the Mission",
+        "library: F01-R16 (HIGH): a project change between the desktop ask and the workstation answer supersedes the ask (re-asked, never executed)",
+        "library: F01-R17 (MEDIUM/LOW): script hashes resolve in the command's own folder; more relay families are remote",
+        "library: F01-R18 (HIGH): a phone's one-time answer never reaches outside the reviewed envelope; only the workstation's extends roots",
+        "library: F01-R19 (MEDIUM): an expired remote envelope is never extended by a one-time answer",
+        "library: F01-R20 (HIGH): code never runs over unreviewed paired-device changes from another Mission, under any envelope or provider",
+        "library: F01-R21 (HIGH): a phone cannot start or resume workstation-held program launches or UI automation",
+        "library: F01-R22 (LOW): task-runner and hook configs are execution config; network paths fail closed without probing",
+        "library: F01-R23 (LOW): relaunching under an expired remote envelope is refused",
+        "library: F01-R24 (BLOCKER): a phone cannot lift a workstation hold on code execution for an Agent without a consent record",
+        "library: F01-R25 (HIGH): a phone batch never covers Agent computer actions outside the Agent's consent",
+        "library: F01-R26 (HIGH): the review gate is Host-wide: code in any folder waits for unreviewed paired-device changes",
+        "library: F01-R27 (HIGH): a paired-device change never lands under workstation-approved code that is already running",
+        "library: F01-R28 (MEDIUM): a device write onto a non-file destination never starts, so no unrecorded change can exist",
+        "library: F01-R29 (MEDIUM): build, test and container tool configs are execution config for remote writes",
+        "library: F01-R30 (HIGH): a phone batch covers only operations a phone could approve alone (exact Calculator identity)",
+        "library: F01-R31 (HIGH): a workstation review acknowledges only the paired-device changes its prompt shows",
+        "library: F01-R32 (MEDIUM): a phone's one-time answer is judged on every same-action verification check it would cover",
+        "library: F01-R33 (MEDIUM): a phone never answers a provider ask that would exceed the Mission's session budget",
+        "library: F01-R34 (LOW): classifier precision: MSBuild entry points and dotenv are config, ordinary props/gradle folders are not",
+        "library: F01-R35 (HIGH): a phone answer never resumes a workstation Mission whose remaining code would run unasked",
+        "library: F01-R36 (HIGH): descendants of a finished workstation session keep paired-device changes held until none survives",
+        "library: F01-R37 (MEDIUM): Git reads wait for review of paired-device changes (owner-configured textconv or filters can run them)",
+        "library: F01-R38 (LOW): a provider review with more changes than one prompt lists asks the next page instead of failing",
+        "library: F01-R39 (HIGH): a paired device writes only inert data and documents; code, agent configuration and downloads stay on the workstation",
+        "library: F01-R40 (HIGH): survivor tracking follows the whole lineage of a finished session, across launcher exits and retries",
+        "library: F01-R41 (HIGH): the workstation reviews the content of paired-device changes, not only their names",
+        "library: F01-R42 (HIGH): a review prompt shows the whole changed file, or says plainly that it cannot",
+        "library: F01-R43 (MEDIUM): a workstation Mission a phone started is a paired-device actor for the hold and the review",
+        "library: F01-R44 (MEDIUM): survivors are judged by the attempt that left them, not by a later reroute",
+        "library: F01-R45 (LOW): revoking a device ends its unexecuted one-time answers",
+        "library: F01-R46 (BLOCKER): a superseded review re-ask shows every change it acknowledges",
+        "library: F01-R47 (HIGH): a phone-answered write held under live code keeps its paired-device attribution after the workstation answers the hold",
+        "library: F01-R48 (MEDIUM): changed-file text cannot imitate review prompt structure",
+        "library: F01-R49 (LOW): a phone's mission.get carries no review listing in reasons or events",
+        "library: F01-R50 (MEDIUM): no Host response to a paired device carries the review listing (state, inbox, agents, mission.get)",
+        "library: F01-R51 (MEDIUM): a device answer anywhere in a Mission attributes every later change in it",
+        "library: F01-R52 (MEDIUM): revoking a device stops the Missions it started or resumed",
+        "library: F01-R53 (BLOCKER): Python task checks never run on a device's timing or over unreviewed paired-device changes",
+        "library: F01-R54 (HIGH): Git and GitHub CLI reads in a workstation plan are never started or resumed by a device",
+        "library: F01-R55 (BLOCKER): a shell-session prompt always shows the review listing, even when another violation also applies",
+        "library: F01-R56 (LOW): revoking a device stops a Mission it resumed by answering",
+        "library: F01-R57 (MEDIUM): every device response drops trusted-desktop grant, operation and binding records",
+        "ui: V53 T5/F01-F04 auth intact: voice is refused for a paired device and never elevated by the client"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V54",
+      "title": "Provider process containment remains intact",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Provider process containment remains intact",
+      "observed": "19/19 mapped tests passed",
+      "evidence": [
+        "library: T3: failed capability terminal event rolls back success before fatal containment",
+        "library: T7 P27 path prefix cousins and traversal are not containment",
+        "library: R1-containment#0 a worker that exits on its own is settled (its job group closed) before any reopen starts a second worker",
+        "library: V54 the real worker exe matches its build record before it is launched",
+        "library: V54 V25 the worker is admitted into a Bunny-owned job and the job is observable with kernel accounting",
+        "library: V54 a real synthesized fixture turn ends in stt.final through the worker protocol",
+        "library: V25 V54 an abrupt termination of the job kills the worker and the process exits",
+        "library: V54 V25 the worker is verified against its build record before any launch",
+        "library: V54 a binary that differs from its build record is refused with WORKER_INTEGRITY",
+        "library: V54 a release manifest that lists a different hash refuses the worker",
+        "library: V54 a matching release manifest is accepted",
+        "library: V54 a missing worker or build record is refused",
+        "library: V25 V54 a refused launch starts nothing and creates no ownership record",
+        "library: containment#3 the build record must name the worker source, and a source edited after the build is refused",
+        "library: containment#4 an overlong line is discarded to its newline even when its tail arrives in later chunks",
+        "library: containment#2 the stdin accounting for the shutdown line is its real byte length",
+        "library: containment#5 a malformed event that throws in a listener is reported and never thrown out of the stdout handler",
+        "library: containment#0 a poll whose inspection fails is unknown state: the job is terminated and closed before the exit is reported",
+        "ui: V54 containment intact: the client never reports a worker or process as running when the snapshot says it is not"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V55",
+      "title": "Real Calculator X53 continues to work",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Real Calculator X53 continues to work",
+      "observed": "7/7 mapped tests passed",
+      "evidence": [
+        "library: A15 Calculator identity cannot imply another application",
+        "library: T9 positive example: one approval finishes a whole bounded Calculator sequence — offer shape, counts, ordering",
+        "library: T9R-F01: a phone keeps the Calculator batch where a single allow would exceed remote authority (batch-only verdict)",
+        "library: T9 TOCTOU: a foreign window with the exact Calculator title is rejected before mutation or budget consumption",
+        "library: T6 X53 DISPOSABLE LIVE VERIFIED: filesystem → Git → owned terminal → fresh Host → isolated browser → real Windows UIA → verified artifact",
+        "library: F01-R3 (MEDIUM): remote Calculator operations must name the Calculator window; a pid alone is not an identity",
+        "library: F01-R30 (HIGH): a phone batch covers only operations a phone could approve alone (exact Calculator identity)"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V56",
+      "title": "Existing T9 remote device restrictions remain intact",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Existing T9 remote device restrictions remain intact",
+      "observed": "70/70 mapped tests passed",
+      "evidence": [
+        "library: T9 F01/F02/F05/F11: device identity is per credential, projected, and never the owner",
+        "library: T9 F04: absolute lifetime and idle bound are enforced by the Host; presence never extends the lifetime",
+        "library: T9 F06/F35/F40: Host identity and epoch expectations refuse stale views; operation ids never execute twice",
+        "library: T9 F26-F29 (DEV-01): a paired device never launches a tool-capable or hosted provider, a shell or an app",
+        "library: T9 F43-limits: paired-device load is bounded per device; the workstation is unchanged",
+        "library: T9 G6: holding and stopping an Agent still work while the Host is degraded",
+        "library: T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/Resume reissue asks at the current revision",
+        "library: T9 F02 D3 (negative regression): a device cannot answer a write that the owner's narrowed Agent consent no longer covers",
+        "library: T9 F19/F20/F23: always-ask risks stay on the Windows Host; remote Deny persists; remote Stop blocks admissions",
+        "library: T9 device projection: bounded, path-free and transcript-free",
+        "library: T9 ledger and limiter units: bounded, per-principal, expiring",
+        "library: T9 F17/G7: Mission approvals bind to the reviewed plan; Agent Missions never start as bare Missions remotely",
+        "library: T9 launch rule: only local tool-free inference may be launched by a paired device",
+        "library: T9 revocation race: a delayed body cannot retain the authority authenticated before revocation",
+        "library: T9 operation ledger bounds include in-progress commands without evicting them",
+        "library: T9: after the T9 additive schema applies on an installed copy, the stale marker is healed and the boot validates",
+        "library: T9: a marker that already matches the applied schema is left byte-identical; non-installed state is untouched",
+        "library: T9: a damaged or wrong-version installed database is refused, never repaired or booted",
+        "library: voice actions are not in the device rights and unknown voice actions are refused on the workstation",
+        "library: T9 single-action invariant: one desktop action keeps plain Allow once, no batch row ever exists",
+        "library: T9 positive example: one approval finishes a whole bounded Calculator sequence — offer shape, counts, ordering",
+        "library: T9 sensitive never covered: read_controls excluded from the offer and asks again; a password control is never admitted",
+        "library: T9 consult boundary: exact operations, own steps, pid, risk ceiling and envelope guards",
+        "library: T9 admission guards: count boundary, epoch, expiry and end state are all enforced atomically; risk lattice holds",
+        "library: T9 exhaustion: a shrunk budget ends the batch with an event and re-prompts; nothing slips past",
+        "library: T9 expiry: a lapsed batch admits nothing, and the UI shows it ended without a silent revive",
+        "library: T9 scope escapes fail closed with a live batch: foreign pid, other app, shell, browser, files, sensitive probes",
+        "library: T9 window drift: a title lookalike asks before any foreign mutation",
+        "library: T9 observed pid: the declared windowPid is the window owner a batch binds to, ahead of control element pids",
+        "library: T9 UWP reality: control elements in a content process never end the batch while the window owner holds",
+        "library: T9 UWP drift: divergent content pids do not authorize a title lookalike",
+        "library: T9 mission boundary: another mission, even for the same app and the same user, inherits nothing",
+        "library: T9 stop: ending a mission ends its batch; the concurrent mission's batch and paused work survive untouched",
+        "library: T9 restart: every batch fails closed twice — the boot epoch refuses immediately and recovery sweeps the rows",
+        "library: T9 remote: a paired phone may grant only the offered batch, revoke its own, and the counts stay canonical",
+        "library: T9 ask_every_time refuses batching: ask again forever, no rescue, no batch button; a denied offer creates nothing",
+        "library: T9 privacy: canonical execution input never reaches renderer snapshots, requests, runs, events or batch records",
+        "library: T9 TOCTOU: a foreign window with the exact Calculator title is rejected before mutation or budget consumption",
+        "library: T9 approval replay: changed planned action cannot answer an old offer and the request stays open",
+        "library: T9 immutable operations: changed selectors, extra fields and spoofed UI claims ask without execution",
+        "library: T9 Stop races preflight: canonical Stop wins before admission and unrelated work survives",
+        "library: T9 expiration races preflight: time is rechecked after the asynchronous target check",
+        "library: T9 retries and provider reroute: each new admission consumes exactly one; provider origin cannot broaden scope",
+        "library: T9 risk escalation: a previously eligible operation asks fresh when adapter risk increases",
+        "library: T9 rule changes before approval: standing ask-every-time prevents granting an old offer",
+        "library: Host HTTP: snapshot stays backward compatible, mission commands are validated, remote devices are limited",
+        "ui: T9 connection: a fresh snapshot without a proven stream is polling, never live",
+        "ui: T9 connection: live only after the stream's ready/hb signal and while the snapshot is fresh",
+        "ui: T9 connection: a stream that never says ready within its deadline counts as stalled",
+        "ui: T9 connection: read failures go reconnecting then offline, and success resets",
+        "ui: T9 connection: first-load failure stays connecting, not reconnecting",
+        "ui: T9 connection: pairing is terminal — no retries, no streams, ignores later reads",
+        "ui: T9 connection: a different Host blocks every control until the user trusts it",
+        "ui: T9 connection: backoff and polling cadence are bounded",
+        "ui: T9 connection: an unchanged tick returns the same object (no re-render storm)",
+        "ui: T9 commands: only mutating actions carry operation ids and epochs",
+        "ui: T9 commands: captions come from codes and outcomes, never parsed text",
+        "ui: T9 commands: a lost acknowledgement resolves only from the Host's own record",
+        "ui: T9 freshness: retained data shows the real time it was last confirmed",
+        "ui: T9 bridge liveness: ready first, heartbeats become named hb events, content never crosses",
+        "ui: T9: the batch button states what it allows, how many, where and how long",
+        "ui: T9: the offer lines name covered actions with truthful counts and what is never covered",
+        "ui: T9: the batch status line reports the canonical count and each ended reason truthfully",
+        "ui: T9 view: only the Host's own verdict lets a device allow an ask; Deny is never hidden",
+        "ui: T9 view: an Agentic consent offer is approvable remotely only with the Host's remoteOffer",
+        "ui: T9 view: Mission plan approval follows the Host's mission verdict",
+        "ui: T9 view: pending asks merge Agentic items and unresolved Mission requests once each",
+        "ui: T9 view: control captions put an unknown outcome before everything else",
+        "ui: T9 view: the mobile attention count covers Agents and unowned Mission asks without double counting",
+        "ui: T9 view: the device rights summary comes from the Host's rights list only"
+      ],
+      "classification": "DETERMINISTIC (fakes or real worker/WPF where named)",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V57",
+      "title": "No production audio settings or credentials changed",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "No production audio settings or credentials changed",
+      "observed": "2/2 mapped tests passed; Production v26-MA2-R1 untouched: same release bytes, install.json, listeners, PIDs and start times, Startup and microphone privacy. Only the running production Host's own provider-probe records (its observation of the shared Ollama model) and the machine's audio endpoint presence changed; T10 wrote neither.",
+      "evidence": [
+        "library: V02 V24 V57 an explicit open either starts contained or reports an honest reason, never a silent success",
+        "ui: V57 no production audio/credential change: the client renders only the Host snapshot and sends no device setting",
+        "production-final.json"
+      ],
+      "classification": "LIVE + DETERMINISTIC",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V58",
+      "title": "Real microphone-to-playback acceptance is performed",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Real microphone-to-playback acceptance is performed",
+      "observed": "human speech → whisper.cpp → Host → local model/Host facts → SAPI → real speakers, 5 turns through the real Island",
+      "evidence": [
+        "live-e2e-conversation.json; live/human-stt-session-5-whisper-beep.json"
+      ],
+      "classification": "LIVE",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V59",
+      "title": "Ten interruption scenarios produce truthful results",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365, real devices/disposable Host",
+      "expected": "Ten interruption scenarios produce truthful results",
+      "observed": "10 live interruption scenarios, 0 stale resumes, audible silence p50 92 ms / p95 109 ms, 0 worker processes after run",
+      "evidence": [
+        "barge-in-adversarial.json"
+      ],
+      "classification": "LIVE",
+      "verdict": "PASS"
+    },
+    {
+      "id": "V60",
+      "title": "Full regression suite remains green",
+      "environment": "Windows 11, 2d5646d5c5a95ab040239b20b034e2c6b0828365",
+      "expected": "Full regression suite remains green",
+      "observed": "1694 tests, 0 failed, 0 skipped; typecheck/lint/build exit 0/0/0",
+      "evidence": [
+        "regression/summary.txt",
+        "full-regression.log",
+        "regression-inventory.json"
+      ],
+      "classification": "LIVE full regression on the T10 source",
+      "verdict": "PASS"
+    }
+  ],
+  "totals": {
+    "pass": 60,
+    "fail": 0,
+    "notCovered": 0
+  }
+}

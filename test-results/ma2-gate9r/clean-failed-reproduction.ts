@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {readFileSync,writeFileSync} from 'node:fs';
+import {getMission} from '../ma2-gate9/staging/live-shared.ts';
+const root='test-results/ma2-gate9r/';
+const detail=await getMission('b05243cb-0b78-4a92-a5c5-b4da2bfafcac');
+assert.equal(detail.mission.state,'stopped');
+assert.equal(detail.runs.filter(r=>r.action==='computer.open_app').length,1);
+execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-File',root+'calculator-inventory.ps1','-OutputPath',root+'failed-repro-inventory.json'],{windowsHide:true});
+const before=JSON.parse(readFileSync(root+'repro-inventory-before.json','utf8').replace(/^\uFEFF/,''));
+const after=JSON.parse(readFileSync(root+'failed-repro-inventory.json','utf8').replace(/^\uFEFF/,''));
+assert.equal(before.count,0);assert.equal(after.count,1);assert.equal(after.verifiedVisibleCount,1);
+const launch=detail.runs.find(r=>r.action==='computer.open_app');
+writeFileSync(root+'failed-reproduction.json',JSON.stringify({gate:'M-A-2 T9R',classification:'HARNESS foreground failure; old focus refused and retried without another launch',detail,before,after},null,2)+'\n');
+writeFileSync(root+'failed-repro-owned.json',JSON.stringify({preexistingHandles:[],targets:after.targets.map((t:any)=>({...t,ownership:'test-owned',createdByTest:true,provenance:{missionId:detail.mission.id,launchRunId:launch!.id,controlledBeforeCount:0,controlledAfterCount:1}}))},null,2)+'\n');
+execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-File',root+'owned-cleanup.ps1','-LedgerPath',root+'failed-repro-owned.json','-OutputPath',root+'failed-repro-cleanup.json'],{windowsHide:true});
+console.log('Single target from the failed focus reproduction safely closed; no user window swept.');

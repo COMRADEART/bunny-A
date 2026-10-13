@@ -1,0 +1,2232 @@
+{
+  "classification": "D01-D70: each row computed from the final regression logs, live evidence files and static checks",
+  "source": "86cc164d103edb97b7c39de0f520bc37d40e1db4\nclean tracked tree at start",
+  "staticNoAudioFiles": {
+    "workerFileWrites": 0,
+    "hostVoiceFileWrites": [],
+    "clean": true
+  },
+  "rows": [
+    {
+      "id": "D01",
+      "title": "Microphone inactive before session activation",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V01 nothing opens at Host start; V01 mic inactive by default; T12 grant: opening hands-free alone has no microphone",
+      "expectedResult": "Microphone inactive before session activation",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V01 nothing opens at Host start",
+            "state": "passed"
+          },
+          {
+            "test": "V01 mic inactive by default",
+            "state": "passed"
+          },
+          {
+            "test": "T12 grant: opening hands-free alone has no microphone",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "live/uia-run-7.jsonl",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D02",
+      "title": "Hands-free session requires explicit start",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 grant: opening hands-free alone has no microphone; T12-PRIV-01: a switch to hands_free never reopens; T12-PRIV-02: a refused hands-free start leaves no grant; T12 UI-01 Start hands-free is the explicit grant; T12 grant: a button press without a live grant",
+      "expectedResult": "Hands-free session requires explicit start",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 grant: opening hands-free alone has no microphone",
+            "state": "passed"
+          },
+          {
+            "test": "T12-PRIV-01: a switch to hands_free never reopens",
+            "state": "passed"
+          },
+          {
+            "test": "T12-PRIV-02: a refused hands-free start leaves no grant",
+            "state": "passed"
+          },
+          {
+            "test": "T12 UI-01 Start hands-free is the explicit grant",
+            "state": "passed"
+          },
+          {
+            "test": "T12 grant: a button press without a live grant",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "live/uia-run-7.jsonl",
+            "exists": true
+          },
+          {
+            "file": "live/uia-run-7.log",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D03",
+      "title": "Microphone captures real audio",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained live/human-bargein-2.json; Inspect retained live/human-endurance-1.json; Inspect retained probes/human-doubletalk-levels-2.txt",
+      "expectedResult": "Microphone captures real audio",
+      "observedResult": "LIVE: real Intel SST array; human finals transcribed in every human session",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "live/human-bargein-2.json",
+            "exists": true
+          },
+          {
+            "file": "live/human-endurance-1.json",
+            "exists": true
+          },
+          {
+            "file": "probes/human-doubletalk-levels-2.txt",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": [],
+      "note": "LIVE: real Intel SST array; human finals transcribed in every human session"
+    },
+    {
+      "id": "D04",
+      "title": "Speaker plays actual synthesized audio",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 native fixture: continuous input and actual synthesis/null playback operate concurrently",
+      "expectedResult": "Speaker plays actual synthesized audio",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 native fixture: continuous input and actual synthesis/null playback operate concurrently",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "barge-in-latency.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "31 receipts with the render meter reading Bunny audible",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D05",
+      "title": "Capture remains active during playback",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 native fixture: continuous input and actual synthesis/null playback operate concurrently",
+      "expectedResult": "Capture remains active during playback",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 native fixture: continuous input and actual synthesis/null playback operate concurrently",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "live/human-bargein-2.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "onsets detected during audible output",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D06",
+      "title": "AEC receives real playback reference",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12-native N-05 three rotating silence buffers; T12 native identity: changing enumeration cannot reuse a cached render index; T12 security: AEC or reference failure is truthful",
+      "expectedResult": "AEC receives real playback reference",
+      "observedResult": "Windows Voice Capture DSP owns the render loopback reference; one device configuration measured",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12-native N-05 three rotating silence buffers",
+            "state": "passed"
+          },
+          {
+            "test": "T12 native identity: changing enumeration cannot reuse a cached render index",
+            "state": "passed"
+          },
+          {
+            "test": "T12 security: AEC or reference failure is truthful",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "acoustic-echo-results.json",
+            "exists": true
+          },
+          {
+            "file": "aec-engine-decision.md",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": [],
+      "note": "Windows Voice Capture DSP owns the render loopback reference; one device configuration measured"
+    },
+    {
+      "id": "D07",
+      "title": "AEC reference is time-aligned",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained acoustic-echo-results.json",
+      "expectedResult": "AEC reference is time-aligned",
+      "observedResult": "Alignment is internal to the Windows DSP; verified by effect: the raw lane transcribed Bunny, the echo-cancelled lane produced 0 onsets/partials/finals",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "acoustic-echo-results.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": [],
+      "note": "Alignment is internal to the Windows DSP; verified by effect: the raw lane transcribed Bunny, the echo-cancelled lane produced 0 onsets/partials/finals"
+    },
+    {
+      "id": "D08",
+      "title": "Bunny speech alone causes no uncontrolled new turn",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12-native live calibration: the measured device residual never starts a turn; T12 echo (item 1): a partial and a final of the exact sentence",
+      "expectedResult": "Bunny speech alone causes no uncontrolled new turn",
+      "observedResult": "trial 0 excluded (human speech present)",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12-native live calibration: the measured device residual never starts a turn",
+            "state": "passed"
+          },
+          {
+            "test": "T12 echo (item 1): a partial and a final of the exact sentence",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "self-trigger-prevention.json",
+            "exists": true
+          },
+          {
+            "file": "live/agent-speech-2.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "5 clean trials, 0 routed finals",
+            "ok": true
+          }
+        ]
+      },
+      "missing": [],
+      "note": "trial 0 excluded (human speech present)"
+    },
+    {
+      "id": "D09",
+      "title": "Real user speech is detected during Bunny playback",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12-native AEC-05 user speech at 0.008 over 0.003 echo starts a turn",
+      "expectedResult": "Real user speech is detected during Bunny playback",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12-native AEC-05 user speech at 0.008 over 0.003 echo starts a turn",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "live/human-bargein-2.json",
+            "exists": true
+          },
+          {
+            "file": "probes/human-doubletalk-levels-3.txt",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D10",
+      "title": "Acoustic barge-in works without a button",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained live/human-bargein-2.json; Inspect retained interruption-results.json",
+      "expectedResult": "Acoustic barge-in works without a button",
+      "observedResult": "missed interruptions bounded 0-4 of 20 (human answers to trials 6/9/16/17 not given)",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "live/human-bargein-2.json",
+            "exists": true
+          },
+          {
+            "file": "interruption-results.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "16/20 trials interrupted by voice alone",
+            "ok": true
+          }
+        ]
+      },
+      "missing": [],
+      "note": "missed interruptions bounded 0-4 of 20 (human answers to trials 6/9/16/17 not given)"
+    },
+    {
+      "id": "D11",
+      "title": "Interruption audibly stops playback",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained barge-in-latency.json",
+      "expectedResult": "Interruption audibly stops playback",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "barge-in-latency.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "render meter silent; onset-to-silence P95 <= 750 ms",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D12",
+      "title": "Cancelled audio chunks never resume",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 native fixture: pause/resume then generation cancellation never resurrects old chunks; T12-native N-02 a pending reset is applied before any pause decision; T12 held (item 3): a reply held past heldMaxMs is cancelled",
+      "expectedResult": "Cancelled audio chunks never resume",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 native fixture: pause/resume then generation cancellation never resurrects old chunks",
+            "state": "passed"
+          },
+          {
+            "test": "T12-native N-02 a pending reset is applied before any pause decision",
+            "state": "passed"
+          },
+          {
+            "test": "T12 held (item 3): a reply held past heldMaxMs is cancelled",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": [
+          {
+            "check": "staleResumed 0 in live trials",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D13",
+      "title": "Late provider callback cannot resume old TTS",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V19 V20 barge-in: generation advances; T12 AUD-08: an inference stop that misses its deadline; T12 security: a late provider stop cannot delay owned microphone worker cleanup",
+      "expectedResult": "Late provider callback cannot resume old TTS",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V19 V20 barge-in: generation advances",
+            "state": "passed"
+          },
+          {
+            "test": "T12 AUD-08: an inference stop that misses its deadline",
+            "state": "passed"
+          },
+          {
+            "test": "T12 security: a late provider stop cannot delay owned microphone worker cleanup",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D14",
+      "title": "Multiple rapid interruptions remain ordered",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 barge-in (item 14): a second rapid barge-in; T12 hold ownership (round 2): an older finalizing turn never cancels",
+      "expectedResult": "Multiple rapid interruptions remain ordered",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 barge-in (item 14): a second rapid barge-in",
+            "state": "passed"
+          },
+          {
+            "test": "T12 hold ownership (round 2): an older finalizing turn never cancels",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D15",
+      "title": "Backchannels do not automatically cancel every response",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 backchannel (item 4); T12 controller: a final during output that is backchannel or hesitation resumes",
+      "expectedResult": "Backchannels do not automatically cancel every response",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 backchannel (item 4)",
+            "state": "passed"
+          },
+          {
+            "test": "T12 controller: a final during output that is backchannel or hesitation resumes",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "live/human-backchannel-1.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "27 live pauses, 0 interrupted",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D16",
+      "title": "Explicit interruption is recognized appropriately",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 interrupt (item 4); T12 F1 duplex: 'stop talking' while Bunny speaks silences her",
+      "expectedResult": "Explicit interruption is recognized appropriately",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 interrupt (item 4)",
+            "state": "passed"
+          },
+          {
+            "test": "T12 F1 duplex: 'stop talking' while Bunny speaks silences her",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "live/human-bargein-2.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D17",
+      "title": "Partial STT text cannot execute privileged commands",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 classifier: a partial alone never implies an interruption or a command; T12 controller: a partial interrupts only with an interrupt phrase",
+      "expectedResult": "Partial STT text cannot execute privileged commands",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 classifier: a partial alone never implies an interruption or a command",
+            "state": "passed"
+          },
+          {
+            "test": "T12 controller: a partial interrupts only with an interrupt phrase",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D18",
+      "title": "Final transcript is bound to the correct turn",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 VT-08: the next input turn is armed; T12 native AUD-04: capture.abort with a turn id aborts only; T12 hold ownership (round 2)",
+      "expectedResult": "Final transcript is bound to the correct turn",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 VT-08: the next input turn is armed",
+            "state": "passed"
+          },
+          {
+            "test": "T12 native AUD-04: capture.abort with a turn id aborts only",
+            "state": "passed"
+          },
+          {
+            "test": "T12 hold ownership (round 2)",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D19",
+      "title": "STT revisions do not create duplicate commands",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 forged or revised finals never create a second Task; R1-races#6 the first-final guard keeps a bounded set",
+      "expectedResult": "STT revisions do not create duplicate commands",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 forged or revised finals never create a second Task",
+            "state": "passed"
+          },
+          {
+            "test": "R1-races#6 the first-final guard keeps a bounded set",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D20",
+      "title": "Soft speech is handled without unbounded wait",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12-native VT-09 soft speech with no frame above the onset threshold for 4 s; T12 item 9: a recognition deadline drops only that input turn",
+      "expectedResult": "Soft speech is handled without unbounded wait",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12-native VT-09 soft speech with no frame above the onset threshold for 4 s",
+            "state": "passed"
+          },
+          {
+            "test": "T12 item 9: a recognition deadline drops only that input turn",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D21",
+      "title": "Loud speech does not permanently suppress quieter speech",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12-native VT-G3 a loud click does not permanently suppress soft speech; T12-native review round 3: a seed taken while the user talked",
+      "expectedResult": "Loud speech does not permanently suppress quieter speech",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12-native VT-G3 a loud click does not permanently suppress soft speech",
+            "state": "passed"
+          },
+          {
+            "test": "T12-native review round 3: a seed taken while the user talked",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D22",
+      "title": "Background noise does not create uncontrolled turns",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12-native VT-02 stationary ambient never counts as speech; T12-native VT-01 stationary loud ambient in a duplex turn ends; V12 noise-only audio fails safely",
+      "expectedResult": "Background noise does not create uncontrolled turns",
+      "observedResult": "one room measured",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12-native VT-02 stationary ambient never counts as speech",
+            "state": "passed"
+          },
+          {
+            "test": "T12-native VT-01 stationary loud ambient in a duplex turn ends",
+            "state": "passed"
+          },
+          {
+            "test": "V12 noise-only audio fails safely",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": [],
+      "note": "one room measured"
+    },
+    {
+      "id": "D23",
+      "title": "Natural hesitation does not cause premature cutoff",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12-native endpointing ignores whisper's trailing full stop; T12 live re-check: an unfinished sentence is joined with its continuation; T12 review r5: a spoken control after a held fragment is routed on its own",
+      "expectedResult": "Natural hesitation does not cause premature cutoff",
+      "observedResult": "live re-check 1 split one sentence (before the join); re-check 2: 2/2 hesitant sentences whole; the join itself is unit-tested only",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12-native endpointing ignores whisper's trailing full stop",
+            "state": "passed"
+          },
+          {
+            "test": "T12 live re-check: an unfinished sentence is joined with its continuation",
+            "state": "passed"
+          },
+          {
+            "test": "T12 review r5: a spoken control after a held fragment is routed on its own",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "live-recheck-results.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": [],
+      "note": "live re-check 1 split one sentence (before the join); re-check 2: 2/2 hesitant sentences whole; the join itself is unit-tested only"
+    },
+    {
+      "id": "D24",
+      "title": "Manual end-of-turn fallback remains functional",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 UI-02 Finish my turn exists only while; T12 manual end is bound to the input lane; manual endpointing finalizes only on capture.end",
+      "expectedResult": "Manual end-of-turn fallback remains functional",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 UI-02 Finish my turn exists only while",
+            "state": "passed"
+          },
+          {
+            "test": "T12 manual end is bound to the input lane",
+            "state": "passed"
+          },
+          {
+            "test": "manual endpointing finalizes only on capture.end",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "live/uia-run-7.log",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D25",
+      "title": "No hidden cloud STT or TTS fallback",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T10-whisper the ready event names the engine that is actually running; T10-whisper a fully verified pinned runtime selects whisper",
+      "expectedResult": "No hidden cloud STT or TTS fallback",
+      "observedResult": "whisper.cpp base.en and Windows SAPI are local; chat routes only local tool-free Ollama",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T10-whisper the ready event names the engine that is actually running",
+            "state": "passed"
+          },
+          {
+            "test": "T10-whisper a fully verified pinned runtime selects whisper",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": [],
+      "note": "whisper.cpp base.en and Windows SAPI are local; chat routes only local tool-free Ollama"
+    },
+    {
+      "id": "D26",
+      "title": "Local/private voice policy is respected",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V13 V14 V42 a question that needs tools or a hosted model is not auto-approved; V13 V14 a local tool-free question is admitted; T12 RES-04: spoken questions waiting for approval are capped",
+      "expectedResult": "Local/private voice policy is respected",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V13 V14 V42 a question that needs tools or a hosted model is not auto-approved",
+            "state": "passed"
+          },
+          {
+            "test": "V13 V14 a local tool-free question is admitted",
+            "state": "passed"
+          },
+          {
+            "test": "T12 RES-04: spoken questions waiting for approval are capped",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D27",
+      "title": "Raw audio is not retained unexpectedly",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "native#2 abandoned recognizers: raw audio is zeroed and released; T10 H11 a full voice turn over the Host HTTP surface journals no transcript or answer text",
+      "expectedResult": "Raw audio is not retained unexpectedly",
+      "observedResult": "evidence records text, timestamps and levels only",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "native#2 abandoned recognizers: raw audio is zeroed and released",
+            "state": "passed"
+          },
+          {
+            "test": "T10 H11 a full voice turn over the Host HTTP surface journals no transcript or answer text",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": [
+          {
+            "check": "static: no file-writing API in the voice worker or Host voice modules",
+            "ok": true
+          }
+        ]
+      },
+      "missing": [],
+      "note": "evidence records text, timestamps and levels only"
+    },
+    {
+      "id": "D28",
+      "title": "Muting prevents new microphone processing",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V24 mute aborts an active capture; T12-native PRIV-03 a capture loop that ends because the microphone is muted; T12 mute and close release duplex; T12 review r5: a fragment built turn never confirms, and mute drops a held fragment",
+      "expectedResult": "Muting prevents new microphone processing",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V24 mute aborts an active capture",
+            "state": "passed"
+          },
+          {
+            "test": "T12-native PRIV-03 a capture loop that ends because the microphone is muted",
+            "state": "passed"
+          },
+          {
+            "test": "T12 mute and close release duplex",
+            "state": "passed"
+          },
+          {
+            "test": "T12 review r5: a fragment built turn never confirms, and mute drops a held fragment",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D29",
+      "title": "Closing session releases capture",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V25 close releases the worker; T12 item 10 (round 2): closing during hands-free",
+      "expectedResult": "Closing session releases capture",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V25 close releases the worker",
+            "state": "passed"
+          },
+          {
+            "test": "T12 item 10 (round 2): closing during hands-free",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "voice-endurance-results.json",
+            "exists": true
+          },
+          {
+            "file": "hostile-audio-results.json",
+            "exists": true
+          },
+          {
+            "file": "live-recheck-results.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "0 worker processes after every live close",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D30",
+      "title": "Closing session releases playback",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V25 close releases the worker; T12 RC-05: close, mute, duplex.error and capture.error cancel a held reply",
+      "expectedResult": "Closing session releases playback",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V25 close releases the worker",
+            "state": "passed"
+          },
+          {
+            "test": "T12 RC-05: close, mute, duplex.error and capture.error cancel a held reply",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D31",
+      "title": "Device loss is reported truthfully",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V03 V04 a permission or device error is truthful; T12 native: duplex.stop during an active capture is a clean abort, never a lost-device error",
+      "expectedResult": "Device loss is reported truthfully",
+      "observedResult": "physical hot-unplug NOT TESTED",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V03 V04 a permission or device error is truthful",
+            "state": "passed"
+          },
+          {
+            "test": "T12 native: duplex.stop during an active capture is a clean abort, never a lost-device error",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": [],
+      "note": "physical hot-unplug NOT TESTED"
+    },
+    {
+      "id": "D32",
+      "title": "Device reconnect does not duplicate audio sessions",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 native identity: changing enumeration cannot reuse a cached render index; T12 restart fences old continuous-session callbacks",
+      "expectedResult": "Device reconnect does not duplicate audio sessions",
+      "observedResult": "physical reconnect NOT TESTED",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 native identity: changing enumeration cannot reuse a cached render index",
+            "state": "passed"
+          },
+          {
+            "test": "T12 restart fences old continuous-session callbacks",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": [],
+      "note": "physical reconnect NOT TESTED"
+    },
+    {
+      "id": "D33",
+      "title": "Model response is streamed where supported",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V13 V14 a local tool-free question is admitted and its real token deltas are spoken in order",
+      "expectedResult": "Model response is streamed where supported",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V13 V14 a local tool-free question is admitted and its real token deltas are spoken in order",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D34",
+      "title": "Spoken chunks remain in correct order",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V13 V14 a local tool-free question is admitted and its real token deltas are spoken in order; V06 V18 hard split keeps every chunk",
+      "expectedResult": "Spoken chunks remain in correct order",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V13 V14 a local tool-free question is admitted and its real token deltas are spoken in order",
+            "state": "passed"
+          },
+          {
+            "test": "V06 V18 hard split keeps every chunk",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D35",
+      "title": "Cold/warm latency is measured separately",
+      "result": "NOT TESTED",
+      "status": "NOT TESTED",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "",
+      "expectedResult": "Cold/warm latency is measured separately",
+      "observedResult": "T12 did not re-measure cold vs warm model latency (T10 voice-latency-results.json remains the record)",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [],
+        "checks": []
+      },
+      "missing": [],
+      "note": "T12 did not re-measure cold vs warm model latency (T10 voice-latency-results.json remains the record)"
+    },
+    {
+      "id": "D36",
+      "title": "Backpressure prevents unbounded TTS queues",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12-native N-03 the stdout queue is 2048 lines / 1 MiB; V06 V18 hard split keeps every chunk; T12-native N-04 AEC output is drained while INCOMPLETE is set, into a bounded",
+      "expectedResult": "Backpressure prevents unbounded TTS queues",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12-native N-03 the stdout queue is 2048 lines / 1 MiB",
+            "state": "passed"
+          },
+          {
+            "test": "V06 V18 hard split keeps every chunk",
+            "state": "passed"
+          },
+          {
+            "test": "T12-native N-04 AEC output is drained while INCOMPLETE is set, into a bounded",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D37",
+      "title": "Conversation context resolves follow-up references",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 F4: 'what about the second one' resolves; T12 F4: the referent expires after referentTtlMs",
+      "expectedResult": "Conversation context resolves follow-up references",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 F4: 'what about the second one' resolves",
+            "state": "passed"
+          },
+          {
+            "test": "T12 F4: the referent expires after referentTtlMs",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D38",
+      "title": "Ambiguous Agent identity requires clarification",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 F4: 'what is my agent doing' names two agents; T12 F2: several active Missions are asked about by title",
+      "expectedResult": "Ambiguous Agent identity requires clarification",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 F4: 'what is my agent doing' names two agents",
+            "state": "passed"
+          },
+          {
+            "test": "T12 F2: several active Missions are asked about by title",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D39",
+      "title": "Agent status uses canonical Host records",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 hostFactsFrom: every canonical Mission is a fact once; T12 F5: 'is the mission done' answers from a plain Mission record; T12 live: status phrasings heard in the endurance session read Host facts",
+      "expectedResult": "Agent status uses canonical Host records",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 hostFactsFrom: every canonical Mission is a fact once",
+            "state": "passed"
+          },
+          {
+            "test": "T12 F5: 'is the mission done' answers from a plain Mission record",
+            "state": "passed"
+          },
+          {
+            "test": "T12 live: status phrasings heard in the endurance session read Host facts",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "voice-endurance-results.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D40",
+      "title": "Verification status is not invented",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 F6: a verification answer names the Mission it describes; V31 verification counts only recorded checks",
+      "expectedResult": "Verification status is not invented",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 F6: a verification answer names the Mission it describes",
+            "state": "passed"
+          },
+          {
+            "test": "V31 verification counts only recorded checks",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D41",
+      "title": "Voice interaction does not fabricate model identity",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V15 an unknown or automatic model is reported as UNKNOWN; V15 model is reported from the recorded value and never invented",
+      "expectedResult": "Voice interaction does not fabricate model identity",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V15 an unknown or automatic model is reported as UNKNOWN",
+            "state": "passed"
+          },
+          {
+            "test": "V15 model is reported from the recorded value and never invented",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D42",
+      "title": "Ordinary chat does not silently become Agentic",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 wiring: a voice draft is a canonical mission.create that waits for review and is never started; T12 F4: a name that is no Host subject, with no referent, is an ordinary question; V16 V38 the session never reads or sends anything but the transcript",
+      "expectedResult": "Ordinary chat does not silently become Agentic",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 wiring: a voice draft is a canonical mission.create that waits for review and is never started",
+            "state": "passed"
+          },
+          {
+            "test": "T12 F4: a name that is no Host subject, with no referent, is an ordinary question",
+            "state": "passed"
+          },
+          {
+            "test": "V16 V38 the session never reads or sends anything but the transcript",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D43",
+      "title": "Background Mission continues during voice interruption",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V45 closing voice does not call any agent command",
+      "expectedResult": "Background Mission continues during voice interruption",
+      "observedResult": "LIVE: up to nine real Agent teams ran through the 42-minute voice session",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V45 closing voice does not call any agent command",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "voice-endurance-results.json",
+            "exists": true
+          },
+          {
+            "file": "hostile-audio-results.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": [],
+      "note": "LIVE: up to nine real Agent teams ran through the 42-minute voice session"
+    },
+    {
+      "id": "D44",
+      "title": "Closing voice does not stop authorized Agents",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V45 closing voice does not call any agent command; V45 closed voice UI does not stop AgentRuntime",
+      "expectedResult": "Closing voice does not stop authorized Agents",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V45 closing voice does not call any agent command",
+            "state": "passed"
+          },
+          {
+            "test": "V45 closed voice UI does not stop AgentRuntime",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": [
+          {
+            "check": "41 Agents persisted after close; Agentic reopen 200",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D45",
+      "title": "Voice Stop speech cannot ambiguously kill a Mission",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 F1: bare stop words classify as speech_stop; T12 F2: a spoken yes cannot confirm a Mission stop; T12 F1: a bare stop with no output and an agent running asks which is meant",
+      "expectedResult": "Voice Stop speech cannot ambiguously kill a Mission",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 F1: bare stop words classify as speech_stop",
+            "state": "passed"
+          },
+          {
+            "test": "T12 F2: a spoken yes cannot confirm a Mission stop",
+            "state": "passed"
+          },
+          {
+            "test": "T12 F1: a bare stop with no output and an agent running asks which is meant",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "hostile-audio-results.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D46",
+      "title": "Voice cannot forge Windows owner authority",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 hostile: override, approve-all and owner claims are sensitive_refused; T12 hostile: override, approve-all and owner claims never draft, propose or stop anything",
+      "expectedResult": "Voice cannot forge Windows owner authority",
+      "observedResult": "synthetic SAPI clips from the phone speaker",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 hostile: override, approve-all and owner claims are sensitive_refused",
+            "state": "passed"
+          },
+          {
+            "test": "T12 hostile: override, approve-all and owner claims never draft, propose or stop anything",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "hostile-audio-results.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "phone owner/admin clips refused, 0 violations",
+            "ok": true
+          }
+        ]
+      },
+      "missing": [],
+      "note": "synthetic SAPI clips from the phone speaker"
+    },
+    {
+      "id": "D47",
+      "title": "Recorded speech cannot grant code-execution authority",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 F3 round 2: a draft that also says start; T12-AUTH-01: inflected destructive drafts are sensitive_refused",
+      "expectedResult": "Recorded speech cannot grant code-execution authority",
+      "observedResult": "synthetic clips, not a human attacker",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 F3 round 2: a draft that also says start",
+            "state": "passed"
+          },
+          {
+            "test": "T12-AUTH-01: inflected destructive drafts are sensitive_refused",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "hostile-audio-results.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "10/10 recorded clips heard, 0 authority violations",
+            "ok": true
+          }
+        ]
+      },
+      "missing": [],
+      "note": "synthetic clips, not a human attacker"
+    },
+    {
+      "id": "D48",
+      "title": "Agent-generated speech cannot grant permissions",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 F3 echo: an overlapped turn that repeats Bunny's own; T12 confirm (item 2): a confirm spoken over Bunny's own output never executes; T12 review r5: typed input drops a held fragment, so stale words can never confirm",
+      "expectedResult": "Agent-generated speech cannot grant permissions",
+      "observedResult": "2 trials with a live voice-confirmable proposal",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 F3 echo: an overlapped turn that repeats Bunny's own",
+            "state": "passed"
+          },
+          {
+            "test": "T12 confirm (item 2): a confirm spoken over Bunny's own output never executes",
+            "state": "passed"
+          },
+          {
+            "test": "T12 review r5: typed input drops a held fragment, so stale words can never confirm",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "hostile-audio-results.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "Bunny said Confirm with a live proposal: 0 turns heard, 0 executed",
+            "ok": true
+          }
+        ]
+      },
+      "missing": [],
+      "note": "2 trials with a live voice-confirmable proposal"
+    },
+    {
+      "id": "D49",
+      "title": "Phone voice restrictions remain effective",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 hostile: override, approve-all and owner claims are sensitive_refused",
+      "expectedResult": "Phone voice restrictions remain effective",
+      "observedResult": "the phone was used only as a synthetic acoustic source; phone/LAN remote voice and device-principal voice were not exercised live",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 hostile: override, approve-all and owner claims are sensitive_refused",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "hostile-audio-results.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": [],
+      "note": "the phone was used only as a synthetic acoustic source; phone/LAN remote voice and device-principal voice were not exercised live"
+    },
+    {
+      "id": "D50",
+      "title": "F01-F04 process and authorization security persists",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "",
+      "expectedResult": "F01-F04 process and authorization security persists",
+      "observedResult": "F01-F04 suites are part of the final regression",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [],
+        "checks": [
+          {
+            "check": "full regression green",
+            "ok": true
+          }
+        ]
+      },
+      "missing": [],
+      "note": "F01-F04 suites are part of the final regression"
+    },
+    {
+      "id": "D51",
+      "title": "Native voice-worker process containment works",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V54 V25 the worker is admitted into a Bunny-owned job; T12 native fixture: mute stops continuous source; close leaves zero active Job processes; T12 native fault: blocked protocol writer exits within watchdog bound",
+      "expectedResult": "Native voice-worker process containment works",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V54 V25 the worker is admitted into a Bunny-owned job",
+            "state": "passed"
+          },
+          {
+            "test": "T12 native fixture: mute stops continuous source; close leaves zero active Job processes",
+            "state": "passed"
+          },
+          {
+            "test": "T12 native fault: blocked protocol writer exits within watchdog bound",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D52",
+      "title": "Host restart invalidates stale voice operations",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 restart fences old continuous-session callbacks",
+      "expectedResult": "Host restart invalidates stale voice operations",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 restart fences old continuous-session callbacks",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D53",
+      "title": "Old audio callbacks do not survive cancellation incorrectly",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 mute and close release duplex; old events cannot restart capture; T12 native fixture: pause/resume then generation cancellation never resurrects old chunks",
+      "expectedResult": "Old audio callbacks do not survive cancellation incorrectly",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 mute and close release duplex; old events cannot restart capture",
+            "state": "passed"
+          },
+          {
+            "test": "T12 native fixture: pause/resume then generation cancellation never resurrects old chunks",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D54",
+      "title": "Multiple active Agent events do not corrupt conversation",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T11-V03: hostFactsFrom carries role and own task",
+      "expectedResult": "Multiple active Agent events do not corrupt conversation",
+      "observedResult": "LIVE 42 min with real teams; answers checked against Host state at the time",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T11-V03: hostFactsFrom carries role and own task",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "voice-endurance-results.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": [],
+      "note": "LIVE 42 min with real teams; answers checked against Host state at the time"
+    },
+    {
+      "id": "D55",
+      "title": "Bunny Notch reflects actual microphone activity",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 composite truth: Listening and speaking only with confirmed capture; T12 live: an idle release leaves no LISTENING state",
+      "expectedResult": "Bunny Notch reflects actual microphone activity",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 composite truth: Listening and speaking only with confirmed capture",
+            "state": "passed"
+          },
+          {
+            "test": "T12 live: an idle release leaves no LISTENING state",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "live/uia-run-7.log",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D56",
+      "title": "Bunny Notch reflects actual playback",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T12 composite truth: Listening and speaking only with confirmed capture; T12 playback (item 3): a playback.paused receipt never desyncs snap.playing",
+      "expectedResult": "Bunny Notch reflects actual playback",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T12 composite truth: Listening and speaking only with confirmed capture",
+            "state": "passed"
+          },
+          {
+            "test": "T12 playback (item 3): a playback.paused receipt never desyncs snap.playing",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D57",
+      "title": "Horizontal Agent indicators remain on the left",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V47 agent indicators left of horizontal notch",
+      "expectedResult": "Horizontal Agent indicators remain on the left",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V47 agent indicators left of horizontal notch",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D58",
+      "title": "Vertical Agent indicators remain above the interaction area",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V48 agent indicators top of vertical notch",
+      "expectedResult": "Vertical Agent indicators remain above the interaction area",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V48 agent indicators top of vertical notch",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D59",
+      "title": "T10 push-to-talk fallback remains functional",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "V19 V22 LIVE-B03 push-to-talk barge-in; T12 lifecycle: a push-to-talk press stops duplex with reason user",
+      "expectedResult": "T10 push-to-talk fallback remains functional",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "V19 V22 LIVE-B03 push-to-talk barge-in",
+            "state": "passed"
+          },
+          {
+            "test": "T12 lifecycle: a push-to-talk press stops duplex with reason user",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D60",
+      "title": "T11 multi-Agent runtime remains functional",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T11-V01: team questions classify as agent_team",
+      "expectedResult": "T11 multi-Agent runtime remains functional",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression plus retained observations",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T11-V01: team questions classify as agent_team",
+            "state": "passed"
+          }
+        ],
+        "live": [
+          {
+            "file": "voice-endurance-results.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "Agent suites green in the final regression",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D61",
+      "title": "Existing real Calculator X53 still works",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "T6 X53 DISPOSABLE LIVE VERIFIED",
+      "expectedResult": "Existing real Calculator X53 still works",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "SYNTHETIC/fixture regression",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [
+          {
+            "test": "T6 X53 DISPOSABLE LIVE VERIFIED",
+            "state": "passed"
+          }
+        ],
+        "live": [],
+        "checks": []
+      },
+      "missing": []
+    },
+    {
+      "id": "D62",
+      "title": "No protected user-owned process is terminated",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained production-compare.json",
+      "expectedResult": "No protected user-owned process is terminated",
+      "observedResult": "harnesses close only exact test-owned PIDs; Task Manager and the production Island were never touched",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "production-compare.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": [],
+      "note": "harnesses close only exact test-owned PIDs; Task Manager and the production Island were never touched"
+    },
+    {
+      "id": "D63",
+      "title": "No production database migration or deployment",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained production-compare.json",
+      "expectedResult": "No production database migration or deployment",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "production-compare.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "production release and schema unchanged",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D64",
+      "title": "Real microphone/speaker full-duplex demonstration passes",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained live/human-bargein-2.json; Inspect retained live/human-endurance-1.json; Inspect retained live-recheck-results.json",
+      "expectedResult": "Real microphone/speaker full-duplex demonstration passes",
+      "observedResult": "one device configuration",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "live/human-bargein-2.json",
+            "exists": true
+          },
+          {
+            "file": "live/human-endurance-1.json",
+            "exists": true
+          },
+          {
+            "file": "live-recheck-results.json",
+            "exists": true
+          }
+        ],
+        "checks": []
+      },
+      "missing": [],
+      "note": "one device configuration"
+    },
+    {
+      "id": "D65",
+      "title": "Real 20-minute conversational endurance is documented",
+      "result": "PASS_WITH_LIMITATIONS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained voice-endurance-results.json",
+      "expectedResult": "Real 20-minute conversational endurance is documented",
+      "observedResult": "42 min but 23 spoken turns (aim 30+)",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "voice-endurance-results.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": ">= 20 minutes",
+            "ok": true
+          }
+        ]
+      },
+      "missing": [],
+      "note": "42 min but 23 spoken turns (aim 30+)"
+    },
+    {
+      "id": "D66",
+      "title": "Real hands-free interruption has measured P50/P95",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained barge-in-latency.json",
+      "expectedResult": "Real hands-free interruption has measured P50/P95",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "barge-in-latency.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "P50 < 400 ms and P95 <= 750 ms (onset to silence)",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D67",
+      "title": "No unresolved BLOCKER/HIGH security finding",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained independent-security-review.json",
+      "expectedResult": "No unresolved BLOCKER/HIGH security finding",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "independent-security-review.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "no open BLOCKER/HIGH",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D68",
+      "title": "All previous 1,750 regression tests remain intact",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained regression-summary.json",
+      "expectedResult": "All previous 1,750 regression tests remain intact",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "regression-summary.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": ">= 1,750 tests, 0 failed",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D69",
+      "title": "Exact source and package provenance verified",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained windows-package-results.json",
+      "expectedResult": "Exact source and package provenance verified",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "windows-package-results.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "package manifest pinned to the final source",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    },
+    {
+      "id": "D70",
+      "title": "Evidence sealed and no secrets disclosed",
+      "result": "PASS",
+      "status": "PASS",
+      "environment": "Windows development checkout and disposable Hosts; real-device records identify Intel SST microphone / Realtek speakers",
+      "preconditions": "Final source-pinned regression fixtures and/or the setup recorded in each referenced live artifact",
+      "testAction": "Inspect retained secret-scan.json",
+      "expectedResult": "Evidence sealed and no secrets disclosed",
+      "observedResult": "Named final tests and/or retained observations satisfy the recorded checks.",
+      "classification": "Retained observations / static checks",
+      "liveSourceScope": "Historical human recordings predate the final closeout repair; the final package has separately pinned capture/playback and cleanup checks.",
+      "evidence": {
+        "tests": [],
+        "live": [
+          {
+            "file": "secret-scan.json",
+            "exists": true
+          }
+        ],
+        "checks": [
+          {
+            "check": "secret scan clean",
+            "ok": true
+          },
+          {
+            "check": "INDEX.sha256 present",
+            "ok": true
+          }
+        ]
+      },
+      "missing": []
+    }
+  ],
+  "totals": {
+    "PASS": 54,
+    "PASS_WITH_LIMITATIONS": 15,
+    "NOT TESTED": 1
+  }
+}

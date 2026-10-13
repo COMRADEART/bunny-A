@@ -3,10 +3,17 @@ import { statSync } from "node:fs";
 import { promisify } from "node:util";
 import { execute, probeOllama, stopTask } from "../orch/exec.server.ts";
 import type { OrchTask, ProviderFeatures, ProviderId, ProviderLive, UsageWindow } from "../orch/types.ts";
-import type { AdapterHooks, AdapterResult, ProviderAdapter, RunningSession } from "./contracts.ts";
+import { CODEX_COMPATIBILITY_MAX_AGE_MS, CODEX_SECURITY_POLICY_VERSION, codexMissionExclusion } from "../orch/compatibility.ts";
+import type { AdapterHooks, AdapterResult, ProviderAdapter, RunningSession, SessionContainment } from "./contracts.ts";
 import { probeCodexCatalog } from "./codex-probe.server.ts";
+import { CODEX_READ_DISABLED_FEATURES, CodexCompatibilityGate, emptyCodexCompatibility, executableStamp } from "./codex-compatibility.server.ts";
+export { CODEX_READ_DISABLED_FEATURES } from "./codex-compatibility.server.ts";
 import { hasTool, locate, systemContext, type DiscoveryContext, type Launchable } from "./discovery.server.ts";
 import { ClaudeNormalizer, CodexNormalizer, normalizedTool as toolType } from "./events.ts";
+import { safeError } from "./failure.server.ts";
+import { trackOwnedChild } from "./owned-processes.server.ts";
+import { OwnedProcessGroup, outputPipe, runWindowsOwnedProcess, type OwnedProcessRecord } from "./owned-process-group.server.ts";
+import { systemTool } from "./system-tools.server.ts";
 
 const exec = promisify(execFile);
 export const normalizedTool = toolType;
@@ -69,7 +76,7 @@ export function providerBase(id: ProviderId): ProviderLive {
     local_or_cloud: id === "ollama" ? "local" : "cloud", supported_task_types: ["coding", "debug", "writing", "ops", "research", "general"],
     current_model: null, models: [], usage: null, usage_note: "Usage unavailable", active_jobs: 0, latency_estimate_ms: null,
     extension: ["cline", "cursor", "opencode"].includes(id), detail: "Not detected on this workstation.", vram: null, tokens_per_sec: null,
-    executable: null, version: null, capabilities: [], usageWindows: [], usageObservedAt: null, features: FEATURES[id],
+    executable: null, version: null, capabilities: [], usageWindows: [], usageObservedAt: null, usage_failed_at: null, usage_error: null, features: FEATURES[id],
     usageCapabilities: { shortWindow: false, weekly: false, resetTime: false, tokenUsage: false, activeJobs: true, source: "none" },
     probedAt: null, evidence: [],
   };
@@ -78,15 +85,19 @@ export function providerBase(id: ProviderId): ProviderLive {
 type ProbeResult = { code: number | null; stdout: string; stderr: string; timedOut: boolean; error?: string };
 /** Runs a provider CLI directly (no shell) with a hard timeout and closed stdin. */
 export function probe(launch: Launchable, args: string[], timeout = 15000): Promise<ProbeResult> {
+  // M-A-3 T9R-F04: on Windows a probe runs in its own Bunny-owned job (NUL stdin); refused if containment is unavailable.
+  if (process.platform === "win32") return runWindowsOwnedProcess(launch.command, [...launch.args, ...args], { cwd: process.cwd(), signal: new AbortController().signal, timeoutMs: timeout, maxOutput: 1024 * 1024, owner: { action: "provider.probe" } })
+    .then((result): ProbeResult => ({ code: result.timedOut ? null : result.exitCode, stdout: result.stdout, stderr: result.stderr, timedOut: result.timedOut }))
+    .catch((error: unknown): ProbeResult => ({ code: null, stdout: "", stderr: "", timedOut: false, error: `Containment unavailable — probe refused: ${safeError(error).message}` }));
   return new Promise((resolve) => {
-    const child = execFile(launch.command, [...launch.args, ...args], { timeout, windowsHide: true, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    const child = trackOwnedChild(execFile(launch.command, [...launch.args, ...args], { timeout, windowsHide: true, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       const failure = error as (NodeJS.ErrnoException & { killed?: boolean; code?: number | string }) | null;
       resolve({
         code: failure ? (typeof failure.code === "number" ? failure.code : null) : 0,
         stdout: String(stdout), stderr: String(stderr), timedOut: !!failure?.killed,
         error: failure && typeof failure.code !== "number" ? failure.message.split("\n")[0] : undefined,
       });
-    });
+    }));
     child.stdin?.end();
   });
 }
@@ -137,8 +148,8 @@ export class OllamaAdapter implements ProviderAdapter {
     live.executable = located.launch?.path ?? null; live.installed = found.up || !!live.executable;
     live.authenticated = found.up; live.authenticatedState = "not_required";
     live.availability = found.up && found.models.length ? "ready" : found.up ? "unavailable" : live.installed ? "offline" : "not_installed";
-    live.models = found.models; live.current_model = found.models[0] ?? null;
-    live.evidence = [`GET http://127.0.0.1:11434/api/tags → ${found.up ? `${found.models.length} models` : "unreachable"}`];
+    live.models = found.models; live.current_model = found.models[0] ?? null; live.remoteModels = found.remote ?? [];
+    live.evidence = [`GET http://127.0.0.1:11434/api/tags → ${found.up ? `${found.models.length} models${live.remoteModels.length ? `, cloud-hosted: ${live.remoteModels.join(", ")}` : ""}` : "unreachable"}`];
     live.detail = found.up ? found.models.join(", ") || "Service reachable; no models installed." : live.installed ? "Installed, but the service is unreachable at 127.0.0.1:11434." : "Not detected on this workstation.";
     if (found.up) {
       try {
@@ -161,7 +172,14 @@ export class OllamaAdapter implements ProviderAdapter {
   launch(task: OrchTask, hooks: AdapterHooks): RunningSession {
     const controller = new AbortController();
     hooks.event("agent.started", `Ollama generation requested · ${task.model}.`);
-    const done = execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs }).then((result) => {
+    const done = execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt, localOnly: !!(task.constraints?.localOnly || task.constraints?.offlineOnly), ...(task.constraints?.contextTokens ? { numCtx: task.constraints.contextTokens } : {}), ...(task.constraints?.outputTokens ? { numPredict: task.constraints.outputTokens } : {}), ...(task.constraints?.responseFormat ? { format: task.constraints.responseFormat } : {}) }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs }).then((result) => {
+      // M-A-3 T11: Ollama's own final message is the receipt: served model, token counts and durations. Counts are
+      // provider-reported, never estimated; when the provider sends no final message nothing is recorded.
+      if (result.ok && result.receipt) {
+        hooks.event("provider.receipt", JSON.stringify({ kind: "ollama-generate", ...result.receipt }));
+        if (result.receipt.promptEvalCount !== null && result.receipt.evalCount !== null)
+          hooks.usage?.({ inputTokens: result.receipt.promptEvalCount, outputTokens: result.receipt.evalCount, cachedInputTokens: 0, source: "ollama /api/generate final message (provider-reported counts; no cost)" });
+      }
       if (result.ok) hooks.event("agent.completed", result.log); else if (!result.stopped) hooks.event("agent.error", result.error ?? result.log);
       return { ...result, output: result.output ?? "" };
     });
@@ -185,22 +203,40 @@ export function parseAgentEvent(provider: ProviderId, event: Record<string, unkn
   }
 }
 
-function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string): RunningSession {
+/**
+ * M-A-3 T9R-F04: on Windows every Codex/Claude session runs inside a Bunny-owned Job Object, assigned at kernel
+ * process creation before the root can run (native JOB_LIST + CREATE_SUSPENDED). A containment failure refuses
+ * the session; it never falls back to an unowned spawn. `spawnChild` exists only for tests that inject stream
+ * faults into the legacy child-process path; production callers never pass it.
+ */
+export function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer:CodexNormalizer|ClaudeNormalizer=id === "codex" ? new CodexNormalizer() : new ClaudeNormalizer(), spawnChild:typeof spawn=spawn): RunningSession {
+  if (process.platform === "win32" && spawnChild === spawn) return containedSession(id, launch, args, task, hooks, sessionId, normalizer);
   let child: ChildProcess | null = null; let stopped = false; let output = ""; let stderr = ""; let buffer = ""; let providerError: string | null = null;
-  const normalizer = id === "codex" ? new CodexNormalizer() : new ClaudeNormalizer();
+  const terminate = async (userStop=false) => {
+    if(userStop) stopped=true;
+    if (!child || child.exitCode !== null || child.signalCode !== null || !child.pid) return;
+    if (process.platform === "win32") await exec(systemTool("taskkill.exe"), ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, timeout: 2000 }).catch(() => { child?.kill(); });
+    else child.kill("SIGTERM");
+  };
+  const fail=(error:unknown)=>{
+    providerError ??= safeError(error).message;
+    terminate().catch(()=>{try {child?.kill();} catch { /* Owned child already gone. */ }});
+  };
+  const boundary=(work:()=>void)=>{try {work();} catch(error) {fail(error);}};
   const done = new Promise<AdapterResult>((resolve) => {
     const env = { ...process.env }; delete env.CLAUDECODE;
-    child = spawn(launch.command, [...launch.args, ...args], { cwd: task.cwd, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"], env });
+    child = trackOwnedChild(spawnChild(launch.command, [...launch.args, ...args], { cwd: task.cwd, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"], env }));
     const capture: AdapterHooks = {
       ...hooks,
       output: (text) => { output = (output + text + "\n").slice(-2_000_000); hooks.output(text + "\n"); },
       event: (type, detail) => { if (type === "agent.error") providerError = detail; hooks.event(type, detail); },
     };
-    child.once("spawn", () => {
+    child.once("spawn", () => boundary(() => {
       hooks.session(id === "claude" ? sessionId : null, child!.pid ?? null);
       hooks.event("agent.started", `${NAMES[id]} process started (PID ${child!.pid}).`);
-    });
-    child.stdout!.on("data", (chunk) => {
+    }));
+    child.stdout!.on("data", (chunk) => boundary(() => {
+      if(providerError) return;
       buffer += chunk.toString(); let index: number;
       while ((index = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, index).replace(/\r$/, ""); buffer = buffer.slice(index + 1);
@@ -210,33 +246,191 @@ function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[]
         try { parsed = JSON.parse(line) as Record<string, unknown>; } catch { parsed = null; }
         if (parsed) parseAgentEvent(id, parsed, capture, normalizer); else capture.output(line.slice(0, 4000));
       }
-      if (buffer.length > 2_000_000) { hooks.event("agent.error", "Provider event exceeds the log limit."); void stop(); buffer = ""; }
-    });
-    child.stderr!.on("data", (chunk) => { const text = chunk.toString(); stderr = (stderr + text).slice(-16000); hooks.raw?.("stderr", text); });
-    child.once("error", (error) => resolve({ ok: false, output, error: error.message }));
-    child.once("close", (code) => resolve({ ok: code === 0 && !stopped && !providerError, output, error: stopped ? "Stopped." : providerError ?? (code === 0 ? undefined : firstLine(stderr) || `Process exited ${code}`), stopped, exitCode: code }));
-    child.stdin!.on("error", () => {});
+      if (buffer.length > 2_000_000) { fail(new Error("Provider event exceeds the log limit.")); buffer = ""; }
+    }));
+    child.stderr!.on("data", (chunk) => boundary(() => { const text = chunk.toString(); stderr = (stderr + text).slice(-16000); hooks.raw?.("stderr", text); }));
+    child.stdout!.on("error",fail);child.stderr!.on("error",fail);
+    child.once("error", (error) => resolve({ ok: false, output, error: safeError(error).message }));
+    child.once("close", (code) => resolve({ ok: code === 0 && !stopped && !providerError, output, error: stopped ? "Stopped." : providerError ?? (code === 0 ? undefined : safeError(firstLine(stderr) || `Process exited ${code}`).message), stopped, exitCode: code }));
+    child.stdin!.on("error", fail);
     child.stdin!.end(task.prompt);
   });
-  const stop = async () => {
-    stopped = true;
-    if (!child || child.exitCode !== null || child.signalCode !== null || !child.pid) return;
-    // The live ChildProcess handle proves ownership; never use persisted PIDs here.
-    if (process.platform === "win32") await exec("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, timeout: 5000 }).catch(() => { child?.kill(); });
-    else child.kill("SIGTERM");
-  };
+  const stop = () => terminate(true);
   return { done, stop, pid: () => child?.pid ?? null };
+}
+
+const CONTAINMENT_CONFIRM_MS = 30_000;
+const pause = (ms: number) => new Promise<void>((done) => { setTimeout(done, ms).unref?.(); });
+/**
+ * M-A-3 T9R-F04 job-contained provider session. Order: Host authority was checked by the caller; the native helper
+ * creates the job (KILL_ON_JOB_CLOSE, no breakaway), creates the root suspended and already assigned, verifies
+ * membership, resumes it, then writes the prompt over an unnamed pipe. Root exit or Stop terminates the WHOLE job
+ * (descendants of exited parents included) and the session ends only on kernel accounting, never on a sample.
+ */
+function containedSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer: CodexNormalizer | ClaudeNormalizer): RunningSession {
+  let group: OwnedProcessGroup | null = null; let stopped = false; let output = ""; let stderr = ""; let buffer = ""; let providerError: string | null = null;
+  let outcome: OwnedProcessRecord["state"] = "failed"; let ending: Promise<void> | null = null; let wake: (() => void) | null = null;
+  let containment: SessionContainment = { mechanism: "windows-job-object", state: "launching", admitted: false, operationId: null, rootPid: null, rootCreatedAt: null, activeProcesses: null, totalProcesses: null, terminatedAtEnd: null, detail: "Creating the Windows job before any provider process exists." };
+  const settle = (patch: Partial<SessionContainment>) => { containment = { ...containment, ...patch }; };
+  const fail = (error: unknown) => { providerError ??= safeError(error).message; wake?.(); };
+  const boundary = (work: () => void) => { try { work(); } catch (error) { fail(error); } };
+  const capture: AdapterHooks = {
+    ...hooks,
+    output: (text) => { output = (output + text + "\n").slice(-2_000_000); hooks.output(text + "\n"); },
+    event: (type, detail) => { if (type === "agent.error") providerError = detail; hooks.event(type, detail); },
+  };
+  const onStdout = (chunk: Buffer) => boundary(() => {
+    if (providerError) return;
+    buffer += chunk.toString(); let index: number;
+    while ((index = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, index).replace(/\r$/, ""); buffer = buffer.slice(index + 1);
+      if (!line.trim()) continue;
+      hooks.raw?.("stdout", line);
+      let parsed: Record<string, unknown> | null = null;
+      try { parsed = JSON.parse(line) as Record<string, unknown>; } catch { parsed = null; }
+      if (parsed) parseAgentEvent(id, parsed, capture, normalizer); else capture.output(line.slice(0, 4000));
+    }
+    if (buffer.length > 2_000_000) { fail(new Error("Provider event exceeds the log limit.")); buffer = ""; }
+  });
+  const onStderr = (chunk: Buffer) => boundary(() => { const text = chunk.toString(); stderr = (stderr + text).slice(-16000); hooks.raw?.("stderr", text); });
+  /**
+   * Terminates every job member until kernel ActiveProcesses is 0. Native terminate never blocks: it issues
+   * TerminateJobObject and returns accounting at once; this loop polls (review round 1, NATIVE-1). Unconfirmed after
+   * 30 s: the handle stays held, termination is retried with backoff, and `emptied` stays pending, so the session's
+   * `done` (completion, verification, retry) waits for kernel accounting (STOP-1).
+   */
+  let markEmpty: () => void = () => {};
+  const emptied = new Promise<void>((resolve) => { markEmpty = resolve; });
+  /** Review round 4 (F04-R3-1/FINAL-1): a native or record failure is an unreadable count (-1), never an escape. */
+  const quiet = (type: string, detail: string) => { try { hooks.event(type, detail); } catch { /* the in-memory containment state stays authoritative */ } };
+  const terminateJob = (reason: string): Promise<void> => {
+    if (ending) return ending;
+    ending = (async () => {
+      const owned = group;
+      if (!owned) { markEmpty(); return; }
+      const sweep = () => { try { return owned.terminate(); } catch { return -1; } };
+      let present: number | null = null;
+      try { present = owned.inspect().activeProcesses; } catch { present = null; }
+      settle({ state: "terminating", detail: reason, terminatedAtEnd: present });
+      const deadline = Date.now() + CONTAINMENT_CONFIRM_MS;
+      let active = sweep();
+      while (active !== 0 && Date.now() < deadline) { await pause(100); active = sweep(); }
+      try { const last = owned.inspect(); settle({ totalProcesses: last.totalProcesses }); } catch { /* accounting below decides */ }
+      const counted = present === null ? "an unknown number of" : String(present);
+      if (active === 0) {
+        // Accounting reached 0: bookkeeping failures are recorded in the detail but never keep the session pending.
+        // Separate guards: a failed annotate never skips the close that releases the handle (review round 5).
+        try { owned.annotate({ terminatedAtEnd: present }); } catch (error) { quiet("provider.containment_record_failed", safeError(error).message); }
+        try { owned.close(outcome); } catch (error) { quiet("provider.containment_record_failed", safeError(error).message); }
+        settle({ state: "empty", activeProcesses: 0, detail: `${reason} Windows job accounting reports 0 active processes; ${counted} process(es) present at the end were terminated with the job.` });
+        markEmpty();
+        return;
+      }
+      try { owned.annotate({ terminatedAtEnd: present, containment: "unconfirmed", activeProcesses: active }); } catch { /* in-memory state below stays authoritative */ }
+      settle({ state: "unconfirmed", activeProcesses: active, detail: `${reason} Windows job termination is unconfirmed: kernel accounting still reports ${active < 0 ? "an unreadable count of" : active} active process(es). The job handle stays held and termination is retried; this session remains live code.` });
+      quiet("provider.containment_unconfirmed", containment.detail);
+      let delay = 1000;
+      const retry = () => {
+        const now = sweep();
+        if (now === 0) { try { owned.close(outcome); } catch { /* accounting is already 0 */ } settle({ state: "empty", activeProcesses: 0, detail: "Windows job accounting reached 0 active processes after a delayed termination." }); quiet("provider.containment_confirmed", containment.detail); markEmpty(); return; }
+        settle({ activeProcesses: now });
+        delay = Math.min(delay * 2, 30_000);
+        setTimeout(retry, delay).unref?.();
+      };
+      setTimeout(retry, delay).unref?.();
+    })();
+    return ending;
+  };
+  const done = (async (): Promise<AdapterResult> => {
+    if (stopped) { settle({ state: "empty", admitted: false, activeProcesses: 0, detail: "Stopped before any provider process existed." }); markEmpty(); return { ok: false, output: "", error: "Stopped.", stopped: true }; }
+    let out: Awaited<ReturnType<typeof outputPipe>> | null = null; let err: Awaited<ReturnType<typeof outputPipe>> | null = null;
+    const closePipes = async () => { await Promise.all([out?.close(), err?.close()]); };
+    try {
+      out = await outputPipe(onStdout); err = await outputPipe(onStderr);
+      if (stopped) throw new Error("Stopped before launch.");
+      const env = { ...process.env }; delete env.CLAUDECODE;
+      const owner = hooks.owner;
+      group = new OwnedProcessGroup(launch.command, task.cwd ?? process.cwd(), {
+        action: `provider.${id}`, missionId: owner?.missionId ?? null, ...(owner?.dataDirectory ? { dataDirectory: owner.dataDirectory } : {}),
+        provider: { taskId: owner?.taskId ?? task.id ?? null, agentId: owner?.agentId ?? null, sessionId: id === "claude" ? sessionId : null, provider: id, hostGeneration: owner?.hostGeneration ?? null },
+      });
+      group.onStop(() => { stop().catch(() => { /* terminateJob never rejects; a throw here must not escape a timer */ }); });
+      group.spawn(launch.command, [...launch.args, ...args], task.cwd ?? process.cwd(), env, out.name, err.name, Buffer.from(task.prompt, "utf8"));
+    } catch (error) {
+      const reason = `Containment unavailable — execution refused: ${safeError(error).message}`;
+      // The root ran briefly when admission verification failed after launch (review round 1, STOP-2): settle the job
+      // by kernel accounting like any other end; only a launch that never produced a process is "refused".
+      if ((error as { launched?: boolean }).launched) {
+        outcome = "failed";
+        if (group?.live) { settle({ admitted: true }); await terminateJob(`${reason} The admitted root was terminated with its job.`); await emptied; }
+        else { settle({ state: "empty", admitted: true, activeProcesses: 0, detail: `${reason} The admitted root was terminated with its job; kernel accounting reported 0.` }); markEmpty(); }
+        await closePipes().catch(() => {});
+        hooks.event("provider.containment_refused", reason);
+        return { ok: false, output: "", error: reason };
+      }
+      try { group?.close("failed"); } catch { /* the refusal below stands */ }
+      await closePipes().catch(() => {});
+      markEmpty();
+      if (stopped) { settle({ state: "empty", admitted: false, activeProcesses: 0, detail: "Stopped before the provider process was admitted." }); return { ok: false, output: "", error: "Stopped.", stopped: true }; }
+      settle({ state: "refused", admitted: false, detail: reason });
+      hooks.event("provider.containment_refused", reason);
+      return { ok: false, output: "", error: reason };
+    }
+    const record = group.inspectHistory();
+    settle({ state: "running", admitted: true, operationId: record.operationId, rootPid: record.launcherPid, rootCreatedAt: record.launcherCreatedAt, detail: "Provider process tree is running inside its Bunny-owned Windows job." });
+    boundary(() => {
+      hooks.session(id === "claude" ? sessionId : null, record.launcherPid);
+      hooks.event("agent.started", `${NAMES[id]} process started (PID ${record.launcherPid}) inside a Bunny-owned Windows job.`);
+    });
+    let exitCode: number | null = null;
+    for (;;) {
+      try {
+        const snapshot = group.inspect();
+        settle({ activeProcesses: snapshot.activeProcesses, totalProcesses: snapshot.totalProcesses });
+        if (snapshot.exitCode !== null) { exitCode = snapshot.exitCode; break; }
+      } catch (error) { fail(new Error(`Windows job inspection failed: ${safeError(error).message}`)); }
+      if (stopped || providerError) break;
+      await new Promise<void>((resume) => { wake = resume; setTimeout(resume, 200).unref?.(); });
+      wake = null;
+    }
+    outcome = stopped ? "stopped" : providerError ? "failed" : exitCode === 0 ? "succeeded" : "failed";
+    await terminateJob(stopped ? "Stop requested: the provider's Windows job was terminated." : exitCode === null ? "Provider failure: the provider's Windows job was terminated." : "Provider root process ended: its Windows job was terminated so no descendant outlives the session.");
+    // Completion, verification and any retry wait for kernel accounting, however long termination takes (STOP-1).
+    await emptied;
+    exitCode ??= group.inspectHistory().exitCode;
+    await closePipes();
+    return { ok: exitCode === 0 && !stopped && !providerError, output, error: stopped ? "Stopped." : providerError ?? (exitCode === 0 ? undefined : safeError(firstLine(stderr) || `Process exited ${exitCode}`).message), stopped, exitCode };
+  })();
+  const stop = async () => {
+    stopped = true; outcome = "stopped"; wake?.();
+    if (group?.live) await terminateJob("Stop requested: the provider's Windows job was terminated.");
+  };
+  return { done, stop, pid: () => containment.rootPid, containment: () => ({ ...containment }) };
 }
 
 export class CodexAdapter extends CliBase implements ProviderAdapter {
   id = "codex" as const;
   detected: ProviderLive | null = null;
+  security: CodexCompatibilityGate;
+  compatibilityDirty = false;
+  constructor(ctx: () => DiscoveryContext = () => systemContext(), security?: CodexCompatibilityGate) {
+    super(ctx); this.security = security ?? new CodexCompatibilityGate({ probe });
+  }
   capabilities() { return FEATURES.codex; }
+  async health(previous: ProviderLive): Promise<ProviderLive | null> {
+    const launch = locate(this.ctx(), this.id).launch;
+    const profile = previous.securityCompatibility;
+    if (!launch || this.compatibilityDirty || !profile || profile.policyVersion !== CODEX_SECURITY_POLICY_VERSION || Date.now() - profile.checkedAt >= CODEX_COMPATIBILITY_MAX_AGE_MS) return null;
+    try { if (executableStamp(launch).stamp !== profile.executable?.stamp) return null; } catch { return null; }
+    return super.health(previous);
+  }
   async detect() {
     const live = providerBase(this.id); live.probedAt = Date.now();
     live.usageCapabilities = { shortWindow: false, weekly: false, resetTime: false, tokenUsage: true, activeJobs: true, source: "codex app-server account/rateLimits/read" };
     const launch = this.located(live);
-    if (!launch) { live.detail = "Codex CLI not found on PATH or in known install locations."; return this.detected = live; }
+    this.compatibilityDirty = false;
+    if (!launch) { live.securityCompatibility = emptyCodexCompatibility("Codex executable was not found."); live.detail = "Codex CLI not found on PATH or in known install locations."; return this.detected = live; }
+    live.securityCompatibility = await this.security.inspect(launch, this.ctx());
     const version = await probe(launch, ["--version"]);
     if (version.code !== 0) { live.availability = "unavailable"; live.detail = `Codex found at ${launch.path}, but \`codex --version\` failed: ${version.timedOut ? "timed out" : version.error || firstLine(version.stderr) || `exit ${version.code}`}.`; return this.detected = live; }
     live.version = firstLine(version.stdout);
@@ -278,7 +472,35 @@ export class CodexAdapter extends CliBase implements ProviderAdapter {
     const launch = this.launchTarget;
     if (!launch || !this.detected?.authenticated) throw new Error("Codex is not ready for execution.");
     const args = codexLaunchArgs(task);
-    return spawnSession("codex", launch, args, task, hooks, task.sessionId ?? crypto.randomUUID());
+    if (!task.executionScope && !task.mission) return spawnSession("codex", launch, args, task, hooks, task.sessionId ?? crypto.randomUUID());
+    const access = task.executionScope?.access;
+    if (!access) throw new Error("Codex Mission launch has no approved execution scope.");
+    const exclusion = codexMissionExclusion(this.detected, access);
+    if (exclusion) throw new Error(exclusion);
+    const current = locate(this.ctx(), this.id).launch;
+    if (!current || current.path !== launch.path || current.command !== launch.command || JSON.stringify(current.args) !== JSON.stringify(launch.args)) throw new Error("Codex excluded: resolved executable changed before Mission launch; refresh providers.");
+    let owned: RunningSession | null = null; let stopped = false;
+    const done = (async (): Promise<AdapterResult> => {
+      // Re-probe version and controls, then hash again immediately before spawn. No model has started here.
+      const profile = await this.security.inspect(current, this.ctx(), true);
+      this.compatibilityDirty = JSON.stringify([profile.compatibilityClass, profile.executable, profile.reason]) !== JSON.stringify([this.detected?.securityCompatibility?.compatibilityClass, this.detected?.securityCompatibility?.executable, this.detected?.securityCompatibility?.reason]);
+      this.detected = { ...this.detected!, securityCompatibility: profile };
+      if (stopped) return { ok: false, stopped: true, output: "", error: "Stopped before Codex Mission launch." };
+      const reason = codexMissionExclusion({ id: "codex", securityCompatibility: profile }, access);
+      if (reason) throw new Error(reason);
+      // Re-resolve after async probes so an alias or provider setting change cannot redirect spawn.
+      const final = locate(this.ctx(), this.id).launch;
+      if (!final || final.path !== current.path || final.command !== current.command || JSON.stringify(final.args) !== JSON.stringify(current.args)) throw new Error("Codex excluded: resolved executable changed during Mission compatibility checks.");
+      const authorized = this.security.authorize(final, profile, access);
+      owned = spawnSession("codex", authorized, args, task, hooks, task.sessionId ?? crypto.randomUUID());
+      return owned.done;
+    })().catch((error: unknown): AdapterResult => {
+      this.compatibilityDirty = true;
+      const reason = error instanceof Error ? error.message : "Codex Mission compatibility check failed.";
+      hooks.event("provider.compatibility_rejected", reason);
+      return { ok: false, output: "", error: reason };
+    });
+    return { done, stop: async () => { stopped = true; await owned?.stop(); }, pid: () => owned?.pid?.() ?? null };
   }
 }
 
@@ -323,12 +545,28 @@ export class ClaudeAdapter extends CliBase implements ProviderAdapter {
   }
 }
 
-/** Read isolation flags verified with Bunny-resolved codex-cli 0.153.4 exec --help. */
+/**
+ * Default-on codex-cli 0.153.4 features that register tools without any config.toml entry, so
+ * --ignore-user-config leaves them on: ChatGPT connector apps (the codex_apps MCP server, e.g. Gmail
+ * send, GitHub merge, deploys), local/remote plugins and their MCP servers, browser and computer control,
+ * image generation, plugin-install suggestions, hooks and skill MCP installs. M-A-1 observed 228 connector
+ * tools in a read session before these were disabled.
+ */
+/**
+ * Isolation flags verified with Bunny-resolved codex-cli 0.153.4 exec --help and live sessions. They apply to
+ * every scoped (mission) session: M-A-1 observed a write step launching the user's unsandboxed node_repl and
+ * computer-use REPL MCP servers and account connectors, which exceed "write files and run sandboxed shell
+ * commands in the approved folder". Unscoped direct tasks keep their exact legacy argv.
+ */
 export function codexLaunchArgs(task: OrchTask, platform = process.platform): string[] {
   const read = task.executionScope?.access === "read";
-  // Ignore extensions and execpolicy from user config; restore only trusted native Windows sandbox policy.
-  const isolation = read ? ["--ignore-user-config", "--ignore-rules", ...(platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : [])] : [];
-  return ["exec", "--json", "--sandbox", read ? "read-only" : "workspace-write", ...isolation, "--skip-git-repo-check", "--cd", task.cwd!, "--model", task.model, "-"];
+  // Ignore extensions and execpolicy from user config; restore only trusted native Windows sandbox policy;
+  // switch off tool-adding defaults and web search, which do not come from user config.
+  const isolation = task.executionScope ? ["--ignore-user-config", "--ignore-rules", ...(platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : []), ...CODEX_READ_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature]), "-c", 'web_search="disabled"'] : [];
+  // M-A-3 T3 §11: the Task's contracted reasoning-effort knob (router-selected). Scoped (mission)
+  // sessions keep their exact verified argv; an effort override there is a documented T3 limitation.
+  const effort = task.executionScope || !task.effort ? [] : ["-c", `model_reasoning_effort="${task.effort}"`];
+  return ["exec", "--json", "--sandbox", read ? "read-only" : "workspace-write", ...isolation, ...effort, "--skip-git-repo-check", "--cd", task.cwd!, "--model", task.model, "-"];
 }
 /** Claude read/write contracts verified with installed Claude Code 2.1.288 help. */
 export function claudeLaunchArgs(task: OrchTask, sessionId: string, platform = process.platform): string[] {

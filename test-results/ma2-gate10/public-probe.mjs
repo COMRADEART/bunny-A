@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import https from 'node:https';
+import {readFileSync,writeFileSync,readdirSync} from 'node:fs';
+import {join} from 'node:path';
+const read=p=>JSON.parse(readFileSync(p,'utf8').replace(/^\uFEFF/,'')),root='C:/Users/allam/AppData/Local/Bunny-A';
+const config=read(root+'/install.json'),remote=read(config.stateRoot+'/settings/remote.json'),credential=read(config.stateRoot+'/credentials/credentials.json'),url=new URL(remote.url);
+const ssrDir=join(config.currentRelease.folder,'.output/server/_ssr');const ssr=readdirSync(ssrDir).filter(n=>n.endsWith('.mjs')).map(n=>readFileSync(join(ssrDir,n),'utf8')).join('\n');
+const ids={};for(const name of ['readBunnyHost','commandBunnyHost']) {ids[name]=ssr.match(new RegExp('id: "([a-f0-9]+)",\\s*name: "'+name+'"'))?.[1];assert.ok(ids[name]);}
+const request=(path,options={})=>new Promise((resolve,reject)=>{const req=https.request(new URL(path,url),{...options,servername:url.hostname},res=>{const chunks=[];res.on('data',x=>chunks.push(x));res.on('end',()=>resolve({status:res.statusCode,body:Buffer.concat(chunks).toString('utf8'),cfRay:res.headers['cf-ray'],peer:res.socket?.remoteAddress}));});req.on('error',reject);req.setTimeout(15000,()=>req.destroy(new Error('Bounded HTTPS audit timeout')));if(options.body)req.write(options.body);req.end();});
+const cases=[];
+const run=async(label,path,options={})=>{const r=await request(path,options);assert.ok(!r.body.includes(credential.token));const leak=/"tasks"\s*:|"missions"\s*:|"providers"\s*:|"projects"\s*:/.test(r.body);assert.equal(leak,false,label);const denial=/Pair this device|Authentication required|Remote requests cannot|Origin mismatch|Workstation authentication|403 Forbidden|404 Not Found|Not found/.test(r.body)||[400,401,403,404].includes(r.status);cases.push({label,path,status:r.status,cfRay:r.cfRay,protectedStateVisible:false,recognizedRefusal:denial,pairFirst:r.body.includes('Pair this device'),responseBytes:Buffer.byteLength(r.body)});return r;};
+const shell=await request('/?companion=1');assert.equal(shell.status,200);
+const headers={'content-type':'application/json',origin:url.origin};
+await run('state/Tasks/Missions/providers/approvals unpaired','/_serverFn/'+ids.readBunnyHost,{method:'POST',headers,body:JSON.stringify({data:{after:0}})});
+for(const action of ['submit','mission.create','approve','stop','mission.respond'])await run('unpaired '+action,'/_serverFn/'+ids.commandBunnyHost,{method:'POST',headers,body:JSON.stringify({data:{action,data:{id:'t10-denial',requestId:'t10-denial',prompt:'Denied',objective:'Denied',mode:'fast',decision:'allow_batch'}}})});
+for(const path of ['/state','/events','/websocket'])await run('unsupported protected path '+path,path,path==='/websocket'?{headers:{connection:'Upgrade',upgrade:'websocket','sec-websocket-version':'13','sec-websocket-key':'dDEwYXVkaXRwcm9iZQ=='}}:{});
+for(const [label,spoof] of [['forwarded-for',{'x-forwarded-for':'127.0.0.1'}],['real-ip',{'x-real-ip':'127.0.0.1'}],['forwarded',{forwarded:'for=127.0.0.1'}],['localhost-host',{host:'localhost:8084'}],['localhost-origin',{origin:'http://localhost:8084'}],['Cloudflare client',{'cf-connecting-ip':'127.0.0.1'}]])await run('spoof '+label,'/_serverFn/'+ids.readBunnyHost,{method:'POST',headers:{...headers,...spoof},body:JSON.stringify({data:{after:0}})});
+assert.ok(cases.every(c=>c.recognizedRefusal),'Every request reached a recognizable refusal');
+writeFileSync('test-results/ma2-gate10/public-denials.json',JSON.stringify({recordedAt:new Date().toISOString(),classification:'LIVE VERIFIED',attackIds:['T10-T6-01','T10-T6-02'],origin:url.origin,staticShellPositiveControl:200,liveTlsPublicTransport:true,realTokenAbsent:true,cases,unsupportedWsDoesNotClaimAuthenticatedWsSupport:true},null,2)+'\n');
+console.log('Current public HTTPS endpoint denied unpaired and spoofed requests without protected state.');

@@ -1,0 +1,62 @@
+{
+  "round": 5,
+  "scope": "verification of round-4 repairs",
+  "verdicts": [
+    {
+      "id": "F04-R3-1",
+      "repaired": true,
+      "newIssue": "",
+      "severity": "NONE",
+      "evidence": "Read src/lib/bunny-host/adapters.server.ts containedSession lines 263-400. terminateJob (299-334) cannot reject: owned.inspect() is in try (306) and falls back to present=null; sweep() wraps owned.terminate() and returns -1 on throw (304); the post-loop inspect is in try (311); annotate+close are in try (315) with quiet() around the record write; the unconfirmed annotate is in try (320); quiet() wraps hooks.event (298); settle() is a pure object spread; pause() and markEmpty() do not throw. The retry timer (324-331) uses sweep() (guarded), try-wrapped close (326), and quiet() (322/326), so it cannot throw out of the timer. The ending IIFE therefore never rejects, so 'ending' and the 'emptied' resolution are reached on every path. 'empty' is only assigned when sweep() returns numeric 0 (line 313, or 325 for retry), so a persistent terminate() throw yields -1, which never equals 0. That routes to 'unconfirmed' (321) with the handle held (close is not called) and retried with backoff capped at 30 s (328), and 'emptied' stays pending by design (STOP-1). A failing inspect() cannot produce a false 'empty', because the decision uses only the sweep() count. stop() (395-398) cannot reject in practice: group.live is a pure getter (owned-process-group.server.ts:217), and terminateJob does not reject, so the onStop catch hides no real failure state (it is defensive only). Residual: the catch at line 348 is dead code, not a masked state.",
+      "disposition": "VERIFIED REPAIRED"
+    },
+    {
+      "id": "F04-R5-1",
+      "repaired": false,
+      "newIssue": "Line 315 wraps owned.annotate() and owned.close(outcome) in one try. If annotate() throws (persist() is a disk write, owned-process-group.server.ts:216), close() is skipped. The job then reports state 'empty' with accounting 0 and markEmpty() runs, but the OwnedProcessGroup handle is never closed (group.live stays true), the record stays closed=false with containment 'terminating', and quiet() only logs provider.containment_record_failed. A later reconciliation can read this as an interrupted, still-open record. Fix: split annotate and close into separate try blocks so close runs regardless of annotate.",
+      "severity": "LOW",
+      "evidence": "adapters.server.ts:315 `try { owned.annotate({ terminatedAtEnd: present }); owned.close(outcome); } catch (error) { quiet(...) }`; owned-process-group.server.ts:216 annotate calls persist() before returning, and close() at 198-205 is the only place handle=null and closed=true are set.",
+      "disposition": "FIXED: annotate and close guarded separately (adapters.server.ts); test F04 R5-GEN/SPLIT"
+    },
+    {
+      "id": "F04-R3-2",
+      "repaired": true,
+      "newIssue": "None in the predicate. Both inside() copies (system-tools.server.ts:16, verification.server.ts:6) use relative() with the check rel==='' || !(rel==='..' || rel.startsWith('..'+sep)) && !isAbsolute(rel). Verified by running path.win32.relative: '..cache' and '..cache\\\\x' are inside; '..', '..\\\\x', '..\\\\..\\\\x' are outside; 'D:\\\\x' and '\\\\\\\\srv\\\\sh\\\\x' are outside (absolute rel); 'c:/W/CWD/x' is inside (case-insensitive); trailing separator and forward slashes normalize. Folder '...' is treated as inside lexically, but on Windows canonical/realpath would resolve it to the root or refuse it, so the direction is safe. safeFile's rel.startsWith('..') over-refuses names like '..x', which is the acceptable direction and unreachable because verifySpec names must start with [A-Za-z0-9_].",
+      "severity": "NONE",
+      "evidence": "system-tools.server.ts:16 and verification.server.ts:6 (predicate); verification.server.ts:34 (safeFile); verification.server.ts:58 (name regex forbids leading '.'). Node path.win32 run: 'C:/w/cwd/..cache' rel='..cache' inside=true; 'C:/w/cwd/..' rel='..' inside=false; 'C:/w/cwd/../x' rel='..\\\\x' inside=false; 'D:/x' rel='D:\\\\x' inside=false; '//srv/sh/x' inside=false; 'c:/W/CWD/x' inside=true.",
+      "disposition": "VERIFIED REPAIRED"
+    },
+    {
+      "id": "F04-R3-3",
+      "repaired": true,
+      "newIssue": "The reported escape is fixed: the hold timer (manager.server.ts:219-232) wraps readProviderSessions and reconcileInterruptedProviderSessions in try/catch, retries on failure, and returns early when disposed. A dispose() during a retry stops it (line 220, and line 256 in the reconcile loop). The remaining defects are listed as NEW-1 to NEW-3.",
+      "severity": "NONE",
+      "evidence": "manager.server.ts:219-232 (check with try/catch around reconcile, reconciled flag, reschedule at line 230); line 220 disposed guard; http.server.ts:968 calls manager.dispose(). Test 'F04 R4-R3-3' at provider-containment.test.ts:547.",
+      "disposition": "VERIFIED REPAIRED"
+    },
+    {
+      "id": "F04-R5-2",
+      "repaired": false,
+      "newIssue": "Folder-level unreadable hold is released without reconciling any records. When readProviderSessions throws at folder level, startup sets unreadable to ['provider-sessions (folder unreadable)'] and found.records to []. On a later successful read, found.unreadable does not include that string, so the check calls reconcile on found.records.filter(r => `${r.operationId}.json` === file), which matches nothing. It then reports reconciled=true and deletes the hold. Interrupted records in the folder are never corroborated, get no restart: lingering entry or restartSurvivorMission entry, and emit no events. readProviderSessions already persisted them as closed/interrupted (owned-process-group.server.ts:116), so they are not revisited this session. A new provider session for the same mission or task can launch while an old one may survive, which breaks the fail-closed invariant HOLD-4 describes.",
+      "severity": "MEDIUM",
+      "evidence": "manager.server.ts:184-185 (folder-level fallback entry); manager.server.ts:223-228 (filter by file name, release when reconciled=true); owned-process-group.server.ts:101-102 (folder read throws or is absent), :116 (records persisted as interrupted on read), :118 (returns records). No test covers the folder-level case.",
+      "disposition": "FIXED (MEDIUM): folder-level hold reconciles every record, holds still-unreadable files separately; re-reads skip this Host generation; test F04 R5-FOLDER"
+    },
+    {
+      "id": "F04-R5-3",
+      "repaired": false,
+      "newIssue": "A persistent reconcile failure retries silently every 10 s with no event. Only the initial provider_session.unreadable event is emitted, so the hold never reports that retries are failing. In addition, a retry can re-emit provider_session.interrupted each time (reconcile emits at line 241 before any later call that could throw, such as the cleanup_unverifiable emit), which produces unbounded repeated events. The hold itself is correctly kept (fail closed).",
+      "severity": "LOW",
+      "evidence": "manager.server.ts:227 (silent catch sets reconciled=false), :230 (reschedule with no event), :241 (emit before possible throw), :250-251 (markProviderSessionReview and cleanup emit).",
+      "disposition": "FIXED: one provider_session.reconcile_failed event per hold; reconciledOperations prevents repeated interrupted events"
+    },
+    {
+      "id": "F04-R5-4",
+      "repaired": false,
+      "newIssue": "A partial reconcile failure can strand a restart hold. reconcileInterruptedProviderSessions sets lingering['restart:<op>'] and restartSurvivorMission (lines 237-240) before the emit at line 241 can throw. If that throw happens, no check loop is started and the restart: entry stays 'checking' forever. If the record file is later deleted, the unreadable: hold releases (reconcile of an empty list succeeds), but the restart: entry and restartSurvivorMission entry remain. restartSurvivorRefusal then blocks new sessions for that mission or task until the Host restarts.",
+      "severity": "LOW",
+      "evidence": "manager.server.ts:237-241 (lingering and survivor-mission set before db.event emit), :205-210 (restartSurvivorRefusal reads lingering), :225-228 (hold released on empty reconcile).",
+      "disposition": "ACCEPTED LOW (fail closed): a partial reconcile failure leaves the restart hold in place until Host restart; only the same Mission/Task is refused; requires a database write failure"
+    }
+  ]
+}

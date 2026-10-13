@@ -1,6 +1,10 @@
 ﻿param(
   [string]$Root = (Split-Path -Parent $PSScriptRoot),
+  [string]$CredentialPath,
+  [string]$DeploymentPath,
+  [string]$PreferencePath,
   [switch]$SmokeTest,
+  [switch]$HotkeyTest,
   [switch]$SystemView,
   [switch]$LightView,
   [switch]$CollapsedView,
@@ -8,8 +12,16 @@
   [scriptblock]$TestHook
 )
 $ErrorActionPreference = 'Stop'
+if(-not $CredentialPath -or -not $DeploymentPath -or -not $PreferencePath) {throw 'Start the Island through Start-Bunny-Release.ps1. Application-data paths must be configured explicitly.'}
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
-$bunnyCredentialPath = Join-Path $Root '.bunny-a/credentials.json'
+$bunnyCredentialPath = $CredentialPath
+$bunnyDeploymentPath = $DeploymentPath
+function Open-BunnyDashboard([string]$Query='') {
+  if(Test-Path -LiteralPath $bunnyDeploymentPath) {Start-Process ('http://127.0.0.1:8084/'+$Query)}
+  elseif($CredentialPath) {throw 'The installed dashboard configuration is missing.'}
+  elseif(Test-Path -LiteralPath (Join-Path $Root 'Bunny-Server.mjs')) {Start-Process ('http://127.0.0.1:8084/'+$Query)}
+  else {& (Join-Path $Root 'scripts/start-bunny-dev.ps1');Start-Process ('http://127.0.0.1:8080/'+$Query)}
+}
 $bunnySnapshot = $null
 $bunnySelectedId = $null
 $bunnyExpanded = $false
@@ -603,6 +615,10 @@ function Update-Bunny {
       Show-BunnyTask
     }
     Update-BunnyChrome
+    if($bunnySnapshot.health -and $bunnySnapshot.health.operationalState -ne 'healthy') {
+      $bunnyControls.Presence.Text='Host '+$bunnySnapshot.health.operationalState+' - new dependent execution unavailable'
+      Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyMuted'
+    }
   } catch {
     $script:bunnyLastError = $_.Exception.Message
     $bunnyControls.Presence.Text = 'Host unreachable ' + $bunnyDot + ' workstation may be offline or sleeping'
@@ -700,7 +716,7 @@ $bunnyControls.TerminalButton.Add_Click({
   # The Host decides per provider; when it cannot attach it says so, and nothing else is opened in its place.
   try { [void](Invoke-Bunny 'terminal' @{ id = $bunnySelectedId }); $bunnyControls.Notice.Text = 'Terminal attached.' } catch { $bunnyControls.Notice.Text = Get-BunnyError $_ }
 })
-$bunnyControls.OpenButton.Add_Click({ if (Test-Path -LiteralPath (Join-Path $Root '.bunny-a/deployment.json')) { Start-Process 'http://127.0.0.1:8084/' } elseif (Test-Path -LiteralPath (Join-Path $Root 'Bunny-Server.mjs')) { Start-Process 'http://127.0.0.1:8084/' } else { & (Join-Path $Root 'scripts/start-bunny-dev.ps1'); Start-Process 'http://127.0.0.1:8080/' } })
+$bunnyControls.OpenButton.Add_Click({Open-BunnyDashboard})
 $bunnyControls.ThemeButton.Add_Click({ Set-BunnyTheme (-not $bunnyLight) })
 if ($LightView) { Set-BunnyTheme $true }
 

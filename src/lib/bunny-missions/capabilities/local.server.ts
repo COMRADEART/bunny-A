@@ -1,11 +1,13 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
-import { canonical, scopedPath, within } from "../paths.server.ts";
+import { canonical, scopedPath, within, privateHostPath, stagingPath } from "../paths.server.ts";
+import { sha256 } from "../artifacts.server.ts";
 import type { ActionManifest, CapabilityResult, RiskClass } from "../types.ts";
 import type { CapabilityAdapter, ExecutionContext } from "./bus.server.ts";
 import { resolveCommand, runCommand, runProcess, tail } from "./process.server.ts";
 import { mergeTransaction } from "./git-merge.server.ts";
 import { commandName } from "../authorization.server.ts";
+import { boundedTestResources, snapshotBoundedTest } from "./bounded-terminal.server.ts";
 
 const READ_LIMIT = 1024 * 1024;
 const input = (name: string, type: ActionManifest["inputs"][number]["type"], required: boolean, description: string) => ({ name, type, required, description });
@@ -34,16 +36,20 @@ export class FilesystemCapability implements CapabilityAdapter {
       { id: "filesystem.read", description: "Read a UTF-8 text file (up to 1 MB).", risk: "READ", inputs: [input("path", "string", true, "File path, relative to the step's working folder.")], outputs: "{ path, bytes, text, sha256 }", evidence: "Absolute path and byte count read from disk.", timeoutMs: 10_000, implemented: true },
       { id: "filesystem.list", description: "List a folder (up to 500 entries).", risk: "READ", inputs: [input("path", "string", false, "Folder path; defaults to the working folder.")], outputs: "{ path, entries: { name, kind, bytes }[] }", evidence: "Folder path and entry count.", timeoutMs: 10_000, implemented: true },
       { id: "filesystem.exists", description: "Check whether a path exists.", risk: "READ", inputs: [input("path", "string", true, "Path to check.")], outputs: "{ path, exists, kind }", evidence: "Path checked on disk.", timeoutMs: 5_000, implemented: true },
-      { id: "filesystem.write", description: "Write a UTF-8 text file atomically (temporary file + rename).", risk: "WRITE", inputs: [input("path", "string", true, "File path."), input("content", "string", true, "Full file contents."), input("overwrite", "boolean", false, "Allow replacing an existing file (default false).")], outputs: "{ path, bytes, created }", evidence: "Path and bytes written, read back from disk.", timeoutMs: 10_000, implemented: true },
+      { id: "filesystem.write", description: "Write a UTF-8 text file atomically (temporary file + rename).", risk: "WRITE", inputs: [input("path", "string", true, "File path."), input("content", "string", true, "Full file contents."), input("overwrite", "boolean", false, "Allow replacing an existing file (default false)."), input("expectBeforeSha256", "string", false, "Optional pre-image guard: \"absent\" or the exact SHA-256 the file must have immediately before the write.")], outputs: "{ path, bytes, created }", evidence: "Path and bytes written, read back from disk.", timeoutMs: 10_000, implemented: true },
       { id: "filesystem.delete", description: "Delete one file (never a folder).", risk: "DESTRUCTIVE", inputs: [input("path", "string", true, "File to delete.")], outputs: "{ path, deleted }", evidence: "Path no longer exists on disk.", timeoutMs: 5_000, implemented: true },
+      ...["hash", "metadata", "compare", "search"].map(operation => ({ id: `filesystem.${operation}`, description: `Bounded scoped file ${operation}.`, risk: "READ" as const, inputs: [input("path", "string", true, "Approved file or search folder."), ...(operation === "compare" ? [input("content", "string", true, "Expected exact UTF-8 text.")] : operation === "search" ? [input("query", "string", true, "Literal text to find.")] : operation === "hash" ? [input("expectedSha256", "string", false, "Optional expected SHA-256.")] : [])], outputs: "Bounded current disk facts.", evidence: "Current resource identity and disk observation.", timeoutMs: 10_000, implemented: true })),
     ] satisfies ActionManifest[],
   };
   async health() { return { availability: "available" as const, detail: "Node filesystem access inside approved roots." }; }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     if (action === "filesystem.list") {
       const path = scopedPath(context.cwd, str(params, "path", false) || ".", context.roots);
+      if (privateScope(context) && privateHostPath(context.dataDirectory, path)) throw new Error("Private Host state is outside project scope.");
+      // M-A-3 T9R-F02: staged paired-device changes are never listed, read or written by any Mission, bounded or not.
+      if (stagingPath(context.dataDirectory, path)) throw new Error("Staged paired-device changes are private Host state.");
       if (!statSync(path).isDirectory()) return fail(`${path} is not a folder.`);
-      const entries = readdirSync(path, { withFileTypes: true }).slice(0, 500).map((entry) => {
+      const entries = readdirSync(path, { withFileTypes: true }).filter(entry => !context.resourceValidation?.(join(path,entry.name)) && (!privateScope(context) || !privateHostPath(context.dataDirectory, join(path, entry.name)))).slice(0, 500).map((entry) => {
         const full = join(path, entry.name); let bytes: number | null = null;
         try { if (entry.isFile()) bytes = statSync(full).size; } catch { bytes = null; }
         return { name: entry.name, kind: entry.isDirectory() ? "folder" : entry.isFile() ? "file" : "other", bytes };
@@ -51,6 +57,42 @@ export class FilesystemCapability implements CapabilityAdapter {
       return ok(`${entries.length} entries in ${path}.`, { path, entries }, [`Listed ${path}`]);
     }
     const path = scopedPath(context.cwd, str(params, "path"), context.roots);
+    if (privateScope(context) && privateHostPath(context.dataDirectory, path)) throw new Error("Private Host authority state is outside project scope.");
+    if (stagingPath(context.dataDirectory, path)) throw new Error("Staged paired-device changes are private Host state.");
+    if (action === "filesystem.metadata") {
+      const info = statSync(path);
+      return ok("Read current file metadata.", { path, bytes: info.size, kind: info.isFile() ? "file" : info.isDirectory() ? "folder" : "other", modifiedAt: info.mtime.toISOString() }, ["Metadata observed from disk."]);
+    }
+    if (action === "filesystem.hash" || action === "filesystem.compare") {
+      const info = statSync(path);
+      if (!info.isFile() || info.size > READ_LIMIT) return fail("Hash/compare requires a bounded regular file.");
+      const body = readFileSync(path); const hash = sha256(body);
+      if (action === "filesystem.compare" && typeof params.content !== "string") throw new Error("Expected content must be text.");
+      const expected = action === "filesystem.compare" ? sha256(params.content as string) : params.expectedSha256;
+      if (action === "filesystem.hash" && expected !== undefined && (typeof expected !== "string" || !/^[a-f0-9]{64}$/.test(expected))) throw new Error("Expected SHA-256 is invalid.");
+      return ok("Current file content independently observed.", { path, sha256: hash, matches: expected === undefined ? null : expected === hash }, [`SHA-256 ${hash}`]);
+    }
+    if (action === "filesystem.search") {
+      const query = str(params, "query"); if (query.length > 1000) throw new Error("Search query exceeds its bound.");
+      const matches: { path: string; line: number }[] = []; let inspected = 0; let bytes = 0; let truncated = false;
+      const walk = (folder: string, depth: number) => {
+        if (depth > 8) { truncated = true; return; }
+        for (const entry of readdirSync(folder, { withFileTypes: true })) {
+          context.signal.throwIfAborted();
+          if (++inspected > 1000 || matches.length >= 100 || bytes > 8 * READ_LIMIT) { truncated = true; return; }
+          if (entry.isSymbolicLink() || entry.name === ".git" || entry.name === "node_modules") continue;
+          if (stagingPath(context.dataDirectory, join(folder, entry.name))) continue;
+          const child = scopedPath(folder, entry.name, context.roots);
+          if (context.resourceValidation?.(child)) continue;
+          if (privateHostPath(context.dataDirectory, child)) continue;
+          if (entry.isDirectory()) walk(child, depth + 1);
+          else if (entry.isFile()) { const info = statSync(child); if (info.size > READ_LIMIT || bytes + info.size > 8 * READ_LIMIT) continue; bytes += info.size;
+            readFileSync(child, "utf8").split(/\r?\n/).forEach((line, index) => { if (line.includes(query) && matches.length < 100) matches.push({ path: relative(path, child), line: index + 1 }); }); }
+        }
+      };
+      if (!statSync(path).isDirectory()) throw new Error("Search requires an approved folder."); walk(path, 0);
+      return ok(`Found ${matches.length} matching lines.`, { path, matches, truncated }, [`Inspected at most ${inspected} entries; bounded content search.`]);
+    }
     if (action === "filesystem.exists") {
       const exists = existsSync(path);
       return ok(`${path} ${exists ? "exists" : "does not exist"}.`, { path, exists, kind: exists ? (statSync(path).isDirectory() ? "folder" : "file") : null }, [`Checked ${path}`]);
@@ -66,15 +108,30 @@ export class FilesystemCapability implements CapabilityAdapter {
     if (action === "filesystem.write") {
       const content = typeof params.content === "string" ? params.content : null;
       if (content === null) throw new Error('Parameter "content" is required.');
+      if (Buffer.byteLength(content) > READ_LIMIT) return fail("Write exceeds the bounded text size.");
       const existed = existsSync(path);
       if (existed && params.overwrite !== true) return fail(`${path} already exists; overwrite was not requested.`);
       if (existed && statSync(path).isDirectory()) return fail(`${path} is a folder.`);
+      if (existed && statSync(path).size > READ_LIMIT) return fail("Existing file exceeds the bounded text size.");
+      const beforeSha256 = existed ? sha256(readFileSync(path)) : null;
+      // M-A-3 T11: optional pre-image guard, checked against the bytes on disk immediately before the atomic rename.
+      // A mismatch never overwrites: another writer's (or the user's) change is preserved for review.
+      const expected = params.expectBeforeSha256;
+      if (expected !== undefined && (typeof expected !== "string" || (expected === "absent" ? existed : beforeSha256 !== expected)))
+        return fail(`FILE_CONFLICT: ${path} is ${existed ? `sha256 ${beforeSha256}` : "absent"}, not the expected pre-image ${String(expected).slice(0, 80)}; nothing was written.`);
       mkdirSync(dirname(path), { recursive: true });
-      const temporary = join(dirname(path), `.${basename(path)}.bunny-${process.pid}-${Date.now()}.tmp`);
-      writeFileSync(temporary, content, "utf8"); renameSync(temporary, path);
+      const temporary = join(dirname(path), `.${basename(path)}.bunny-${crypto.randomUUID()}.tmp`);
+      try {
+        writeFileSync(temporary, content, { encoding: "utf8", flag: "wx" });
+        if (expected !== undefined) {
+          const now = existsSync(path) ? sha256(readFileSync(path)) : "absent";
+          if (now !== (expected === "absent" ? "absent" : expected)) return fail(`FILE_CONFLICT: ${path} changed while the write was prepared; nothing was written.`);
+        }
+        renameSync(temporary, path);
+      } finally { if (existsSync(temporary)) rmSync(temporary); }
       const back = readFileSync(path, "utf8");
       if (back !== content) return fail(`Read-back of ${path} did not match what was written.`);
-      return ok(`Wrote ${Buffer.byteLength(content)} bytes to ${path}.`, { path, bytes: Buffer.byteLength(content), created: !existed }, [`Wrote and read back ${path}`], { artifacts: [{ type: "source_file", title: relative(context.cwd, path) || basename(path), path, mediaType: "text/plain" }] });
+      return ok(`Wrote ${Buffer.byteLength(content)} bytes to ${path}.`, { path, bytes: Buffer.byteLength(content), created: !existed, sha256: sha256(back), beforeSha256 }, [`Wrote and read back ${path}; before ${beforeSha256 ?? "absent"}; after ${sha256(back)}`], { artifacts: [{ type: "source_file", title: relative(context.cwd, path) || basename(path), path, mediaType: "text/plain" }], before: { sha256: beforeSha256 }, after: { sha256: sha256(back) } });
     }
     if (action === "filesystem.delete") {
       if (!existsSync(path)) return fail(`${path} does not exist.`);
@@ -85,6 +142,13 @@ export class FilesystemCapability implements CapabilityAdapter {
     return { ok: false, status: "unsupported", summary: `${action} is not supported.`, output: null, evidence: [] };
   }
 }
+
+/**
+ * M-A-3 T9R-F02 (E48): private Host state (database, credentials, sessions, staging) is never a Mission resource, under
+ * any envelope or root. Before F02 this applied only to Agentic delegation; a plain Mission with a broad root could read it.
+ * Direct workstation capability calls outside any Mission keep their existing behaviour.
+ */
+function privateScope(context: ExecutionContext) { return !!context.boundedDelegation || !!context.missionId; }
 
 const DESTRUCTIVE_GIT = [/^reset$/, /^clean$/, /^push$/, /^rebase$/, /^checkout$/, /^restore$/, /^branch$/, /^filter-branch$/, /^update-ref$/, /^gc$/, /^prune$/];
 export class TerminalCapability implements CapabilityAdapter {
@@ -110,12 +174,20 @@ export class TerminalCapability implements CapabilityAdapter {
   }
   async execute(_action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     const command = str(params, "command"); const args = argv(params); const cwd = cwdOf(params, context);
-    const timeoutMs = Math.min(typeof params.timeoutMs === "number" && params.timeoutMs > 0 ? params.timeoutMs : context.timeoutMs, context.timeoutMs);
+    const timeoutMs = Math.min(typeof params.timeoutMs === "number" && params.timeoutMs > 0 ? params.timeoutMs : context.timeoutMs, context.timeoutMs, context.boundedEnvironment ? 60_000 : Infinity);
     const identity = context.executable === undefined ? resolveCommand(command, cwd) : context.executable;
     if (!identity) throw new Error(`Command "${command}" is not an executable Bunny-A can launch without a shell.`);
-    const result = await runProcess(identity, args, { cwd, signal: context.signal, timeoutMs });
+    let launchIdentity = identity; let launchCwd = cwd;
+    if (context.boundedEnvironment) {
+      const script = scopedPath(cwd, args[0], context.roots);
+      const resources = boundedTestResources(script, cwd, context.roots);
+      if (!context.boundedScriptHash) throw new Error("No current approved script identity.");
+      launchCwd = snapshotBoundedTest(script, resources, cwd, join(context.dataDirectory, "agentic-terminal", context.capabilityRunId!), context.boundedScriptHash);
+      launchIdentity = { ...identity, prefix: ["--permission", `--allow-fs-read=${launchCwd}`] };
+    }
+    const result = await runProcess(launchIdentity, args, { cwd: launchCwd, signal: context.signal, timeoutMs, env: context.boundedEnvironment, owned:true, owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,...(context.agentId ? {agentId:context.agentId} : {}),dataDirectory:context.dataDirectory,records:context.processOwnership,action:"terminal.exec"} });
     const line = `${command} ${args.join(" ")}`.trim();
-    const output = { command, args, cwd, exitCode: result.exitCode, stdout: tail(result.stdout, 20_000), stderr: tail(result.stderr, 8_000), durationMs: result.durationMs, timedOut: result.timedOut };
+    const output = { command, args, cwd, ...(context.boundedEnvironment ? { executionBoundary: "pure-read-check-v1", executionCwd: launchCwd } : {}), exitCode: result.exitCode, stdout: tail(result.stdout, 20_000), stderr: tail(result.stderr, 8_000), durationMs: result.durationMs, timedOut: result.timedOut };
     const evidence = [`${line} in ${cwd} → exit ${result.exitCode ?? "none"} after ${result.durationMs} ms`];
     const report = { type: "test_report" as const, title: `${line} output`, inline: `$ ${line}\n# cwd: ${cwd}\n# exit: ${result.exitCode}\n\n${tail(result.stdout, 30_000)}\n${result.stderr ? `\n# stderr\n${tail(result.stderr, 10_000)}` : ""}`, mediaType: "text/plain" };
     if (result.timedOut) return { ok: false, status: "timeout", summary: `${line} timed out after ${timeoutMs} ms.`, output, evidence, errorCategory: "timeout", artifacts: [report] };
@@ -135,6 +207,7 @@ export class GitCapability implements CapabilityAdapter {
       { id: "git.status", description: "Branch and porcelain status.", risk: "READ", inputs: [input("cwd", "string", false, "Repository folder.")], outputs: "{ branch, changes: string[], clean }", evidence: "git status --porcelain=v1 -b output.", timeoutMs: 20_000, implemented: true },
       { id: "git.diff", description: "Diff stat and patch (working tree vs HEAD, or against a ref).", risk: "READ", inputs: [input("cwd", "string", false, "Repository folder."), input("against", "string", false, "Ref to compare with.")], outputs: "{ stat, patch, empty }", evidence: "Patch stored as an artifact with its SHA-256.", timeoutMs: 30_000, implemented: true },
       { id: "git.log", description: "Recent commits (one line each).", risk: "READ", inputs: [input("cwd", "string", false, "Repository folder."), input("limit", "number", false, "How many (max 100).")], outputs: "{ commits: string[] }", evidence: "git log --oneline output.", timeoutMs: 20_000, implemented: true },
+      ...["tracked_files", "branch", "commit_info"].map(op => ({ id: `git.${op}`, description: `Read repository ${op}.`, risk: "READ" as const, inputs: [input("cwd", "string", false, "Approved repository."), ...(op === "commit_info" ? [input("ref", "string", false, "Commit ref, defaults HEAD.")] : [])], outputs: "Bounded repository facts.", evidence: "Current Git CLI observation.", timeoutMs: 20_000, implemented: true })),
       { id: "git.commit", description: "Stage all changes in the folder and commit with a message.", risk: "WRITE", inputs: [input("cwd", "string", false, "Repository folder."), input("message", "string", true, "Commit message.")], outputs: "{ commit }", evidence: "New HEAD commit id.", timeoutMs: 60_000, implemented: true },
       { id: "git.worktree_add", description: "Create an isolated worktree on a new bunny/* branch under the Host data folder.", risk: "WRITE", inputs: [input("cwd", "string", false, "Repository folder."), input("name", "string", true, "Short worktree name.")], outputs: "{ path, branch, base }", evidence: "Worktree path and branch.", timeoutMs: 60_000, implemented: true },
       { id: "git.worktree_remove", description: "Remove a clean Bunny-owned worktree (never one outside the Host data folder).", risk: "WRITE", inputs: [input("cwd", "string", false, "Main repository folder."), input("path", "string", true, "Worktree path.")], outputs: "{ removed }", evidence: "Worktree no longer listed.", timeoutMs: 60_000, implemented: true },
@@ -145,13 +218,38 @@ export class GitCapability implements CapabilityAdapter {
     const git = resolveCommand("git");
     return git ? { availability: "available" as const, detail: `git at ${git.file}.` } : { availability: "unavailable" as const, detail: "git executable not found on PATH." };
   }
-  async git(args: string[], cwd: string, context: ExecutionContext, timeoutMs = 60_000) {
-    return runCommand("git", args, { cwd, signal: context.signal, timeoutMs: Math.min(timeoutMs, context.timeoutMs) });
+  async git(args: string[], cwd: string, context: ExecutionContext, timeoutMs = 60_000, signal: AbortSignal = context.signal) {
+    if (context.boundedDelegation) {
+      const env: NodeJS.ProcessEnv = Object.fromEntries(["SystemRoot", "WINDIR", "TEMP", "TMP", "PATH"].flatMap(k => process.env[k] ? [[k, process.env[k]!]] : []));
+      Object.assign(env, { GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_ATTR_NOSYSTEM: "1" });
+      const safeArgs = args[0] === "diff" ? [args[0], "--no-ext-diff", "--no-textconv", ...args.slice(1)] : args;
+      return runCommand("git", ["--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + join(context.dataDirectory, "disabled-hooks"), "-c", "diff.external=", ...safeArgs], { cwd, signal: context.signal, env, timeoutMs: Math.min(timeoutMs, context.timeoutMs), owner: { missionId: context.missionId, stepId: context.stepId, capabilityRunId: context.capabilityRunId, ...(context.agentId ? { agentId: context.agentId } : {}), dataDirectory: context.dataDirectory, records: context.processOwnership, action: `git.${args[0]}` } });
+    }
+    // M-A-3 T9R-F01: under remote authority Git never runs repo-configured programs (hooks, fsmonitor, external diff or textconv).
+    const hardened = context.remoteAuthority ? ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.hooksPath=" + join(context.dataDirectory, "disabled-hooks"), "-c", "diff.external=", ...(args[0] === "diff" ? [args[0], "--no-ext-diff", "--no-textconv", ...args.slice(1)] : args)] : args;
+    return runCommand("git", hardened, { cwd, signal, timeoutMs: Math.min(timeoutMs, context.timeoutMs),owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,...(context.agentId ? {agentId:context.agentId} : {}),dataDirectory:context.dataDirectory,records:context.processOwnership,action:`git.${args[0]}`} });
   }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     const cwd = cwdOf(params, context);
+    if (context.boundedDelegation && !["git.status", "git.diff", "git.log", "git.tracked_files", "git.branch", "git.commit_info"].includes(action)) return fail("Delegated Git mutations are unsupported.");
     const inside = await this.git(["rev-parse", "--show-toplevel"], cwd, context, 15_000);
     if (inside.exitCode !== 0) return fail(`${cwd} is not inside a git repository.`);
+    if (context.boundedDelegation) {
+      scopedPath(cwd, inside.stdout.trim(), context.roots);
+      const metadata = await this.git(["rev-parse", "--path-format=absolute", "--git-common-dir"], cwd, context, 15_000);
+      if (metadata.exitCode !== 0) return fail("Repository metadata could not be verified.");
+      scopedPath(cwd, metadata.stdout.trim(), context.roots);
+      const denied = await context.revalidate?.(); if (denied) throw new Error(denied);
+    }
+    if (action === "git.tracked_files" || action === "git.branch" || action === "git.commit_info") {
+      const ref = typeof params.ref === "string" ? params.ref : "HEAD";
+      if (!/^[A-Za-z0-9][\w./@^~-]{0,119}$/.test(ref)) return fail("Invalid commit reference.");
+      const args = action === "git.tracked_files" ? ["ls-files", "-z"] : action === "git.branch" ? ["symbolic-ref", "--short", "HEAD"] : ["show", "--no-patch", "--no-show-signature", "--format=%H%n%P%n%s", ref];
+      const result = await this.git(args, cwd, context);
+      if (result.exitCode !== 0) return fail(`Git read failed: ${tail(result.stderr, 300)}`);
+      const output = action === "git.tracked_files" ? { files: result.stdout.split("\0").filter(Boolean).slice(0, 1000) } : action === "git.branch" ? { branch: result.stdout.trim() } : { commit: result.stdout.trim() };
+      return ok("Current repository facts read.", output, [`${action} observed in approved repository.`]);
+    }
     if (action === "git.status") {
       const result = await this.git(["status", "--porcelain=v1", "-b"], cwd, context);
       if (result.exitCode !== 0) return fail(`git status failed: ${tail(result.stderr, 300)}`);
@@ -161,7 +259,8 @@ export class GitCapability implements CapabilityAdapter {
     }
     if (action === "git.diff") {
       const against = typeof params.against === "string" && params.against ? params.against : "HEAD";
-      if (!/^[\w./@^~-]{1,120}$/.test(against)) return fail("Invalid ref.");
+      // A ref never starts with "-": an option there (e.g. --textconv, --ext-diff) would override Bunny's own flags.
+      if (!/^[\w./@^~][\w./@^~-]{0,119}$/.test(against)) return fail("Invalid ref.");
       const stat = await this.git(["diff", "--stat", against], cwd, context);
       const patch = await this.git(["diff", against], cwd, context);
       if (stat.exitCode !== 0 || patch.exitCode !== 0) return fail(`git diff failed: ${tail(stat.stderr || patch.stderr, 300)}`);
@@ -205,7 +304,8 @@ export class GitCapability implements CapabilityAdapter {
     if (action === "git.merge") {
       const branch = str(params, "branch");
       if (!/^bunny\/[A-Za-z0-9._-]{1,80}$/.test(branch)) return fail("Only bunny/* branches can be merged by a mission.");
-      return mergeTransaction(branch, cwd, context);
+      // M-A-3 T9R-F01: under remote authority the merge runs with the same hardened Git flags as every other call.
+      return mergeTransaction(branch, cwd, context, context.remoteAuthority ? (args, at, signal, timeoutMs) => this.git(args, at, context, timeoutMs, signal) : undefined);
     }
     return { ok: false, status: "unsupported", summary: `${action} is not supported.`, output: null, evidence: [] };
   }

@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,mkdirSync,statSync} from 'node:fs';
+import {join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
+import {DatabaseSync} from 'node:sqlite';
+import {fileSha256,verifyRelease,sourceCheck,importClosure} from '../../scripts/bunny-release.mjs';
+import {rowDigest,tableDumps,APPEND_ONLY,VOLATILE_TABLE} from '../ma2-gate8/tools/22-rowdigest.mjs';
+const rec='test-results/ma2-final-remediation-r1',out=join(rec,'pre-activation'),prod=join(process.env.LOCALAPPDATA,'Bunny-A'),stage=join(process.env.LOCALAPPDATA,'Bunny-A-R1-stage');mkdirSync(out,{recursive:true});
+const read=p=>JSON.parse(readFileSync(p,'utf8').replace(/^\uFEFF/,'')),sha=b=>createHash('sha256').update(b).digest('hex'),save=(name,v)=>writeFileSync(join(out,name),JSON.stringify({recordedAt:new Date().toISOString(),...v},null,2)+'\n');
+const config=read(join(prod,'install.json')),creds=read(join(config.stateRoot,'credentials/credentials.json')),candidate=read(join(stage,'install.json'));
+const {idleCheck}=await import(pathToFileURL(join(candidate.currentRelease.folder,'scripts/bunny-rollback-preflight.mjs')).href);
+const idle=await idleCheck(config.hostPort,creds.token,config.stateRoot);
+const health=await fetch('http://127.0.0.1:'+config.hostPort+'/health').then(r=>r.json());assert.equal(health.pid,creds.pid);assert.equal(health.instanceId,creds.instanceId);assert.equal(health.operationalState,'healthy');
+const res=await fetch('http://127.0.0.1:'+config.hostPort+'/state',{headers:{authorization:'Bearer '+creds.token}});assert.equal(res.status,200);const s=await res.json();
+const backup=join(stage,'backups','production-r1-prepared-'+Date.now()+'.sqlite');const db=new DatabaseSync(join(config.stateRoot,'host.sqlite'),{readOnly:true});db.prepare('VACUUM INTO ?').run(backup);db.close();
+const copy=new DatabaseSync(backup,{readOnly:true});assert.equal(copy.prepare('PRAGMA integrity_check').get().integrity_check,'ok');copy.exec('BEGIN');
+const tables=copy.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(t=>t.name),ledger={};
+for(const t of tables){const {pk,rows}=tableDumps(copy,t);ledger[t]={pk,count:rows.length,appendOnly:APPEND_ONLY.has(t),volatile:VOLATILE_TABLE.has(t),rows:Object.fromEntries(rows.map(r=>[String(r[pk]),rowDigest(t,r).digest]))};}
+const prior=read(join(rec,'baseline/protected-row-ledger.json')).tables,missing=[],changed=[];
+for(const [t,v] of Object.entries(prior))if(!v.volatile)for(const [id,digest] of Object.entries(v.rows)){if(!ledger[t]?.rows[id])missing.push({table:t,id});else if(ledger[t].rows[id]!==digest)changed.push({table:t,id});}
+assert.equal(missing.length,0);assert.equal(changed.length,0);
+const devices=copy.prepare('SELECT * FROM devices').all().map(d=>({id:d.id,name:d.name,revokedAt:d.revoked_at,fullRowSha256:sha(JSON.stringify(d))}));
+const settings=copy.prepare('SELECT * FROM settings').all().map(r=>({key:r.key,sha256:sha(r.value)}));
+const recordRows=t=>copy.prepare('SELECT record FROM '+t).all().map(r=>JSON.parse(r.record));
+const pending=recordRows('permission_requests').filter(r=>!r.resolvedAt&&r.risk==='DESTRUCTIVE');const inFlight=recordRows('capability_runs').filter(r=>['running','started','in_flight'].includes(r.status));
+assert.equal(pending.length,0);assert.equal(inFlight.length,0);copy.exec('ROLLBACK');copy.close();
+const baseline=read(join(rec,'baseline/production.json'));assert.deepEqual(devices,baseline.devices);assert.deepEqual(settings,baseline.settings);
+const manifest=read(join(config.currentRelease.folder,'release-manifest.json'));const integrity=verifyRelease(config.currentRelease.folder),blobs=sourceCheck(process.cwd(),config.currentRelease.folder),closure=importClosure(config.currentRelease.folder);assert.ok(integrity.ok&&blobs.ok&&closure.ok);
+const remote=read(join(config.stateRoot,'settings/remote.json'));
+save('db-backup.json',{classification:'LIVE VERIFIED',path:backup,sha256:fileSha256(backup),bytes:statSync(backup).size,integrity:'ok',method:'Read-only VACUUM INTO',privateOutsideEvidence:true,refreshRequiredImmediatelyAfterAuthorization:true});
+save('protected-row-ledger.json',{classification:'LIVE VERIFIED',tables:ledger,exclusions:'Canonical rowDigest excludes secret fields/provider volatile probe telemetry; workspace_locks volatile'});
+save('production.json',{classification:'LIVE VERIFIED',authorizationObtained:false,activationPerformed:false,release:manifest.release,version:manifest.version,sourceCommit:manifest.sourceCommit,toolingCommit:manifest.toolingCommit,manifestSha256:fileSha256(join(config.currentRelease.folder,'release-manifest.json')),zipSha256:config.currentRelease.packageSha256,health,stateRoot:config.stateRoot,workspace:config.workspace,hostPort:config.hostPort,canonicalIdle:idle,pendingDestructiveApprovals:pending.length,inFlightMutations:inFlight.length,devices,settings,remote,providers:Object.values(s.providers??{}).map(p=>({id:p.id,availability:p.availability,version:p.version,compatibility:p.securityCompatibility??null})),integrity:{files:integrity.checked,ok:integrity.ok,blobs:blobs.ok,closure:closure.ok},baselinePreservation:{missing,changed,deviceLedgerEqual:true,settingsEqual:true},productionFiles:['install.json','state/state-layout.json','state/credentials/credentials.json','state/settings/deployment.json','state/settings/remote-consent.json'].map(path=>({path,sha256:fileSha256(join(prod,path))})),physicalPhoneTested:false,providerExecutionAttempted:false});
+const dev=join(prod,'development'),dc=read(join(dev,'credentials.json')),dh=await fetch('http://127.0.0.1:43139/health').then(r=>r.json());assert.equal(dc.pid,dh.pid);assert.equal(dc.instanceId,dh.instanceId);assert.notEqual(dc.token,creds.token);
+const dr=await fetch('http://127.0.0.1:43139/state',{headers:{authorization:'Bearer '+dc.token}});assert.equal(dr.status,200);const ds=await dr.json();const dd=new DatabaseSync(join(dev,'host.sqlite'),{readOnly:true});const policies=dd.prepare('SELECT * FROM policies').all().map(r=>({id:r.id,recordSha256:sha(JSON.stringify(r))}));const counts=Object.fromEntries(['tasks','missions','devices','capability_runs','permission_requests','projects'].map(t=>[t,dd.prepare('SELECT COUNT(*) n FROM '+t).get().n]));dd.close();
+writeFileSync(join(rec,'development-host.json'),JSON.stringify({recordedAt:new Date().toISOString(),classification:'LIVE VERIFIED',health:dh,stateRoot:dev,credentialsPath:join(dev,'credentials.json'),credentialIdentityMatches:true,tokenDistinctFromProduction:true,counts,policies,release:ds.release??null,workspace:{observedProjects:ds.projects,defaultRoot:'process.cwd() according to source; likely npm project root because npm run host resolves scripts/bunny-host.mjs; exact running cwd not exposed by read-only API, NOT ESTABLISHED'},startup:'npm run host via Git Bash; production Startup shortcut points to external installed Bunny-A.exe',ownerEvidence:'development-native.json',purpose:'Source-entry development Host separate from pinned production. Not a singleton collision. Original human intent unknown; retained because stale-test ownership is unproved.',stopped:false,secretRecorded:false},null,2)+'\n');
+console.log('Fresh consistent production backup, idle guard, historical protected-row/device/settings preservation and separate development Host classification passed. No activation.');

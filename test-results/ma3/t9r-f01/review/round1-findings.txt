@@ -1,0 +1,258 @@
+===== null
+coverage: Read the full diff of src (git diff 7fbea39 -- src, about 1025 lines) and the untracked remote-authority.test.ts. Traced principal derivation in http.server.ts (bearer equal to Host token gives local, else authenticateDevice; actor is 'workstation' or 'device:<uuid>' from the DB id, not request data). Checked mission.respond key allow-list, mission.approve/start, agent.* device gates, the operation ledger keys (principal-prefixed), expect.hostId/epoch (equality only), action truncation (exact-match dispatch, no bypass), and the Host listener (127.0.0.1 only). Searched every 'workstation' liter
+{
+ "title": "Paired phone can start a workstation-held Mission and thereby launch its shell-capable sessions",
+ "severity": "MEDIUM",
+ "file": "src/lib/bunny-missions/commands.server.ts",
+ "line": 27,
+ "scenario": "Workstation approves a Mission with start:false (manager.server.ts:807 only starts when start is true, so the Mission stays in state 'ready'). A paired device then sends mission.start. 'mission.start' is in the REMOTE set (line 27) and its handler (lines 53-60) checks only state==='ready' and Agent ownership, with no code-execution or shell refusal. missions.start() schedules the steps; launch runs missionScopeCheck, which sees a workstation envelope (isRemoteEnvelope false), so remoteSessionViolation returns null. Claude write and Codex sessions (shell) therefore run with no trusted-desktop grant, started by the phone. This path is not changed by the diff (pre-existing), and the policy wording decides its severity: if 'device must never cause shell execution' is read literally, escalate to BLOCKER.",
+ "evidence": "commands.server.ts:27 REMOTE includes mission.start; commands.server.ts:53-60 handler; manager.server.ts:807 'if (start) mission = this.start(mission)'; authorization.server.ts remoteSessionViolation returns null for non-remote envelopes; manager.server.ts launch-time missionScopeCheck at ~1129.",
+ "recommendation": "Owner ruling needed. Either drop mission.start from the device set, or refuse device start for any Mission whose approved scope includes shell-capable provider sessions, terminal, or Git hooks, leaving that start to the workstation."
+}
+{
+ "title": "Device self sign-out and credential expiry leave device-granted authority live",
+ "severity": "LOW",
+ "file": "src/lib/bunny-host/http.server.ts",
+ "line": 732,
+ "scenario": "A paired device approves a Mission (remote envelope) and an allow_batch, then signs out via DELETE /api/bunny-pair, which sends device.revoke with no id. The handler computes 'const ended = local ? await endDeviceGrants(...) : zeros', so for a device endDeviceGrants never runs. The device's envelope stays unrevoked, the batch stays active and any Agentic consent stays ACTIVE until envelope/batch/consent expiry or a Host restart. DEVICE_EXPIRED (idle or absolute lifetime) never triggers revocation either. The authority is bounded: the remote ceiling forbids shell, and batches are Calculator-bound. However, the change summary says 'endDeviceGrants also on device self sign-out', which the code contradicts (the comment at line 731 says the opposite, 'owner decision still open'). The 'lost device's authority ends with it' comment is also wrong for self sign-out.",
+ "evidence": "http.server.ts:731-732 comment and ternary; authenticateDevice returns DEVICE_EXPIRED without any grant sweep; endDeviceGrants is only called from the local branch.",
+ "recommendation": "Either call endDeviceGrants on self sign-out and from an expiry sweep, or correct the summary and record the owner decision explicitly. Verify with a test that signs a device out and asserts its envelope and batch are revoked."
+}
+{
+ "title": "Gateway loopback check compares X-Forwarded-Proto case-sensitively",
+ "severity": "LOW",
+ "file": "src/lib/orch/host-bridge.server.ts",
+ "line": 37,
+ "scenario": "On the local (workstation) path, a request with Host 127.0.0.1:8080 and peer 127.0.0.1 is refused only when X-Forwarded-Proto is exactly 'https'. A proxy that sends 'HTTPS', or Node joins duplicate XFP headers into 'https, https', passes as local and gets the workstation token (hostCall and bunny-events use credentials.token when local). Exploiting it needs a tunnel that adds XFP but none of the PROXY_HEADERS (cf-*, x-forwarded-for, forwarded, via, ...) and rewrites Host to loopback. The configured Cloudflare tunnel adds cf-* headers, so this is not realistic today. Probe result: Request(http://127.0.0.1:8080/x, X-Forwarded-Proto: HTTPS) with peer 127.0.0.1 gives {local:true,token:null}; the lowercase 'https' variant throws 'Remote requests cannot use workstation authentication.'",
+ "evidence": "Probe run in an mkdtemp folder importing authorizeBridge from the repo by file URL: uppercase HTTPS returned local:true; lowercase https threw. Line 30 has the same case-sensitive comparison for the origin.",
+ "recommendation": "Compare case-insensitively, or refuse any presence of x-forwarded-proto or forwarded on the local path (as the other proxy headers are refused)."
+}
+{
+ "title": "Restart recovery text for remote interrupted Missions promises a Retry that is refused",
+ "severity": "LOW",
+ "file": "src/lib/bunny-missions/manager.server.ts",
+ "line": 4054,
+ "scenario": "A device-granted Mission has a step in flight when the Host restarts. recover() revokes the remote envelope (line 3874) and, in the interrupted-step branch, sets waiting_for_user with detail '... Retry starts fresh child tasks under the same authorization.' The remote-aware wording exists only in the no-interrupted branch (line ~4004 onward). Retry then throws 'The mission authorization expired or was revoked; replan to approve it again.' No authority is expanded, since retry() refuses a revoked envelope, but the recovery guidance is wrong for remote Missions.",
+ "evidence": "manager.server.ts:3874 revocation; manager.server.ts:4054 interrupted-branch detail; manager.server.ts:4004 staleRemote branch; retry() at ~3609 refuses envelope.revokedAt.",
+ "recommendation": "Use the remote-aware text (replan and approve again) when staleRemote.has(mission.id) in the interrupted branch as well."
+}
+{
+ "title": "Agent-Mission revocation ends the envelope but not the Mission",
+ "severity": "INFO",
+ "file": "src/lib/bunny-host/http.server.ts",
+ "line": 855,
+ "scenario": "In endDeviceGrants, an Agent Mission envelope granted by the revoked device is saved as revoked and the loop continues (lines 855-859), with no missions.stop. The Agent is stopped in the earlier loop only when the device's agentic record is ACTIVE or PAUSED (lines 834-842). If the consent is WAITING_FOR_USER, the Mission stays in its state with a revoked envelope. Admissions fail closed, so this is not a bypass, but the comment 'its Agent stopped above' does not always hold and the unstopped counter is not raised.",
+ "evidence": "http.server.ts:834-842 agentic loop condition; http.server.ts:855-859 envelope revoked without stop.",
+ "recommendation": "Stop the Mission (or its Agent) in this branch when it is active, and count a failure in unstopped."
+}
+{
+ "title": "Local-path workstation auth relies on the tunnel adding a proxy header (residual, pre-existing)",
+ "severity": "INFO",
+ "file": "src/lib/orch/host-bridge.server.ts",
+ "line": 37,
+ "scenario": "A request that arrives on loopback with Host rewritten to 127.0.0.1 is treated as the workstation unless it carries one of PROXY_HEADERS or an https XFP. Any tunnel that adds neither gives the phone the workstation token. The diff adds more markers and a bunny_device cookie refusal, which helps, but the defence is header presence, not proof of origin. Not introduced by this change.",
+ "evidence": "authorizeBridge lines 34-41; the bunny_device cookie refusal (line 40) only covers requests that still carry the device cookie.",
+ "recommendation": "Make the tunnel mark its traffic (for example a shared secret header set by the tunnel config) and refuse local auth when that marker is present, or require a Host that is not an exposed hostname."
+}
+===== null
+coverage: Read the full diff of src (12 tracked files at the start, plus two files that appeared mid-review: src/components/island/mission.tsx and approval-batches.test.ts; the remoteVerdicts batchOnly change in manager.server.ts was read in its current form). Read authorization.server.ts, types.ts, manager.server.ts (launch/submit/respond/deviceRequestRefusal/deviceMissionRefusal/desktop grant helpers/recover/stop/replan), bunny-host/manager.server.ts launch and reroute, capabilities/bus.server.ts decision and request, local.server.ts git path, http.server.ts endDeviceGrants and device.revoke, orch/hos
+{
+ "title": "Device single allow of skill-step Calculator asks is refused because params are judged as {}",
+ "severity": "LOW",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/manager.server.ts",
+ "line": 2006,
+ "scenario": "Remote-granted Mission with an app.open skill step for app \"calculator\" (computer.open_app, EXECUTE). The phone calls mission.respond allow_once. deviceRequestRefusal calls agenticRequestParams(step, action, phase), which returns {} for skill executors (line 2620 fall-through), so remoteExecutionRefusal sees calculatorOperation(\"computer.open_app\", {}) == false and returns 'Approval required on Windows Host ... not an exact reviewed Calculator operation', and the device gets WorkstationRequiredError. Before this change deviceApprovalRefusal allowed EXECUTE for devices, so this is a device-only regression of a policy-permitted exact Calculator op. The bus itself would judge the real params {app:'calculator'} as allowable under remote authority, so this is a false refusal, not a bypass. The newer batchOnly verdict (line 2064) only rescues the case when a batchOffer exists; skill asks without a batch offer stay refused.",
+ "evidence": "agenticRequestParams: `if (step.executor.kind === \"capability\") return step.executor.params; if (step.executor.kind === \"model\" && step.taskId) ...; return {};` (manager.server.ts:2618-2620). deviceRequestRefusal: `const params = this.agenticRequestParams(step, request.action, step.pendingPhase ?? \"execute\");` (manager.server.ts:2006). calculatorOperation in batches.server.ts:55. Not probed at runtime; derived from reading.",
+ "recommendation": "Judge a skill ask on the ask's own params (persist the filled params on the PermissionRequest when askPermission is called, or use the matching plan entry the way batchOfferFor does) instead of {} for executor.kind === 'skill'."
+}
+{
+ "title": "Routing preference is persisted as a hard providerDenylist on the Task and blocks later reroutes",
+ "severity": "LOW",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/manager.server.ts",
+ "line": 1317,
+ "scenario": "A write step under a remote envelope is submitted with providerDenylist = [codex, claude, opencode, cline, cursor] (outsideCeiling). submit persists input.constraints on the Task record, and router.ts:35 treats providerDenylist as a hard eligibility rule ('Provider denied.'). If the remaining in-ceiling provider (ollama) later fails and the Task is rerouted or retried, the reroute check at bunny-host/manager.server.ts:1267 and the launch eligibility check at :1056 both read task.constraints, so no outside-ceiling provider can be chosen for that same Task, even after a valid trusted-desktop grant exists for that exact provider/model/folder. The preference therefore behaves as a persistent hard constraint, not only a routing hint; the comment at manager.server.ts:1320 says a launch 'asks the workstation' for this case, which the denylist prevents. Static reading only; not probed.",
+ "evidence": "outsideCeiling computed at manager.server.ts:1288; merged into submit constraints at :1317; router.ts:35 `if (constraints.providerDenylist?.includes(provider.id)) return \"Provider denied.\";`; reroute `eligibility(targetProvider, current.constraints ?? {})` at bunny-host/manager.server.ts:1267; launch `eligibility(preProvider, task.constraints ?? {})` at :1056. Workstation-only missions are unaffected because isRemoteEnvelope is false and the list is empty.",
+ "recommendation": "Do not persist the remote routing preference into task.constraints; apply it only as a submit-time preference (or clear providerDenylist for outside-ceiling providers when a desktop grant for that exact operation exists), and fix the comment at :1320 to match actual behavior."
+}
+{
+ "title": "Device-granted Agent Mission envelope is revoked without stopping the Mission",
+ "severity": "LOW",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/http.server.ts",
+ "line": 855,
+ "scenario": "Device-granted Agent Mission (envelope.grantedBy === device actor). On device revoke by the workstation, endDeviceGrants now takes the Agent branch: it saves revokedAt on the envelope and continues (lines 855-859) without calling missions.stop. The comment says 'its Agent stopped above', but the Agentic loop above only stops agents whose agentic_authorizations row has provenance actor === the device AND state ACTIVE or PAUSED. If that row is in another state (or has different provenance), the Mission is left in an active state with a revoked envelope, and nothing stops its waiting steps. Launches fail closed ('authorization revoked'), so there is no authority leak, but the Mission can linger in a running/waiting state the user did not end. Not probed.",
+ "evidence": "http.server.ts:855-859 (agentic.exists branch: saveAuthorization revoked, approvals++, continue) versus the Agentic loop above it (lines ~836-850) that gates on e.authorization_provenance?.actor === deviceActor and ['ACTIVE','PAUSED'].includes(e.current_state).",
+ "recommendation": "In the Agent branch, also call missions.stop (or confirm the Agent stop covered this Mission) instead of relying on the comment, and count an unstopped Mission in the 'unstopped' tally."
+}
+{
+ "title": "Device self sign-out does not end its granted envelopes, contrary to the stated design",
+ "severity": "LOW",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/http.server.ts",
+ "line": 732,
+ "scenario": "A paired phone approves a plain Mission (remote envelope), then the user signs that device out from the phone. device.revoke with no id takes the 'self' path, local is false, so endDeviceGrants is never called and the envelope, batches and Agentic consent stay live until the Mission ends or the Host restarts. The change summary says 'endDeviceGrants also on device self sign-out', but the diff only adds a comment at line 731 ('Self sign-out keeps the approvals the user gave ... owner decision still open'). Behavior is unchanged from before this change, but the summary and the code disagree. Remote authority is capped to tool-free/read sessions and bounded writes, so impact is limited.",
+ "evidence": "http.server.ts:731 comment; :732 `const ended = local ? await endDeviceGrants(`device:${id}`) : {...zeros}`; the pre-existing comment at :730 says 'A lost device's authority ends with it'.",
+ "recommendation": "Get an explicit owner decision. If the design holds, call endDeviceGrants on self sign-out too; otherwise correct the design summary and the comment."
+}
+{
+ "title": "approval.desktop_grant_used is emitted twice per grant use",
+ "severity": "INFO",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/bus.server.ts",
+ "line": 276,
+ "scenario": "A capability admitted under a trusted-desktop grant emits 'approval.desktop_grant_used' from MissionManager.consumeDesktopGrant (manager.server.ts:2139, 'used (n/max)') and again from bus.server.ts:276 ('admitted under trusted-desktop grant ... (single use)'). Audit readers see two events for one use. Cosmetic; no authority effect.",
+ "evidence": "bus.server.ts:276 and manager.server.ts:2139 both emit the same event type for the same consume.",
+ "recommendation": "Emit the event in one place (the consume) and keep the bus log line under a different type."
+}
+===== null
+coverage: Read the full git diff 7fbea39 -- src (about 1025 lines) and the untracked remote-authority.test.ts file list only. Read surrounding code for decide() ordering, the CapabilityBus.decision/request batch and grant flow, all capability manifests and riskOf (never downgrades), the GitCapability remote and bounded branches, the filesystem and canonical/scopedPath path logic, the computer.* runtime for invoke/focus/open, the device rights table and the device refusal functions, reauthorizeAgent, the claude/codex launch args (Claude read uses --setting-sources "" and --strict-mcp-config, so project h
+{
+ "title": "Remote device can plant a repo filter via the Windows 8.3 alias GIT~1 and then run it through permitted read-only git.status",
+ "severity": "BLOCKER",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/authorization.server.ts",
+ "line": 168,
+ "scenario": "A remote (device-granted) mission whose approved scope includes filesystem.write under the repo root and git.status. Step 1: filesystem.write path \"GIT~1/config\" with overwrite:true and content [filter \"x\"] clean = <command>. Step 2: filesystem.write \".gitattributes\" with \"* filter=x\" (an ordinary non-.git path). Step 3: git.status (READ, not refused remotely) runs the Host's hardened git command. Git executes the repo-configured clean filter, which the hardened argv does not neutralize. Probe result: remoteExecutionRefusal(\"filesystem.write\",{path:\"GIT~1/config\"},\"WRITE\",repo) returns null (allowed remotely); scopedPath(repo,\"GIT~1/config\",[repo]) resolves to repo\\GIT~1\\config and the write lands in the real .git/config; with the exact remote hardened flags (--no-pager -c core.fsmonitor=false -c core.hooksPath=... -c diff.external=) git status executed the planted clean filter (marker written). The same lexical regex also gates the Agent path at authorization.server.ts:312 (canonical() keeps GIT~1 lexical), so the alias bypasses both guards. Precondition: 8.3 short names enabled on the volume (default on the system drive; the probe ran on C:). The chain was probed at the git and path layers, not end-to-end through CapabilityBus.",
+ "evidence": "Probe 1: remoteExecutionRefusal blocks \".git/config\" and \"sub/../.git/config\" but allows \".git./config\" and \".git /config\". The trailing-dot forms did not write (ENOENT on this Node), so only GIT~1 is a real bypass. Probe 2: existsSync(repo/GIT~1/config)=true; remoteExecutionRefusal(\"GIT~1/config\")=null; write landed in real .git/config. Probe 3: appended [filter \"x\"] clean=node payload plus .gitattributes \"a.txt filter=x\", touched mtime, ran git --no-pager --no-optional-locks ... status under the exact remote flags from local.server.ts:206: exit 0, marker file written. Hardening at local.server.ts:206 sets only core.fsmonitor, core.hooksPath and diff.external. Probe temp directories were removed.",
+ "recommendation": "Make the .git guard operate on a native canonical path (fs.realpathSync.native, which expands 8.3 names) and also deny any path segment matching /^git~\\d+$/i. Treat .gitattributes and .git/info/attributes writes as code-execution-class (desktopRequired) under remote authority, since they select filter and diff drivers. Under remote authority, either refuse git.status/diff when repo config or attributes changed after approval, or run remote read-only git against a config that cannot define filter drivers. Apply the same canonical check in agenticScopeViolation (authorization.server.ts:312)."
+}
+{
+ "title": "Remote git.diff hardening is undone by an against value that begins with '-' (--textconv re-enables textconv drivers)",
+ "severity": "MEDIUM",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/local.server.ts",
+ "line": 239,
+ "scenario": "A device-granted mission with git.diff (READ) on a repo. The against param is \"--textconv\". The regex ^[\\w./@^~-]{1,120}$ accepts the leading '-'. The remote hardening builds [\"diff\",\"--no-ext-diff\",\"--no-textconv\",against] (local.server.ts:206-241), so the caller's --textconv comes after and wins. Git then runs the textconv driver that diff.<driver> defines for any path a .gitattributes selects. A device can write .gitattributes (ordinary bounded write) with \"<glob> diff=<driver>\". Probe: patch-form argv with --no-textconv followed by --textconv executed the configured textconv command (marker written); the default HEAD form did not. The driver must already exist in the repo .git/config (see the first finding) or the user's global gitconfig (for example pdf or docx textconv helpers). The --stat form does not trigger textconv, so the bypass needs the patch call, which git.diff makes.",
+ "evidence": "local.server.ts:238 reads against; line 239 is the regex; lines 240-241 build the stat and patch calls with args in the form [\"diff\", ...]. Probe 4 (temp repo, driver defined in .git/config): against=HEAD marker absent; against=--textconv marker written. Probe directory removed.",
+ "recommendation": "Reject any against value starting with '-' (or require a '--' separator before it, then verify the rev with rev-parse --verify). Also place the caller value after the hardening flags only after validation, so no later flag can override them."
+}
+{
+ "title": "Calculator 'exact op' gate accepts pid-only invoke_control and focus, which runtime does not bind to Calculator",
+ "severity": "MEDIUM",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/batches.server.ts",
+ "line": 55,
+ "scenario": "Under remote authority, computer.invoke_control with {pid: <any app process>, automationId: \"equalButton\"} (or any num*/op/clear id) passes remoteExecutionRefusal, because calculatorOperation accepts pid without title=\"Calculator\" and checks only the param shape (batches.server.ts:55-63; authorization.server.ts:163). At runtime, calculator is true only when params.title===\"Calculator\" or a desktop batch is present (computer.server.ts:471). Without that, Find-Window returns the window with that pid (computer.server.ts:57-70, no Calculator identity check) and Assert-BatchControl returns immediately when no batch exists (computer.server.ts:224-225). The control is then invoked in whatever application owns the pid. This is not the reviewed Calculator operation the policy requires. Impact is limited: only the CALCULATOR_CONTROLS automation ids can be invoked, and no typing is possible under remote authority.",
+ "evidence": "batches.server.ts:55 calculatorOperation; line 63 accepts invoke_control on any CALCULATOR_CONTROLS id; computer.server.ts:471 sets calculator only for title==='Calculator' or desktopBatch; computer.server.ts:224-225 returns early without a batch; 57-70 match by pid only. Not runtime-probed (requires Windows UI Automation).",
+ "recommendation": "For remote authority, require title===\"Calculator\" or a verified batch identity for invoke_control and focus_window, or refuse pid-only Calculator ops unless the runtime Native-CalculatorFrame check passes for that pid. Make calculatorOperation and the runtime agree on the same target identity."
+}
+{
+ "title": "Execution-config files are not classified as code-execution under remote authority (only the .git component is)",
+ "severity": "MEDIUM",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/authorization.server.ts",
+ "line": 166,
+ "scenario": "remoteExecutionRefusal checks filesystem writes only for a .git path component (authorization.server.ts:166-168). A device-approved bounded write to a project file that a trusted later action executes is not caught: package.json scripts (run by npm test), a project .npmrc setting npm's script-shell, .vscode/tasks.json, .husky hooks, Makefile. Under remote authority the device can approve such writes as ordinary WRITE actions. Execution then happens under a later workstation-approved terminal.exec npm test or verification, or a user action, so device-authored content becomes code under desktop approval. Not probed; the npm script-shell behavior is from npm documentation, not verified here.",
+ "evidence": "authorization.server.ts:166-168 is the only path-based refusal. The remote path has no classification for other execution-config files.",
+ "recommendation": "Under remote authority, classify writes to known execution-config names (package*.json scripts, .npmrc/.yarnrc/.bunfig, .vscode/tasks.json, .husky/, Makefile, build and CI files) as desktopRequired, or at least require the desktop approval flag on the first run of any command that reads them."
+}
+{
+ "title": "Retry/reroute relaunch validates the trusted-desktop grant without consuming it (single-use is enforced only in launch)",
+ "severity": "LOW",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+ "line": 1280,
+ "scenario": "TaskManager.startSession (retry/reroute) calls missionScopeCheck(targetTask) with the default phase \"check\" (line 1280). MissionManager consumes the grant only when phase===\"launch\" (manager.server.ts:383). A relaunch with a valid, unconsumed provider-session grant therefore starts a shell-capable session without spending the grant (adapter launch at line 1331). Consumption happens only in TaskManager.launch, so if an initial launch ever fails before consumption, a retry could reuse the same grant until its 5-minute expiry. Reachability was not established and was not probed; this is a single-use gap in code, not a demonstrated bypass.",
+ "evidence": "bunny-host/manager.server.ts:1277-1281 (targetTask, check phase) and 1331 (launch with no consume); bunny-missions/manager.server.ts:373-383 (consume only on phase launch).",
+ "recommendation": "Pass phase \"launch\" from startSession as well, so every shell-capable session start spends one use, or make the check phase refuse any unconsumed grant that a launch has not claimed."
+}
+===== null
+coverage: Read the full git diff 7fbea39 -- src (about 1025 lines across authorization.server.ts, types.ts, manager.server.ts, bus.server.ts, local.server.ts, skills.server.ts, store.server.ts, bunny-host manager/http, host-bridge) and the untracked remote-authority.test.ts. Ran only the allowed test (20/20 pass). Read the surrounding code: respond() (manager 3329-3440), askPermission and all of its call sites (manager 904, 1130, 1408, 1617, 2185, 2787, 2836, 2876; skills.server.ts 91; bus.server.ts 150), bus.request admission and consumption (bus.server.ts 118-300, no await between grant lookup and con
+{
+ "title": "Unspent trusted-desktop session grant is only validated, never spent, on relaunch/reroute paths, so one approval can admit repeat shell sessions",
+ "severity": "HIGH",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+ "line": 1280,
+ "scenario": "Remote Mission, write step, no in-ceiling route at submit, so the child is routed to claude write (shell) and an ask with desktopRequired is created. Workstation allow_once mints grant G (uses 0, expiry 5 min). At launch, revalidation reroutes the Task to Ollama (tool-free, in ceiling); the final launch check passes without any grant, so G is never spent. When the Ollama session fails, the retry-same (line 1536), verification re-execution (line 1566) or reroute (line 1580) paths call startSession with the claude write op. startSession calls missionScopeCheck(targetTask) with the default phase 'check' (line 1280). In 'check' the grant is found by desktopSessionGrant and accepted, and it is never consumed (consumption happens only when phase === 'launch', manager.server.ts line 110). Each such relaunch starts a shell session under the same single approval until the 5-minute expiry. Fallback submit (manager.server.ts 1317-1320) omits providerDenylist, so eligibility does not block the return to claude.",
+ "evidence": "Probe in an OS temp dir (node --experimental-strip-types, repo modules imported by file URL, folder removed afterwards): after a workstation allow_once with the launch held, missionScopeCheck(child,'check') returned null twice with grant.uses still 0; missionScopeCheck(child,'launch') returned null and uses became 1; a following 'check' was refused with 'Approval required on Windows Host ... claude write sessions run with shell authority'. The reroute-then-relaunch chain itself was not exercised end to end. Existing test F01-5/F01-2b only cover spent grants.",
+ "recommendation": "Spend or refuse the grant on every session start, not only on the initial launch: have startSession pass phase 'launch' (or make 'check' consume). Revoke unused session grants whenever a Task's operation changes (launch-time reroute or relaunch to a different provider/model/access). Add a test that holds a grant, reroutes at launch, then relaunches back to the approved op."
+}
+{
+ "title": "Single-use grant is spent before the Agentic admission gate, which always refuses remote shell sessions, so the approval is burned with no session",
+ "severity": "MEDIUM",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts",
+ "line": 1129,
+ "scenario": "Agent Mission with a device-granted (remote) envelope. A child shell session raises a desktopRequired ask (manager.server.ts 1388 taskViolation refuses it). Workstation allow_once mints G; respond calls tasks.approve, which calls launch. The check at line 1129 passes via G and the 'launch' phase spends G (uses=1). Next, line 1132 runs missionAttemptAdmission(final,'action') -> admitAgenticProvider. Its validate callback (manager.server.ts 2584-2593) calls taskViolation without any desktop option, which reaches providerScopeViolation with no desktopGrant (authorization.server.ts 374) and returns remoteSessionViolation. The admission returns 'Outside current Agentic authority', launch throws, and the step fails. The grant is spent, and the approved op can never launch for that envelope.",
+ "evidence": "Code-path read only (not probed end to end): authorization.server.ts:374, manager.server.ts:2584-2593, agentic-store.server.ts:129-130 (validate reason returned directly), bunny-host/manager.server.ts:1129-1132 ordering. Fail-closed, so not a bypass.",
+ "recommendation": "Thread the desktop grant into the admission validate callback (or evaluate taskViolation with desktopGrant). Move the single-use spend to after every refusal in launch (admission, update and state transitions), or make it a two-phase reserve and commit."
+}
+{
+ "title": "Desktop grants are not attempt-bound and survive Retry within their 5-minute TTL",
+ "severity": "LOW",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/manager.server.ts",
+ "line": 3601,
+ "scenario": "A capability ask on step S is answered allow_once, minting G. If admission does not happen (mission held or interrupted before the bus admits the call), G stays unspent. A later Retry of S re-runs the identical op within 5 minutes and is admitted under G without a new prompt. retry() (line 3601) does not revoke grants; only stop (3519) and replan (3688) do. desktopContext (lines 2094-2106) binds Mission, Agent, step, Task, plan, authorization and epoch, but not the step attempt. The op is identical, so this is not permission expansion, but it contradicts the 'Retry never reuses a denied or spent approval' intent.",
+ "evidence": "desktopContext and desktopCapabilityGrant (2124-2132) read; retry() does not call revokeDesktopGrants (grep of callers: 3519 and 3688 only). Not probed.",
+ "recommendation": "Include the attempt index in DesktopGrantContext, or revoke unspent grants of the step on Retry and hold, so an approval covers one attempt."
+}
+{
+ "title": "Trusted-desktop operation binding omits provider executable identity, effort and resolved model for sessions",
+ "severity": "INFO",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/authorization.server.ts",
+ "line": 173,
+ "scenario": "sessionOperation binds provider, model (literal, so 'auto' is not pinned to the resolved default model), access, cwd and sessionAuthority, plus taskId/planReference/authorizationId through the context. It does not bind the resolved provider binary, reasoning effort, or the provider-default model. A provider-side default-model or binary change between approval and launch would run under the old approval. No device-reachable path was found to exploit this. The prompt is fixed per child taskId, so it is effectively bound.",
+ "evidence": "authorization.server.ts:173-175; manager.server.ts:2094-2111 context construction. Capability grants bind the full params digest and the resolved terminal executable file and prefix (authorization.server.ts:177-179), which is sound.",
+ "recommendation": "Bind the resolved executable path and hash for session ops, and the effort level, or refuse 'auto' for desktop session grants."
+}
+{
+ "title": "Ordinary ask with no desktopRequired flag can be produced for a remote-refused action, and one bus path drops the desktop flags",
+ "severity": "INFO",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/capabilities/bus.server.ts",
+ "line": 260,
+ "scenario": "(a) decide() evaluates agenticViolation after the remote block (authorization.server.ts 274-276). With a valid grant present and an agenticViolation, it returns a plain ask; bus.server.ts line 152 then returns it, so an ordinary ask exists for a code-executing action. A device answer is still refused by the final remoteExecutionRefusal check in deviceRequestRefusal (manager.server.ts 2007), and the workstation cannot run it, so there is no bypass. (b) bus.server.ts line 260 returns admitted.reason as a plain ask with no desktopRequired/desktopOperation; it is effectively unreachable today because the admission callback re-runs the same synchronous decision.",
+ "evidence": "Code read of decide(), bus.decision()/request() ordering, and deviceRequestRefusal(). No probe needed; no exploit path found.",
+ "recommendation": "Carry desktopRequired and desktopOperation on every ask a remote-refused op can produce, including the agenticViolation and admission-reason returns, so the flag never depends on the ordering of checks."
+}
+{
+ "title": "Paired devices receive full desktop grant and operation records in the mission projection",
+ "severity": "INFO",
+ "file": "C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/manager.server.ts",
+ "line": 2059,
+ "scenario": "The device projection spreads each request (...request) for both resolved requests (returned as-is) and unresolved ones, so desktopOperation (exact command digest, cwd, resolved executable file/prefix) and desktopGrant (ids, uses, expiry) reach the phone. This is not authority: grants are consumed by request id, and the device cannot mint or spend them.",
+ "evidence": "manager.server.ts:2059-2068 read.",
+ "recommendation": "Strip desktopGrant and desktopOperation from the device projection, leaving only the desktopRequired flag and the remote verdict."
+}
+===== null
+coverage: Read the full diff of git diff 7fbea39 -- src (authorization.server.ts, types.ts, store.server.ts, bunny-missions/manager.server.ts, capabilities/bus.server.ts, capabilities/local.server.ts, bunny-host/manager.server.ts, bunny-host/http.server.ts, orch/host-bridge.server.ts and tests) and read surrounding code. Traced provider-session launch paths: launchModel dispatch (taskViolation, approveDelegated check, reviewer-independence fallback, outsideCeiling routing preference); TaskManager.approve/approveDelegated/launch (both missionScopeCheck calls, launch-time revalidation reroute, final check
+{
+ "title": "Git metadata write refusal bypassed by the 8.3 short name GIT~1; remote envelope can plant a git filter driver and run it via git.status",
+ "severity": "BLOCKER",
+ "file": "src/lib/bunny-missions/authorization.server.ts",
+ "line": 168,
+ "scenario": "Preconditions: a paired-device-approved Mission envelope (remote authority) whose approved scope includes filesystem.write over the repo root and git.status, as allowed by the remote ceiling. Step 1: a filesystem.write with path 'GIT~1/config' (8.3 alias of .git on this NTFS volume) and the existing config plus a [filter \"probe\"] clean driver. decide() returns allow because the remote Git-metadata regex /(^|[\\\\/])\\.git([\\\\/]|$)/i (line 168, applied to resolve(cwd,path) without canonicalization) does not match 'GIT~1'. The real filesystem adapter (scopedPath -> canonical -> JS realpathSync, which keeps 'GIT~1') writes the file into .git/config. Step 2: a filesystem.write of .gitattributes '* filter=probe' (not a .git path, allowed). Step 3: filesystem.write of a tracked file to change its stat. Step 4: git.status (READ, allowed remotely; the remoteAuthority -c hardening does not disable filter drivers) runs the configured clean command. Probe result: the clean command ran and wrote its marker file; the workstation-only control path '.git/config' correctly returned ask/desktopRequired. The same regex-on-uncanonical-path also governs Agentic scope (authorization.server.ts:312) and the device answer check (manager.server.ts:2007 via deviceRequestRefusal), so those sites carry the same bypass. Precondition note: a device does not author plan parameters itself, so the path must come from an approved plan step or a re-asked request; the Host gate that is supposed to stop it does not.",
+ "evidence": "Real-module probe in an OS temp folder (mkdtemp, removed afterwards): decide(filesystem.write,'.git/config') -> ask desktopRequired:true; decide(filesystem.write,'GIT~1/config') -> allow 'Inside mission authorization'. FilesystemCapability.execute wrote GIT~1/config and real .git/config then contained [filter \"probe\"]. GitCapability.execute('git.status', remoteAuthority:true) -> ok, and the marker file contained FILTER-RAN. Node test: fs.writeFileSync('.../GIT~1/config') succeeded, 'GIT~1','Git~1','git~1' all alias .git on C:. fs.realpathSync.native('.../GIT~1/config') -> '...\\\\.git\\\\config' while fs.realpathSync and paths.server.ts canonical() keep 'GIT~1'. Trailing-dot ('.git.') and trailing-space variants do NOT alias (ENOENT), so only 8.3 aliasing is exploitable. The real repo's .git is reachable as GIT~1 on this machine (read-only check). Relevant lines: authorization.server.ts:168 (remote regex), :272-274 (decide remote rule), :213-216 (mission scopeViolation has no Git check), :312 (Agentic regex); paths.server.ts:8-16 (canonical uses realpathSync); capabilities/local.server.ts:57 (scopedPath for filesystem).",
+ "recommendation": "Resolve every path with fs.realpathSync.native (or reject any segment matching /^git~\\d+$/i) before the Git-metadata test, in canonical()/scopedPath() and in remoteExecutionRefusal, and apply the same check to the Agentic (:312) and deviceRequestRefusal (manager.server.ts:2007) sites. Add the Git-metadata refusal to the mission-level scopeViolation as defense in depth. Add a regression test that a remote filesystem.write to 'GIT~1/config' yields desktopRequired, and a real-adapter test that the write is refused.",
+ "category": "policy-bypass"
+}
+{
+ "title": "Single-use desktop grant is spent before the admission check, so a refused launch burns it",
+ "severity": "LOW",
+ "file": "src/lib/bunny-host/manager.server.ts",
+ "line": 1132,
+ "scenario": "TaskManager.launch runs missionScopeCheck(final,'launch') at line 1129, which calls consumeDesktopGrant (bunny-missions manager.server.ts:110) and increments uses to 1. missionAttemptAdmission at line 1132 can then return a violation and throw 'Outside current Agentic authority', so no session starts but the grant is spent. The workstation must mint a new grant to retry, and the mint is bound to the same request. Fail-closed (no bypass), functional only.",
+ "evidence": "Code order in src/lib/bunny-host/manager.server.ts lines 1128-1133 and src/lib/bunny-missions/manager.server.ts line 110. Not probed.",
+ "recommendation": "Run the admission check before consuming the grant, or re-credit the grant (uses--) when a later check in launch refuses before the adapter starts.",
+ "category": "correctness"
+}
+{
+ "title": "isRemoteEnvelope fails open for unmarked envelopes whose grantedBy is neither 'device:*' nor a string",
+ "severity": "LOW",
+ "file": "src/lib/bunny-missions/authorization.server.ts",
+ "line": 131,
+ "scenario": "For an envelope with no authority marker and no writeIncludesShell=false, isRemoteEnvelope returns false unless grantedBy starts with 'device:'. The comment at line 117 and authorityFor() say every non-workstation actor is remote (fail closed), so the two disagree. Any unmarked envelope with another grantedBy string (e.g. a future actor such as 'trigger:...') would be treated as workstation authority. Not reachable today: envelopeFrom is called only with the HTTP actor ('workstation' or 'device:<id>') at manager.server.ts ~768 and ~2226.",
+ "evidence": "authorization.server.ts:117 (comment), :120-122 (authorityFor fails closed), :127-131 (isRemoteEnvelope). Code reading only.",
+ "recommendation": "Make the final fallback fail closed: return true unless grantedBy === 'workstation' and the envelope has no remote marker.",
+ "category": "defense-in-depth"
+}
+{
+ "title": "Desktop grant is bound to the step's current taskId and to authorization/plan values read at mint time, not at ask time",
+ "severity": "LOW",
+ "file": "src/lib/bunny-missions/manager.server.ts",
+ "line": 2101,
+ "scenario": "mintDesktopGrant (line 2146) builds its binding from desktopContext (line 2094), which reads taskId, planReference and authorizationId from the store when the workstation answers, not from the values in force when the ask was raised. If the step's taskId or the mission authorization changed while the request was open, the grant binds to the new values while the operation the workstation reviewed was the old one. The operation itself is still checked exactly at use (sameOperation), so the exposure is limited to the Task/authorization identity. I found no reachable path that changes these while a desktopRequired request is open, so this is hardening only.",
+ "evidence": "manager.server.ts:2094-2104 (desktopContext reads store.step(stepId).taskId and mission.authorizationId at call time) and :2146-2151 (mintDesktopGrant). Code reading only.",
+ "recommendation": "Capture taskId, planReference and authorizationId on the PermissionRequest when it is created, and mint from those stored values, refusing if they differ from the current state.",
+ "category": "defense-in-depth"
+}
+{
+ "title": "Device-started workstation-approved missions and resumed Agents launch shell-capable sessions without a per-session grant (owner policy decision)",
+ "severity": "INFO",
+ "file": "src/lib/bunny-missions/commands.server.ts",
+ "line": 53,
+ "scenario": "A workstation approves a Mission with start:false, so the envelope is workstation authority with writeIncludesShell true. A paired device, which holds the answer right, calls mission.start (commands.server.ts:53-59, no remote check beyond state==='ready' and Agent origin). Similarly, agent.resume by a device (agent-runtime.server.ts:196-245, supervise right) calls schedule() and launches the Agent's claude write or codex sessions under the workstation envelope. No trusted-desktop grant is involved because the envelope is not remote. This matches 'resume within authority' in the policy, but the device chooses the moment at which shell sessions run; the owner should confirm this is intended.",
+ "evidence": "commands.server.ts:53-59; agent-runtime.server.ts:196-245; manager tickOnce admits steps without a remote check when the envelope is workstation authority. Code reading only.",
+ "recommendation": "Owner decision: either accept (resume/start within workstation-approved authority) or require a desktop grant when a device starts a Mission whose envelope has writeIncludesShell true.",
+ "category": "policy-question"
+}

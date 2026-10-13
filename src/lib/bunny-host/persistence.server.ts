@@ -39,6 +39,16 @@ export class HostDatabase {
   projects(): Project[] { return (this.db.prepare("SELECT record FROM projects").all() as { record: string }[]).map(row => JSON.parse(row.record) as Project); }
   get(id: string): OrchTask { const row = this.db.prepare("SELECT record FROM tasks WHERE id=?").get(id) as { record: string } | undefined; if (!row) throw new Error("Unknown task."); return JSON.parse(row.record) as OrchTask; }
   inserted = 0;
+  onFailure: ((error:unknown,rollbackFailed:boolean)=>void)|null=null;
+  /** Synchronous SQLite boundary: preserve the original failure even if rollback itself fails. */
+  transaction<T>(work: () => T): T {
+    let started=false;
+    try {this.db.exec("BEGIN IMMEDIATE");started=true;const result=work();this.db.exec("COMMIT");return result;}
+    catch(error) {
+      if(started) try {this.db.exec("ROLLBACK");} catch(rollback) {const fatal=new AggregateError([error,rollback],"SQLite transaction and rollback failed; Host integrity requires recovery.");this.onFailure?.(fatal,true);throw fatal;}
+      this.onFailure?.(error,false);throw error;
+    }
+  }
   event(type: string, taskId: string | null, detail: string, missionId: string | null = null): HostEvent {
     const at = Date.now(); const result = this.db.prepare("INSERT INTO events(at,type,task_id,detail,mission_id) VALUES(?,?,?,?,?)").run(at,type,taskId,detail.slice(0,16000),missionId);
     // Bound the journal: keep the newest 20,000 events, trimming every 500 inserts.
@@ -46,11 +56,11 @@ export class HostDatabase {
     return { sequence: Number(result.lastInsertRowid), at, type, taskId, detail: detail.slice(0,16000), missionId };
   }
   write(task: OrchTask, type: string, detail: string): HostEvent {
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
+    return this.transaction(()=>{
       this.db.prepare("INSERT INTO tasks(id,record) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET record=excluded.record").run(task.id,JSON.stringify(task));
-      const event = this.event(type,task.id,detail,task.mission?.missionId ?? null); this.db.exec("COMMIT"); return event;
-    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+      if(task.startedAt && /^task\.(completed|failed|stopped)$/.test(type)) this.outcome(task);
+      return this.event(type,task.id,detail,task.mission?.missionId ?? null);
+    });
   }
   events(after = 0): HostEvent[] { return (this.db.prepare("SELECT sequence,at,type,task_id AS taskId,detail,mission_id AS missionId FROM events WHERE sequence>? ORDER BY sequence LIMIT 500").all(after) as HostEvent[]); }
   taskEvents(taskId: string, after = 0): HostEvent[] { return (this.db.prepare("SELECT sequence,at,type,task_id AS taskId,detail,mission_id AS missionId FROM events WHERE task_id=? AND sequence>? ORDER BY sequence LIMIT 500").all(taskId, after) as HostEvent[]); }

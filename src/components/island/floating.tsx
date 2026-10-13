@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { activeTasks, liveProviders, useIsland } from "@/store/use-island";
 import { Approval, Composer, openTask, Routing } from "./task";
-import { NAMES, ProviderMark, TaskActivity, TaskBadge } from "./ui";
+import { HostHealthWarning, NAMES, ProviderMark, TaskActivity, TaskBadge } from "./ui";
 import { elapsed, isActive, verifiedFile, TERMINAL } from "./ui-model";
 import { Sparkline, Telemetry, thermalReading, ThermalWarning } from "./telemetry";
 import {
@@ -28,7 +28,8 @@ import {
   TaskJourney,
 } from "./motion";
 import { orbState, isPrivateEvent } from "./motion-model";
-import { useVoiceInput, VoicePanel } from "./voice";
+import { VoicePanel } from "./voice";
+import { voiceListening } from "./voice-model";
 import { focusMission, justFinished } from "./mission-model";
 import { MissionCompletion, MissionPanel, MissionStrip } from "./mission";
 
@@ -50,7 +51,7 @@ export function FloatingIsland({ now }: { now: number }) {
   const active = activeTasks(store.tasks);
   const [view, setView] = useState<View>("idle");
   const [focused, setFocused] = useState<string | null>(null);
-  const voice = useVoiceInput();
+  const voiceLive = voiceListening(store.voice, store.voiceReceivedAt, now);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
   const [dismissedHeat, setDismissedHeat] = useState<string | null>(null);
@@ -87,7 +88,7 @@ export function FloatingIsland({ now }: { now: number }) {
   );
   const sample = store.samples.at(-1);
   const orb =
-    voice.state === "listening"
+    voiceLive
       ? "listening"
       : orbState(store.host, expanded ? task : active[0], routing);
   useEffect(
@@ -106,7 +107,7 @@ export function FloatingIsland({ now }: { now: number }) {
       : null;
   const collapse = () => {
     setView("idle");
-    voice.stop();
+    if (store.voice?.open) void store.closeVoice();
     if (store.sheet === "compose" || store.sheet === "decision") store.setSheet("today");
     requestAnimationFrame(() => bunny.current?.focus());
   };
@@ -216,6 +217,7 @@ export function FloatingIsland({ now }: { now: number }) {
       }}
     >
       <div className="island-measure" ref={measured}>
+        <HostHealthWarning />
         <header className="island-header">
           <button
             type="button"
@@ -228,21 +230,21 @@ export function FloatingIsland({ now }: { now: number }) {
               held.current = false;
               holdTimer.current = setTimeout(() => {
                 held.current = true;
-                voice.start();
+                void store.listenStart();
                 setView("voice");
               }, 420);
             }}
             onPointerUp={() => {
               if (holdTimer.current) clearTimeout(holdTimer.current);
-              if (held.current) voice.stop();
+              if (held.current) void store.listenEnd();
             }}
             onPointerLeave={() => {
               if (holdTimer.current) clearTimeout(holdTimer.current);
-              if (held.current) voice.stop();
+              if (held.current) void store.listenEnd();
             }}
             onPointerCancel={() => {
               if (holdTimer.current) clearTimeout(holdTimer.current);
-              voice.stop();
+              void store.listenEnd();
             }}
             onClick={() => {
               if (held.current) {
@@ -334,10 +336,7 @@ export function FloatingIsland({ now }: { now: number }) {
               <Routing />
             ) : view === "voice" ? (
               <VoicePanel
-                state={voice.state}
-                transcript={voice.transcript}
-                onStop={() => {
-                  voice.stop();
+                onEnded={() => {
                   store.setSheet("compose");
                   setView("composer");
                 }}

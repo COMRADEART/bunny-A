@@ -2,7 +2,9 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ActionManifest, CapabilityResult } from "../types.ts";
 import type { CapabilityAdapter, ExecutionContext } from "./bus.server.ts";
-import { blockedHost, checkingProxy, safeUrl, type NetworkOptions } from "./browser-network.server.ts";
+import { approvedOrigin, blockedHost, checkingProxy, safeUrl, type NetworkOptions } from "./browser-network.server.ts";
+import { operationContract } from "../cross-app.ts";
+import { HostContainment, type SafeError } from "../../bunny-host/failure.server.ts";
 export { blockedHost, safeUrl } from "./browser-network.server.ts";
 
 type PwPage = {
@@ -15,7 +17,8 @@ type PwPage = {
   waitForEvent(event: "download", options: { timeout: number }): Promise<{ suggestedFilename(): string; saveAs(path: string): Promise<void>; url(): string }>;
 };
 type PwLocator = { first(): PwLocator; click(options: { timeout: number }): Promise<void>; fill(text: string, options: { timeout: number }): Promise<void>; press(key: string, options: { timeout: number }): Promise<void>; waitFor(options: { timeout: number; state?: string }): Promise<void>; allInnerTexts(): Promise<string[]>; evaluateAll<T>(fn: (nodes: Element[], arg: string | null) => T, arg: string | null): Promise<T>; count(): Promise<number> };
-type PwContext = { pages(): PwPage[]; newPage(): Promise<PwPage>; close(): Promise<void>; route(pattern: string, handler: (route: { request(): { url(): string }; abort(reason?: string): Promise<void>; continue(): Promise<void> }) => Promise<void>): Promise<void> };
+type PwContext = { pages(): PwPage[]; newPage(): Promise<PwPage>; close(): Promise<void>; routeWebSocket(pattern: string, handler: (route: { close(): void }) => void): Promise<void>; route(pattern: string, handler: (route: { request(): { url(): string; method(): string }; abort(reason?: string): Promise<void>; continue(): Promise<void> }) => Promise<void>): Promise<void> };
+export type BrowserSessionRecord = { version: 1; missionId: string; reference: string; url: string | null; updatedAt: number };
 
 const input = (name: string, type: ActionManifest["inputs"][number]["type"], required: boolean, description: string) => ({ name, type, required, description });
 
@@ -27,8 +30,17 @@ export class BrowserCapability implements CapabilityAdapter {
   dataDirectory: string; headless: boolean; allowLoopback: boolean;
   context: PwContext | null = null; starting: Promise<PwContext> | null = null; channel: string | null = null;
   tabs = new Map<string, PwPage>(); current: string | null = null; idle: ReturnType<typeof setTimeout> | null = null;
+  containment:HostContainment;
+  asyncFailure:SafeError|null=null;
   network: NetworkOptions; proxy: Awaited<ReturnType<typeof checkingProxy>> | null = null;
-  constructor(dataDirectory: string, options: { headless?: boolean; allowLoopback?: boolean; network?: NetworkOptions } = {}) {
+  sessions = new Map<string, BrowserCapability>();
+  sessionStorage: { load(id: string): BrowserSessionRecord | null; save(record: BrowserSessionRecord): void } | null = null;
+  profile: string | null = null;
+  reference: string | null = null;
+  authority: (() => string | null) | null = null;
+  tail: Promise<void> = Promise.resolve();
+  constructor(dataDirectory: string, options: { headless?: boolean; allowLoopback?: boolean; network?: NetworkOptions; containment?:HostContainment } = {}) {
+    this.containment=options.containment ?? new HostContainment();
     this.dataDirectory = dataDirectory; this.headless = options.headless ?? true; this.allowLoopback = options.allowLoopback ?? false;
     this.network = { ...options.network, allowLoopback: this.allowLoopback };
   }
@@ -57,18 +69,23 @@ export class BrowserCapability implements CapabilityAdapter {
     if (this.context) return this.context;
     this.starting ??= (async () => {
       const { chromium } = await import("playwright") as unknown as { chromium: { launchPersistentContext(dir: string, options: Record<string, unknown>): Promise<PwContext> } };
-      const profile = join(this.dataDirectory, "browser-profile"); mkdirSync(profile, { recursive: true });
+      const profile = this.profile ?? join(this.dataDirectory, "browser-profile"); mkdirSync(profile, { recursive: true });
       const errors: string[] = [];
       this.proxy = await checkingProxy(this.network);
       for (const channel of [undefined, "chrome", "msedge"]) {
         try {
-          const context = await chromium.launchPersistentContext(profile, { headless: this.headless, acceptDownloads: true, serviceWorkers: "block", proxy: { server: this.proxy.url, bypass: "<-loopback>" },
+          const context = await chromium.launchPersistentContext(profile, { headless: this.headless, acceptDownloads: !this.network.allowedOrigins, serviceWorkers: "block", proxy: { server: this.proxy.url, bypass: "<-loopback>" },
             args: ["--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"], ...(channel ? { channel } : {}) });
           this.channel = channel ?? "bundled chromium";
+          if (this.network.allowedOrigins) await context.routeWebSocket("**/*", route => route.close());
           // Every request — subresources and redirects included — is checked, not just the first URL.
           await context.route("**/*", async (route) => {
-            let host = ""; try { const url = new URL(route.request().url()); host = url.hostname; if (url.protocol === "data:" || url.protocol === "blob:") return route.continue(); } catch { return route.abort("blockedbyclient"); }
-            return blockedHost(host, this.allowLoopback) ? route.abort("blockedbyclient") : route.continue();
+            try {
+            if (this.authority?.()) return await route.abort("blockedbyclient");
+            if (this.network.allowedOrigins && !["GET", "HEAD"].includes(route.request().method())) return await route.abort("blockedbyclient");
+            let host = ""; try { const url = new URL(route.request().url()); host = url.hostname; if (url.protocol === "data:" || url.protocol === "blob:") return await route.continue(); approvedOrigin(url, this.network.allowedOrigins); } catch { return await route.abort("blockedbyclient"); }
+            await (blockedHost(host, this.allowLoopback) ? route.abort("blockedbyclient") : route.continue());
+            } catch(error) {await this.containment.contain(error,"boundary",{owner:{subsystem:"browser"},failureClass:"SUBSYSTEM_FAILURE",fail:failure=>{this.asyncFailure=failure;}});}
           });
           for (const page of context.pages()) await page.close().catch(() => {});
           this.context = context; return context;
@@ -79,12 +96,13 @@ export class BrowserCapability implements CapabilityAdapter {
     })().finally(() => { this.starting = null; });
     return this.starting;
   }
-  keepAlive() { if (this.idle) clearTimeout(this.idle); this.idle = setTimeout(() => void this.close(), 5 * 60_000); this.idle.unref?.(); }
+  keepAlive() { if (this.idle) clearTimeout(this.idle); this.idle = setTimeout(() => this.containment.background({subsystem:"browser"},()=>this.close(),undefined,"SUBSYSTEM_FAILURE"), 5 * 60_000); this.idle.unref?.(); }
   async page(tabId?: unknown): Promise<{ id: string; page: PwPage }> {
     const context = await this.ensure();
     const id = typeof tabId === "string" && tabId ? tabId : this.current;
     if (id && this.tabs.has(id) && !this.tabs.get(id)!.isClosed()) { this.current = id; return { id, page: this.tabs.get(id)! }; }
     if (typeof tabId === "string" && tabId) throw new Error(`Unknown or closed tab ${tabId}.`);
+    if (this.network.allowedOrigins && this.tabs.size >= 3) throw new Error("Mission tab limit reached.");
     const page = await context.newPage(); const created = crypto.randomUUID().slice(0, 8);
     this.tabs.set(created, page); this.current = created; return { id: created, page };
   }
@@ -98,6 +116,48 @@ export class BrowserCapability implements CapabilityAdapter {
     throw new Error("Provide role(+name), label, placeholder, text or selector.");
   }
   async execute(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
+    this.containment.assertAccepting("browser");
+    if (context.crossApp) {
+      if (!context.missionId || !/^[\w-]{1,80}$/.test(context.missionId) || !context.browserOrigins?.length || operationContract(action)?.authorizationCategory !== "browser") throw new Error("No bounded Mission browser scope.");
+      let session = this.sessions.get(context.missionId);
+      if (!session) {
+        if (this.sessions.size >= 3) throw new Error("Active Mission browser limit reached.");
+        session = new BrowserCapability(this.dataDirectory, { headless: this.headless, allowLoopback: this.allowLoopback, network: { ...this.network, allowedOrigins: [...context.browserOrigins] }, containment: this.containment });
+        session.profile = join(this.dataDirectory, "browser-sessions", context.missionId);
+        session.reference = this.sessionStorage?.load(context.missionId)?.reference ?? crypto.randomUUID();
+        this.sessions.set(context.missionId, session);
+      }
+      const active = session;
+      const previous = active.tail; let release!: () => void; active.tail = new Promise<void>(resolve => { release = resolve; });
+      await previous;
+      const aborted = () => { void active.close(); };
+      try {
+        context.signal.throwIfAborted(); const denied = context.revalidate?.(); if (denied) throw new Error(denied);
+        if (JSON.stringify(active.network.allowedOrigins) !== JSON.stringify(context.browserOrigins)) throw new Error("Browser scope changed; a fresh isolated session is required.");
+        active.authority = context.revalidate ?? null;
+        context.signal.addEventListener("abort", aborted, { once: true });
+        const saved = this.sessionStorage?.load(context.missionId);
+        if (!active.current && action !== "browser.navigate" && saved?.url) {
+          approvedOrigin(safeUrl(saved.url, this.allowLoopback), context.browserOrigins);
+          const acquired = await active.perform("browser.navigate", { url: saved.url }, context);
+          if (!acquired.ok) return acquired;
+        }
+        if (typeof params.url === "string") approvedOrigin(safeUrl(params.url, this.allowLoopback), context.browserOrigins);
+        const result = await active.perform(action, params, context);
+        const page = active.current ? active.tabs.get(active.current) : null;
+        if (page) approvedOrigin(safeUrl(page.url(), this.allowLoopback), context.browserOrigins);
+        if (result.ok && !active.asyncFailure) {
+          this.sessionStorage?.save({ version: 1, missionId: context.missionId, reference: active.reference!, url: page?.url() ?? null, updatedAt: Date.now() });
+          return { ...result, output: { ...(result.output as object), sessionRef: active.reference }, evidence: [...result.evidence, `Mission-owned browser session ${active.reference}`] };
+        }
+        return { ...result, ok: false, status: "failed", errorCategory: "capability_failed" };
+      } finally { context.signal.removeEventListener("abort", aborted); release(); }
+    }
+    const result=await this.perform(action,params,context);
+    if(this.asyncFailure) return {ok:false,status:"failed",summary:"Browser asynchronous handler failed; dependent execution is unavailable.",output:null,evidence:[],errorCategory:"capability_failed"};
+    return result;
+  }
+  async perform(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
     this.keepAlive();
     const timeout = Math.min(context.timeoutMs, 60_000);
     const evidenceOf = async (page: PwPage) => ({ url: page.url(), title: await page.title().catch(() => ""), retrievedAt: new Date().toISOString() });
@@ -177,6 +237,9 @@ export class BrowserCapability implements CapabilityAdapter {
     if (action === "browser.download") {
       const folder = join(this.dataDirectory, "artifacts", context.missionId ? context.missionId.slice(0, 36) : "direct", "downloads"); mkdirSync(folder, { recursive: true });
       const waiting = page.waitForEvent("download", { timeout: Math.min(timeout, 60_000) });
+      // A refused URL, a navigation error or a missing control abandons this wait. Unhandled, its later timeout
+      // rejection ended the whole Host process (M-A-1); the success path still awaits it below.
+      waiting.catch(() => {});
       if (typeof params.url === "string" && params.url) {
         const url = safeUrl(params.url, this.allowLoopback);
         // Navigating to a file URL raises "Download is starting"; the download event still fires.
@@ -191,6 +254,7 @@ export class BrowserCapability implements CapabilityAdapter {
     return { ok: false, status: "unsupported", summary: `${action} is not supported.`, output: null, evidence: [] };
   }
   async close() {
+    await Promise.all([...this.sessions.values()].map(session => session.close())); this.sessions.clear();
     if (this.idle) clearTimeout(this.idle);
     const context = this.context; this.context = null; this.tabs.clear(); this.current = null;
     await context?.close().catch(() => {});

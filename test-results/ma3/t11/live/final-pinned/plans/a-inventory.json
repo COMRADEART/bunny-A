@@ -1,0 +1,251 @@
+{
+  "mission": "Inventory dashboard team",
+  "missionId": "eabd5cd3-6146-49be-b524-c6edef8b6a46",
+  "phase": "review",
+  "state": "waiting_for_approval",
+  "planReference": "team:f9e6a62953374c8c4c51ede049cdfd9e42f7b81278fb7959c7a88f467aeb5b89",
+  "planRevisions": 0,
+  "rejected": [],
+  "members": [
+    {
+      "agentId": "02bf9efc-e435-4cc4-9907-eb4710ba5a24",
+      "role": "planner"
+    },
+    {
+      "agentId": "c72323fd-1d38-49c9-81d7-839ada32c056",
+      "role": "researcher"
+    },
+    {
+      "agentId": "3f54eaed-1db0-439f-8b00-72d12c94dd05",
+      "role": "implementer"
+    },
+    {
+      "agentId": "0559bc79-3860-469d-8a5f-1d2b0dd4f1b3",
+      "role": "documenter"
+    },
+    {
+      "agentId": "3538bce3-8bf0-45e0-8602-e1449e317c35",
+      "role": "reviewer"
+    },
+    {
+      "agentId": "923a4584-7688-4e33-aee9-93818ed63ca9",
+      "role": "tester"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "plan",
+      "role": "planner",
+      "kind": "plan",
+      "objective": "Propose a bounded team plan for the objective as one JSON document.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t1",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the inventory file to gather facts.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t2",
+      "role": "implementer",
+      "kind": "generate_json",
+      "objective": "Generate the JSON dataset from the observed input.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t3",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Generate the HTML page with the required elements.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Generate the Markdown document for the README.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t5",
+      "role": "documenter",
+      "kind": "write_file",
+      "objective": "Save the generated README.md.",
+      "dependsOn": [
+        "t4"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t6",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page.",
+      "dependsOn": [
+        "t3"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t7",
+      "role": "reviewer",
+      "kind": "review",
+      "objective": "Review the generated HTML page.",
+      "dependsOn": [
+        "t6"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t8",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Verify the generated HTML page meets the requirements.",
+      "dependsOn": [
+        "t6",
+        "t7"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t9",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Verify the generated README.md meets the requirements.",
+      "dependsOn": [
+        "t5"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": [
+        "R4"
+      ]
+    },
+    {
+      "key": "t3_r1",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Generate the HTML page with the required elements.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t6_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page.",
+      "dependsOn": [
+        "t3_r1"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t8_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Verify the generated HTML page meets the requirements.",
+      "dependsOn": [
+        "t6_r1",
+        "t7"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4_r1",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Generate the Markdown document for the README.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t5_r1",
+      "role": "documenter",
+      "kind": "write_file",
+      "objective": "Save the generated README.md.",
+      "dependsOn": [
+        "t4_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t9_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Verify the generated README.md meets the requirements.",
+      "dependsOn": [
+        "t5_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": [
+        "R4"
+      ]
+    }
+  ]
+}

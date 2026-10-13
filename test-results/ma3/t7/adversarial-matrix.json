@@ -1,0 +1,559 @@
+{
+  "sourceCommit": "8b71167ba13de496ba25a6f78a7c70e99b388284",
+  "cases": [
+    {
+      "id": "P01",
+      "expected": "Register existing root",
+      "actual": "Canonical root registered; repeated registration returns same identity",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P02",
+      "expected": "Preserve existing files",
+      "actual": "UI preserve.txt unchanged; registration test retains bytes",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-ui-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P03",
+      "expected": "Create empty owned Project",
+      "actual": "Real UI created empty root beneath configured workspace/projects",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-ui-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P04",
+      "expected": "Stable ID after genuine restart",
+      "actual": "Project ID unchanged across new PID/generation",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "restart-recovery.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P05",
+      "expected": "Same names do not merge",
+      "actual": "Two distinct roots keep independent IDs under same name",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P06",
+      "expected": "Same Git remote does not merge",
+      "actual": "Identical origin config on distinct roots retains independent IDs",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P07",
+      "expected": "Missing root needs relink",
+      "actual": "Renamed root blocked, NEEDS_RELINK shown in UI",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-ui-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P08",
+      "expected": "Explicit current relink review",
+      "actual": "Unchecked/stale/conflicting-root relink refused; confirmed valid relink persists",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-ui-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P09",
+      "expected": "Rename metadata only",
+      "actual": "Display title changes; root path and files unchanged",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P10",
+      "expected": "Archive retains files/history",
+      "actual": "UI archive and real Mission archive keep root and canonical history",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P11",
+      "expected": "Restore keeps IDs",
+      "actual": "Same Project/Mission/workspace IDs restored",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P12",
+      "expected": "Stopped Agent stays stopped",
+      "actual": "Controlled stopped row remains STOPPED after archive/restore",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P13",
+      "expected": "Favorite durable",
+      "actual": "Real favorite and tags retained after UI Host restart",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-ui-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P14",
+      "expected": "Search real name/description/tags",
+      "actual": "Three indexed fields tested; UI name/tag queries corroborated",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-ui-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P15",
+      "expected": "Filters real records",
+      "actual": "Active/Archived/Favorites/attention shown; SQLite state corroborated",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-ui-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P16",
+      "expected": "Deterministic sort",
+      "actual": "Stable name tie-break verified; UI Name selection exercised",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P17",
+      "expected": "Canonical activity",
+      "actual": "Mission events and metadata audit events project into actual activity",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P18",
+      "expected": "No fabricated progress",
+      "actual": "Project projection contains lifecycle/counts/attention, no completion metric",
+      "testType": "STATIC VERIFIED",
+      "evidencePath": "project-schema.md",
+      "status": "PASS"
+    },
+    {
+      "id": "P19",
+      "expected": "Bound large lists",
+      "actual": "152-row controlled list capped 100; UI page 25-30 of 30 exercised",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "ui-responsive.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P20",
+      "expected": "Render long Windows path",
+      "actual": "Path over 260 chars registered and visible at 390 width without horizontal overflow",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "long-path-project.json; ui-responsive.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P21",
+      "expected": "Durable Agent workspace",
+      "actual": "Actual Agent acquired owned manifest/scratch outside user root",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P22",
+      "expected": "Workspace identity survives restart",
+      "actual": "Pinned identity unchanged after fresh Host",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "restart-recovery.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P23",
+      "expected": "Distinct scratch for two Agents",
+      "actual": "Unique Agent/Mission bindings yield separate scratch roots",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P24",
+      "expected": "Other Agent scratch inaccessible",
+      "actual": "Other scratch and own private manifest denied",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P25",
+      "expected": "Cross-Project root isolation",
+      "actual": "Project B unchanged, context/root access denied",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P26",
+      "expected": "Explicit cross-Project scope",
+      "actual": "Absent exact current T5 scope denied by resolver; current T5 remains authority",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P27",
+      "expected": "Reject traversal/prefix cousins",
+      "actual": "Relative traversal and AppSecrets prefix cousin rejected",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P28",
+      "expected": "Reject junction/symlink escape",
+      "actual": "Real Windows junction creation then registration refusal",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P29",
+      "expected": "Root substitution needs review",
+      "actual": "Moved original/replacement inode rejected as CONTEXT_CHANGED",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P30",
+      "expected": "Exclude Host state",
+      "actual": "Private SQLite/credentials paths excluded; T5 regression preserved",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P31",
+      "expected": "Resolve current Mission context",
+      "actual": "Five actual step snapshots bind current Project/Mission/Agent",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-context-provenance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P32",
+      "expected": "Record safe provenance",
+      "actual": "Selected ref hashes, consent revision/generation, root identity persisted",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-context-provenance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P33",
+      "expected": "Bound context",
+      "actual": "13-file/64KB overflow refused; snapshot/reference retention limits enforced",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P34",
+      "expected": "No default secret export",
+      "actual": "Sensitive filenames excluded; no raw content persisted or auto-uploaded",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P35",
+      "expected": "README grants no authority",
+      "actual": "Owner-approved README cannot resolve without current T5 envelope",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P36",
+      "expected": "Project cannot force model",
+      "actual": "No model fields/lock; independent actual T3 router decisions",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P37",
+      "expected": "Different Task models in same Project",
+      "actual": "Two eligible simulated probe models selected by actual TaskManager/router; zero execution",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P38",
+      "expected": "T3 preserved",
+      "actual": "Unmodified dynamic routing tests rerun with all assertions",
+      "testType": "SIMULATED",
+      "evidencePath": "security-focused.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P39",
+      "expected": "T2 quota truth preserved",
+      "actual": "Unknown/stale/quota/hard-constraint tests rerun unchanged",
+      "testType": "SIMULATED",
+      "evidencePath": "security-focused.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P40",
+      "expected": "Unknown capabilities stay UNKNOWN",
+      "actual": "T1 discovery tests rerun unchanged",
+      "testType": "SIMULATED",
+      "evidencePath": "security-focused.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P41",
+      "expected": "Canonical work links",
+      "actual": "Agent/Mission/step/capability run IDs remain canonical after restart",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "agent-project-links.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P42",
+      "expected": "Artifact provenance correct",
+      "actual": "Existing artifact IDs/step provenance/hashes resolve and open verified",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "artifact-provenance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P43",
+      "expected": "Cross-Project artifact denial",
+      "actual": "Project B cannot open Project A artifact",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P44",
+      "expected": "Completed Mission stays completed",
+      "actual": "Completed state persists and no repeat capabilities",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "restart-recovery.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P45",
+      "expected": "Stale consent not revived",
+      "actual": "Old consent refused after genuine Host generation change",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "restart-recovery.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P46",
+      "expected": "Checkpoint retained",
+      "actual": "34 canonical checkpoints preserved",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "restart-recovery.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P47",
+      "expected": "Unowned cleanup refused",
+      "actual": "Separate reviewed cleanup required; root remains",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P48",
+      "expected": "No active silent cleanup",
+      "actual": "Cleanup always refuses; active scratch still exists",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P49",
+      "expected": "Bounded Git",
+      "actual": "Real reviewed Git status plus unchanged T6 helper/network/process safety suites",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P50",
+      "expected": "No automatic Git writes/remotes",
+      "actual": "Project registry does not invoke Git; explicit metadata uses T6 reads only",
+      "testType": "STATIC VERIFIED",
+      "evidencePath": "project-schema.md; security-focused.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P51",
+      "expected": "Migration leaves files in place",
+      "actual": "Legacy ID/path preserved with keep.txt identical",
+      "testType": "SIMULATED",
+      "evidencePath": "migration-audit.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P52",
+      "expected": "Idempotent migration",
+      "actual": "Repeated SQLite migration retains identity and bytes",
+      "testType": "SIMULATED",
+      "evidencePath": "migration-audit.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P53",
+      "expected": "Ambiguous mapping fails closed",
+      "actual": "Malformed original bytes and duplicate IDs retained for review; injected rollback passes",
+      "testType": "SIMULATED",
+      "evidencePath": "migration-audit.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P54",
+      "expected": "Concurrent safety",
+      "actual": "Revision conflict prevents overwrite; canonical exclusive WorkspaceCoordinator blocks second root mutation",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P55",
+      "expected": "No shared authority",
+      "actual": "Separate B receives no A context, authorization or artifact",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P56",
+      "expected": "Real Project UI/API",
+      "actual": "Semantic UI controls mutate actual Host records/events",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-ui-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P57",
+      "expected": "Archive/restore Host backed",
+      "actual": "Same record ID and revision history verified after UI actions",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "project-ui-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P58",
+      "expected": "Responsive required sizes",
+      "actual": "1280x800,1920x1080,390x844 light/dark, focus, empty/offline states verified",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "ui-responsive.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P59",
+      "expected": "Real integrated Mission",
+      "actual": "Five approved capability steps independently verified; exactly 2 writes and 1 bounded terminal run",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "integrated-project-mission.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P60",
+      "expected": "Preserve production",
+      "actual": "v26 all manifest bytes match; same process lifetimes, table membership and disabled flags; no production mutation. Full initial mutable-data byte equality NOT TESTED.",
+      "testType": "LIVE VERIFIED",
+      "evidencePath": "production-final.json; production-process-lifetimes.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P61",
+      "expected": "Reject hard-link leakage",
+      "actual": "Cross-root hard link denied",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P62",
+      "expected": "Detect manifest tampering",
+      "actual": "Modified manifest prevents admission, CONTEXT_CHANGED",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P63",
+      "expected": "Enforce scratch quota",
+      "actual": "Prospective >64MB write rejected",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P64",
+      "expected": "Fresh consent after branch drift",
+      "actual": "Changed HEAD fails same envelope; new reviewed revision resolves new anchor",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P65",
+      "expected": "No generic dashboard output leakage",
+      "actual": "Existing T5 presentation assertion exposed new data leak; whitelist now denies generic/unknown capability output",
+      "testType": "SIMULATED",
+      "evidencePath": "focused-final.log; full-regression.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P66",
+      "expected": "Windows special paths denied",
+      "actual": "UNC/device/ADS/reserved/trailing-dot aliases rejected",
+      "testType": "SIMULATED",
+      "evidencePath": "t7-final.log",
+      "status": "PASS"
+    },
+    {
+      "id": "P67",
+      "expected": "Packaged runtime complete",
+      "actual": "Pinned bundled Node/import closure/browser/Project registry/release manifest verified",
+      "testType": "DISPOSABLE LIVE VERIFIED",
+      "evidencePath": "package-acceptance.json",
+      "status": "PASS"
+    },
+    {
+      "id": "P68",
+      "expected": "Migration atomicity",
+      "actual": "Injected interruption rolls back exact original record then retry succeeds",
+      "testType": "SIMULATED",
+      "evidencePath": "migration-audit.json",
+      "status": "PASS"
+    }
+  ],
+  "total": 68,
+  "passed": 68,
+  "failed": 0,
+  "classificationNote": "SIMULATED denotes controlled bindings/probes; these exercise real Windows files/SQLite or actual routing code. Positive Host/UI/restart claims use genuine disposable Hosts. P60 explicitly limits uncollected initial mutable-data byte comparison.",
+  "notTested": [
+    "Arbitrary autonomous model planning",
+    "Live provider execution in T7 Mission",
+    "Artificial UI network-latency injection",
+    "Full initial T7 mutable-production byte snapshot"
+  ]
+}

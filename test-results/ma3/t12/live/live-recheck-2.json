@@ -1,0 +1,77 @@
+{
+  "mode": "live-recheck",
+  "classification": "LIVE human speech, real microphone/speakers, hands-free, disposable Host",
+  "sourceCommit": null,
+  "startedAt": "2026-10-12T08:38:31.810Z",
+  "script": [
+    {
+      "say": "Prepare a … (pause for a second) … plan for the dashboard project.",
+      "expect": "one mission_draft turn (not split)"
+    },
+    {
+      "say": "Is any task running?",
+      "expect": "agent_status"
+    },
+    {
+      "say": "Open notes and save it on the desktop.",
+      "expect": "device_action_unsupported"
+    },
+    {
+      "say": "Are you running any tasks?",
+      "expect": "agent_status"
+    },
+    {
+      "say": "End voice, please.",
+      "expect": "voice_close (the session ends)"
+    }
+  ],
+  "turns": [
+    {
+      "turnId": "input-3-e3c407a9",
+      "heard": "prepare plan for the dashboard project",
+      "kind": "mission_draft",
+      "answer": "I drafted a Mission: the dashboard project. It is waiting for review on the Windows Host screen. I can't approve or start it by voice. It uses the default workspace, because no project name matched.",
+      "answerSource": "host_facts",
+      "overlapped": null
+    },
+    {
+      "turnId": "input-7-c7740b47",
+      "heard": "Tell me about the weather on Mars.",
+      "kind": "chat",
+      "answer": "The weather on Mars can vary, with temperatures ranging from about -80°F (-62°C) during the coldest winter nights to as high as 70°F (21°C) during summer days at the equator. Mars also experiences dust storms and can have winds.",
+      "answerSource": "model",
+      "overlapped": null
+    },
+    {
+      "turnId": "input-13-e5d3b04d",
+      "heard": "End voice please.",
+      "kind": "voice_close",
+      "answer": null,
+      "answerSource": null,
+      "overlapped": null
+    }
+  ],
+  "notes": [
+    "[5s] team.created {\"name\":\"Inventory dashboard team\",\"missionId\":\"ee6eb980-9b20-4761-a519-855d682deaa7\"}",
+    "[28s] team.approved {\"name\":\"Inventory dashboard team\",\"tasks\":10}",
+    "[34s] handsfree.live {\"aec\":\"Windows Voice Capture DSP/source\"}",
+    "[57s] turn {\"heard\":\"prepare plan for the dashboard project\",\"kind\":\"mission_draft\"}",
+    "[57s] answer {\"heard\":\"prepare plan for the dashboard project\",\"kind\":\"mission_draft\",\"answer\":\"I drafted a Mission: the dashboard project. It is waiting for review on the Windows Host screen. I can't approve or start it by voice. It us\"}",
+    "[88s] turn {\"heard\":\"Tell me about the weather on Mars.\",\"kind\":\"chat\"}",
+    "[97s] answer {\"heard\":\"Tell me about the weather on Mars.\",\"kind\":\"chat\",\"answer\":\"The weather on Mars can vary, with temperatures ranging from about -80°F (-62°C) during the coldest winter nights to as high as 70°F (21°C) \"}",
+    "[134s] turn {\"heard\":\"End voice please.\",\"kind\":\"voice_close\"}",
+    "[134s] voice.closed {\"lastClose\":{\"source\":\"voice_command\",\"at\":1791794445625}}"
+  ],
+  "closedBy": {
+    "source": "voice_command",
+    "at": 1791794445625
+  },
+  "workerPidsAfterClose": [],
+  "voiceMissions": [
+    {
+      "title": "the dashboard project",
+      "state": "waiting_for_approval",
+      "authorizationId": null
+    }
+  ]
+}

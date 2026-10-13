@@ -1,0 +1,11 @@
+M-A-3 T9R-F01 production comparison (read-only observation; production v26 never modified)
+
+Unchanged before -> after: release Bunny-A-Windows-v26-MA2-R1, install.json sha256, current release folder,
+release manifest (161 files, sha256 81f83786...), database path, listeners 127.0.0.1:8084 (pid 23016) and
+127.0.0.1:43119 (pid 13672), processes, startup shortcut, and 22 of 25 table digests.
+
+Changed: events (3673 -> 3679), providers (row digest), sqlite_sequence. Read-only query of the 6 new events:
+all are type provider.status_changed written by the running production Host's own provider detection
+(Ollama ready<->offline twice, Codex ready<->unavailable once, Claude Code version line), with no task,
+Mission, device, approval or authorization rows. Attribution: the production Host's periodic provider
+polling during heavy local test load; no T9R-F01 action wrote to production.

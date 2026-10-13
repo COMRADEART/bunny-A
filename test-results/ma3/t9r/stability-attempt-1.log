@@ -1,0 +1,43 @@
+X53 1/10 warm: PASS; Agent 4877d4d7-3c05-4ebe-83dd-895afbf734d2, Mission 85e9fdf9-b7a2-4426-a932-2666693563b3
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Warm target retains exact frame/content identity
++ actual - expected
+
+  {
++   contentProcessId: 18388,
++   contentStartedAt: '639271137972690187',
+-   contentProcessId: null,
+-   contentStartedAt: null,
+    handle: '5111952',
+    processId: 10088,
+    processStartedAt: '639270365907246455'
+  }
+
+    at file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t9r/stability.mjs:39:15
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: {
+    handle: '5111952',
+    processId: 10088,
+    processStartedAt: '639270365907246455',
+    contentProcessId: 18388,
+    contentStartedAt: '639271137972690187'
+  },
+  expected: {
+    handle: '5111952',
+    processId: 10088,
+    processStartedAt: '639270365907246455',
+    contentProcessId: null,
+    contentStartedAt: null
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.18.0

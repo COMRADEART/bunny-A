@@ -1,0 +1,425 @@
+{
+  "reviews": [
+    {
+      "lens": "repairs",
+      "summary": "Round-1 repairs were checked against the working tree. Most are correct: the native terminate is non-blocking and the IsProcessInJob error is fixed; the containedSession done path awaits 'emptied' and every refusal/launched/stop path calls markEmpty; the codex app-server probe, process.server.ts (owned env hardening still applied) and TaskManager.launch/approve refusal are in place; restartSurvivorRefusal is scoped to the same mission or task; the settleStops and dispose ordering has no deadlock; and the native build proof matches the current C source. Incomplete repairs: RESTART-03/startup-throw (R2-01) and STOP-2 (R2-02) are partial, and SHUT-1 (R2-04) misses the failOperation path. Also found: an alias-stat regression in interpreter resolution (R2-03, not executed) and unguarded bookkeeping in terminateJob (R2-05). No BYPASS or escape from the job was found. The round-1 C1 close-drop was left as an accepted LOW and was not re-opened.",
+      "repairVerdicts": [
+        {
+          "finding": "F04-C1",
+          "repaired": false,
+          "note": "Not changed in close_group. Accepted LOW per the disposition: the last-handle close is KILL_ON_JOB_CLOSE, and provider terminateJob keeps the handle until the kernel reports 0. Reviewed and unchanged, as the task stated."
+        },
+        {
+          "finding": "F04-C2",
+          "repaired": true,
+          "note": "native/bunny-owned-process.c:161-162 now uses GetLastError() when IsProcessInJob fails and ERROR_ACCESS_DENIED only when member is FALSE."
+        },
+        {
+          "finding": "F04-C4",
+          "repaired": false,
+          "note": "Partial. terminate_owned now calls terminate_group(g,0) and returns at once, and JS polls. close_group still blocks the Node main thread for up to 1.5 s plus a writer wait (up to about 3.4 s). Residual, not a containment bypass."
+        },
+        {
+          "finding": "F04-BYPASS-1",
+          "repaired": true,
+          "note": "verification.server.ts exec runs an absolute PATH-resolved interpreter, excluding task-folder entries, inside runWindowsOwnedProcess with owner verification.python. Residual regression in resolveInterpreter (R2-03): statSync on App Execution Alias stubs."
+        },
+        {
+          "finding": "F04-BYPASS-2",
+          "repaired": true,
+          "note": "codex-probe.server.ts containedTransport runs the app-server in an OwnedProcessGroup with interactive stdin (spawn arg true), and probe() routes win32 through runWindowsOwnedProcess. A containment failure rejects the probe. Interactive budget (512 KiB) is checked before WriteFile."
+        },
+        {
+          "finding": "F04-LOW-2",
+          "repaired": true,
+          "note": "runProcess always uses runWindowsOwnedProcess on win32. spawnSession's spawnChild seam is only a test seam (production never passes it). The owned env hardening is still applied when owned is set."
+        },
+        {
+          "finding": "F04-STOP-1",
+          "repaired": true,
+          "note": "containedSession done awaits the emptied promise, which resolves only on kernel zero or the refused/empty paths. Retry is unconfirmed-only with backoff. Residual bookkeeping-throw gap in R2-05."
+        },
+        {
+          "finding": "F04-STOP-2",
+          "repaired": false,
+          "note": "Partial. The launched:true marker is attached only when terminate() returns normally (owned-process-group.server.ts:178-181). If terminate() or persist() throws after launch, the root is reported as refused with admitted=false (R2-02)."
+        },
+        {
+          "finding": "F04-STOP-3",
+          "repaired": true,
+          "note": "stopContained text distinguishes admitted/never-admitted, prints 'an unknown number of' when terminatedAtEnd is null, and the Stop text no longer claims a job for a never-admitted session."
+        },
+        {
+          "finding": "F04-SHUT-1",
+          "repaired": false,
+          "note": "Partial. http close awaits settleStops() before db.close, and dispose() runs after it. The failOperation path (manager.server.ts:321) calls session.stop() outside stopsInFlight, so shutdown does not await it (R2-04)."
+        },
+        {
+          "finding": "F04-NATIVE-1",
+          "repaired": true,
+          "note": "terminate is non-blocking (terminate_group(g,0)) and the JS retry polls with backoff. close_group still blocks on the main thread, which is accepted as residual latency at shutdown and finalize."
+        },
+        {
+          "finding": "F04-LENS-RESTART-01",
+          "repaired": true,
+          "note": "manager.server.ts possiblyAlive treats unknown birth as possibly alive; no-identity records go to cleanup_unverifiable and markProviderSessionReview, and 'empty' is never claimed without a verified absence."
+        },
+        {
+          "finding": "F04-LENS-RESTART-02",
+          "repaired": true,
+          "note": "possiblyAlive gives a liveness predicate (null/NaN birth counts as alive) used by reconcile, separate from the strict kill-authority identity match in terminateVerified."
+        },
+        {
+          "finding": "F04-LENS-RESTART-03",
+          "repaired": false,
+          "note": "Partial. The per-record parse is in try (owned-process-group.server.ts:106-110), but field shape is not validated and reconcile runs unguarded in the constructor (manager.server.ts:185, 235-236). See R2-01."
+        },
+        {
+          "finding": "F04-LENS-RESTART-04",
+          "repaired": true,
+          "note": "restartSurvivorRefusal is checked in the private launch path used by both approve and approveDelegated (manager.server.ts:1150), and matches only the same mission or task. Unrelated work is not blocked."
+        },
+        {
+          "finding": "F04-R1-LOW-startup-throw",
+          "repaired": false,
+          "note": "Same residual as RESTART-03. The constructor still throws for a parseable record whose launcherPath or members are missing or invalid (R2-01)."
+        }
+      ],
+      "rows": [
+        {
+          "lens": "repairs",
+          "id": "R2-01",
+          "severity": "LOW",
+          "title": "Restart reconcile dereferences unvalidated record fields outside any try, so a parseable malformed record aborts TaskManager construction",
+          "file": "src/lib/bunny-host/manager.server.ts",
+          "line": 185,
+          "reproduction": "Write runtime/provider-sessions/<uuid>.json containing {\"schema\":\"bunny-owned-operation/1\",\"operationId\":\"<uuid>\",\"containment\":\"running\",\"closed\":false} (no launcherPath, no members). readProviderSessions (owned-process-group.server.ts:106-113) accepts it because only schema, containment and operationId are checked. Then the TaskManager constructor calls reconcileInterruptedProviderSessions (manager.server.ts:185) with no try, and line 235 evaluates record.launcherPath.split(...) and line 236 record.members.map(...), which throw TypeError. The Host constructor fails and the Host does not start. Only the JSON parse is inside the try (owned-process-group.server.ts:107-110), so the round-1 RESTART-03 / R1-LOW-startup-throw repair is incomplete.",
+          "rootCause": "Validation covers the parse and three header fields. The shape of launcherPath, launcherPid, members and each member is never checked, and the reconcile step that consumes them runs unguarded in the constructor.",
+          "repair": "Validate the full shape in readProviderSessions' try (launcherPath string, launcherPid number, launcherCreatedAt number, members array of {pid:number, createdAt:number, file?:string}) and route failures to unreadable. Also wrap each record's reconcile call in try/catch that holds the record as unreadable and emits provider_session.unreadable. Add a constructor test with such a record asserting the Host still starts and the record stays held.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted. Verified in the code:\n\n1. src/lib/bunny-host/owned-process-group.server.ts:106-113 (readProviderSessions). The try block (lines 107-110) checks only schema, containment and operationId. A record with no launcherPath or members passes. Because the record has closed:false, it is pushed into `recovered` and persisted as interrupted/closed (line 114), and it is returned without a shape check.\n\n2. src/lib/bunny-host/manager.server.ts:184-185. The TaskManager constructor calls readProviderSessions then reconcileInterruptedProviderSessions(found.records) inside `if (this.dataDirectory)`. An awk scan of lines 115-190 found no try/catch enclosing that call. Only the nearby holdUnreadable path is wrapped, and that wrapper is in the later check() closure, not the constructor.\n\n3. manager.server.ts:235-236 (per the finding's line numbers, in reconcileInterruptedProviderSessions). `record.launcherPath.split(...)` throws a TypeError when launcherPath is undefined. The members .map also throws when members is missing. Nothing in that function guards against it, so the constructor throws and the Host does not start.\n\n4. The record is persisted before the throw, and a later boot still selects it (containment \"running\" is not in the skip list at line 111). So the failure repeats on every start until someone deletes the file by hand.\n\nReachability is limited. The app's own writers always set launcherPath and members (owned-process-group.server.ts:156 and 190), and persist() writes through a tmp file and rename, so a normal crash does not produce this shape. It needs a hand-edited or externally damaged file in the data directory. That is fail-closed (no process is killed or trusted, and nothing is bypassed), so the impact is a Host availability failure, not a containment bypass. LOW is the justified severity. The finding's reproduction and root cause are accurate, and its repair is consistent with the code."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted; the mechanism is real but the trigger is local tampering only. Verified in code:\n- owned-process-group.server.ts:101-113 (readProviderSessions): the try covers JSON.parse and only checks schema, containment and operationId. A parseable record missing launcherPath/members is pushed into `recovered` unchanged, and the state is persisted as interrupted/closed (line ~114) before the caller runs.\n- manager.server.ts:~173-176: the constructor calls reconcileInterruptedProviderSessions(found.records) with no try. Inside it (~line 234-236) the array literal evaluates record.launcherPath.split(...) and record.members.map(...) unguarded, so a missing field throws TypeError and the constructor fails. The claimed reproduction holds.\n- The consequence is a repeated boot failure: the record is still containment \"running\" on the next start (the skip filter at line 107 only drops empty/absent_after_restart/refused), so it is recovered and throws again until the file is deleted by hand.\n- Trigger reachability is narrow. The only writer (owned-process-group.server.ts:156 constructor, plus members push at line 190) always writes launcherPath and members, and persist is whole-file JSON, so a truncated file fails the parse and goes to the unreadable hold path. A parseable file missing those fields requires out-of-band edits to the local runtime directory, which is the same trust level as the Host itself. Nothing in the viewer, phone or network path reaches it.\n- Hence a real robustness gap (fail-start rather than hold), not a silent containment bypass. Failing loudly at startup does not leave an unkilled process unaccounted for. The R2-01 repair (validate shape inside the try, and guard each record's reconcile call) is still appropriate. Severity LOW is justified. The native/README has no out-of-contract entry that covers this, so it is not a documented exclusion."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "repairs",
+          "id": "R2-02",
+          "severity": "LOW",
+          "title": "Post-launch inspect failure is reported as never-admitted ('refused', admitted=false) when terminate() or persist() throws",
+          "file": "src/lib/bunny-host/owned-process-group.server.ts",
+          "line": 178,
+          "reproduction": "The root is launched and runs. The first post-launch inspect() calls persist(), which can throw EPERM on the rename (Windows antivirus or indexer lock). The catch at owned-process-group.server.ts:178-181 then calls this.terminate(), which calls persist() again. If that throws too, the raw error escapes without Object.assign(...,{launched:true}). In adapters.server.ts containedSession (lines ~348-364) the error is not 'launched', so the code runs group?.close('failed') and settles state 'refused' with admitted:false and detail 'Containment unavailable — execution refused'. The job was killed by the close, but the record and Stop text claim no provider process was ever admitted. Round-1 STOP-2 said only a launch that never produced a handle may be 'refused'.",
+          "rootCause": "The launched marker is attached only when terminate() returns normally. Any exception from the bookkeeping path inside the catch bypasses it, so the classification depends on which I/O call failed instead of on whether the handle exists.",
+          "repair": "In OwnedProcessGroup.spawn, attach launched:true to every error thrown after this.handle is set, whatever its origin, for example by wrapping the post-launch block in try/catch that rethrows Object.assign(error,{launched:true}) whenever this.handle is non-null. Let terminate() failures in that path fall back to close() and keep the handle. Add a test where persist throws after launch and assert state is not 'refused' and admitted is true.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The defect is real but narrow, and the record-level part of the claim is overstated.\n\nMechanism, verified in code:\n- owned-process-group.server.ts:175-180: the post-launch catch calls this.terminate() and attaches launched:true only if terminate() returns normally.\n- owned-process-group.server.ts:203-207: terminate() calls this.native.terminate(...) first, then persist(). If persist() throws (writeFileSync/renameSync EPERM from an antivirus or indexer lock, realistic on Windows), the kernel job has already been terminated, but the raw error escapes the catch without the launched marker.\n- adapters.server.ts:346-363: the outer catch sees no launched flag, runs group?.close(\"failed\") inside a swallowing try, then settles state \"refused\" with admitted:false and \"Containment unavailable — execution refused\". The root did run, since native launch resumes it before inspect() is reached at line 177.\n\nConsequences:\n- The in-memory containment snapshot (and the detail/admitted fields it feeds) reports that no process was admitted. manager.server.ts:1897 then appends \"No provider process was admitted for this session.\" This is the untruthful statement the finding describes.\n- The persisted record is not the \"refused\" state the finding claims. close() at owned-process-group.server.ts:196-197 rewrites containment to \"empty\" or \"unconfirmed\" because its value is \"running\", not \"refused\". The record claim holds only if the close persist also fails.\n- If close's persist also throws, the exception is swallowed by adapters.server.ts:357, and release() (line 200) is never called. That leaves the tracked group registered, a minor leak the finding does not mention.\n\nNothing elsewhere prevents this. The only trigger is an I/O failure on the bookkeeping write after the root has already launched, so impact is limited to misleading status text and bookkeeping. The job is still killed and no process survives. Suggested repair is right: mark the error launched whenever this.handle is set, and let terminate() failures fall back to close() while keeping the handle."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The defect is real as stated, but its impact is classification only, not a containment escape.\n\nCode path, verified by reading:\n- owned-process-group.server.ts spawn(): the post-launch try block runs this.inspect(); persist(). On failure the catch calls this.terminate() and then throws Object.assign(..., {launched:true}) only if terminate() returns normally. terminate() calls persist() whenever record.containment is set, which is always true for provider sessions. If that persist throws (for example an EPERM rename on a Windows-locked file), the raw error escapes the catch without the launched marker.\n- adapters.server.ts containedSession (about lines 344-364): an error without launched:true goes to group?.close(\"failed\") and settles state \"refused\", admitted:false, detail \"Containment unavailable — execution refused\". The root did run, so the record and Stop text misstate the outcome.\n\nWhy it is LOW and not higher:\n- The job is not leaked. containedSession calls group.close(\"failed\") in the non-launched branch, and close() releases the handle, which with KILL_ON_JOB_CLOSE terminates every member. The other callers (runWindowsOwnedProcess and the codex probe) also call close() in their catch blocks. No process escapes.\n- The trigger needs two persist failures in sequence (inspect's persist only runs when something changed, then terminate's persist), so it is rare.\n- The consequence is a truthfulness and classification error (admitted:false for a root that ran), with a recorded containment of empty or unconfirmed rather than refused. No lost accounting for a live process.\n- Partial mitigation: close() still records activeProcesses from the native close return, so the count is kept.\n\nThe proposed repair (mark launched:true whenever this.handle is non-null, and let terminate failures fall back to close while keeping the handle) is sound. I found no prevention elsewhere that would refute it."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "repairs",
+          "id": "R2-03",
+          "severity": "LOW",
+          "title": "Interpreter resolution uses statSync, which fails on Windows App Execution Alias stubs, so Python-via-alias verification now fails (regression)",
+          "file": "src/lib/bunny-host/verification.server.ts",
+          "line": 19,
+          "reproduction": "On a Windows machine where python.exe is available only as the Microsoft Store alias in %LOCALAPPDATA%\\Microsoft\\WindowsApps (an APPEXECLINK reparse point), resolveInterpreter calls statSync(candidate) on that PATH entry. libuv opens the file without FILE_FLAG_OPEN_REPARSE_POINT, so the call throws (ERROR_CANT_ACCESS_FILE, surfaced as UNKNOWN or EACCES). The catch on line 19 skips it, resolveInterpreter returns null, and exec throws 'No Python interpreter on PATH outside the task folder.' The pre-change execFile('python') used CreateProcess PATH search, which launches the alias, so verification worked before. Not verified by execution in this session.",
+          "rootCause": "Existence is tested with a stat that follows the reparse point. App execution aliases are not regular files that stat can open, so they are dropped.",
+          "repair": "Treat a candidate as present when lstatSync succeeds (or accessSync with X_OK succeeds), and do not require isFile() for APPEXECLINK reparse points. Keep the task-folder exclusion. Add a Windows regression with a fake alias-style stub, or document the alias limitation if it is intentionally unsupported.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Code-grounded check of src/lib/bunny-host/verification.server.ts. Line 19 is exactly `try {if(statSync(candidate).isFile()&&!inside(root,canonical(candidate))) return candidate;} catch { /* not here */ }`, and resolveInterpreter (line 13) skips any candidate whose statSync throws. Nothing elsewhere in the file or resolveInterpreter's callers (runPython, line 26) adds a fallback to a PATH-search launch, so when python.exe exists only as a WindowsApps App Execution Alias and no other python is on PATH, runPython throws \"No Python interpreter on PATH outside the task folder.\" (line 27). That is a real false negative, not a bypass: it fails closed. I did not verify the libuv/Node behavior by execution (the rules forbid running anything), so the statSync-throws-on-APPEXECLINK premise rests on known Windows reparse-point behavior, not a test. Not refuted: the defect is real in principle but narrow (alias is the only interpreter, and a Store python is installed behind the alias), and it changes availability of verification, not containment. Severity LOW is justified. Suggested repair from the finding (lstatSync existence check, or an X_OK-style check, keeping the task-folder exclusion) is reasonable, and a Windows regression test with an alias-style reparse stub would confirm it."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted, but unverified by execution and the impact is narrow.\n\nWhat I confirmed in src/lib/bunny-host/verification.server.ts (lines 13-23 of the working tree): resolveInterpreter tests each absolute PATH entry with statSync(candidate).isFile() inside a try/catch that skips on any throw. runPython (around lines 25-33) has no fallback to a bare \"python\" name, so when resolveInterpreter returns null it throws \"No Python interpreter on PATH outside the task folder.\" The pre-change code used execFile(\"python\"), which goes through CreateProcess PATH search. So if a Store App Execution Alias (APPEXECLINK reparse point) is the only python on PATH and stat fails on it, the python verification path now fails where it previously worked. The finding's regression claim is consistent with the code.\n\nWhat I could not confirm: whether libuv's stat (statSync) really throws on APPEXECLINK stubs. I did not run anything, per the read-only rule, and I did not check the libuv source. The finding itself says it is not verified by execution. Also, the alias case is only a regression when the Store alias is functional (a real Store Python install), which is one common install layout.\n\nSecurity impact: none. The failure is fail-closed (verification reports failure), the task-folder exclusion is untouched, and nothing is executed that was not previously executed. This is a functional regression, so LOW is the right severity. The proposed repair (lstatSync or accessSync X_OK as the existence test, while keeping the task-folder exclusion) is reasonable, but it should be checked with a real alias on Windows before it is treated as settled."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "repairs",
+          "id": "R2-04",
+          "severity": "LOW",
+          "title": "failOperation() stops contained sessions outside stopsInFlight, so Host shutdown does not await their job termination",
+          "file": "src/lib/bunny-host/manager.server.ts",
+          "line": 321,
+          "reproduction": "During Host shutdown in draining state, http.server.ts close() calls manager.failOperation(id) for each session (not manager.stop). failOperation calls this.sessions.get(id)?.stop() at manager.server.ts:321 directly, which runs containedSession.stop() -> terminateJob. That work is not added to stopsInFlight, so manager.settleStops() (http.server.ts ~line 966) does not await it. manager.dispose() and db.close() can run while the job is still being terminated. Termination then depends on kill-on-close at process exit. No DB write is lost, because failOperation's update happens before the await. The round-1 SHUT-1 repair is therefore partial.",
+          "rootCause": "Only manager.stop() registers its promise in stopsInFlight. failOperation and any other direct session.stop() caller bypass that registration.",
+          "repair": "Route session termination in failOperation through a helper that registers the promise in stopsInFlight (for example stopsInFlight.set(id, promise) around the session.stop() call), or register every session.stop() inside a single method that settleStops awaits.",
+          "votes": [
+            {
+              "refuted": true,
+              "severityIfReal": "NONE",
+              "reasoning": "The finding's reproduction omits the await at http.server.ts:948-961. In the draining path, close() runs manager.failOperation(id, ...) for every session inside Promise.allSettled and awaits it. failOperation (manager.server.ts:316-327) ends with `await this.sessions.get(id)?.stop()` at line 326, so job termination completes before the close() finally block runs `await ownedCleanup`, `await manager.settleStops()`, `manager.dispose()` (lines 964-968) and before db.close() (line 974). The race described (dispose or db.close running while the job is still terminating) does not occur on the shutdown path. The other branch (non-draining) calls manager.stop(), which is registered in stopsInFlight at manager.server.ts:1926-1928. The one remaining gap is a failOperation invoked from a background path (for example stopInBackground's failure handler at manager.server.ts:312) that is not awaited by close(). That is a narrow race in a failure path and not the stated defect, so the finding is refuted as written."
+            },
+            {
+              "refuted": true,
+              "severityIfReal": "NONE",
+              "reasoning": "The finding's premise that shutdown does not await job termination on the failOperation path is wrong. In src/lib/bunny-host/http.server.ts close() (around lines 947-972), when containment.health.operationalState === \"draining\", every session is passed to manager.failOperation(id, ...) inside `await Promise.allSettled([...])`. That allSettled is awaited before the `finally` block that calls `await manager.settleStops()`, `manager.dispose()`, and before `db.close()`. So the failOperation promises, and the session.stop() call inside them (manager.server.ts ~line 321, `await this.sessions.get(id)?.stop()`), are awaited before the database closes, whether or not they are registered in stopsInFlight. The non-draining branch uses manager.stop(), which does register in stopsInFlight. Also, containedSession.stop() (adapters.server.ts ~392-395) awaits terminateJob(), which polls owned.terminate()/inspect() until ActiveProcesses reaches 0 or CONTAINMENT_CONFIRM_MS elapses (adapters.server.ts ~297-309), so the await spans kernel accounting. failOperation's early returns (TERMINAL state, or stopping.has(id), where the in-flight stop is already in stopsInFlight) do not leave an unawaited termination. The stopsInFlight-registration gap is real as a code-style asymmetry, but it has no observable consequence on the shutdown ordering the finding describes, so there is no defect."
+            }
+          ],
+          "confirmed": false
+        },
+        {
+          "lens": "repairs",
+          "id": "R2-05",
+          "severity": "LOW",
+          "title": "Unconfirmed-termination bookkeeping can throw inside the async termination chain and in the retry timer, leaving the stop promise unhandled and emptied unresolved",
+          "file": "src/lib/bunny-host/adapters.server.ts",
+          "line": 321,
+          "reproduction": "terminateJob's async IIFE calls owned.annotate, owned.close and owned.terminate, which all call persist() (writeFileSync plus renameSync). If persist throws (EPERM under a file lock), then: (a) at line ~312 the IIFE rejects before markEmpty(), so emptied never resolves and done never settles; (b) inside the retry closure at line 321 there is no try, so the throw is an uncaught timer exception, which the Host's uncaughtException containment treats as fatal; (c) stop() is invoked as 'void stop()' from group.onStop (line 345), so a rejection from terminateJob becomes an unhandled rejection. The recorded containment state stays 'terminating' or 'unconfirmed' with no event, and the job handle is never closed by this session.",
+          "rootCause": "Termination bookkeeping is not isolated from I/O failures. The only exception boundary is the caller, and the retry timer has none.",
+          "repair": "Wrap the body of terminateJob's IIFE and the retry closure in try/catch. On failure, record containment 'unconfirmed' in memory, emit provider.containment_unconfirmed with the error, keep the handle, and schedule another retry. Let markEmpty fire only on a confirmed zero. Make onStop call stop().catch(...) so rejections are contained.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Confirmed by reading the code; the defect is real but limited in impact. (1) adapters.server.ts terminateJob IIFE (about lines 300-325): owned.terminate() in the polling loop, owned.annotate(), and owned.close() are all unguarded. Each calls persist() (owned-process-group.server.ts:77-79: writeFileSync to .tmp then renameSync), and owned-process-group.server.ts:203-212 and :212 show terminate and annotate call persist directly. A throw therefore rejects the IIFE before markEmpty(), so `emptied` never resolves, the containment state stays 'terminating' or 'unconfirmed', and the handle is never closed by the session. (2) The retry closure (about line 321) calls owned.terminate() and owned.close() with no try, so the throw is an uncaught timer exception. failure.server.ts:152 and :447 treat uncaughtException as HOST_FATAL, and classifyFailure maps HOST_FATAL to CONTROLLED_EXIT. (3) stop() is invoked as `void stop()` from group.onStop (adapters.server.ts about line 345), so a rejection becomes an unhandled rejection. Under failure.server.ts:152 that is also HOST_FATAL when ownedAndSafe is false. Mitigating facts: this needs a write or rename failure on the record file (for example Windows EPERM from a file lock). The uncaught path ends in a controlled Host exit, and that exit closes the KILL_ON_JOB_CLOSE job, so members are still killed rather than orphaned. The main done path does reject rather than hang, because it awaits terminateJob directly. The failure is in bookkeeping and crash behavior, not a containment bypass. LOW is the right severity. The proposed repair is sound."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The core defect is real but narrower than the finding states. Verified in the code:\n\n1. The bookkeeping calls are not isolated. terminateJob's async IIFE (adapters.server.ts ~L70-100) calls owned.annotate, owned.close, owned.terminate and settle/markEmpty. Each of these reaches persist() in owned-process-group.server.ts:77-80 (writeFileSync plus renameSync, no try/catch). The IIFE has no try/catch, so a throw before markEmpty() rejects `ending`, and emptied never resolves.\n\n2. The retry closure (~L92-99) has no try. owned.terminate() calls persist() (owned-process-group.server.ts:206), so a throw inside retry() is an uncaught timer exception. That reaches process.on(\"uncaughtException\") in failure.server.ts:570, which classifyFailure maps to HOST_FATAL / CONTROLLED_EXIT (failure.server.ts:152). A transient EPERM/EBUSY on the .tmp rename, from AV or an indexer holding the record file, can therefore take down the Host.\n\n3. The onStop path is also real. group.onStop(() => { void stop(); }) (L345) discards the promise from stop(), which awaits terminateJob. The owned-processes group-stop loop (owned-processes.server.ts:36) calls these stops, so a rejection becomes an unhandled rejection.\n\nCorrections to the finding: done does not hang. In the main path and the stop path, done awaits the same rejected `ending` (`await terminateJob(...)` before `await emptied`), so done rejects rather than staying pending. Only the emptied promise stays pending, and nothing else awaits it.\n\nContainment: the failure is fail-closed. The record stays in 'terminating' or 'unconfirmed', the handle is never closed by the session, and a Host exit closes the KILL_ON_JOB_CLOSE handle and so kills the job. Restart reconciliation treats unknown-birth or live records as possibly alive. No survivor escapes and no false \"empty\" is recorded. The issue is a controlled Host exit or a rejected session after a disk/lock error, which fits LOW. It is not a bypass, and it needs a filesystem error on the record path."
+            }
+          ],
+          "confirmed": true
+        }
+      ]
+    },
+    {
+      "lens": "native2",
+      "summary": "Read-only review of native/bunny-owned-process.c after the round-1 and round-2 changes. The interactive stdin path, the writer-thread failure ordering, close_group and terminate_group, the handle-ownership and membership checks, and the write/endInput export checks (group identity by list membership and env, closed-group refusal, budget arithmetic) found no HIGH or MEDIUM defect and no bypass. Three LOW findings remain.",
+      "repairVerdicts": [],
+      "rows": [
+        {
+          "lens": "native2",
+          "id": "NATIVE-R2-01",
+          "severity": "LOW",
+          "title": "inspect silently drops live job members it cannot open or verify",
+          "file": "native/bunny-owned-process.c",
+          "line": 216,
+          "reproduction": "A job member whose OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION) fails (transient access error, or a process that refuses the query) hits `if(!p)continue;` at line 219 and is omitted from the members array with no marker. The same silent omission happens at line 220 when IsProcessInJob fails: `IsProcessInJob(...)&&member` treats a call failure identically to 'not a member'. The snapshot therefore reports a reduced members list while activeProcesses (line 205) still counts the member. JS merges only the reported members into record.members (owned-process-group.server.ts:191), and restart reconciliation builds its expected identities solely from record.members (manager.server.ts:236). A member absent from record.members is never checked after a Host restart, so reconciliation can conclude every recorded identity is absent while an unrecorded member is alive.",
+          "rootCause": "Enumeration failures are treated as 'no member' rather than as an incomplete inspection. The C2 split of IsProcessInJob failure from non-member, applied in launch (line 161-162), was not carried into inspect. The snapshot has no field recording how many members could not be verified.",
+          "repair": "Count members skipped by OpenProcess failure and by IsProcessInJob failure (separately from confirmed non-members) and return them as an extra field such as unverifiedMembers. In JS, treat unverifiedMembers > 0 as an incomplete identity set: mark the record for review and do not treat absence of the recorded identities as a complete picture. Alternatively retry the open once before skipping.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The omission itself is real. native/bunny-owned-process.c:219 (`if(!p)continue;`) drops a member whose OpenProcess fails with no marker, and line 220 (`IsProcessInJob(...)&&member`) treats an IsProcessInJob call failure the same as a non-member. activeProcesses (line 205) still counts the member, and the snapshot has no unverified count. JS merges only reported members (owned-process-group.server.ts:191), and restart reconciliation builds expected identities only from record.members (manager.server.ts:236). This contradicts the RESTART-01 comment in manager.server.ts (\"none is silently dropped\"). The stated harm is largely prevented elsewhere. The job is created with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE and no breakaway (line 137), so when the previous Host dies and its last job handle closes, the kernel ends every remaining member. A member that is alive after restart and absent from record.members therefore requires a kernel invariant to fail. Members also accumulate across snapshots (line 191), so an omission needs every inspection to fail for that PID. The live Stop and containment paths use kernel ActiveProcesses, not the members list, so they are unaffected. Remaining impact is diagnostic under-reporting. LOW is justified; the repair (an unverifiedMembers count routed to review) is reasonable but not a containment bypass."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The silent omission is real. native/bunny-owned-process.c:216-219 does `if(!p)continue;` after OpenProcess with no marker, and lines 220-222 treat an IsProcessInJob failure the same as \"not a member\" (`IsProcessInJob(...)&&member`). activeProcesses (line 205) comes from JobObjectBasicAccountingInformation and still counts the omitted member, so the snapshot's members list can be smaller than activeProcesses. The JS side has no check for that mismatch: owned-process-group.server.ts:190-191 merges only the reported members, and the merge is additive, so a member is lost only if it first appears in a snapshot where its open fails.\n\nThe claimed survivor consequence does not hold. The job is created with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE (native line 137), and Stop uses TerminateJobObject(g->job,1) (line 69), which is kernel-wide and does not depend on the members enumeration. A Host restart closes the job handle, so the kernel ends every member, including unrecorded ones. Restart reconciliation at manager.server.ts:234-251 therefore reaches the correct \"absent\" conclusion. Unrecorded members cannot survive a Host death, so the stated scenario (\"reconciliation concludes absent while an unrecorded member is alive\") cannot happen as written.\n\nWhat remains is an evidence-fidelity gap: the members list is incomplete and nothing flags the mismatch against activeProcesses. Transient OpenProcess failures on same-user processes are rare, so the impact is LOW. Keep it as a LOW defect with the impact corrected, not as a HIGH or survivor-class issue. The suggested unverifiedMembers field is a reasonable repair for the accounting gap."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "native2",
+          "id": "NATIVE-R2-02",
+          "severity": "LOW",
+          "title": "Prompt writer ResumeThread result ignored after the root is running",
+          "file": "native/bunny-owned-process.c",
+          "line": 177,
+          "reproduction": "launch() resumes the root at line 176 (the last point where a failure is reported as a refused launch), then calls `if(g->writer)ResumeThread(g->writer);` at line 177 with the return value discarded. If that resume fails, the root runs and blocks on stdin forever, the prompt is never delivered, and launch returns a successful handle, so the session appears started and is reported as running instead of refused. The round-2 L4 claim that every native failure precedes the root running holds only for the root resume, not for this one.",
+          "rootCause": "The writer resume is treated as infallible after the root has started. Its failure has no handler and no containment record update.",
+          "repair": "Check the return value of ResumeThread(g->writer). On failure, close the group (close_group(g) kills the root and the job) and fail the launch, or resume the writer before ResumeThread(pi.hThread) so a failure is still a pre-run refusal. Pick one ordering and document it in native/README.md.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The defect is real as stated. native/bunny-owned-process.c:177 calls `if(g->writer)ResumeThread(g->writer);` with the return value discarded, after the root has already resumed at line 176. No handler exists, and the function reaches `goto done` and returns a live handle. If the writer resume fails, the suspended prompt writer never writes, so the root blocks forever on stdin. The prompt is not delivered, and the launch is reported as started rather than refused. The root is still inside the kill-on-close job, and close_group (lines 74-90) kills it on stop, so this is a liveness and reporting gap, not a containment bypass. Its practical reachability is very low: ResumeThread on a handle the Host just created with CreateThread(CREATE_SUSPENDED) fails only if the handle is invalid, which the code does not allow. The native/README.md line 39 description (writer runs after ResumeThread) is consistent with the code, so the README does not claim the writer resume is a pre-run failure. LOW is the justified severity. A minimal repair is to check the writer resume result and call close_group on failure, or to resume the writer before the root."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Read native/bunny-owned-process.c lines 117-177 (read-only). The code matches the finding exactly: the writer is created CREATE_SUSPENDED (line 171), the root is resumed at line 176 with the failure branch resuming the writer and calling close_group, and line 177 `if(g->writer)ResumeThread(g->writer);` discards the return value after the root is already running. The defect is real as a contract deviation from the round-2 L4 claim that every native failure precedes the root running. However, the reproduction is practically unreachable: ResumeThread on a suspended thread handle we just created with full access returns (DWORD)-1 only for an invalid or revoked handle, and g->writer was validated by CreateThread success. The stated failure mode also does not bypass containment. The root stays in KILL_ON_JOB_CLOSE job and the returned handle is live, so Stop/close_group still terminates it; the impact is a stalled session that reports as started with the prompt never delivered, not provider code running outside containment. That justifies LOW, not a higher severity. The suggested fix (resume the writer before the root, or check the return and fail the launch) is sound and would restore the pre-run-refusal guarantee."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "native2",
+          "id": "NATIVE-R2-03",
+          "severity": "LOW",
+          "title": "Interactive input budget undercounts bytes delivered before a partial write failure",
+          "file": "native/bunny-owned-process.c",
+          "line": 237,
+          "reproduction": "write_input_owned loops WriteFile over the buffer (line 237). If the first WriteFile call delivers N bytes and a later call fails, the function returns fail() at line 237 without adding N to g->inputWritten, because the counter is updated only after the loop completes (line 238). Bytes already in the pipe are not charged to MAX_INTERACTIVE_INPUT, so the per-group budget can be exceeded by up to one write's worth of bytes across retries. Practical impact is small because a failed WriteFile on this pipe usually means the reader closed, so later writes fail too.",
+          "rootCause": "Budget accounting is applied per successful call instead of per byte actually handed to the pipe.",
+          "repair": "Charge each WriteFile result immediately: `g->inputWritten+=written;` inside the while loop, before the failure check. Keep the pre-call check at line 235 as it is.",
+          "votes": [
+            {
+              "refuted": true,
+              "severityIfReal": "LOW",
+              "reasoning": "The undercount is real as code: native/bunny-owned-process.c:237-238 only adds `size` to g->inputWritten after the loop, so bytes written before a failing WriteFile are not charged. But the stated consequence cannot be reached. (1) The only caller is containedTransport in src/lib/bunny-host/codex-probe.server.ts:47, where owned.writeInput(...) is a plain synchronous call with no retry; a thrown BUNNY_JOB_FAILED propagates to the probe, which rejects, and the group is closed via close() (lines 29-39). Nothing re-issues the same buffer, so there is no \"across retries\" overshoot. (2) Within one call the loop never writes more than `size`, and size was already checked against MAX_INTERACTIVE_INPUT - inputWritten at line 235. (3) A WriteFile that partially delivers and then fails on an anonymous pipe means the reader has gone; subsequent writes fail too, so no further bytes reach the pipe. The defect is a missing accounting line on a failure path with no reachable overshoot, so it is not a real budget bypass. At most it is a bookkeeping nit with no effect on the bounded-write guarantee; the proposed one-line fix is harmless but not required."
+            },
+            {
+              "refuted": true,
+              "severityIfReal": "NONE",
+              "reasoning": "The counter gap is real as code: native/bunny-owned-process.c:236-237 loops WriteFile and returns fail() before g->inputWritten+=size at line 238, so bytes delivered before a mid-loop failure are not charged. But it cannot produce an over-budget write in practice. (1) A WriteFile failure on an anonymous pipe is persistent (reader closed or handle invalid), so a later write in the same group also fails at the same point and never reaches the pipe. (2) The only JS caller, src/lib/bunny-host/codex-probe.server.ts:47 (write: text => owned.writeInput), has no retry; the thrown error ends the bounded JSON-RPC probe, and owned-process-group.server.ts:210 writeInput does not catch. (3) The budget is a guard so synchronous writes never block the Host, and that property is not weakened because no write succeeds after a failure. Net: an accounting nit with no reachable consequence, so it is not a defect worth reporting."
+            }
+          ],
+          "confirmed": false
+        }
+      ]
+    },
+    {
+      "lens": "bypass2",
+      "summary": "One conditional HIGH bypass found: Host-side Windows helpers (processTable powershell.exe, telemetry powershell.exe, computer.* powershell.exe, stopOwnedChildren taskkill.exe) are launched by bare name with no cwd and outside any Job Object, so a provider-written binary in the Host cwd (an approved task folder when the Host is started from a project root) executes with Host privileges. Provider, verification, mission-process, git, gh and connector launches were checked and resolve absolute paths. The telemetry path is cached and runs once per Host process, so it is less exposed than the processTable path. The terminal.exec relative-path executable is gated by the approved executable identity (authorization.server.ts:329-334), so it is not reported. Nothing was run and no files were changed.",
+      "repairVerdicts": [],
+      "rows": [
+        {
+          "lens": "bypass2",
+          "id": "F04-BYPASS-CWD-1",
+          "severity": "HIGH",
+          "title": "Host-side bare powershell.exe/taskkill.exe run unowned with the Host cwd, which can be an approved task folder",
+          "file": "src/lib/bunny-host/process-tree.server.ts:11 (also src/lib/orch/telemetry.server.ts:57, src/lib/bunny-missions/capabilities/computer.server.ts:393, src/lib/bunny-host/owned-processes.server.ts:43)",
+          "reproduction": "Preconditions: (a) the Host is started from a folder that is also an approved project/task folder (e.g. the repo root, which is what the dev workflow does; http.server.ts:279 sets TaskManager root = options.root ?? process.cwd(), and manager.server.ts:790 allows folder === defaultRoot as a task working directory); (b) a provider task has that folder as its cwd, so it can write files there. Steps: the provider writes a PE named powershell.exe (any compiled binary, or a copy of a program) into the Host cwd. The Host then calls processTable() (process-tree.server.ts:11, via execOwnedFile with no cwd, called from manager.server.ts lines 248, 1770, 1832, 1932, 1946, 1967 during stop/reconcile/launch-survivor checks) or the telemetry GPU probe (telemetry.server.ts:57, runs once per Host process at startup), or a computer.* action (computer.server.ts:393). libuv resolves a bare executable name by searching the child cwd before PATH on Windows, so the planted file runs as the Host user, outside any Bunny-owned Job Object (execOwnedFile only calls trackOwnedChild, which is bookkeeping, not containment). The same applies to stopOwnedChildren() at owned-processes.server.ts:43-44, which runs bare taskkill.exe with the Host cwd during shutdown. The planted program can also print a fabricated process table on stdout, which feeds the survivor and identity logic in manager.server.ts.",
+          "rootCause": "Windows bare-name resolution for execFile/spawn with no explicit cwd or absolute path uses the Host's current directory first. Several Host-side Windows launches pass a bare name ('powershell.exe', 'taskkill.exe') and no cwd, and the execOwnedFile/trackOwnedChild helper does not put them in a job. The F04 repair covered provider, verification, and mission-process launches, but not these Host-side helper launches. Provider and mission launches resolve absolute paths (discovery.server.ts searchPath, process.server.ts onPath/realpath), so they are not affected. Only these bare-name callers are.",
+          "repair": "Launch Windows helpers by absolute System32 path (join(process.env.SystemRoot ?? 'C:\\\\Windows', 'System32','WindowsPowerShell','v1.0','powershell.exe') and join(SystemRoot,'System32','taskkill.exe')), and set an explicit cwd outside any project folder (e.g. the Host data directory). Ideally route them through runWindowsOwnedProcess so they are owned. Add a static test that no win32 execFile/spawn call in src passes a bare executable name without an absolute path or a non-writable cwd. Impact is limited to a Host where cwd is a provider-writable folder, so a note that Host cwd must not be a task folder would also reduce exposure.",
+          "file_line": null,
+          "votes": [
+            {
+              "refuted": true,
+              "severityIfReal": "LOW",
+              "reasoning": "The mechanism is real but the finding is refuted as a HIGH defect because it is a documented out-of-contract class.\n\nVerified in code:\n- processTable() (src/lib/bunny-host/process-tree.server.ts:11) runs bare \"powershell.exe\" through execOwnedFile with no cwd. execOwnedFile (owned-processes.server.ts:20-31) only calls trackOwnedChild, which is bookkeeping, not a job. stopOwnedChildren() (owned-processes.server.ts:43) runs bare \"taskkill.exe\" with no cwd. computer.server.ts:393 and telemetry.server.ts:57 do the same. On Windows, libuv searches the child cwd before PATH, so a planted powershell.exe in the Host cwd would run unowned.\n- The precondition holds: http.server.ts:279 uses options.root ?? process.cwd(), and manager.server.ts:790/797/818 allow defaultRoot as a task folder.\n- Provider and mission launches use absolute paths or group.spawn (adapters.server.ts:340-345, process.server.ts), so the claim that only these bare-name callers are affected is accurate.\n\nWhy it is not a HIGH defect:\n- native/README.md states that jobs are \"lifetime ownership, not a sandbox\", and that \"Arbitrary same-user native code able to attack the Host is outside this containment contract; provider authority is unchanged in T4.\" It also says a \"deliberately hostile same-user or elevated process that targets the Host itself is also outside this contract.\"\n- A provider that can write files in its task folder can already execute arbitrary same-user code through its own shell authority. Running a planted binary as the Host does not grant anything the provider did not already have. Brokered and detached launches are also explicitly out of contract.\n- The fabricated process-table concern requires the same planted-code precondition, so it falls under the same out-of-contract class.\n\nThe real issue is a hardening gap: the Host runs attacker-writable bare names from a writable cwd, contrary to the \"no unowned launch\" intent of the static test in provider-containment.test.ts:167. The repair of absolute System32 paths plus an explicit non-task cwd is correct and cheap. Severity should be LOW hardening, not HIGH."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "MEDIUM",
+              "reasoning": "The core mechanism is real and code-grounded, but HIGH overstates it. Grounding: process-tree.server.ts:11 runs bare \"powershell.exe\" via execOwnedFile with no cwd and no absolute path. owned-processes.server.ts:43 runs bare \"taskkill.exe\" with no cwd in stopOwnedChildren. computer.server.ts:393 runs bare \"powershell.exe\" with no cwd. telemetry.server.ts:57 does the same once per process. execOwnedFile (owned-processes.server.ts:20-30) only does bookkeeping, not containment. Host root defaults to process.cwd() (http.server.ts:279), and manager.server.ts:790/818 accepts folder === defaultRoot as a valid task cwd, so a provider task whose cwd is the Host's own folder can write there. libuv's Windows search_path looks in the child cwd before PATH, so a planted powershell.exe or taskkill.exe in that folder would be executed by the Host outside any job. The static test in provider-containment.test.ts has no check for bare Windows helper names, and the F04 repair does not cover these helper launches. The finding's stated mechanism holds, and the precondition (Host started from a folder that is also an approved task folder, which the dev workflow does) is plausible.\n\nWhy not HIGH: the same provider already has pre-authorized Bash and PowerShell in its task folder (adapters.server.ts approval text), so a planted binary grants no privilege the provider does not already hold as the same user. The real impact is a containment-lifecycle gap: an unowned process that runs in Host context, survives Stop, and can run on Host shutdown or reconcile. Confidentiality and privilege impact are not added. Deployment-dependent exposure also applies (an installed Host with a non-writable root is not affected). I therefore confirm the defect at MEDIUM. Repair: use absolute System32 paths plus an explicit non-task cwd, or route through runWindowsOwnedProcess, and add a static test for bare win32 executable names."
+            }
+          ],
+          "confirmed": true
+        }
+      ]
+    },
+    {
+      "lens": "truth",
+      "summary": "Read-only review of the F04 containment diff against the truthfulness and live-code-visibility lens. Found four real issues. A persisted restart task error asserts provider processes 'ended' before any identity check. Provider probes are live contained jobs that liveCodeExecutions cannot see. Records with no identity are listed for review only once and are then silently dropped. An unreadable-record hold is released without reconciling that record. Stop wording also says the job 'was terminated' while termination is unconfirmed. Verified without a defect: stopContained and containedSession accounting (empty only at ActiveProcesses 0; unconfirmed, refused and launching branches), native terminate/close timing, and the restart identity check (possiblyAlive fails closed on unknown birth time or an empty table). No bypass of the F01 hold was found for verification.* jobs, sessions, survivors or restart survivors (access undefined classifies as live).",
+      "repairVerdicts": [],
+      "rows": [
+        {
+          "lens": "truth",
+          "id": "F04-TRUTH-1",
+          "severity": "MEDIUM",
+          "title": "Restart task error asserts provider processes ended before identities are checked",
+          "file": "src/lib/bunny-host/manager.server.ts",
+          "line": 176,
+          "reproduction": "Host A runs a Codex task in a Windows job and dies while a member is still alive. Host B starts. The restart walk (manager.server.ts ~lines 164-186) calls this.update(task,{state:'failed', error:'...Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.'},'task.failed'). Startup then calls reconcileInterruptedProviderSessions (~line 189), which emits provider_session.interrupted ('Verifying recorded process identities before this counts as stopped') and, if an identity is still alive, provider_session.cleanup_unconfirmed ('are still alive ... treated as live code'). The persisted task error and the later events contradict each other, and the task error is what the task card shows.",
+          "rootCause": "The restart walk writes an unverified 'ended' claim into the persisted task error. The corroboration happens afterwards and is never reflected in that text.",
+          "repair": "Reword the task error to state only what is known, e.g. 'Host restarted while a provider job was running; the previous Host's job handle closed, so the kernel ends its members. Recorded processes are being verified; this Host killed no process.' Better still, drop the 'ended' claim from the task error and let provider_session.* events carry the verdict.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted: the defect is real but is a text-truthfulness issue, not a containment or kill-authority defect.\n\nCode facts (src/lib/bunny-host/manager.server.ts):\n- Lines 164-182: the constructor's restart loop calls this.update(task, {state:'failed', error:'...Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.'}, 'task.failed'). This happens before readProviderSessions/reconcileInterruptedProviderSessions run (lines 183-186).\n- Lines 231 and 261 then emit provider_session.interrupted (\"Verifying recorded process identities before this counts as stopped\") and provider_session.cleanup_unconfirmed (\"are still alive ... treated as live code\"). So the persisted task error asserts \"ended\" as fact while the later events say the verdict is still pending or contradicted.\n- The restart loop is unconditional for every task in launching/running/verifying/waiting states. It does not check whether the task had a job record. adapters.server.ts:206 uses plain spawn unless win32 and the default spawnChild, so tasks without a job still receive the \"Windows job-contained ... ended\" text. That makes the claim false for those tasks, not just unverified.\n\nWhy not higher: no authority changes. Kill decisions, lingering holds, restartSurvivorRefusal and the reconcile verdict all use independent code paths, and the events carry the correct state. The harm is a misleading card/error string. It conflicts with the STOP-3 repair (truthful stop text), so it is a truthfulness regression, but LOW is the justified severity.\n\nRecommended repair: make the task error state only what is known and that no process was killed by this Host, e.g. \"Host restarted while a provider session was active; recorded processes are being verified; this Host killed no process.\" Gate any job wording on the presence of a job record. Let provider_session.* events carry the verdict."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Code read: manager.server.ts:164-182 writes an unconditional persisted task error for every task in launching/running/verifying/waiting states, stating \"Windows job-contained provider processes ended with the previous Host (kill-on-close); this Host killed no process.\" This is written before reconcileInterruptedProviderSessions (line 185) runs. Reconcile (lines 225-265) explicitly treats the outcome as unverified (\"Verifying recorded process identities before this counts as stopped\"), and can emit cleanup_unconfirmed with \"still alive ... treated as live code\". So the wording does precede and can be contradicted by later events, and the task card shows the error text.\n\nThe finding's stated reproduction is largely unreachable, though. A member of a KILL_ON_JOB_CLOSE job cannot survive the last job handle closing, and the Host's death closes that handle, so \"dies while a member is still alive\" holds only if a member escaped the job or the old Host is still running. Neither is the normal case. Escape is not shown in the code reviewed: native/bunny-owned-process.c:137 sets KILL_ON_JOB_CLOSE with no breakaway, and on win32 production launches go through containedSession (adapters.server.ts:206). The non-contained paths are the spawnChild test seam and non-win32 code, which are out of the Windows contract.\n\nWhat survives is a real overclaim: the same unverified \"ended\" sentence is applied unconditionally to every interrupted task, including tasks in \"launching\" (possibly no job created) and \"verifying\" tasks that may not have a provider-session record, so the claim is asserted without evidence for those tasks. Because the authoritative verdict lives in the provider_session.* events and the claim is true in the normal kernel-guaranteed case, I rate it LOW rather than MEDIUM. The suggested rewording (state only that the job handle closed and processes are being verified) is the right repair."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "truth",
+          "id": "F04-COVERAGE-2",
+          "severity": "LOW",
+          "title": "Provider probes are live contained jobs invisible to liveCodeExecutions",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 2726,
+          "reproduction": "Probes are spawned with action 'provider.probe': adapters.server.ts:89 (probe() on win32 via runWindowsOwnedProcess) and codex-probe.server.ts:42 (OwnedProcessGroup for the app-server probe, stdin held open, up to 8 s). liveCodeExecutions() (manager.server.ts:2726-2744) returns bus.liveCode, task sessions, lingering survivors and liveHostCodeRuns(). Probes appear in none of these. liveHostCodeRuns() is filled only when action starts with 'verification.' (owned-process-group.server.ts spawn). So a paired-device mutation (remoteMutationHeld) and F02 promotion can proceed while a Codex app-server probe job is alive.",
+          "rootCause": "Live-job registration is keyed to a list of action prefixes, not to every OwnedProcessGroup spawn. Probes have no session and no provider record, so no path reports them.",
+          "repair": "Register every OwnedProcessGroup (and runWindowsOwnedProcess) spawn in a live registry from spawn to close, and have liveCodeExecutions read that registry, so probes and any future action are covered. The probe's tool-free catalog methods lower the practical impact, which is why this is LOW.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The coverage gap is real as stated. liveCodeExecutions (manager.server.ts:2726-2743) returns bus.liveCode, task sessions, lingering survivors and liveHostCodeRuns(). liveHostCodeRuns() is filled only when the action starts with \"verification.\" (owned-process-group.server.ts:174). Probes use action \"provider.probe\" (adapters.server.ts:89, codex-probe.server.ts:42), so a live probe job is never listed. remoteMutationHeld (manager.server.ts ~2750) therefore returns null while a probe job is alive, so the paired-device hold is not applied during that window. The finding's claim that the probe is not registered anywhere else holds. The harm does not follow, though. The hold exists so that code already running cannot read a paired-device change unreviewed. Probe commands are `--version`, `login status`/`auth status`/`status`/`auth list`, and the Codex app-server catalog calls (initialize, model/list, account/rateLimits/read). None of them executes workspace project content or reads the mutated destination, and the probe is not a session with tools. So no concrete bypass exists, and the defect reduces to a defense-in-depth registry gap. Its severity is LOW at most, and arguably NONE in practice. The proposed repair (register every OwnedProcessGroup spawn) is a reasonable hardening but not required for any stated guarantee in native/README.md."
+            },
+            {
+              "refuted": true,
+              "severityIfReal": "LOW",
+              "reasoning": "The coverage gap is real as described: liveCodeExecutions() (manager.server.ts:2726-2743) returns bus.liveCode, task sessions, lingering survivors and liveHostCodeRuns(). liveHostCodeRuns() is populated only when the action starts with \"verification.\" (owned-process-group.server.ts:174), so provider.probe jobs from adapters.server.ts:89 and codex-probe.server.ts:42 are not listed. The finding's harm path does not hold, however. The hold in remoteMutationHeld (manager.server.ts:2755-2757) is scoped to \"code approved on the Windows Host that Bunny tracks\" and to the reason that such running code could read a held project path unreviewed. Probes are not workstation-approved project code: they run provider CLIs with fixed catalog/version arguments, in process.cwd() (the Bunny host directory, adapters.server.ts:89 and codex-probe.server.ts:42), not in the mission project folder where the held paired-device path lives. The app-server probe is tool-free and lasts at most about 8 s. So a paired-device mutation proceeding during a probe cannot expose the changed file to any code that Bunny's hold is meant to protect. The finding's own repair concedes the practical impact is negligible. Refuted as a defect: the gap is a registry-scope difference rather than a reachable unreviewed-read path. If one insists on counting it, the severity would be LOW at most."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "truth",
+          "id": "F04-REVIEW-3",
+          "severity": "LOW",
+          "title": "Records with no identity are listed for review only once, then silently dropped",
+          "file": "src/lib/bunny-host/owned-process-group.server.ts",
+          "line": 112,
+          "reproduction": "Restart 1: a provider record with no recorded identity is marked by markProviderSessionReview (reviewRequired=true, closed=true) and a provider_session.cleanup_unverifiable event is emitted (manager.server.ts ~line 241). Restart 2: readProviderSessions line 112 (if(record.reviewRequired&&record.state==='interrupted') continue;) excludes it from both records and unreadable. No event and no lingering entry is produced. native/README.md says 'Unreadable records, and records without any identity, are listed for review', which is no longer true after the first restart.",
+          "rootCause": "reviewRequired is a skip flag with no consumer: nothing lists or re-surfaces those records. The only report is the one-time startup event.",
+          "repair": "Either keep reviewRequired records in a review list that is emitted or exposed on each start, or change the README to say the one-time event is the only report.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The defect is real as described, and I confirmed each step in the code.\n\n1. Restart 1: readProviderSessions (owned-process-group.server.ts:100-117) sets state=\"interrupted\" and closed=true at line 114 for the record. reconcileInterruptedProviderSessions (manager.server.ts:225-242) then sees no identity (expected is empty after the pid>0 filter) and calls markProviderSessionReview (owned-process-group.server.ts:119-124), which sets reviewRequired=true and closed=true. It then emits provider_session.cleanup_unverifiable once.\n\n2. Restart 2: line 111 does not skip the record (its containment is not empty, absent_after_restart or refused). Line 112 (`if(record.reviewRequired&&record.state===\"interrupted\") continue;`) does skip it, so it is absent from both records and unreadable. The manager's reconcile and hold paths (manager.server.ts:184-186) never see it again, so no event is emitted and no lingering entry is created.\n\n3. Grep shows no other consumer of reviewRequired. Nothing re-surfaces these records.\n\n4. The native/README.md:57-58 sentence \"records without any identity, are listed for review\" is therefore accurate only for the first start, which is the defect as stated.\n\nLimits on severity: the kernel already ended the job members when the previous Host closed its handle, so there is no live-code or kill-safety risk. The one-time event is persisted in the task event log, so the audit trail is not lost. The gap is only in the continuing review surface and in the README wording. That supports LOW, not higher."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted: the mechanism is real. Restart 1 (manager.server.ts:225-242) hits the no-identity branch, calls markProviderSessionReview (owned-process-group.server.ts:119-124, which sets reviewRequired=true and closed=true and leaves state as \"interrupted\" from readProviderSessions line 114), and emits provider_session.cleanup_unverifiable. Restart 2: readProviderSessions line 111 does not skip it (containment is not empty/absent_after_restart/refused for a no-identity record), but line 112 (reviewRequired && state===\"interrupted\") does `continue`, so it is excluded from both records and unreadable. No lingering entry and no re-emitted event follow. README line 57 (\"records without any identity, are listed for review\") is therefore only true for the first start after the crash. Mitigating facts that keep this at LOW: the kernel already ended the job members when the previous Host's handle closed; the cleanup_unverifiable event is persisted in the task event database, so the review record survives in history; and no process is held or unaccounted for at runtime. The defect is a re-surfacing and documentation gap, not a containment bypass. Repair options: keep an un-cleared review list emitted on each start, or narrow the README wording to say the one-time event is the report."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "truth",
+          "id": "F04-HOLD-4",
+          "severity": "LOW",
+          "title": "Unreadable-record hold is released without reconciling the record",
+          "file": "src/lib/bunny-host/manager.server.ts",
+          "line": 216,
+          "reproduction": "A provider-session JSON file is unreadable at startup, so holdUnreadableProviderSessions (lines ~209-223) sets lingering 'unreadable:<file>' and emits provider_session.unreadable ('treated as live code (fail closed) until the record is readable or removed'). Later the file becomes parseable (repaired or fully written). The 10 s check at line 218 sees it absent from the unreadable list, calls lingering.delete(key), and the hold ends. The record is never passed to reconcileInterruptedProviderSessions, so its recorded identities are never checked in this run and no provider_session event is emitted for it. It is only reconciled on the next restart.",
+          "rootCause": "The readability check and the reconciliation are separate paths. Readability alone releases the hold, although the event text promises the hold lasts until the record is readable.",
+          "repair": "When a file becomes readable, feed its parsed record(s) into reconcileInterruptedProviderSessions and keep the hold until that reconciliation settles. Alternatively, keep the hold until the record is reconciled, not merely readable.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted. The defect is real as described, with a line-number nuance. manager.server.ts holdUnreadableProviderSessions (about lines 210-223): the 10 s check calls readProviderSessions again and, when the file is no longer in the unreadable list, runs lingering.delete(key) and returns. Nothing feeds the newly readable record into reconcileInterruptedProviderSessions. Readability alone ends the hold. The constructor (lines 184-186) is the only place readProviderSessions feeds records to reconciliation, so a record that becomes readable mid-run is not checked against the process table until the next restart. Two points limit the severity. First, the event text (\"treated as live code ... until the record is readable or removed\") matches the code literally, so it is not a misleading promise. Second, the record is not lost: owned-process-group.server.ts readProviderSessions (lines 100-117) persists state interrupted/closed and returns the record, and on the next restart it is recovered again unless it was already closed with containment empty, absent_after_restart or refused. The hold also does not gate launches, since restartSurvivorRefusal only consults restartSurvivorMission, which the unreadable key never enters. Its only effect is the live-code count, and the job-contained processes died with the previous Host under KILL_ON_JOB_CLOSE. The gap is that the Host stops reporting live code for a record whose identities were never corroborated in this run. That is a real but low-impact gap, so LOW is the justified severity. A side effect the finding does not mention: the 10 s re-check calls readProviderSessions, which persists state on every other recovered record each time, so the repair should avoid that side effect when re-reading."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "The defect is real as stated, with a narrower impact and a corrected root cause.\n\nCode path: manager.server.ts:210-223. holdUnreadableProviderSessions sets lingering 'unreadable:<file>' and emits provider_session.unreadable. The 10 s check() calls readProviderSessions(dataDirectory).unreadable.includes(file). Once the file parses, check() deletes the lingering key and returns. Nothing feeds the recovered record into reconcileInterruptedProviderSessions, and no provider_session event is emitted on release. The record's identities are therefore not checked in this run.\n\nRoot-cause correction: the event text at line 214 says the hold lasts \"until the record is readable or removed\", so readability-release matches the text. The defect is the gap between that text and the reconciliation contract: a record released from the hold is never reconciled this run and gets no event.\n\nA second effect, not in the finding: readProviderSessions (owned-process-group.server.ts:100-117) is not side-effect free. For each non-closed record it persists state 'interrupted' and closed=true (line 114). The check's readProviderSessions call therefore silently rewrites the record on the readable transition, while the record is discarded from the results. The record is still recovered on the next restart because its containment is not terminal, so the loss is in this run's accounting, not permanent.\n\nImpact is limited. restartSurvivorRefusal (line 200-207) only consults restartSurvivorMission, which unreadable records never populate, so the hold never blocked launches for that work. The effect is that the live-code count drops with no process-table corroboration and no event. Kernel kill-on-close also makes a surviving member unlikely. That supports LOW, not a higher severity. It is not a documented out-of-contract class."
+            }
+          ],
+          "confirmed": true
+        }
+      ]
+    }
+  ]
+}

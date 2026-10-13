@@ -1,0 +1,193 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "derivedBy": "assemble-evidence.mjs",
+  "rows": [
+    {
+      "id": "J36",
+      "title": "Abrupt native-helper death has safe documented behaviour",
+      "classification": "LIVE+STATIC",
+      "result": "PASS",
+      "evidence": "helper is in-process: its death is Host death (J35); job-handle-lifecycle.md"
+    },
+    {
+      "id": "J46",
+      "title": "No uncontrolled helper retains authority after close",
+      "classification": "LIVE",
+      "result": "PASS",
+      "evidence": "probes and sessions closed by accounting; no separate helper process"
+    }
+  ],
+  "architecture": "The ownership helper is a Node-API module inside the Host process; there is no separate helper process, IPC channel or watchdog. Helper death is Host death, covered by the abrupt-exit evidence (kernel KILL_ON_JOB_CLOSE).",
+  "live": [
+    {
+      "round": 1,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": false,
+        "cleanupObservedMs": 967,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "running"
+      }
+    },
+    {
+      "round": 2,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": true,
+        "cleanupObservedMs": 968,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "stopped"
+      }
+    },
+    {
+      "round": 3,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": false,
+        "cleanupObservedMs": 967,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "running"
+      }
+    },
+    {
+      "round": 4,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": true,
+        "cleanupObservedMs": 1001,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "stopped"
+      }
+    },
+    {
+      "round": 5,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": false,
+        "cleanupObservedMs": 935,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "running"
+      }
+    },
+    {
+      "round": 6,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": true,
+        "cleanupObservedMs": 981,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "stopped"
+      }
+    },
+    {
+      "round": 7,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": false,
+        "cleanupObservedMs": 961,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "running"
+      }
+    },
+    {
+      "round": 8,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": true,
+        "cleanupObservedMs": 924,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "stopped"
+      }
+    },
+    {
+      "round": 9,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": false,
+        "cleanupObservedMs": 982,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "running"
+      }
+    },
+    {
+      "round": 10,
+      "result": "PASS",
+      "step": {
+        "step": 4,
+        "title": "Host terminated abruptly (taskkill /F); OS observation",
+        "killedDuringStop": true,
+        "cleanupObservedMs": 949,
+        "ownedRemaining": 0,
+        "providerRootAlive": false,
+        "unrelatedAlive": {
+          "same": true,
+          "providerLike": true
+        },
+        "recordStateOnDisk": "stopped"
+      }
+    }
+  ]
+}

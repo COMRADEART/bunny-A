@@ -5,14 +5,14 @@ import type { ExecutionContext } from "./bus.server.ts";
 import { runCommand, runProcess, resolveCommand, tail, type RunResult } from "./process.server.ts";
 
 export type GitRunner = (args: string[], cwd: string, signal: AbortSignal, timeoutMs: number) => Promise<RunResult>;
-const runGit: GitRunner = (args, cwd, signal, timeoutMs) => runCommand("git", args, { cwd, signal, timeoutMs });
 type Cleanup = { attempted: boolean; ok: boolean; detail: string };
 
 /** One Git transaction. Starts only on a clean tracked tree and without another Git transaction;
  * a unique MERGE_MSG marker + original/target HEAD identify our unfinished merge. Cancellation
  * cleanup uses a fresh bounded signal and never resets or aborts an unrelated merge.
  */
-export async function mergeTransaction(branch: string, cwd: string, context: ExecutionContext, run: GitRunner = runGit): Promise<CapabilityResult> {
+export async function mergeTransaction(branch: string, cwd: string, context: ExecutionContext, suppliedRun?: GitRunner): Promise<CapabilityResult> {
+  const run: GitRunner=suppliedRun??((args,cwd,signal,timeoutMs)=>runCommand("git",args,{cwd,signal,timeoutMs,owner:{missionId:context.missionId,stepId:context.stepId,capabilityRunId:context.capabilityRunId,dataDirectory:context.dataDirectory,records:context.processOwnership,action:`git.${args[0]}`}}));
   const cleanupContext = new AbortController();
   const inspect = (args: string[]) => run(args, cwd, cleanupContext.signal, 15_000);
   const required = async (args: string[]) => { const result = await inspect(args); if (result.exitCode !== 0) throw new Error(`Git inspection failed: ${tail(result.stderr || result.stdout, 400)}`); return result.stdout.trim(); };
@@ -21,17 +21,21 @@ export async function mergeTransaction(branch: string, cwd: string, context: Exe
   const target = await required(["rev-parse", "--verify", `${branch}^{commit}`]);
   const originalStatus = await required(["status", "--porcelain=v1", "--untracked-files=no"]);
   const refused = (detail: string): CapabilityResult => ({ ok: false, status: "failed", summary: detail, output: { merged: false, cleanup: { attempted: false, ok: true, detail: "No Bunny merge started." } }, evidence: [detail], errorCategory: "workspace_conflict" });
-  if (["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "index.lock"].some((path) => existsSync(join(gitDir, path)))) return refused("An existing Git operation or index lock is present; Bunny did not start or abort any merge.");
+  const read = (name: string) => { try { return readFileSync(join(gitDir, name), "utf8").trim(); } catch { return ""; } };
+  const lock = join(gitDir, "bunny-merge.lock");
+  if (["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "index.lock"].some((path) => existsSync(join(gitDir, path)))) {
+    // A merge whose MERGE_MSG carries Bunny's marker was left by an interrupted Bunny transaction (e.g. a Host crash). Still never touched.
+    const interrupted = existsSync(join(gitDir, "MERGE_HEAD")) ? /Bunny merge transaction [0-9a-f-]{36}/.exec(read("MERGE_MSG"))?.[0] : undefined;
+    return refused(interrupted ? `An interrupted ${interrupted} is still in progress in this repository; Bunny did not start or abort any merge. Review git status, then commit it or run "git merge --abort"${existsSync(lock) ? ` and delete ${lock}` : ""} to discard it.` : "An existing Git operation or index lock is present; Bunny did not start or abort any merge.");
+  }
   if (originalStatus) return refused("Merge requires a clean tracked working tree and index; user changes were preserved.");
   if (context.signal.aborted) return refused("Merge cancelled before start; no files changed.");
   const marker = `Bunny merge transaction ${crypto.randomUUID()}`;
-  const lock = join(gitDir, "bunny-merge.lock");
   let descriptor: number;
-  try { descriptor = openSync(lock, "wx"); } catch { return refused("Another Bunny merge transaction holds this repository; no merge started."); }
+  try { descriptor = openSync(lock, "wx"); } catch { return refused(`A Bunny merge lock is present (${lock}): another Bunny merge is running in this repository, or an interrupted one left the lock behind. No merge started; if no Bunny merge is running, delete the lock.`); }
   writeFileSync(descriptor, marker); closeSync(descriptor);
   let result: RunResult | null = null; let error: string | null = null;
   let head = headBefore; let conflicts: string[] = []; let cleanup: Cleanup = { attempted: false, ok: true, detail: "No unfinished merge." };
-  const read = (name: string) => { try { return readFileSync(join(gitDir, name), "utf8").trim(); } catch { return ""; } };
   try {
     // Re-check after taking our lock. External Git processes never use it.
     if (read("MERGE_HEAD") || await required(["rev-parse", "HEAD"]) !== headBefore) return refused("Repository changed before merge; no Bunny merge started.");

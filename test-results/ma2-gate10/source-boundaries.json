@@ -1,0 +1,187 @@
+{
+  "recordedAt": "2026-10-07T01:25:17.441Z",
+  "classification": "STATIC VERIFIED",
+  "attackIds": [
+    "T10-T8-06",
+    "T10-XG-11",
+    "T10-XG-12",
+    "T10-XG-13"
+  ],
+  "records": [
+    {
+      "path": "src/lib/bunny-missions/manager.server.ts",
+      "bytes": 87561,
+      "sha256": "bbbc90a3c4147a4dd25b136de0060381303120898cdee4a8f148f4e4044d5d11",
+      "guards": [
+        {
+          "needle": "if (request.resolvedAt)",
+          "line": 759
+        },
+        {
+          "needle": "step.pendingRequestId !== requestId",
+          "line": 761
+        },
+        {
+          "needle": "bunny-host-restart",
+          "line": 881
+        },
+        {
+          "needle": "approvedOnce: null",
+          "line": 249
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    },
+    {
+      "path": "src/lib/bunny-host/manager.server.ts",
+      "bytes": 34543,
+      "sha256": "4a81fb7e22b0d21de3bd70b73287733d2c6f6b1c95a3071420754265d5194067",
+      "guards": [
+        {
+          "needle": "id:crypto.randomUUID()",
+          "line": 146
+        },
+        {
+          "needle": "TERMINAL.includes(current.state)",
+          "line": 88
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    },
+    {
+      "path": "src/lib/bunny-host/presentation.ts",
+      "bytes": 22055,
+      "sha256": "83700d98145eb44c1d16cdfd8eb0449377a8ea062cc0d68b3e9b657f5bb48a4f",
+      "guards": [
+        {
+          "needle": "unique.has(event.sequence)",
+          "line": 253
+        },
+        {
+          "needle": "revision,",
+          "line": 372
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    },
+    {
+      "path": "src/components/island/activity-model.ts",
+      "bytes": 2826,
+      "sha256": "73e278fa5fe01e28f9e8945ff8a37f445905dbb2e235bda01eb60b84f4f8c435",
+      "guards": [
+        {
+          "needle": "revision",
+          "line": 6
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    },
+    {
+      "path": "src/lib/bunny-missions/batches.server.ts",
+      "bytes": 14567,
+      "sha256": "8769d44cfc56fb4d425192c701750256b35688e64a3de74275f269a69cb68b7b",
+      "guards": [
+        {
+          "needle": "epoch",
+          "line": 35
+        },
+        {
+          "needle": "expiresAt",
+          "line": 188
+        },
+        {
+          "needle": "maxActions",
+          "line": 166
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    },
+    {
+      "path": "src/lib/bunny-host/http.server.ts",
+      "bytes": 24139,
+      "sha256": "5a0971e95871f8f2b2e336a282ac8cd9aab189aaa3d1bc40b1264981e65057a8",
+      "guards": [
+        {
+          "needle": "authorized",
+          "line": 64
+        },
+        {
+          "needle": "revoked_at",
+          "line": 120
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    },
+    {
+      "path": "scripts/bunny-rollback-preflight.mjs",
+      "bytes": 3208,
+      "sha256": "4beaef2595d43451e8c3e7054c690b65473638d88d3ce5b9554c15a4aa584f69",
+      "guards": [
+        {
+          "needle": "readOnly: true",
+          "line": 12
+        },
+        {
+          "needle": "activeBatches",
+          "line": 20
+        },
+        {
+          "needle": "config.triggersEnabled",
+          "line": 23
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    },
+    {
+      "path": "scripts/install-bunny-release.ps1",
+      "bytes": 16600,
+      "sha256": "c3c0883f2946044bbe89a652bbdc3c6e35c2d2908ab6a90114f6146414beed8e",
+      "guards": [
+        {
+          "needle": "bunny-rollback-preflight.mjs",
+          "line": 78
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    },
+    {
+      "path": "test-results/ma2-gate8/tools/30-rollback-controller.mjs",
+      "bytes": 14481,
+      "sha256": "3b01e61bbf44a592ba9d1143a1a0a95264944d745f581385948ad2b84d68a1af",
+      "guards": [
+        {
+          "needle": "install.json LAST",
+          "line": 8
+        },
+        {
+          "needle": "writeFileSync(targetInstallJson",
+          "line": 152
+        },
+        {
+          "needle": "startFailed:host-process-identity-mismatch",
+          "line": 188
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    },
+    {
+      "path": "scripts/browser-smoke.mjs",
+      "bytes": 6437,
+      "sha256": "ecd86199756e49b9fdbced2e888a7ce75b9acc6302f406862a7008ddde96e0fb",
+      "guards": [
+        {
+          "needle": "await browser?.close()",
+          "line": 178
+        }
+      ],
+      "classification": "STATIC VERIFIED"
+    }
+  ],
+  "semantics": {
+    "submit": "Each authenticated submit creates a fresh UUID; no idempotency-key contract.",
+    "missionCreate": "Each create produces a fresh Mission/draft; separately approved execution.",
+    "approvalRespond": "Resolved request or canonical step no longer waiting on that exact ID refuses. Restart now explicitly invalidates unresolved requests.",
+    "stalePresentation": "Host sequence/cursor, canonical terminal state, frontend revision and boot epoch are independently checked. A UI cache is not new authenticated authority.",
+    "oldT8Controller": "Historical acceptance code and copies are preserved; old idleCheck is unsafe for paused Missions. Use the packaged canonical guard before any real switch, plus fresh held process handles from the current activation procedure."
+  }
+}

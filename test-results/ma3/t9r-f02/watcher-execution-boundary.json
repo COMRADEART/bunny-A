@@ -1,0 +1,78 @@
+{
+  "claim": "Inert staging does not trigger a watched project; the project changes only on authorized promotion. External consumers of PROMOTED files are not claimed preventable.",
+  "rows": [
+    {
+      "id": "E12",
+      "title": "Watcher not triggered by inert staging",
+      "initialConditions": "recursive fs.watch on the project",
+      "operation": "Phone write staged",
+      "expected": "No watcher event",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E12:",
+          "names": [
+            "F02-E12: a recursive watcher on the project sees no change while the phone write is staged"
+          ],
+          "result": "PASS"
+        },
+        {
+          "type": "LIVE disposable Host (real HTTP, pairing, SQLite, Agent consent, fs.watch)",
+          "file": "live-staging-acceptance.json",
+          "steps": [
+            4
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E13",
+      "title": "Watcher observes change only after authorized promotion",
+      "initialConditions": "same watcher",
+      "operation": "Workstation promotes",
+      "expected": "Event only after promotion",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E13:",
+          "names": [
+            "F02-E13: the same watcher sees the change only after the workstation promotes it"
+          ],
+          "result": "PASS"
+        },
+        {
+          "type": "LIVE disposable Host (real HTTP, pairing, SQLite, Agent consent, fs.watch)",
+          "file": "live-staging-acceptance.json",
+          "steps": [
+            9
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E45",
+      "title": "Phone-written document cannot automatically become execution input",
+      "initialConditions": "staged document; dependent terminal step",
+      "operation": "Run",
+      "expected": "Never sees it; workstation still required",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E45:",
+          "names": [
+            "F02-E45: a phone-written document cannot become execution input: the dependent terminal step never sees it and still needs the workstation"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    }
+  ]
+}

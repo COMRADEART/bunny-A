@@ -1,0 +1,58 @@
+{
+  "gate": "M-A-2 GATE T9",
+  "title": "Bounded Desktop Approval Batching / Approval UX Refinement",
+  "recordedAt": "2026-10-06T00:00:00Z",
+  "repository": {
+    "path": "C:\\Users\\allam\\Documents\\new\\bun-router",
+    "branch": "ma2-operational-hardening",
+    "headCommit": "abe993a",
+    "headSubject": "T8: close gate — BUNNY_MA2_T8_PASS (real pinned rollback T6→T5 + real forward recovery T5→T6, zero git/db-rollback)",
+    "workingTreeClean": true,
+    "untracked": ["BUNNY_OPENDOTS_ADOPTION_REPORT.md", "MA1D_FINAL_INDEPENDENT_REVIEW.md", "MA1_CLAUDE_FINAL_REVIEW.md", "memory/"]
+  },
+  "production": {
+    "installRoot": "%LOCALAPPDATA%\\Bunny-A",
+    "currentRelease": "Bunny-A-Windows-v17-T6",
+    "installVersion": "17.0.0-T6",
+    "sourceCommit": "cb005ef75bf86d4d9e722b5214612fe115db5c6b",
+    "manifestSha256": "f5bf648c92711baba3fe4a24ea46c449fd8f226c0afa018f8f9cf93da52fde88",
+    "packageSha256": "29740a280d96a7d1ed87acab3fbd59fc709ed523e8f118da43be4603606ace1d",
+    "hostPort": 43119,
+    "hostState": "at-rest (health probe: unable to connect; recorded state, not failure; no v17-T8 release was manufactured — T8 was acceptance-only)"
+  },
+  "databaseInspection": {
+    "db": "%LOCALAPPDATA%\\Bunny-A\\state\\host.sqlite",
+    "missions": 9,
+    "mission_authorizations": 9,
+    "mission_authorizations_computer_enabled": 0,
+    "mission_authorizations_terminal_enabled": 0,
+    "mission_authorizations_risk_classes_observed": ["READ", "READ+EXECUTE"],
+    "permission_requests": 0,
+    "capability_grants": 0,
+    "capability_runs": 12,
+    "capability_runs_actions_observed": ["git.status", "git.diff"],
+    "migrations": ["ma0.missions.v1"],
+    "desktopControlEverEnvelopeApproved": false
+  },
+  "regressionFloor": {
+    "briefFloor": 592,
+    "verifiedNow": { "scriptTests": 247, "appTests": 311, "uiTests": 34, "passed": 592, "failed": 0 },
+    "verifyFrom": "repository test suite + test-results/ma2-gate9/{full,ui}-tests-baseline.log",
+    "floorRule": "do not delete tests to meet this floor; add focused T9 tests on top"
+  },
+  "baselineGates": {
+    "fullTestsLog": "test-results/ma2-gate9/full-tests-baseline.log",
+    "uiTestsLog": "test-results/ma2-gate9/ui-tests-baseline.log",
+    "typecheckLog": "test-results/ma2-gate9/typecheck-baseline.log",
+    "allExitZero": true
+  },
+  "priorGates": {
+    "T1_through_T8": "all PASS (per brief)",
+    "t7CloseCommit": "c126e7f",
+    "t8CloseCommit": "abe993a"
+  },
+  "notes": [
+    "Bunny's existing approval vocabulary has no 'Allow for task' or 'Allow for skill' persistent option; the spec vocabulary maps to: Allow once = permission-request approval (one invocation, or a matching action for one skill run); envelope = per-mission authorization; grant override = capability_grants policy; direct invocation = workstation direct:{confirmed}; delegated = TaskManager approveDelegated.",
+    "Production desktop-control history is empty (no computer-enabled envelope, no requests, no desktop runs): approval behavior for desktop flows must therefore be evidenced from source semantics plus fresh live runs against the staged runtime."
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "classification": "LIVE",
+  "startedAt": "2026-10-10T17:14:28.879Z",
+  "finishedAt": "2026-10-10T17:14:36.653Z",
+  "headCommit": "9e647196824b2a0c41cf8424f47e4614cea3343c",
+  "workingTreeChanges": [
+    "M native/README.md",
+    " M native/bunny-owned-process.c",
+    " M scripts/package-bunny-desktop.ps1",
+    " M src/lib/bunny-host/adapters.server.ts",
+    " M src/lib/bunny-host/codex-probe.server.ts",
+    " M src/lib/bunny-host/contracts.ts",
+    " M src/lib/bunny-host/http.server.ts",
+    " M src/lib/bunny-host/manager.server.ts",
+    " M src/lib/bunny-host/owned-process-group.server.ts",
+    " M src/lib/bunny-host/verification.server.ts",
+    " M src/lib/bunny-missions/capabilities/process.server.ts",
+    "?? scripts/fixtures/f04-job-wrapper.c",
+    "?? scripts/fixtures/f04-process-fixture.c",
+    "?? src/lib/bunny-host/provider-containment.test.ts"
+  ],
+  "rounds": 1,
+  "passed": 1,
+  "failed": 0,
+  "results": [
+    {
+      "scenario": "graceful-shutdown",
+      "round": 1,
+      "result": "PASS",
+      "steps": [
+        {
+          "step": 1,
+          "title": "contained tree running before graceful shutdown",
+          "taskId": "0e2c6020-b97f-40d0-8fe7-39cf0becaf00",
+          "rootPid": 12424,
+          "ownedFixtureProcesses": 14
+        },
+        {
+          "step": 2,
+          "title": "graceful Host close (production close path)",
+          "exitCode": 0,
+          "printedClosed": true,
+          "ownedRemaining": 0,
+          "providerRootAlive": false,
+          "jobRecord": {
+            "state": "stopped",
+            "containment": "empty",
+            "activeProcesses": 0,
+            "closed": true,
+            "terminatedAtEnd": 26
+          },
+          "unrelatedAlive": {
+            "same": true,
+            "providerLike": true
+          }
+        },
+        {
+          "step": 3,
+          "title": "task record after graceful shutdown (read by a new Host)",
+          "taskState": "stopped",
+          "stopReason": "Host shutdown stopped this owned task.",
+          "stopCleanup": {
+            "status": "complete",
+            "inspectedAt": 1791652474447,
+            "unresolvedProcessCount": 0,
+            "terminationFailures": 0
+          },
+          "detail": "Host shutdown stopped this owned task. Windows job verified empty by kernel accounting: 26 process(es) in the job at Stop were terminated with it, including any descendant whose parent had exited."
+        }
+      ]
+    }
+  ]
+}

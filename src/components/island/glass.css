@@ -1,0 +1,477 @@
+/*
+ * M-A-3 T13 Windows glass system: the single token source for the live workspace shell.
+ *
+ * bunny.css and premium.css both defined the same tokens on the shell root, so the light theme's winner depended on stylesheet
+ * load order. This file is imported last and uses `.bunny-app.t8-app` (specificity 0,2,0 with a theme attribute at 0,3,0), so the
+ * shell's tokens are unambiguous. Spec: docs/t13/BUNNY_A_T13_DESIGN_SPEC.md section 11.
+ *
+ * Contrast: body text is at least 4.5:1 on every surface in both themes (checked in glass-model tests as literal values).
+ */
+
+/* Light workspace (default). Aurora page; glass surfaces are translucent white over it. The explicit light selector (0,3,0) outranks
+   the older bunny.css and premium.css light blocks (0,2,0), so the winner no longer depends on load order. */
+.bunny-app.t8-app,
+.bunny-app.t8-app[data-theme="light"] {
+  --font-bunny: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --page: #eef2fb;
+  --page-wash-a: #c9c2ff;
+  --page-wash-b: #bfd8ff;
+  --page-end: #eef2fb;
+  --fg: #121726;
+  --muted: #5a6378;
+  --subtle: #5a6378;
+  --panel: rgba(255, 255, 255, 0.64);
+  --glass: rgba(255, 255, 255, 0.64);
+  --glass-edge: rgba(255, 255, 255, 0.75);
+  --glass-solid: #f6f7fb;
+  --elevated: rgba(255, 255, 255, 0.82);
+  --field: rgba(255, 255, 255, 0.78);
+  --border: rgba(30, 40, 80, 0.14);
+  --luminous: transparent;
+  --hover: rgba(91, 108, 255, 0.08);
+  --pressed: rgba(91, 108, 255, 0.16);
+  --working: #3550d6;
+  --working-soft: #e6ebff;
+  --thinking: #6d4fe0;
+  --claude: #5a6378;
+  --positive: #1e7a4c;
+  --negative: #b42335;
+  --warning: #8a5a00;
+  --stopped: #5a6378;
+  /* Darkened from #5b6cff so white primary labels reach 4.5:1 (WCAG AA) at the 13px label size. */
+  --action: #4a5be0;
+  --action-ink: #ffffff;
+  --accent: var(--action);
+  --accent-ink: var(--action-ink);
+  --lilac: #9c7bff;
+  --focus: #3550d6;
+  --disabled: #6b7389;
+  --shadow: 0 8px 30px rgba(30, 40, 80, 0.1);
+  --raised-shadow: 0 16px 48px rgba(30, 40, 80, 0.16);
+  --blur: 24px;
+  --glass-saturate: 160%;
+  --dark-well: #0b0d14;
+  color-scheme: light;
+  color: var(--fg);
+  background:
+    radial-gradient(900px 620px at 10% -12%, var(--page-wash-a) 0%, transparent 62%),
+    radial-gradient(820px 620px at 104% 0%, var(--page-wash-b) 0%, transparent 60%),
+    var(--page);
+  background-attachment: fixed;
+}
+
+/* Dark workspace: deep indigo washes; glass is a dark translucent layer. */
+.bunny-app.t8-app[data-theme="dark"] {
+  --page: #0a0d16;
+  --page-wash-a: #2a2f7a;
+  --page-wash-b: #1b3a6b;
+  --page-end: #0a0d16;
+  --fg: #eef1fa;
+  --muted: #9aa3b8;
+  --subtle: #9aa3b8;
+  --panel: rgba(20, 24, 38, 0.66);
+  --glass: rgba(20, 24, 38, 0.66);
+  --glass-edge: rgba(255, 255, 255, 0.1);
+  --glass-solid: #141824;
+  --elevated: rgba(34, 39, 58, 0.86);
+  --field: rgba(10, 13, 22, 0.6);
+  --border: rgba(160, 175, 230, 0.16);
+  --hover: rgba(142, 162, 255, 0.1);
+  --pressed: rgba(142, 162, 255, 0.2);
+  --working: #a9bcff;
+  --working-soft: #1f2a4d;
+  --thinking: #c3b5ff;
+  --claude: #9aa3b8;
+  --positive: #8fd7b0;
+  --negative: #ffb4b0;
+  --warning: #f0cf8f;
+  --stopped: #9aa3b8;
+  --action: #8ea2ff;
+  --action-ink: #0a0d16;
+  --focus: #b7c4ff;
+  --disabled: #7a8296;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  --raised-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+  background:
+    radial-gradient(900px 620px at 12% -12%, var(--page-wash-a) 0%, transparent 60%),
+    radial-gradient(820px 620px at 100% 0%, var(--page-wash-b) 0%, transparent 58%),
+    var(--page);
+  background-attachment: fixed;
+}
+
+/* Glass surfaces. Every frosted panel in the shell goes through these two rules. */
+.bunny-app.t8-app .glass,
+.bunny-app.t8-app .t8-surface,
+.bunny-app.t8-app .app-sidebar,
+.bunny-app.t8-app .cx-panel,
+.bunny-app.t8-app .connection-banner {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-edge);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--blur)) saturate(var(--glass-saturate));
+}
+.bunny-app.t8-app .app-sidebar {
+  background: var(--glass);
+}
+
+/* Fallback: no backdrop-filter support, reduced transparency, or forced colours all get opaque surfaces. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bunny-app.t8-app .glass,
+  .bunny-app.t8-app .t8-surface,
+  .bunny-app.t8-app .app-sidebar,
+  .bunny-app.t8-app .cx-panel,
+  .bunny-app.t8-app .connection-banner {
+    background: var(--glass-solid);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .bunny-app.t8-app {
+    --blur: 0px;
+    --glass: var(--glass-solid);
+    --panel: var(--glass-solid);
+  }
+  .bunny-app.t8-app .glass,
+  .bunny-app.t8-app .t8-surface,
+  .bunny-app.t8-app .app-sidebar,
+  .bunny-app.t8-app .cx-panel,
+  .bunny-app.t8-app .connection-banner {
+    background: var(--glass-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (forced-colors: active) {
+  .bunny-app.t8-app,
+  .bunny-app.t8-app .glass,
+  .bunny-app.t8-app .t8-surface,
+  .bunny-app.t8-app .app-sidebar,
+  .bunny-app.t8-app .cx-panel,
+  .bunny-app.t8-app .connection-banner {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* The dark character well: character art always sits on this, so its dark visor never disappears into light glass. */
+.bunny-app.t8-app .cx-well {
+  background: radial-gradient(circle at 50% 35%, #1a1e2b 0%, #07080d 100%);
+  border-radius: 14px;
+}
+
+/* ----- Shell layout: main column + collapsible right context panel --------------------------------------------- */
+.bunny-app.t8-app .topbar-companion {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s3);
+}
+.bunny-app.t8-app .workspace-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s4);
+  align-items: start;
+  min-width: 0;
+}
+.bunny-app.t8-app .workspace-split > .workspace-content {
+  min-width: 0;
+}
+.bunny-app.t8-app .nav-group-label {
+  margin: var(--s4) var(--s3) var(--s2);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.bunny-app.t8-app .cx-panel {
+  width: 280px;
+  position: sticky;
+  top: var(--s4);
+  border-radius: var(--r-lg);
+  padding: var(--s4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  max-height: calc(100dvh - 2 * var(--s4));
+  overflow: auto;
+}
+.bunny-app.t8-app .cx-panel[data-collapsed="true"] {
+  width: auto;
+  padding: var(--s2);
+}
+.bunny-app.t8-app .cx-section h3 {
+  margin: 0 0 var(--s2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.bunny-app.t8-app .cx-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: var(--s2);
+  align-items: center;
+  width: 100%;
+  padding: var(--s2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+}
+.bunny-app.t8-app .cx-row:hover {
+  background: var(--hover);
+}
+.bunny-app.t8-app .cx-row[data-bound="false"] {
+  /* The muted token alone conveys the unbound state. An extra opacity fade would composite the name below the
+     documented 4.5:1 body-text bar on light glass (spec section 11), so the row must not fade its text. */
+  color: var(--muted);
+}
+.bunny-app.t8-app .cx-copy,
+.bunny-app.t8-app .ch-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.bunny-app.t8-app .ch-copy small,
+.bunny-app.t8-app .cx-copy small {
+  display: block;
+}
+.bunny-app.t8-app .cx-row small,
+.bunny-app.t8-app .cx-muted {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.bunny-app.t8-app .cx-badge {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--working-soft);
+  color: var(--fg);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+/* ----- Chat landing -------------------------------------------------------------------------------------------- */
+.bunny-app.t8-app .ch-hero {
+  padding: var(--s6) 0 var(--s4);
+}
+.bunny-app.t8-app .ch-hero h1 {
+  margin: var(--s1) 0 0;
+  font-size: var(--text-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.bunny-app.t8-app .ch-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+.bunny-app.t8-app .ch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--field);
+  color: var(--fg);
+  font-size: var(--text-sm);
+}
+.bunny-app.t8-app .ch-quick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--s2);
+  margin: var(--s4) 0;
+}
+.bunny-app.t8-app .ch-quick button {
+  text-align: left;
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--glass);
+  color: var(--fg);
+}
+.bunny-app.t8-app .ch-mission-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: var(--s3);
+  align-items: center;
+  width: 100%;
+  padding: var(--s3);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+}
+.bunny-app.t8-app .ch-neutral-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--field);
+  color: var(--muted);
+}
+
+/* ----- Personal Agent Studio ----------------------------------------------------------------------------------- */
+.bunny-app.t8-app .st-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: var(--s3);
+}
+.bunny-app.t8-app .st-card {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3);
+  border-radius: var(--r-lg);
+}
+.bunny-app.t8-app .st-card[data-bound="false"] {
+  opacity: 0.8;
+}
+.bunny-app.t8-app .st-card .st-well {
+  height: 150px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 35%, #1a1e2b 0%, #07080d 100%);
+}
+.bunny-app.t8-app .st-form {
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.bunny-app.t8-app .st-form label {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.bunny-app.t8-app .st-form input,
+.bunny-app.t8-app .st-form textarea,
+.bunny-app.t8-app .st-form select {
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--field);
+  color: var(--fg);
+  font: inherit;
+}
+.bunny-app.t8-app .st-error {
+  color: var(--negative);
+  font-size: var(--text-xs);
+}
+.bunny-app.t8-app .st-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+}
+.bunny-app.t8-app .st-tag[aria-pressed="true"] {
+  background: var(--working-soft);
+  color: var(--fg);
+}
+.bunny-app.t8-app .st-tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--field);
+  color: var(--fg);
+  font-size: var(--text-xs);
+}
+
+/* ----- Approvals, Files ---------------------------------------------------------------------------------------- */
+.bunny-app.t8-app .ap-row,
+.bunny-app.t8-app .fi-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s3);
+  align-items: center;
+  padding: var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+.bunny-app.t8-app .ap-actions,
+.bunny-app.t8-app .fi-actions {
+  display: flex;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.bunny-app.t8-app .fi-preview {
+  white-space: pre-wrap;
+  max-height: 320px;
+  overflow: auto;
+  margin: var(--s2) 0 0;
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--field);
+  color: var(--fg);
+  font-size: var(--text-sm);
+}
+
+/* The phone companion owns the whole viewport, including landscape widths that also match desktop breakpoints.
+   It must never be placed into the desktop shell's sidebar column. */
+.bunny-app.t8-app[data-surface="companion"] {
+  display: block;
+}
+.bunny-app.t8-app[data-surface="companion"] > .workspace-content {
+  max-width: none;
+  padding: 0;
+}
+
+/* ----- Responsive: the context panel leaves the grid on narrow windows and becomes a collapsed rail ------------- */
+@media (max-width: 1180px) {
+  .bunny-app.t8-app .workspace-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bunny-app.t8-app .cx-panel {
+    position: static;
+    width: 100%;
+    max-height: none;
+  }
+  /* A collapsed rail keeps its re-open control at the top of the page, not after the whole page content. */
+  .bunny-app.t8-app .cx-panel[data-collapsed="true"] {
+    order: -1;
+  }
+}
+/* Approval and file rows with their action buttons: at phone width the actions take a full row, so the title is not squeezed. */
+@media (max-width: 720px) {
+  .bunny-app.t8-app .ap-row,
+  .bunny-app.t8-app .fi-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bunny-app.t8-app .ap-actions,
+  .bunny-app.t8-app .fi-actions {
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 720px) {
+  .bunny-app.t8-app .ch-quick {
+    grid-template-columns: 1fr;
+  }
+  .bunny-app.t8-app .st-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Motion: loops and transitions stop for reduced-motion users; colour and layout still change. */
+@media (prefers-reduced-motion: reduce) {
+  .bunny-app.t8-app * {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .cx-well,
+  .st-well {
+    forced-color-adjust: none;
+  }
+}

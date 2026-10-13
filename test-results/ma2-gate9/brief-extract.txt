@@ -1,0 +1,1622 @@
+
+
+<pasted_content id="56f0">
+BUNNY-A — M-A-2 GATE T9
+BOUNDED DESKTOP APPROVAL BATCHING / APPROVAL UX REFINEMENT
+
+ROLE
+
+You are implementing and validating ONLY M-A-2 Gate T9.
+
+Do NOT start T10.
+Do NOT implement OCT-1 or OD-1 research work.
+Do NOT redesign Bunny's authority system.
+Do NOT trade safety for fewer approval prompts.
+
+Accepted gates:
+
+T1 — PASS
+T2 — PASS
+T3 — PASS
+T4 — PASS
+T5 — PASS
+T6R — PASS
+T7 — PASS
+T8 — PASS
+
+Current production:
+
+Bunny-A-Windows-v17-T6
+
+T7 close:
+c126e7f
+
+T8 close:
+abe993a
+
+Current regression floor:
+
+592 tests
+
+No v17-T8 release was manufactured.
+T8 was acceptance-only.
+
+IMPORTANT:
+
+Read the ACTUAL current source, permission implementation, capability-grant
+semantics, Computer Runtime, approval UI, T5 presentation layer, and T8 docs
+before designing T9.
+
+Do not invent authority semantics from this prompt.
+
+
+================================================================
+0. T9 PURPOSE
+================================================================
+
+T9 must solve one specific UX problem:
+
+Desktop/computer automation currently asks the user for too many repeated
+approvals during a single bounded workflow.
+
+T9 must reduce approval fatigue WITHOUT turning:
+
+"Approve this action"
+
+into:
+
+"Control my whole computer."
+
+The property to establish is:
+
+A user may deliberately authorize a narrow batch of predictable low-risk
+desktop actions, while anything outside that exact envelope still requires a
+new approval.
+
+
+================================================================
+1. AUTHORITY REMAINS HOST-OWNED
+================================================================
+
+Canonical authority remains:
+
+MissionManager
+TaskManager
+Capability Bus
+permission engine
+Host persisted state
+
+The UI may request or display a grant.
+
+The UI does NOT create authority by itself.
+
+No renderer-local:
+
+approved=true
+
+may authorize execution.
+
+
+================================================================
+2. INSPECT CURRENT APPROVAL MODEL FIRST
+================================================================
+
+Before changing code inspect:
+
+capability_grants
+permission_requests
+mission_authorizations
+capability_runs
+Computer Runtime action schema
+approval endpoints
+desktop UI approval components
+phone approval components
+Host journal events
+restart/recovery behavior
+
+Determine exactly what existing:
+
+Allow once
+Allow for task
+Allow for skill
+grant override
+approval scope
+
+currently means.
+
+Create:
+
+test-results/ma2-gate9/current-approval-model.md
+
+Do not silently reinterpret existing semantics.
+
+
+================================================================
+3. MINIMUM CHANGE PRINCIPLE
+================================================================
+
+Prefer extending the existing permission/grant system.
+
+Do NOT create:
+
+second permission engine
+second grant database
+second approval journal
+separate desktop authorization service
+
+If existing capability_grants can safely represent the feature, use them.
+
+If they cannot, make the smallest schema/model extension necessary.
+
+
+================================================================
+4. BOUNDED APPROVAL ENVELOPE
+================================================================
+
+Design an explicit approval envelope.
+
+Conceptually it may contain:
+
+grantId
+actor/device identity
+Task ID
+Mission ID if applicable
+step ID if applicable
+capability family
+operation classes
+target application
+target process/window identity where available
+workspace/project scope
+risk ceiling
+maximum action count
+createdAt
+expiresAt
+Host instance / authority generation if required
+status
+
+Use the ACTUAL minimal fields required by Bunny.
+
+Do not add fields purely because this prompt lists them.
+
+
+================================================================
+5. DEFAULT MUST REMAIN CONSERVATIVE
+================================================================
+
+Existing single-action approval remains available.
+
+Do NOT automatically batch approvals.
+
+User must explicitly choose a bounded option.
+
+Example UI:
+
+Allow once
+
+Allow this small batch
+  8 actions · Calculator only · 2 minutes
+
+Deny
+
+Never default to the broadest option.
+
+
+================================================================
+6. NO "ALLOW EVERYTHING"
+================================================================
+
+Do NOT add:
+
+Allow all
+Always allow desktop control
+Trust this agent forever
+Full computer access
+Approve entire Mission regardless of action
+
+T9 is bounded batching, not permanent trust.
+
+
+================================================================
+7. ELIGIBLE ACTIONS
+================================================================
+
+Only low-risk, predictable desktop actions should be batch-eligible.
+
+Examples may include:
+
+focus known application
+click known UI control
+select tab/menu
+scroll
+type non-sensitive ordinary text
+move through deterministic UI
+read visible UI state
+safe local navigation
+
+Eligibility must come from Bunny's risk model, not from the model saying:
+
+"This is safe."
+
+
+================================================================
+8. ACTIONS THAT MUST NOT BE BATCHED
+================================================================
+
+The following should require fresh explicit approval unless existing policy is
+even stricter:
+
+destructive filesystem action
+delete
+overwrite important data
+Git destructive mutation
+credential entry
+password entry
+secret entry
+security settings
+install/uninstall
+administrator/elevation
+payment/purchase
+financial transaction
+send external communication
+publish/post
+account creation/deletion
+permission/security changes
+device pairing/revocation
+clipboard extraction of sensitive data
+upload of private files
+external side effect with meaningful consequence
+
+Do not create an exhaustive brittle string list if Bunny already has structured
+risk classes.
+
+Use structured policy.
+
+
+================================================================
+9. BATCH SCOPE MUST BE EXACT
+================================================================
+
+A grant for:
+
+Calculator
+
+must not authorize:
+
+Chrome
+
+A grant for:
+
+Task A
+
+must not authorize:
+
+Task B
+
+A grant for:
+
+Mission Step 3
+
+must not automatically authorize Step 4 unless the approved envelope
+explicitly says so.
+
+A grant for:
+
+click/type
+
+must not authorize:
+
+shell execution
+
+A grant for:
+
+local UI actions
+
+must not authorize:
+
+external network side effects.
+
+
+================================================================
+10. TARGET APPLICATION BINDING
+================================================================
+
+Where technically reliable, bind desktop approval to the intended application.
+
+Preferred identity hierarchy:
+
+process identity
+application executable identity
+window/process association
+AutomationId/control hierarchy
+window title only as supporting context
+
+Do not trust window title alone as authority if a stronger identifier exists.
+
+
+================================================================
+11. WINDOW DRIFT
+================================================================
+
+If the active target unexpectedly changes to another application/window:
+
+pause.
+
+Do NOT continue using the existing batch grant.
+
+Require:
+
+re-evaluation
+or
+new approval
+
+This includes popups from another security domain/application where applicable.
+
+
+================================================================
+12. ACTION COUNT LIMIT
+================================================================
+
+A batch grant must have a finite action budget.
+
+Example concept:
+
+max 10 desktop mutations
+
+Do not choose this example value blindly.
+
+Select a conservative default based on actual workflow/testing.
+
+When exhausted:
+
+request new approval.
+
+
+================================================================
+13. TIME LIMIT
+================================================================
+
+A batch grant must expire.
+
+It must not remain usable indefinitely because a Task was left open.
+
+Use a short bounded duration appropriate to desktop interaction.
+
+Expiration uses Host time/state, not client UI timers as authority.
+
+
+================================================================
+14. RISK CEILING
+================================================================
+
+Every grant must have a maximum risk level.
+
+If a later action exceeds that risk level:
+
+approval is required even if:
+
+same application
+same Mission
+same time window
+remaining action count > 0
+
+
+================================================================
+15. PRECONDITION / POSTCONDITION
+================================================================
+
+Computer Runtime actions already use structured action semantics.
+
+Preserve:
+
+target
+precondition
+action
+postcondition
+timeout
+retry
+risk
+evidence
+
+Batch approval does NOT remove validation.
+
+Every action still verifies:
+
+precondition
+action result
+postcondition
+
+
+================================================================
+16. NO MODEL SELF-EXPANSION
+================================================================
+
+An agent/model cannot enlarge its own grant.
+
+It may request:
+
+additional authority
+
+The Host decides whether user approval is required.
+
+Never accept model-generated:
+
+grantScope += ...
+
+
+================================================================
+17. NO APPROVAL THROUGH NATURAL-LANGUAGE CLAIM
+================================================================
+
+Text such as:
+
+"The user already approved this"
+
+is not authority.
+
+Only canonical Host grant records count.
+
+
+================================================================
+18. APPROVAL UI
+================================================================
+
+Approval UI should state clearly:
+
+what Bunny wants to do
+which application
+which Task/Mission
+what action classes
+maximum number of actions
+expiration
+risk level
+whether external effects are included
+
+Example:
+
+Bunny wants to control Calculator
+
+Allowed:
+• click buttons
+• type numbers
+• read result
+
+Scope:
+Task "Calculate expenses"
+
+Limit:
+up to 8 actions
+2 minutes
+
+External side effects:
+None
+
+[Allow once]
+[Allow this batch]
+[Deny]
+
+Use actual Bunny visual language.
+
+
+================================================================
+19. NO RAW INTERNAL POLICY DUMP
+================================================================
+
+Keep user-facing approval understandable.
+
+Do not expose:
+
+internal capability JSON
+private reasoning
+raw selectors
+secret command arguments
+internal stack traces
+
+Detailed diagnostics may remain in local evidence/debug views.
+
+
+================================================================
+20. APPROVAL PREVIEW
+================================================================
+
+Where Bunny already knows a short deterministic sequence, optionally show:
+
+3 planned actions
+
+or equivalent.
+
+Do NOT fabricate a complete plan when the exact number is unknown.
+
+Unknown work remains:
+
+bounded but indeterminate.
+
+
+================================================================
+21. BATCH USAGE COUNTER
+================================================================
+
+UI may show:
+
+5 / 8 approved actions used
+
+only if the count is canonical.
+
+Do not infer percentage from elapsed time.
+
+
+================================================================
+22. GRANT CONSUMPTION
+================================================================
+
+Define exactly what consumes an action budget.
+
+Preferred:
+
+an admitted mutating Computer Runtime operation.
+
+Do not consume quota merely for:
+
+rendering UI
+reading status
+approval-card refresh
+
+Retries require deliberate semantics.
+
+
+================================================================
+23. RETRY SEMANTICS
+================================================================
+
+A retry must not create unlimited authority.
+
+Determine whether:
+
+same action retry
+
+consumes:
+one additional budget unit
+or remains part of the same admitted operation.
+
+Document and test whichever policy is selected.
+
+Bound retry count regardless.
+
+
+================================================================
+24. FAILURE
+================================================================
+
+If an action fails:
+
+do not automatically expand scope.
+
+Possible behavior:
+
+retry within bounded policy
+pause
+request new approval
+
+depending on actual failure class.
+
+
+================================================================
+25. UNEXPECTED DIALOG
+================================================================
+
+If desktop automation encounters:
+
+UAC
+password prompt
+purchase
+file overwrite confirmation
+security warning
+unexpected permission request
+
+batch authorization must pause.
+
+Require explicit user approval where applicable.
+
+
+================================================================
+26. SENSITIVE INPUT
+================================================================
+
+Typing normal text may be batch-eligible.
+
+Typing:
+
+password
+API token
+credit-card data
+security code
+private key
+secret
+
+must NOT inherit ordinary typing approval.
+
+Sensitive-input classification must be conservative.
+
+
+================================================================
+27. CLIPBOARD
+================================================================
+
+Clipboard read/write needs explicit policy.
+
+Do not silently grant arbitrary clipboard access as part of:
+
+click/type
+
+If existing Bunny policy already covers clipboard, preserve it.
+
+Sensitive clipboard contents must not enter public activity projection.
+
+
+================================================================
+28. FILE PICKERS
+================================================================
+
+Opening a file picker may be low-risk.
+
+Selecting/uploading a private file can create an external side effect.
+
+Do not treat those as equivalent.
+
+Batch policy must stop before a materially broader file disclosure.
+
+
+================================================================
+29. BROWSER VS COMPUTER RUNTIME
+================================================================
+
+Do not blur:
+
+Browser Runtime authorization
+
+with:
+
+Windows Computer Runtime authorization
+
+A desktop batch grant does not automatically authorize browser-network actions.
+
+Existing Browser Runtime approval/security remains canonical.
+
+
+================================================================
+30. SHELL IS SEPARATE
+================================================================
+
+A Computer Runtime batch grant never grants:
+
+PowerShell
+cmd
+terminal
+arbitrary process execution
+
+unless a separate existing capability is explicitly authorized.
+
+This preserves the OCT-1 rejection of free-form Terminal AI authority.
+
+
+================================================================
+31. APPLICATION-SPECIFIC SAFE BATCH
+================================================================
+
+Create at least one positive live example.
+
+Suggested:
+
+Windows Calculator
+
+Sequence:
+
+open/focus Calculator
+perform a bounded calculation
+read result
+
+One explicit batch approval should allow the eligible sequence.
+
+Do NOT weaken unrelated application authority.
+
+
+================================================================
+32. SECOND APPLICATION NEGATIVE TEST
+================================================================
+
+While Calculator batch grant is active:
+
+attempt to target another application.
+
+Expected:
+
+approval required / action denied.
+
+The existing Calculator grant must not transfer.
+
+
+================================================================
+33. HIGH-RISK INTERRUPTION TEST
+================================================================
+
+During a valid low-risk batch, introduce an action classified above the grant's
+risk ceiling.
+
+Expected:
+
+batch pauses
+fresh approval required
+
+No silent continuation.
+
+
+================================================================
+34. EXPIRATION TEST
+================================================================
+
+Let a batch grant expire.
+
+Attempt another eligible action.
+
+Expected:
+
+fresh approval required.
+
+Do not rely on UI disappearance alone.
+
+
+================================================================
+35. ACTION-BUDGET TEST
+================================================================
+
+Exhaust the approved action count.
+
+The next action must require a new decision.
+
+No off-by-one bypass.
+
+
+================================================================
+36. TASK BOUNDARY TEST
+================================================================
+
+Create:
+
+Task A
+Task B
+
+Approve batch for A.
+
+Attempt same desktop action from B.
+
+Expected:
+
+B does not inherit A's grant.
+
+
+================================================================
+37. MISSION BOUNDARY TEST
+================================================================
+
+If approval is Mission-scoped:
+
+prove exact semantics.
+
+A child Task/step may use the grant only if it falls within the approved Mission
+envelope.
+
+Unrelated Mission must not inherit.
+
+
+================================================================
+38. PROVIDER REROUTE
+================================================================
+
+Provider identity must not be the approval identity.
+
+Example:
+
+Code worker routed Codex → Claude
+
+If the logical Task/Mission/capability scope remains valid:
+
+provider change alone should not necessarily invalidate approval.
+
+But provider change must never broaden capability.
+
+Test actual desired semantics.
+
+
+================================================================
+39. HOST RESTART
+================================================================
+
+Decide whether batch grants survive Host restart.
+
+Strong default recommendation:
+
+ephemeral desktop batch grants do NOT survive Host restart.
+
+If current architecture requires persistence:
+
+prove revocation/revision safety.
+
+Do not persist broad desktop authority accidentally.
+
+
+================================================================
+40. UI DISCONNECT
+================================================================
+
+Closing/reloading dashboard does NOT necessarily stop Host-owned work.
+
+But it must not create new approval.
+
+If an already-approved bounded batch continues according to Host semantics,
+document it.
+
+Canonical Host state wins after reconnect.
+
+
+================================================================
+41. REMOTE APPROVAL
+================================================================
+
+Phone/remote client may display the same approval if currently supported.
+
+Do not give remote UI broader authority.
+
+A batch approved remotely must have the same envelope as desktop approval.
+
+
+================================================================
+42. DEVICE IDENTITY
+================================================================
+
+Record which paired device approved the grant where existing authorization
+model supports this.
+
+Do not make device identity the sole security boundary if Host policy requires
+more context.
+
+
+================================================================
+43. REVOCATION / CANCELLATION
+================================================================
+
+T9 does NOT implement the broader OD-1 revocation architecture.
+
+But the user must be able to stop the Task/Mission.
+
+Stop must prevent future actions under the grant.
+
+If the current grant system supports explicit revoke/clear:
+
+make behavior truthful.
+
+Do not claim cancellation reverses already completed external effects.
+
+
+================================================================
+44. STOP DURING BATCH
+================================================================
+
+Live test:
+
+start a bounded desktop batch
+Stop the Task before completion
+
+Expected:
+
+no further desktop actions
+owned execution stops
+grant no longer authorizes continued work
+unrelated Bunny work survives
+
+
+================================================================
+45. HOST CRASH / INTERRUPTION
+================================================================
+
+Use disposable/live-safe testing.
+
+If Host dies during a desktop batch:
+
+on recovery:
+
+do not blindly replay pending GUI mutations
+do not silently restore ephemeral approval
+mark interrupted as appropriate
+
+T3 semantics remain canonical.
+
+
+================================================================
+46. JOURNAL
+================================================================
+
+Record safe events such as:
+
+approval.requested
+approval.granted
+approval.batch_started
+approval.action_consumed
+approval.exhausted
+approval.expired
+approval.scope_mismatch
+approval.revoked/cleared where supported
+
+Use existing Bunny event authority.
+
+Do NOT add another audit store.
+
+
+================================================================
+47. PRIVACY
+================================================================
+
+Journal/UI must not store:
+
+typed passwords
+secret input
+full clipboard secrets
+private reasoning
+sensitive field values
+
+Safe activity:
+
+Typed text into Calculator field
+
+not:
+
+Typed "my-secret-password"
+
+
+================================================================
+48. INDEPENDENT VERIFICATION
+================================================================
+
+Batch approval affects execution authority only.
+
+It does NOT affect verification.
+
+Provider completion
+≠
+Task completion
+≠
+independent verification
+
+Preserve T5 semantics.
+
+
+================================================================
+49. NO FAKE SAFETY CLAIM
+================================================================
+
+Do not describe a batch as:
+
+safe
+
+merely because the user approved it.
+
+Use:
+
+authorized within bounded scope
+
+Safety/risk classification remains separate.
+
+
+================================================================
+50. EXISTING "ALLOW ONCE" SEMANTICS
+================================================================
+
+Preserve current single-action behavior.
+
+Do not force all approvals into batch mode.
+
+Existing conservative users should see no authority expansion.
+
+
+================================================================
+51. POLICY LEVELS
+================================================================
+
+If useful, provide only a small set of explicit choices.
+
+Example:
+
+Allow once
+Allow this bounded sequence
+Deny
+
+Avoid complicated policy matrices in normal UI.
+
+
+================================================================
+52. NO GLOBAL PREFERENCE FOR T9
+================================================================
+
+Do not add:
+
+Always allow Calculator forever
+
+or application-global persistent trust.
+
+That belongs to a separate future policy-design milestone if ever desired.
+
+
+================================================================
+53. T1 PRESERVATION
+================================================================
+
+Verify:
+
+state outside Git
+DB schema/layout correct
+workspace unchanged
+no state fallback
+
+
+================================================================
+54. T2 PRESERVATION
+================================================================
+
+Approval batching must not bypass provider compatibility.
+
+Mission-incompatible Codex remains Mission-incompatible even if desktop
+capability is approved.
+
+
+================================================================
+55. T3 PRESERVATION
+================================================================
+
+Failures remain contained.
+
+Approval/grant errors must not crash Host.
+
+Restart recovery remains honest.
+
+
+================================================================
+56. T4 PRESERVATION
+================================================================
+
+Stop/process cleanup remains ownership-based.
+
+No PID/name kill logic introduced.
+
+
+================================================================
+57. T5 PRESERVATION
+================================================================
+
+UI keeps:
+
+safe projection
+Task/provider/verification distinctions
+degraded/interrupted states
+privacy rules
+current dashboard
+
+
+================================================================
+58. T6 PRESERVATION
+================================================================
+
+Remote approval uses same Host authority.
+
+No public/tunnel bypass.
+
+Revoked devices cannot approve batches.
+
+
+================================================================
+59. T7 PRESERVATION
+================================================================
+
+Windows sign-in/startup remains accepted.
+
+Do not create another auto-start mechanism.
+
+
+================================================================
+60. T8 PRESERVATION
+================================================================
+
+Rollback tooling and installed release selection remain intact.
+
+If T9 creates a new release, T8 principles must continue to work:
+
+explicit pin
+outside Git
+canonical current state
+no stale PID authority
+
+
+================================================================
+61. SOURCE CHANGE EXPECTATION
+================================================================
+
+T9 likely requires runtime/UI changes.
+
+If so:
+
+create a normal immutable candidate:
+
+Bunny-A-Windows-v17-T9
+
+or repository-consistent next version.
+
+Do not call it T8/T10.
+
+
+================================================================
+62. BUILD FROM EXACT SOURCE
+================================================================
+
+Record:
+
+source SHA
+tooling SHA
+package SHA
+manifest SHA
+dashboard asset identity
+
+No dirty working-tree source in package.
+
+
+================================================================
+63. STAGE FIRST
+================================================================
+
+Do NOT immediately replace production.
+
+Run T9 against:
+
+disposable production DB copy
+separate workspace
+separate Host token
+separate ports
+
+Then staged installed package.
+
+
+================================================================
+64. PRODUCTION ACTIVATION
+================================================================
+
+Only activate T9 if:
+
+full tests pass
+security tests pass
+live desktop approval acceptance passes
+rollback exists
+production backup exists
+user authorization for activation exists under current procedure
+
+Otherwise leave candidate staged.
+
+
+================================================================
+65. REGRESSION FLOOR
+================================================================
+
+Actual current floor:
+
+592
+
+Verify from repository/evidence first.
+
+Do not delete tests.
+
+Add focused T9 tests.
+
+
+================================================================
+66. REQUIRED AUTOMATED TEST AREAS
+================================================================
+
+At minimum cover:
+
+single-action approval unchanged
+explicit batch approval
+batch denied
+application binding
+Task binding
+Mission binding
+action-count exhaustion
+time expiration
+risk escalation
+unexpected target application
+sensitive input
+shell exclusion
+Browser Runtime exclusion
+provider reroute
+Stop
+Host restart
+UI reconnect
+remote approval
+revoked remote device
+secret redaction
+journal events
+verification independence
+
+
+================================================================
+67. LIVE TEST MATRIX
+================================================================
+
+At minimum LIVE verify:
+
+A. Allow once still works
+
+B. Calculator bounded batch works
+
+C. second app requires approval
+
+D. higher-risk action interrupts batch
+
+E. action limit interrupts batch
+
+F. expiration interrupts batch
+
+G. Stop ends further use
+
+H. unrelated Task cannot reuse grant
+
+I. local UI accurately displays scope
+
+J. phone/remote representation does not broaden authority if tested
+
+
+================================================================
+68. ADVERSARIAL TESTS
+================================================================
+
+Attempt:
+
+reuse grant ID from another Task
+modify requested action after approval
+change target app
+change capability class
+exceed action budget
+use after expiry
+use after Stop
+use after Host restart
+replay old approval request
+spoof provider identity
+spoof UI state
+
+Expected:
+
+fail closed.
+
+
+================================================================
+69. TOCTOU
+================================================================
+
+Approval-time target and execution-time target may differ.
+
+Revalidate critical scope immediately before action admission.
+
+Do not rely solely on what the UI showed when user clicked Approve.
+
+
+================================================================
+70. EVENT ORDERING
+================================================================
+
+Test:
+
+approval granted
+action starts
+Stop races action
+grant expires during sequence
+
+Avoid:
+
+action admitted after canonical Stop
+actions admitted after expiration
+duplicate consumption
+
+
+================================================================
+71. CONCURRENCY
+================================================================
+
+Two concurrent Tasks must not share a batch accidentally.
+
+Even if:
+
+same application
+same action type
+same user
+
+Authority remains scoped.
+
+
+================================================================
+72. MULTIPLE WINDOWS
+================================================================
+
+If one application has multiple windows:
+
+define scope carefully.
+
+If binding to process/app rather than exact window:
+
+document it.
+
+Sensitive cross-document/window transitions may require reapproval.
+
+Do not overclaim exact window isolation if OS APIs cannot guarantee it.
+
+
+================================================================
+73. ACCESSIBILITY / UIA
+================================================================
+
+Preserve selector hierarchy:
+
+AutomationId
+>
+control type/name
+>
+stable hierarchy
+>
+coordinates last resort
+
+Batch approval must not encourage coordinate-only automation.
+
+
+================================================================
+74. VISION FALLBACK
+================================================================
+
+If local vision/Ollama is used to identify a target:
+
+visual interpretation does not expand authority.
+
+The resulting action still must fit approved structured scope.
+
+
+================================================================
+75. EXTERNAL MODEL FALLBACK
+================================================================
+
+External reasoning may resolve ambiguity only where existing policy permits.
+
+It does not grant extra desktop authority.
+
+Keep external-provider use separately observable.
+
+
+================================================================
+76. APPROVAL PERFORMANCE
+================================================================
+
+Measure UX improvement honestly.
+
+Example metrics:
+
+number of prompts before T9
+number after T9
+actions executed
+batch size
+time to completion
+
+Do not optimize for minimum prompts at the expense of scope.
+
+
+================================================================
+77. SUCCESS METRIC
+================================================================
+
+T9 succeeds when:
+
+a normal low-risk desktop workflow requires materially fewer repetitive prompts
+
+AND
+
+scope-escape attempts still stop for approval.
+
+
+================================================================
+78. EVIDENCE ROOT
+================================================================
+
+Use:
+
+test-results/ma2-gate9/
+
+Suggested records:
+
+baseline.json
+approval-model-before.md
+policy-design.md
+schema-change.json if applicable
+focused-tests.log
+full-tests.log
+ui-tests.log
+typecheck.log
+lint.log
+build.log
+windows-build.log
+candidate-package.json
+single-action-live.json
+batch-calculator-live.json
+app-boundary-live.json
+risk-boundary-live.json
+budget-exhaustion-live.json
+expiration-live.json
+task-isolation-live.json
+stop-live.json
+restart-live.json
+remote-approval-live.json if run
+adversarial.json
+privacy.json
+journal.json
+production-preservation.json
+activation.json if activated
+final-production.json
+
+
+================================================================
+79. HASHED EVIDENCE INDEX
+================================================================
+
+Create:
+
+test-results/ma2-gate9/evidence/index.json
+
+For each relevant evidence file record:
+
+relative path
+size
+SHA-256
+classification
+timestamp
+
+Do not include secret values.
+
+
+================================================================
+80. DOCUMENTATION
+================================================================
+
+Create:
+
+MA2_T9_APPROVAL_BATCHING_ACCEPTANCE.md
+
+Update:
+
+MA2_ACCEPTANCE_MATRIX.md
+MA2_IMPLEMENTATION_REPORT.md
+MA2_INDEPENDENT_REVIEW_PACKET.md
+
+Required report sections:
+
+# M-A-2 Gate T9
+
+## Baseline
+
+## Previous approval behavior
+
+## New bounded policy
+
+## Security invariants
+
+## IMPLEMENTED
+
+## LIVE VERIFIED
+
+## SIMULATED
+
+## STATIC VERIFIED
+
+## NOT TESTED
+
+## BLOCKED
+
+## DEFERRED
+
+## Positive batch workflow
+
+## Scope escape tests
+
+## Expiration / budget tests
+
+## Stop / restart behavior
+
+## Remote approval behavior
+
+## Privacy
+
+## UX impact
+
+## Candidate identity
+
+## Final production state
+
+## Final verdict
+
+
+================================================================
+81. PASS CRITERIA
+================================================================
+
+Return exactly:
+
+BUNNY_MA2_T9_PASS
+
+or:
+
+BUNNY_MA2_T9_FAIL
+
+PASS requires:
+
+- existing single approval preserved
+- batch approval is explicit
+- scope is finite
+- time is finite
+- action count is finite
+- risk ceiling exists
+- Task/Mission scope enforced
+- application/target scope enforced as technically possible
+- shell authority not inherited
+- Browser authority not inherited
+- sensitive/high-risk actions re-prompt
+- scope escape fails closed
+- expiration works
+- budget exhaustion works
+- Stop prevents further use
+- Host restart does not silently revive unsafe grants
+- concurrent Tasks do not share grants
+- UI truthfully shows scope
+- privacy preserved
+- verification semantics unchanged
+- T1–T8 preserved
+- full regression passes
+- no unresolved BLOCKER/HIGH
+
+
+================================================================
+82. DO NOT ISSUE FULL M-A-2 VERDICT
+================================================================
+
+T10 remains open.
+
+Do NOT claim:
+
+BUNNY_MA2_OPERATIONAL_PASS
+
+
+================================================================
+83. AFTER T9
+================================================================
+
+If T9 passes:
+
+NEXT = T10
+
+T10 is:
+
+FINAL ADVERSARIAL OPERATIONAL AUDIT
+
+It must attack the combined T1–T9 system rather than add product features.
+
+Do not start T10 in this run.
+
+
+================================================================
+84. NORTH STAR
+================================================================
+
+"One explicit approval may authorize a small, predictable sequence.
+
+It must never become standing permission to control the computer."
+
+
+BEGIN M-A-2 GATE T9.
+</pasted_content id="56f0">

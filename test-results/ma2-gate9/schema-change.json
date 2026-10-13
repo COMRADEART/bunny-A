@@ -1,0 +1,64 @@
+{
+  "gate": "M-A-2 T9",
+  "change": "Additive approval-batch schema on the existing Host database (MissionStore)",
+  "migration": "ma2.approval-batches.v1",
+  "recorded": "2026-10-06",
+  "tables": [
+    {
+      "name": "approval_batches",
+      "kind": "CREATE TABLE IF NOT EXISTS",
+      "columns": {
+        "id": "TEXT PRIMARY KEY",
+        "mission_id": "TEXT NOT NULL",
+        "authorization_id": "TEXT NOT NULL",
+        "family": "TEXT NOT NULL",
+        "actions": "TEXT NOT NULL (JSON array, exact action ids, no wildcards)",
+        "risk_ceiling": "TEXT NOT NULL",
+        "target_json": "TEXT NOT NULL (JSON {app, processId, title}; processId null allowed)",
+        "target_tier": "TEXT NOT NULL ('process' | 'app')",
+        "max_actions": "INTEGER NOT NULL",
+        "used_count": "INTEGER NOT NULL DEFAULT 0",
+        "observed_pid": "INTEGER (nullable)",
+        "observed_pid_from": "TEXT (nullable)",
+        "batch_epoch": "TEXT NOT NULL (Host boot epoch)",
+        "created_at": "INTEGER NOT NULL (ms, Host clock)",
+        "created_by": "TEXT NOT NULL (actor string)",
+        "expires_at": "INTEGER NOT NULL (ms, Host clock)",
+        "status": "TEXT NOT NULL ('active' | 'ended')",
+        "end_at": "INTEGER (nullable)",
+        "end_reason": "TEXT (nullable: exhausted|expired|revoked|scope_mismatch|mission_ended|host_restart)",
+        "end_by": "TEXT (nullable)",
+        "origin_step_id": "TEXT NOT NULL",
+        "record": "TEXT NOT NULL (full ApprovalBatch JSON; the used_count column and record.usedCount are rewritten together in the admission UPDATE, so reads can never see divergent counts)"
+      },
+      "indexes": [
+        "CREATE INDEX IF NOT EXISTS idx_approval_batches_mission ON approval_batches(mission_id)"
+      ]
+    }
+  ],
+  "permission_requests": "NO new column: the batch offer lives inside the permission_requests `record` JSON (PermissionBatchOffer on PermissionRequest.batchOffer; set once at request creation by the Host, never by callers; same additive pattern as resolution)",
+  "migrationsTable": "existing migrations table gains 'ma2.approval-batches.v1' via INSERT OR IGNORE (same pattern as ma0.missions.v1; additive; no data rewriting)",
+  "stateMarker": {
+    "issue": "the installed-state marker (state-layout.json) records databaseSchemaSha256 at migration time; a Host applying its own additive schema at boot made every SECOND boot fail validation (\"unexpected schema\") with a healthy database — a restart of an activated T9 could never happen",
+    "change": "refreshStateMarker (state-paths.server.ts): after the mission layer applies its schema, startHost reconciles the marker's databaseSchemaSha256 + databaseUserVersion to the APPLIED schema (read-only db read, marker fields rewritten, identity fields preserved; quick_check must pass or nothing is rewritten); non-installed state untouched",
+    "tests": "src/lib/bunny-host/state-marker.test.ts (3): stale marker healed + second boot validates (defect reproduced first); current marker left byte-identical; damaged/wrong-version database refused and marker untouched",
+    "userVersion": "PRAGMA user_version stays 3 the same as every prior gate; only the schema fingerprint moves"
+  },
+  "invariants": [
+    "additive only: no existing column altered, no row rewritten, no data dropped",
+    "all Host databases (existing installations) upgrade on first boot with zero manual steps",
+    "the second boot after an additive migration validates and runs (renewed by the marker reconciliation)",
+    "the production database is never modified by the T9 development or staging flow; staging uses a disposable COPY"
+  ],
+  "invariantsUpdated": "the final invariant list replaces the earlier three-element list recorded with the pre-reconciliation tree",
+  "finalReview": {
+    "sourceCommit": "445beebf8c9d951066dd0bddb1b066820762a912",
+    "additionalSqlMigration": false,
+    "recordJsonAdditions": [
+      "operations[{stepId,digest}]",
+      "windowIdentity{handle,processId,processStartedAt}"
+    ],
+    "oldGrantWithoutOperations": "fail closed",
+    "rendererInputProjection": "redacted without canonical plan mutation"
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "classification": "LIVE read-only comparison of installed production (no writes, no restart)",
+  "release": "Bunny-A-Windows-v26-MA2-R1",
+  "before": "2026-10-11T18:37:39.119Z",
+  "final": "2026-10-12T01:19:44.581Z",
+  "unchangedChecks": {
+    "installJson": true,
+    "currentRelease": true,
+    "releaseManifest": true,
+    "listeners": true,
+    "processesSamePidsAndStartTimes": true,
+    "startupShortcut": true,
+    "micPrivacy": true
+  },
+  "changed": {
+    "databaseTables": [
+      "events",
+      "providers",
+      "sqlite_sequence"
+    ],
+    "newEventCount": 25,
+    "newEventTypes": [
+      "provider.status_changed"
+    ],
+    "newEvents": [
+      {
+        "sequence": 3712,
+        "at": "2026-10-11T18:41:05.407Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3713,
+        "at": "2026-10-11T18:41:35.530Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3714,
+        "at": "2026-10-11T21:12:06.413Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3715,
+        "at": "2026-10-11T21:12:36.503Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3716,
+        "at": "2026-10-11T22:32:18.936Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3717,
+        "at": "2026-10-11T23:23:41.346Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3718,
+        "at": "2026-10-11T23:24:11.442Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3719,
+        "at": "2026-10-11T23:24:44.113Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3720,
+        "at": "2026-10-11T23:25:14.209Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3721,
+        "at": "2026-10-11T23:29:45.720Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3722,
+        "at": "2026-10-11T23:58:26.666Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3723,
+        "at": "2026-10-11T23:59:58.547Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3724,
+        "at": "2026-10-12T00:00:28.636Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3725,
+        "at": "2026-10-12T00:00:58.741Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3726,
+        "at": "2026-10-12T00:06:00.606Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3727,
+        "at": "2026-10-12T00:25:08.999Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3728,
+        "at": "2026-10-12T00:25:39.105Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3729,
+        "at": "2026-10-12T00:43:44.944Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3730,
+        "at": "2026-10-12T00:47:46.546Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3731,
+        "at": "2026-10-12T00:48:16.638Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3732,
+        "at": "2026-10-12T00:49:16.822Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3733,
+        "at": "2026-10-12T00:50:48.325Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3734,
+        "at": "2026-10-12T00:51:49.567Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3735,
+        "at": "2026-10-12T01:13:29.243Z",
+        "type": "provider.status_changed"
+      },
+      {
+        "sequence": 3736,
+        "at": "2026-10-12T01:13:59.361Z",
+        "type": "provider.status_changed"
+      }
+    ],
+    "explanation": "New event types are limited to the running production Host's provider observations. T11 used the shared Ollama service from disposable Hosts. Production database inspection was read-only; no whole-database byte-equality claim is made.",
+    "audioEndpointsSha256": {
+      "before": "2e765cef1eb4d06c66337f0cd0bcc5fa6cf294e5fa3ed8d9e16f8c076b17a34e",
+      "final": "8ee26b5bb0b261d8f8d7c0299ef70cc005624536218d5b992555cbc22c7e40e5",
+      "explanation": "Read-only endpoint enumeration differs; the cause was not established by this task. No driver, privacy, or audio-setting mutation was performed."
+    }
+  },
+  "notPerformed": [
+    "deploy T11",
+    "restart production",
+    "migrate production SQLite",
+    "modify credentials",
+    "modify paired phone records",
+    "start the tunnel",
+    "change firewall rules",
+    "modify Startup",
+    "replace installed files",
+    "change microphone privacy",
+    "modify audio drivers",
+    "kill unrelated processes",
+    "enable Missions/Triggers",
+    "push"
+  ],
+  "unchanged": true,
+  "summary": "See unchangedChecks for exact immutable-release, install, listener/process, Startup and microphone-privacy comparisons. T11 performed no production write, restart or installation. Other observations are listed separately, without attributing unexplained changes.",
+  "result": "PASS"
+}

@@ -1,0 +1,264 @@
+{
+  "subsystem": "Host-side device authority and the HTTP command boundary (src/lib/bunny-host/http.server.ts and its dispatch into commands.server.ts, agent-runtime.server.ts agentCommand, project-service.server.ts, plus the gateway hop in src/lib/orch/host-bridge.server.ts, src/routes/api/bunny-pair.ts and bunny-events.ts)",
+  "capabilities": [
+    {
+      "name": "Device pairing (one-time code creation and redemption)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "http.server.ts:315 (single pending code), :559-571 (pairing.create, workstation-only, randomBytes(12) = 96 bits, 10-minute expiry), :333-349 (/pair redeem, timing-safe hash compare :340 with :105-109, insert :343, single use pairing=null :344), :318-319 + :335-337 (FailureLimiter 5 failures per client and 100 global per 10 min); gateway bunny-pair.ts:10 (refuses local), :14 (x-bunny-pair-client from clientKey), :16 (HttpOnly; Secure; SameSite=Strict; Max-Age=31536000 cookie). Tests: host.test.ts 'Host HTTP authentication, pairing revocation and approval validation' (lines 84-90: pair 200, reused code 403); host.test.ts 'pairing limiter counts failures only, never extends a lockout and resets on success' (unit, lines 119-126).",
+      "detail": "Redemption, single use and the per-key limiter are tested. Nothing tests the 10-minute expiry, the global limiter, or that a device token is refused for pairing.create. The phone chooses its own device name and there is no confirmation step on the workstation. Whoever holds the code gets the device."
+    },
+    {
+      "name": "Device bearer authentication on /state, /command and /events",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "http.server.ts:329-331 (local = timingSafeEqual with the master token; device = SELECT id FROM devices WHERE token_hash=sha256(bearer) AND revoked_at IS NULL), :350 (401). Tests: host.test.ts:86 (device /state 200); capabilities.test.ts 'Host HTTP: snapshot stays backward compatible, mission commands are validated, remote devices are limited' (:281 device mission.get 200).",
+      "detail": "The Host binds 127.0.0.1 only (http.server.ts:645) and rejects any Host header other than 127.0.0.1/localhost:port (:321-323) and any Origin or cross-site header (:324-325; tested host.test.ts:82). A remote phone reaches it only through the gateway, which picks the master token (local) or the bunny_device cookie (remote) (host-bridge.server.ts:57)."
+    },
+    {
+      "name": "Revocation on /state and /command (checked per request)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "http.server.ts:331 (lookup per request filters revoked_at IS NULL), :572-578 (device.revoke, workstation-only). Tests: host.test.ts:88-89; ma2-t10.test.ts 'T10-T6-04: revocation ends an already authenticated Host/task SSE before future delivery' (:67-69 /events, /state and /command 401 after revoke); capabilities.test.ts:311-312; agentic-live.test.ts 'T5 DISPOSABLE LIVE VERIFIED: fresh Host process/SQLite, revoked device, old approval, reviewed restart' (:90-91 agent.list 401).",
+      "detail": "Revocation is immediate for new requests. A /command that was already authenticated runs to completion (for example a long agent.stop or discover). The gateway turns the Host's 401 into a 're-pair' message (host-bridge.server.ts:62)."
+    },
+    {
+      "name": "Revocation on an open /events SSE stream (checked per delivery)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "http.server.ts:366-373 (stillAuthorized re-queries id+token_hash+revoked_at IS NULL), streamSse :170-173, :176-179, :200-203 (checked before every batch, every event and every heartbeat). Tests: ma2-t10.test.ts 'T10-T6-04: revocation ends an already authenticated ${Host|task} SSE before future delivery' (:49-71) and 'T10-T6-04: revoking one device preserves workstation and independently paired streams' (:72-82).",
+      "detail": "Covers both the whole-Host stream and the ?task= stream. The gateway SSE forwards only {sequence} signals (event-signal.ts:2-9), so event detail never reaches the phone."
+    },
+    {
+      "name": "Revocation cascading to approvals, batches or Agentic consent the device granted",
+      "classification": "UNSUPPORTED",
+      "evidence": "http.server.ts:366-367 comment: 'Revocation does not cancel an independently granted Host capability batch.' device.revoke (:572-578) only updates devices.revoked_at. Batches record createdBy device:<id> (approval-batches.test.ts:569) and Agentic provenance records the actor (agentic-store.server.ts:98), but nothing reads either on revoke.",
+      "detail": "Revoking a lost phone leaves in force every batch, mission envelope and Agentic envelope it approved."
+    },
+    {
+      "name": "Server-side expiry of device tokens or sessions",
+      "classification": "UNSUPPORTED",
+      "evidence": "persistence.server.ts:26 (devices has no expires_at or last_seen); http.server.ts:331 and :368-372 never compare created_at; bunny-pair.ts:16 cookie Max-Age is one year, but the Host never expires the token.",
+      "detail": "A device token is valid until a manual revoke. There is no rotation, idle timeout or last-seen tracking."
+    },
+    {
+      "name": "Device identity record (fields stored)",
+      "classification": "PARTIAL",
+      "evidence": "persistence.server.ts:26 columns: id, name, token_hash, created_at, revoked_at. Insert at http.server.ts:343. Exposed to every caller, devices included, at manager.server.ts:331-333 (id, name, createdAt of every non-revoked device).",
+      "detail": "Missing: role or rights, last_seen_at, expires_at, a session generation or rotation counter, revoked_by or reason, and any pairing provenance (client key, origin). Every paired device has the same authority. No index on token_hash."
+    },
+    {
+      "name": "Workstation-only gating of administrative Host actions",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "http.server.ts:466 provider.configure_path, :474 remote.configure, :494 thermal.configure, :501 verification.record, :514 policy.candidate, :525 policy.promote, :529 policy.rollback, :533 legacy.import, :560 pairing.create, :573 device.revoke.",
+      "detail": "The gates exist, but no test sends any of these actions with a device token. They throw a plain Error, so the phone gets the generic 'Host command failed...' text instead of the reason (http.server.ts:610), and each refusal is recorded as host.operation_failed (:597-600)."
+    },
+    {
+      "name": "Mission action allowlist for remote devices",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "commands.server.ts:15-20 (MISSION_ACTIONS), :22 (REMOTE = mission.create, mission.approve, mission.start, mission.stop, mission.respond, mission.get, mission.revoke_batch, inbox.ack), :25 (CommandRefusedError gate), :39 (no steps from remote). Tests: capabilities.test.ts 'Host HTTP: ... remote devices are limited' (:282-285 configure, capability.run, create-with-steps and trigger.create refused over HTTP; :291-299 phone approve uses the Host scope; :303-304 phone stop); missions.test.ts 'MA0R: phone approval serializes exactly the desktop authority and ignores client scope overrides'; approval-batches.test.ts 'T9 remote: a paired phone may grant only the offered batch, revoke its own, and the counts stay canonical' (calls missionCommand directly with local:false, not over HTTP).",
+      "detail": "mission.respond and mission.revoke_batch by a device are tested only at the missionCommand level. mission.start, inbox.ack and mission.create without steps have no device test. revokeBatch does not check ownership (manager.server.ts:3025-3035), so any device can end any batch. That is the safe direction."
+    },
+    {
+      "name": "Project action gate for remote devices",
+      "classification": "PARTIAL",
+      "evidence": "http.server.ts:417-424 (dispatch; every error re-wrapped as CommandRefusedError); project-service.server.ts:42-57 (list, get and artifact allowed remotely), :59 (repository workstation-only), :72 (cutoff for add, create, update, relink, remove and agent.create). Test: host.test.ts:87 (device project.add returns 400; status only).",
+      "detail": "Remote project.list, project.get and project.artifact are untested with a device token. project.artifact reads only verified, hash-matched files of 1 MB or less inside canonical storage or the Project root (project-service.server.ts:264-306)."
+    },
+    {
+      "name": "Agent supervision: agent.list and agent.get",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "agent-runtime.server.ts:906-913; listed in safeActions at http.server.ts:393-394. Test at dispatch level only: agentic-authorization.test.ts 'A27 UI reconnect is a read projection and preserves consent' (agentCommand with actor device:test).",
+      "detail": "No HTTP test with a device token. The gateway's dashboardCommand drops the agents and agent fields (presentation.ts:585-595), so the phone sees Agents only through the /state snapshot."
+    },
+    {
+      "name": "Agent Pause, Resume and Stop from a paired device",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "http.server.ts:397-411 (no remote gate on agent.pause, agent.resume, agent.stop); agent-runtime.server.ts:172-253. No test runs these with a device token or device: actor (grep found agent.stop only with the workstation token in agentic-live.test.ts:72, :101).",
+      "detail": "Reachable but unverified. agent.stop, agent.pause and agent.authorization.revoke/deny are not in safeActions (http.server.ts:384-395), so they get 503 when the Host is degraded with '*'. mission.stop and stop are in safeActions and still work. Pause also needs ACTIVE Agentic consent (agent-runtime.server.ts:179-181)."
+    },
+    {
+      "name": "Answering Agentic (T5) approvals from a device",
+      "classification": "PARTIAL",
+      "evidence": "http.server.ts:400-405 (device data limited to id and revision for agent.authorization.*); agent-runtime.server.ts:858-899 (propose and adjust refused for device:, approve, deny and revoke allowed). Refusal tests: agentic-authorization.test.ts 'A33 revoked device authority has no separate approval engine', 'A34 remote client cannot invent or widen the Host offer'; agentic-live.test.ts:89 (HTTP adjust with device token returns 400).",
+      "detail": "Only the refusals are tested. A device's approve, deny and revoke have no test. When no Agentic offer exists, agent.authorization.approve falls through to agents.start, which approves the whole planner scope as the device (agent-runtime.server.ts:870-871, :151-170), so it is not limited to a Host offer. The workstation's propose step is not required."
+    },
+    {
+      "name": "Remote direct-task execution (submit, approve, retarget, discover, task.feedback)",
+      "classification": "UNSAFE_OR_BLOCKED",
+      "evidence": "http.server.ts:427-435 (submit and approve, no local check), :439-448 (retarget, discover), :459-464 (task.feedback); manager.server.ts:964-973 (approve records approval.remote_device and launches), :639-860 (submit accepts any prompt, override, modelOverride, projectId, workingDirectory = registered root or defaultRoot); adapters.server.ts:306 + :396 + :400 (unscoped codex: --sandbox workspace-write, no isolation flags, user config and plugins active), :403-408 (claude: Read, Write, Edit, Bash, PowerShell; acceptEdits; --permission-prompts none).",
+      "detail": "A paired phone can write a free-text prompt, approve it itself, and get provider-run shell commands on the workstation. No test covers these actions with a device token."
+    },
+    {
+      "name": "Remote terminal attach and session input",
+      "classification": "UNSUPPORTED",
+      "evidence": "manager.server.ts:1822-1828 (terminal() always throws 'Terminal attachment unavailable'); manager.server.ts:1805-1820 (sendInput needs session.sendInput); adapters.server.ts:32, :43, :54, :68 (every adapter marks sendInput unsupported, and no RunningSession implements it); http.server.ts:452-458 (ungated for devices).",
+      "detail": "Both are inert today. input/session.input is not gated for devices, so it would become live input injection as soon as an adapter implements sendInput."
+    },
+    {
+      "name": "Error text returned to devices (secret redaction)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "http.server.ts:595-613 (CommandRefusedError goes through safeError(error,[token]); anything else returns generic text plus requestId; HostUnavailableError is a fixed 503); failure.server.ts:51-99 (registered device and master tokens, secret-named environment values, Bearer/cookie/authorization, key=value and sk-/ghp_ patterns, 1024-character bound); gateway host-bridge.server.ts:63 passes result.error through. Tests: failure.test.ts 'T3: HTTP unexpected command failure returns safe text and telemetry failure stays local', 'T3: error evidence redacts credentials, headers, cookies, known secrets and environment values', 'T3: redaction includes credentials crossing a serializer truncation boundary'.",
+      "detail": "Exception: every project.* error is re-wrapped verbatim as CommandRefusedError (http.server.ts:417-424). Raw fs errors from project-service.server.ts:286/289 (statSync/readFileSync ENOENT) therefore reach the phone with absolute paths."
+    },
+    {
+      "name": "Per-device command, state and stream rate limiting",
+      "classification": "UNSUPPORTED",
+      "evidence": "The only limiter is FailureLimiter on /pair (http.server.ts:318-319, :335-337). /state (:354), /events (:355-375) and /command (:376-594) have none, and neither does the gateway (only bunny-pair.ts uses clientKey).",
+      "detail": "No per-device quota and no cap on concurrent SSE streams. manager.server.ts:123 setMaxListeners(100) only affects warnings."
+    },
+    {
+      "name": "Command idempotency, operation ids and replay protection",
+      "classification": "UNSUPPORTED",
+      "evidence": "There is no operationId or idempotency key anywhere in http.server.ts, commands.server.ts, host.ts or host-bridge.server.ts; requestId is generated by the server per HTTP request (http.server.ts:617) and returned only on error. Existing state guards: manager.server.ts:1019-1020 (duplicate launch refused), bunny-missions/manager.server.ts:3044 (request already answered), :707 (mission not waiting), agent-runtime.server.ts:175, :199, :232-233 (already paused, not paused, already stopped).",
+      "detail": "submit, mission.create and agent.create are not idempotent. The gateway times out after 15 s (host-bridge.server.ts:59), so a phone retry after a timeout can duplicate work or get a misleading refusal. Static bearer tokens with no nonce."
+    },
+    {
+      "name": "Stable Host identity",
+      "classification": "UNSUPPORTED",
+      "evidence": "failure.server.ts:217 (instanceId = randomUUID per HostContainment); manager.server.ts:58 and :97 (instanceId = containment.instanceId); bunny-missions/manager.server.ts:140, :2031 (host_generation = instanceId); release-identity.server.ts:17-33 (build provenance only). /health (http.server.ts:327-328): app, instanceId, pid, operationalState, reason, unavailableSubsystems, lastFatal. /state: HostSnapshot (contracts.ts:18-44) plus release and presentation (http.server.ts:292-311).",
+      "detail": "Nothing persistent identifies the Host. A phone cannot tell 'same Host restarted' from 'different Host'. Device rows do survive restarts."
+    },
+    {
+      "name": "Gateway decision between workstation and paired device",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "host-bridge.server.ts:23-43. Tests: host-bridge.server.test.ts 'workstation access requires a loopback peer, not just a loopback Host header', 'proxied requests cannot borrow workstation authentication', 'non-loopback hosts never get workstation access'.",
+      "detail": "Outside this subsystem, but it is the only path a device has to the Host. The Host itself makes no distinction between local and remote in its responses. Filtering happens only in the gateway's dashboardSnapshot and dashboardCommand (presentation.ts:422-596)."
+    }
+  ],
+  "gaps": [
+    {
+      "id": "DEV-01",
+      "severity": "BLOCKER",
+      "title": "A paired device can submit and self-approve direct tasks, which gives it provider-mediated shell execution on the workstation",
+      "detail": "A phone (or a stolen bunny_device cookie) sends POST /command {action:'submit', data:{prompt:'<any instructions>', mode:'fast', override:'claude'}} through the gateway, then {action:'approve', data:{id}}. Neither is gated (http.server.ts:427-435). manager.approve launches immediately (manager.server.ts:964-973). The unscoped Claude session runs with Bash and PowerShell allowed, acceptEdits and --permission-prompts none (adapters.server.ts:403-408). Codex runs workspace-write with user config and plugins active (adapters.server.ts:306, :396, :400). The working folder is defaultRoot or any registered project (manager.server.ts:656-674). retarget (:439-445), discover (:446-448; forces CLI re-probes), task.feedback (:459-464), session.get (:449-451; raw result and error, returned unfiltered by the Host), input/session.input (:452-455; inert today) and terminal (:456-458) are also ungated. This contradicts the stated remote policy ('Everything else needs the workstation', commands.server.ts:21) and the T9 rule 'only within device rights'. No test covers any of these actions with a device token.",
+      "suggestedMinimalFix": "Make the HTTP boundary default-deny for devices. In http.server.ts, before the switch at :426, add `const REMOTE_CORE = new Set(['stop']); if (!local && !REMOTE_CORE.has(action)) throw new CommandRefusedError(`${action} requires workstation access.`)`, mirroring commands.server.ts:22/:25. Add an HTTP test in the style of ma2-t10.test.ts that pairs a device and asserts 400 plus /workstation/ for submit, approve, retarget, discover, session.get, input, terminal and task.feedback, with no adapter launch (the fixture's launch: () => assert.fail)."
+    },
+    {
+      "id": "DEV-02",
+      "severity": "HIGH",
+      "title": "Devices can create new Agents and Missions and approve them, not only supervise existing ones",
+      "detail": "A phone sends agent.create {objective, projectId} (allowed when steps is absent, http.server.ts:398-399), then agent.start {id} (no gate; agent-runtime.server.ts:151-170 calls missions.approve(..., 'device:<id>')). agent.authorization.approve with no Agentic offer falls through to agents.start (agent-runtime.server.ts:870-871). Likewise mission.create followed by mission.approve with start:true (commands.server.ts:22, :47). The phone can therefore start new planner-scoped autonomous work, including write roots and terminal commands from requestedScope (bunny-missions/manager.server.ts:739-779). The workstation's propose step (local-only, agent-runtime.server.ts:859-860) is not required. The T9 goal is to supervise existing Agents and answer only Host-offered approvals.",
+      "suggestedMinimalFix": "Remove mission.create from REMOTE (commands.server.ts:22). In the http.server.ts AGENT_ACTIONS branch, refuse agent.create and agent.start when !local. In agentCommand's agent.authorization.approve (agent-runtime.server.ts:866-874), for device: actors require an existing Agentic offer (agents.missions.agentic.forMission(missionId)?.current_state === 'WAITING_FOR_USER') before calling start or reauthorize. Add device-token HTTP tests for each."
+    },
+    {
+      "id": "DEV-03",
+      "severity": "HIGH",
+      "title": "Devices have no rights model: any paired device can approve any Host-offered scope, whatever the risk",
+      "detail": "The devices table has no role or rights column (persistence.server.ts:26). A paired phone can answer mission.respond allow_once or allow_batch for DESTRUCTIVE or EXTERNAL_SIDE_EFFECT requests, terminal.exec and provider.execute (bunny-missions/manager.server.ts:3036-3135; at :3129 provider.execute launches the child task). It can also approve full mission envelopes (:704-779; 'same scope as workstation approval' at :768). The only device-specific behavior is an approval.remote_device audit event (:765-770, :3089) and the provenance channel 'paired-device' (agentic-store.server.ts:98). The T9 phrase 'within device rights' has nothing to enforce against.",
+      "suggestedMinimalFix": "Without a schema change, define a Host constant device policy in http.server.ts or commands.server.ts (for example, devices may deny anything but allow only risk classes READ and WRITE, never DESTRUCTIVE or EXTERNAL_SIDE_EFFECT, and never provider.execute). Enforce it in MissionManager.respond and approve when by.startsWith('device:'), reusing request.risk and envelope.riskClasses. Return CommandRefusedError so the phone shows 'approve on the workstation'. Add a per-device rights column later if per-device policy is needed."
+    },
+    {
+      "id": "DEV-04",
+      "severity": "HIGH",
+      "title": "Device tokens never expire on the Host",
+      "detail": "Any request with a once-valid bearer token is accepted forever unless the workstation revokes it: the lookup at http.server.ts:331 and the SSE re-check at :368-372 filter only revoked_at. There is no expires_at or last_seen (persistence.server.ts:26). The gateway cookie lasts one year (bunny-pair.ts:16). A stolen or forgotten phone keeps full device authority, including DEV-01 and DEV-02, indefinitely, and the workstation cannot see when a device was last used.",
+      "suggestedMinimalFix": "Expiry needs no schema change: add `AND created_at > ?` (now − N days) to both device queries (http.server.ts:331, :371) and have the gateway turn the 401 into a re-pair, which host-bridge.server.ts:62 already does. For last-seen, add an additive `ALTER TABLE devices ADD COLUMN last_seen_at INTEGER` in HostDatabase (the pattern at persistence.server.ts:30-36; refreshStateMarker heals additive changes) and update it at most once a minute per device."
+    },
+    {
+      "id": "DEV-05",
+      "severity": "MEDIUM",
+      "title": "Revoking a device does not end the batches or Agentic envelopes it granted",
+      "detail": "Scenario: the phone answers mission.respond allow_batch (batch createdBy 'device:<id>', approval-batches.test.ts:569) or approves an Agentic envelope (provenance actor device:<id>, agentic-store.server.ts:98). The phone is lost and the workstation sends device.revoke. The batch and the envelope stay active (http.server.ts:366-367 comment; device.revoke :572-578 touches only the devices table). The Agent keeps acting on authority from a revoked device.",
+      "suggestedMinimalFix": "In the device.revoke case, call MissionManager.revokeBatch for active batches with createdBy === `device:${id}`, and syncAgentic(state(e.id,'REVOKED')) for ACTIVE or PAUSED envelopes whose authorization_provenance.actor matches. Both helpers already exist (bunny-missions/manager.server.ts:3025; agent-runtime.server.ts:892-896). Emit one event listing what was ended."
+    },
+    {
+      "id": "DEV-06",
+      "severity": "MEDIUM",
+      "title": "Agent Stop and Pause are refused when the Host is degraded; mission Stop is not",
+      "detail": "After a persistence boundary failure, containment.degrade('*') runs (http.server.ts:251-258). If the phone then sends agent.stop or agent.pause, assertAccepting('http') throws HostUnavailableError and the phone gets 503, because safeActions (http.server.ts:384-395) includes stop and mission.stop but not agent.stop, agent.pause, agent.authorization.revoke or agent.authorization.deny. The phone's Stop control fails exactly when it matters most. No test covers this.",
+      "suggestedMinimalFix": "Add 'agent.stop', 'agent.pause', 'agent.authorization.revoke' and 'agent.authorization.deny' to safeActions at http.server.ts:384-395; these only reduce authority. Add a test that degrades '*' and asserts that a device's agent.stop returns 200."
+    },
+    {
+      "id": "DEV-07",
+      "severity": "MEDIUM",
+      "title": "No operation ids or idempotency for remote commands across the 15 s gateway timeout",
+      "detail": "Scenario: the phone sends agent.stop. agents.stop awaits missions.stop, which awaits process-tree cleanup (manager.server.ts:1666-1751) and can take more than 15 s. The gateway aborts (host-bridge.server.ts:59) and the phone shows an error while the Host commits the stop. A retry returns 'already stopped' (agent-runtime.server.ts:233). For submit, mission.create and agent.create, a retry creates duplicates. Nothing lets the phone correlate a request with its outcome: requestId is server-side and returned only on error (http.server.ts:596-605).",
+      "suggestedMinimalFix": "Accept an optional data-level `operationId` (UUID) on /command. Keep an in-memory LRU, for example 1000 entries for 10 minutes, keyed by `${actor}:${operationId}` that returns the first response for a replay. Include operationId in the audit.command event detail (http.server.ts:587-593). For T9 Pause/Resume/Stop alone, the minimum is to document that the phone must re-read /state after a timeout and treat 'already paused/stopped' as success."
+    },
+    {
+      "id": "DEV-08",
+      "severity": "MEDIUM",
+      "title": "No per-device rate limiting on /command, /state or /events",
+      "detail": "A paired device, or anyone holding its cookie, can loop discover, which forces full CLI re-probes of every provider (manager.server.ts:253-261). It can open unbounded concurrent /events streams, each running a SQLite authorization query on every event (http.server.ts:368-372), or flood submit. Every successful command also writes an audit.command row (http.server.ts:587-593) into the journal, which is capped at 20,000 rows (persistence.server.ts:54-55). That evicts real history and wakes every SSE subscriber. The only limiter is on /pair (http.server.ts:318-319).",
+      "suggestedMinimalFix": "Reuse the existing fixed-window idea: a small counter Map keyed by device id, checked right after authentication at http.server.ts:350 (for example 120 commands per minute per device, refusing with 429), plus a per-device count of open SSE streams, incremented in the /events branch and decremented in streamSse close. Skip writing audit.command for read-only actions (agent.list, agent.get, mission.get, project.list, project.get)."
+    },
+    {
+      "id": "DEV-09",
+      "severity": "LOW",
+      "title": "device.revoke reports success for unknown or already-revoked ids, and the event omits the device id",
+      "detail": "The workstation sends device.revoke {id:'typo'}. The UPDATE matches 0 rows, the Host still emits 'Device credential revoked.' and returns 200 (http.server.ts:572-578). Re-revoking overwrites revoked_at. The audit trail cannot say which device was revoked.",
+      "suggestedMinimalFix": "Use `UPDATE devices SET revoked_at=? WHERE id=? AND revoked_at IS NULL`, check `.changes === 1`, otherwise throw CommandRefusedError('Unknown or already revoked device.'), and put the device id in the event detail."
+    },
+    {
+      "id": "DEV-10",
+      "severity": "LOW",
+      "title": "Refused remote commands are not audited",
+      "detail": "A device's attempt at mission.configure or agent.authorization.adjust throws CommandRefusedError. The catch block skips containment (http.server.ts:597-600) and audit.command is emitted only on success (:587-593), so the journal has no record that a device tried and was refused. Plain-Error refusals become host.operation_failed with no actor and are deduplicated for 60 s (failure.server.ts:334-335).",
+      "suggestedMinimalFix": "In the catch block, when !local, emit db.event('audit.command_refused', null, `device ${device.id}: ${String(input.action)}`), deduplicated per device and action per minute."
+    },
+    {
+      "id": "DEV-11",
+      "severity": "LOW",
+      "title": "Project command errors reach the phone verbatim, including filesystem paths",
+      "detail": "The phone sends project.artifact for a verified artifact whose file was deleted. statSync throws `ENOENT: no such file or directory, stat 'C:\\Users\\...\\file'` (project-service.server.ts:286). http.server.ts:417-424 re-wraps it as CommandRefusedError, safeError redacts only secrets, not paths, and the gateway forwards result.error (host-bridge.server.ts:63).",
+      "suggestedMinimalFix": "In http.server.ts:420-423, when !local and the caught error is not already a CommandRefusedError raised on purpose, replace the message with fixed text ('Project command refused; details retained on the Host.')."
+    },
+    {
+      "id": "DEV-12",
+      "severity": "LOW",
+      "title": "A phone cannot sign itself out or revoke its own token",
+      "detail": "device.revoke is workstation-only (http.server.ts:573) and nothing on the Host clears the cookie, so a user handing a phone to someone else cannot end its access from the phone.",
+      "suggestedMinimalFix": "Allow device.revoke when !local && data.id === device.id. The device id is already returned to the phone by bunny-pair.ts:16 and is available as device.id at http.server.ts:331."
+    },
+    {
+      "id": "DEV-13",
+      "severity": "LOW",
+      "title": "The global pairing limiter can be exhausted from the public tunnel origin",
+      "detail": "Anyone who can reach the quick-tunnel URL can POST /api/bunny-pair with bad codes. The per-client key comes from cf-connecting-ip or, failing that, client-controlled x-forwarded-for (host-bridge.server.ts:46-48). The global cap of 100 failures per 10 minutes (http.server.ts:319) then blocks legitimate pairing for 10 minutes. 96-bit codes make guessing infeasible, so this is availability only.",
+      "suggestedMinimalFix": "Accept and document it, or key the per-client limiter only on cf-connecting-ip and drop the x-forwarded-for fallback."
+    },
+    {
+      "id": "DEV-14",
+      "severity": "LOW",
+      "title": "No stable Host identifier",
+      "detail": "instanceId is regenerated on every boot (failure.server.ts:217, manager.server.ts:97) and doubles as host_generation (bunny-missions/manager.server.ts:140, :2031). The release identity is build provenance (release-identity.server.ts:17). A phone cannot tell whether the Host behind the origin is the same installation after a restart or tunnel change.",
+      "suggestedMinimalFix": "Persist a host id once with `INSERT OR IGNORE INTO settings(key,value) VALUES('host_id', randomUUID())` (the settings table is already used at manager.server.ts:119-121) and expose it in HostSnapshot (contracts.ts:18) and in the /pair response."
+    },
+    {
+      "id": "DEV-15",
+      "severity": "INFO",
+      "title": "safeActions lists actions that do not exist",
+      "detail": "capability.list, skill.list, inbox.list and trigger.list (http.server.ts:389-392) are not in MISSION_ACTIONS (commands.server.ts:15-20) or anywhere else, so they fall through to 'Unknown Host action.' (http.server.ts:585).",
+      "suggestedMinimalFix": "Remove them from safeActions, or implement them deliberately."
+    },
+    {
+      "id": "DEV-16",
+      "severity": "INFO",
+      "title": "remote.configure enabled:false does not suspend paired devices",
+      "detail": "remoteConfigured and remoteUrl are display-only in-memory flags (http.server.ts:473-492; manager.server.ts:63-64; read only by UI components). Device tokens keep working at the Host whatever the setting. Only the gateway's BUNNY_REMOTE_ORIGIN environment variable controls remote reachability (host-bridge.server.ts:29, :40).",
+      "suggestedMinimalFix": "Have device authentication at http.server.ts:331 also require manager.remoteConfigured, or document that 'remote off' means the tunnel or gateway is off."
+    },
+    {
+      "id": "DEV-17",
+      "severity": "INFO",
+      "title": "The Host returns unfiltered data to device tokens; only the gateway filters it",
+      "detail": "The Host gives a device the same /state as the workstation, plus the raw session.get (result tail, error, cwd, pid, transcript path; manager.server.ts:1753-1779) and mission.get data. All filtering is in the gateway's dashboardSnapshot and dashboardCommand (presentation.ts:422-596), which is not device-aware. It still passes task prompts, cwd, pids, provider executable paths and evidence, the full devices list and remoteUrl to the phone.",
+      "suggestedMinimalFix": "For T9, keep the gateway as the single filter but add a device-mode projection: when !access.local, have hostRequest's caller drop devices, provider paths and evidence, and task cwd and pid."
+    }
+  ],
+  "keyFacts": [
+    "ACTION MATRIX: AGENT_ACTIONS (agent-runtime.server.ts:826-842, dispatched at http.server.ts:397-411). Remote allowed: agent.create (only when data.steps is absent, http.server.ts:398-399), agent.start (no gate), agent.pause, agent.resume, agent.stop, agent.list, agent.get, agent.authorization.approve, agent.authorization.deny and agent.authorization.revoke (data limited to id and revision for device callers, http.server.ts:400-405). Remote refused: agent.authorization.propose (agent-runtime.server.ts:859-860) and agent.authorization.adjust (agent-runtime.server.ts:876-879).",
+    "ACTION MATRIX: MISSION_ACTIONS (commands.server.ts:15-20, remote gate at :25 against REMOTE at :22). Remote allowed: mission.create (steps refused for remote at :39), mission.approve, mission.start, mission.stop, mission.respond, mission.get, mission.revoke_batch, inbox.ack. Remote refused: mission.plan, mission.replan, mission.retry, mission.configure, capability.run, capability.grant, capability.revoke_grant, capability.refresh, skill.run, skill.versions, skill.repair, skill.verify, skill.record, trigger.create, trigger.enable, trigger.disable, trigger.delete.",
+    "ACTION MATRIX: project.* (http.server.ts:417-424 dispatching to project-service.server.ts:36-106). Remote allowed: project.list (:42), project.get (:50), project.artifact (:56). Remote refused: project.repository (:59), and at the cutoff (:72) project.add, project.create, project.update, project.relink, project.remove, project.agent.create.",
+    "ACTION MATRIX: core switch (http.server.ts:426-586). Remote allowed with no gate: submit (:427), approve (:430), stop (:436), retarget (:439), discover (:446), session.get (:449), input and session.input (:452), terminal (:456; always throws, manager.server.ts:1822-1828), task.feedback (:459). Remote refused with a plain Error, so the phone sees generic text: provider.configure_path (:466), remote.configure (:474), thermal.configure (:494), verification.record (:501), policy.candidate (:514), policy.promote (:525), policy.rollback (:529), legacy.import (:533), pairing.create (:560), device.revoke (:573). Task-level pause and resume are refused for every caller (:579-583). safeActions that bypass containment: stop, mission.stop, session.get, mission.get, agent.list, agent.get, plus the non-existent capability.list, skill.list, inbox.list and trigger.list (:384-395).",
+    "Device identity fields stored: id, name (self-asserted, at most 100 characters), token_hash (unsalted SHA-256 of a 32-byte random base64url token), created_at, revoked_at (persistence.server.ts:26; insert at http.server.ts:343). Missing: role or rights, last_seen, expires_at, session generation or rotation, revoked_by, pairing provenance.",
+    "Pairing: workstation-only creation (http.server.ts:559-560); a 96-bit code (randomBytes(12), :561); 10-minute expiry (:562); one outstanding code that each new create overwrites (:315, :562); single use (pairing=null at :344; the check, insert and clear run synchronously after body parse); timing-safe hash compare (:340); per-client limit of 5 failures and global limit of 100 failures per 10 minutes (:318-319); the gateway allows pairing only from the configured remote HTTPS origin (bunny-pair.ts:10) and sets an HttpOnly Secure SameSite=Strict cookie with a one-year Max-Age (bunny-pair.ts:16). The workstation does not confirm which device paired.",
+    "Revocation: /state and /command re-check revoked_at on every request (http.server.ts:331). /events re-checks id+token_hash+revoked_at before each batch, event and heartbeat (http.server.ts:368-373, :170-179, :200). An in-flight /command completes. Batches and envelopes the device granted are not ended (comment at http.server.ts:366-367).",
+    "Session expiry: none. No code compares created_at or any timestamp for device tokens (http.server.ts:331, :368-372).",
+    "Host identity: instanceId changes every boot (failure.server.ts:217; manager.server.ts:58, :97) and doubles as the Agentic host_generation. /health is unauthenticated on loopback and returns {app, instanceId, pid, operationalState, reason, unavailableSubsystems, lastFatal} (http.server.ts:327-328); the gateway has no /health route. /state returns the full HostSnapshot (contracts.ts:18-44) plus release identity and presentation (http.server.ts:292-311), identical for workstation and devices.",
+    "Idempotency: no operation ids or idempotency keys. Only state guards: duplicate launch refused (manager.server.ts:1019-1020), request already answered (bunny-missions/manager.server.ts:3044), already paused, not paused, already stopped (agent-runtime.server.ts:175, :199, :233). The gateway timeout is 15 s (host-bridge.server.ts:59).",
+    "Rate limiting: only FailureLimiter on /pair (http.server.ts:66-101, :318-319). None per device on /command, /state or /events, and none in the gateway.",
+    "Arbitrary execution: submit followed by approve from a device launches unscoped provider sessions. Claude gets Bash, PowerShell, Write and Edit with acceptEdits and --permission-prompts none (adapters.server.ts:403-408); Codex gets workspace-write with no isolation flags (adapters.server.ts:306, :396, :400). terminal() always throws. sendInput is unsupported by every adapter (adapters.server.ts:32, :43, :54), so input and session.input are inert. discover re-probes CLIs with fixed arguments only. capability.run, skill.run and project.repository are workstation-only.",
+    "Error text to devices: CommandRefusedError messages go through safeError(error,[token]) (http.server.ts:609); other errors return 'Host command failed. Inspect operation state before retrying.' plus requestId (:610); HostUnavailableError is a fixed 503. Redaction covers registered device and master tokens, secret-named environment values, Bearer/cookie/authorization headers, key=value secrets and sk-/ghp_ patterns (failure.server.ts:51-99). Exception: project.* errors are re-wrapped verbatim and can carry fs paths (http.server.ts:417-424).",
+    "Tests that actually use a device token over HTTP: host.test.ts 'Host HTTP authentication, pairing revocation and approval validation'; ma2-t10.test.ts 'T10-T6-04' (x3); capabilities.test.ts 'Host HTTP: snapshot stays backward compatible, mission commands are validated, remote devices are limited'; agentic-live.test.ts 'T5 DISPOSABLE LIVE VERIFIED: fresh Host process/SQLite, revoked device, old approval, reviewed restart' (adjust 400; agent.list 401 after revoke). Device-actor dispatch tests that do not go through HTTP: approval-batches.test.ts 'T9 remote: ...', missions.test.ts 'MA0R: phone approval serializes exactly the desktop authority...', agentic-authorization.test.ts A27, A33, A34.",
+    "No device-token test exists for: submit, approve, retarget, discover, session.get, input, terminal, task.feedback, agent.create, agent.start, agent.pause, agent.resume, agent.stop, agent.authorization.approve, deny and revoke, mission.start, mission.respond over HTTP, inbox.ack, project.list, project.get, project.artifact, or any workstation-only core admin action.",
+    "The gateway forwards every action unchanged to the Host (host.ts:110-131 commandBunnyHost calls hostRequest('/command', data)), so the Host is the single authority. dashboardCommand (presentation.ts:581-596) drops the session, agents, agent and non-project data fields from responses."
+  ]
+}

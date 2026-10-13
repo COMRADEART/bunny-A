@@ -1,0 +1,69 @@
+{
+  "round": 1,
+  "verdicts": [
+    {
+      "id": "F03-FOLLOWUP-1",
+      "repaired": false,
+      "newIssue": "The three named variants are refused (node render.js *.md # grep; node render.js $(ls *.md); ls *.md | xargs node render.js in a Makefile). The same class of bypass remains open through the statement splitter, comment stripping, option-driven runners, basename and env-prefix handling, and a regression in package.json parsing. See NEW-1 to NEW-6.",
+      "severity": "MEDIUM",
+      "evidence": "Fixture probe (scratchpad/probe.mjs, temp projects deleted) against the working-tree classifyDeviceWrite. Refused as expected: 'ls *.md | xargs node render.js' (EXECUTION_RELEVANT), 'node render.js *.md' control, '$(wildcard *.md)' control. Still PHONE_SAFE_DOCUMENT: 'ls *.md 2>&1 | xargs node render.js' in Makefile and in package.json scripts; 'ls *.md \" #\" | xargs node render.js'; 'ls *.md \";\" | xargs node render.js'; 'rg --pre \"node render.js\" x *.md'; 'remark --use ./render.js *.md'; 'prettier --plugin=./render.js --write *.md'; './grep x *.md' with a local ./grep script present; 'npx ./ls *.md'; 'PATH=./bin:$PATH ls *.md'; 'GIT_EXTERNAL_DIFF=./render.sh git diff *.md'; 'node render.js n*'; 'node render.js *.m?'; 'node render.js *.m[d]'; 'grep -l x *.md 2>&1 | node render.js'; 'ls *.md >list.txt 2>&1; xargs node render.js < list.txt'. Source: authorization.server.ts line 729 (run.split(/\\n|&&|\\|\\||;|&/) splits on the single & of 2>&1 and on ; inside quotes) and readOnlyStatement line 622 (comment regex (^|\\s)#.*$ strips text inside quotes).",
+      "disposition": "repair extended (fail-closed line rule) — re-verified in review/f03-followup-verify-2.json"
+    },
+    {
+      "id": "NEW-1",
+      "repaired": false,
+      "newIssue": "Splitting statements on a lone '&' breaks the pipeline judgement that the repair claims to enforce. In 'ls *.md 2>&1 | xargs node render.js' the statement is cut at '2>&' into 'ls *.md 2>' (read-only, exempt) and '1 | xargs node render.js' (no glob), so the runner never sees the glob. This idiom is common and the same result holds in package.json scripts.",
+      "severity": "HIGH",
+      "evidence": "Probe cases A, K, V, W all returned PHONE_SAFE_DOCUMENT with 'plain document'. The split is at authorization.server.ts line 729: run.split(/\\n|&&|\\|\\||;|&/). The repair's comment says 'a pipeline is judged whole', which is false for the redirect form. HEAD also split on | and &, so this predates the repair but is inside the class the repair targets.",
+      "disposition": "FIXED: lines with redirections (<, >) are never exempt; test case 2>&1"
+    },
+    {
+      "id": "NEW-2",
+      "repaired": false,
+      "newIssue": "Quote-unaware splitting and comment stripping let a read-only first stage hide a runner. A '#' or ';' inside quotes truncates or splits the statement, so the runner after it is never seen. Example: 'ls *.md \" #\" | xargs node render.js'. The comment regex (^|\\s)#.*$ runs on quoted text, and ';' splits inside quotes.",
+      "severity": "HIGH",
+      "evidence": "Probe C ('ls *.md \" #\" | xargs node render.js') and L ('ls *.md \";\" | xargs node render.js') both return PHONE_SAFE_DOCUMENT. readOnlyStatement (line 622) strips from ' #' to end of line, leaving 'ls *.md \"' as the only pipe stage, so it is exempt. The runner in the stripped tail is never judged.",
+      "disposition": "FIXED: lines with #, or quotes containing ; & |, are never exempt"
+    },
+    {
+      "id": "NEW-3",
+      "repaired": false,
+      "newIssue": "Read-only tools that take an option naming a program run that program on the glob. These are exempt because the program basename is in READ_ONLY_PROGRAM. Examples: rg --pre, remark --use, prettier --plugin=. eslint --rulesdir, --plugin and --parser are the same class by reading but were not run.",
+      "severity": "MEDIUM",
+      "evidence": "Probes E ('rg --pre \"node render.js\" x *.md'), F ('remark --use ./render.js *.md') and M ('prettier --plugin=./render.js --write *.md') all returned PHONE_SAFE_DOCUMENT. The exploit needs a local program to already exist in the project, so this is not reachable from a phone-written file alone. readOnlyStatement checks only the program name, not its arguments.",
+      "disposition": "FIXED: program-loading options (--pre, --use, --plugin, --rulesdir, --parser, --config, -c, --require, ...) and path/script arguments void the exemption"
+    },
+    {
+      "id": "NEW-4",
+      "repaired": false,
+      "newIssue": "Program identity is judged by basename and env prefixes only. A path-qualified read-only name (./grep, bin/ls) or a PATH or GIT_EXTERNAL_DIFF assignment runs a local program on the glob while the statement is judged read-only. Path stripping occurs in readOnlyStatement's split on [\\\\/].",
+      "severity": "MEDIUM",
+      "evidence": "Probes D (fixture with a local 'grep' script and 'Makefile: ./grep x *.md') , T ('npx ./ls *.md'), G ('PATH=./bin:$PATH ls *.md') and N ('GIT_EXTERNAL_DIFF=./render.sh git diff *.md') all returned PHONE_SAFE_DOCUMENT. The git-diff case assumes the external-diff program exists; the PATH case needs a bin/ls in the project. The repair's program check does not verify that the resolved program is the system tool.",
+      "disposition": "FIXED: a path-qualified program or any environment assignment voids the exemption"
+    },
+    {
+      "id": "NEW-5",
+      "repaired": false,
+      "newIssue": "Regression: a package.json whose scripts contain an escaped quote (\\\") now loses detection for a glob outside the scripts, such as lint-staged or ava config. The repair's raw-parse change means that only scripts are scanned when the file parses. Under HEAD the referenceText-mangled text failed to parse and the whole file was scanned, so the glob was caught. The no-escape variant was never detected, so the regression is limited to escaped files.",
+      "severity": "MEDIUM",
+      "evidence": "Head copy of authorization.server.ts (git show HEAD, imports rewritten to absolute URLs in scratchpad) versus working tree: '{\"scripts\":{\"x\":\"node -e \\\\\"1\\\\\"\"},\"lint-staged\":{\"*.md\":\"node render.js\"}}' is EXECUTION_RELEVANT under HEAD and PHONE_SAFE_DOCUMENT now. Same for '\"ava\":{\"files\":[\"*.md\"]}'. The escaped-script case '\"docs\":\"node render.js \\\\\"*.md\\\\\"\"' is still detected. Code: shellLines line 641 returns only the referenced scripts.",
+      "disposition": "FIXED: package.json content outside scripts is checked for globs on a never-exempt line (folder references stay judged on the full text)"
+    },
+    {
+      "id": "NEW-6",
+      "repaired": false,
+      "newIssue": "Globs that match the destination without an extension glob are not seen. The extensionGlob regex requires '*.<ext>' so prefix, single-character and bracket forms (n*, *.m?, *.m[d]) are missed. This predates the repair and the repair did not touch extensionGlob, so it is not a regression.",
+      "severity": "MEDIUM",
+      "evidence": "Probes H ('node render.js n*'), I ('node render.js *.m?') and J ('node render.js *.m[d]') all returned PHONE_SAFE_DOCUMENT. Each glob matches notes.md. The subfolder variant 'node render.js docs/n*' was detected, but only through the folder reference. extensionGlob is defined at authorization.server.ts line 666 and is unchanged by the uncommitted diff.",
+      "disposition": "FIXED: any glob word whose last segment matches the destination name counts (n*, *.m?, *.m[d], braces)"
+    },
+    {
+      "id": "NEW-7",
+      "repaired": false,
+      "newIssue": "Minor loosening: a tab between 'git' and 'add' or 'diff' is now exempt, where HEAD's literal 'git add' match refused it. git add/diff is the intended read-only class, so this is low risk, but it is a loosening introduced by the repair's split(/\\s+/).",
+      "severity": "LOW",
+      "evidence": "HEAD vs working tree on 'git\\tadd *.md' in a Makefile: HEAD EXECUTION_RELEVANT, working tree PHONE_SAFE_DOCUMENT. Not exploitable on its own: git add runs no consumer program unless .git/config or .gitattributes filters are set, and .git is excluded from the scan. Not tested: heredoc, command/builtin/time/nice prefixes. Both fail closed by code reading (program is not in READ_ONLY_PROGRAM), but they were not run.",
+      "disposition": "ACCEPTED LOW: git<TAB>add is the intended read-only git add; .git is excluded from the scan and git add runs no project program"
+    }
+  ]
+}

@@ -12,12 +12,16 @@ import {
   Square,
   X,
 } from "lucide-react";
-import type { Availability, ProviderId, ProviderLive, TaskState } from "@/lib/orch/types";
+import type { Availability, ProviderId, ProviderLive, TaskState, UsageWindow } from "@/lib/orch/types";
 import { ringPlacement } from "@/lib/bunny-host/usage";
 import { useIsland } from "@/store/use-island";
 import { finitePlan } from "./ui-model";
+import { checkedLine, modelsDiscovered, resetIn, usageChipLabel, usageFor, usageStateLabel, usageWindowReset, usageWindowLine } from "./usage-model";
+import type { ProviderUsageSnapshot } from "@/lib/bunny-host/provider-usage.server";
 import type { OrchTask } from "@/lib/orch/types";
 import { activityDetail, isPrivateEvent } from "./motion-model";
+import { codexMissionExclusion, codexMissionStatus } from "@/lib/orch/compatibility";
+import { hostHealthMessage, publicEventLabel, taskStatus } from "@/lib/bunny-host/presentation";
 
 export const NAMES: Record<ProviderId, string> = {
   codex: "Codex",
@@ -27,6 +31,11 @@ export const NAMES: Record<ProviderId, string> = {
   cline: "Cline",
   cursor: "Cursor",
 };
+export function HostHealthWarning() {
+  const health=useIsland(state=>state.hostHealth);
+  const message=hostHealthMessage(health);
+  return message ? <p className="host-health-warning" role="status">{message}</p> : null;
+}
 export const STATUS: Record<Availability, string> = {
   ready: "Ready",
   busy: "Busy",
@@ -105,6 +114,10 @@ export function ProviderIcon({ id }: { id: ProviderId }) {
     </span>
   );
 }
+function providerStatusText(provider: ProviderLive) {
+  const directOnly = provider.id === "codex" && (codexMissionExclusion(provider, "read") || codexMissionExclusion(provider, "write"));
+  return directOnly && provider.availability === "ready" ? "Direct tasks ready" : directOnly && provider.availability === "busy" ? "Direct task active" : STATUS[provider.availability];
+}
 export function ProviderStatus({ provider }: { provider: ProviderLive }) {
   const Icon =
     provider.availability === "authentication_required"
@@ -115,11 +128,11 @@ export function ProviderStatus({ provider }: { provider: ProviderLive }) {
   return (
     <span className="provider-status" data-status={provider.availability}>
       <Icon aria-hidden="true" size={11} />
-      {STATUS[provider.availability]}
+      {providerStatusText(provider)}
     </span>
   );
 }
-export function TaskBadge({ state }: { state: TaskState }) {
+export function TaskBadge({ state, task }: { state: TaskState; task?: OrchTask }) {
   const Icon =
     state === "completed"
       ? Check
@@ -133,7 +146,7 @@ export function TaskBadge({ state }: { state: TaskState }) {
   return (
     <span className="task-badge" data-state={state}>
       <Icon aria-hidden="true" size={12} />
-      {STATES[state]}
+      {task ? taskStatus(task).label : STATES[state]}
     </span>
   );
 }
@@ -147,7 +160,7 @@ export const reportTime = (value: number | null | undefined) =>
       })
     : "Unavailable";
 export function usageDescription(provider: ProviderLive) {
-  return `${NAMES[provider.id]} · ${STATUS[provider.availability]}\n${provider.id === "ollama" ? `Model: ${provider.current_model ?? "Unavailable"}\nVRAM: ${provider.vram ?? "Unavailable"}\nTokens/sec: ${provider.tokens_per_sec ?? "Unavailable"}` : (provider.usageWindows ?? []).map((w) => `${w.label}: ${w.usedPercent}% used · reset ${reportTime(w.resetsAt)}`).join("\n") || "Quota unavailable"}\n${provider.active_jobs} active jobs · Version ${provider.version ?? "unavailable"}`;
+  return `${NAMES[provider.id]} · ${providerStatusText(provider)}\n${provider.id === "ollama" ? `Model: ${provider.current_model ?? "Unavailable"}\nVRAM: ${provider.vram ?? "Unavailable"}\nTokens/sec: ${provider.tokens_per_sec ?? "Unavailable"}` : (provider.usageWindows ?? []).map((w) => `${w.label}: ${w.usedPercent}% used · reset ${reportTime(w.resetsAt)}`).join("\n") || "Quota unavailable"}\n${provider.active_jobs} active jobs · Version ${provider.version ?? "unavailable"}${provider.id === "codex" ? `\nMission execution: ${codexMissionStatus(provider)}` : ""}`;
 }
 export function ProviderMark({
   provider,
@@ -156,8 +169,26 @@ export function ProviderMark({
   provider: ProviderLive;
   interactive?: boolean;
 }) {
-  const ring = ringPlacement(provider.id === "ollama" ? [] : provider.usageWindows);
-  const title = usageDescription(provider);
+  const providerUsage = useIsland((s) => s.providerUsage);
+  const record = usageFor(providerUsage, provider.id);
+  // Verified rings (M-A-3 T2 §13): only provider-reported data the Host still calls
+  // current/estimated is drawn as an arc. Stale, restart-restored and unknown states
+  // never pretend to be live; a legacy Host without usage truth keeps its old look.
+  const ringVisible = record
+    ? record.status === "current" || record.status === "estimated"
+    : (provider.usageWindows?.length ?? 0) > 0;
+  const ring = ringVisible
+    ? ringPlacement(
+        provider.id === "ollama"
+          ? []
+          : record
+            ? record.windows.map<UsageWindow>((w) => ({ label: w.label, usedPercent: w.percentUsed ?? NaN, resetsAt: w.resetAt, kind: w.kind as UsageWindow["kind"], windowMinutes: null }))
+            : (provider.usageWindows ?? []),
+      )
+    : { inner: null, outer: null };
+  const title = record
+    ? `${NAMES[provider.id]} · usage ${usageChipLabel(record).toLowerCase()}\n${record.windows.length ? record.windows.map((w) => usageWindowLine(w, Date.now())).join("\n") : record.note}\n${checkedLine(record, Date.now())}`
+    : usageDescription(provider);
   const mark = (
     <span
       className="usage-mark"
@@ -228,9 +259,34 @@ export function ProviderFacts({
   provider: ProviderLive;
   compact?: boolean;
 }) {
+  // Usage truth (M-A-3 T2): the Host's normalized record, when this Host knows usage.
+  const providerUsage = useIsland((s) => s.providerUsage);
+  const modelCapabilities = useIsland((s) => s.modelCapabilities);
+  const record = usageFor(providerUsage, provider.id);
+  const models = modelsDiscovered(modelCapabilities, provider.id);
+  const now = Date.now();
+  const chip = record ? (
+    <span
+      className="usage-chip"
+      data-usage-status={
+        record.providerId === "ollama" && record.status === "current" ? "local" : record.status
+      }
+    >
+      {usageChipLabel(record)}
+    </span>
+  ) : null;
   return (
     <>
       <dl className="fact-list">
+        <div><dt>Installed</dt><dd>{provider.installed ? "Yes" : "No"}</dd></div>
+        <div><dt>Authentication</dt><dd>{provider.authenticatedState === "not_required" ? "Not required" : provider.authenticated ? "Authenticated" : provider.authenticatedState === "unknown" ? "Unknown" : "Required"}</dd></div>
+        <div><dt>Direct tasks</dt><dd>{["ready","busy"].includes(provider.availability) ? "Ready" : STATUS[provider.availability]}</dd></div>
+        {provider.id === "codex" ? (
+          <div>
+            <dt>Mission execution</dt>
+            <dd>{codexMissionStatus(provider)}</dd>
+          </div>
+        ) : null}
         {provider.id === "ollama" ? (
           <>
             <div>
@@ -261,6 +317,35 @@ export function ProviderFacts({
               <dt>Generation</dt>
               <dd>{provider.active_jobs > 0 ? "Active" : "Idle"}</dd>
             </div>
+            <div>
+              <dt>Usage</dt>
+              <dd>{chip ?? "Unknown"}</dd>
+            </div>
+          </>
+        ) : record ? (
+          <>
+            <div>
+              <dt>Usage</dt>
+              <dd>{chip}</dd>
+            </div>
+            {record.windows.map((w) => {
+              const reset = !compact ? usageWindowReset(w, now) : null;
+              return (
+                <div key={`${w.kind}-${w.label}`}>
+                  <dt>
+                    {w.kind === "short" ? "Short window" : w.kind === "weekly" ? "Weekly" : w.label}
+                    {!compact && reset ? <small>{reset}</small> : null}
+                  </dt>
+                  <dd>{w.percentUsed == null ? "Unknown" : `${Math.round(w.percentUsed)}%`}</dd>
+                </div>
+              );
+            })}
+            {!compact && models != null ? (
+              <div>
+                <dt>Models</dt>
+                <dd>{models} discovered</dd>
+              </div>
+            ) : null}
           </>
         ) : (provider.usageWindows ?? []).length ? (
           (provider.usageWindows ?? []).map((w) => (
@@ -289,7 +374,15 @@ export function ProviderFacts({
           </div>
         ) : null}
       </dl>
-      {provider.usageObservedAt && provider.id !== "ollama" ? (
+      {provider.id === "codex" && !compact ? (
+        <p className="caption">{provider.securityCompatibility?.compatibilityClass === "VALIDATED" && codexMissionStatus(provider) === "Validated" ? `Profile ${provider.securityCompatibility.registryEntry ?? "Validated runtime"} · Mission security policy ${provider.securityCompatibility.policyVersion} validated for read and write access.` : codexMissionExclusion(provider, "read") ?? codexMissionExclusion(provider, "write")}</p>
+      ) : null}
+      {record ? (
+        <p className="caption">
+          {checkedLine(record, now)} ·{" "}
+          {compact ? usageStateLabel(record.status) : record.note}
+        </p>
+      ) : provider.usageObservedAt && provider.id !== "ollama" ? (
         <p className="caption">
           Reported {reportTime(provider.usageObservedAt)} ·{" "}
           {compact
@@ -336,7 +429,7 @@ export function TaskActivity({ task, expanded = false }: { task: OrchTask; expan
         <span>
           {task.latestEvent && isPrivateEvent(task.latestEvent.type)
             ? "Working…"
-            : (task.latestEvent?.label ?? (task.state === "verifying" ? "Verifying" : "Working…"))}
+            : (task.state === "verifying" ? "Bunny verifying" : task.latestEvent ? publicEventLabel(task.latestEvent.type) : taskStatus(task).label)}
         </span>
       </div>
       {task.latestEvent?.detail ? (
@@ -350,7 +443,6 @@ export function TaskActivity({ task, expanded = false }: { task: OrchTask; expan
           <span>
             {plan.completed} / {plan.total} steps
           </span>
-          {plan.current ? <small>{plan.current}</small> : null}
         </div>
       ) : null}
     </div>

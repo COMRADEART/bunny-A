@@ -1,0 +1,81 @@
+{
+  "gate": "M-A-2 T9",
+  "recordedAt": "2026-10-06T19:49:13.082Z",
+  "unresolvedBlocker": 0,
+  "unresolvedHigh": 0,
+  "failures": [
+    {
+      "id": "T9-target-admission",
+      "classification": "RESOLVED PRODUCT SECURITY",
+      "finding": "Title-selected operations could touch foreign targets before post-run detection; arbitrary typing/control scope was too broad.",
+      "resolution": "f7d8ccb: exact operation/step digests, verified Calculator profile and preflight before admission; all target/operation escapes fail before mutation."
+    },
+    {
+      "id": "T9-UWP-chrome",
+      "classification": "RESOLVED PRODUCT COMPATIBILITY",
+      "evidence": [
+        "v18-B-live.json",
+        "v18-target-probe.log"
+      ],
+      "finding": "Over-strict dialog check refused normal UWP frame/content windows.",
+      "resolution": "8d49b7d recognizes only normal verified nonmodal UWP descendants; v19 and final v20 live positive pass."
+    },
+    {
+      "id": "T9-renderer-input",
+      "classification": "RESOLVED PRODUCT PRIVACY",
+      "finding": "Original typed input remained in mission renderer snapshots despite safe events/visible activity.",
+      "resolution": "445beeb redacts typed input and secret-key params in view/detail without changing Host execution input; whole-response focused/live scan passes."
+    },
+    {
+      "id": "T9-release-name",
+      "classification": "RESOLVED BUILD HARNESS",
+      "evidence": [
+        "t9-final-full-elevated.log"
+      ],
+      "finding": "Candidate r2 naming failed the existing pin expectation.",
+      "resolution": "Repository-consistent next-version candidates, no release test weakened or package overwritten."
+    },
+    {
+      "id": "T9-restart-harness",
+      "classification": "RESOLVED HARNESS",
+      "evidence": [
+        "v19-R-harness-failure.json",
+        "v19-R-harness-timeout.json",
+        "v19-R1-harness-assertion-failure.json"
+      ],
+      "finding": "PowerShell module/child handle issues, followed by incorrect interrupted-step assertion for an approval pause.",
+      "resolution": "Explicit installed launcher controller; T3 paused-step semantics preserved, v19/v20 recovery/replay verified."
+    },
+    {
+      "id": "T9-plan-limit",
+      "classification": "RESOLVED HARNESS",
+      "evidence": [
+        "v19-G2-harness-plan-limit.json"
+      ],
+      "finding": "14-step test exceeded the existing 12-step planner limit.",
+      "resolution": "Use 12 steps without increasing limit; actual in-flight Stop passes."
+    },
+    {
+      "id": "T9-Windows-test-cleanup",
+      "classification": "LOW HARNESS LIMITATION",
+      "evidence": [
+        "t9-v20-full.log",
+        "t9-v20-full-recheck.log",
+        "t9-v20-t4-cleanup-isolated.log",
+        "t9-v20-full-sequential.log"
+      ],
+      "finding": "Default concurrent test files hit EPERM deleting a temporary T4 fixture after ownership assertions.",
+      "resolution": "Unchanged isolated test and complete unchanged sequential inventory pass; no weakened assertion/skip or T4 runtime change."
+    },
+    {
+      "id": "T9-restricted-environment",
+      "classification": "RESOLVED ENVIRONMENT",
+      "evidence": [
+        "t9-final-full.log",
+        "t9-final-dev-render.log"
+      ],
+      "finding": "Restricted process/browser environment lacked native access for Windows acceptance.",
+      "resolution": "Authorized normal Windows execution; no automatic approval rejection or product security bypass."
+    }
+  ]
+}

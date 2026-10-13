@@ -1,0 +1,27 @@
+{
+  "note": "Verifier reanalysis of run 1 (results.json). Raw run output is unchanged. Corrections and new findings are below.",
+  "c1_driver_false_fail": {
+    "original": "FAIL companion right after the interrupt receipt",
+    "cause": "driver read a cached sampler snapshot taken before the interrupt returned",
+    "correctedFromHostTimeline": {
+      "firstHostInterruptedSampleMsAfterReceipt": 20,
+      "companion": "INTERRUPTED (Recent interruption receipt.)",
+      "playing": false
+    },
+    "verdict": "PASS"
+  },
+  "c3_scope_gap": "c3 checked Host rows only; the web companion was not checked against the receipt in the driver",
+  "w1_web_speaking_after_cancel": {
+    "verdict": "FAIL (web surface)",
+    "receiptRequestedAt": 1791835199428,
+    "webSpeakingUntilMsAfterReceipt": 626,
+    "webNextState": "READY",
+    "hostSpeakingRowsAfterReceipt": 0,
+    "evidence": "webRows SPEAKING from +48.29s to READY at receipt+626 ms; screenshot shots/web-c-interrupted.png shows Speaking",
+    "interpretation": "Web companion lags the Host about 0.6 s on the cancel (300 ms poll plus server function). Host never showed SPEAKING after the receipt."
+  },
+  "w2_web_ready_blip": "web showed READY for about 0.4 s after the cancel before INTERRUPTED appeared (Host continuously INTERRUPTED); not a SPEAKING violation",
+  "observation_precedence": "Companion precedence puts INTERRUPTED above LISTENING for 2.5 s after a cancel, so a confirmed push-to-talk capture (capturing=true) shows INTERRUPTED during that window (rows +50.84 to +52.21). Not a false mic-active claim, since capture was real.",
+  "observation_web_startup": "web showed DISCONNECTED for about 2 s on first load before the first Host read (+14.7 s), then SLEEPING",
+  "stop_checks": 18
+}

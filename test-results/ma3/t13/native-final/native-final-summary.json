@@ -1,0 +1,332 @@
+{
+  "checks": [
+    {
+      "name": "Real Island window is present",
+      "ok": true,
+      "detail": {
+        "islandPid": 40216,
+        "pref": "C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t13-native-final-46196\\island-full-173951\\pref.json"
+      }
+    },
+    {
+      "name": "All four weapon chips are named, focusable Button controls (E02/IR-H3)",
+      "ok": true,
+      "detail": {
+        "focusableList": [
+          "Window | Bunny Island | ",
+          "Button | Gada - Research Gada, Completed and verified | ",
+          "Button | Spear - Review Spear, Needs you | ",
+          "Button | Vishnu Chakra - Build Chakra, Paused | ",
+          "Button | Sword - Test Sword, Ready to start | ",
+          "Button | Quick controls | ExtrasButton",
+          "Button | Open workspace | SearchButton",
+          "Button | Ask Bunny, sleeping. Voice session closed. | BunnyButton",
+          "Button | Voice input | VoiceButton"
+        ],
+        "keyboardFocusableUnnamed": 0
+      }
+    },
+    {
+      "name": "Tab round reaches every weapon chip",
+      "ok": true,
+      "detail": {
+        "tabNames": [
+          "0:Bunny Island",
+          "1:Gada - Research Gada, Completed and verified",
+          "2:Spear - Review Spear, Needs you",
+          "3:Vishnu Chakra - Build Chakra, Paused",
+          "4:Sword - Test Sword, Ready to start",
+          "5:Quick controls",
+          "6:Open workspace",
+          "7:Ask Bunny, sleeping. Voice session closed.",
+          "8:Voice input",
+          "9:Gada - Research Gada, Completed and verified",
+          "10:Spear - Review Spear, Needs you",
+          "11:Vishnu Chakra - Build Chakra, Paused",
+          "12:Sword - Test Sword, Ready to start"
+        ],
+        "aborted": null
+      }
+    },
+    {
+      "name": "Enter on the Gada chip expands the detail panel",
+      "ok": true,
+      "detail": {
+        "before": "1140,6,921,123",
+        "after": "1050,6,1101,922",
+        "focused": {
+          "name": "Quick controls",
+          "controlType": "Button",
+          "automationId": "ExtrasButton",
+          "inIsland": true
+        }
+      }
+    },
+    {
+      "name": "Back/Escape returns focus to the originating chip or Quick controls (IR-H3)",
+      "ok": true,
+      "detail": {
+        "focused": {
+          "name": "Quick controls",
+          "controlType": "Button",
+          "automationId": "ExtrasButton",
+          "inIsland": true
+        },
+        "after": "1050,6,1101,922"
+      }
+    },
+    {
+      "name": "Escape collapses the expanded panel again",
+      "ok": true,
+      "detail": {
+        "after": "1140,6,921,123",
+        "bunny": "1469,19,90,84"
+      }
+    },
+    {
+      "name": "Minimize actually minimizes the Island window",
+      "ok": true,
+      "detail": {
+        "islandPid": 40216,
+        "command": "minimize",
+        "isIconic": true,
+        "isZoomed": false,
+        "rect": "0,1889,237,39"
+      }
+    },
+    {
+      "name": "Window stays iconic for the whole minimized sample (no restore flip)",
+      "ok": true,
+      "detail": {
+        "iconicFlips": 0
+      }
+    },
+    {
+      "name": "Minimized idle CPU drops far below collapsed full-motion idle (IR-M5/E04 direction)",
+      "ok": true,
+      "detail": {
+        "collapsedAvg": 31,
+        "minAvg": 14.22,
+        "restAvg": 27.97,
+        "minimizedNotMinimizedRestored": 27.97,
+        "collapsedFullP95": 45.74,
+        "minP95": 38.23
+      }
+    },
+    {
+      "name": "Minimized cost sits near the same-machine Motion Off baseline (disclosed, not a spec budget)",
+      "ok": true,
+      "detail": {
+        "minAvg": 14.22,
+        "moAvg": 10
+      }
+    },
+    {
+      "name": "Disposable fixture Host stopped",
+      "ok": true,
+      "detail": {
+        "seedExit": 0,
+        "pid": 18204
+      }
+    }
+  ],
+  "samples": {
+    "collapsedFull": {
+      "label": "LIVE collapsed full motion (Island PID 40216, real install\\Bunny-Island.ps1, not -SmokeTest)",
+      "seconds": 25,
+      "avgCpuPctOneCore": 31,
+      "p95IntervalCpuPctOneCore": 45.74,
+      "maxIntervalCpuPctOneCore": 50.39,
+      "peakWorkingSetMB": 365.7,
+      "peakPrivateMB": 339.3,
+      "finalWorkingSetMB": 364.8,
+      "finalThreads": 73,
+      "finalHandles": 1053,
+      "logicalProcessors": 22
+    },
+    "minimized": {
+      "label": "LIVE guarded (Island PID 40216): minimized full motion",
+      "seconds": 20,
+      "avgCpuPctOneCore": 14.22,
+      "p95IntervalCpuPctOneCore": 38.23,
+      "iconicFlips": 0,
+      "iconicAlwaysTrue": true,
+      "peakWorkingSetMB": 429.2,
+      "samples": [
+        {
+          "t": 1,
+          "cpuPctOneCore": 15.42,
+          "iconic": true,
+          "workingSetMB": 426.7,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 2,
+          "cpuPctOneCore": 6.06,
+          "iconic": true,
+          "workingSetMB": 426.9,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 3,
+          "cpuPctOneCore": 1.55,
+          "iconic": true,
+          "workingSetMB": 426.9,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 4,
+          "cpuPctOneCore": 32.19,
+          "iconic": true,
+          "workingSetMB": 427.2,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 5,
+          "cpuPctOneCore": 6.2,
+          "iconic": true,
+          "workingSetMB": 427.2,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 6,
+          "cpuPctOneCore": 7.64,
+          "iconic": true,
+          "workingSetMB": 427.4,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 7,
+          "cpuPctOneCore": 20.06,
+          "iconic": true,
+          "workingSetMB": 427.4,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 8,
+          "cpuPctOneCore": 15.51,
+          "iconic": true,
+          "workingSetMB": 427.6,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 9,
+          "cpuPctOneCore": 10.85,
+          "iconic": true,
+          "workingSetMB": 427.6,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 10,
+          "cpuPctOneCore": 12.26,
+          "iconic": true,
+          "workingSetMB": 427.9,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 11,
+          "cpuPctOneCore": 17.02,
+          "iconic": true,
+          "workingSetMB": 427.9,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 12,
+          "cpuPctOneCore": 13.81,
+          "iconic": true,
+          "workingSetMB": 428.1,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 13,
+          "cpuPctOneCore": 10.72,
+          "iconic": true,
+          "workingSetMB": 428.1,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 14,
+          "cpuPctOneCore": 38.23,
+          "iconic": true,
+          "workingSetMB": 428.4,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 15,
+          "cpuPctOneCore": 15.31,
+          "iconic": true,
+          "workingSetMB": 428.4,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 16,
+          "cpuPctOneCore": 27.85,
+          "iconic": true,
+          "workingSetMB": 428.7,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 17,
+          "cpuPctOneCore": 4.64,
+          "iconic": true,
+          "workingSetMB": 428.7,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 18,
+          "cpuPctOneCore": 6.16,
+          "iconic": true,
+          "workingSetMB": 428.9,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 19,
+          "cpuPctOneCore": 13.9,
+          "iconic": true,
+          "workingSetMB": 428.9,
+          "rect": "0,1889,237x39"
+        },
+        {
+          "t": 20,
+          "cpuPctOneCore": 4.65,
+          "iconic": true,
+          "workingSetMB": 429.2,
+          "rect": "0,1889,237x39"
+        }
+      ]
+    },
+    "restored": {
+      "label": "LIVE restored collapsed full motion (Island PID 40216, real install\\Bunny-Island.ps1, not -SmokeTest)",
+      "seconds": 10,
+      "avgCpuPctOneCore": 27.97,
+      "p95IntervalCpuPctOneCore": 41.89,
+      "maxIntervalCpuPctOneCore": 41.89,
+      "peakWorkingSetMB": 440.8,
+      "peakPrivateMB": 411,
+      "finalWorkingSetMB": 440,
+      "finalThreads": 58,
+      "finalHandles": 1103,
+      "logicalProcessors": 22
+    },
+    "motionOff": {
+      "label": "LIVE collapsed motion off (Island PID 37484, real install\\Bunny-Island.ps1, not -SmokeTest)",
+      "seconds": 20,
+      "avgCpuPctOneCore": 10,
+      "p95IntervalCpuPctOneCore": 40.25,
+      "maxIntervalCpuPctOneCore": 40.25,
+      "peakWorkingSetMB": 298.2,
+      "peakPrivateMB": 273,
+      "finalWorkingSetMB": 293.9,
+      "finalThreads": 69,
+      "finalHandles": 1017,
+      "logicalProcessors": 22
+    }
+  },
+  "notes": [
+    "own-lane cleanup: SUCCESS: The process with PID 6184 (child process of PID 40740) has been terminated.\r\nSUCCESS: The process with PID 40740 (child process of PID 46196) has been terminated.",
+    "Same-machine cost ladder (avg CPU % of one core): collapsed full 31, minimized 14.22, motion-off 10. Minimized sits 4.2 pp above motion-off.",
+    "taskkill 37484: Command failed: taskkill.exe /PID 37484 /T /F"
+  ],
+  "classification": "LIVE: real install\\Bunny-Island.ps1 islands (PIDs this launch owned), real disposable Host 43881. Keyboard via real SendKeys with foreground verified per key. Production untouched.",
+  "finished": true
+}

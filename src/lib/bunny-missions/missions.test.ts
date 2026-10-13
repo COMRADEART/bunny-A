@@ -5,8 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { HostDatabase } from "../bunny-host/persistence.server.ts";
+import { ModelCapabilityRegistry } from "../bunny-host/model-capability.server.ts";
 import { TaskManager } from "../bunny-host/manager.server.ts";
 import { providerBase, codexLaunchArgs, claudeLaunchArgs } from "../bunny-host/adapters.server.ts";
+import { runsLocally } from "../bunny-host/router.ts";
 import type { AdapterHooks, AdapterResult, ProviderAdapter } from "../bunny-host/contracts.ts";
 import type { OrchTask, ProviderId, ProviderLive } from "../orch/types.ts";
 import { MissionManager } from "./manager.server.ts";
@@ -23,9 +25,11 @@ import type { CapabilityAdapter } from "./capabilities/bus.server.ts";
 import { FilesystemCapability, NotificationsCapability, TerminalCapability } from "./capabilities/local.server.ts";
 import { communicationConnectors } from "./capabilities/connectors.server.ts";
 import type { ActionManifest, MissionStep } from "./types.ts";
+import { simulatedCodexProfile } from "../bunny-host/testing/codex.test.ts";
+import { emptyCodexCompatibility } from "../bunny-host/codex-compatibility.server.ts";
 
 function ready(id: ProviderId): ProviderLive {
-  return { ...providerBase(id), installed: true, authenticated: true, availability: "ready", capabilities: id === "ollama" ? ["text"] : ["filesystem", "terminal", "text"], current_model: id === "ollama" ? "test-local" : null };
+  return { ...providerBase(id), installed: true, authenticated: true, availability: "ready", capabilities: id === "ollama" ? ["text"] : ["filesystem", "terminal", "text"], current_model: id === "ollama" ? "test-local" : null, ...(id === "codex" ? { securityCompatibility: simulatedCodexProfile() } : {}) };
 }
 type Launched = { task: OrchTask; finish: (result: AdapterResult) => void; hooks: AdapterHooks; stopped: boolean };
 function fakeAdapter(id: ProviderId, launched: Launched[]): ProviderAdapter {
@@ -44,7 +48,10 @@ async function setup(options: { providers?: ProviderId[]; adapters?: (dir: strin
   const root = options.root ?? join(dir, "project"); mkdirSync(root, { recursive: true });
   const db = new HostDatabase(join(dir, "host.sqlite"));
   const launched: Launched[] = [];
-  const tasks = new TaskManager(db, root, (options.providers ?? ["claude"]).map((id) => fakeAdapter(id, launched)));
+  // M-A-3 T3 legacy-parity: these mission fixtures predate model-routing facts; probing nothing
+  // keeps the pre-T3 provider-level behavior byte-identical (T3 paths have their own fixtures).
+  const factLess = new ModelCapabilityRegistry(db, { availableProviders: () => [] });
+  const tasks = new TaskManager(db, root, (options.providers ?? ["claude"]).map((id) => fakeAdapter(id, launched)), { modelRegistry: factLess });
   await tasks.discover();
   const notifications: string[] = [];
   const adapters = options.adapters?.(dir) ?? [new FilesystemCapability(), new TerminalCapability(), new NotificationsCapability((title) => notifications.push(title)), ...communicationConnectors()];
@@ -337,6 +344,54 @@ test("MA0R: replan with write authority revokes read approval and cannot run unt
   } finally { await env.cleanup(); }
 });
 
+function restrictCodex(tasks: TaskManager) {
+  const previous = tasks.registry.get("codex")!;
+  tasks.registry.providers.set("codex", { ...previous, securityCompatibility: emptyCodexCompatibility("unvalidated replacement binary") });
+}
+for (const access of ["read", "write"] as const) test(`T2: pending ${access} Mission retarget and direct child approval cannot bypass Codex compatibility`, async () => {
+  const env = await setup({ providers: ["claude", "codex"] });
+  try {
+    const view = env.missions.create({ objective: "Inspect", mode: "fast", origin: "workstation", steps: [model("Agent", "Inspect files", [], { access })] });
+    env.missions.approve(view.id, "workstation", false);
+    const child = env.tasks.submit({ prompt: "Inspect files", mode: "fast", override: "claude", constraints: { missionAccess: access } }, { missionId: view.id, stepId: view.steps[0].id, executionScope: { access } });
+    restrictCodex(env.tasks);
+    assert.throws(() => env.missions.retargetTask(child.id, "codex"), /unvalidated replacement binary/);
+    assert.throws(() => env.tasks.retarget(child.id, "codex"), /unvalidated replacement binary/);
+    // Old child records did not have missionAccess. The public retarget entry and approval hook still guard them.
+    env.db.write({ ...child, constraints: {}, provider: "codex" }, "fixture.legacy", "old child without compatibility constraint");
+    assert.throws(() => env.missions.retargetTask(child.id, "codex"), /unvalidated replacement binary/);
+    assert.throws(() => env.tasks.approve(child.id), /unvalidated replacement binary/);
+    assert.equal(env.launched.length, 0);
+    const direct = env.tasks.submit({ prompt: "Direct", mode: "fast", override: "claude" });
+    assert.equal(env.missions.retargetTask(direct.id, "codex").provider, "codex", "legacy direct retarget stays intentional");
+  } finally { await env.cleanup(); }
+});
+for (const action of ["automatic retry", "explicit retry", "replan"] as const) test(`T2: ${action} recalculates eligibility after a validated Codex runtime is replaced`, async () => {
+  const env = await setup({ providers: ["codex"] });
+  try {
+    const view = env.missions.create({ objective: "Inspect", mode: "fast", origin: "workstation", steps: [model("Agent", "Inspect files", [], { access: "read", maxRetries: action === "automatic retry" ? 1 : 0 })] });
+    const approved = env.missions.approve(view.id, "workstation");
+    await until(() => env.launched.length === 1, "initial validated child");
+    if (action === "automatic retry") restrictCodex(env.tasks);
+    env.launched[0].finish({ ok: false, output: "", error: "provider crashed" });
+    await until(() => ["failed", "waiting_for_user"].includes(env.missions.mission(view.id).state), "failed or blocked Mission");
+    if (action !== "automatic retry") {
+      restrictCodex(env.tasks);
+      if (action === "explicit retry") env.missions.retry(view.id, "workstation");
+      else {
+        const next = await env.missions.replan(view.id, "workstation", [model("New agent", "Inspect files", [], { access: "write", maxRetries: 0 })]);
+        assert.equal(next.authorizationId, null);
+        assert.ok(env.missions.store.authorization(approved.authorizationId!)?.revokedAt);
+        env.missions.approve(view.id, "workstation");
+      }
+    }
+    await until(() => env.missions.get(view.id).events.some(event => event.type === "mission.step.failed" && /unvalidated replacement binary/.test(event.detail)), "compatibility refusal on new routing");
+    assert.equal(env.launched.length, 1, "no second provider model session starts");
+    const allChildren = env.db.tasks().filter(task => task.mission?.missionId === view.id);
+    assert.equal(allChildren.length, 1, "routing refuses before a new child task is created");
+  } finally { await env.cleanup(); }
+});
+
 test("MA0R: child <= step <= envelope is enforced even on direct child approval", async () => {
   const env = await setup();
   try {
@@ -354,17 +409,29 @@ test("MA0R: child <= step <= envelope is enforced even on direct child approval"
   } finally { await env.cleanup(); }
 });
 
-test("MA0R: phone approval serializes exactly the desktop authority and ignores client scope overrides", async () => {
+// M-A-3 T9R-F01 (owner-approved contract revision): this MA0R test asserted that a phone approval serializes exactly
+// the desktop authority, including writeIncludesShell: true. A paired phone now grants the same Host-owned scope with a
+// remote authority marker and without shell-capable provider sessions; everything else is unchanged.
+test("MA0R/T9R-F01: phone approval keeps the Host-owned scope, ignores client scope overrides and never carries shell authority", async () => {
   const env = await setup();
   try {
-    const view = env.missions.create({ objective: "Inspect then edit", mode: "fast", origin: "workstation", steps: [model("A", "Inspect", [], { access: "read" }), model("B", "Edit", [0], { access: "write" })] });
+    const plan = [model("A", "Inspect", [], { access: "read" }), model("B", "Edit", [0], { access: "write" })];
+    const view = env.missions.create({ objective: "Inspect then edit", mode: "fast", origin: "workstation", steps: plan });
     const before = JSON.parse(JSON.stringify(view.requestedScope));
+    assert.equal(before.providers.sessions.writeIncludesShell, true, "the displayed request states that write sessions use a shell");
     await missionCommand(env.missions, "mission.approve", { id: view.id, start: false, scope: { projectRoots: ["C:/"], providers: { execution: true } } }, { local: false, actor: "device:paired-phone" });
     const envelope = JSON.parse(JSON.stringify(env.missions.get(view.id).authorization)) as Record<string, unknown>;
-    for (const key of ["id", "missionId", "grantedAt", "grantedBy", "expiresAt", "revokedAt"]) delete envelope[key];
-    assert.deepEqual(envelope, before, "remote command uses Host-owned requested scope only");
+    assert.deepEqual(envelope.authority, { kind: "remote", actor: "device:paired-phone", sessionCeiling: ["tool_free", "read_tools"], codeExecution: "desktop_only" });
+    for (const key of ["id", "missionId", "grantedAt", "grantedBy", "expiresAt", "revokedAt", "authority"]) delete envelope[key];
+    const expected = structuredClone(before); expected.providers.sessions.writeIncludesShell = false;
+    assert.deepEqual(envelope, expected, "remote command uses Host-owned requested scope only, minus shell authority");
     assert.ok(env.missions.get(view.id).events.some((event) => event.type === "approval.mission_envelope"));
-    assert.ok(env.missions.get(view.id).events.some((event) => event.type === "approval.remote_device" && /paired-phone/.test(event.detail)));
+    assert.ok(env.missions.get(view.id).events.some((event) => event.type === "approval.remote_device" && /paired-phone/.test(event.detail) && /trusted-desktop/.test(event.detail)));
+    const desk = env.missions.create({ objective: "Inspect then edit", mode: "fast", origin: "workstation", steps: plan });
+    env.missions.approve(desk.id, "workstation", false);
+    const desktop = env.missions.get(desk.id).authorization!;
+    assert.deepEqual(desktop.authority, { kind: "workstation" }, "the workstation approval path is unchanged");
+    assert.equal(desktop.providers.sessions!.writeIncludesShell, true);
   } finally { await env.cleanup(); }
 });
 
@@ -526,7 +593,12 @@ test("out-of-envelope capability asks; deny fails the step; allow-once runs only
     const second = env.missions.create({ objective: "Write2", mode: "fast", origin: "workstation", steps: [{ role: "Writer", objective: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: outside, content: "allowed once" } } }] });
     env.missions.approve(second.id, "workstation");
     await until(() => env.missions.store.requests(second.id).length === 1, "request");
-    await env.missions.respond(env.missions.store.requests(second.id)[0].id, "allow_once", "device:phone");
+    // T9R-F01: a paired device never authorizes a write outside the reviewed envelope; the workstation's allow-once does.
+    const secondRequest = env.missions.store.requests(second.id)[0];
+    await assert.rejects(env.missions.respond(secondRequest.id, "allow_once", "device:phone"), /Approval required on Windows Host/);
+    assert.equal(env.missions.store.request(secondRequest.id).resolvedAt, null, "the device refusal leaves the ask open");
+    assert.ok(!existsSync(outside), "nothing written on the device's answer");
+    await env.missions.respond(secondRequest.id, "allow_once", "workstation");
     await until(() => env.missions.mission(second.id).state === "completed", "completion after allow once");
     assert.ok(env.missions.memory.entries(second.id).some((m) => m.kind === "user_decision" && m.verified && /allowed once/.test(m.key)));
     rmSync(outside, { force: true });
@@ -641,7 +713,9 @@ test("feature flag off: mission commands refused, snapshot reports disabled, dir
     const task = env.tasks.submit({ prompt: "Direct", mode: "fast" }); env.tasks.approve(task.id);
     env.launched[0].finish({ ok: true, output: "done" });
     await until(() => env.db.get(task.id).state === "completed", "direct completion");
-    assert.deepEqual(env.db.events().slice(before).map((e) => e.type).filter((t) => !t.startsWith("agent.") && t !== "session.recorded"), ["task.created", "routing.started", "approval.required", "approval.accepted", "executor.starting", "task.completed"]);
+    // M-A-3 T3 adds routing.classified/selected (submit-time) and routing.revalidated (launch
+    // gate) to the direct-task flow; the approval → executor → completion shape is unchanged.
+    assert.deepEqual(env.db.events().slice(before).map((e) => e.type).filter((t) => !t.startsWith("agent.") && t !== "session.recorded"), ["task.created", "routing.classified", "routing.selected", "routing.started", "approval.required", "routing.revalidated", "approval.accepted", "executor.starting", "task.completed"]);
     assert.equal(env.missions.inbox.recent().length, 0, "no inbox writes while disabled");
   } finally { await env.cleanup(); }
 });
@@ -660,6 +734,69 @@ test("budget: external model calls beyond the envelope fall back to local or fai
     assert.equal(env.missions.mission(view.id).state, "waiting_for_user", "budget exhaustion waits for the user instead of spending more");
     assert.equal(env.missions.mission(view.id).accounting.externalModelCalls, 2);
   } finally { await env.cleanup(); }
+});
+test("MA1: mission children are routed on the step objective, not on Bunny's agent-prompt boilerplate", async () => {
+  // Before: "read-only: do not modify any files … approved working folder" inferred requiresFilesystem for every
+  // mission model step, so text-only (local) providers were never eligible and local-only missions could not run.
+  const env = await setup({ providers: ["claude", "ollama"] });
+  try {
+    // Non-local mission: an agent step works in the approved folder, so text-only providers stay ineligible
+    // (live M-A-1: a "Read README.md" step was otherwise routed to text-only Ollama).
+    const open = env.missions.create({ objective: "Open", mode: "fast", origin: "workstation", steps: [model("Reader", "Read README.md and report the secret word")] });
+    env.missions.approve(open.id, "workstation");
+    await until(() => env.launched.length === 1, "open launch");
+    assert.equal(env.launched[0].task.routingPrompt, "Read README.md and report the secret word");
+    assert.match(env.launched[0].task.prompt, /do not modify any files/, "the provider still receives the full agent prompt");
+    assert.equal(env.launched[0].task.constraints?.requiresFilesystem, true);
+    assert.equal(env.launched[0].task.provider, "claude");
+    env.launched[0].finish({ ok: true, output: "done" });
+    await until(() => env.missions.mission(open.id).state === "completed", "open completion");
+    // Local-only mission: the step objective decides, not Bunny's boilerplate.
+    const local = env.missions.create({ objective: "Local", mode: "fast", origin: "workstation", localOnly: true, steps: [model("Writer", "Write two sentences about unit tests"), model("Reader", "Read the README file and list its headings")] });
+    env.missions.approve(local.id, "workstation");
+    await until(() => env.launched.length === 2 && env.missions.store.steps(local.id).some((s) => s.state === "failed"), "local text launch and file step refusal");
+    assert.equal(env.launched[1].task.provider, "ollama", "a local-only text step can use the local text-only model");
+    assert.equal(env.launched[1].task.constraints?.requiresFilesystem, false);
+    const reader = env.missions.store.steps(local.id).find((s) => s.role === "Reader")!;
+    assert.equal(reader.failure?.category, "provider_unavailable", "file work stays impossible without a local filesystem-capable agent (fails closed)");
+    env.launched[1].finish({ ok: true, output: "two sentences" });
+    const direct = env.tasks.submit({ prompt: "Write two sentences about unit tests", mode: "fast" });
+    assert.equal(direct.routingPrompt, undefined, "direct tasks are unchanged");
+  } finally { await env.cleanup(); }
+});
+test("MA1: Ollama locality is per model: local-only missions get a local model; a cloud-hosted tag is never launched as local", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "bunny-ma1-ollama-"));
+  const root = join(dir, "project"); mkdirSync(root);
+  const db = new HostDatabase(join(dir, "host.sqlite"));
+  const launched: Launched[] = [];
+  const base = fakeAdapter("ollama", launched);
+  // As observed on the M-A-1 workstation: the first installed tag proxies to ollama.com.
+  const ollama: ProviderAdapter = { ...base, detect: async () => ({ ...ready("ollama"), current_model: "deepseek-v4.1-flash:cloud", models: ["deepseek-v4.1-flash:cloud", "qwen2.5-coder:7b"], remoteModels: ["deepseek-v4.1-flash:cloud"] }) };
+  const tasks = new TaskManager(db, root, [ollama], { modelRegistry: new ModelCapabilityRegistry(db, { availableProviders: () => [] }) });
+  await tasks.discover();
+  const missions = new MissionManager(tasks, { dataDirectory: dir, adapters: [] });
+  missions.configure({ enabled: true }, "test");
+  try {
+    const local = missions.create({ objective: "Summarize", mode: "fast", origin: "workstation", localOnly: true, steps: [model("Writer", "Summarize hello")] });
+    missions.approve(local.id, "workstation");
+    await until(() => launched.length === 1, "local launch");
+    assert.equal(launched[0].task.model, "qwen2.5-coder:7b", "a local-only envelope never launches a cloud-hosted tag");
+    launched[0].finish({ ok: true, output: "hello" });
+    await until(() => missions.mission(local.id).state === "completed", "local completion");
+    assert.equal(missions.mission(local.id).accounting.localModelCalls, 1);
+    assert.equal(missions.mission(local.id).accounting.externalModelCalls, 0);
+
+    // A non-local agent step needs a filesystem-capable provider, so text-only Ollama (and its cloud tag) is never launched.
+    const open = missions.create({ objective: "Summarize", mode: "fast", origin: "workstation", providers: ["ollama"], steps: [model("Writer", "Summarize hello")] });
+    missions.approve(open.id, "workstation");
+    await until(() => missions.store.steps(open.id)[0].state === "failed", "open step refused");
+    assert.equal(missions.store.steps(open.id)[0].failure?.category, "provider_unavailable");
+    assert.equal(launched.length, 1, "the cloud-hosted tag was never launched");
+    // Per-model accounting itself: the same provider counts as external for its cloud tag.
+    const live = tasks.live().find((p) => p.id === "ollama")!;
+    assert.equal(runsLocally(live, "deepseek-v4.1-flash:cloud"), false);
+    assert.equal(runsLocally(live, "qwen2.5-coder:7b"), true);
+  } finally { await missions.close(); db.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 test("recovery after a Host restart: interrupted steps are reported, never resumed; retry starts a fresh child", async () => {
   const first = await setup();
@@ -751,5 +888,20 @@ test("MA0R migration: old mission JSON stays byte-identical and missing provider
       } finally { db.close(); }
     }
     assert.equal(env.launched.length, 0, "migration starts no provider");
+  } finally { await env.cleanup(); }
+});
+test("MA1: a direct task's approval item leaves the inbox once the task is approved or stopped", async () => {
+  const env = await setup();
+  try {
+    const open = (taskId: string) => env.missions.inbox.recent().filter((e) => e.taskId === taskId && e.kind === "requires_approval" && !e.acknowledgedAt);
+    const approved = env.tasks.submit({ prompt: "Direct task to approve", mode: "fast" });
+    assert.equal(open(approved.id).length, 1, "a waiting direct task asks the user");
+    env.tasks.approve(approved.id, "workstation");
+    assert.equal(open(approved.id).length, 0, "approval answers the item");
+    const stopped = env.tasks.submit({ prompt: "Direct task to stop", mode: "fast" });
+    assert.equal(open(stopped.id).length, 1);
+    await env.tasks.stop(stopped.id);
+    assert.equal(open(stopped.id).length, 0, "a task that ended no longer needs approval");
+    env.launched.forEach((run) => run.finish({ ok: true, output: "done" }));
   } finally { await env.cleanup(); }
 });

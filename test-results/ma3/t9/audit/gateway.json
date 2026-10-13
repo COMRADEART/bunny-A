@@ -1,0 +1,235 @@
+{
+  "subsystem": "Gateway, transport and tunnel (src/lib/orch/host-bridge.server.ts, src/lib/orch/host.ts, src/routes/api/bunny-pair.ts, src/routes/api/bunny-events.ts, install/Bunny-Server.mjs, install/manifest.mjs, install/Start-Bunny-Release.ps1, install/Bunny-State.ps1, scripts/bunny-tunnel*.mjs, vite.config.ts, server/middleware/grok-pwa.ts, scripts/grok-pwa-*.mjs)",
+  "capabilities": [
+    {
+      "name": "How the production gateway is launched (process, port, bind address)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "install/Start-Bunny-Release.ps1:69-97 (starts runtime\\node.exe on <package>\\Bunny-Server.mjs, hidden window, logs/gateway.log, waits on http://127.0.0.1:8084/bunny-health, checks pid/root identity); install/Bunny-Server.mjs:38 server.listen(8084,\"127.0.0.1\"); :24 imports .output/server/index.mjs (Nitro node-middleware preset, vite.config.ts:175-176 when JEV_DESKTOP_BUILD=1, set by scripts/package-bunny-desktop.ps1:62-64); logon shortcut runs Start-Bunny-Release.ps1 (scripts/install-bunny-release.ps1:204-212). Live: MA2_T6_REMOTE_ACCEPTANCE.md:82 (cloudflared targets only 127.0.0.1:8084) and test-results/ma2-gate6r/*.json",
+      "detail": "One Node process (bundled node.exe) serving Bunny-Server.mjs on 127.0.0.1:8084, plain HTTP, started at Windows logon by the Startup shortcut, or by Launch-Bunny-A.cmd/ps1. It runs only when settings/deployment.json exists and -NoGateway is not passed. It wraps the Nitro node-middleware handler with requestAllowed (Host/Origin/Sec-Fetch) and answers /bunny-health and the manifest itself. Live evidence comes from the MA2 T6R release only. Production is still v26-MA2-R1 (MA3_T8_PREMIUM_UI_ACCEPTANCE.md:3, no production install), so the T8 source (the SSE route, the premium shell) is not running in production."
+    },
+    {
+      "name": "BUNNY_REMOTE_ORIGIN derivation",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "install/Bunny-Server.mjs:11-18 remoteOrigins() runs on every request (:26), reads BUNNY_REMOTE_CONFIG (= <state>\\settings\\remote.json, install/Bunny-State.ps1:67), sets process.env.BUNNY_REMOTE_ORIGIN=new URL(config.url).origin or deletes it; remote.json is written by the tunnel worker only after cloudflared reports a registered connection (scripts/bunny-tunnel.mjs:47-56) and removed on exit or stale reconcile (:60-64, :76-84). Only setter in repo besides tests: install/Bunny-Server.mjs:15. Dev launchers never set it (scripts/start-bunny-dev.ps1:1-6).",
+      "detail": "Remote acceptance is re-evaluated per request, so deleting remote.json or rotating the tunnel turns off the old origin at once (an old Host header is refused 403 by requestAllowed). No unit test covers Bunny-Server.mjs. allowedOrigins (install/manifest.mjs:18-28) is unit tested via scripts/desktop-install.test.mjs:15-23. In dev, BUNNY_REMOTE_ORIGIN is unset, so the remote branch always throws 'Remote gateway is not configured' (host-bridge.server.ts:40)."
+    },
+    {
+      "name": "Tunnel start: automatic vs manual",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "install/Start-Bunny-Release.ps1:98-117: at every launcher run (including logon shortcut) the tunnel worker scripts\\bunny-tunnel.mjs is started automatically IF settings\\remote-consent.json exists with enabled=true and provider='Cloudflare', the gateway is ready, -NoRemote is absent and the cloudflared SHA-256 matches; otherwise 'remote.skipped' is logged. remote-consent.json is only written by migration (scripts/bunny-state-migration.mjs:117); no UI/command writes it (grep).",
+      "detail": "Autostart is conditional and consent-gated. Turning remote on or off has no in-product control: someone has to edit the consent file. The worker is bounded to 3 attempts with 10s/20s backoff (scripts/bunny-tunnel-worker.mjs:39,198-207), then exits code 2 and needs an explicit relaunch (scripts/bunny-tunnel.mjs:107)."
+    },
+    {
+      "name": "Quick-tunnel address parsing/publication and supervisor health restarts",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "scripts/bunny-tunnel-state.mjs:3-60; scripts/bunny-tunnel-worker.mjs:25-210; tests in scripts/bunny-tunnel.test.mjs: 'Cloudflare API errors and documentation are never public companion URLs' (:13), 'quick tunnel publishing requires both actual announcement and registered connection' (:20), 'chunked cloudflared output stays unavailable...' (:27), 'candidate tunnel target is loopback-only...' (:45), 'startup decisions reconcile a dead worker's stale publication and refuse a live duplicate' (:62), 'zero active edge connections sustained...' (:124), 'edge-connection churn...' (:161), 'sustained public failures reach the streak floor...' (:199), 'a degradation-triggered child exit still counts against the bounded attempt budget' (:246)",
+      "detail": "cloudflared runs as 'tunnel --no-autoupdate --url http://127.0.0.1:8084 --protocol http2' (scripts/bunny-tunnel.mjs:42). The target must be an HTTP loopback origin with an explicit port (bunny-tunnel-state.mjs:50-59)."
+    },
+    {
+      "name": "Named (stable hostname) tunnel",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "scripts/bunny-tunnel.mjs:29-38,42 ('tunnel --config <file> run'); only readyTunnelAddress is tested (scripts/bunny-tunnel.test.mjs:40 'named tunnels retain their configured origin and wait for registration'); BUNNY_REMOTE.md:50 'Named mode has not been activated or tested against a real account/domain here.'",
+      "detail": "The code exists but has no live validation. A stable hostname is the only way to avoid re-pairing after each tunnel restart."
+    },
+    {
+      "name": "LAN / local-network HTTPS transport",
+      "classification": "UNSUPPORTED",
+      "evidence": "Repo-wide: no node:https/node:tls/createSecureServer (grep). Listeners: install/Bunny-Server.mjs:38 (127.0.0.1:8084), src/lib/bunny-host/http.server.ts:645 (127.0.0.1:<hostPort>), install/server.mjs:40 (JEV 127.0.0.1:8082), scripts/preview-node-middleware.mjs:13 and vite.config.ts:155-157 (127.0.0.1:8081).",
+      "detail": "The only path to a phone is Cloudflare (quick tunnel by default). Nothing serves HTTPS on the LAN."
+    },
+    {
+      "name": "Non-loopback binding anywhere",
+      "classification": "PARTIAL",
+      "evidence": "vite.config.ts:148-153 server.host '0.0.0.0', port 8080 (Vite dev only, started by scripts/start-bunny-dev.ps1:6 'npm run dev'); every installed/production listener binds 127.0.0.1 (see above).",
+      "detail": "Only the source-development Vite server binds all interfaces. On the installed layout nothing is reachable from the LAN. The dev exposure is listed under gaps."
+    },
+    {
+      "name": "TLS termination location",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "scripts/bunny-tunnel.mjs:1-2,42 (outbound tunnel; origin http://127.0.0.1:8084); host-bridge.server.ts:30 derives https only from x-forwarded-proto; srvx node adapter builds request.url with protocol http unless socket.encrypted or trustProxy (node_modules/srvx/dist/adapters/node.mjs:126-135); built entry uses toNodeHandler(nitroApp.fetch) with no trustProxy (.output/server/index.mjs).",
+      "detail": "TLS from the phone ends at the Cloudflare edge. The edge-to-cloudflared hop is TLS (http2). The cloudflared-to-gateway and gateway-to-Host hops are plaintext loopback. Cloudflare can see the bunny_device cookie and all remote traffic in plaintext; this trust dependency is inherent to the design."
+    },
+    {
+      "name": "Workstation vs paired-device decision (authorizeBridge)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "src/lib/orch/host-bridge.server.ts:23-43; tests src/lib/orch/host-bridge.server.test.ts: 'workstation access requires a loopback peer, not just a loopback Host header' (:7), 'proxied requests cannot borrow workstation authentication' (:13), 'non-loopback hosts never get workstation access' (:16); live test-results/ma2-gate6r/forwarded-header-tests.json (forwarded-local-unpaired / forwarded-local-admin denied)",
+      "detail": "Local means a loopback Host header plus a loopback TCP peer (getRequestIP without trusting XFF) plus none of cf-connecting-ip/cf-ray/x-forwarded-for/x-real-ip/forwarded/x-forwarded-proto=https. Remote means the effective origin equals the BUNNY_REMOTE_ORIGIN https origin; the token comes from the bunny_device cookie. Untested branches: Origin mismatch (:33), Sec-Fetch-Site (:32), x-forwarded-host on local (:35-36), x-forwarded-proto from a non-loopback peer (:30)."
+    },
+    {
+      "name": "CSRF / cross-site protection for createServerFn POSTs (readBunnyHost/commandBunnyHost)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "src/lib/orch/host.ts:7-37 both call hostRequest → authorizeBridge first (host-bridge.server.ts:52); authorizeBridge refuses Sec-Fetch-Site cross-site (:32) and Origin != effective origin (:33); install/Bunny-Server.mjs:27 + install/manifest.mjs:30-36 refuse unknown Host/X-Forwarded-Host, non-GET with foreign Origin, and cross-site Sec-Fetch-Site; cookie SameSite=Strict (src/routes/api/bunny-pair.ts:16). Tests: scripts/desktop-install.test.mjs 'desktop runtime refuses unknown hosts and cross-site writes' (:8) and 'remote runtime accepts only an explicitly configured HTTPS origin' (:15); live test-results/ma2-gate6r/csrf-origin-tests.json (cross-origin-read 403, cross-site-command 403, spoofed-origin-workstation 'Origin mismatch.').",
+      "detail": "TanStack's own CSRF middleware is not registered: there is no src/start.ts, and node_modules/@tanstack/start-server-core/dist/esm/createStartHandler.js:42-69 only warns in dev. Server functions also accept CORS-simple multipart/urlencoded bodies (server-functions-handler.js:11,43). Cross-site calls are therefore stopped only by the custom Origin/Sec-Fetch checks, plus SameSite=Strict for remote clients. Remote clients have three layers; workstation (cookie-less) has two: Origin and Sec-Fetch-Site. A non-POST method on these functions gets 405 (server-functions-handler.js:34-37)."
+    },
+    {
+      "name": "Device cookie attributes and lifetime",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "src/routes/api/bunny-pair.ts:16 'bunny_device=<token>; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000' + cache-control no-store; only issued on the remote branch (:10); live test-results/ma2-gate6r/token-leak-audit.json cookieBoundary {httpOnly,secure,sameSite:Strict}",
+      "detail": "The cookie is host-only (no Domain attribute) with a 1-year client lifetime and no __Host- prefix. Server side, the token never expires and is not bound to an origin: the devices table holds only id, name, token_hash, created_at, revoked_at (src/lib/bunny-host/persistence.server.ts:26). Revocation is workstation-only (http.server.ts:572-573)."
+    },
+    {
+      "name": "Pairing transport",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "src/routes/api/bunny-pair.ts:7-18 (length caps 100, forwards to Host /pair with x-bunny-pair-client=clientKey); Host: 96-bit code, 10-min expiry, single outstanding code (src/lib/bunny-host/http.server.ts:559-562), per-client 5/10min + global 100/10min limiter (:318-319,:333-348); code only creatable locally (:560). Live test-results/ma2-gate6r/pairing-abuse.json (5x 403 then 429).",
+      "detail": "The code travels in the POST body, never in a URL. clientKey prefers cf-connecting-ip (host-bridge.server.ts:46-49), which the Cloudflare edge sets."
+    },
+    {
+      "name": "Remote supervision/control pass-through (view state; approve/stop; Agent pause/resume/authorization)",
+      "classification": "PARTIAL",
+      "evidence": "src/lib/orch/host.ts:7-37 forwards every action string unchanged to Host /command with the device bearer (host-bridge.server.ts:57-59); Host enforces device rights (http.server.ts:396-416: remote agent graphs refused, agent.authorization.* limited to {id,revision}); dashboardCommand returns only snapshot/pairCode/task/mission, plus data for project.* actions (src/lib/bunny-host/presentation.ts:581-596). Live remote task approve and stop: MA2_T6_REMOTE_ACCEPTANCE.md:45,280.",
+      "detail": "The gateway adds no authority of its own, which is correct for 'no second authority'. Remote task approve and stop were verified live at MA2. Remote Agent Pause/Resume/Stop and authorization answers through the gateway have never been exercised remotely; T8 explicitly lists physical phone as NOT TESTED (MA3_T8_PREMIUM_UI_ACCEPTANCE.md:25,35). Command responses drop `data` for agent.get, inbox.list, capability.list and similar actions, so the phone sees Agents only through the snapshot."
+    },
+    {
+      "name": "CORS headers",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "No access-control-* header anywhere in src/install/server/scripts (grep). Installed gateway emits none. Vite dev adds cors with default origin regex for localhost/127.0.0.1/[::1] (node_modules/vite/dist/node/chunks/node.js:781,24874-24875,24986). Live cross-origin-read denied (csrf-origin-tests.json).",
+      "detail": "Installed: no CORS, so cross-origin reads are opaque. Dev: localhost origins get ACAO without credentials; authorizeBridge's Origin equality check still refuses them (same-site localhost:3000 is not blocked by Sec-Fetch-Site, only by Origin)."
+    },
+    {
+      "name": "Security response headers (CSP, HSTS, X-Frame-Options/frame-ancestors, Referrer-Policy, nosniff)",
+      "classification": "UNSUPPORTED",
+      "evidence": "grep over src/install/server/scripts finds only 'x-content-type-options: nosniff' on Host JSON (src/lib/bunny-host/http.server.ts:125), which is not browser-facing; install/Bunny-Server.mjs:25-32 and server/middleware/grok-pwa.ts:63-111 set none; src/routes/__root.tsx:8-45 has no CSP meta; .output/server/index.mjs contains none.",
+      "detail": "The gateway pages browsers load have no CSP, HSTS, frame-ancestors, X-Frame-Options or Referrer-Policy (browser default strict-origin-when-cross-origin applies). See the clickjacking and third-party-script gaps."
+    },
+    {
+      "name": "Credentials kept out of URLs/logs",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "Device token only in HttpOnly cookie (bunny-pair.ts:16) and forwarded as Authorization to loopback Host (host-bridge.server.ts:59; bunny-events.ts:45-48); SSE cursor ?after=N is the only query value (host-stream.ts:38); pairing code only in POST body (phone.tsx:308-312); Host redacts device tokens via registerDiagnosticSecret (http.server.ts:332,342); gateway does no request logging (Bunny-Server.mjs:25-36). Live token-leak-audit.json: masterCredentialLogged=false, masterCredentialInPhoneUrl=false.",
+      "detail": "tunnel.log records the quick-tunnel hostname (cloudflared output, Start-Bunny-Release.ps1:113). That is an entry point, not a credential. TanStack logs 'Server Fn Error!' with error messages only."
+    },
+    {
+      "name": "SSE bridge (local) and through Cloudflare quick tunnel; client fallback",
+      "classification": "PARTIAL",
+      "evidence": "src/routes/api/bunny-events.ts:11-74 (auth, 5s connect timeout, signal-only re-encode); src/lib/bunny-host/event-signal.ts:2-65; tests src/components/island/premium-model.test.ts 'T8: SSE signal redacts prompt, tokens, cookies and raw details' (:187), 'T8: invalid SSE cursors never become replay identifiers' (:200), 'T8: chunked SSE signal survives multibyte private text and closes exactly once' (:205), 'T8: client cancellation cancels upstream...' (:224), 'T8: overlong event refuses...' (:237). Quick tunnel: MA2_T6_REMOTE_ACCEPTANCE.md:85-88 and test-results/ma2-gate6r/sse-reconnect.json ('Quick tunnels do not support SSE'; transport 'Authenticated HTTPS polling'). Client: src/components/island/host-stream.ts:28-54; shell src/components/island/premium.tsx:60 (workspace.tsx:1 exports premium).",
+      "detail": "The local bridge is unit tested. SSE through a quick tunnel is unsupported by Cloudflare. T6 passed only because the old shell polled every 1.5s (src/components/island/desktop.tsx:63-74). The T8 premium shell no longer polls. It refreshes only on SSE messages, on SSE onerror (refresh plus a reconnect after 3s, host-stream.ts:44-50), and on a 30s timer (host-stream.ts:54). If Cloudflare buffers the stream instead of erroring, the phone can be up to ~30s stale. Remote T8 behaviour has never been tested."
+    },
+    {
+      "name": "Rate limiting at the gateway",
+      "classification": "UNSUPPORTED",
+      "evidence": "No limiter in install/Bunny-Server.mjs, host-bridge.server.ts, host.ts or bunny-events.ts; only Host pairing limiter (http.server.ts:318-319,336).",
+      "detail": "Paired devices can send unlimited commands and snapshot reads. Unpaired callers are rejected cheaply: 'Pair this device' from the server functions, and 401 from bunny-events before any upstream connect (bunny-events.ts:33-34)."
+    },
+    {
+      "name": "x-forwarded-proto handling on direct non-loopback connections",
+      "classification": "PARTIAL",
+      "evidence": "src/lib/orch/host-bridge.server.ts:30 (header trusted whenever !local, regardless of TCP peer), :40 (only checks equality with BUNNY_REMOTE_ORIGIN); Vite 8.3.1 host validation node_modules/vite/dist/node/chunks/node.js:16832-16846,24876-24877 (non-IP, non-localhost Host → 403; vite.config.ts sets no server.allowedHosts); installed bind 127.0.0.1 (Bunny-Server.mjs:38). No unit test for this case (host-bridge.server.test.ts:16-22 only uses a loopback peer).",
+      "detail": "In code, a non-loopback peer that sends 'x-forwarded-proto: https' with Host equal to the remote host is treated as the HTTPS remote origin over plaintext. Dev: not reachable, because Vite rejects 'Host: *.trycloudflare.com' and BUNNY_REMOTE_ORIGIN is unset. Installed: LAN peers cannot connect at all. In both layouts the forged request still needs a valid bunny_device token (host-bridge.server.ts:41; hostRequest :57-58), and browsers will not send the Secure cookie over HTTP. Result: no privilege escalation; a defence-in-depth weakness only."
+    },
+    {
+      "name": "PWA manifest / service worker / caching",
+      "classification": "PARTIAL",
+      "evidence": "install/manifest.mjs:1-16 desktopManifest (display standalone, start_url '/', icons /bunny-icon-192.png and -512.png) served by install/Bunny-Server.mjs:30 (no cache-control); src/routes/__root.tsx:24-25 links manifest and apple-touch-icon; test scripts/desktop-install.test.mjs:24-27 'Android manifest supplies standalone display and both required icon sizes'. No navigator.serviceWorker/workbox/caches anywhere (only Playwright serviceWorkers:'block' in src/lib/bunny-missions/capabilities/browser.server.ts:77).",
+      "detail": "The app is installable but has no service worker. Nothing is cached offline, and there is no Web Push. Notifications are in-page `new Notification` only (src/store/use-island.ts:366-369) and fire only while the page is open (BUNNY_REMOTE.md:50 'does not provide Android background push')."
+    },
+    {
+      "name": "Control-origin HTML free of third-party script",
+      "classification": "UNSAFE_OR_BLOCKED",
+      "evidence": "scripts/grok-pwa-shared.mjs:203 GROK_EXTENSIONS_SCRIPT_SRC='https://grok.com/grok-app-builder/extensions.js', :210-213 enabled unless runtime env VITE_GROK_EXTENSIONS==='0', :236-249,:464-465 injected into every HTML head; server/middleware/grok-pwa.ts:99-109 streams injection; vite.config.ts:186 serverDir './server' for desktop build too; built bundle .output/server/index.mjs has 'globalMiddleware = [toEventHandler(static_default), toEventHandler(grokPwaMiddleware)]' and reads process.env?.VITE_GROK_EXTENSIONS at runtime; no launcher sets it (install/Bunny-State.ps1:62-74, install/Start-Bunny-Release.ps1:47-49). T6 token-leak-audit.json checked only token visibility.",
+      "detail": "Unless the user's environment happens to set VITE_GROK_EXTENSIONS=0 (production env not inspected), every Bunny-A HTML page, on both 127.0.0.1:8084 and the tunnel origin, loads a third-party script with full same-origin privileges. This is statically verified only."
+    }
+  ],
+  "gaps": [
+    {
+      "id": "GW-1",
+      "severity": "HIGH",
+      "title": "Third-party script (grok.com extensions.js) runs on the remote-control and workstation origins",
+      "detail": "Scenario: the phone opens https://<quick>.trycloudflare.com/ (or the owner opens http://127.0.0.1:8084/). install/Bunny-Server.mjs:31 hands the request to Nitro. grokPwaMiddleware (server/middleware/grok-pwa.ts:99-109) injects <script src=\"https://grok.com/grok-app-builder/extensions.js\" defer> (scripts/grok-pwa-shared.mjs:236-249,464-465) because VITE_GROK_EXTENSIONS is not '0' in the gateway environment, and no launcher sets it (install/Bunny-State.ps1:62-74). With no CSP, that script can same-origin fetch the TanStack server functions; the browser attaches the HttpOnly bunny_device cookie automatically. It can approve/stop/submit with device rights on the phone. On the workstation it gets master authority: commandBunnyHost('pairing.create') returns pairCode to the page (http.server.ts:559-562, presentation.ts:590), which the script could exfiltrate to pair a foreign device through the tunnel. Loading the script also leaks the tunnel hostname to grok.com via Referer.",
+      "suggestedMinimalFix": "Set $env:VITE_GROK_EXTENSIONS='0' in Set-BunnyStateEnvironment (install/Bunny-State.ps1:62-74) for the installed gateway, which the runtime check at scripts/grok-pwa-shared.mjs:210-213 already honors. Add a desktop-package test asserting rendered HTML has no external <script src>. This needs the owner's sign-off: AGENTS.md rules 2/4 protect the banner for the Grok sandbox deployment, and the installed Windows product is a different deployment."
+    },
+    {
+      "id": "GW-2",
+      "severity": "HIGH",
+      "title": "T8 shell over a quick tunnel has no fast refresh fallback (SSE unsupported); approvals can be ~30s stale",
+      "detail": "Scenario: a paired phone on https://<quick>.trycloudflare.com runs the premium shell (premium.tsx:60), which opens EventSource('/api/bunny-events?after=N') (host-stream.ts:38). Cloudflare quick tunnels do not support SSE (MA2_T6_REMOTE_ACCEPTANCE.md:85-88; test-results/ma2-gate6r/sse-reconnect.json). If the stream is buffered rather than errored, onopen and onerror never fire. The only refresh is then the 30s invalidate timer (host-stream.ts:54), so a new Host-offered approval or an Agent pause/stop can appear up to 30s late, and the hung stream holds a Host SSE subscriber. If it errors instead, the client loops at 3s with no backoff (host-stream.ts:44-50). T6 passed only with the retired 1.5s polling shell (desktop.tsx:63-74). The T8 remote behavior is untested.",
+      "suggestedMinimalFix": "In host-stream.ts, if onopen has not fired within ~5s, or the origin is not loopback, close the EventSource and fall back to the existing refreshOllama() on a 2-3s timer while streamStatus !== 'live'. Alternatively, activate the existing named-tunnel mode (scripts/bunny-tunnel.mjs:29-38), which supports streaming. Verify live through the real tunnel."
+    },
+    {
+      "id": "GW-3",
+      "severity": "MEDIUM",
+      "title": "Quick-tunnel hostname rotation forces re-pairing at the workstation and leaves old device tokens valid forever",
+      "detail": "Scenario: the PC reboots or the tunnel worker restarts (bounded retries, scripts/bunny-tunnel-worker.mjs:39). cloudflared gets a new random hostname and remote.json is rewritten (bunny-tunnel.mjs:54). The phone's host-only cookie belongs to the old host, so the phone shows 'Pair this device'. Pairing needs a code created on the workstation (http.server.ts:560), so remote supervision cannot be restored remotely (BUNNY_REMOTE.md:48). The old device row stays unrevoked with no expiry (persistence.server.ts:26), so anyone holding an old token can still use it against the new origin by sending 'Cookie: bunny_device=<old>'.",
+      "suggestedMinimalFix": "Prefer the already-implemented named tunnel for T9. Minimally, add last_used_at plus an expiry or idle-timeout check to the existing device lookup (http.server.ts:331), and offer a workstation 'revoke stale devices' action that reuses device.revoke (http.server.ts:572-577)."
+    },
+    {
+      "id": "GW-4",
+      "severity": "MEDIUM",
+      "title": "Any local process gets workstation (master) authority through the gateway without any credential",
+      "detail": "Scenario: an Agent-launched CLI or any same-user process sends POST http://127.0.0.1:8084/_serverFn/<commandBunnyHost id> with Host 127.0.0.1:8084, no Origin and no proxy headers. requestAllowed passes because there is no Origin (install/manifest.mjs:34). authorizeBridge returns local:true (host-bridge.server.ts:25-38), and hostRequest substitutes the master token (:57). The process can then self-approve, answer agent.authorization.*, issue pairing.create, remote.configure and device.revoke. This is equivalent to the existing exposure of credentials.json, whose mode 0o600 has no effect on Windows (http.server.ts:647-651), but it does not even require a file read. Only the browser capability blocks loopback (browser.server.ts:77); CLI adapters are not shown to be blocked.",
+      "suggestedMinimalFix": "Require a workstation session secret in addition to the loopback peer. Example: the Island/launcher opens the dashboard with a one-time code redeemed into an HttpOnly SameSite=Strict workstation cookie, using the same mechanism as bunny-pair. Also restrict loopback/8084 egress for adapter processes (cross-subsystem)."
+    },
+    {
+      "id": "GW-5",
+      "severity": "MEDIUM",
+      "title": "Workstation dashboard can be framed (no frame-ancestors / X-Frame-Options), enabling clickjacking of approvals",
+      "detail": "Scenario: a page the owner visits embeds <iframe src=\"http://127.0.0.1:8084/?view=agentic&agent=<id>\">. Workstation auth needs no cookie, and requests from inside the frame are same-origin (Origin http://127.0.0.1:8084, Sec-Fetch-Site same-origin), so host-bridge.server.ts:32-33 pass. The framed UI is fully authorized and the user can be tricked into clicking Approve or Resume. No anti-framing header exists anywhere (grep), including in Bunny-Server.mjs:25-32. Whether it works depends on the browser: Chrome Local/Private Network Access may block public-to-loopback frames. Remote origins are mitigated because SameSite=Strict withholds the cookie in cross-site frames, assuming trycloudflare.com is on the Public Suffix List (not verifiable from the repo).",
+      "suggestedMinimalFix": "In install/Bunny-Server.mjs handler, before calling middleware, set 'Content-Security-Policy: frame-ancestors 'none'' (or 'X-Frame-Options: DENY') plus 'Referrer-Policy: no-referrer' on every response. This does not block grok.com scripts, so it does not touch the AGENTS.md CSP rule."
+    },
+    {
+      "id": "GW-6",
+      "severity": "MEDIUM",
+      "title": "Dev server on 0.0.0.0:8080 exposes repository files and dev endpoints to the LAN",
+      "detail": "Scenario (source development only): a LAN client requests http://<workstation-ip>:8080/test-results/ma2-gate6r/forwarded-header-tests.json or any non-.html file under the repo root. Vite's static middleware serves the project root (node_modules/vite/dist/node/chunks/node.js:17795-17823, registered at :24903), and IP Host headers are allowed (:16842). This exposes source, reports and evidence containing tunnel hostnames, and /__open-in-editor (:24889) is reachable. Bunny authority itself is refused: a loopback Host from a LAN peer throws (host-bridge.server.ts:27), and the remote branch throws because BUNNY_REMOTE_ORIGIN is unset (:40). Dev Host credentials live outside the repo (state-paths.server.ts:9-11).",
+      "suggestedMinimalFix": "On Windows source development, bind Vite to 127.0.0.1, e.g. honor an env override in vite.config.ts server.host. Keep 0.0.0.0 only for the Linux sandbox contract."
+    },
+    {
+      "id": "GW-7",
+      "severity": "LOW",
+      "title": "x-forwarded-proto trusted from non-loopback peers in authorizeBridge",
+      "detail": "host-bridge.server.ts:30 upgrades the effective origin to https for any non-local request carrying 'x-forwarded-proto: https', even when the TCP peer is a LAN address. It is not exploitable in the installed layout (127.0.0.1 bind, Bunny-Server.mjs:38) or in dev (Vite host check plus unset BUNNY_REMOTE_ORIGIN), and the request still needs a valid device token. If a developer sets BUNNY_REMOTE_ORIGIN and server.allowedHosts, a LAN client could pair over plaintext, putting the code and the returned token on the LAN. No unit test covers it.",
+      "suggestedMinimalFix": "In authorizeBridge, require loopbackPeer for the remote branch too (the only legitimate remote hop is cloudflared on loopback), e.g. `if (!local && !loopbackPeer) throw`. Add a host-bridge test with xfp https and peer 192.168.1.50."
+    },
+    {
+      "id": "GW-8",
+      "severity": "LOW",
+      "title": "Global pairing limiter can be exhausted by internet clients (pairing DoS)",
+      "detail": "Anyone who knows the tunnel URL can send bad codes from 20 or more IPs (5 each per clientKey = cf-connecting-ip). That trips globalAttempts (100/10min, http.server.ts:319,336), and legitimate pairing returns 429 for up to 10 minutes, repeatedly.",
+      "suggestedMinimalFix": "Only count failures toward the global limiter while a pairing code is outstanding. Or reset globalAttempts when the workstation issues pairing.create (http.server.ts:559-562)."
+    },
+    {
+      "id": "GW-9",
+      "severity": "LOW",
+      "title": "Local dashboard availability coupled to remote.json validity; non-atomic write",
+      "detail": "Bunny-Server.mjs:26 calls remoteOrigins() before every request, local ones included. A malformed or partially written remote.json (bunny-tunnel.mjs:54 uses plain writeFileSync), or a non-https url, makes JSON.parse or allowedOrigins throw (manifest.mjs:22-24). Every request, including the local 127.0.0.1:8084 dashboard, then returns 500 until the file is fixed.",
+      "suggestedMinimalFix": "Write remote.json with temp-file plus rename (as Write-BunnyJson does, Bunny-State.ps1:75-79). In remoteOrigins, catch parse errors and fall back to loopback-only origins."
+    },
+    {
+      "id": "GW-10",
+      "severity": "LOW",
+      "title": "No gateway-level rate limiting or backoff for paired/revoked clients",
+      "detail": "A revoked phone keeps calling readBunnyHost and opening EventSource every 3s indefinitely (host-stream.ts:28-50; bunny-events.ts:52-57 returns 401). A paired device can send unbounded commands. Quick tunnels also cap concurrent requests, so one client can starve the others.",
+      "suggestedMinimalFix": "Exponential backoff in host-stream.ts when pairingRequired is true. Reuse FailureLimiter (http.server.ts:66) per device id for /command."
+    },
+    {
+      "id": "GW-11",
+      "severity": "INFO",
+      "title": "BUNNY_REMOTE.md operational instructions are stale",
+      "detail": "BUNNY_REMOTE.md:46 tells operators to run scripts/start-bunny-remote.ps1, which now throws (scripts/start-bunny-remote.ps1:2). BUNNY_REMOTE.md:9-12,34 reference .bunny-a/tools and .bunny-a/tunnel.json, but the installed paths are <state>/cloudflared/cloudflared.exe and <state>/settings/tunnel.json (scripts/bunny-tunnel-paths.mjs:14-16).",
+      "suggestedMinimalFix": "Update the doc to Start-Bunny-Release.ps1 and the installed state paths."
+    },
+    {
+      "id": "GW-12",
+      "severity": "INFO",
+      "title": "Command responses drop Host `data` for non-project actions",
+      "detail": "dashboardCommand (presentation.ts:589) forwards result.data only for project.* actions. Responses to agent.get, inbox.list, capability.list, session.get and similar commands sent from the phone carry no detail; the UI must rely on snapshot.agents/missions.",
+      "suggestedMinimalFix": "If T9 needs per-Agent detail on demand, extend the allow-list in presentation.ts:589 to the read-only agent/inbox actions already in Host safeActions (http.server.ts:384-395)."
+    }
+  ],
+  "keyFacts": [
+    "Production gateway: one node.exe process running <package>\\Bunny-Server.mjs, listening on 127.0.0.1:8084 over plain HTTP. Start-Bunny-Release.ps1 starts it (install/Start-Bunny-Release.ps1:69-97), from the Windows Startup shortcut (scripts/install-bunny-release.ps1:204-212) or Launch-Bunny-A.cmd.",
+    "Host API: 127.0.0.1:<hostPort, default 43119> (http.server.ts:645; Start-Bunny-Release.ps1:17). It rejects any Origin header and any non-loopback Host header (http.server.ts:321-325).",
+    "The only non-loopback bind in the repo is the source-dev Vite server on 0.0.0.0:8080 (vite.config.ts:150-151). No LAN or HTTPS listener exists anywhere.",
+    "BUNNY_REMOTE_ORIGIN is set only by install/Bunny-Server.mjs:15. It is recomputed on every request from <state>\\settings\\remote.json, which the tunnel worker writes after cloudflared registers and removes on exit. Dev launchers never set it, so remote access is always refused in dev.",
+    "The tunnel starts automatically at every launcher run (including logon) only if settings\\remote-consent.json says enabled=true and provider=Cloudflare. Nothing in the product UI writes that file (Start-Bunny-Release.ps1:98-117).",
+    "TLS terminates at the Cloudflare edge. cloudflared to 127.0.0.1:8084 and gateway to Host are plaintext loopback. The srvx node adapter does not trust proxies (no trustProxy option), so request.url is http and getRequestIP is the socket address.",
+    "Cookie: bunny_device=<32-byte base64url>; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000. Host-only, no __Host- prefix. No server-side expiry or origin binding.",
+    "TanStack's built-in CSRF middleware is not registered (no src/start.ts). CSRF defence is custom: authorizeBridge Origin equality plus Sec-Fetch-Site != cross-site, Bunny-Server requestAllowed, and SameSite=Strict. Live T6R evidence shows cross-site and spoofed-origin requests denied.",
+    "No CSP, HSTS, X-Frame-Options/frame-ancestors or Referrer-Policy on any browser-facing response. The installed gateway sends no CORS headers; Vite dev reflects localhost origins.",
+    "There is no rate limiting at the gateway. Pairing is limited at the Host: 5 per client and 100 globally per 10 minutes, keyed on cf-connecting-ip.",
+    "SSE: /api/bunny-events forwards sequence-only signals and is unit tested (premium-model.test.ts). Cloudflare quick tunnels do not support SSE (T6). The T8 premium shell refreshes only on SSE events, on SSE error (about every 3s) and on a 30s timer; the 1.5s polling loop that T6 accepted is gone. Remote T8 behaviour is untested.",
+    "x-forwarded-proto spoofing is possible in code but not exploitable as installed. The gateway binds loopback only, and Vite 8.3.1 host validation plus the unset BUNNY_REMOTE_ORIGIN block it in dev. It never removes the device-token requirement.",
+    "Any local process presenting Host 127.0.0.1:8084 with no Origin and no proxy headers gets master-token workstation authority through the gateway.",
+    "No service worker, offline cache or Web Push. The manifest is install/manifest.mjs desktopManifest, served by Bunny-Server.mjs:30.",
+    "The installed gateway injects https://grok.com/grok-app-builder/extensions.js into every HTML page unless the runtime env VITE_GROK_EXTENSIONS=0, and no launcher sets it.",
+    "Production runs v26-MA2-R1 (MA3_T8 acceptance: no production install). The T8 SSE route and premium shell exist only in source and test packages."
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "gate": "M-A-2 T9R",
+  "release": "Bunny-A-Windows-v20-T9",
+  "ok": true,
+  "productDuplicateReproduced": true,
+  "missionId": "71cd4bc3-bfac-4e23-a23f-f064edfc2ece",
+  "approvalRequestId": "d353c4f4-99b3-4c1a-a2da-c8d078cfc01d",
+  "offer": {
+    "actions": [
+      "computer.open_app"
+    ],
+    "counts": {
+      "computer.open_app": 2
+    },
+    "maxActions": 4,
+    "ttlMs": 120000,
+    "riskCeiling": "EXECUTE",
+    "targetLabel": "Calculator",
+    "target": {
+      "app": "calculator",
+      "processId": null,
+      "title": null
+    },
+    "targetTier": "app",
+    "family": "computer",
+    "readOnly": [],
+    "operations": [
+      {
+        "stepId": "b1d838c3-a1de-4bbc-ae52-d74db1fe1fff",
+        "digest": "21b4097ddb481ec1b386a8ce2bb09177751aae5a96eb50737468da484cd08613"
+      },
+      {
+        "stepId": "7dc4cb05-2176-479c-88c8-50364f71e026",
+        "digest": "21b4097ddb481ec1b386a8ce2bb09177751aae5a96eb50737468da484cd08613"
+      }
+    ]
+  },
+  "launchRuns": [
+    {
+      "id": "f60e258c-a8c6-4732-b332-3c4e564fe72b",
+      "action": "computer.open_app",
+      "capability": "computer",
+      "missionId": "71cd4bc3-bfac-4e23-a23f-f064edfc2ece",
+      "stepId": "7dc4cb05-2176-479c-88c8-50364f71e026",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Allowed by the small approval batch for Calculator: 2 of 4 mutating actions used.",
+      "params": {
+        "app": "calculator"
+      },
+      "status": "succeeded",
+      "summary": "Started C:\\WINDOWS\\System32\\calc.exe (pid 55804).",
+      "evidence": [
+        "computer.open_app via UI Automation at 2026-10-06T20:06:23.516Z"
+      ],
+      "artifactIds": [],
+      "startedAt": 1791317182138,
+      "finishedAt": 1791317183516,
+      "durationMs": 1378,
+      "origin": "mission:71cd4bc3-bfac-4e23-a23f-f064edfc2ece"
+    },
+    {
+      "id": "3bfedad1-fbbe-44c0-94c3-b616b67fef5a",
+      "action": "computer.open_app",
+      "capability": "computer",
+      "missionId": "71cd4bc3-bfac-4e23-a23f-f064edfc2ece",
+      "stepId": "b1d838c3-a1de-4bbc-ae52-d74db1fe1fff",
+      "risk": "EXECUTE",
+      "decision": "allow",
+      "decisionReason": "Allowed by the small approval batch for Calculator: 1 of 4 mutating actions used.",
+      "params": {
+        "app": "calculator"
+      },
+      "status": "succeeded",
+      "summary": "Started C:\\WINDOWS\\System32\\calc.exe (pid 43528).",
+      "evidence": [
+        "computer.open_app via UI Automation at 2026-10-06T20:06:22.109Z"
+      ],
+      "artifactIds": [],
+      "startedAt": 1791317180687,
+      "finishedAt": 1791317182109,
+      "durationMs": 1422,
+      "origin": "mission:71cd4bc3-bfac-4e23-a23f-f064edfc2ece"
+    }
+  ],
+  "canonicalBatch": {
+    "id": "47058a1f-2f99-4904-b22a-ace078b66224",
+    "maxActions": 4,
+    "usedCount": 2,
+    "targetLabel": "Calculator",
+    "createdAt": 1791317180629,
+    "expiresAt": 1791317300629,
+    "status": "active",
+    "endReason": null
+  },
+  "before": {
+    "gate": "M-A-2 T9R",
+    "recordedAt": "2026-10-06T20:06:20.3545186Z",
+    "readOnly": true,
+    "targets": [],
+    "count": 0,
+    "verifiedVisibleCount": 0
+  },
+  "after": {
+    "gate": "M-A-2 T9R",
+    "recordedAt": "2026-10-06T20:06:24.4263815Z",
+    "readOnly": true,
+    "targets": [
+      {
+        "handle": "6818032",
+        "processId": 34640,
+        "processStartedAt": "639269006874532721",
+        "frameExecutable": "C:\\WINDOWS\\system32\\ApplicationFrameHost.exe",
+        "contentProcessId": 28008,
+        "contentStartedAt": "639269139827115417",
+        "contentExecutable": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsCalculator_11.2607.0.0_x64__8wekyb3d8bbwe\\CalculatorApp.exe",
+        "verifiedMicrosoftCalculator": true,
+        "title": "Calculator",
+        "className": "ApplicationFrameWindow",
+        "visible": true,
+        "foreground": false,
+        "ownership": "pre-existing / unknown; never cleanup-authorized by inventory alone"
+      },
+      {
+        "handle": "658014",
+        "processId": 34640,
+        "processStartedAt": "639269006874532721",
+        "frameExecutable": "C:\\WINDOWS\\system32\\ApplicationFrameHost.exe",
+        "contentProcessId": 28680,
+        "contentStartedAt": "639269139813024887",
+        "contentExecutable": "C:\\Program Files\\WindowsApps\\Microsoft.WindowsCalculator_11.2607.0.0_x64__8wekyb3d8bbwe\\CalculatorApp.exe",
+        "verifiedMicrosoftCalculator": true,
+        "title": "Calculator",
+        "className": "ApplicationFrameWindow",
+        "visible": true,
+        "foreground": false,
+        "ownership": "pre-existing / unknown; never cleanup-authorized by inventory alone"
+      }
+    ],
+    "count": 2,
+    "verifiedVisibleCount": 2
+  },
+  "cleanupProvenance": "Controlled empty inventory before two explicitly approved acquisition calls; exactly two verified Calculator windows produced. No by-name close."
+}

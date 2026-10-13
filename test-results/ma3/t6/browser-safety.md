@@ -1,0 +1,5 @@
+# Browser boundary
+
+T6 observation uses one bounded Mission-owned session, exact credential-free HTTP origins, GET/HEAD only, blocked WebSockets/service workers/downloads, and the existing checked-DNS/pinned-address proxy. Redirects and subresources are checked before connection; context routes recheck current authority. Profile/cookies remain Host-private; semantic references carry only bounded URL/title/text/sessionRef. Personal browser sessions are never borrowed.
+
+The actual integrated browser navigated http://127.0.0.1:61167/ and independently read the fixture. Loopback was enabled only by the explicit disposable Host test seam; production private-network policy remains refused. The packaged API resolves inside the package and launched an actual browser. Allowed public-origin observation is supported; mutation, form submissions, publication, downloads and arbitrary app/browser automation are outside T6 consent. See package-acceptance.json and the real Chromium network fence regression in regression-final.log.

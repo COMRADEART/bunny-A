@@ -1,0 +1,50 @@
+{
+  "gate": "M-A-3 T9R-F04",
+  "derivedBy": "assemble-evidence.mjs",
+  "providers": [
+    {
+      "provider": "codex",
+      "path": "CodexAdapter.launch (direct and Mission) → spawnSession",
+      "owner": "Bunny-owned local CLI",
+      "containment": "Windows job (containedSession)",
+      "fullTreeTermination": "provable (kernel accounting)",
+      "probes": "probe() and app-server catalogue probe in jobs"
+    },
+    {
+      "provider": "claude",
+      "path": "ClaudeAdapter.launch → spawnSession",
+      "owner": "Bunny-owned local CLI",
+      "containment": "Windows job (containedSession)",
+      "fullTreeTermination": "provable (kernel accounting)",
+      "probes": "probe() in jobs"
+    },
+    {
+      "provider": "ollama",
+      "path": "HTTP 127.0.0.1:11434",
+      "owner": "user-owned shared service",
+      "containment": "none claimed (no Bunny worker)",
+      "fullTreeTermination": "n/a: request abort only"
+    },
+    {
+      "provider": "ollama :cloud / remote tags",
+      "path": "via local daemon to hosted service",
+      "owner": "remote",
+      "containment": "none claimed",
+      "fullTreeTermination": "n/a"
+    },
+    {
+      "provider": "opencode, cline, cursor-agent",
+      "path": "detect-only (probes)",
+      "owner": "Bunny-owned probe",
+      "containment": "probe() in jobs; never launched for work",
+      "fullTreeTermination": "n/a"
+    },
+    {
+      "provider": "WSL / brokered (WMI, scheduler, services, COM, shell hand-off)",
+      "path": "none launched by Bunny",
+      "owner": "external",
+      "containment": "explicitly not contained, not claimed",
+      "fullTreeTermination": "not provable"
+    }
+  ]
+}

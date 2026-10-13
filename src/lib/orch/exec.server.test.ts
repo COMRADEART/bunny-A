@@ -26,6 +26,15 @@ test("offline or malformed Ollama discovery fails cleanly", async () => {
   globalThis.fetch = async () => new Response("invalid JSON");
   assert.deepEqual(await probeOllama(), { up: false, models: [] });
 });
+test("MA1: Ollama discovery marks cloud-hosted tags as remote, never as local models", async () => {
+  // Shape observed from Ollama 0.35.0 /api/tags on the M-A-1 workstation.
+  globalThis.fetch = async () => new Response(JSON.stringify({ models: [
+    { name: "deepseek-v4.1-flash:cloud", size: 326, remote_model: "deepseek-v4.1-flash", remote_host: "https://ollama.com" },
+    { name: "qwen2.5-coder:7b", size: 4683087561 },
+    { name: "some-hosted-model", remote_host: "https://example.invalid" },
+  ] }));
+  assert.deepEqual(await probeOllama(), { up: true, models: ["deepseek-v4.1-flash:cloud", "qwen2.5-coder:7b", "some-hosted-model"], remote: ["deepseek-v4.1-flash:cloud", "some-hosted-model"] });
+});
 test("a missing requested model is refused instead of silently switching", async () => {
   let calls = 0;
   globalThis.fetch = async () => {
@@ -84,4 +93,20 @@ test("Host streaming preserves genuine Ollama output and cancellation during dis
   globalThis.fetch=async(_url,options)=>{if(options?.method) generationCalled=true;controller.abort();return tags();};
   const stopped=await execute({...request,taskId:"prelaunch-stop"},{signal:controller.signal});
   assert.equal(stopped.stopped,true);assert.equal(generationCalled,false);
+});
+test("V16 T10: a local-only task (every voice turn) is refused at launch when the fresh probe reports its tag hosted", async () => {
+  let generated = false;
+  globalThis.fetch = async (_url, options) => {
+    if (options?.method) { generated = true; return new Response(JSON.stringify({ response: "x" })); }
+    return new Response(JSON.stringify({ models: [{ name: "became-hosted", remote_host: "https://example.invalid" }, { name: "deepseek-v4.1-flash:cloud" }] }));
+  };
+  for (const model of ["became-hosted", "deepseek-v4.1-flash:cloud"]) {
+    const result = await execute({ ...request, taskId: `local-only-${model}`, model, localOnly: true });
+    assert.equal(result.ok, false);
+    assert.match(result.error!, /hosted service; this task requires local execution/);
+  }
+  assert.equal(generated, false, "no generation request reaches a hosted tag");
+  // Without the local-only requirement the ordinary (non-voice) route is unchanged.
+  const ordinary = await execute({ ...request, taskId: "ordinary-hosted", model: "became-hosted" });
+  assert.equal(ordinary.ok, true);
 });

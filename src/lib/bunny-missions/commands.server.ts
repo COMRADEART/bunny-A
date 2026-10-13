@@ -4,61 +4,110 @@ import type { GrantPolicy, SkillStep, SkillValidation } from "./types.ts";
 import { isAbsolute } from "node:path";
 import { statSync } from "node:fs";
 import { scopedPath } from "./paths.server.ts";
+import { CommandRefusedError } from "../bunny-host/failure.server.ts";
+import { WorkstationRequiredError } from "../bunny-host/device-authority.server.ts";
 
 const PROVIDERS: ProviderId[] = ["codex", "claude", "ollama", "opencode", "cline", "cursor"];
 const GRANTS: GrantPolicy[] = ["always_allow", "allow_for_mission", "ask_every_time", "read_only", "never_allow"];
-function text(value: unknown, max = 8000): string { if (typeof value !== "string" || !value.trim() || value.length > max) throw new Error("Invalid or oversized text."); return value; }
-function id(value: unknown): string { const out = text(value, 200); if (!/^[A-Za-z0-9._:-]+$/.test(out)) throw new Error("Invalid id."); return out; }
-function object(value: unknown): Record<string, unknown> { if (value === undefined) return {}; if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Expected an object."); return value as Record<string, unknown>; }
+function text(value: unknown, max = 8000): string { if (typeof value !== "string" || !value.trim() || value.length > max) throw new CommandRefusedError("Invalid or oversized text."); return value; }
+function id(value: unknown): string { const out = text(value, 200); if (!/^[A-Za-z0-9._:-]+$/.test(out)) throw new CommandRefusedError("Invalid id."); return out; }
+function object(value: unknown): Record<string, unknown> { if (value === undefined) return {}; if (!value || typeof value !== "object" || Array.isArray(value)) throw new CommandRefusedError("Expected an object."); return value as Record<string, unknown>; }
 
 export const MISSION_ACTIONS = new Set([
-  "mission.create", "mission.plan", "mission.replan", "mission.approve", "mission.start", "mission.stop", "mission.retry", "mission.respond", "mission.get", "mission.configure",
+  "mission.create", "mission.plan", "mission.replan", "mission.approve", "mission.start", "mission.stop", "mission.retry", "mission.respond", "mission.get", "mission.configure", "mission.revoke_batch",
+  "mission.staging.list", "mission.staging.inspect",
   "inbox.ack", "capability.run", "capability.grant", "capability.revoke_grant", "capability.refresh",
   "skill.run", "skill.versions", "skill.repair", "skill.verify", "skill.record",
   "trigger.create", "trigger.enable", "trigger.disable", "trigger.delete",
 ]);
-/** What a paired phone may do: create, inspect, answer approvals and stop. Everything else needs the workstation. */
-const REMOTE = new Set(["mission.create", "mission.approve", "mission.start", "mission.stop", "mission.respond", "mission.get", "inbox.ack"]);
+/**
+ * What a paired phone may do: inspect, answer approvals (once or small batch) and stop. Everything else needs the
+ * workstation. M-A-3 T9: creating new Missions moved to the workstation; answers stay within the Host's owner-consent
+ * boundary (MissionManager.device*Refusal).
+ */
+const REMOTE = new Set(["mission.approve", "mission.start", "mission.stop", "mission.respond", "mission.get", "mission.revoke_batch", "inbox.ack"]);
 
+/** M-A-3 T11 (review PA-01): a team Mission is approved, started and replanned only through its Coordinator. */
+function teamRoute(missions: MissionManager, value: unknown) {
+  let team = false;
+  try { team = !!missions.mission(String(value ?? "")).team; } catch { team = false; }
+  if (team) throw new CommandRefusedError("A team Mission is approved, started and replanned through its Coordinator Agent (agent.team.approve / agent.team.revise).");
+}
 export async function missionCommand(missions: MissionManager, action: string, data: Record<string, unknown>, access: { local: boolean; actor: string }): Promise<{ mission?: unknown; data?: unknown }> {
-  if (!access.local && !REMOTE.has(action)) throw new Error(`${action} requires workstation access.`);
+  if (!access.local && !REMOTE.has(action)) throw new WorkstationRequiredError(`${action} requires workstation access.`);
   const roots = () => [...missions.tasks.db.projects().map((project) => project.path), missions.tasks.defaultRoot];
   const direct = (cwd: unknown) => {
     const all = roots();
     const folder = cwd === undefined ? missions.tasks.defaultRoot : text(cwd, 2000);
-    if (!isAbsolute(folder) || [...folder].some((char) => char.charCodeAt(0) < 32) || process.platform === "win32" && (/^(\\\\|\/\/)/.test(folder) || /:[^\\/]/.test(folder.slice(2)))) throw new Error("Working directory must be a plain absolute project path.");
+    if (!isAbsolute(folder) || [...folder].some((char) => char.charCodeAt(0) < 32) || process.platform === "win32" && (/^(\\\\|\/\/)/.test(folder) || /:[^\\/]/.test(folder.slice(2)))) throw new CommandRefusedError("Working directory must be a plain absolute project path.");
     const canonical = scopedPath(missions.tasks.defaultRoot, folder, all);
-    if (!statSync(canonical).isDirectory()) throw new Error("Working directory must be an existing approved folder.");
+    if (!statSync(canonical).isDirectory()) throw new CommandRefusedError("Working directory must be an existing approved folder.");
     return { missionId: null, stepId: null, envelope: null, origin: `workstation`, cwd: canonical, roots: all };
   };
   switch (action) {
     case "mission.create": {
       const mode = data.mode;
-      if (!["fast", "balanced", "deep"].includes(String(mode))) throw new Error("Unknown mission mode.");
-      if (data.steps !== undefined && !access.local) throw new Error("Explicit mission graphs can only be supplied from the workstation.");
+      if (!["fast", "balanced", "deep"].includes(String(mode))) throw new CommandRefusedError("Unknown mission mode.");
+      if (data.steps !== undefined && !access.local) throw new CommandRefusedError("Explicit mission graphs can only be supplied from the workstation.");
       let providers: ProviderId[] | null = null;
-      if (data.providers !== undefined) { if (!Array.isArray(data.providers) || data.providers.some((p) => !PROVIDERS.includes(p as ProviderId))) throw new Error("Invalid provider list."); providers = data.providers as ProviderId[]; }
-      if (data.localOnly !== undefined && typeof data.localOnly !== "boolean") throw new Error("localOnly must be true or false.");
+      if (data.providers !== undefined) { if (!Array.isArray(data.providers) || data.providers.some((p) => !PROVIDERS.includes(p as ProviderId))) throw new CommandRefusedError("Invalid provider list."); providers = data.providers as ProviderId[]; }
+      if (data.localOnly !== undefined && typeof data.localOnly !== "boolean") throw new CommandRefusedError("localOnly must be true or false.");
       return { mission: missions.create({ objective: text(data.objective), title: data.title === undefined ? undefined : text(data.title, 200), mode: mode as Mode, projectId: data.projectId == null ? null : id(data.projectId), steps: data.steps, localOnly: data.localOnly === true, providers, origin: access.actor }) };
     }
     case "mission.plan": case "mission.replan":
+      teamRoute(missions, data.id);
       return { mission: await missions.replan(id(data.id), access.actor, data.steps, data.objective === undefined ? undefined : text(data.objective)) };
-    case "mission.approve": return { mission: missions.approve(id(data.id), access.actor, data.start !== false) };
+    case "mission.approve": teamRoute(missions, data.id); return { mission: missions.approve(id(data.id), access.actor, data.start !== false, data.revision === undefined ? undefined : Number(data.revision), data.plan === undefined ? undefined : text(data.plan, 200)) };
     case "mission.start": {
       missions.requireEnabled();
+      teamRoute(missions, data.id);
       const mission = missions.mission(id(data.id));
-      if (mission.state !== "ready") throw new Error("Only an approved (ready) mission can be started.");
-      return { mission: missions.view(missions.start(mission)) };
+      if (mission.state !== "ready") throw new CommandRefusedError("Only an approved (ready) mission can be started.");
+      // M-A-3 T9 (G7): an Agent's Mission runs through its Agent, never as a bare Mission started remotely.
+      if (!access.local && (missions.agentic.exists(mission.id) || mission.origin.startsWith("agent:"))) throw new WorkstationRequiredError("Agent Missions are started from their Agent on the Windows Host.");
+      // M-A-3 T9R-F01: a device never decides when workstation-held code execution begins.
+      if (!access.local) { const refusal = missions.deviceStartRefusal(mission); if (refusal) throw new WorkstationRequiredError(refusal); missions.markDeviceDriven(mission.id, access.actor); }
+      return { mission: missions.view(missions.start(missions.mission(mission.id))) };
     }
     case "mission.stop": return { mission: await missions.stop(id(data.id), access.actor) };
     case "mission.retry": return { mission: missions.retry(id(data.id), access.actor) };
     case "mission.respond": {
-      if (data.decision !== "allow_once" && data.decision !== "deny") throw new Error("Decision must be allow_once or deny.");
-      return { mission: await missions.respond(id(data.requestId), data.decision, access.actor) };
+      if (!access.local && Object.keys(data).some(key => !["requestId", "decision", "maxActions", "ttlMs"].includes(key)))
+        throw new CommandRefusedError("Remote approval can only answer the exact Host request; Agent, Mission and Project binding cannot be supplied by a device.");
+      if (data.decision !== "allow_once" && data.decision !== "allow_batch" && data.decision !== "deny") throw new CommandRefusedError("Decision must be allow_once, allow_batch or deny.");
+      // Only-shrink knobs on the batch button; the manager clamps both to what the offer stated.
+      const options: { maxActions?: number; ttlMs?: number } = {};
+      for (const [key, min] of [["maxActions", 1] as const, ["ttlMs", 1000] as const]) {
+        const value = data[key];
+        if (value === undefined) continue;
+        const n = Number(value);
+        if (!Number.isInteger(n) || n < min) throw new CommandRefusedError(`${key} must be an integer of at least ${min}.`);
+        options[key] = n;
+      }
+      return { mission: await missions.respond(id(data.requestId), data.decision, access.actor, options) };
     }
-    case "mission.get": return { data: missions.get(id(data.id)) };
+    case "mission.get": {
+      const view = missions.get(id(data.id));
+      if (!access.local && view.mission.team)
+        throw new WorkstationRequiredError("Detailed team working material is available on the Windows Host; use the phone's team overview to supervise it.");
+      return { data: access.local ? view : missions.deviceMissionData(view) };
+    }
+    case "mission.revoke_batch": return { mission: missions.revokeBatch(id(data.missionId), id(data.batchId), access.actor) };
+    // M-A-3 T9R-F02 (D2): staged paired-device changes are reviewed on the Windows Host only (never in REMOTE).
+    case "mission.staging.list": {
+      if (!access.local) throw new WorkstationRequiredError("Staged paired-device changes are reviewed on the Windows Host.");
+      return { data: missions.staging.forMission(id(data.missionId)).map(({ fileIdentity: _identity, ...record }) => record) };
+    }
+    case "mission.staging.inspect": {
+      if (!access.local) throw new WorkstationRequiredError("Staged paired-device changes are reviewed on the Windows Host.");
+      return { data: missions.inspectStaged(id(data.stagingId), access.actor) };
+    }
     case "mission.configure": return { data: missions.configure(object(data), access.actor) };
-    case "inbox.ack": return { data: missions.inbox.acknowledge(id(data.id)) };
+    case "inbox.ack": {
+      // M-A-3 T9R-F01: a device clears its own view of notices, never the workstation's pending-approval prompts.
+      if (!access.local && missions.store.inboxEvent(id(data.id)).kind === "requires_approval") throw new WorkstationRequiredError("Pending approvals are cleared by answering them, not by a paired device acknowledgement.");
+      return { data: missions.inbox.acknowledge(id(data.id)) };
+    }
     case "capability.refresh": await missions.bus.refreshHealth(); return { data: missions.bus.list() };
     case "capability.run": {
       missions.requireEnabled();
@@ -66,10 +115,10 @@ export async function missionCommand(missions: MissionManager, action: string, d
       return { data: outcome };
     }
     case "capability.grant": {
-      const policy = data.policy as GrantPolicy; if (!GRANTS.includes(policy)) throw new Error("Unknown grant policy.");
-      const scope = data.scope === undefined ? "global" : text(data.scope, 100); if (scope !== "global" && !/^mission:[0-9a-f-]{36}$/.test(scope)) throw new Error("Scope must be global or mission:<id>.");
-      const pattern = text(data.action, 100); if (!/^([a-z]+\.([a-z_]+|\*)|\*)$/.test(pattern)) throw new Error("Grant action must be capability.action, capability.* or *.");
-      if (pattern === "*" && (policy === "always_allow" || policy === "allow_for_mission")) throw new Error("A blanket allow for every capability is refused.");
+      const policy = data.policy as GrantPolicy; if (!GRANTS.includes(policy)) throw new CommandRefusedError("Unknown grant policy.");
+      const scope = data.scope === undefined ? "global" : text(data.scope, 100); if (scope !== "global" && !/^mission:[0-9a-f-]{36}$/.test(scope)) throw new CommandRefusedError("Scope must be global or mission:<id>.");
+      const pattern = text(data.action, 100); if (!/^([a-z]+\.([a-z_]+|\*)|\*)$/.test(pattern)) throw new CommandRefusedError("Grant action must be capability.action, capability.* or *.");
+      if (pattern === "*" && (policy === "always_allow" || policy === "allow_for_mission")) throw new CommandRefusedError("A blanket allow for every capability is refused.");
       missions.store.setGrant(pattern, scope, policy, access.actor);
       missions.emit("capability.grant_changed", `${access.actor} set ${pattern} (${scope}) to ${policy}.`, scope.startsWith("mission:") ? scope.slice(8) : null);
       return { data: missions.store.grants() };
@@ -78,13 +127,13 @@ export async function missionCommand(missions: MissionManager, action: string, d
     case "skill.run": missions.requireEnabled(); return { data: await missions.skills.run(id(data.id), object(data.params), { ...direct(data.cwd), direct: { confirmed: data.confirmed === true } }) };
     case "skill.versions": return { data: missions.skills.versions(id(data.id)) };
     case "skill.repair": {
-      if (!Array.isArray(data.steps)) throw new Error("steps must be an array.");
+      if (!Array.isArray(data.steps)) throw new CommandRefusedError("steps must be an array.");
       const steps = data.steps.map((raw) => { const step = object(raw); return { action: text(step.action, 100), params: object(step.params), label: step.label === undefined ? text(step.action, 100) : text(step.label, 100) } as SkillStep; });
       return { data: missions.skills.proposeRepair(id(data.id), steps, data.validations as SkillValidation[] | undefined) };
     }
     case "skill.verify": missions.requireEnabled(); return { data: await missions.skills.verifyCandidate(id(data.id), Number(data.version), object(data.params), { ...direct(data.cwd), direct: { confirmed: data.confirmed === true } }) };
     case "skill.record": {
-      if (!Array.isArray(data.runIds) || data.runIds.some((value) => typeof value !== "string")) throw new Error("runIds must be an array of run ids.");
+      if (!Array.isArray(data.runIds) || data.runIds.some((value) => typeof value !== "string")) throw new CommandRefusedError("runIds must be an array of run ids.");
       return { data: missions.skills.record(id(data.id), text(data.name, 80), data.runIds as string[]) };
     }
     case "trigger.create": return { data: missions.triggers.create(object(data), access.actor) };
@@ -92,5 +141,5 @@ export async function missionCommand(missions: MissionManager, action: string, d
     case "trigger.disable": return { data: missions.triggers.setEnabled(id(data.id), false, access.actor) };
     case "trigger.delete": missions.triggers.remove(id(data.id), access.actor); return {};
   }
-  throw new Error("Unknown mission action.");
+  throw new CommandRefusedError("Unknown mission action.");
 }

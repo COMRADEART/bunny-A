@@ -1,0 +1,239 @@
+{
+  "subsystem": "Existing evidence, tests and the Android companion (remote-device security coverage, disposable Host/gateway recipes, production read-only observation, T8 seal and packaging metadata) — audited read-only at HEAD 98b7155, branch codex/ma3-t8-premium-ui",
+  "capabilities": [
+    {
+      "name": "Workstation-initiated one-time pairing (Host /pair, 10-minute code, single use)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "src/lib/bunny-host/http.server.ts:333-349 (pair), :559-562 (pairing.create is local-only, 600000 ms expiry), :343 (row insert stores token_hash). Tests: src/lib/bunny-host/host.test.ts:75 'Host HTTP authentication, pairing revocation and approval validation' (:84-86 pair returns 200 and token; :90 reusing the code returns 403); :119 'pairing limiter counts failures only...' (FailureLimiter unit test); also used in ma2-t10.test.ts:20-25, capabilities.test.ts:279-280, agentic-live.test.ts:86-88.",
+      "detail": "Code reuse, the limiter and the token round trip are tested. No test covers expiry after 10 minutes (http.server.ts:562), a device calling pairing.create (:560), or the per-client limiter key. The global 5/100 limits were checked live only in MA2 T6R (pairing-abuse.json, MA2_T6_REMOTE_ACCEPTANCE.md:283), against the v17 release."
+    },
+    {
+      "name": "Gateway pairing route and bunny_device cookie (HttpOnly; Secure; SameSite=Strict; Max-Age=1y)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "src/routes/api/bunny-pair.ts:9-10 (local callers refused), :12 (input bounds), :14 (x-bunny-pair-client from clientKey), :16 (Set-Cookie flags). No *.test.* file references bunny-pair or Set-Cookie (grep). Historical live check: test-results/ma2-gate6r/client.mjs:65-69 asserted /HttpOnly; Secure; SameSite=Strict/ on installed v17-T6.",
+      "detail": "There is no automated test against current source. The only proof is MA2 T6R live evidence, which ran on a much older installed release. No MA3 gate exercised this route: no BUNNY_REMOTE_ORIGIN appears anywhere in test-results/ma3."
+    },
+    {
+      "name": "authorizeBridge workstation decision (loopback TCP peer, proxy headers disqualify)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "src/lib/orch/host-bridge.server.ts:23-38. Tests: src/lib/orch/host-bridge.server.test.ts:7 'workstation access requires a loopback peer, not just a loopback Host header' (127.0.0.1/::1 peer is local; non-loopback or undefined peer throws); :13 'proxied requests cannot borrow workstation authentication' (cf-connecting-ip, x-forwarded-for, x-forwarded-proto=https, x-real-ip all throw)",
+      "detail": "The local branch is covered. The 'forwarded' and 'cf-ray' headers (:11) and an x-forwarded-host mismatch (:35-36) have no unit test. T8 stream-live-probe.json probed an untrusted forwarded peer live and got 503."
+    },
+    {
+      "name": "authorizeBridge remote branch (BUNNY_REMOTE_ORIGIN + HTTPS effective origin + bunny_device cookie; Origin/sec-fetch CSRF checks)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "host-bridge.server.ts:30 (x-forwarded-proto https sets effectiveOrigin), :32 (cross-site refused), :33 (Origin mismatch), :40 (origin must equal BUNNY_REMOTE_ORIGIN and be https), :41 (cookie parse). Only test: host-bridge.server.test.ts:16 'non-loopback hosts never get workstation access' (no origin configured throws; configured origin + cookie returns {local:false, token:'abc'}).",
+      "detail": "No unit test covers these remote cases: Origin mismatch, sec-fetch-site cross-site, http (non-https) remote origin, missing cookie, or the 401 to 'pair again' mapping in hostRequest (:62). MA2 T6R csrf-origin-tests.json and forwarded-header-tests.json were live on v17 only."
+    },
+    {
+      "name": "Device revocation enforced on /state, /command and already-open SSE (per-delivery check)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "http.server.ts:331 (devices lookup requires revoked_at IS NULL), :350 (401), :368-373 (stillAuthorized re-checked per delivery), :572-576 (revoke). Tests: ma2-t10.test.ts:49 'T10-T6-04: revocation ends an already authenticated {Host|task} SSE before future delivery' (stream closes with no post-revoke frame; /events, /state and stop all return 401); ma2-t10.test.ts:72 'revoking one device preserves workstation and independently paired streams'; host.test.ts:88-89; capabilities.test.ts:311-312; agentic-live.test.ts:90-91 (device agent.list returns 401 after revoke)",
+      "detail": "This is covered at the Host API layer. Revoking an unknown id silently succeeds (UPDATE with no existence check, :574-576). The same revocation through the gateway SSE bridge (/api/bunny-events with a cookie) is not tested."
+    },
+    {
+      "name": "Remote device refused workstation-only commands",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "capabilities.test.ts:264 'Host HTTP: snapshot stays backward compatible, mission commands are validated, remote devices are limited' (:282-285 device mission.configure, capability.run, mission.create with steps and trigger.create all match /workstation/); host.test.ts:87 (device project.add returns 400)",
+      "detail": "Not tested: a device calling pairing.create (http.server.ts:560), device.revoke (:573), 'Remote devices cannot supply executable Agent graphs' (:398-399) or 'Remote approval can only answer the exact Host offer' (:400-405). Grep finds no test that references these messages."
+    },
+    {
+      "name": "Device inspects, approves (Host-computed scope only) and stops Missions",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "capabilities.test.ts:281 (device mission.get returns 200), :291-299 (device mission.approve ignores client providers/projectRoots/maxSessions; envelope equals Host requestedScope; grantedBy /^device:/), :300-302 (approval.remote_device event), :303-304 (device mission.stop gives stopped); missions.test.ts:412 'MA0R: phone approval serializes exactly the desktop authority and ignores client scope overrides' (missionCommand level)",
+      "detail": "Covered over real Host HTTP with a real device token in a disposable Host."
+    },
+    {
+      "name": "Device answers a T9 computer-approval batch offer (clamped to Host offer) and revokes it",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "src/lib/bunny-missions/approval-batches.test.ts:560 'T9 remote: a paired phone may grant only the offered batch, revoke its own, and the counts stay canonical' (:567-569 maxActions 9999 clamped to offer.maxActions, createdBy device:paired-phone; :573-576 revoke_batch)",
+      "detail": "Tested only by calling missionCommand directly with {local:false, actor:'device:paired-phone'}. The HTTP, device-token and gateway path is not exercised."
+    },
+    {
+      "name": "Device read of Agents (agent.list / agent.get)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "Allowed: http.server.ts:397-411 and agent-runtime.server.ts:906-912. Test: agentic-authorization.test.ts:79 'A27 UI reconnect is a read projection and preserves consent' (agentCommand agent.get with actor 'device:test'). Over HTTP the only check is that a revoked token gets 401 (agentic-live.test.ts:91).",
+      "detail": "No HTTP test confirms that a valid paired device token can list or get Agents. Responses go through the same dashboardSnapshot projection as workstation reads (src/lib/orch/host.ts:11,35), which presentation.test.ts:198 and :260 cover generically."
+    },
+    {
+      "name": "Device Pause/Resume/Stop of existing Agents",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "http.server.ts:397-411 forwards any AGENT_ACTIONS from a device with actor device:<id>; agent-runtime.server.ts:900-905 (pause, resume, stop have no device check). No test calls agent.pause, agent.resume or agent.stop with a device actor or token (grep of *.test.ts for device.token or 'device:' shows only adjust, propose, get and list).",
+      "detail": "This is the core T9 control path, and no test, disposable live run or MA3 gate has ever executed it from a paired device. A27 and A26 (agentic-authorization.test.ts:78-79) use the 'workstation' actor for pause and resume."
+    },
+    {
+      "name": "Device answers Host-offered Agentic consent (agent.authorization.approve/deny/revoke with id+revision only)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "http.server.ts:400-405 (devices may send only id and revision to agent.authorization.*); agent-runtime.server.ts:866-874 (approve), :888-899 (deny/revoke). Refusals are tested: agentic-authorization.test.ts:85 A33 (device propose rejected /remote/), :86 A34 (device adjust rejected /workstation/); agentic-live.test.ts:89 (device adjust over HTTP returns 400).",
+      "detail": "The positive path (a device approves the exact offered revision), a stale revision sent by a device, and device deny/revoke are untested. agentic-store.server.ts:98 records the channel 'paired-device', but no test asserts it. The A33 test name says 'revoked device', yet it only passes the actor string 'device:revoked' and never revokes anything."
+    },
+    {
+      "name": "Device creates new Agents (objective-only, Host-planned)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "http.server.ts:398-399 refuses only when data.steps is supplied; AgentRuntime.create (agent-runtime.server.ts:103-127) has no actor check and sets origin 'agent:device:<id>'",
+      "detail": "This exists today but has never been tested, and it goes beyond the T9 goal of supervising existing Agents. See gap G3."
+    },
+    {
+      "name": "Gateway SSE bridge for paired devices (/api/bunny-events)",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "src/routes/api/bunny-events.ts:14 (authorizeBridge), :33-34 (device token from the cookie), :45 (Host /events with the device bearer), :59 (signalStream redaction). Tests: premium-model.test.ts:187 'T8: SSE signal redacts prompt, tokens, cookies and raw details', :223 'client cancellation cancels upstream...'. Live: test-results/ma3/t8/stream-probe.mjs:6-23 drove only workstation-loopback requests on 127.0.0.1:8082 (200) plus denials (400/503).",
+      "detail": "The device-cookie path through the bridge was never run. MA2_T6_REMOTE_ACCEPTANCE.md:85-88 records that Cloudflare quick tunnels do not support SSE. The client falls back to invalidation every 30 s (src/components/island/host-stream.ts:38, :54)."
+    },
+    {
+      "name": "Android companion URL policy (ServerAddress.normalize / sameOrigin)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "android/app/src/main/java/com/routeragent/jev/ServerAddress.java:11-31 (only bare https origins; rejects userinfo, query, fragment, path, localhost, 127.*, ::1, 0.0.0.0 and bad ports), :33-42 (sameOrigin). android/tests/ServerAddressTest.java:8-23 runs 21 checks, executed only by scripts/build-android.ps1:48-49. They are not part of any npm test lane (package.json 'test').",
+      "detail": "This pure-Java policy check runs at build time and does not run in npm test."
+    },
+    {
+      "name": "Android WebView runtime security policy",
+      "classification": "PARTIAL",
+      "evidence": "AndroidManifest.xml:4 (INTERNET only), :5 (allowBackup=false, usesCleartextTraffic=false), :6 (exported launcher, no intent data read); MainActivity.java:178-187 (JS and DOM storage on; file/content access off; MIXED_CONTENT_NEVER_ALLOW; SafeBrowsing on; no JS window opening or multiple windows; third-party cookies off); :205-208 (SSL error leads to cancel); :151-153 (external browser only for https); no addJavascriptInterface anywhere; :219 loads <origin>/?companion=1. Weakness: :192-201 lets any non-gesture HTTPS navigation to any origin stay inside the WebView ('HTTPS redirects may be the trusted tunnel's sign-in flow').",
+      "detail": "TLS, cleartext, bridge and file-access controls are sound. Navigation is not restricted to the configured origin, there is no certificate pinning (system CA trust), and showConnection() (:103-150) never clears cookies or storage when the origin changes. None of this has been exercised on a device."
+    },
+    {
+      "name": "Android companion physically installed, paired and used for control",
+      "classification": "IMPLEMENTED_UNVERIFIED",
+      "evidence": "ANDROID_APK_REPORT.md:49-52 (no phone or emulator; runtime unverified); test-results/ma2-gate6/android-installation.json:2-6 (2026-10-05T04:19:47Z, source 'User: Just installed the apk', model null, androidVersion null); MA2_T6_REMOTE_ACCEPTANCE.md:97-102, :285, :361-366 (physical install, pairing and device-side approval/Stop NOT TESTED); MA3_T8_PREMIUM_UI_ACCEPTANCE.md:25, :35; src/components/island/premium.tsx:724-725 ('Phone Agentic control is a later gate').",
+      "detail": "Installation rests on the user's own report. One production device row lines up in time with the T6 phone invitation, but no evidence file records which client created it. Control (approval, Pause, Stop) from a phone has never been tested."
+    },
+    {
+      "name": "Disposable Host fixtures for live acceptance",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "scripts/fixtures/agentic-host-worker.mjs:4-8,12 (args data/root/port; deletes BUNNY_STATE_LAYOUT and BUNNY_RELEASE_ROOT; token sent over IPC); agentic-live.test.ts:18-27 (ephemeral port allocator, fork with --experimental-strip-types); scripts/fixtures/project-host-worker.mjs:7-13,42 (also deletes BUNNY_HOST_WORKSPACE); test-results/ma3/t8/ui-host.mjs:9-10,16,19 (mkdtemp under os.tmpdir 'bunny-t8-ui-', port 43158)",
+      "detail": "This is reusable for T9. The fixtures write credentials.json into the data directory, where fixture-command.mjs:6 and seal-evidence.mjs:17 read it."
+    },
+    {
+      "name": "Disposable gateway with a remote-device origin",
+      "classification": "UNSUPPORTED",
+      "evidence": "T8 gateway: test-results/ma3/t8/package-dashboard.mjs:8-16 (R4 package middleware on 127.0.0.1:8082 with BUNNY_HOST_DATA_DIRECTORY and BUNNY_HOST_CREDENTIALS_FILE; no BUNNY_REMOTE_ORIGIN, so remote requests throw at host-bridge.server.ts:40). Installed gateway install/Bunny-Server.mjs:6,19 needs BUNNY_STATE_LAYOUT=2, BUNNY_HOST_CREDENTIALS_FILE, BUNNY_REMOTE_CONFIG and BUNNY_HOST_DATA_DIRECTORY, and hardcodes 127.0.0.1:8084 (:38), the production port. Dev gateway: startup.sh:15 runs npm run dev on 0.0.0.0:8080.",
+      "detail": "No prior MA3 gate built a disposable gateway with BUNNY_REMOTE_ORIGIN set. The tunnel tooling can target another loopback gateway through BUNNY_TUNNEL_ORIGIN (scripts/bunny-tunnel.mjs:18; tested in bunny-tunnel.test.mjs:45 'candidate tunnel target is loopback-only...'). A development tunnel expects <data>/tools/cloudflared.exe (scripts/bunny-tunnel-paths.mjs:13)."
+    },
+    {
+      "name": "Read-only production observation in MA3 gates",
+      "classification": "PARTIAL",
+      "evidence": "Correct method: test-results/ma3/production-restart/evidence/postboot-census-READONLY-script.mjs:4-10 copies state/host.sqlite plus -wal and -shm to a temp directory and opens it readOnly; RESTART_RECORD.md:36, :54, :58. Misdirected: test-results/ma3/t5/observe-production.mjs:3, t6/final-audit.mjs:12, t7/production-audit.mjs:4 and t8/audit.mjs:18-19 all open %LOCALAPPDATA%/Bunny-A/development/host.sqlite, the dev-Host directory per src/lib/bunny-host/state-paths.server.ts:9-11. T8 production-before.json:21-24 therefore reports devices 0 (and tasks, projects, missions 0), while production has devices 18 (MA3_BASELINE.md:99-101).",
+      "detail": "Process identity (CIM, audit.mjs:35) and installed-manifest checks (audit.mjs:32) did target production. Every MA3 T5–T8 'production SQLite unchanged' claim actually describes the development database."
+    },
+    {
+      "name": "T8 evidence seal (INDEX.md + INDEX.sha256 + verify-evidence.mjs)",
+      "classification": "IMPLEMENTED_AND_TESTED",
+      "evidence": "test-results/ma3/t8/seal-evidence.mjs:10 (exclusions), :13-15 (LF/no-BOM normalization), :16-33 (secret scan including an exact disposable-token match), :35-36 (required files), :37-54 (index and sha file), :55-57 (self-verify), :58-59 (NUL pathspec .grok/t8-evidence-paths.bin); verify-evidence.mjs:8-23 (git cat-file bytes equal the working tree and the digests; committed path set equals the sealed set). In this audit, a read-only `sha256sum -c test-results/ma3/t8/INDEX.sha256` returned ALL OK for 204 entries.",
+      "detail": "This can be reused for T9. Its portability caveat is listed as gap G13."
+    },
+    {
+      "name": "Windows test packaging for MA3 gates (release name, version, pin metadata)",
+      "classification": "PARTIAL",
+      "evidence": "scripts/package-bunny-desktop.ps1:32 (reads install/release-pin.json from ToolingCommit), :33-34 (PackageName and SourceCommit default to the pin), :45 (release-pin.json shipped as a tooling file), :121 (manifest version=$pin.version, always); install/release-pin.json:2-4 (v26-MA2-R1 / 26.0.0-MA2-R1 / 8001d51d); test-results/ma3/t8/package-manifest.json:3-6 (release v27-MA3-T8-R4-TEST, version 26.0.0-MA2-R1, source and tooling 987afea); package-inherited-release-pin.json:2-4; test-results/ma3/t7/package-manifest.json:3-4 (v28-MA3-T7-test, also 26.0.0-MA2-R1)",
+      "detail": "Source and tooling are correctly pinned to T8, but semver and release-pin are legacy v26 values. finalize-evidence.mjs:99 and :112 and MA3_T8_PREMIUM_UI_ACCEPTANCE.md:61 acknowledge this."
+    }
+  ],
+  "gaps": [
+    {
+      "id": "G1",
+      "severity": "HIGH",
+      "title": "MA3 T5–T8 'production SQLite' observations read the development database, not production",
+      "detail": "t8/audit.mjs:18-19 opens C:/Users/allam/AppData/Local/Bunny-A/development/host.sqlite. The same path is used in t7/production-audit.mjs:4, t6/final-audit.mjs:12 and t5/observe-production.mjs:3. state-paths.server.ts:9-11 defines that as the development directory, which belongs to the source dev Host on 43139 (MA3_BASELINE.md, process census). The installed production state root is ...\\Bunny-A\\state (test-results/ma3/production-restart/RESTART_RECORD.md:36; MA3_BASELINE.md §5). Result: T8 production-before.json:21-24 reports devices 0, tasks 0, projects 0, and T7 reports 'zero Project rows' (MA3_T7_PROJECT_WORKSPACE_ACCEPTANCE.md:114), while the production census reads 18 devices (1 active), 62 tasks and 13 projects (MA3_BASELINE.md:99-101). Scenario: T9 copies audit.mjs, pairs or revokes a device on production by mistake, and reports 'devices unchanged' from the dev DB.",
+      "suggestedMinimalFix": "Reuse the MA3 baseline census method instead (postboot-census-READONLY-script.mjs:4-10): copy state/host.sqlite, -wal and -shm into a temp directory and open the copy readOnly. Only do this if the T9 brief authorizes reading production. Otherwise label the production DB comparison NOT TESTED and correct the T5–T8 wording in the T9 report. Never point an audit at developmentStateDirectory()."
+    },
+    {
+      "id": "G2",
+      "severity": "HIGH",
+      "title": "No test exercises a paired device supervising Agents: Pause, Resume, Stop, or approving/denying/revoking a Host offer",
+      "detail": "A device token reaches agentCommand with actor device:<id> for every AGENT_ACTION (http.server.ts:397-411). pause, resume and stop (agent-runtime.server.ts:900-905) and authorization approve/deny/revoke (:866-874, :888-899) have no device check, by design. No *.test.ts calls these with a device token or 'device:' actor (grep). Only refusals are tested: A33/A34 (agentic-authorization.test.ts:85-86) and HTTP adjust returning 400 (agentic-live.test.ts:89). Scenario: a phone POSTs {action:'agent.authorization.approve', data:{id, revision:<stale>}} or agent.resume on an Agent whose consent was revoked. Nothing proves the outcome over HTTP, nor that the event or provenance records 'paired-device' (agentic-store.server.ts:98).",
+      "suggestedMinimalFix": "Add one disposable live test that reuses agentic-live.test.ts start(), /pair and device.token (lines 18-35, 86-91). As a device, run agent.list, agent.get, agent.pause, agent.resume (refused without consent, allowed with), agent.stop, approve of the exact current revision (allowed), approve of a stale revision (refused), extra keys (refused by http.server.ts:400-405) and deny/revoke. Assert canonical state and device provenance, then revoke the device and confirm 401 for each action."
+    },
+    {
+      "id": "G3",
+      "severity": "MEDIUM",
+      "title": "A paired device can create new Agents (objective-only); untested and beyond the T9 supervise-only scope",
+      "detail": "http.server.ts:398-399 refuses agent.create from a device only when data.steps is present. AgentRuntime.create (agent-runtime.server.ts:103-127) has no actor check and creates a Mission with origin 'agent:device:<id>'. Scenario: a phone sends commandBunnyHost {action:'agent.create', data:{objective:'...'}}. A new Host-planned Agent is created and occupies AGENT_LIMITS.maxActiveAgents slots (:109). The phone can then call agent.start or agent.authorization.approve on it (:856-857, :866-871). No test covers this.",
+      "suggestedMinimalFix": "If T9 is supervise-only, refuse agent.create from non-local callers at the existing branch at http.server.ts:398 (extend the same CommandRefusedError) and add a device-token test. If remote creation is intended, test it explicitly and document it."
+    },
+    {
+      "id": "G4",
+      "severity": "MEDIUM",
+      "title": "No per-device rights model; 'within device rights' means one fixed role",
+      "detail": "The devices table holds only (id, name, token_hash, created_at, revoked_at): the insert at http.server.ts:343 and the schema in missions.test.ts:829. Remote authority is a single hardcoded non-local role (the `local` flag at http.server.ts:330-331, actor strings 'device:<id>'). Tokens have no expiry. The Host row never expires, and the cookie Max-Age is one year (bunny-pair.ts:16). Scenario: a lost phone keeps full remote-role authority until a workstation revoke.",
+      "suggestedMinimalFix": "Document in T9 that device rights are the single existing remote role, enforced at http.server.ts and agent-runtime.server.ts. Do not invent scopes. Make 'revoke a lost device' part of T9 acceptance, reusing device.revoke (:572-576)."
+    },
+    {
+      "id": "G5",
+      "severity": "MEDIUM",
+      "title": "Android WebView keeps arbitrary cross-origin HTTPS navigations in-app when there is no user gesture",
+      "detail": "MainActivity.java:192-201 returns false (load in the WebView) for any https URL unless request.hasGesture() and the target is cross-origin. Scenario: a script- or redirect-initiated navigation, such as an artifact link that redirects or a tunnel error page, moves the WebView to https://attacker.example. That page then renders inside the 'Bunny-A' chrome with JS and DOM storage enabled (:179-180) and can phish a pairing code. The HttpOnly, SameSite=Strict, origin-bound cookie is not exposed, so the risk is phishing, not token theft. There is also no certificate pinning (:205-208 relies on system trust).",
+      "suggestedMinimalFix": "In shouldOverrideUrlLoading, keep a navigation in the WebView only if ServerAddress.sameOrigin(serverUrl, destination). Open everything else with openBrowser(). Add the cases to android/tests/ServerAddressTest.java and rebuild with scripts/build-android.ps1."
+    },
+    {
+      "id": "G6",
+      "severity": "MEDIUM",
+      "title": "Existing production 'Phone companion' credential is bound to a withdrawn quick-tunnel origin; physical phone control was never tested",
+      "detail": "test-results/ma2-gate7/post-signin/device-preservation.json:3-9 records id a307ff4b-2d0b-425e-88b9-84eaf1302506, name 'Phone companion', createdAt 1791174129259 (2026-10-05T04:22:09Z), revokedAt null. That time falls inside the T6 invitation window: 04:15:39–04:25:39Z for origin martin-lovely-myself-tomatoes.trycloudflare.com (test-results/ma2-gate6/android-installation.json:10-12). That origin later returned 530/1033 and was withdrawn (MA2_T6_REMOTE_ACCEPTANCE.md:143-146). Cookies are per origin, so the phone must pair again at any new hostname (BUNNY_REMOTE.md:48). The name is the UI default (src/components/island/phone.tsx:219), so it does not prove APK vs browser. Device-side approval and Stop are NOT TESTED (MA2_T6:97-102, :285; MA3_T8:25). Scenario: T9 asks the user to 'use the existing Phone'. It fails at the new origin, re-pairing adds an 18th+ row, and the old active credential remains.",
+      "suggestedMinimalFix": "Plan T9 physical acceptance as a fresh pairing at the current origin, with the user present. Record model and Android version. Leave a307ff4b untouched unless the user explicitly asks to revoke it. Classify the phone rows NOT TESTED if the user does not take part."
+    },
+    {
+      "id": "G7",
+      "severity": "MEDIUM",
+      "title": "Paired-device path through the T8 SSE bridge and live-update latency over a quick tunnel are unverified",
+      "detail": "bunny-events.ts:33-45 forwards a device cookie token to Host /events. T8 stream-probe.mjs:6-23 tested only loopback workstation requests and denials (stream-live-probe.json). MA2_T6_REMOTE_ACCEPTANCE.md:85-88 says quick tunnels do not support SSE. The client falls back to invalidation every 30 s (host-stream.ts:54). Scenario: a phone over the quick tunnel sees a pending Agent approval up to 30 s late. Revocation mid-stream through the bridge (rather than direct Host /events) has no test.",
+      "suggestedMinimalFix": "Extend stream-probe.mjs, or add a test, using a disposable gateway with BUNNY_REMOTE_ORIGIN=https://<name>. Send Host: <name> and x-forwarded-proto: https over loopback (host-bridge.server.ts:30, :40) with a bunny_device cookie. Assert a signals-only stream, then revoke and assert closure. Document the polling bound for the phone."
+    },
+    {
+      "id": "G8",
+      "severity": "LOW",
+      "title": "authorizeBridge remote branch and pairing route lack unit tests",
+      "detail": "host-bridge.server.test.ts:16-22 covers only 'not configured' and 'configured origin + cookie'. Untested: Origin mismatch (host-bridge.server.ts:33), sec-fetch-site cross-site (:32), an http remote origin (:40), a missing cookie (token null leads to 'Pair this device' at :58), the 401 to re-pair mapping (:62), and clientKey trusting spoofable cf-connecting-ip and x-forwarded-for (:46-48). bunny-pair.ts (local refusal :10, bounds :12, cookie flags :16) has no test.",
+      "suggestedMinimalFix": "Add cases to src/lib/orch/host-bridge.server.test.ts, which already runs in the npm test lane via src/lib/orch/*.test.ts. Add a handler test for bunny-pair.ts against a disposable startHost."
+    },
+    {
+      "id": "G9",
+      "severity": "LOW",
+      "title": "Host-level remote refusals and pairing expiry have no tests; A33 test name overstates coverage",
+      "detail": "No *.test.* file references 'Remote devices cannot supply executable Agent graphs' (http.server.ts:399), 'Remote approval can only answer the exact Host offer' (:405), 'Pairing can only be initiated on the workstation' (:560) or 'Device revocation requires workstation access' (:573). The 10-minute expiry (:562) is untested. agentic-authorization.test.ts:85 is named 'A33 revoked device authority...' but only passes the actor 'device:revoked' to agentCommand and never revokes anything.",
+      "suggestedMinimalFix": "Add these as device-token HTTP assertions in the same disposable test as G2. Inject a clock, or wait for expiry against a short test hook only if one already exists. Otherwise label expiry STATIC VERIFIED."
+    },
+    {
+      "id": "G10",
+      "severity": "LOW",
+      "title": "Running npm test rewrites tracked historical T5/T6/T7 evidence (working tree currently dirty)",
+      "detail": "After the existing T9 baseline run (test-results/ma3/t9/baseline-tests.log: 256/650/24 pass, NPMTEST_EXIT=0), git status shows 21 modified tracked files under test-results/ma3/t5 (5), t6 (4 + 8 in security/) and t7 (4). agentic-live.test.ts:12-13 and other tests write into those directories. Prior gates restored them with preserve-evidence.mjs (test-results/ma3/t8/preserve-evidence.mjs:6-15) and t6/final-audit.mjs:24-28.",
+      "suggestedMinimalFix": "Before sealing T9, run a copy of t8/preserve-evidence.mjs retargeted to test-results/ma3/t9/regression-*. It copies regenerated files and restores the HEAD bytes. Record historical-evidence-preservation.json."
+    },
+    {
+      "id": "G11",
+      "severity": "LOW",
+      "title": "T8 seal lacks a .gitattributes rule while core.autocrlf=true",
+      "detail": ".gitattributes:8-13 marks the T5–T7 evidence and reports -text, with no rule for T8. `git config core.autocrlf` is true. verify-evidence.mjs:18 compares Git blob bytes to working-tree bytes, and INDEX.sha256 hashes LF bytes (seal-evidence.mjs:13-15). A fresh Windows checkout could produce CRLF and fail verification. Also, test-results/ is gitignored (.gitignore:8), so evidence must be force-added (T8 used a NUL pathspec file, seal-evidence.mjs:58-59).",
+      "suggestedMinimalFix": "For T9, add '/MA3_T9_*.md -text' and '/test-results/ma3/t9/** -text -whitespace', mirroring .gitattributes:12-13, and reuse seal-evidence.mjs and verify-evidence.mjs with t9 paths."
+    },
+    {
+      "id": "G12",
+      "severity": "LOW",
+      "title": "Packaging stamps legacy v26 semver and release-pin into MA3 test packages; name ordering inverted",
+      "detail": "package-bunny-desktop.ps1:121 always writes version=$pin.version, and :32 reads install/release-pin.json from the tooling commit. install/release-pin.json:2-4 = Bunny-A-Windows-v26-MA2-R1 / 26.0.0-MA2-R1 / 8001d51d…. The T8 package (package-manifest.json:3-6) is named v27-MA3-T8-R4-TEST with version 26.0.0-MA2-R1 and source 987afea. The shipped release-pin.json (package-manifest.json:1838-1842; package-inherited-release-pin.json) still names v26 and 8001d51d. The T7 package was named v28-MA3-T7-test (t7/package-manifest.json:3-4), so T8's 'v27' sorts before T7. Consumers report manifest.version: install/Bunny-Release-Info.ps1:56, release-identity.server.ts:25-26, and /bunny-health via install/Bunny-Server.mjs:9,29.",
+      "suggestedMinimalFix": "For a T9 test package, pass an explicit -PackageName with a monotonically increasing number. Either add an optional -Version parameter feeding :121 or keep the legacy value. In both cases, state in evidence (as finalize-evidence.mjs:99 did) that it is not a release candidate."
+    },
+    {
+      "id": "G13",
+      "severity": "INFO",
+      "title": "Prior evidence contains internal inconsistencies T9 should not inherit",
+      "detail": "(a) MA2_T6_REMOTE_ACCEPTANCE.md:101-102 says 'no phone record was observed', yet the production row a307ff4b was created at 2026-10-05T04:22:09Z, after production-preservation.json was recorded at 04:04Z (12 rows, 0 active, :246-247). (b) MA2_T7_WINDOWS_SIGNIN_ACCEPTANCE.md:259 calls epoch 1791174129259 '03/2026-era'; it is 2026-10-05. (c) MA3_BASELINE.md:97 lists the dev state root as Bunny-A\\state\\development, while code uses Bunny-A\\development (state-paths.server.ts:10). (d) The MA2 T6R independent client obtained pairing codes with the production master token read from stateRoot/credentials/credentials.json (test-results/ma2-gate6r/client.mjs:11, :18, :65). That is not reusable under the T9 no-production-credentials rule.",
+      "suggestedMinimalFix": "Cite device facts only from test-results/ma2-gate7/post-signin/device-preservation.json and MA3_BASELINE.md:99-101. Drive any T9 independent client against a disposable Host and gateway whose token comes over fixture IPC (agentic-host-worker.mjs:12)."
+    }
+  ],
+  "keyFacts": [
+    "(1) Remote-device security tests: [a] src/lib/orch/host-bridge.server.test.ts:7 loopback peer required for workstation; :13 cf-connecting-ip/x-forwarded-for/x-forwarded-proto/x-real-ip deny workstation; :16 no BUNNY_REMOTE_ORIGIN throws 'not configured', configured https origin + cookie gives {local:false, token}. [b] src/lib/bunny-host/host.test.ts:75: unauthenticated /state 401; master token + foreign Origin 403; device pair 200; device /state 200; device project.add 400; revoke gives 401; reused code 403. host.test.ts:119: FailureLimiter. [c] src/lib/bunny-host/ma2-t10.test.ts:49 (Host and task SSE variants): revoke closes the open device SSE with no post-revoke frame; /events, /state and stop return 401. :72: revoking one device keeps the workstation and other device streams. [d] src/lib/bunny-missions/capabilities.test.ts:264: device mission.get, mission.approve (Host scope only, overrides ignored, grantedBy device:) and mission.stop allowed; mission.configure, capability.run, mission.create with steps and trigger.create refused; 401 after revoke. [e] missions.test.ts:412 phone approval equals desktop scope (missionCommand level). [f] approval-batches.test.ts:560 device batch clamped to Host offer, revocable (missionCommand level). [g] agentic-authorization.test.ts:79 A27 (device agent.get read-only), :85 A33 (device propose refused), :86 A34 (device adjust refused; adjust only reduces). [h] agentic-live.test.ts:76 real forked Host: device adjust 400, device agent.list 401 after revoke. [i] scripts/desktop-install.test.mjs:8,:15 installed-gateway Origin/Host filter (install/manifest.mjs). [j] premium-model.test.ts:187, :223 and following: SSE bridge forwards sequence only, cancel cleanup, overlong refusal. [k] presentation.test.ts:198, :260 public projection redaction. [l] android/tests/ServerAddressTest.java (21 checks, build-android.ps1:48-49 only). None tests device agent pause/resume/stop or a positive device approval of an agent authorization.",
+    "Test lanes (package.json 'test'): scripts/*.test.mjs; one strip-types lane listing app-data, auth, src/lib/orch/*.test.ts, named bunny-host tests (host.test.ts, ma2-t10.test.ts and others) and src/lib/bunny-missions/*.test.ts; a --test-force-exit lane for agent-runtime and agent-recovery. 'test:ui' = src/components/island/*.test.ts. The Android ServerAddressTest is in no npm lane. Existing T9 baseline log test-results/ma3/t9/baseline-tests.log: 256 + 650 + 24 pass, NPMTEST_EXIT=0.",
+    "(2) Disposable Host recipes. In-process startHost({dataDirectory: mkdtemp, port}) at fixed ports 43129 (host.test.ts:77), 43131 (capabilities.test.ts:266) and 45139 (ma2-t10.test.ts:17). Forked worker scripts/fixtures/agentic-host-worker.mjs [data, root, port] on an ephemeral port (agentic-live.test.ts:18-27); it deletes BUNNY_STATE_LAYOUT and BUNNY_RELEASE_ROOT (:6-7) and sends the token over IPC (:12). scripts/fixtures/project-host-worker.mjs also deletes BUNNY_HOST_WORKSPACE (:10-12); T8 ran it on port 43158 with data at os.tmpdir()/bunny-t8-ui-*/state (ui-host.mjs:9-10, :16, :19). Dev preview Host (startup.sh:4-10): BUNNY_HOST_DATA_DIRECTORY=$BUNNY_PREVIEW_DATA_DIRECTORY or tmpdir/bunny-t5-preview-bun-router; BUNNY_HOST_PORT=$BUNNY_PREVIEW_HOST_PORT or 43145; unset BUNNY_STATE_LAYOUT, BUNNY_RELEASE_ROOT and BUNNY_HOST_CREDENTIALS_FILE; `npm run host`. Hazards: BUNNY_HOST_PORT defaults to 43119, the production port (http.server.ts:246). Without BUNNY_HOST_DATA_DIRECTORY, the Host and gateway use %LOCALAPPDATA%/Bunny-A/development (state-paths.server.ts:9-11; host-bridge.server.ts:53).",
+    "(2) Disposable gateways. T5: `npm run dev` (Vite 0.0.0.0:8080, startup.sh:15) and the built preview on 127.0.0.1:8081 (scripts/preview-platform.mjs:27). T8: test-results/ma3/t8/package-dashboard.mjs:8-16 imports the R4 package .output/server/index.mjs middleware on 127.0.0.1:8082 with BUNNY_HOST_DATA_DIRECTORY=<fixture data> and BUNNY_HOST_CREDENTIALS_FILE=<data>/credentials.json, deleting BUNNY_STATE_LAYOUT, BUNNY_RELEASE_ROOT and DATABASE_URL. BUNNY_REMOTE_ORIGIN was never set in any MA3 gate (grep test-results/ma3), so no MA3 gate exercised the remote-device gateway path. The installed gateway install/Bunny-Server.mjs requires BUNNY_STATE_LAYOUT=2, BUNNY_HOST_CREDENTIALS_FILE, BUNNY_REMOTE_CONFIG and BUNNY_HOST_DATA_DIRECTORY (:6, :19), derives BUNNY_REMOTE_ORIGIN from remote.json (:11-17) and hardcodes 127.0.0.1:8084 (:38). For loopback remote simulation, authorizeBridge accepts Host:<remote host> + x-forwarded-proto:https + cookie bunny_device when BUNNY_REMOTE_ORIGIN matches (host-bridge.server.ts:30, :40-41). BUNNY_TUNNEL_ORIGIN can point a tunnel at another loopback gateway (scripts/bunny-tunnel.mjs:18).",
+    "(2) Independent authenticated clients. MA2 T6R test-results/ma2-gate6r/client.mjs: seroval toJSONAsync/fromCrossJSON RPC to <origin>/_serverFn/<id>, with readBunnyHost and commandBunnyHost ids scraped from the release SSR chunk host-B6dxD6Oz.mjs (:12-13, :20-25). Headers: x-tsr-serverFn, sec-fetch-site:same-origin, origin. Pairing: POST /api/bunny-pair, assert the Set-Cookie flags, store the cookie in a 0600 temp file (:65-69). The code itself came from local('pairing.create') using the PRODUCTION master token read from stateRoot/credentials/credentials.json (:11, :18). MA3 T5: raw fetch to disposable Host /pair and then a device bearer on /command (agentic-live.test.ts:86-91). MA3 T8: no remote client; stream-probe.mjs used workstation-loopback fetches only.",
+    "(3) Production observation methods. The MA3 baseline and restart census copied C:\\Users\\allam\\AppData\\Local\\Bunny-A\\state\\host.sqlite (+wal/+shm) to a temp directory and opened the copy readOnly (production-restart/evidence/postboot-census-READONLY-script.mjs:4-10; RESTART_RECORD.md:54). Restart #2 also read live /state over the gateway with the production bearer (production-restart-2/RESTART_RECORD.md:21-22). MA3 T5/T6/T7/T8 opened %LOCALAPPDATA%/Bunny-A/development/host.sqlite with {readOnly:true}; T8 wrapped it in BEGIN/ROLLBACK (t8/audit.mjs:18-31). That is the dev DB, not production. Process CIM inventory (audit.mjs:35) and verifyRelease on releases/Bunny-A-Windows-v26-MA2-R1 (audit.mjs:32; 160 files) did target production. Production root per gateway health: ...\\Bunny-A\\state (RESTART_RECORD.md:36); production Host port 43119, gateway 8084.",
+    "(3) Production device facts, from prior evidence only: devices 18 rows, 1 active ('Phone companion'), 17 revoked. Sources: MA3_BASELINE.md:99-101 (census 2026-10-07T19:51:30.830Z) and test-results/ma3/production-restart/RESTART_RECORD.md:58 (devices 18, activeDevices 1). Identified Phone record: id a307ff4b-2d0b-425e-88b9-84eaf1302506, name 'Phone companion', createdAt 1791174129259 (2026-10-05T04:22:09Z), revokedAt null (test-results/ma2-gate7/post-signin/device-preservation.json:3-9, recorded 2026-10-06T04:18:37Z). MA2_FINAL_REMEDIATION_R1_1.md:97: 16 original device rows byte-identical; 18 total; the sole active Phone preserved. T8's production-before.json devices=0 (lines 21-24) is the dev DB and must not be cited.",
+    "(4) Android companion policy (package com.routeragent.jev, versionCode 2 / 2.0, minSdk 26, target 35; AndroidManifest.xml:2-6): INTERNET only, allowBackup=false, usesCleartextTraffic=false. Origin input is normalized to a bare https origin, rejecting loopback, userinfo, query, fragment and path (ServerAddress.java:11-31). Origin is stored in private preferences (MainActivity.java:58, :137). WebView (:178-187): JS and DOM storage on; file/content off; mixed content never; SafeBrowsing on; no JS window opening or multiple windows; third-party cookies off; first-party cookies default on. Never cleared on connection change (:103-150). No JS bridge. SSL errors call cancel() (:205-208); no pinning. Non-https navigations are blocked; gesture cross-origin opens the system browser; NON-gesture cross-origin HTTPS stays in the WebView (:192-201). Loads <origin>/?companion=1 (:219). APK releases/Bunny-A-Android-v2.apk sha256 c2345d32af1b157f… (test-results/ma2-gate6r/android-apk.json); Android source unchanged since ea0e803 (2026-10-02).",
+    "(4) Physical testing: never verified by the agent. ANDROID_APK_REPORT.md:49-52 (no phone or emulator). The user reported installing the APK at 2026-10-05T04:19:47Z (test-results/ma2-gate6/android-installation.json:2-6; model and androidVersion null). An invitation for origin martin-lovely-myself-tomatoes.trycloudflare.com was valid 04:15:39–04:25:39Z (:10-12). The production 'Phone companion' row was created at 04:22:09Z with the UI default name (phone.tsx:219). That correlation is my timestamp inference and is not recorded as a confirmation anywhere. MA2 T6, T6R and MA3 T8 label physical install, pairing and device-side approval/Stop NOT TESTED (MA2_T6:97-102, :285, :361-366; MA3_T8:25, :35).",
+    "(5) T8 seal format (test-results/ma3/t8/seal-evidence.mjs). Normalize text evidence (md/mjs/ps1/json/log/txt/sha256) to UTF-8 without BOM and LF (:13-15). Secret scan first: forbidden payload types, the exact disposable Host token read from <fixture.data>/credentials.json, private keys, sk- keys, high-entropy credential fields. Writes secret-scan.json and asserts zero findings (:16-33). Assert the required files (:35-36). INDEX.md: header lines (source commit, branch, gate verdict, links, seal rules), then a table '| [rel](<rel>) | bytes | sha256 |' over all sealed files including the root report (as ../../../MA3_T8_PREMIUM_UI_ACCEPTANCE.md). INDEX.md does not list itself (:37-52). INDEX.sha256: sorted lines '<sha256><two spaces><workspace-relative path>', including INDEX.md and excluding itself (:53-54). Self-verify (:55-57). Write the NUL-separated staging pathspec .grok/t8-evidence-paths.bin (:58-59). Excluded: package/**, ui-host-approved.log (frozen copy kept) (:10). verify-evidence.mjs [--staged] compares git cat-file bytes to the working tree and the digests, and asserts the committed path set equals the sealed set with no package/sqlite/db/exe/node paths (:8-23). This audit's read-only sha256sum -c of the 204 entries passed.",
+    "(6) Version inconsistency origin. scripts/package-bunny-desktop.ps1:32 loads install/release-pin.json from -ToolingCommit; :33-34 default PackageName and SourceCommit from it; :121 writes the release-manifest record with version=$pin.version unconditionally; :45 ships install/release-pin.json as tooling file release-pin.json. install/release-pin.json:2-4 = release Bunny-A-Windows-v26-MA2-R1, version 26.0.0-MA2-R1, sourceCommit 8001d51d…. T8 overrode the name (v27-MA3-T8-R4-TEST) and the source/tooling (987afea) but kept version 26.0.0-MA2-R1 (t8/package-manifest.json:3-6) and the inherited pin (package-inherited-release-pin.json). Acknowledged at finalize-evidence.mjs:99, :112 and MA3_T8_PREMIUM_UI_ACCEPTANCE.md:61. T7's package 'v28-MA3-T7-test' has the same version (t7/package-manifest.json:3-4), so the numbering is inverted.",
+    "Host authority facts relevant to T9. The gateway is a thin proxy: commandBunnyHost and readBunnyHost call hostRequest and dashboardCommand/dashboardSnapshot (src/lib/orch/host.ts:7-36); the Host decides. The Host API refuses any Origin or cross-site header and any non-loopback Host header (http.server.ts:321-325). A device is identified by token_hash with revoked_at NULL (:331). Remote callers may use all AGENT_ACTIONS except agent.create with steps (:398-399) and agent.authorization.* with keys beyond id/revision (:400-405). agentCommand refuses device propose and adjust only (agent-runtime.server.ts:858-860, :875-879).",
+    "Working-tree note (read-only observation): git status shows 21 modified tracked evidence files under test-results/ma3/t5, t6 (including security/) and t7. The T9 baseline npm test run regenerated them, and they must be preserved and restored as in t8/preserve-evidence.mjs before any T9 seal. Untracked protected files: BUNNY_OPENDOTS_ADOPTION_REPORT.md, MA1D_FINAL_INDEPENDENT_REVIEW.md, MA1_CLAUDE_FINAL_REVIEW.md, MA2_FINAL_INDEPENDENT_REVIEW.md, memory/."
+  ]
+}

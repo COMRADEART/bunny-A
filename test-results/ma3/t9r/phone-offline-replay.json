@@ -1,0 +1,74 @@
+{
+  "id": "S4",
+  "title": "Offline approval replay",
+  "tests": [
+    {
+      "name": "T9 F12-F15/F19-F22/F50 (G2): device answers only exact Host offers; Pause/Resume reissue asks at the current revision",
+      "status": "pass"
+    },
+    {
+      "name": "T9R offline approval is refused after reconnect; only the new Host offer can execute",
+      "status": "pass"
+    },
+    {
+      "name": "T9 approval replay: changed planned action cannot answer an old offer and the request stays open",
+      "status": "pass"
+    }
+  ],
+  "result": "PASS",
+  "evidence": {
+    "classification": "LIVE canonical admission; SIMULATED offline holding of a client payload",
+    "staleCode": "REFUSED",
+    "duplicateRejected": true,
+    "oldRequest": "0de204ff-7a7e-4c88-bac2-af7bedcef034",
+    "newRequest": "0e3417be-633f-4e2b-a0af-af1b54fa7613",
+    "automaticReplay": false,
+    "verifiedReceipt": "Offline receipt"
+  },
+  "phoneOnlyNetwork": {
+    "result": "PASS",
+    "classification": "LIVE paired credential, actual test-client transport listeners closed and restored, real admitted Host filesystem effect; SIMULATED loopback phone network adapter",
+    "agentId": "602c8956-1860-4ce7-8d7d-3f0b299baa94",
+    "missionId": "3fe74045-9008-4878-b0b6-24d1819d3927",
+    "held": {
+      "kind": "held-write",
+      "missionId": "3fe74045-9008-4878-b0b6-24d1819d3927",
+      "capabilityRunId": "5016976c-e0e4-4ce6-9422-7421057bbc57",
+      "path": "result.txt",
+      "observedAt": "2026-10-09T07:27:26.425Z"
+    },
+    "off": {
+      "clientTransport": "closed",
+      "hostPid": 14184,
+      "hostRunning": true,
+      "at": "2026-10-09T07:27:26.594Z"
+    },
+    "transportFailure": "ECONNREFUSED",
+    "hostIdentityUnchanged": true,
+    "successfulWrites": 1,
+    "writeRuns": 1,
+    "capabilityRuns": [
+      {
+        "action": "filesystem.read",
+        "status": "succeeded"
+      },
+      {
+        "action": "filesystem.compare",
+        "status": "succeeded"
+      },
+      {
+        "action": "filesystem.write",
+        "status": "succeeded"
+      },
+      {
+        "action": "filesystem.compare",
+        "status": "succeeded"
+      }
+    ],
+    "canonicalTaskCount": 0,
+    "reconnected": true,
+    "physicalPhone": "NOT TESTED",
+    "realLan": "NOT TESTED",
+    "publicTunnel": false
+  }
+}

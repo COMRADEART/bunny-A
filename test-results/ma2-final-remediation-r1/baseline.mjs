@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,mkdirSync,readdirSync,statSync,existsSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import {DatabaseSync} from 'node:sqlite';
+import {join} from 'node:path';
+import {verifyRelease,sourceCheck,importClosure,fileSha256} from '../../scripts/bunny-release.mjs';
+import {rowDigest,tableDumps,APPEND_ONLY,VOLATILE_TABLE} from '../ma2-gate8/tools/22-rowdigest.mjs';
+const rec='test-results/ma2-final-remediation-r1',prod=join(process.env.LOCALAPPDATA,'Bunny-A'),stage=join(process.env.LOCALAPPDATA,'Bunny-A-R1-stage');
+const read=p=>JSON.parse(readFileSync(p,'utf8').replace(/^\uFEFF/,'')),sha=b=>createHash('sha256').update(b).digest('hex'),save=(name,v)=>{const p=join(rec,name);mkdirSync(join(p,'..'),{recursive:true});writeFileSync(p,JSON.stringify({recordedAt:new Date().toISOString(),...v},null,2)+'\n');};
+const config=read(join(prod,'install.json')),state=config.stateRoot,release=config.currentRelease.folder,manifest=read(join(release,'release-manifest.json')),creds=read(join(state,'credentials/credentials.json'));
+const auth={authorization:'Bearer '+creds.token};const response=await fetch('http://127.0.0.1:'+config.hostPort+'/state',{headers:auth});assert.equal(response.status,200);const snapshot=await response.json();
+const health=await fetch('http://127.0.0.1:'+config.hostPort+'/health').then(r=>r.json());assert.equal(health.pid,creds.pid);assert.equal(health.instanceId,creds.instanceId);
+const integrity=verifyRelease(release),blobs=sourceCheck(process.cwd(),release),closure=importClosure(release);assert.ok(integrity.ok&&blobs.ok&&closure.ok);
+const backupDir=join(stage,'backups');mkdirSync(backupDir,{recursive:true});const backup=join(backupDir,'production-r1-baseline.sqlite');assert.ok(!existsSync(backup));
+const db=new DatabaseSync(join(state,'host.sqlite'),{readOnly:true});db.prepare('VACUUM INTO ?').run(backup);db.close();
+const copy=new DatabaseSync(backup,{readOnly:true});assert.equal(copy.prepare('PRAGMA integrity_check').get().integrity_check,'ok');copy.exec('BEGIN');
+const tables=copy.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(r=>r.name),ledger={};
+for(const table of tables){const {pk,rows}=tableDumps(copy,table);ledger[table]={pk,appendOnly:APPEND_ONLY.has(table),volatile:VOLATILE_TABLE.has(table),count:rows.length,rows:Object.fromEntries(rows.map(r=>[String(r[pk]),rowDigest(table,r).digest]))};}
+const devices=copy.prepare('SELECT * FROM devices').all().map(row=>({id:row.id,name:row.name,revokedAt:row.revoked_at,fullRowSha256:sha(JSON.stringify(row))}));
+const settingRows=copy.prepare('SELECT * FROM settings').all(),missionConfig=JSON.parse(settingRows.find(r=>r.key==='missions_config')?.value??'{}');
+const dbVersion=copy.prepare('PRAGMA user_version').get().user_version;copy.exec('ROLLBACK');copy.close();
+save('baseline/protected-row-ledger.json',{classification:'LIVE VERIFIED',source:'SQLite-consistent immutable baseline backup',tables:ledger,exclusions:'Existing canonical rowDigest secret/provider telemetry exclusions; volatile workspace_locks explicit'});
+save('baseline/db-backup.json',{classification:'LIVE VERIFIED',path:backup,sha256:fileSha256(backup),size:statSync(backup).size,method:'Read-only source VACUUM INTO; committed WAL-aware SQLite snapshot',integrity:'ok',schemaVersion:dbVersion,privateBackupOutsideEvidence:true});
+const protectedFiles=['install.json','state/state-layout.json','state/credentials/credentials.json','state/settings/deployment.json','state/settings/remote-consent.json'].filter(p=>existsSync(join(prod,p))).map(path=>({path,sha256:fileSha256(join(prod,path))}));
+const providers=Object.values(snapshot.providers??{}).map(p=>({id:p.id,version:p.version,availability:p.availability,compatibility:p.securityCompatibility??null}));
+const activeTasks=(snapshot.tasks??[]).filter(t=>!['completed','failed','stopped'].includes(t.state)).map(t=>({id:t.id,state:t.state}));
+save('baseline/production.json',{classification:'LIVE VERIFIED',head:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),branch:execFileSync('git',['branch','--show-current'],{encoding:'utf8'}).trim(),status:execFileSync('git',['status','--short'],{encoding:'utf8'}),release:manifest.release??config.currentRelease.name,version:manifest.version,releasePath:release,sourceCommit:manifest.sourceCommit,toolingCommit:manifest.toolingCommit,manifestSha256:fileSha256(join(release,'release-manifest.json')),zipSha256:config.currentRelease.packageSha256,dashboard:manifest.dashboard,health,stateRoot:state,workspace:config.workspace,hostPort:config.hostPort,devices,missionConfig,settings:settingRows.map(r=>({key:r.key,sha256:sha(r.value)})),protectedFiles,providers,activeTasks,productionActivated:false});
+save('baseline/production-integrity.json',{classification:'STATIC VERIFIED',integrity,blobs,closure,coveredSizesMatch:manifest.files.every(f=>statSync(join(release,f.path)).size===f.bytes)});
+const roots=['ma2-final-independent','ma2-gate10','ma2-gate9','ma2-gate9r','ma2-gate8','ma2-gate6r'];const records=[];
+for(const name of roots){const files=[];const walk=folder=>{for(const item of readdirSync(folder,{withFileTypes:true})){const p=join(folder,item.name);if(item.isDirectory())walk(p);else files.push(p);}};walk(join('test-results',name));const verdicts=files.filter(p=>/final-verdict|regression-final\.json|candidate-package\.json|classification\.json|failure-ledger\.json|stop-ownership-finding\.json|development-host\.json/.test(p)).map(path=>({path,size:statSync(path).size,sha256:fileSha256(path),parsed:read(path)}));records.push({root:name,fileCount:files.length,evidenceBytes:files.reduce((n,p)=>n+statSync(p).size,0),verdicts});}
+save('baseline/historical-evidence-inspection.json',{classification:'STATIC VERIFIED',records,reviewSha256:fileSha256('MA2_FINAL_INDEPENDENT_REVIEW.md'),priorReviewImmutable:true});
+save('baseline/regression-floor.json',{classification:'STATIC VERIFIED',packageScripts:read('package.json').scripts,previousObserved:read('test-results/ma2-final-independent/run-20261007T0153Z/test-regression.json'),actualCurrentCounts:'Pending current full execution; historical numbers are not current counts',deletedTestFiles:execFileSync('git',['diff','--name-only','--diff-filter=D','deb83e8','--','src','scripts'],{encoding:'utf8'}).trim()});
+console.log('Fresh production identity, consistent private backup, protected ledgers and required evidence roots inspected.');

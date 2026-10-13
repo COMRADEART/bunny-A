@@ -1,0 +1,79 @@
+{
+  "rows": [
+    {
+      "id": "E37",
+      "title": "Scope reduction/admission race serialized",
+      "initialConditions": "device answer",
+      "operation": "Narrowing in the same tick",
+      "expected": "Nothing written",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E37:",
+          "names": [
+            "F02-E37: a device answer and an immediate owner narrowing in the same tick leave nothing written"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    },
+    {
+      "id": "E39",
+      "title": "Stop blocks later admissions",
+      "initialConditions": "device-answered or staged write",
+      "operation": "Stop",
+      "expected": "No write; staged WITHDRAWN",
+      "evidenceType": "in-process Host integration (real MissionManager/TaskManager/SQLite, disposable folders)",
+      "observed": "Every supporting test and live artifact passed (see supportingEvidence)",
+      "supportingEvidence": [
+        {
+          "prefix": "F02-E39a:",
+          "names": [
+            "F02-E39a: Stop before admission blocks a device-answered write; nothing is written"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-E39b:",
+          "names": [
+            "F02-E39b: Stop after a device answer was staged withdraws the staged change; the project is untouched"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-ST3:",
+          "names": [
+            "F02-ST3: Stop withdraws a STAGED change; nothing reaches the project"
+          ],
+          "result": "PASS"
+        },
+        {
+          "prefix": "F02-R3-5:",
+          "names": [
+            "F02-R3-5: Stop ends an unused one-time answer with a WITHDRAWN end state"
+          ],
+          "result": "PASS"
+        }
+      ],
+      "result": "PASS"
+    }
+  ],
+  "additional": [
+    {
+      "prefix": "T9R four-way phone/desktop race resolves one request exactly once",
+      "names": [
+        "T9R four-way phone/desktop race resolves one request exactly once"
+      ],
+      "result": "PASS"
+    },
+    {
+      "prefix": "T9R concurrent desktop and phone approval has one canonical winner and one effect",
+      "names": [
+        "T9R concurrent desktop and phone approval has one canonical winner and one effect"
+      ],
+      "result": "PASS"
+    }
+  ]
+}

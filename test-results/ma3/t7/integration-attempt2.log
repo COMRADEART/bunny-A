@@ -1,0 +1,179 @@
+✔ A07/A08: pause survives a real Host restart; nothing resumes by itself; resume completes under the same envelope (2435.9577ms)
+✔ A12: restart during a read child requeues it once; one interrupted row, one recovered row, same agent and mission (2494.4805ms)
+✔ A13/A28: verification recorded and crash before the mission heard — consume the canonical result, never re-execute (890.4122ms)
+✔ A30: completed child without recorded verification — re-run the check, never the underlying effect (794.7592ms)
+{"type":"host.degraded","at":1791476092838,"failureClass":"HOST_DEGRADED","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+{"type":"host.subsystem_failed","at":1791476092837,"failureClass":"SUBSYSTEM_FAILURE","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+✔ A19: a corrupt checkpoint stops recovery fail-closed; nothing replays and the mission waits for the user (3780.746ms)
+✔ A15: a restart-invalidated approval is denied, cleared, and re-asked fresh — never reused (1058.5993ms)
+✔ A16/A17: the removed provider's requeue re-routes to the remaining eligible provider (877.4579ms)
+✔ A20: a foreign recovery claim blocks the walk; once released, a runtime picks the agent up (2460.2804ms)
+✔ A21: reconcile refuses completed/blocked-by-authority steps and non-completed canonical truth (1015.6044ms)
+✔ A22: a COMPLETED agent stays COMPLETED across a restart; a STOPPED agent never resurrects (2222.8437ms)
+✔ A35: a historical direct task's canonical row is byte-identical across the restart (757.9798ms)
+✔ A01: create persists a profile with a stable id; bad input never persists (574.5278ms)
+✔ A32: the active bound refuses the 11th agent and frees the slot on stop (1004.2145ms)
+✔ A02/A03/A04: two Tasks route to different providers under one agent, same mission, distinct sessions (1186.25ms)
+✔ A05: a scope-violating capability ask lands WAITING_FOR_USER and the allow_once decision releases it (830.4101ms)
+✔ A06: pause blocks the next admission while the admitted step finishes; nothing resumes by itself (2172.2042ms)
+✔ A08: resume without restart reuses the same run and generation, then completes (908.7139ms)
+✔ A08 refusals: resume refuses a revoked, an expired, and a deleted envelope; the agent stays paused (689.5396ms)
+✔ A09: stop persists STOPPED first, stops the mission, and refuses pause/resume/second-stop (689.3159ms)
+✔ A18: a failing provider fails the mission; the agent's failure row carries fixed phrases only (854.9745ms)
+✔ A24: the agent retains its project reference; the mission runs at the project root (478.8157ms)
+✖ A31/§25: lifecycle rows are the agent's own vocabulary, once each, never colliding with task rows (703.7683ms)
+✔ A27: the agent runs to COMPLETED with zero UI involvement (700.2809ms)
+✔ agentCommand dispatch: list/get/create start; unknown agent and unknown action refuse (526.2622ms)
+✔ Codex detection: npm shim resolves to its real script; a signed-out CLI is authentication_required, never ready (285.5195ms)
+✔ Claude detection: loggedIn=false requires sign-in; unreadable auth stays Unknown; missing CLI is not_installed (287.0907ms)
+✔ Codex ready requires a real catalogue: a signed-in CLI without one is unavailable, not ready (343.9154ms)
+✔ discovery parses npm shims and Cursor Agent version folders without executing anything (1.0362ms)
+✔ detect-only providers are reported but never routable (140.1846ms)
+✔ hard localOnly constraint excludes cloud providers outright, whatever their score (4.15ms)
+✔ MA1: local-only routing never inherits an Ollama cloud-hosted default; other routing is unchanged (0.7844ms)
+✔ MA1: a stale local-only task whose model is cloud-hosted is refused at launch (217.5671ms)
+✔ automatic routing for a file-and-run task: text-only Ollama is ineligible and the decision is structured (0.989ms)
+✔ requiresGit and a specific working directory are hard requirements (0.6057ms)
+✔ usage: official windows place short inside and weekly outside; nothing exposed means Usage unavailable (0.5199ms)
+✔ event normalization: only evidence-backed activity, plans give determinate progress, duplicates collapse (2.6675ms)
+✔ Claude Code usage comes from its own rate_limit_event, captured verbatim from a real session (0.2758ms)
+✔ session-reported usage survives re-probes with its report time; a provider refusal blocks routing until reset (2.6456ms)
+✔ registry publishes provider.status_changed only on material change and persists state (1.9484ms)
+✔ periodic refresh does not re-run full probes before their interval (1.6808ms)
+✔ Host-owned sessions: state, latest activity and progress survive any client; stop affects only its task (38.6897ms)
+✔ real task lifecycle: running → Bunny-A verifying → completed only when Bunny-A's own disk read matches (140.2481ms)
+✔ a required working directory must be an approved project folder (13.275ms)
+✔ process tree: descendants follow parent links and reject reused PIDs; survivors need the same start time (0.3074ms)
+✔ persisted provider state is shown after a Host restart but nothing routes until re-probed (5.6965ms)
+✔ Ollama stays a routable local executor with no quota claims (91.1951ms)
+✔ the session transcript is private evidence on disk (32.0991ms)
+Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\win\async.c, line 94
+✖ src\lib\bunny-host\m2.test.ts (1994.1386ms)
+✔ A01 envelope creation: stable persisted identity, version, bounded policy (640.5625ms)
+✔ A02 explicit user consent: proposal and forged oneTime never grant execution (577.52ms)
+✔ A03 covered read: repeated Host admission has no new approval request (1079.0884ms)
+✔ A04 covered workspace write: real adapter writes and independently reads back (814.5429ms)
+✔ A05 repeated exact test family: real owned Node execution and finite accounting (1565.1055ms)
+✔ A06 multiple step/Task authority references share one budget (955.06ms)
+✔ A07 provider switch cannot change the persisted scope (702.0984ms)
+✔ A08 specialized local model claims cannot expand filesystem authority (737.8893ms)
+✔ A09 cross-Mission envelope replay fails at actual Bus admission (746.8102ms)
+✔ A10 cross-Agent identity substitution cannot grant authority (756.3185ms)
+✔ A11 cross-project cwd/root substitution rejected (724.0318ms)
+✔ A12 traversal and junction escape rejected before file mutation (729.0722ms)
+✔ A13 argv and wrapper laundering: node eval/shell/install cannot inherit test authority (820.6913ms)
+✔ A14 browser read cannot imply browser mutation (698.3984ms)
+✔ A15 Calculator identity cannot imply another application (670.3552ms)
+✔ A16 high-risk action pauses before actual deletion (773.737ms)
+✔ A17 scope expansion creates exact Host request and waiting Agent checkpoint (745.5788ms)
+✔ A18 denial persisted; identical denied resource cannot be retried by alternate model (832.1515ms)
+✔ A19 wall-clock expiry rejects actual admission (1610.5127ms)
+✔ A20 finite action budget rejects subsequent read (810.8506ms)
+✔ A21 concurrent final allowance: at most one real action admitted (813.4518ms)
+✔ A22 retries are counted as new authority, never free (972.7871ms)
+✔ A23 model reroute does not reset spent allowance (866.8384ms)
+✔ A24 revocation rejects future stale requests (693.3245ms)
+✔ A25 Stop persists before later admissions (694.0426ms)
+✔ A26 Pause blocks actual Bus admission; Resume revalidates (876.4224ms)
+✔ A27 UI reconnect is a read projection and preserves consent (780.628ms)
+✔ A28 new generation retains history and requires fresh reviewed consent (813.2637ms)
+✔ A29 old approval ID is refused after restart invalidation (726.1576ms)
+✔ A30 prior T9 epoch cannot be revived by Agentic grant (656.3763ms)
+✔ A31 tampered persisted envelope fails closed (656.153ms)
+✔ A32 stale revision refused after scope reduction (680.5389ms)
+✔ A33 revoked device authority has no separate approval engine (HTTP regression elsewhere) (658.0918ms)
+✔ A34 remote client cannot invent or widen the Host offer (746.5417ms)
+✔ A35 model claims prior approval cannot launder oneTime or direct authority (728.4294ms)
+✔ A36 untrusted document text cannot change capability scope (810.5849ms)
+✔ A37 replaced root identity cannot inherit consent (689.4858ms)
+✔ A38 unknown action and risk fail closed in canonical decision (668.8521ms)
+✔ A39 high-risk denial cannot reroute into specialized local authority (721.6768ms)
+✔ A40 every real admission has safe Agent/Mission/step/envelope provenance (775.5755ms)
+✔ A41 no content or credential material in envelope/admission/public authority projection (816.6428ms)
+✔ A42 legacy direct Task/capability authority stays additive (658.8055ms)
+✔ A43 T4 checkpoint continuity survives T5 consent and Pause (668.0498ms)
+✔ A44 routing/provider selection never edits authorization revision or roots (653.4536ms)
+✔ A45 revocation committed before admission wins the race (781.2166ms)
+✔ A46 already-completed effects remain after Stop and revocation (865.9874ms)
+✔ A47 no second authority: canonical deny still wins over Agentic scope (768.6348ms)
+✔ A48 unknown quota still has finite action and provider-attempt ceilings (707.591ms)
+✔ A49 completed envelope cannot resurrect (697.0249ms)
+✔ A50 scope reduction effective before next dispatch (842.3071ms)
+✔ T5 command bytes and environment revalidated at real execution (1296.5569ms)
+✔ T5 read-only Task cannot borrow a write step's authority (708.723ms)
+✔ T5 positive parser grammar rejects executable imports, network, constructor and dynamic path escapes (979.7921ms)
+✔ T5 forged invocation flags cannot defeat a standing ask-every-time rule (750.4994ms)
+✔ T5 Pause before consent cannot strand the pending review (568.5668ms)
+✖ T5 broad roots cannot read, overwrite or copy Host authority state (733.4597ms)
+✔ T5 A06/A40: actual TaskManager inference admission, simulated provider I/O, shared finite budget (655.6319ms)
+✔ T5 A07/A23/A39/A44: actual retarget and launch cannot enlarge Mission authority (provider I/O simulated) (704.9085ms)
+✔ T5 A22 actual TaskManager retry spends fresh authority and refuses an exhausted budget (provider I/O simulated) (1295.0034ms)
+✖ T5 Git read cannot execute repository fsmonitor configuration (749.2637ms)
+ℹ tests 108
+ℹ suites 0
+ℹ pass 104
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 80929.8644
+
+✖ failing tests:
+
+test at src\lib\bunny-host\agent-runtime.test.ts:396:1
+✖ A31/§25: lifecycle rows are the agent's own vocabulary, once each, never colliding with task rows (703.7683ms)
+  AssertionError [ERR_ASSERTION]: agent.workspace.created is lifecycle vocabulary
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/agent-runtime.test.ts:413:38)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at src\lib\bunny-host\m2.test.ts:1:1
+✖ src\lib\bunny-host\m2.test.ts (1994.1386ms)
+  'test failed'
+
+test at src\lib\bunny-missions\agentic-authorization.test.ts:51:120
+✖ T5 broad roots cannot read, overwrite or copy Host authority state (733.4597ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Host credentials, consent database/. Input:
+  
+  'Project/Agent workspace identity, resource scope or disk bound failed; review context.'
+  
+      at probe.rootIsState (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/agentic-authorization.test.ts:120:58)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/agentic-authorization.test.ts:51:185)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Project/Agent workspace identity, resource scope or disk bound failed; review context.',
+    expected: /Host credentials, consent database/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at src\lib\bunny-missions\agentic-authorization.test.ts:51:120
+✖ T5 Git read cannot execute repository fsmonitor configuration (749.2637ms)
+  AssertionError [ERR_ASSERTION]: Project/Agent workspace identity, resource scope or disk bound failed; review context.
+  + actual - expected
+  
+  + undefined
+  - 'succeeded'
+  
+      at covered (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/agentic-authorization.test.ts:49:165)
+      at async probe.git (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/agentic-authorization.test.ts:194:3)
+      at async TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-missions/agentic-authorization.test.ts:51:185)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

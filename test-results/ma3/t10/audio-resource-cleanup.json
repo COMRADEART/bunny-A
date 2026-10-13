@@ -1,0 +1,137 @@
+{
+  "hostDeath": [
+    {
+      "workerGoneAfterMs": 341,
+      "classification": "LIVE Host process killed during speech; F04 job closed; worker died"
+    }
+  ],
+  "workerProcessesAfterBargeInRun": "0",
+  "packagedCloseWorkersRemaining": 0,
+  "deterministic": [
+    {
+      "suite": "scripts",
+      "name": "V24 mute aborts an active capture and refuses capture.start until unmuted",
+      "result": "PASS"
+    },
+    {
+      "suite": "scripts",
+      "name": "V25 shutdown with an active capture releases everything and exits 0 within 2 s",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V25 capture and playback truth require the worker confirmation and the matching state",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V02 V24 V57 an explicit open either starts contained or reports an honest reason, never a silent success",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V24 voice.mute honours both the clients' {on} field and the {muted} spelling over real HTTP",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V25 close releases the worker: capture, playback and session flags are cleared and shutdown is sent",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V24 muted: capture is refused and nothing is captured",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V26 an input device lost mid-capture is a truthful DEVICE_UNAVAILABLE, not a silent stop",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V27 a playback error keeps the textual answer and reports the code",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10 H5 above the soft stdin budget an idle session relaunches the worker and keeps its session id",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10 H5 a turn that would cross the hard stdin budget is ended with an error, not silently dropped",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10 H5 a turn that starts during an idle relaunch waits for the fresh worker and captures on it",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V25 R3-session#2 concurrent closes join one close; an open after them gets exactly one live worker",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10 R4 H-RELAUNCH-WAKE a press waiting on transcription survives the idle relaunch its wake triggers",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V54 V25 the worker is admitted into a Bunny-owned job and the job is observable with kernel accounting",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V25 close shuts the worker down: its process is gone and its ownership record is closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V25 V54 an abrupt termination of the job kills the worker and the process exits",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V25 a speak with an immediate speak.cancel produces a cancel receipt for that generation",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V54 V25 the worker is verified against its build record before any launch",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V25 V54 a refused launch starts nothing and creates no ownership record",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V24 muted mic captures nothing: muted state disables talk and shows the mute copy",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V25 mic resources released on close: a closed session cannot show live level or listening",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V26 input device disconnect handled: DEVICE_LOST copy is shown and talk is still gated by the snapshot",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V27 playback device loss handled: playback errors surface and Speaking stops",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V27 T10: speech into a muted or zero-volume Windows output is disclosed as inaudible; unknown volume is not called muted",
+      "result": "PASS"
+    }
+  ]
+}

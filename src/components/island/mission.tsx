@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { Check, ChevronLeft, ChevronRight, ExternalLink, RotateCcw, ShieldCheck, Square, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ExternalLink, MousePointerClick, RotateCcw, ShieldCheck, Square, X } from "lucide-react";
 import { useIsland } from "@/store/use-island";
 import type { MissionView } from "@/lib/bunny-missions/types";
 import { NAMES } from "./ui";
 import { openTask } from "./task";
+import { allowVerdict, isDevice, missionApproveVerdict } from "./remote-view-model";
 import {
   agentDetail,
   agentRows,
+  batchButtonLabel,
+  batchOfferLines,
+  batchStatusLabel,
   duration,
   focusMission,
   MISSION_LABEL,
@@ -16,6 +20,8 @@ import {
   permissionLabel,
 } from "./mission-model";
 import type { ProviderId } from "@/lib/orch/types";
+import { ActivityTimeline } from "./activity";
+import { artifactStatus } from "@/lib/bunny-host/presentation";
 
 /** Inbox text with mission titles instead of raw ids. */
 function readable(detail: string, missions: MissionView[]) {
@@ -30,7 +36,7 @@ const providerName = (id: string | null) => (id && id in NAMES ? NAMES[id as Pro
 /** Compact Bunny Bar strip: mission title and one glyph per agent role. */
 export function MissionStrip({ mission, onOpen }: { mission: MissionView; onOpen: () => void }) {
   const tasks = useIsland((s) => s.tasks);
-  const { rows, more } = agentRows(mission, tasks, 4);
+  const { rows, more } = agentRows(mission, tasks, 3);
   return (
     <button
       className="mission-strip"
@@ -92,6 +98,8 @@ function ProgressMeter({ mission }: { mission: MissionView }) {
 
 function ApprovalCard({ mission }: { mission: MissionView }) {
   const store = useIsland();
+  const delegatedAgent = store.agents?.agents.find(agent => agent.missionId === mission.id && agent.authorization);
+  if (delegatedAgent) return <div className="mission-approval"><p className="caption">Review and authorize the exact bounded access for {delegatedAgent.name} in Persistent agents below.</p></div>;
   return (
     <div className="mission-approval">
       <p className="eyebrow">
@@ -112,14 +120,36 @@ function ApprovalCard({ mission }: { mission: MissionView }) {
       </ul>
       {mission.planning.rationale.length ? <p className="caption">{mission.planning.rationale.join(" ")}</p> : null}
       <div className="actions">
-        <button className="btn primary" onClick={() => void store.approveMission(mission.id)}>
-          Approve & start
-        </button>
-        <button className="btn quiet" onClick={() => void store.stopMission(mission.id)}>
+        {missionApproveVerdict(mission, store.viewer).allowed ? (
+          <button className="btn primary" disabled={!store.canAct()} onClick={() => void store.approveMission(mission.id)}>
+            Approve & start
+          </button>
+        ) : (
+          <p className="control-caption host-required">{missionApproveVerdict(mission, store.viewer).caption}</p>
+        )}
+        <button className="btn quiet" disabled={!store.canAct()} onClick={() => void store.stopMission(mission.id)}>
           Cancel
         </button>
       </div>
     </div>
+  );
+}
+
+/** M-A-3 T9R-F02: the Host shows 8 KB of a staged change; the workstation reads every byte before promoting more. */
+const PROMOTION_PREVIEW_BYTES = 8192;
+function StagedInspection({ stagingId, bytes }: { stagingId: string; bytes: number }) {
+  const store = useIsland();
+  const [shown, setShown] = useState<{ content: string; sha256: string; bytes: number } | null>(null);
+  if (bytes <= PROMOTION_PREVIEW_BYTES || isDevice(store.viewer)) return null;
+  return shown ? (
+    <div className="mission-staged-content" data-testid="staged-content">
+      <p className="caption">All {shown.bytes} bytes, sha256 {shown.sha256}:</p>
+      <pre className="caption">{shown.content}</pre>
+    </div>
+  ) : (
+    <button className="btn secondary" disabled={!store.canAct()} onClick={() => void store.inspectStaged(stagingId).then(setShown)}>
+      Inspect all {bytes} bytes
+    </button>
   );
 }
 
@@ -129,24 +159,50 @@ function Requests({ mission }: { mission: MissionView }) {
   if (!open.length) return null;
   return (
     <div className="mission-requests">
-      {open.map((request) => (
-        <div className="mission-request" key={request.id}>
-          <p>
-            <strong>{mission.steps.find((step) => step.id === request.stepId)?.role ?? "Step"}</strong> wants{" "}
-            <code>{request.action}</code> ({request.risk.toLowerCase().replaceAll("_", " ")})
-          </p>
-          <p className="caption">{request.reason}</p>
-          {mission.steps.find((step) => step.id === request.stepId)?.executor.kind === "skill" ? <p className="caption">Allows matching actions throughout this skill run inside the approved folders. Other actions still require their own approval.</p> : null}
-          <div className="actions">
-            <button className="btn primary" onClick={() => void store.respondMission(request.id, "allow_once")}>
-              {permissionLabel(mission, request.stepId)}
-            </button>
-            <button className="btn quiet" onClick={() => void store.respondMission(request.id, "deny")}>
-              Deny
-            </button>
+      {open.map((request) => {
+        const offer = request.batchOffer;
+        return (
+          <div className="mission-request" key={request.id}>
+            <p>
+              <strong>{mission.steps.find((step) => step.id === request.stepId)?.role ?? "Step"}</strong> wants{" "}
+              <code>{request.action}</code> ({request.risk.toLowerCase().replaceAll("_", " ")})
+            </p>
+            <p className="caption">{request.reason}</p>
+            {request.promotion ? <StagedInspection stagingId={request.promotion.stagingId} bytes={request.promotion.contentSize} /> : null}
+            {mission.steps.find((step) => step.id === request.stepId)?.executor.kind === "skill" ? <p className="caption">Allows matching actions throughout this skill run inside the approved folders. Other actions still require their own approval.</p> : null}
+            {offer ? (
+              <div className="mission-batch-offer">
+                <ul className="mission-scope" data-testid="batch-offer">
+                  {batchOfferLines(offer).map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <div className="actions">
+              {allowVerdict(request, store.viewer).allowed ? (
+                <>
+                  {request.remote?.batchOnly ? null : (
+                    <button className="btn primary" disabled={!store.canAct()} onClick={() => void store.respondMission(request.id, "allow_once")}>
+                      {permissionLabel(mission, request.stepId)}
+                    </button>
+                  )}
+                  {offer ? (
+                    <button className="btn secondary" data-testid="allow-batch" disabled={!store.canAct()} onClick={() => void store.respondMission(request.id, "allow_batch")}>
+                      {batchButtonLabel(offer)}
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <p className="control-caption host-required">{allowVerdict(request, store.viewer).caption}</p>
+              )}
+              <button className="btn quiet" disabled={!store.canAct()} onClick={() => void store.respondMission(request.id, "deny")}>
+                Deny
+              </button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -222,6 +278,19 @@ export function MissionPanel({ mission, now }: { mission: MissionView; now: numb
       <ProgressMeter mission={mission} />
       {mission.state === "waiting_for_approval" ? <ApprovalCard mission={mission} /> : null}
       <Requests mission={mission} />
+      {mission.batch ? (
+        <div className="mission-batch" data-state={mission.batch.status} data-testid="batch-block">
+          <p className="eyebrow">
+            <MousePointerClick size={13} /> Small approval batch
+          </p>
+          <p className="caption">{batchStatusLabel(mission.batch, now)}</p>
+          {mission.batch.status === "active" ? (
+            <button className="btn quiet" onClick={() => void store.revokeBatch(mission.id, mission.batch!.id)}>
+              Revoke batch
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {mission.recovery ? <p className="mission-failure">{mission.recovery.detail}</p> : null}
       {mission.state !== "waiting_for_approval" ? (
         <ul className="mission-agent-list">
@@ -241,6 +310,11 @@ export function MissionPanel({ mission, now }: { mission: MissionView; now: numb
         </ul>
       ) : null}
       {mission.result ? <p className="result-summary">{mission.result.summary}</p> : null}
+      <div className="verification-card" data-passed={mission.state === "completed" && mission.result?.unverifiedSteps === 0 ? "true" : "unknown"}>
+        <ShieldCheck size={16} aria-hidden="true" /><span>{mission.state === "verifying" ? "Bunny verifying mission" : mission.result ? `${mission.result.verifiedSteps} steps verified · ${mission.result.unverifiedSteps} not independently verified` : "Independent verification is separate from provider and capability completion."}</span>
+      </div>
+      {mission.artifacts.length ? <section><h3 className="eyebrow">Artifacts</h3><ul className="mission-artifacts">{mission.artifacts.map(artifact=><li key={artifact.id}><strong>{artifact.title}</strong><span>{artifact.type.replaceAll("_"," ")} · {mission.steps.find(step=>step.id===artifact.stepId)?.role ?? "Bunny"}</span><b data-verified={artifact.verification}>{artifactStatus(artifact)}</b></li>)}</ul></section> : null}
+      <ActivityTimeline missionId={mission.id} />
       {mission.failure && mission.state !== "stopped" ? <p className="mission-failure">{mission.failure.detail}</p> : null}
       <div className="actions">
         {(mission.state === "failed" || mission.state === "waiting_for_user") &&

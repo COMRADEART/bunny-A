@@ -1,0 +1,118 @@
+{
+  "classification": "LIVE timing receipts from the Host VoiceSnapshot (Date.now on the Host)",
+  "islandConversation": [
+    {
+      "turnId": "t1-319d6e16",
+      "final": "What is my agent doing?",
+      "kind": "agent_status",
+      "source": "hotkey",
+      "endpointing": "vad",
+      "captureStopReason": "vad",
+      "route": null,
+      "answerSource": "host_facts",
+      "ms": {
+        "activationToCapture": 286,
+        "captureToFirstPartial": 5661,
+        "captureToFinal": 8269,
+        "finalToFirstToken": null,
+        "finalToFirstTtsReady": 107,
+        "finalToFirstPlayback": 543,
+        "finalToCompleted": 3013
+      }
+    },
+    {
+      "turnId": "t2-2f8546f9",
+      "final": "Did the test pass?",
+      "kind": "agent_verification",
+      "source": "hotkey",
+      "endpointing": "vad",
+      "captureStopReason": "end",
+      "route": null,
+      "answerSource": "host_facts",
+      "ms": {
+        "activationToCapture": 43,
+        "captureToFirstPartial": 2270,
+        "captureToFinal": 4405,
+        "finalToFirstToken": null,
+        "finalToFirstTtsReady": 13,
+        "finalToFirstPlayback": 397,
+        "finalToCompleted": 3378
+      }
+    },
+    {
+      "turnId": "t3-4f44f055",
+      "final": "Tell me a story about a rabbit.",
+      "kind": "chat",
+      "source": "hotkey",
+      "endpointing": "vad",
+      "captureStopReason": "end",
+      "route": "huihui_ai/qwen2.5-abliterate:7b",
+      "answerSource": "model",
+      "ms": {
+        "activationToCapture": 48,
+        "captureToFirstPartial": 3802,
+        "captureToFinal": 7060,
+        "finalToFirstToken": 10340,
+        "finalToFirstTtsReady": 10862,
+        "finalToFirstPlayback": 11441,
+        "finalToCompleted": null
+      }
+    },
+    {
+      "turnId": "t4-d7e75759",
+      "final": "Stop what is the capital of France?",
+      "kind": "agent_control",
+      "source": "hotkey",
+      "endpointing": "vad",
+      "captureStopReason": "end",
+      "route": null,
+      "answerSource": "host_facts",
+      "ms": {
+        "activationToCapture": 70,
+        "captureToFirstPartial": 2312,
+        "captureToFinal": 4457,
+        "finalToFirstToken": null,
+        "finalToFirstTtsReady": 8,
+        "finalToFirstPlayback": 112,
+        "finalToCompleted": 2584
+      }
+    },
+    {
+      "turnId": "t5-cdaa3ad7",
+      "final": "What is the capital of France?",
+      "kind": "chat",
+      "source": "hotkey",
+      "endpointing": "vad",
+      "captureStopReason": "end",
+      "route": "huihui_ai/qwen2.5-abliterate:7b",
+      "answerSource": "model",
+      "ms": {
+        "activationToCapture": 191,
+        "captureToFirstPartial": 2214,
+        "captureToFinal": 4376,
+        "finalToFirstToken": 679,
+        "finalToFirstTtsReady": 1044,
+        "finalToFirstPlayback": 1431,
+        "finalToCompleted": 4049
+      }
+    }
+  ],
+  "typedWarmTurn": {
+    "turnId": "t1-typed-072a5609",
+    "activatedAt": 1791681638272,
+    "captureStartedAt": null,
+    "firstAudioAt": null,
+    "firstPartialAt": null,
+    "speechEndAt": null,
+    "finalAt": 1791681638272,
+    "admittedAt": 1791681638316,
+    "firstTokenAt": 1791681639067,
+    "firstTtsReadyAt": 1791681640305,
+    "firstPlaybackAt": 1791681640856,
+    "completedAt": 1791681640204
+  },
+  "notes": [
+    "Turn t3 (story) first token 10.3 s after the final: cold load of the 7B local model; the warm turn t5 had its first token 0.68 s after the final.",
+    "captureToFinal includes the user's own speaking time."
+  ]
+}

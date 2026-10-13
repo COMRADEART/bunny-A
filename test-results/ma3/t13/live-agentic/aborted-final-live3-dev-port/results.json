@@ -1,0 +1,530 @@
+{
+  "classification": "LIVE: independent corrected run, disposable real Host 43861, real filesystem and shell-free terminal capabilities, genuine web UI on isolated dev 8094. No model provider configured and no native UI automated.",
+  "beganAt": "2026-10-12T20:30:17.319Z",
+  "finishedAt": "2026-10-12T20:31:30.464Z",
+  "fatal": "page.waitForFunction: Timeout 60000ms exceeded.\n    at openPage (C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13\\live-agentic\\final-live.mjs:79:14)\n    at async file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/live-agentic/final-live.mjs:149:3",
+  "summary": {
+    "passed": 12,
+    "failed": 0,
+    "total": 12
+  },
+  "checks": [
+    {
+      "name": "Explicitly propose bounded Agentic consent for C",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicitly propose bounded Agentic consent for E",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Explicitly propose bounded Agentic consent for H",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Seven durable user Agents created through real Host API",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Host accepts real slot bindings",
+      "ok": true,
+      "detail": {
+        "1": "537b778e-7be4-4241-8459-d01bfb38af54",
+        "2": "3cca9d35-cee7-4565-afc7-5dabcbd02597",
+        "3": "55959a9d-77fc-4410-99f3-d10ac1f2bf6c",
+        "4": "88b06652-94b2-44ce-b428-7ac633c8c560"
+      }
+    },
+    {
+      "name": "agent.start A accepted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start B accepted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start D accepted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "agent.start C accepted",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Unverified read settles COMPLETED without VERIFIED",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Write and compare VERIFIED is derived from Mission result",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "Test and destructive delete both require explicit review",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "commands": [
+    {
+      "action": "mission.configure",
+      "data": {
+        "enabled": true
+      },
+      "sentAt": 1791837017940,
+      "ackAt": 1791837017969,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-A",
+        "objective": "Live independent A",
+        "steps": [
+          {
+            "role": "Read seed without verification",
+            "objective": "Read seed without verification",
+            "access": "read",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.read",
+              "params": {
+                "path": "seed.txt"
+              }
+            },
+            "verification": []
+          }
+        ]
+      },
+      "sentAt": 1791837017969,
+      "ackAt": 1791837018020,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-B",
+        "objective": "Live independent B",
+        "steps": [
+          {
+            "role": "Write and compare",
+            "objective": "Write and compare",
+            "access": "write",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.write",
+              "params": {
+                "path": "out.txt",
+                "content": "hello",
+                "overwrite": true
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.compare",
+                "params": {
+                  "path": "out.txt",
+                  "content": "hello"
+                },
+                "expect": {
+                  "field": "matches",
+                  "equals": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "sentAt": 1791837018020,
+      "ackAt": 1791837018070,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-C",
+        "objective": "Live independent C",
+        "steps": [
+          {
+            "role": "Run real Node tests",
+            "objective": "Run real Node tests",
+            "access": "read",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "terminal.exec",
+              "params": {
+                "command": "node",
+                "args": [
+                  "--test",
+                  "live.test.mjs"
+                ]
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.exists",
+                "params": {
+                  "path": "live.test.mjs"
+                },
+                "expect": {
+                  "field": "exists",
+                  "equals": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "sentAt": 1791837018070,
+      "ackAt": 1791837018134,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-D",
+        "objective": "Live independent D",
+        "steps": [
+          {
+            "role": "Await deletion approval",
+            "objective": "Await deletion approval",
+            "access": "write",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.delete",
+              "params": {
+                "path": "seed.txt"
+              }
+            },
+            "verification": []
+          }
+        ]
+      },
+      "sentAt": 1791837018134,
+      "ackAt": 1791837018196,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-E",
+        "objective": "Live independent E",
+        "steps": [
+          {
+            "role": "Run real Node tests",
+            "objective": "Run real Node tests",
+            "access": "read",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "terminal.exec",
+              "params": {
+                "command": "node",
+                "args": [
+                  "--test",
+                  "live.test.mjs"
+                ]
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.exists",
+                "params": {
+                  "path": "live.test.mjs"
+                },
+                "expect": {
+                  "field": "exists",
+                  "equals": true
+                }
+              }
+            ]
+          },
+          {
+            "role": "Write after resume",
+            "objective": "Write after resume",
+            "access": "write",
+            "dependsOn": [
+              0
+            ],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.write",
+              "params": {
+                "path": "after-resume.txt",
+                "content": "resumed",
+                "overwrite": true
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.compare",
+                "params": {
+                  "path": "after-resume.txt",
+                  "content": "resumed"
+                },
+                "expect": {
+                  "field": "matches",
+                  "equals": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "sentAt": 1791837018196,
+      "ackAt": 1791837018262,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-F",
+        "objective": "Live independent F",
+        "steps": [
+          {
+            "role": "Await deletion for stop demo",
+            "objective": "Await deletion for stop demo",
+            "access": "write",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "filesystem.delete",
+              "params": {
+                "path": "seed2.txt"
+              }
+            },
+            "verification": []
+          }
+        ]
+      },
+      "sentAt": 1791837018262,
+      "ackAt": 1791837018318,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.create",
+      "data": {
+        "name": "T13-H",
+        "objective": "Live independent H",
+        "steps": [
+          {
+            "role": "Run real Node tests",
+            "objective": "Run real Node tests",
+            "access": "read",
+            "dependsOn": [],
+            "executor": {
+              "kind": "capability",
+              "action": "terminal.exec",
+              "params": {
+                "command": "node",
+                "args": [
+                  "--test",
+                  "live.test.mjs"
+                ]
+              }
+            },
+            "verification": [
+              {
+                "kind": "capability",
+                "action": "filesystem.exists",
+                "params": {
+                  "path": "live.test.mjs"
+                },
+                "expect": {
+                  "field": "exists",
+                  "equals": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "sentAt": 1791837018318,
+      "ackAt": 1791837018365,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.authorization.propose",
+      "data": {
+        "id": "55959a9d-77fc-4410-99f3-d10ac1f2bf6c"
+      },
+      "sentAt": 1791837018365,
+      "ackAt": 1791837018396,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.authorization.propose",
+      "data": {
+        "id": "e5168fe1-2cbb-4b4b-ac00-ba056aeb778c"
+      },
+      "sentAt": 1791837018396,
+      "ackAt": 1791837018427,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.authorization.propose",
+      "data": {
+        "id": "24f19db0-4eab-4cf1-bf7b-ecfd1ca7402e"
+      },
+      "sentAt": 1791837018427,
+      "ackAt": 1791837018457,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "personal_agents.configure",
+      "data": {
+        "slots": [
+          {
+            "slot": 1,
+            "weapon": "gada",
+            "displayName": "Gada",
+            "description": "",
+            "purpose": "",
+            "style": "concise",
+            "responsibilities": [],
+            "agentId": "537b778e-7be4-4241-8459-d01bfb38af54",
+            "active": true
+          },
+          {
+            "slot": 2,
+            "weapon": "spear",
+            "displayName": "Spear",
+            "description": "",
+            "purpose": "",
+            "style": "concise",
+            "responsibilities": [],
+            "agentId": "3cca9d35-cee7-4565-afc7-5dabcbd02597",
+            "active": true
+          },
+          {
+            "slot": 3,
+            "weapon": "chakra",
+            "displayName": "Vishnu Chakra",
+            "description": "",
+            "purpose": "",
+            "style": "concise",
+            "responsibilities": [],
+            "agentId": "55959a9d-77fc-4410-99f3-d10ac1f2bf6c",
+            "active": true
+          },
+          {
+            "slot": 4,
+            "weapon": "sword",
+            "displayName": "Sword",
+            "description": "",
+            "purpose": "",
+            "style": "concise",
+            "responsibilities": [],
+            "agentId": "88b06652-94b2-44ce-b428-7ac633c8c560",
+            "active": true
+          }
+        ],
+        "expectRevision": 0
+      },
+      "sentAt": 1791837018464,
+      "ackAt": 1791837018503,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "data": {
+        "id": "537b778e-7be4-4241-8459-d01bfb38af54"
+      },
+      "sentAt": 1791837018523,
+      "ackAt": 1791837018600,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "data": {
+        "id": "3cca9d35-cee7-4565-afc7-5dabcbd02597"
+      },
+      "sentAt": 1791837018698,
+      "ackAt": 1791837018781,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "data": {
+        "id": "88b06652-94b2-44ce-b428-7ac633c8c560"
+      },
+      "sentAt": 1791837019000,
+      "ackAt": 1791837019082,
+      "status": 200,
+      "error": null
+    },
+    {
+      "action": "agent.start",
+      "data": {
+        "id": "55959a9d-77fc-4410-99f3-d10ac1f2bf6c",
+        "revision": 1
+      },
+      "sentAt": 1791837019177,
+      "ackAt": 1791837019251,
+      "status": 200,
+      "error": null
+    }
+  ],
+  "ids": {
+    "A": "537b778e-7be4-4241-8459-d01bfb38af54",
+    "B": "3cca9d35-cee7-4565-afc7-5dabcbd02597",
+    "C": "55959a9d-77fc-4410-99f3-d10ac1f2bf6c",
+    "D": "88b06652-94b2-44ce-b428-7ac633c8c560",
+    "E": "e5168fe1-2cbb-4b4b-ac00-ba056aeb778c",
+    "F": "39c3b354-af6f-43dc-b18e-c94530b01bf2",
+    "H": "24f19db0-4eab-4cf1-bf7b-ecfd1ca7402e"
+  },
+  "shots": [],
+  "browserErrors": [],
+  "notTested": [
+    "Native WPF window close/minimize continuity, docking, multi-monitor, taskbar, and native reduced motion: native computer APIs disabled in this session.",
+    "Live provider-reported CODING/PLANNING/RESEARCHING/VERIFYING animations: no provider configured in disposable Host; prior unit/state fixtures remain simulation evidence.",
+    "Physical phone, iOS safe areas, microphone, real voice speaker/input, and real remote tunnel/device approval: unavailable configurations."
+  ],
+  "cleanup": {
+    "browserClosed": true,
+    "ownDevTreeStopped": true,
+    "hostStopped": true,
+    "credentialsCleared": true
+  },
+  "originalEvidencePreserved": [
+    "results.json",
+    "timeline.json",
+    "scenario.mjs",
+    "capture.mjs",
+    "shots/",
+    "cp/"
+  ]
+}

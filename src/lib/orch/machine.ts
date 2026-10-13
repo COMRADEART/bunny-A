@@ -6,7 +6,7 @@ const NEXT: Record<TaskState, TaskState[]> = {
   waiting_for_approval: ["launching", "stopped"],
   launching: ["running", "failed", "stopped"],
   running: ["completed", "failed", "stopped", "paused", "waiting_for_input", "waiting_for_agent_approval", "verifying"],
-  verifying: ["completed", "failed", "stopped"],
+  verifying: ["completed", "failed", "stopped", "running"], // M-A-3 T3 §24: an escalated verification re-executes at higher effort or on an alternate model; the machine gains this one additive transition.
   waiting_for_agent_approval: ["running", "failed", "stopped"],
   waiting_for_input: ["running", "stopped", "failed"],
   paused: ["running", "stopped"],

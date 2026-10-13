@@ -1,0 +1,134 @@
+{
+  "schema": "bunny-voice-fsm/1",
+  "source": "src/lib/bunny-host/voice/voice-fsm.ts (VOICE_TRANSITIONS, generated from the live module)",
+  "states": [
+    {
+      "state": "IDLE",
+      "meaning": "Session open; microphone closed; nothing playing.",
+      "next": [
+        "ARMING",
+        "PROCESSING",
+        "MUTED",
+        "ERROR",
+        "DEVICE_UNAVAILABLE"
+      ]
+    },
+    {
+      "state": "ARMING",
+      "meaning": "Capture requested; device not yet confirmed open.",
+      "next": [
+        "LISTENING",
+        "IDLE",
+        "ERROR",
+        "DEVICE_UNAVAILABLE",
+        "MUTED",
+        "INTERRUPTED"
+      ]
+    },
+    {
+      "state": "LISTENING",
+      "meaning": "Worker confirmed capture.started on a real (or labelled fixture) device.",
+      "next": [
+        "TRANSCRIBING",
+        "IDLE",
+        "ARMING",
+        "ERROR",
+        "DEVICE_UNAVAILABLE",
+        "MUTED"
+      ]
+    },
+    {
+      "state": "TRANSCRIBING",
+      "meaning": "Capture stopped; recognizer finalizing.",
+      "next": [
+        "PROCESSING",
+        "IDLE",
+        "ARMING",
+        "ERROR",
+        "DEVICE_UNAVAILABLE"
+      ]
+    },
+    {
+      "state": "PROCESSING",
+      "meaning": "Final transcript accepted (confidence-gated); answer being produced or awaiting first playback.",
+      "next": [
+        "SPEAKING",
+        "IDLE",
+        "ARMING",
+        "INTERRUPTED",
+        "ERROR"
+      ]
+    },
+    {
+      "state": "SPEAKING",
+      "meaning": "Worker confirmed playback.started for the current generation.",
+      "next": [
+        "PROCESSING",
+        "INTERRUPTED",
+        "IDLE",
+        "ARMING",
+        "ERROR"
+      ]
+    },
+    {
+      "state": "INTERRUPTED",
+      "meaning": "Playback cancelled by the user (speak.cancel); transient, next turn available.",
+      "next": [
+        "IDLE",
+        "ARMING",
+        "ERROR"
+      ]
+    },
+    {
+      "state": "MUTED",
+      "meaning": "Microphone muted (snapshot.muted authoritative); no capture possible.",
+      "next": [
+        "IDLE",
+        "ARMING",
+        "ERROR"
+      ]
+    },
+    {
+      "state": "ERROR",
+      "meaning": "Worker/engine error; capture and playback truth cleared.",
+      "next": [
+        "IDLE",
+        "ARMING",
+        "DEVICE_UNAVAILABLE",
+        "MUTED"
+      ]
+    },
+    {
+      "state": "DEVICE_UNAVAILABLE",
+      "meaning": "Capture refused truthfully: ENDPOINT_MUTED, PERMISSION_DENIED, DEVICE_UNAVAILABLE/BUSY/LOST.",
+      "next": [
+        "IDLE",
+        "ARMING",
+        "ERROR",
+        "MUTED"
+      ]
+    }
+  ],
+  "truthRules": {
+    "capturing": "state===LISTENING && worker confirmed capture.started for the current turn/gen",
+    "playing": "state===SPEAKING && worker confirmed playback.started for the current gen",
+    "speechInFlight": [
+      "SPEAKING",
+      "PROCESSING"
+    ],
+    "illegalTransitions": "refused and counted (tryTransition), never applied",
+    "closed": "open=false: no worker process, no device handles; capturing=false, playing=false"
+  },
+  "identity": [
+    "sessionId",
+    "hostEpoch",
+    "principal (workstation)",
+    "devices.input/output",
+    "turnId",
+    "generation (cancellation, monotonic)",
+    "route.taskId (inference op)",
+    "createdAt",
+    "updatedAt"
+  ],
+  "staleSuppression": "worker events with gen < current generation or turn != current turn are dropped and counted (lateEventsDropped); a voice.listen.end bound to an older turn is ignored"
+}

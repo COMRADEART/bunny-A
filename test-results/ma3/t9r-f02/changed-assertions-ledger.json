@@ -1,0 +1,204 @@
+{
+  "rule": "Do not delete or skip these tests. Do not invert assertions merely to make the new implementation pass. Document every changed assertion and its authorization rationale.",
+  "remote-authority.test.ts (F01 suite)": [
+    {
+      "test": "F01-1",
+      "originalRequirement": "A phone-approved bounded file operation runs without any extra prompt (no request, file written, completes).",
+      "before": "phoneApprove -> until completed; requests(view).length === 0; file written.",
+      "after": "phoneApprove -> waitAsk filesystem.promote; requests(view).length === 1 (only the promotion); note.txt absent until promotion; phoneRespond on the promotion rejects DESKTOP_ONLY; workstation respond promotes; file written; authority remote; launched 0.",
+      "authorizationRationale": "F02 D2 stages every device write; the only remaining prompt is the workstation-only promotion. Keeps the no-write-prompt requirement and adds a negative regression that a device cannot promote."
+    },
+    {
+      "test": "F01-7",
+      "originalRequirement": "Workstation revocation of a device ends every outstanding approval it granted (sign-out variant was disabled).",
+      "before": "for (const signOut of [false])",
+      "after": "for (const signOut of [false, true]); the existing assertions (revoked envelope, state stopped, late respond refused, retry refused, no launch) now apply to self sign-out too.",
+      "authorizationRationale": "F02 D5: self sign-out now revokes the envelopes the device granted and stops those Missions. Comment above the test updated (old 'keeps approvals' statement was obsolete). Test name kept."
+    },
+    {
+      "test": "F01-R5",
+      "originalRequirement": "A phone cannot start a workstation-approved Mission that can run code; remote-approved ones it may; a benign phone-started Mission completes.",
+      "before": "phone mission.start of a benign write completes directly.",
+      "after": "promoteStaged(env, benign.id) inserted after the phone start, before the completed wait.",
+      "authorizationRationale": "The device-started write is staged (F02 D2); completion now needs the workstation promotion. Phone-start refusal assertions unchanged."
+    },
+    {
+      "test": "F01-R15",
+      "originalRequirement": "The workstation prompt for code execution lists files paired-device authority changed in the Mission.",
+      "before": "write path lib.json (root); promotion not present; regex /paired-device authority: \"lib\\.json\"/.",
+      "after": "write path data/lib.json; promoteStaged inserted before the terminal ask; regex /paired-device authority: \"[^\"]*lib\\.json\"/.",
+      "authorizationRationale": "A root .json is CONFIGURATION under F02, so the data example uses data/ (PHONE_SAFE_DATA). The listing now shows absolute JSON-escaped paths, so the regex accepts any prefix. The listing requirement is unchanged."
+    },
+    {
+      "test": "F01-R18",
+      "originalRequirement": "A phone's one-time answer never reaches outside the reviewed envelope; only the workstation's answer extends roots; the outside write lands after the workstation allows it.",
+      "before": "regex /outside the approved write scope/ on the first ask; device answer simulated by saveRequest on the live ask with resolvedBy PHONE; workstation allow then waited for completed.",
+      "after": "regex /classified UNKNOWN \\(outside the step's working folder\\)/ on the first ask; device answer simulated on a separate request record id 'f01-r18-device-answer' with resolvedAt now; workstation allow followed by promoteStaged before waiting for completed. The phone-rejection and no-root-from-device assertions are unchanged.",
+      "authorizationRationale": "F02 refuses out-of-root writes with the classification reason first. The old device-answer simulation stamped the live ask's lifecycle EXPIRED (first stamp wins), a test artifact that invalidated the real workstation answer. The workstation's write is staged and needs its promotion."
+    },
+    {
+      "test": "F01-R20",
+      "originalRequirement": "Code never runs over unreviewed paired-device changes from another Mission, under any envelope or provider.",
+      "before": "Mission A phone-approved edit of helper.json, completed; pendingRemoteChanges length 1; later a second phone edit of helper.json.",
+      "after": "seedUnreviewed(env, 'helper.json', ...) (unreviewed change recorded with runId 'seed'); same pendingRemoteChanges length 1 assertion; second phone edit replaced by seedUnreviewed again. All gate assertions unchanged.",
+      "authorizationRationale": "F02 stages device writes, so they no longer land unreviewed. The review gate is exercised as defense in depth by seeding the unreviewed change directly, as specified."
+    },
+    {
+      "test": "F01-R26",
+      "originalRequirement": "The review gate is Host-wide: code in any folder waits for unreviewed paired-device changes.",
+      "before": "phone-approved edit of helper.json as Mission a, then a terminal decision check from other folders.",
+      "after": "seedUnreviewed(env, 'helper.json', ...) replaces the phone edit; decision assertions unchanged.",
+      "authorizationRationale": "Same as R20: device writes are staged, so the unreviewed change is seeded to exercise the Host-wide gate."
+    },
+    {
+      "test": "F01-R27",
+      "originalRequirement": "A paired-device change never lands under workstation-approved code that is already running; the held change lands after the workstation allows it.",
+      "before": "helper.json at root, phone edit held, workstation allow, then wait for completed; final content checked at root.",
+      "after": "data/helper.json (script reads data/helper.json); promoteStaged(env, edit.id) inserted after the held allow; final content checked at data/helper.json. Hold, phone-refusal, running-code and ran.txt=='host' assertions unchanged.",
+      "authorizationRationale": "Root .json is CONFIGURATION (promotion refused). The held change is staged, so the workstation's promotion is required."
+    },
+    {
+      "test": "F01-R28",
+      "originalRequirement": "A paired-device change is recorded for review even when the write fails after starting (no unrecorded change).",
+      "before": "phone write onto a directory; expects a failed filesystem.write run and a pendingRemoteChanges row for folder.txt.",
+      "after": "Renamed to 'a device write onto a non-file destination never starts, so no unrecorded change can exist'. waitAsk filesystem.write: desktopRequired true; reason matches classified UNKNOWN (destination exists and is not a regular file); phone allow rejects DESKTOP_ONLY; zero filesystem.write runs; folder untouched; no pendingRemoteChanges row for it.",
+      "authorizationRationale": "F02 classifies the destination before anything starts, so a device write never reaches the 'fails after starting' point. The new assertions are a negative regression for the same safety property (nothing unrecorded changed). Coverage gap: a device write that fails after touching disk is no longer reachable through filesystem.write."
+    },
+    {
+      "test": "F01-R31",
+      "originalRequirement": "A workstation review acknowledges only the paired-device changes its prompt shows (13 changes: 12 shown, 1 more).",
+      "before": "two phone-approved batches of 7 and 6 writes, then expects pendingRemoteChanges length 13.",
+      "after": "13 seedUnreviewed calls (f-00..f-12); pendingRemoteChanges length 13 kept; all paging assertions unchanged.",
+      "authorizationRationale": "Device writes are staged, so 13 unreviewed changes are seeded directly."
+    },
+    {
+      "test": "F01-R37",
+      "originalRequirement": "Git reads wait for review of paired-device changes.",
+      "before": "phone-approved write of conv.json, completed; git decisions asked with remoteReview length 1.",
+      "after": "seedUnreviewed(env, 'conv.json', '1') replaces the phone edit; git decision assertions unchanged.",
+      "authorizationRationale": "Seeded unreviewed change, as device writes are staged."
+    },
+    {
+      "test": "F01-R38",
+      "originalRequirement": "A provider review with more changes than one prompt lists asks the next page instead of failing.",
+      "before": "two phone batches totalling 13 writes (g-00..g-12), then a provider ask.",
+      "after": "13 seedUnreviewed calls (g-00..g-12); provider paging assertions unchanged.",
+      "authorizationRationale": "Device writes are staged, so the 13 unreviewed changes are seeded."
+    },
+    {
+      "test": "F01-R39",
+      "originalRequirement": "A paired device writes only inert data and documents; code, agent configuration and downloads stay on the workstation.",
+      "before": "safe list includes out/result.json and conf/values.yaml; refused list does not include them.",
+      "after": "safe list uses exports/result.json (a data folder); refused list adds out/result.json and conf/values.yaml (CONFIGURATION).",
+      "authorizationRationale": "F02 classifies JSON/YAML outside a recognized data folder as CONFIGURATION (safer). conf/ is a configuration folder. The coverage (safe data passes, config refused) is preserved."
+    },
+    {
+      "test": "F01-R39 (delete)",
+      "originalRequirement": "Removing a file adds no code: remoteExecutionRefusal(filesystem.delete, old.mjs) is null.",
+      "before": "assert null for old.mjs.",
+      "after": "assert null for old.txt (ordinary document); assert DESKTOP_ONLY refusal for old.mjs (execution-relevant file).",
+      "authorizationRationale": "F02 applies the same classification to device deletes, so deleting execution-relevant files is workstation-only. The 'removing a document adds no code' premise is kept and a negative regression is added."
+    },
+    {
+      "test": "F01-R41",
+      "originalRequirement": "The workstation reviews the content of paired-device changes, not only their names.",
+      "before": "phone-approved note write of notes.txt, completed; then a terminal ask with the content in reason.",
+      "after": "seedUnreviewed(env, 'notes.txt', body) replaces the phone write; content, sha256 and git-in-flight assertions unchanged.",
+      "authorizationRationale": "Device writes are staged, so the unreviewed change is seeded."
+    },
+    {
+      "test": "F01-R42",
+      "originalRequirement": "A review prompt shows the whole changed file, or says plainly that it cannot.",
+      "before": "two phone-approved writes (padded.txt, huge.txt), then a terminal ask.",
+      "after": "seedUnreviewed for padded.txt and huge.txt; all prompt and projection assertions unchanged.",
+      "authorizationRationale": "Device writes are staged, so the unreviewed changes are seeded."
+    },
+    {
+      "test": "F01-R43",
+      "originalRequirement": "A workstation Mission a phone started is a paired-device actor for the hold and the review; its write is recorded for review.",
+      "before": "after the held allow and completion, pendingRemoteChanges includes w.txt.",
+      "after": "promoteStaged(env, write.id) after the held allow; then staging.forMission(write.id) has a record for w.txt with promotionState PROMOTED. The deviceDriven, hold and running-code assertions are unchanged.",
+      "authorizationRationale": "F02 records a device change as reviewed when it is promoted (the promotion acknowledges it), so the review record is now the promoted staging record."
+    },
+    {
+      "test": "F01-R46",
+      "originalRequirement": "A superseded review re-ask shows every change it acknowledges (2 changes, with content).",
+      "before": "two phone writes (a.txt, then b.txt with SECOND-CHANGE-CONTENT) between the ask and the workstation answer.",
+      "after": "seedUnreviewed for a.txt before the run; seedUnreviewed for b.txt after the first ask; one direct workstation write (bump.txt) added so the mutation sequence moves, as any file-changing run does. The supersede and re-ask assertions are unchanged.",
+      "authorizationRationale": "Seeded changes make no capability run, so the mutation sequence needs one real project mutation to trigger the 'Project files changed' supersede path. The direct write adds no paired-device change."
+    },
+    {
+      "test": "F01-R48",
+      "originalRequirement": "Changed-file text cannot imitate review prompt structure.",
+      "before": "phone-approved write of forge.txt with forged listing text.",
+      "after": "seedUnreviewed(env, 'forge.txt', same content); listing assertions unchanged.",
+      "authorizationRationale": "Device writes are staged, so the unreviewed change is seeded."
+    },
+    {
+      "test": "F01-R49",
+      "originalRequirement": "A phone's mission.get carries no review listing in reasons or events.",
+      "before": "phone-approved write of secret.txt (content), then terminal ask shows content to the workstation only.",
+      "after": "seedUnreviewed(env, 'secret.txt', same content); workstation/phone assertions unchanged.",
+      "authorizationRationale": "Device writes are staged, so the unreviewed change is seeded."
+    },
+    {
+      "test": "F01-R50",
+      "originalRequirement": "No Host response to a paired device carries the review listing (state, inbox, agents, mission.get).",
+      "before": "phone write completes; a workstation terminal mission then shows the sentinel in its review prompt; device /state and device mission.get checked for the sentinel.",
+      "after": "phone write waits for the filesystem.promote request (the workstation promotion prompt is the review listing); workstation mission.get includes the sentinel; device /state does not; device mission.get requests (not the phone's own step parameters) do not include the sentinel and carry no promotion field. Terminal-mission part removed.",
+      "authorizationRationale": "The review listing now reaches the workstation through the promotion prompt. The device's own plan parameters legitimately name its content, so the device check targets its requests and promotion records."
+    },
+    {
+      "test": "F01-R53",
+      "originalRequirement": "Python task checks never run on a device's timing or over unreviewed paired-device changes.",
+      "before": "phoneWriteNote(env, 'phone.txt') then codeRunGate matches DESKTOP_ONLY.",
+      "after": "seedUnreviewed(env, 'phone.txt', 'phone note') replaces the phone write; codeRunGate assertion unchanged.",
+      "authorizationRationale": "Device writes are staged, so the unreviewed change is seeded."
+    },
+    {
+      "test": "F01-R55",
+      "originalRequirement": "A shell-session prompt always shows the review listing, even when another violation also applies.",
+      "before": "phoneWriteNote(env, 'cross-mission.md', ...) then a phone-approved provider ask with review listing.",
+      "after": "seedUnreviewed(env, 'cross-mission.md', ...) replaces the phone write; all listing assertions unchanged.",
+      "authorizationRationale": "Device writes are staged, so the unreviewed change is seeded."
+    }
+  ],
+  "remote-device.test.ts / remote-remediation.test.ts (T9/T9R)": "see one-time-approval-regression.json (9 entries)",
+  "agent-runtime.test.ts (T4)": [
+    {
+      "test": "A08: resume without restart reuses the same run and generation, then completes",
+      "before": "env.agents.start/pause/resume(id, \"test\")",
+      "after": "env.agents.start/pause/resume(id, \"workstation\")",
+      "authorizationRationale": "Any actor string other than the authenticated workstation is a remote grantor. Under D2 its file writes are staged for workstation promotion and would never complete in a test that expects completion. F01 made the same change for A02-A05/A18. The assertions on run, generation, lifecycle rows and completion are unchanged."
+    },
+    {
+      "test": "A31/§25: lifecycle rows are the agent's own vocabulary",
+      "before": "env.agents.start/pause/resume(id, \"test\")",
+      "after": "env.agents.start/pause/resume(id, \"workstation\")",
+      "authorizationRationale": "Any actor string other than the authenticated workstation is a remote grantor. Under D2 its file writes are staged for workstation promotion and would never complete in a test that expects completion. F01 made the same change for A02-A05/A18. The assertions on run, generation, lifecycle rows and completion are unchanged."
+    },
+    {
+      "test": "A27: the agent runs to COMPLETED with zero UI involvement",
+      "before": "env.agents.start/pause/resume(id, \"test\")",
+      "after": "env.agents.start/pause/resume(id, \"workstation\")",
+      "authorizationRationale": "Any actor string other than the authenticated workstation is a remote grantor. Under D2 its file writes are staged for workstation promotion and would never complete in a test that expects completion. F01 made the same change for A02-A05/A18. The assertions on run, generation, lifecycle rows and completion are unchanged."
+    }
+  ],
+  "F02 tests updated by later F02 review rounds (new tests, not legacy)": [
+    {
+      "test": "F02-E15",
+      "change": "expects the inspected content to equal JSON-escaped text (JSON.stringify(big)) instead of the raw bytes",
+      "rationale": "Round-3 MEDIUM: the full inspection is escaped exactly like the preview, so bidirectional or invisible code points cannot reorder what the reviewer reads."
+    },
+    {
+      "test": "F02-R2-3",
+      "change": "an answer that authorized the admitted run carries CONSUMED instead of a later stamp",
+      "rationale": "Round-3 MEDIUM: §12. CONSUMED is stamped when the one-time answer authorizes an admitted run, and the first stamp wins."
+    },
+    {
+      "test": "F02-R2-4",
+      "change": "unadmitted answers are INVALIDATED_BY_DEVICE_REVOCATION; an admitted answer keeps CONSUMED",
+      "rationale": "Same §12 rule. Revocation never relabels an answer already consumed."
+    }
+  ]
+}

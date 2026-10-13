@@ -1,0 +1,138 @@
+{
+  "classification": "Loopback-only transport validation; no LAN or internet path exercised",
+  "sourceCommit": "395d1c0a246d8f2b0c85c236e11a9a0437ad6456",
+  "loopbackTrustedTls": {
+    "result": "PASS",
+    "rows": [
+      {
+        "id": "F01/F11",
+        "title": "Independent device identity and finite authority",
+        "result": "PASS"
+      },
+      {
+        "id": "F08",
+        "title": "Certificate trust fails closed",
+        "result": "PASS"
+      },
+      {
+        "id": "F02/F10/F31",
+        "title": "Authentication and origin failures are enforced",
+        "result": "PASS"
+      },
+      {
+        "id": "F06/F35",
+        "title": "Wrong Host and stale generation execute nothing",
+        "result": "PASS"
+      },
+      {
+        "id": "F12/F13/F14/F19",
+        "title": "Workstation delegation and scope expansion remain forbidden",
+        "result": "PASS"
+      },
+      {
+        "id": "F39/F40/F61",
+        "title": "Discarded Stop acknowledgment is reconciled without repeating effects",
+        "result": "PASS"
+      },
+      {
+        "id": "F20",
+        "title": "Remote denial persists in canonical Host state",
+        "result": "PASS"
+      },
+      {
+        "id": "F30/F43/F56",
+        "title": "Verified artifact access and Project isolation",
+        "result": "PASS"
+      },
+      {
+        "id": "F03/F44/F46/F47",
+        "title": "Self-revocation removes future control and artifact authority",
+        "result": "PASS"
+      },
+      {
+        "id": "F35/F41/F42/F43",
+        "title": "Fresh Host process preserves identity and artifacts, invalidates grants",
+        "result": "PASS"
+      }
+    ],
+    "evidence": "protocol/remote-protocol-results.json"
+  },
+  "transportDowngrade": {
+    "classification": "LIVE raw HTTP request to disposable built gateway, no secure-connector assertion",
+    "expected": "downgrade refused",
+    "observed": {
+      "code": "GATEWAY_REFUSED",
+      "message": "Origin mismatch."
+    },
+    "result": "PASS"
+  },
+  "certificateTrust": {
+    "id": "F08",
+    "title": "Certificate trust fails closed",
+    "classification": "LIVE disposable Host + built gateway, SIMULATED loopback TLS termination",
+    "startedAt": "2026-10-09T07:27:01.907Z",
+    "observed": {
+      "error": "DEPTH_ZERO_SELF_SIGNED_CERT",
+      "certificateBypass": false,
+      "systemTrustModified": false
+    },
+    "result": "PASS"
+  },
+  "phoneOnlyNetworkLoss": {
+    "result": "PASS",
+    "classification": "LIVE paired credential, actual test-client transport listeners closed and restored, real admitted Host filesystem effect; SIMULATED loopback phone network adapter",
+    "agentId": "602c8956-1860-4ce7-8d7d-3f0b299baa94",
+    "missionId": "3fe74045-9008-4878-b0b6-24d1819d3927",
+    "held": {
+      "kind": "held-write",
+      "missionId": "3fe74045-9008-4878-b0b6-24d1819d3927",
+      "capabilityRunId": "5016976c-e0e4-4ce6-9422-7421057bbc57",
+      "path": "result.txt",
+      "observedAt": "2026-10-09T07:27:26.425Z"
+    },
+    "off": {
+      "clientTransport": "closed",
+      "hostPid": 14184,
+      "hostRunning": true,
+      "at": "2026-10-09T07:27:26.594Z"
+    },
+    "transportFailure": "ECONNREFUSED",
+    "hostIdentityUnchanged": true,
+    "successfulWrites": 1,
+    "writeRuns": 1,
+    "capabilityRuns": [
+      {
+        "action": "filesystem.read",
+        "status": "succeeded"
+      },
+      {
+        "action": "filesystem.compare",
+        "status": "succeeded"
+      },
+      {
+        "action": "filesystem.write",
+        "status": "succeeded"
+      },
+      {
+        "action": "filesystem.compare",
+        "status": "succeeded"
+      }
+    ],
+    "canonicalTaskCount": 0,
+    "reconnected": true,
+    "physicalPhone": "NOT TESTED",
+    "realLan": "NOT TESTED",
+    "publicTunnel": false
+  },
+  "lan": {
+    "result": "NOT TESTED",
+    "reason": "No authorized physical phone on the Wi-Fi network (device-inventory.json); binding a disposable Host to the LAN interface without a real second device would only exercise the local stack."
+  },
+  "internet": {
+    "result": "NOT TESTED",
+    "reason": "Public tunnel not authorized; it was not started."
+  },
+  "publicTunnel": false,
+  "firewallChanged": false,
+  "productionNetworkConfigChanged": false
+}

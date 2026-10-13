@@ -1,0 +1,69 @@
+{
+  "classification": "INDEPENDENT read-only review with actual Host-method probes and an isolated native fake-driver compile; no new live acoustic proof",
+  "reviewer": "/root/t12_final_review",
+  "reviewerAuthoredImplementation": false,
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "sourceHashes": {
+    "src/lib/bunny-host/voice/voice-intent.ts": "6c22cb2a0478a0e2a2cd8d15df13ff023a8b8bcbfaae37dc56292620eb875fda",
+    "src/lib/bunny-host/voice/voice-session.server.ts": "799851ea3465564637bceb31bc97d9f004392bd6e964db18f2a2854492673fe2",
+    "src/lib/bunny-host/voice/voice-protocol.ts": "b3428673632ae0d74f699ccbf4c4d472f88acc7c1965eae50a59b5da97dfe5cb",
+    "native/voice/BunnyVoiceWorker.cs": "63ae2c4b8a4eb70d32a74b79566a463baa688f124939ac7989c0cbcbaf1a2681"
+  },
+  "findings": [
+    {
+      "id": "CLOSEOUT-TRUTH-01",
+      "severity": "HIGH",
+      "reproduction": "On 92a4636, claimsAction and actual sendModelChunk forwarded 'I have completed the mission', 'The task succeeded' and other completion claims with claimBlocked=false.",
+      "rootCause": "Missing accomplishment inflections and completion predicates; a later finite-word expansion still missed reached completion, green and came back clean.",
+      "repair": "Completion/verification inflections plus declarative operational-subject refusal in the tool-free model output path; canonical Host-fact responses bypass this model-only guard.",
+      "regression": ["T12 closeout: completion and verification claims require Host facts, including unqualified test success", "T12 closeout: streamed completion claims are replaced and later chunks never become speech"],
+      "independentDisposition": "CLOSED in bounded probes: 55/55 completion claims and 4/4 split-chunk claims blocked; no exhaustive semantic guarantee."
+    },
+    {
+      "id": "CLOSEOUT-AUDIO-01",
+      "severity": "HIGH",
+      "reproduction": "An isolated compile of the actual native Speaker held injected driver Open, cancelled generation 1, then released Open. Before repair it submitted one cancelled Chunk before resetting.",
+      "rootCause": "Cancellation was checked before potentially blocking Open, but not again before Submit.",
+      "repair": "Recheck c.Cancelled under gate after Open returns, before giving the driver PCM; retain all driver calls outside the command gate.",
+      "regression": ["T12 closeout: cancelling while the driver opens never submits the cancelled chunk when Open returns"],
+      "independentDisposition": "CLOSED: opened=true, cancelResetPending=true, submittedChunks=0, submittedCancelled=false, resetApplied=true.",
+      "classification": "SYNTHETIC injected recording driver; no claim of a live acoustic stall."
+    },
+    {
+      "id": "CLOSEOUT-PRIV-01",
+      "severity": "HIGH",
+      "reproduction": "Actual beginListen waited for duplexStopping, mute revoked consent, and the suspended Start then renewed a grant. Unmute could open duplex without a fresh explicit Start. stopDuplex's already-stopping return also skipped revocation.",
+      "rootCause": "No post-await lifecycle validation, and privacy revocation happened after the early return.",
+      "repair": "Revoke before an already-stopping return; increment grantRevision on revocation and validate epoch, revision, mode and mute after await boundaries.",
+      "regression": ["T12 closeout: mute during a pending stop revokes consent and invalidates suspended starts even after unmute"],
+      "independentDisposition": "CLOSED: sustained mute and mute-unmute during pending Start leave grant=null and zero duplex.start; fresh explicit Start creates one start."
+    },
+    {
+      "id": "CLOSEOUT-METRICS-01",
+      "severity": "MEDIUM",
+      "reproduction": "Actual onCancelReceipt reported workerResetMs=250 for resetPending=true although the reset had not been acknowledged.",
+      "rootCause": "Protocol omitted resetPending and described the bounded cancel wait as time inside waveOutReset.",
+      "repair": "Preserve resetPending; separate workerCancelWaitMs from acknowledged workerResetMs.",
+      "regression": ["T12 closeout: a pending reset reports bounded wait without claiming reset completion"],
+      "independentDisposition": "CLOSED: pending -> workerResetMs=null, workerCancelWaitMs=250, workerResetPending=true; acknowledged -> completion receipt preserved."
+    }
+  ],
+  "openBlockerHigh": 0,
+  "authorityBypassFound": false,
+  "openDisclosed": [
+    {
+      "severity": "MEDIUM",
+      "area": "conversation",
+      "title": "Conservative operational-subject guard refuses some general explanations",
+      "observed": "10/10 sampled general statements such as 'A task is a unit of work' and 'Space missions explore planets' were refused; 37/38 separate negative/general corpus examples retained.",
+      "disposition": "Disclosed conservative correctness tradeoff. A future semantic guard needs separate validation before relaxing Host-fact ownership."
+    },
+    {
+      "severity": "LOW",
+      "area": "conversation",
+      "title": "One negative-corpus false refusal and two conversational self-description refusals remain"
+    }
+  ],
+  "boundedCoverage": {"completionClaims": 55, "blocked": 55, "splitChunkClaims": 4, "splitBlocked": 4, "negativeGeneral": 38, "retained": 37, "generalOperationalExamples": 10, "generalOperationalRefused": 10},
+  "liveEvidenceScope": "Historical T12 human/device recordings predate the closeout repair. This review used no microphone, speakers, production state or execution authority."
+}

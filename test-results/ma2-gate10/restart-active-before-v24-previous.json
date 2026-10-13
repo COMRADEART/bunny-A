@@ -1,0 +1,795 @@
+{
+  "recordedAt": "2026-10-07T00:46:07.022Z",
+  "classification": "DISPOSABLE LIVE",
+  "attackIds": [
+    "T10-T9-07",
+    "T10-XG-05",
+    "T10-XG-06"
+  ],
+  "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+  "health": {
+    "app": "Bunny-A",
+    "instanceId": "841f6b19-f9fd-4540-bdab-e66473edc82e",
+    "pid": 38776,
+    "operationalState": "healthy",
+    "reason": null,
+    "unavailableSubsystems": [],
+    "lastFatal": null
+  },
+  "oldRequestId": "88fc911e-e561-49bb-8916-2e1111e9b644",
+  "pendingRequestId": "827fbf5b-cb8c-432e-a597-1b861106b176",
+  "runCount": 1,
+  "batch": {
+    "id": "1440addb-e3f7-4298-805b-6337150654e6",
+    "maxActions": 4,
+    "usedCount": 1,
+    "targetLabel": "Calculator",
+    "createdAt": 1791333964742,
+    "expiresAt": 1791334084742,
+    "status": "active",
+    "endReason": null
+  },
+  "rollbackPreflightRefusal": "idleCheckRefused:active-work {\"tasks\":0,\"missions\":2,\"runs\":0,\"grants\":1,\"missionsEnabled\":true,\"triggersEnabled\":false}",
+  "detail": {
+    "mission": {
+      "id": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+      "title": "T10 active crash boundary",
+      "objective": "Disposable crash audit; do not replay GUI action.",
+      "request": "Disposable crash audit; do not replay GUI action.",
+      "projectId": null,
+      "root": "C:\\Users\\allam\\Bunny-Workspace-T10-stage",
+      "mode": "fast",
+      "state": "waiting_for_user",
+      "origin": "workstation",
+      "createdAt": 1791333964619,
+      "updatedAt": 1791333966793,
+      "startedAt": 1791333964666,
+      "finishedAt": null,
+      "planning": {
+        "planner": "bunny-planner-deterministic-v1",
+        "complexity": "medium",
+        "rationale": [
+          "User-supplied plan; validated and bounded by Bunny."
+        ],
+        "replans": 0,
+        "plannedAt": 1791333964630
+      },
+      "requestedScope": {
+        "projectRoots": [
+          "C:\\Users\\allam\\Bunny-Workspace-T10-stage"
+        ],
+        "riskClasses": [
+          "READ"
+        ],
+        "capabilities": [
+          "computer.open_app",
+          "computer.type",
+          "filesystem.exists",
+          "filesystem.list",
+          "filesystem.read",
+          "notifications.send"
+        ],
+        "providers": {
+          "execution": false,
+          "allow": null,
+          "localOnly": false,
+          "sessions": {
+            "steps": [],
+            "maxSessions": 0,
+            "writeIncludesShell": true
+          }
+        },
+        "filesystem": {
+          "read": [
+            "C:\\Users\\allam\\Bunny-Workspace-T10-stage"
+          ],
+          "write": []
+        },
+        "browser": {
+          "enabled": false,
+          "domains": "public"
+        },
+        "terminal": {
+          "enabled": false,
+          "commands": [],
+          "executables": []
+        },
+        "git": {
+          "actions": []
+        },
+        "network": {
+          "allowed": false
+        },
+        "computer": {
+          "enabled": true
+        },
+        "budget": {
+          "maxExternalModelCalls": 2,
+          "maxRuntimeMs": 1800000,
+          "maxRetries": 2,
+          "maxTokens": null
+        },
+        "alwaysAsk": [
+          "EXTERNAL_SIDE_EFFECT",
+          "DESTRUCTIVE"
+        ]
+      },
+      "authorizationId": "11d45c4f-0fe9-4a92-9db1-965dbb52a719",
+      "capabilityRequirements": [
+        "computer.open_app",
+        "computer.type",
+        "filesystem.exists",
+        "filesystem.list",
+        "filesystem.read",
+        "notifications.send"
+      ],
+      "providerConstraints": {
+        "localOnly": false
+      },
+      "budget": {
+        "maxExternalModelCalls": 2,
+        "maxRuntimeMs": 1800000,
+        "maxRetries": 2,
+        "maxTokens": null
+      },
+      "retryPolicy": {
+        "maxRetriesPerStep": 2
+      },
+      "verificationRequired": false,
+      "result": null,
+      "failure": null,
+      "recovery": null,
+      "accounting": {
+        "runtimeMs": 0,
+        "externalModelCalls": 0,
+        "localModelCalls": 0,
+        "deterministicSteps": 0,
+        "retries": 0,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokensReported": false
+      },
+      "steps": [
+        {
+          "id": "33a1b48e-e3c4-40fa-9e2e-1198573cf177",
+          "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+          "index": 0,
+          "role": "Acquire",
+          "objective": "Reuse original Calculator",
+          "dependsOn": [],
+          "requiredCapabilities": [
+            "computer.open_app"
+          ],
+          "reasoning": "none",
+          "preferences": {},
+          "scope": {
+            "root": "C:\\Users\\allam\\Bunny-Workspace-T10-stage",
+            "access": "read",
+            "isolation": "shared"
+          },
+          "providerConstraints": {},
+          "modelConstraint": null,
+          "executor": {
+            "kind": "capability",
+            "action": "computer.open_app",
+            "params": {
+              "app": "calculator"
+            }
+          },
+          "expectedArtifacts": [],
+          "verification": [],
+          "maxRetries": 2,
+          "timeoutMs": 600000,
+          "weight": null,
+          "state": "completed",
+          "taskId": null,
+          "capabilityRunId": "2bc284f2-18bb-4c27-a8ca-2aad231699e9",
+          "workspace": "C:\\Users\\allam\\Bunny-Workspace-T10-stage",
+          "attempts": [
+            {
+              "attempt": 1,
+              "startedAt": 1791333964682,
+              "finishedAt": null,
+              "taskId": null,
+              "capabilityRunId": null,
+              "provider": null,
+              "outcome": "running",
+              "category": null,
+              "detail": ""
+            },
+            {
+              "attempt": 2,
+              "startedAt": 1791333964777,
+              "finishedAt": 1791333966763,
+              "taskId": null,
+              "capabilityRunId": "2bc284f2-18bb-4c27-a8ca-2aad231699e9",
+              "provider": null,
+              "outcome": "completed",
+              "category": null,
+              "detail": "completed"
+            }
+          ],
+          "result": {
+            "summary": "Reused the verified Calculator target.",
+            "artifactIds": [],
+            "verified": null,
+            "verification": []
+          },
+          "evidence": [],
+          "failure": null,
+          "accounting": {
+            "runtimeMs": 1988,
+            "local": true,
+            "provider": null,
+            "model": null,
+            "inputTokens": null,
+            "outputTokens": null,
+            "deterministic": true
+          },
+          "pendingRequestId": null,
+          "pendingPhase": null,
+          "approvedOnce": null,
+          "startedAt": 1791333964682,
+          "finishedAt": 1791333966763
+        },
+        {
+          "id": "04e3a828-94af-4f8c-9f77-62ed804025a8",
+          "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+          "index": 1,
+          "role": "Pause",
+          "objective": "Never approve this separate request",
+          "dependsOn": [
+            "33a1b48e-e3c4-40fa-9e2e-1198573cf177"
+          ],
+          "requiredCapabilities": [
+            "computer.type"
+          ],
+          "reasoning": "none",
+          "preferences": {},
+          "scope": {
+            "root": "C:\\Users\\allam\\Bunny-Workspace-T10-stage",
+            "access": "read",
+            "isolation": "shared"
+          },
+          "providerConstraints": {},
+          "modelConstraint": null,
+          "executor": {
+            "kind": "capability",
+            "action": "computer.type",
+            "params": {
+              "title": "Calculator",
+              "name": "Never execute",
+              "text": "[25 characters]"
+            }
+          },
+          "expectedArtifacts": [],
+          "verification": [],
+          "maxRetries": 2,
+          "timeoutMs": 600000,
+          "weight": null,
+          "state": "waiting_for_approval",
+          "taskId": null,
+          "capabilityRunId": null,
+          "workspace": "C:\\Users\\allam\\Bunny-Workspace-T10-stage",
+          "attempts": [
+            {
+              "attempt": 1,
+              "startedAt": 1791333966773,
+              "finishedAt": null,
+              "taskId": null,
+              "capabilityRunId": null,
+              "provider": null,
+              "outcome": "running",
+              "category": null,
+              "detail": ""
+            }
+          ],
+          "result": null,
+          "evidence": [],
+          "failure": null,
+          "accounting": {
+            "runtimeMs": 5,
+            "local": true,
+            "provider": null,
+            "model": null,
+            "inputTokens": null,
+            "outputTokens": null,
+            "deterministic": true
+          },
+          "pendingRequestId": "827fbf5b-cb8c-432e-a597-1b861106b176",
+          "pendingPhase": "execute",
+          "approvedOnce": null,
+          "startedAt": 1791333966773,
+          "finishedAt": null
+        },
+        {
+          "id": "e8892bb2-06ea-431d-a585-ea9cc5bc06ff",
+          "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+          "index": 2,
+          "role": "Acquire",
+          "objective": "Reuse original Calculator",
+          "dependsOn": [
+            "04e3a828-94af-4f8c-9f77-62ed804025a8"
+          ],
+          "requiredCapabilities": [
+            "computer.open_app"
+          ],
+          "reasoning": "none",
+          "preferences": {},
+          "scope": {
+            "root": "C:\\Users\\allam\\Bunny-Workspace-T10-stage",
+            "access": "read",
+            "isolation": "shared"
+          },
+          "providerConstraints": {},
+          "modelConstraint": null,
+          "executor": {
+            "kind": "capability",
+            "action": "computer.open_app",
+            "params": {
+              "app": "calculator"
+            }
+          },
+          "expectedArtifacts": [],
+          "verification": [],
+          "maxRetries": 2,
+          "timeoutMs": 600000,
+          "weight": null,
+          "state": "pending",
+          "taskId": null,
+          "capabilityRunId": null,
+          "workspace": null,
+          "attempts": [],
+          "result": null,
+          "evidence": [],
+          "failure": null,
+          "accounting": {
+            "runtimeMs": 0,
+            "local": null,
+            "provider": null,
+            "model": null,
+            "inputTokens": null,
+            "outputTokens": null,
+            "deterministic": true
+          },
+          "pendingRequestId": null,
+          "pendingPhase": null,
+          "approvedOnce": null,
+          "startedAt": null,
+          "finishedAt": null
+        }
+      ],
+      "progress": {
+        "kind": "steps",
+        "completed": 1,
+        "total": 3,
+        "failed": 0,
+        "running": 0
+      },
+      "requests": [
+        {
+          "id": "827fbf5b-cb8c-432e-a597-1b861106b176",
+          "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+          "stepId": "04e3a828-94af-4f8c-9f77-62ed804025a8",
+          "action": "computer.type",
+          "risk": "EXECUTE",
+          "reason": "EXECUTE actions were not approved for this mission.",
+          "createdAt": 1791333966785,
+          "resolvedAt": null,
+          "resolution": null,
+          "resolvedBy": null,
+          "batchOffer": null
+        },
+        {
+          "id": "88fc911e-e561-49bb-8916-2e1111e9b644",
+          "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+          "stepId": "33a1b48e-e3c4-40fa-9e2e-1198573cf177",
+          "action": "computer.open_app",
+          "risk": "EXECUTE",
+          "reason": "EXECUTE actions were not approved for this mission.",
+          "createdAt": 1791333964697,
+          "resolvedAt": 1791333964747,
+          "resolution": "allow_batch",
+          "resolvedBy": "workstation",
+          "batchOffer": {
+            "actions": [
+              "computer.open_app"
+            ],
+            "counts": {
+              "computer.open_app": 2
+            },
+            "maxActions": 4,
+            "ttlMs": 120000,
+            "riskCeiling": "EXECUTE",
+            "targetLabel": "Calculator",
+            "target": {
+              "app": "calculator",
+              "processId": null,
+              "title": null
+            },
+            "targetTier": "app",
+            "family": "computer",
+            "readOnly": [],
+            "operations": [
+              {
+                "stepId": "33a1b48e-e3c4-40fa-9e2e-1198573cf177",
+                "digest": "21b4097ddb481ec1b386a8ce2bb09177751aae5a96eb50737468da484cd08613"
+              },
+              {
+                "stepId": "e8892bb2-06ea-431d-a585-ea9cc5bc06ff",
+                "digest": "21b4097ddb481ec1b386a8ce2bb09177751aae5a96eb50737468da484cd08613"
+              }
+            ]
+          }
+        }
+      ],
+      "artifacts": [],
+      "batch": {
+        "id": "1440addb-e3f7-4298-805b-6337150654e6",
+        "maxActions": 4,
+        "usedCount": 1,
+        "targetLabel": "Calculator",
+        "createdAt": 1791333964742,
+        "expiresAt": 1791334084742,
+        "status": "active",
+        "endReason": null
+      }
+    },
+    "events": [
+      {
+        "sequence": 1621,
+        "at": 1791333964622,
+        "type": "mission.created",
+        "taskId": null,
+        "detail": "Mission \"T10 active crash boundary\" created by workstation (fast).",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1622,
+        "at": 1791333964625,
+        "type": "mission.planning",
+        "taskId": null,
+        "detail": "Planning with bunny-planner-deterministic-v1.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1623,
+        "at": 1791333964630,
+        "type": "mission.planned",
+        "taskId": null,
+        "detail": "3 step(s): Acquire → Pause → Acquire. User-supplied plan; validated and bounded by Bunny.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1624,
+        "at": 1791333964633,
+        "type": "mission.approval_required",
+        "taskId": null,
+        "detail": "Mission 79432a5d-a94b-4db4-9b42-4b70b836f48c \"T10 active crash boundary\" needs approval: READ; capabilities computer.open_app, computer.type, filesystem.exists, filesystem.list, filesystem.read, notifications.send; no model calls.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1626,
+        "at": 1791333964659,
+        "type": "approval.mission_envelope",
+        "taskId": null,
+        "detail": "Mission envelope 11d45c4f-0fe9-4a92-9db1-965dbb52a719 by workstation; provider sessions {\"steps\":[],\"maxSessions\":0,\"writeIncludesShell\":true}.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1627,
+        "at": 1791333964661,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "Mission authorization 11d45c4f-0fe9-4a92-9db1-965dbb52a719 granted by workstation: roots C:\\Users\\allam\\Bunny-Workspace-T10-stage; READ; terminal []; git []; browser off; computer on; expires 2026-10-07T01:16:04.654Z.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1628,
+        "at": 1791333964667,
+        "type": "mission.started",
+        "taskId": null,
+        "detail": "Mission \"T10 active crash boundary\" started.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1630,
+        "at": 1791333964676,
+        "type": "mission.step.ready",
+        "taskId": null,
+        "detail": "Acquire is ready. (step 33a1b48e-e3c4-40fa-9e2e-1198573cf177)",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1631,
+        "at": 1791333964682,
+        "type": "mission.step.started",
+        "taskId": null,
+        "detail": "Acquire started (attempt 1, deterministic). (step 33a1b48e-e3c4-40fa-9e2e-1198573cf177)",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1632,
+        "at": 1791333964686,
+        "type": "capability.requested",
+        "taskId": null,
+        "detail": "computer.open_app requested by mission:79432a5d-a94b-4db4-9b42-4b70b836f48c (step 33a1b48e-e3c4-40fa-9e2e-1198573cf177).",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1633,
+        "at": 1791333964688,
+        "type": "authorization.required",
+        "taskId": null,
+        "detail": "computer.open_app: EXECUTE actions were not approved for this mission.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1634,
+        "at": 1791333964699,
+        "type": "mission.permission_required",
+        "taskId": null,
+        "detail": "Mission 79432a5d-a94b-4db4-9b42-4b70b836f48c request 88fc911e-e561-49bb-8916-2e1111e9b644: Acquire needs permission for computer.open_app (EXECUTE): EXECUTE actions were not approved for this mission. (step 33a1b48e-e3c4-40fa-9e2e-1198573cf177)",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1635,
+        "at": 1791333964706,
+        "type": "mission.waiting_for_user",
+        "taskId": null,
+        "detail": "Mission 79432a5d-a94b-4db4-9b42-4b70b836f48c is waiting for 1 permission decision(s).",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1637,
+        "at": 1791333964744,
+        "type": "approval.batch_started",
+        "taskId": null,
+        "detail": "Small approval batch granted by workstation for Calculator: at most 4 mutating actions within 2 min; covers Open its app. It ends at the limit, at expiry, on Stop, on a target mismatch, or with the mission.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1638,
+        "at": 1791333964757,
+        "type": "approval.additional_capability",
+        "taskId": null,
+        "detail": "computer.open_app allow_batch by workstation; request 88fc911e-e561-49bb-8916-2e1111e9b644; scope one small bounded batch (4 actions, target Calculator).",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1639,
+        "at": 1791333964759,
+        "type": "mission.resumed",
+        "taskId": null,
+        "detail": "workstation answered request 88fc911e-e561-49bb-8916-2e1111e9b644.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1640,
+        "at": 1791333964762,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "computer.open_app for step 33a1b48e-e3c4-40fa-9e2e-1198573cf177: allow_batch by workstation (request 88fc911e-e561-49bb-8916-2e1111e9b644).",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1642,
+        "at": 1791333964777,
+        "type": "mission.step.started",
+        "taskId": null,
+        "detail": "Acquire started (attempt 2, deterministic). (step 33a1b48e-e3c4-40fa-9e2e-1198573cf177)",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1648,
+        "at": 1791333965762,
+        "type": "capability.requested",
+        "taskId": null,
+        "detail": "computer.open_app requested by mission:79432a5d-a94b-4db4-9b42-4b70b836f48c (step 33a1b48e-e3c4-40fa-9e2e-1198573cf177).",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1649,
+        "at": 1791333965767,
+        "type": "approval.batch_consumed",
+        "taskId": null,
+        "detail": "computer.open_app admitted under the small approval batch: 1 / 4 mutating actions used.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1650,
+        "at": 1791333965769,
+        "type": "authorization.granted",
+        "taskId": null,
+        "detail": "computer.open_app: Allowed by the small approval batch for Calculator: 1 of 4 mutating actions used.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1651,
+        "at": 1791333965772,
+        "type": "capability.started",
+        "taskId": null,
+        "detail": "computer.open_app started.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1656,
+        "at": 1791333966758,
+        "type": "capability.completed",
+        "taskId": null,
+        "detail": "computer.open_app succeeded: Reused the verified Calculator target.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1657,
+        "at": 1791333966763,
+        "type": "mission.step.completed",
+        "taskId": null,
+        "detail": "Acquire completed (no independent check requested). (step 33a1b48e-e3c4-40fa-9e2e-1198573cf177)",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1658,
+        "at": 1791333966768,
+        "type": "mission.step.ready",
+        "taskId": null,
+        "detail": "Pause is ready. (step 04e3a828-94af-4f8c-9f77-62ed804025a8)",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1659,
+        "at": 1791333966773,
+        "type": "mission.step.started",
+        "taskId": null,
+        "detail": "Pause started (attempt 1, deterministic). (step 04e3a828-94af-4f8c-9f77-62ed804025a8)",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1660,
+        "at": 1791333966776,
+        "type": "capability.requested",
+        "taskId": null,
+        "detail": "computer.type requested by mission:79432a5d-a94b-4db4-9b42-4b70b836f48c (step 04e3a828-94af-4f8c-9f77-62ed804025a8).",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1661,
+        "at": 1791333966778,
+        "type": "authorization.required",
+        "taskId": null,
+        "detail": "computer.type: EXECUTE actions were not approved for this mission.",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1662,
+        "at": 1791333966788,
+        "type": "mission.permission_required",
+        "taskId": null,
+        "detail": "Mission 79432a5d-a94b-4db4-9b42-4b70b836f48c request 827fbf5b-cb8c-432e-a597-1b861106b176: Pause needs permission for computer.type (EXECUTE): EXECUTE actions were not approved for this mission. (step 04e3a828-94af-4f8c-9f77-62ed804025a8)",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      },
+      {
+        "sequence": 1663,
+        "at": 1791333966793,
+        "type": "mission.waiting_for_user",
+        "taskId": null,
+        "detail": "Mission 79432a5d-a94b-4db4-9b42-4b70b836f48c is waiting for 1 permission decision(s).",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      }
+    ],
+    "memory": [
+      {
+        "id": "7af5258f-7445-45dd-907e-c0bf55325b06",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+        "kind": "user_decision",
+        "key": "Mission approved",
+        "value": "workstation approved READ in C:\\Users\\allam\\Bunny-Workspace-T10-stage until 2026-10-07T01:16:04.654Z.",
+        "provenance": "user:workstation",
+        "verified": true,
+        "createdAt": 1791333964656
+      },
+      {
+        "id": "6285d7d1-ba9c-4c21-b816-d1bfa5c99dd3",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+        "kind": "user_decision",
+        "key": "computer.open_app allowed as a small batch (4 actions for Calculator)",
+        "value": "workstation: EXECUTE actions were not approved for this mission.",
+        "provenance": "user:workstation",
+        "verified": true,
+        "createdAt": 1791333964754
+      }
+    ],
+    "authorization": {
+      "projectRoots": [
+        "C:\\Users\\allam\\Bunny-Workspace-T10-stage"
+      ],
+      "riskClasses": [
+        "READ"
+      ],
+      "capabilities": [
+        "computer.open_app",
+        "computer.type",
+        "filesystem.exists",
+        "filesystem.list",
+        "filesystem.read",
+        "notifications.send"
+      ],
+      "providers": {
+        "execution": false,
+        "allow": null,
+        "localOnly": false,
+        "sessions": {
+          "steps": [],
+          "maxSessions": 0,
+          "writeIncludesShell": true
+        }
+      },
+      "filesystem": {
+        "read": [
+          "C:\\Users\\allam\\Bunny-Workspace-T10-stage"
+        ],
+        "write": []
+      },
+      "browser": {
+        "enabled": false,
+        "domains": "public"
+      },
+      "terminal": {
+        "enabled": false,
+        "commands": [],
+        "executables": []
+      },
+      "git": {
+        "actions": []
+      },
+      "network": {
+        "allowed": false
+      },
+      "computer": {
+        "enabled": true
+      },
+      "budget": {
+        "maxExternalModelCalls": 2,
+        "maxRuntimeMs": 1800000,
+        "maxRetries": 2,
+        "maxTokens": null
+      },
+      "alwaysAsk": [
+        "EXTERNAL_SIDE_EFFECT",
+        "DESTRUCTIVE"
+      ],
+      "id": "11d45c4f-0fe9-4a92-9db1-965dbb52a719",
+      "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+      "grantedAt": 1791333964654,
+      "grantedBy": "workstation",
+      "expiresAt": 1791335764654,
+      "revokedAt": null
+    },
+    "runs": [
+      {
+        "id": "2bc284f2-18bb-4c27-a8ca-2aad231699e9",
+        "action": "computer.open_app",
+        "capability": "computer",
+        "missionId": "79432a5d-a94b-4db4-9b42-4b70b836f48c",
+        "stepId": "33a1b48e-e3c4-40fa-9e2e-1198573cf177",
+        "risk": "EXECUTE",
+        "decision": "allow",
+        "decisionReason": "Allowed by the small approval batch for Calculator: 1 of 4 mutating actions used.",
+        "params": {
+          "app": "calculator"
+        },
+        "status": "succeeded",
+        "summary": "Reused the verified Calculator target.",
+        "evidence": [
+          "computer.open_app via UI Automation at 2026-10-07T00:46:06.755Z",
+          "Calculator target reuse_existing: {\"handle\":\"15991686\",\"processId\":34640,\"processStartedAt\":\"639269006874532721\",\"contentProcessId\":18744,\"contentStartedAt\":\"639269305910907240\"}"
+        ],
+        "artifactIds": [],
+        "startedAt": 1791333965765,
+        "finishedAt": 1791333966758,
+        "durationMs": 993,
+        "origin": "mission:79432a5d-a94b-4db4-9b42-4b70b836f48c"
+      }
+    ]
+  }
+}

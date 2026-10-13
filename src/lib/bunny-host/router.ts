@@ -1,5 +1,6 @@
 import { analyze, routeTask, scoreProvider, weights } from "../orch/router.ts";
 import type { Mode, ProviderId, ProviderLive, RouteDecision, TaskConstraints } from "../orch/types.ts";
+import { codexMissionExclusion } from "../orch/compatibility.ts";
 
 export function inferredConstraints(prompt: string, constraints: TaskConstraints = {}): TaskConstraints {
   const filesystem=/\b(create|write|read|modify|edit|fix|debug|refactor|repair)\b[\s\S]*\b(file|repository|repo|script|test|code|folder)\b|\b[\w-]+\.(py|ts|tsx|js|mjs|txt)\b/i.test(prompt);
@@ -8,12 +9,28 @@ export function inferredConstraints(prompt: string, constraints: TaskConstraints
   return { ...constraints, requiresFilesystem:constraints.requiresFilesystem || filesystem || !!constraints.workingDirectory,requiresTerminal:constraints.requiresTerminal || terminal || git || constraints.requiresGit,requiresGit:constraints.requiresGit || git,localOnly: constraints.localOnly || /\blocal[- ]only\b|\bdon't send\b|\bdo not send\b/i.test(prompt), offlineOnly: constraints.offlineOnly || /\boffline[- ]only\b/i.test(prompt) };
 }
 const STATUS: Record<string,string>={not_installed:"is not installed",authentication_required:"needs sign-in",rate_limited:"has reached its usage limit",offline:"is offline",unavailable:"is unavailable",unknown:"has an unknown status"};
+/**
+ * Locality is per model: a local service (Ollama) can proxy a tag to a hosted model, whose generation leaves
+ * this machine. Mission accounting, local-only envelopes and local-only launches use this, never the provider label alone.
+ */
+export function runsLocally(provider: Pick<ProviderLive,"local_or_cloud"|"remoteModels"> | undefined, model: string | null | undefined): boolean {
+  return !!provider && provider.local_or_cloud === "local" && !!model && !(provider.remoteModels ?? []).includes(model) && !/(:|-)cloud$/i.test(model);
+}
+/** The model a local-only task should use: the current one when it is local, otherwise the first local model. */
+export function localModel(provider: ProviderLive): string | null {
+  return runsLocally(provider, provider.current_model) ? provider.current_model : (provider.models ?? []).find((model) => runsLocally(provider, model)) ?? null;
+}
 /** Hard eligibility. A provider failing any rule is excluded outright; scores never override it. */
 export function eligibility(provider: ProviderLive, constraints: TaskConstraints): string | null {
   if (!["ready","busy"].includes(provider.availability)) return `${provider.name} ${STATUS[provider.availability] ?? provider.availability}.`;
   if (!provider.installed) return `${provider.name} is not installed.`;
   if (!provider.authenticated) return `${provider.name} is not signed in.`;
+  if (constraints.missionAccess) {
+    const compatibility = codexMissionExclusion(provider, constraints.missionAccess);
+    if (compatibility) return compatibility;
+  }
   if ((constraints.localOnly || constraints.offlineOnly) && provider.local_or_cloud !== "local") return "Requires local execution; this provider runs in the cloud.";
+  if ((constraints.localOnly || constraints.offlineOnly) && !localModel(provider)) return "Requires local execution; every installed model of this provider is cloud-hosted.";
   if (constraints.providerAllowlist && !constraints.providerAllowlist.includes(provider.id)) return "Outside provider allowlist.";
   if (constraints.providerDenylist?.includes(provider.id)) return "Provider denied.";
   if (constraints.requiresFilesystem && !provider.capabilities?.includes("filesystem")) return constraints.workingDirectory ? "Cannot work inside a specific folder (text generation only)." : "Filesystem capability unavailable.";
@@ -24,6 +41,7 @@ export function eligibility(provider: ProviderLive, constraints: TaskConstraints
 }
 export function requirementsOf(constraints: TaskConstraints): string[] {
   return [
+    constraints.missionAccess && `validated Mission ${constraints.missionAccess} security`,
     constraints.requiresFilesystem && "filesystem", constraints.requiresTerminal && "terminal", constraints.requiresGit && "git", constraints.requiresGPU && "gpu",
     constraints.localOnly && "local only", constraints.offlineOnly && "offline only", constraints.workingDirectory && `working directory ${constraints.workingDirectory}`,
     constraints.providerAllowlist?.length && `only ${constraints.providerAllowlist.join(", ")}`, constraints.providerDenylist?.length && `never ${constraints.providerDenylist.join(", ")}`,
@@ -37,8 +55,8 @@ function usageNote(provider: ProviderLive): string | null {
 export function bunnyRoute(input: { prompt: string; mode: Mode; providers: ProviderLive[]; override?: ProviderId | "auto"; constraints?: TaskConstraints; learned?: (provider: ProviderId, type: string) => number; policyId?: string }): RouteDecision {
   const constraints = inferredConstraints(input.prompt,input.constraints);
   const pool = input.providers.filter(provider => !eligibility(provider,constraints));
-  if (!pool.length) throw new Error("No ready executor can satisfy this task's hard constraints.");
-  if (input.override && input.override !== "auto" && !pool.some(provider=>provider.id===input.override)) throw new Error("Selected executor is not eligible for this task.");
+  if (!pool.length) throw new Error(`No ready executor can satisfy this task's hard constraints. ${input.providers.map(provider => eligibility(provider, constraints)).filter(Boolean).join(" ")}`);
+  if (input.override && input.override !== "auto" && !pool.some(provider=>provider.id===input.override)) throw new Error(`Selected executor is not eligible for this task. ${input.providers.find(provider => provider.id === input.override) ? eligibility(input.providers.find(provider => provider.id === input.override)!, constraints) : "Provider was not found."}`);
   const features = analyze(input.prompt,input.mode);
   const learned = new Map(pool.map(live=>[live.id,input.learned?.(live.id,features.task_type) ?? 0]));
   const ranked = pool.map(live=>({provider: live.id, score: scoreProvider(live.id,input.prompt,input.mode,live)+learned.get(live.id)!})).sort((a,b)=>b.score-a.score || a.provider.localeCompare(b.provider));
@@ -46,6 +64,10 @@ export function bunnyRoute(input: { prompt: string; mode: Mode; providers: Provi
   const chosen = manual ? input.override as ProviderId : ranked[0].provider;
   const chosenLive = pool.find(provider=>provider.id===chosen)!;
   const decision = routeTask({...input,providers:pool,override: chosen});
+  // A local-only task never inherits a cloud-hosted default model from a local service.
+  const local = constraints.localOnly || constraints.offlineOnly ? localModel(chosenLive) : null;
+  const substituted = local && local!==decision.recommended_model ? decision.recommended_model : null;
+  if (local) decision.recommended_model = local;
   const excluded = input.providers.filter(provider=>!pool.includes(provider)).map(provider=>({provider:provider.id,reason:eligibility(provider,constraints)!}));
   const requirements = requirementsOf(constraints);
   const delta = learned.get(chosen) ?? 0;
@@ -53,6 +75,7 @@ export function bunnyRoute(input: { prompt: string; mode: Mode; providers: Provi
     manual ? `Manual override: ${chosenLive.name}.` : `${chosenLive.name} has the highest score of ${pool.length} eligible provider${pool.length === 1 ? "" : "s"}.`,
     `${chosenLive.name} is installed and ${chosenLive.availability} (probed on this Host).`,
     requirements.length ? `Hard requirements met: ${requirements.join(", ")}.` : "No hard requirements beyond a ready provider.",
+    substituted ? `Local only: using local model ${decision.recommended_model}, not the cloud-hosted default ${substituted}.` : null,
     `${features.task_type} task, complexity ${features.complexity.toFixed(2)}, ${input.mode} weights.`,
     delta ? `Verified history adjusts ${chosenLive.name} by ${delta >= 0 ? "+" : ""}${delta.toFixed(3)}.` : "No history weight yet (needs at least 5 recorded outcomes for this task type).",
     usageNote(chosenLive),

@@ -1,0 +1,871 @@
+✔ non-canvas app with no custom card gets a soft BRAND NOTE (utility exception) (5.0537ms)
+✔ non-canvas app with a compliant card is silent (5.9435ms)
+✔ card file without site.json card=custom warns (4.4715ms)
+✔ card file with missing site.json warns for card=custom (4.126ms)
+✔ card file with invalid site.json warns for card=custom (4.9743ms)
+✔ oversized card warns for non-canvas apps too (4.6111ms)
+✔ canvas app with no card warns 'missing' and missing og:type (4.0396ms)
+✔ canvas card without type still warns for og:type (4.0558ms)
+✔ oversized card warns on the scraper budget (jpg and legacy png) (10.7978ms)
+✔ compliant game (custom card + site.json type + x-banner) is silent (4.6814ms)
+✔ __root.tsx og:type no longer satisfies the canvas gate (5.6124ms)
+✔ oversized x-banner warns on the same scraper budget as og.jpg (5.1648ms)
+✔ legacy png + site.json type still needs the X feed card (4.3221ms)
+✔ siteDeclaresOgTypeGame reads the site contract (0.1858ms)
+✔ a fresh og-pending marker silences the whole gate view (3.2458ms)
+✔ a stale og-pending marker is ignored and the warnings return (3.8672ms)
+✔ the marker goes stale on the clock, not on the file (4.4714ms)
+✔ no marker means nothing is in flight (3.1877ms)
+✔ parseBrandCheckArgs takes --game, --placeholder-ok and --root, and rejects the rest (0.5236ms)
+✔ cli: a game missing its card reports JSON and exits 1 (63.8963ms)
+✔ cli: a compliant game passes (68.1336ms)
+✔ cli: the task's own marker is reported, not honoured (69.8024ms)
+✔ cli: a bad argument fails with JSON on stderr (63.9416ms)
+✔ cli: a non-game with no card fails too — the pass exists to produce one (63.2532ms)
+✔ cli: --placeholder-ok is how a plain-utility pass reports no card as expected (131.2622ms)
+✔ cli: a non-game with a compliant card passes (71.1579ms)
+✔ SKILL.md and AGENTS.md name the marker path and bound this script uses (1.8578ms)
+✔ the sections that own the brand-task prohibition never affirm a wait (2.1774ms)
+✔ SKILL.md tells the pass to self-check with the flag this CLI accepts (0.786ms)
+✔ normalizes whitespace before hashing (1.7872ms)
+✔ nullish and blank body text normalize to the empty string (0.1346ms)
+✔ body text prefix is normalized and capped (0.1052ms)
+✔ identical runs do not diverge (0.6242ms)
+✔ status change diverges (0.2982ms)
+✔ title change diverges (0.3036ms)
+✔ title comparison is skipped when either side lacks one (0.2536ms)
+✔ canvas disappearing diverges; canvas appearing does not (0.2615ms)
+✔ horizontal overflow appearing diverges; clearing does not (0.2634ms)
+✔ new console errors diverge (0.1905ms)
+✔ errors already present in the baseline do not re-diverge (0.1331ms)
+✔ body text collapse diverges (0.1044ms)
+✔ body text dropping to zero reports collapse (0.1882ms)
+✔ zero-length baseline reports growth via the hash branch, not collapse (0.1082ms)
+✔ hash mismatch with a trivial length delta and same page start is tolerated (0.0695ms)
+✔ hash mismatch with a trivial length delta but changed page start diverges (0.082ms)
+✔ prefix check is skipped when either side lacks a prefix (0.1072ms)
+✔ length-delta tolerance boundary: 50 tolerated, 51 diverges (500-char baseline) (0.0817ms)
+✔ length-delta floor dominates small baselines: 20 tolerated, 21 diverges (100-char baseline) (0.067ms)
+✔ collapse boundary: exactly half is 'changed', one below is 'collapsed' (0.0696ms)
+✔ missing baseline viewport diverges (0.0676ms)
+✔ empty or null baseline diverges for every viewport (0.0944ms)
+✔ degenerate current verdict fails closed (0.3323ms)
+✔ multiple signals across viewports all accumulate (0.1046ms)
+✔ baselineComparison round-trips a valid baseline (0.2334ms)
+✔ baselineComparison fails closed on malformed or wrong-shape baselines (0.3046ms)
+✔ parseSmokeArgs defaults (0.2922ms)
+✔ parseSmokeArgs consumes --baseline without shifting positionals (0.1211ms)
+✔ parseSmokeArgs rejects a trailing --baseline flag (0.1059ms)
+✔ parseSmokeArgs supports the --baseline= form (0.1437ms)
+✔ parseSmokeArgs rejects unknown flags instead of treating them as positionals (0.1141ms)
+✔ parseSmokeArgs env fallback and flag precedence (0.1214ms)
+✔ derivedPaths handles .png, .PNG, and extensionless inputs (0.3061ms)
+✔ exitCodeFor: clean run exits 0 (0.1763ms)
+✔ exitCodeFor: errors in any single viewport exit 2 (0.1172ms)
+✔ exitCodeFor: navigation failure in any viewport exits 1, beating errors (0.1573ms)
+✔ exitCodeFor: 4xx boundary and missing status (0.1261ms)
+✔ exitCodeFor: no viewport data is a failure (0.1322ms)
+✔ browser-smoke wires the guard and verdict helpers (1.6894ms)
+✔ browser-smoke file I/O only touches guarded paths (1.2268ms)
+✔ defaultScreenshotPath stays inside the allowed output root on each platform (0.1059ms)
+fatal: 'C:\Users\allam\Documents\new\bun-router\test-results\ma3\t13\source-checkout\' does not appear to be a git repository
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+✔ M-A-1D: the production release pin is the reviewed M-A-1 code candidate (109.3907ms)
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (153.2278ms)
+✔ M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release (9059.867ms)
+✔ M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release (13772.362ms)
+✔ T10-XG-06: rollback refuses a paused Mission with a live desktop grant, even outside the snapshot page (129.2782ms)
+✔ T10 rollback preflight preserves the idle positive control, and refuses enabled scheduling (79.2793ms)
+✔ T10 rollback preflight refuses orphan grant and interrupted or waiting work independently (106.2328ms)
+✔ MA2 T1: the read-only SQLite snapshot includes committed WAL rows (166.8177ms)
+✔ MA2 T1: all 23 tables and non-database files survive migration (248.8283ms)
+✔ MA2 T1: an unexpected changed task field fails preservation (246.7978ms)
+✔ MA2 T1: new telemetry is allowed, but missing historical events fail (281.5953ms)
+✔ MA2 T1: active tasks refuse migration before copy (145.02ms)
+✔ MA2 T1: active missions refuse migration before copy (143.9296ms)
+✔ MA2 T1: unknown schema refuses migration (149.2084ms)
+✔ MA2 T1: an occupied stage is never overwritten (141.5847ms)
+✔ MA2 T1: state cannot be installed inside a Git checkout (129.9788ms)
+✔ MA2 T1: a source directory junction fails preflight (142.0635ms)
+✔ MA2 T1: a target junction cannot hide a repository dependency (128.5968ms)
+✔ MA2 T1: copied hard-linked files become independent files (232.4856ms)
+✔ MA2 T1: git clean in a disposable checkout cannot delete migrated state (361.0644ms)
+✔ MA2 T1: a named-tunnel configuration needs an explicit credential inventory (141.9615ms)
+✔ MA2 T1: the installed tunnel uses application state and rejects a missing or changed client (274.4274ms)
+✔ MA2 T1: installed Host state fails closed without an explicit path or database (129.4624ms)
+✔ MA2 T1: installed Host resolves flat canonical state and moved credentials (362.8854ms)
+✔ MA2 T1: a truncated database and unknown layout fail closed without creating state (262.6564ms)
+✔ MA2 T1: a retired production source cannot become development state (146.6097ms)
+✔ MA2 T1 Windows controller: complete cutover and idempotent retry (19320.4094ms)
+✔ MA2 T1 Windows controller: after-copy (18073.3962ms)
+✔ MA2 T1 Windows controller: after-config (19684.743ms)
+✔ MA2 T1 Windows controller: after-host (26942.8547ms)
+✔ T3: disposable tunnel worker crash has three bounded attempts and no Host failure (708.9237ms)
+{"type":"host.degraded","at":1791844253555,"failureClass":"HOST_DEGRADED","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+{"type":"host.subsystem_failed","at":1791844253553,"failureClass":"SUBSYSTEM_FAILURE","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+✔ T3: tunnel output callback rejection is contained and marks transport unavailable (172.3971ms)
+✔ T3: cancelling tunnel backoff never revives stopped work (274.4779ms)
+✔ T3: tunnel development state has no retired checkout fallback (6.8546ms)
+✔ T3: installed entry uses actual global policy and launcher has no crash retry loop (4.4935ms)
+✔ T3: every retired credential launcher refuses before starting a process or creating state (8.0838ms)
+✔ Cloudflare API errors and documentation are never public companion URLs (1.4991ms)
+✔ quick tunnel publishing requires both actual announcement and registered connection (0.4899ms)
+✔ chunked cloudflared output stays unavailable until the full hostname and connection arrive (0.2854ms)
+✔ an announced API service address is rejected even after connection text (0.1863ms)
+✔ named tunnels retain their configured origin and wait for registration (0.1767ms)
+✔ candidate tunnel target is loopback-only without changing the installed default (0.4583ms)
+✔ the child's registration ledger parses register and unregister events with connIndex (1.1891ms)
+✔ startup decisions reconcile a dead worker's stale publication and refuse a live duplicate (0.4412ms)
+✔ a healthy child keeps the supervisor quiet; abort ends the single attempt (415.9933ms)
+✔ zero active edge connections sustained beyond the window stop the owned child and retry (919.9627ms)
+✔ edge-connection churn with a sub-floor active count stops the child exactly as the T6 diagnostic recorded (512.4372ms)
+✔ sustained public failures reach the streak floor while a gateway fault breaks the streak without counting (1015.5072ms)
+✔ a degradation-triggered child exit still counts against the bounded attempt budget (300.4644ms)
+✔ T10-whisper a release with the pin is closed only when every pinned runtime file, the shim and the model are present (57.2583ms)
+✔ the flag predicate matches src/lib/auth (1.6936ms)
+✔ reads the value a live dev server resolved (0.4822ms)
+✔ a server started without the flag reads as sign-in on (0.2403ms)
+✔ agreement passes (0.3107ms)
+✔ divergence fails in either direction (0.435ms)
+✔ an unobservable dev server is indeterminate, not agreement (0.2467ms)
+✔ a dev server that cannot be reached probes as null (0.3091ms)
+✔ a server without the endpoint probes as null, not as agreement (0.5174ms)
+✔ only a divergence warns the smoke verdict (1.5247ms)
+✔ the build side resolves the template's shipped app-env (7.599ms)
+✔ the CLI reports rather than silently passing when run via a symlink (393.9114ms)
+✔ T6 release closure refuses a cross-app package without its browser API and licenses (68.0021ms)
+✔ T6 browser dependency export refuses an installed version outside the source lockfile (120.2556ms)
+✔ desktop runtime refuses unknown hosts and cross-site writes (2.204ms)
+✔ remote runtime accepts only an explicitly configured HTTPS origin (1.807ms)
+✔ Android manifest supplies standalone display and both required icon sizes (1.2097ms)
+✔ MA1: the desktop package copies every source folder the native Host imports (288.0613ms)
+✔ injects before </head> (5.3227ms)
+✔ injects the extensions script without a project id (1.5759ms)
+✔ injects project id on the script and meta when provided (1.4171ms)
+✔ does not duplicate grok:app_id (10.2851ms)
+✔ omits x:creator tags without both creator values (2.1216ms)
+✔ injects x:creator tags when both creator values are set (0.9266ms)
+✔ escapes x:creator values (0.2314ms)
+✔ does not duplicate x:creator tags (2.1043ms)
+✔ platform chrome overwrites share-card metas and always sets og:title (1.4384ms)
+✔ does not duplicate twitter:card or og:title (3.6268ms)
+✔ a baked site.image is treated as a custom card (2.4929ms)
+✔ baked identity does not need a workspace filesystem (1.7279ms)
+✔ a public card file wins over a baked site without card=custom (2.3948ms)
+✔ public/og.png wins when jpg is absent (2.052ms)
+✔ resolveOgCardAsset: disk file, then bake, then empty (placeholder) (3.3173ms)
+✔ snapshotOgIdentity stamps card=custom from a public card file (2.4204ms)
+✔ snapshotOgIdentity stamps banner from public/x-banner.jpg (2.9647ms)
+✔ emits x:game:image for a public host when site.banner is set (1.127ms)
+✔ does not emit x:game:image without a public host or banner (1.2382ms)
+✔ site title Grok App is a real name, not a sentinel (1.0656ms)
+✔ published grok.me slug is still a title fallback (2.1241ms)
+✔ rejects Vercel system hosts as og:image origins (0.5917ms)
+✔ published VITE_PUBLIC_HOSTNAME wins over request Host for og:image (1.7019ms)
+✔ vercel Host without a public hostname emits no og:image (0.6951ms)
+✔ emits og:image for a public host and prefers a custom card (2.0624ms)
+✔ placeholder og:image appends site.color when it is 6-digit hex (1.9289ms)
+✔ document title entities are not double-escaped on og:title (0.742ms)
+✔ site.json title wins over the host slug (0.7904ms)
+✔ injects into documents with no head element (1.5026ms)
+✔ streaming injector matches </HEAD> case-insensitively (2.0058ms)
+✔ does not duplicate the extensions script (2.0199ms)
+✔ is idempotent (2.1058ms)
+✔ uses the app name in the injected title tag (0.6804ms)
+✔ streaming injector handles </head> split across chunks (1.2113ms)
+✔ streaming injector passes post-head chunks through untouched (0.9161ms)
+✔ streaming injector falls back when no </head> is seen (0.8696ms)
+✔ detects install query (0.2901ms)
+✔ filters non-document paths (0.3758ms)
+✔ strips install params from the app link (0.1759ms)
+✔ names the install page from host slug (0.0932ms)
+✔ rejects hosts that are not plain slugs (0.0759ms)
+✔ renders install page markup (1.5445ms)
+✔ escapes host-derived values in the install page (1.0813ms)
+✔ renders the manifest with the per-app name (0.2767ms)
+✔ vite config keeps the nitro serverDir wiring (1.031ms)
+✔ nitro middleware and its bundled assets exist (4.0128ms)
+✔ vite plugin bakes og identity as a virtual module (1.2064ms)
+✔ DPI: device work areas convert to DIPs at 125% and 150%, and a secondary monitor left of primary keeps negative DIPs (2659.9703ms)
+✔ work-area fingerprint rounds to whole DIPs so a saved monitor matches again only when its geometry is unchanged (0.357ms)
+✔ drag-to-dock: the release point picks the nearest edge of the monitor under the pointer, for all four edges (0.257ms)
+✔ drag-to-dock: a secondary monitor left of primary (negative coordinates) snaps to its own edges (0.1952ms)
+✔ drag-to-dock: the taskbar on the left or the top moves the usable edge, and the snap follows the work area (0.2266ms)
+✔ drag-to-dock: a corner resolves to a single edge by the fixed tie order (top, bottom, left, right) (0.156ms)
+✔ drag-to-dock: the offset is clamped to 0..1 when the pointer is past either end of the edge (0.2256ms)
+✔ placement after a drag stays wholly inside its work area for every edge, monitor and DPI (0.2931ms)
+✔ expansion direction is anchored to the dock edge: TOP down, BOTTOM up, LEFT right, RIGHT left (0.2225ms)
+✔ the on-screen check accepts a rect inside a secondary monitor and rejects one that leaves it (0.5684ms)
+✔ restore: a saved monitor is used only when it still exists with the same geometry; otherwise the primary monitor (0.2372ms)
+✔ companion mirror: the voice snapshot maps to the same expression as companionState() in voice-companion.ts (0.2219ms)
+✔ companion display: Host offline or a stale voice poll shows DISCONNECTED; a fresh verified agent shows HAPPY; the Host state is used when sent (0.178ms)
+✔ weapon motion: planning loops, waiting slows, needs-you pulses amber and stops, verified and failed are one-shots (0.1899ms)
+✔ Personal Agent strip: bound active slots in slot order, at most four; unbound and inactive slots draw nothing (1.2747ms)
+✔ verified transitions: the first observation seeds and never celebrates; an observed move into VERIFIED fires once per slot (0.3831ms)
+✔ native real-level ring stops in reduced motion and rejects future or non-listening samples (6.3579ms)
+✔ character art: the gada compact PNG is read at its real width from the header (0.2906ms)
+✔ every character id the Island draws exists as a runtime PNG under public/bunny-a/characters (3.7514ms)
+✔ the package lists every character PNG under characters\ unconditionally, and the new Island modules (1.6186ms)
+✔ the Island resolves art from the release folder first, then the development public folder (0.6181ms)
+✔ motion in the strip and the companion uses transforms and opacity only: no layout property is animated (3.002ms)
+✔ one-shots and loops only start on a state change: the strip keys each loop and never restarts it on a plain poll (2.7588ms)
+✔ animations stop when motion is off or reduced, when the system disables animation, and when the strip is hidden (5.3047ms)
+✔ the Ctrl+Alt+Arrow keyboard move and the drag share one edge rule, and the settings combo stays in sync (2.1792ms)
+✔ accessibility: every weapon, the companion and the detail actions carry a name; the card is reachable by keyboard (3.0038ms)
+✔ weapon chips never draw letters, provider marks or internal team members (1.4745ms)
+✔ Ctrl+Alt docking and drag keep the four locked dock behaviours: the strip side and the expansion follow the edge (1.5698ms)
+✔ no function is defined twice in the Visual module (the slot-row opener had a duplicate) (2.1124ms)
+✔ offline data is labelled last known wherever a retained Agent state is shown: slot rows, the weapon card and chip names (4.1028ms)
+✔ the Notch carries no "--" placeholder text and the header controls and weapon chips meet the 44 DIP target (4.4863ms)
+✔ weapon chips show keyboard focus, and the expanded slot rows do the same (2.8936ms)
+✔ a weapon command is never reported as sent while another command is still in flight (1.6409ms)
+✔ the harness evidence receipts, when present, record every notch check as passing (0.6764ms)
+✔ V47-V49: every edge, work area, size and offset places the notch fully inside the WorkArea (4290.5308ms)
+✔ V47: top and bottom are horizontal with agent indicators LEFT of the body (0.8493ms)
+✔ V48: left and right are vertical with agent indicators at the TOP of the body (1.2518ms)
+✔ V49: indicator layout is bounded (at most 4 weapon chips plus one overflow chip) and counts overflow exactly (1.9943ms)
+✔ V47/V48: the indicator axis follows the notch orientation (ONE row beside a horizontal notch, ONE column above a vertical one) (1.1115ms)
+✔ V49: the DPI-scaled 1536x816 work area (125%) keeps the default top notch centred and on-screen (0.4045ms)
+✔ V49: the bottom notch sits above the taskbar edge with the same margin as the top (0.3605ms)
+✔ Visual layer routes every edge through Get-BunnyPlacement and keeps the window title unchanged (3.6419ms)
+✔ V47/V48: the vertical size is swapped before placement (length along the edge, thickness across it) (2.0653ms)
+✔ Settings offers Top, Bottom, Left and Right, and the choice is persisted under the edge key (2.1271ms)
+✔ display-settings and DPI changes re-fit the notch through Resize-Bunny (size clamp and placement), not only the position (1.8127ms)
+✔ the indicator rule is shared: Visual asks Get-BunnyIndicatorLayout for the side and axis, never a second rule (3.6173ms)
+✔ no random value anywhere in the Island layer (placement, indicators and layout are deterministic) (9.7572ms)
+✔ T13 chips: team members get no letter; their tooltip names role, state and their own task (740.2525ms)
+✔ T13 strip: the notch draws weapon characters from the slot contract, never letters or team members (3.1801ms)
+✔ every Bunny-Island PowerShell file parses with zero errors under the PowerShell 5.1 parser (2415.6636ms)
+✖ island PowerShell sources are ASCII-only so PowerShell 5.1 reads them without a BOM (2.1282ms)
+✔ window title stays "Bunny Island" (the launcher keys readiness on it) (0.4255ms)
+✔ new Island files are in the packaged install file list (1.1814ms)
+✔ every voice action the panel sends is a workstation action in the shared contract (2.3073ms)
+✔ V46: Listening requires worker capture AND a fresh poll; otherwise the panel says Reconnecting (0.3706ms)
+✔ V46: Speaking is shown only from snapshot.playing, and only one branch produces it (0.3336ms)
+✖ V46: the level meter is driven only by snapshot.level with a freshness check, never by a timer or random value (1.0178ms)
+✔ V51: the voice layer adds no decorative animation (reduced motion and high contrast stay quiet) (0.5381ms)
+✔ V50: every voice control has an AutomationProperties.Name in the Visual XAML (0.9387ms)
+✔ V45: closing the Island releases voice (voice.session.close) and never calls agent.* or mission.* (0.7829ms)
+✔ the product hotkey is Ctrl+Alt+Space with MOD_NOREPEAT; the test chord is used only with -HotkeyTest; unregistered on close (0.3902ms)
+✔ a refused shortcut reports Shortcut unavailable and does not stop the Island (0.2611ms)
+✔ voice requests never run synchronously on the UI thread (0.2967ms)
+✔ no raw audio, transcripts or credentials are written to logs or files by the voice layer (0.3441ms)
+✔ push-to-talk while SPEAKING sends voice.listen.start (no gate on playing) and the press never sends an interrupt (0.3788ms)
+✔ the Interrupt control sends voice.interrupt and is the only control that cancels speech (0.3021ms)
+✔ the mic glyph carries Listening and Speaking as an accent, and a fault as a warning (collapsed notch has no status line) (0.2847ms)
+✔ -HotkeyTest is the only way the alternate test chord is selected, and blur is opt-in (default off) (0.7085ms)
+✔ R1-races#1 R1-truth#0 the on-screen Confirm and Mute send the keys the Host reads (proposalId, on) (3.9417ms)
+✔ R1-truth#1 the WPF Mute button sends voice.mute with the Host key on (not muted) and reflects snapshot.muted (0.6081ms)
+✔ R1-truth#2 a quick WPF tap latches tap-to-talk: a visible finish state, a second tap ends it, and a deadline bounds it (0.44ms)
+✔ R1-truth#8 the WPF uiIntent seq is scoped to the Host epoch: a new epoch resets the floor and never replays an old seq (0.2778ms)
+✔ R1-truth#6 the WPF Interrupt control is enabled only from a fresh snapshot, like the Speaking label (0.2718ms)
+✔ R1-races#2 acceptVoice drops a stale answer before any press reset or polling stop (1.192ms)
+✔ R1-truth#5 the desktop level meter and the WPF level meter both read snapshot.level.at against the local clock (1.0726ms)
+✔ R2-races#0 holding the mic 600 ms sends one listen.start and one listen.end, and the release Click restarts nothing (1176.6531ms)
+✔ R2-races#0 a second tap held 600 ms ends the latched turn and its release Click starts nothing new (0.2976ms)
+✔ R2-races#0 keyboard activation still toggles (no pointer Click pending) (0.1829ms)
+✔ R2-races#0 static: the pointer Click is consumed by a flag set on release, not by the mouse-down timestamp (0.7061ms)
+✔ R2-races#1 a release queued before the listen.start is acknowledged binds to that start turn (0.2199ms)
+✔ R2-races#1 a lost listen.start leaves the later release unbound, so it ends whatever capture the Host holds (0.1501ms)
+✔ R2-races#5 closing sends no queued-but-unsent open or listen, and the close lands after the open in flight (0.2054ms)
+✔ R2-races#5 static: the window close sends the session close whenever an open or listen was sent or queued (0.5683ms)
+✔ R2-truth#0 the first snapshot without an intent seeds the floor, so the first intent after start opens the workspace once (0.1619ms)
+✔ R2-truth#1 an expired proposal shows neither Needs approval nor a Confirm target (0.4889ms)
+✔ R2-fixcheck#1 the desktop hold-to-talk listen.start sends source push_to_talk through the store (1.5869ms)
+✔ R2-races#2 the desktop press maps a transport failure to unknown (defensive end) and a Host refusal to refused (1.5259ms)
+✔ T12 UI-07 the WPF hands-free notice and the AEC copy are the same strings as voice-model.ts (1.5534ms)
+✔ T12 UI-01 the hands-free toggle is mode-only in WPF, and a mode switch never sends listen.start (0.3601ms)
+✔ T12 UI-01 the explicit Start hands-free is the only WPF path that sends a hands-free listen.start, and it is named (0.4374ms)
+✔ T12 P7 unmute never reopens the microphone in WPF: the Mute handler sends voice.mute only (0.4294ms)
+✔ T12 UI-02 the WPF Finish my turn control ends the live input by its input id and is named (0.6693ms)
+✔ T12 UI-02 the WPF talk button is disabled in hands-free, so no release caption can sit on a disabled control (0.6128ms)
+✔ T12 UI-04 WPF interrupt enablement matches React: playing, thinking or holding a reply, from a fresh snapshot (0.5909ms)
+✔ T12 UI-04 WPF proposal sentence for a Mission stop is "Stop the Mission <title>" and never offers voice confirmation (0.9915ms)
+✔ T12 UI-09 the WPF composite label order: releasing, then both halves, then speaking only from playing, then held (0.3175ms)
+✔ T12 UI-03 WPF status row and barge-in receipt are data-only, derived from snapshot.duplex and lastBargeIn, never animated (0.3861ms)
+✔ T12 UI-01 the WPF hands-free status row is derived from snapshot.duplex, empty outside hands-free, and never claims more than the Host reports (0.0928ms)
+✔ T12 composite truth in WPF: Listening and speaking only with capture and playback, Speaking only from playback, Paused for a held reply (0.1042ms)
+✔ T12 UI-03 the WPF barge-in receipt shows the measured time and nothing when unmeasured (0.0516ms)
+✔ T12 UI-01/P7 WPF: Start hands-free sends the one explicit grant, Finish my turn ends the input by id, and a toggle never starts listening (0.0987ms)
+✔ T12 lane2 the WPF shortcut press in hands-free is the explicit hands-free start: no hold, no release, no duplex restart (0.0868ms)
+✔ T12 lane2 the WPF push-to-talk start is refused in hands-free: no listen.start and no capture intent (0.0451ms)
+✔ T12 lane2 the WPF mode switch ends a held press before the mode changes (0.0641ms)
+✔ T12 lane2 the WPF status row and barge-in receipt are empty while no session is open, even if the Host kept mode and the last receipt (0.1227ms)
+✔ T12 lane2 static: the shortcut branches to the hands-free start before any hold, and push-to-talk never starts in hands-free (0.324ms)
+✔ T12 lane2 static: the hands-free start is refused unless the session is open in hands_free and the duplex is idle (0.253ms)
+✔ _migrations keys on basename, not path (0.7631ms)
+✔ a file already applied from another directory does not re-apply (0.65ms)
+✔ pending migrations are returned in name order (9.5023ms)
+✔ non-.sql entries are dropped (readdir also yields the auth/ directory) (0.1447ms)
+✔ the auth schema ships outside the globbed directory (0.6609ms)
+✔ this workspace's auth schema copy is byte-identical to its source (0.3135ms)
+✔ the copy check reads both files and catches an edit (5.3952ms)
+✔ T4: native ownership builds reproducibly in independent directories (2515.4468ms)
+✔ parsePreviewArgs accepts the two actions (1.4194ms)
+✔ parsePreviewArgs rejects missing, unknown and extra arguments (0.2122ms)
+✔ parsePid reads a pidfile and rejects junk (0.1655ms)
+✔ parsePgid reads the pgrp field past a comm containing spaces (0.2105ms)
+✔ parseListenerInodes picks LISTEN sockets on the wanted port only (0.3096ms)
+✔ parseListenerInodes reads the tcp6 dump the same way (0.1565ms)
+✔ looksLikePreviewProcess matches the npm wrapper and its vite child (0.2964ms)
+✔ looksLikePreviewProcess spares the sibling scripts and re-used pids (0.2403ms)
+✔ previewOwners trusts port owners and dedupes the pidfile pid (0.1923ms)
+✔ previewOwners adds a pidfile pid whose command line is still the preview (0.2201ms)
+✔ previewOwners drops a stale pidfile pid re-used by another process (0.1459ms)
+✔ previewOwners drops a pidfile pid that no longer exists (0.0982ms)
+✔ previewOwners on a free port with no pidfile signals nothing (0.7723ms)
+✔ stopOutcome fails when a pid survives or the port is still held (0.2023ms)
+✔ stopOutcome reports a verified free port (0.145ms)
+✔ stopOutcome fails on a listener whose owner cannot be attributed (0.1211ms)
+✔ terminatePids SIGTERMs live pids and skips dead ones (0.3379ms)
+✔ terminatePids escalates to SIGKILL when SIGTERM is ignored (0.2089ms)
+✔ terminatePids reports a pid that survives SIGKILL as stubborn (0.2355ms)
+✔ terminatePids on a free port signals nothing (0.1134ms)
+✔ preview: a successful sign-out clears the token, then redirects (1.7237ms)
+✔ preview: a rejected sign-out still clears the token and redirects (0.2345ms)
+✔ preview: a sign-out that throws synchronously still clears and redirects (0.1627ms)
+✔ preview: a sign-out that never settles clears and redirects once the wait expires (16.9069ms)
+✔ preview: no bearer means nothing to invalidate, so no request is made (0.4876ms)
+✔ preview: a stored bearer is still invalidated server-side (0.2852ms)
+✔ deployed: a confirmed sign-out clears the token, then redirects (0.3405ms)
+✔ deployed: a sign-out that never settles throws and does NOT redirect (24.338ms)
+✔ deployed: a rejected sign-out throws and does NOT redirect (0.727ms)
+✔ deployed: the timeout is distinguishable from a rejection (30.3952ms)
+✔ settleWithin reports the outcome and never rejects (31.4514ms)
+✔ settleWithin waits its full window, then gives up rather than hanging (0.7883ms)
+✔ pre-sign-in: the preview clear gives up at the preview bound (0.6931ms)
+✔ pre-sign-in: a deployed session gets the deployed window, not the preview one (0.5207ms)
+✔ pre-sign-in: a failed clear never blocks sign-in (0.318ms)
+✔ pre-sign-in: the preview skips the request when there is no bearer (0.1299ms)
+✔ every sign-out bound comes from one rule (0.0832ms)
+✔ the defaults are bounded, and deployed waits longer than preview (0.2801ms)
+✔ T9R harness cleanup selects only its explicitly created target, preserving user targets (1.5829ms)
+✔ T9R harness refuses user-owned or pre-existing windows even with a plausible PID (0.9942ms)
+✔ T9R harness refuses stale PID/native handle and content lifetime (2.7141ms)
+✔ T9R harness refuses ambiguous ownership and unverified package identity (0.3929ms)
+✔ build record matches the source and the compiled worker (6.5905ms)
+✔ ready event reports local SAPI engines and the worker protocol (292.5962ms)
+✔ devices event is a read-only real enumeration with structure only (146.0198ms)
+✔ V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD (2864.0117ms)
+✔ manual endpointing finalizes only on capture.end (2583.3597ms)
+✔ V11 silence never becomes a command: stt.none no_speech, no final (1764.4003ms)
+✔ V12 noise-only input fails safely: vad noise_only and no final (1162.6413ms)
+✔ V06 total capture is bounded by maxMs and reports the buffered peak (408.8252ms)
+✔ V05 a second capture.start while capturing is refused with DEVICE_BUSY (304.2603ms)
+✔ V28 capture during playback is refused with BUSY_PLAYBACK (half duplex) (282.4004ms)
+✔ V19 V22 LIVE-B03 push-to-talk barge-in: speak.cancel immediately followed by capture.start opens the capture (no BUSY_PLAYBACK) (376.2378ms)
+✔ V24 mute aborts an active capture and refuses capture.start until unmuted (286.9303ms)
+✔ V18 speech chunks play strictly in seq order on the null sink (1942.3458ms)
+✔ V19 V20 speak.cancel stops audible playback and nothing from that gen starts afterwards (1172.7666ms)
+✔ V21 a late speak with an old gen after cancel never plays (979.6993ms)
+✔ V22 rapid cancel and speak cycles keep turn state and gen monotonic (286.1926ms)
+✔ V25 shutdown with an active capture releases everything and exits 0 within 2 s (230.0132ms)
+✔ unknown op is answered with UNKNOWN_OP and malformed JSON keeps the process alive (140.382ms)
+✔ BUFFER_LIMIT rejects oversized speech text (123.9837ms)
+✔ V52 stdout carries only bounded JSON events with no audio-looking payload (2793.6428ms)
+✔ a command line over 64 KiB is rejected and the worker stays alive (150.5221ms)
+✔ T10 endpointing: recognizer evidence keeps no_speech from firing and bounds the turn end (8072.6038ms)
+✔ T10 Part-B endpointing: room noise above the calibrated floor still ends the turn; one loud click does not (8046.8018ms)
+✔ T10 stop decision: rejected-only recognizer text is stt.none rejected, never a final (8008.9752ms)
+✔ T10 AGC: the gained audio never changes the reported levels, and gain stays in 1x..24x (8068.4364ms)
+✔ T10 levels: reported rms and peak equal the raw fixture samples window by window (AGC cannot change them) (556.7667ms)
+✔ T10 staleDropped: speak commands at or below the highest cancelled gen are counted per cancel receipt (122.0929ms)
+✔ native#0 a stalled playback driver never holds the command loop: cancel, enqueue and shutdown stay bounded (8072.5725ms)
+✔ T12 closeout: cancelling while the driver opens never submits the cancelled chunk when Open returns (0.264ms)
+✔ native#0 live: a healthy speak.cancel applies the reset within the bounded wait and reports no resetPending (246.0906ms)
+✔ native#2 abandoned recognizers: raw audio is zeroed and released, and the ledger refuses past its bound (0.3692ms)
+✔ native#3 speak.cancel receipts share one meter worker, and a full queue starts no thread (0.1872ms)
+✔ native#4 device index is range-checked: out of range is DEVICE_UNAVAILABLE and never wraps to another device (562.7885ms)
+✔ native#5 a worker thread fault is contained: the guard runs its handler and the body never escapes (0.313ms)
+✔ native#6 the finalize decision reads the onset state published during capture, not a value set at thread exit (0.0986ms)
+✔ R2-native#0 a recognizer whose start throws is disposed before the error propagates, so the turn holds no engine (1.7651ms)
+✔ R2-native#1 the capture thread body is guarded: a protocol write that fails on a closed pipe ends the turn, not the process (3.8178ms)
+✔ R2-native#2 a playback chunk whose header never completes is released after the reset, and its device handle is closed (1.5772ms)
+✔ R2-native#3 raw microphone buffers are zeroed before they are freed, and capture frames are cleared when the turn ends (2.0592ms)
+✔ T12-native VT-01 a short duplex burst (200 ms) ends its speech turn: onset, then speech_end within 1.2 s, flagged short (0.2091ms)
+✔ T12-native VT-02 stationary ambient never counts as speech: no onset in 10 s and the floor learns the level (0.199ms)
+✔ T12-native VT-03 speech over a calibrated noise floor starts and ends about 900 ms after it stops (0.1196ms)
+✔ T12-native VT-G3 a loud click does not permanently suppress soft speech that follows it (0.0827ms)
+✔ T12-native VT-05 output-aware onset: our own residual at 0.003 never starts a turn, but user speech over it does (0.1367ms)
+✔ T12-native AEC-01/06 echo after quiet first frames, a pause and a gap is never an onset (the residual is floored and held) (0.0854ms)
+✔ T12-native AEC-01 the learned residual is not decayed by a paused (silent) window (0.0886ms)
+✔ T12-native AEC-05 user speech at 0.008 over 0.003 echo starts a turn, and never lifts the residual above the echo cap (0.0747ms)
+✔ T12-native round-2 AEC-01/05 a steady echo at 0.0045 or 0.005, or a loud echo after a quiet start, is no onset while output is audible (0.078ms)
+✔ T12-native live calibration: the measured device residual never starts a turn and 0.003 speech over it does within 120 ms (0.07ms)
+✔ T12-native review round 3: a seed taken while the user talked over the first reply is lowered by the next reply and never raised later (0.0791ms)
+✔ T12-native endpointing ignores whisper's trailing full stop and waits longer after a word that cannot end a sentence (0.0522ms)
+✔ T12-native AEC-02 a pre-roll replay never carries frames captured while our output was audible or in its reverb tail (0.0598ms)
+✔ T12-native PRIV-03 a capture loop that ends because the microphone is muted reports 'mute', and the lifetime bound reports 'lifetime' (0.0538ms)
+✔ T12-native AEC-02 round-2 user speech at 0.03 captured during our output is kept in the pre-roll for the next turn (0.0477ms)
+✔ T12-native RC-02 a playback.error for a generation releases its pause: the next chunk of that gen is not paused (0.0536ms)
+✔ T12-native VT-01 stationary loud ambient in a duplex turn ends after the silence clock, not at the cap (0.0643ms)
+✔ T12-native N-02 behaviour: on the playback thread a pause precedes the reset, and no restart happens before it (0.0568ms)
+✔ T12-native VT-09 soft speech with no frame above the onset threshold for 4 s ends the turn, even with evidence held fresh (0.1702ms)
+✔ T12-native N-07 the render-identity checks are labelled as guards, and claim no echo cancellation (1.3476ms)
+✔ T12-native N-03 the stdout queue is 2048 lines / 1 MiB and the stall watchdog is 10 s, both bounded (1.8223ms)
+✔ T12-native N-01 duplex open honors stop and mute before, during and after the device open (1.6627ms)
+✔ T12-native N-02 a pending reset is applied before any pause decision, and a cancelled chunk never restarts the device (1.4048ms)
+✔ T12-native N-06 speak.pause emits a measured receipt off the playback thread, bounded to 1.5 s (1.5766ms)
+✔ T12-native N-04 AEC output is drained while INCOMPLETE is set, into a bounded one-second pending buffer (1.7069ms)
+✔ T12-native N-05 three rotating silence buffers keep the render endpoint fed (1.2517ms)
+✔ T12-native N-10 timeBeginPeriod(1) is paired with timeEndPeriod(1) on every path of a duplex session (1.6804ms)
+✔ T12-native VT-09 the finalizing turns stay abortable through a bounded list, so a new capture can attach (1.4803ms)
+✔ T12-native AUD-04 capture.abort with a turn id matches turn AND gen exactly (1.9283ms)
+✔ T12-native VT-01 duplex speech_end always reports speechMs and short, and short bursts skip the decode (1.7898ms)
+✖ whisper: the staged runtime and model match native/voice/whisper-pin.json and the build record (1.9652ms)
+✖ whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error (0.8946ms)
+✖ whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final (0.831ms)
+✖ whisper: silence never becomes a final (no VAD onset, so stt.none no_speech) (0.7186ms)
+✖ whisper: noise-only input never becomes a final with words (0.7222ms)
+✖ whisper: capture.abort that lands during the final decode never emits a final (0.7624ms)
+✖ whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently (0.6807ms)
+✔ keeps VITE_-prefixed string entries (1.2341ms)
+✔ drops non-VITE keys, non-string values and malformed documents (0.17ms)
+✔ a missing app-env.json is a clean no-op (0.7251ms)
+✔ reads the app env from a workspace (2.1958ms)
+✔ an explicit process-env override wins over the file (0.186ms)
+✔ the template ships auth off (1.2196ms)
+✔ vite loadEnv resolves the wrapped value (2.9104ms)
+✔ the wrapped command runs with the app env applied (108.7621ms)
+✔ the wrapped command sees an explicit override, not the file value (108.4799ms)
+✔ the wrapper propagates the command's exit code (99.3121ms)
+✔ a signal-killed command is never reported as success (98.5481ms)
+✔ the CLI still runs when invoked through a symlinked path (108.4891ms)
+✔ parseWriteAtomicArgs needs exactly a staged file and a target (1.1835ms)
+✔ stagingError refuses a temp inside public/ and a no-op move (0.2124ms)
+✔ handOver replaces the target and clears the staged file (2.9345ms)
+✔ handOver creates a missing target directory (3.2905ms)
+✔ an interrupted pass leaves the target on its old bytes, temp-free (2.9486ms)
+✔ a failed hand-over creates no directory for the target it never wrote (1.1147ms)
+✔ a staged file on another filesystem is refused, not copied (2.5764ms)
+✔ cli: hands the file over, and refuses a temp staged in public/ (112.5307ms)
+✔ cli: relative paths follow the script's root, not the caller's cwd (61.0447ms)
+✔ every hand-over the og skill prints is one this script accepts (5.0913ms)
+✔ cli: a missing staged file fails without touching the target (58.4213ms)
+ℹ tests 440
+ℹ suites 0
+ℹ pass 430
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 205658.1674
+
+✖ failing tests:
+
+test at scripts\bunny-release.test.mjs:44:1
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (153.2278ms)
+  Error: Command failed: git clone --shared --quiet C:\Users\allam\Documents\new\bun-router\test-results\ma3\t13\source-checkout\ C:\Users\allam\AppData\Local\Temp\bunny-release-pkg-uLLFyl\clone
+  fatal: 'C:\Users\allam\Documents\new\bun-router\test-results\ma3\t13\source-checkout\' does not appear to be a git repository
+  fatal: Could not read from remote repository.
+  
+  Please make sure you have the correct access rights
+  and the repository exists.
+  
+      at genericNodeError (node:internal/errors:985:15)
+      at wrappedFn (node:internal/errors:539:14)
+      at checkExecSyncError (node:child_process:925:11)
+      at execFileSync (node:child_process:961:15)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/bunny-release.test.mjs:48:5)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12) {
+    status: 128,
+    signal: null,
+    output: [ null, <Buffer >, <Buffer 66 61 74 61 6c 3a 20 27 43 3a 5c 55 73 65 72 73 5c 61 6c 6c 61 6d 5c 44 6f 63 75 6d 65 6e 74 73 5c 6e 65 77 5c 62 75 6e 2d 72 6f 75 74 65 72 5c 74 65 ... 202 more bytes> ],
+    pid: 50368,
+    stdout: <Buffer >,
+    stderr: <Buffer 66 61 74 61 6c 3a 20 27 43 3a 5c 55 73 65 72 73 5c 61 6c 6c 61 6d 5c 44 6f 63 75 6d 65 6e 74 73 5c 6e 65 77 5c 62 75 6e 2d 72 6f 75 74 65 72 5c 74 65 ... 202 more bytes>
+  }
+
+test at scripts\island-voice.test.mjs:51:1
+✖ island PowerShell sources are ASCII-only so PowerShell 5.1 reads them without a BOM (2.1282ms)
+  AssertionError [ERR_ASSERTION]: Bunny-Island.Visual.ps1 contains non-ASCII characters
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/island-voice.test.mjs:54:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: `# Dot-sourced UI layer. Invoke-Bunny continues to use the existing authenticated Host contract.\nfunction Invoke-BunnyClick($Control) { if(-not$Control.IsEnabled){throw ('Control is disabled: '+$Control.Name)};$Control.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Primitives.ButtonBase]::ClickEvent,$Control)) }\nfunction Save-BunnyScreenshot([string]$Name) {\n $directory=if($ScreenshotDirectory){$ScreenshotDirectory}else{Join-Path $Root 'screenshots'};[void](New-Item -ItemType Directory -Path $directory -Force);Resize-Bunny;$bunnyWindow.UpdateLayout()\n # A WPF resize reaches the HWND on the next dispatcher pass, including in test hooks.\n # The HWND can lag the requested size by a few passes (a strip can make the notch taller); pump until the actual height matches.\n for($attempt=0;$attempt-lt10;$attempt++){$frame=[Windows.Threading.DispatcherFrame]::new();$settle=[Windows.Threading.DispatcherTimer]::new();$settle.Interval=[TimeSpan]::FromMilliseconds(40);$settle.Add_Tick({$settle.Stop();$frame.Continue=$false});$settle.Start();[Windows.Threading.Dispatcher]::PushFrame($frame);$bunnyWindow.UpdateLayout();if([Math]::Abs($bunnyWindow.ActualHeight-$bunnyWindow.Height)-lt1){break}}\n $bitmap=[Windows.Media.Imaging.RenderTargetBitmap]::new([int]$bunnyWindow.ActualWidth,[int]$bunnyWindow.ActualHeight,96,96,[Windows.Media.PixelFormats]::Pbgra32);$bitmap.Render($bunnyWindow);$encoder=[Windows.Media.Imaging.PngBitmapEncoder]::new();$encoder.Frames.Add([Windows.Media.Imaging.BitmapFrame]::Create($bitmap));$path=Join-Path $directory ($Name+'.png');$stream=[IO.File]::Create($path);try{$encoder.Save($stream)}finally{$stream.Dispose()};return $path\n}\n$bunnyPreferencePath = if($PreferencePath) {$PreferencePath} else {throw 'Installed Island requires an explicit preference path; the retired repository path is refused.'}\n$bunnyPreferences = @{ size='compact'; position='center'; idle='providers'; glass='medium'; motion='full'; collapse=10; theme='dark'; primary=@('codex','claude','ollama'); edge='top'; edgeOffset=0.5; blur='off'; monitor=$null }\n. (Join-Path $PSScriptRoot 'Bunny-Island.Placement.ps1')\n. (Join-Path $PSScriptRoot 'Bunny-Island.Characters.ps1')\ntry { if (Test-Path -LiteralPath $bunnyPreferencePath) { $saved=Get-Content -LiteralPath $bunnyPreferencePath -Raw | ConvertFrom-Json; foreach ($property in $saved.PSObject.Properties) { if ($bunnyPreferences.ContainsKey($property.Name)) { $bunnyPreferences[$property.Name]=$property.Value } } } } catch { }\n$bunnyView='idle'; $bunnyExpanded=$false; $bunnyTaskExpanded=$false; $bunnyPending=$null; $bunnyFinishedAt=$null; $bunnySeenTaskState=''; $bunnyHeatDismissed=$null; $bunnyHot=$null; $bunnyOnline=$false; $bunnySettingsUpdating=$false\n$bunnyAnimate = -not $SmokeTest -and [Windows.SystemParameters]::ClientAreaAnimation -and -not [Windows.SystemParameters]::HighContrast\n[xml]$bunnyVisualXaml = @'\n<StackPanel x:Name="NotchRoot" Orientation="Horizontal" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">\n <StackPanel.Resources>\n  <Style TargetType="ComboBox">\n   <Setter Property="Foreground" Value="{DynamicResource BunnyText}"/>\n   <Setter Property="Background" Value="{DynamicResource BunnyField}"/>\n   <Setter Property="BorderBrush" Value="{DynamicResource BunnySep}"/>\n   <Setter Property="MinHeight" Value="44"/>\n   <Setter Property="Padding" Value="12,8"/>\n   <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>\n   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">\n    <Grid>\n     <ToggleButton Focusable="False" IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}">\n      <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border x:Name="Field" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="10"><Path Data="M0,0 L4,4 L8,0" Stroke="{DynamicResource BunnyMuted}" StrokeThickness="1.3" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,13,0"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Field" Property="Background" Value="{DynamicResource BunnyHover}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template>\n     </ToggleButton>\n     <ContentPresenter IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Margin="12,8,32,8" VerticalAlignment="Center"/>\n     <Border x:Name="Focus" IsHitTestVisible="False" BorderBrush="{DynamicResource BunnyAccent}" BorderThickness="2" CornerRadius="10" Visibility="Collapsed"/>\n     <Popup x:Name="PART_Popup" AllowsTransparency="True" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" Focusable="False">\n      <Border Background="{DynamicResource BunnyPopup}" BorderBrush="{DynamicResource BunnySep}" BorderThickness="1" CornerRadius="12" Padding="4" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"><ScrollViewer MaxHeight="240" CanContentScroll="True" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/></ScrollViewer></Border>\n     </Popup>\n    </Grid>\n    <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Focus" Property="Visibility" Value="Visible"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger></ControlTemplate.Triggers>\n   </ControlTemplate></Setter.Value></Setter>\n  </Style>\n  <Style TargetType="ComboBoxItem"><Setter Property="Foreground" Value="{DynamicResource BunnyText}"/><Setter Property="MinHeight" Value="44"/><Setter Property="Padding" Value="12,8"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem"><Border x:Name="Item" CornerRadius="8" Padding="{TemplateBinding Padding}" Background="Transparent"><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource BunnyHover}"/></Trigger><Trigger Property="IsSelected" Value="True"><Setter TargetName="Item" Property="Background" Value="{DynamicResource BunnyAccentSoft}"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>\n  <Style TargetType="CheckBox"><Setter Property="Foreground" Value="{DynamicResource BunnyText}"/><Setter Property="MinHeight" Value="44"/><Setter Property="Cursor" Value="Hand"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox"><DockPanel><Border x:Name="Box" Width="18" Height="18" CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource BunnyMuted}" Background="{DynamicResource BunnyField}" Margin="0,0,8,0" VerticalAlignment="Center"><Path x:Name="Tick" Data="M0,4 L3,7 L9,0" Stroke="{DynamicResource BunnyAccent}" StrokeThickness="1.7" Margin="3" Visibility="Collapsed"/></Border><ContentPresenter VerticalAlignment="Center"/></DockPanel><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Tick" Property="Visibility" Value="Visible"/><Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource BunnyAccent}"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Box" Property="BorderThickness" Value="2"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>\n </StackPanel.Resources>\n <Border x:Name="StripCapsule" Visibility="Collapsed" Height="58" Margin="0,14,-12,10" VerticalAlignment="Top" HorizontalAlignment="Left" CornerRadius="29" BorderThickness="1" BorderBrush="#24FFFFFF" Padding="6,0" Background="#FF0B0D14">\n  <StackPanel x:Name="AgentStrip" Orientation="Horizontal" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" AutomationProperties.Name="Agent indicators"/>\n </Border>\n <Border x:Name="Glass" CornerRadius="28" BorderThickness="1" Padding="6,0" Margin="10,14,10,10">\n  <Border.Effect><DropShadowEffect BlurRadius="24" ShadowDepth="8" Opacity="0.45" Color="#FF000000"/></Border.Effect>\n  <StackPanel x:Name="GlassStack">\n   <DockPanel x:Name="Header" Height="56" LastChildFill="False">\n    <DockPanel.Resources>\n     <SolidColorBrush x:Key="BunnyText" Color="#FFEEF2FA"/><SolidColorBrush x:Key="BunnyMuted" Color="#FF9AA3B8"/><SolidColorBrush x:Key="BunnyAccent" Color="#FF8EB9FF"/>\n     <SolidColorBrush x:Key="BunnyField" Color="#14FFFFFF"/><SolidColorBrush x:Key="BunnyHover" Color="#26FFFFFF"/><SolidColorBrush x:Key="BunnySep" Color="#24FFFFFF"/>\n     <SolidColorBrush x:Key="BunnyAccentSoft" Color="#338EB9FF"/><SolidColorBrush x:Key="BunnyOnAccent" Color="#FF14213A"/><SolidColorBrush x:Key="BunnyPositive" Color="#FF85CFA5"/>\n     <SolidColorBrush x:Key="BunnyWarning" Color="#FFE6BF78"/><SolidColorBrush x:Key="BunnyNegative" Color="#FFF5A09D"/>\n    </DockPanel.Resources>\n    <Button x:Name="ExtrasButton" DockPanel.Dock="Right" Width="44" Height="44" Style="{DynamicResource IconButton}" ToolTip="Quick controls" AutomationProperties.Name="Quick controls"/>\n    <Button x:Name="SearchButton" DockPanel.Dock="Right" Width="44" Height="44" Style="{DynamicResource IconButton}" ToolTip="Open workspace" AutomationProperties.Name="Open workspace"/>\n    <Button x:Name="BunnyButton" DockPanel.Dock="Left" Width="60" Height="56" Padding="0" Background="Transparent" BorderThickness="0" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" ToolTip="Ask Bunny" AutomationProperties.Name="Ask Bunny"><Border x:Name="BrandTile" Width="56" Height="56" CornerRadius="0" Background="Transpar`... 93068 more characters,
+    expected: /[\u0080-\uFFFF]/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at scripts\island-voice.test.mjs:98:1
+✖ V46: the level meter is driven only by snapshot.level with a freshness check, never by a timer or random value (1.0178ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\$snap\.level -and \(\(\$now - \[double\]\$snap\.level\.at\) -lt \$bunnyVoiceFreshMs\)/. Input:
+  
+  '# M-A-3 T10: native voice client for the Island. Voice is an input/output modality. This file sends voice.* Host\n' +
+    '# actions and renders the Host VoiceSnapshot. It never authorizes anything, never fabricates text or a level, and\n' +
+    '# animates nothing from timers. Requests run off the UI thread: one FIFO queue, one in-flight HttpClient request,\n' +
+    '# and a 100 ms DispatcherTimer that only inspects finished tasks. Closing the Island never calls agent or mission\n' +
+    '# actions; it closes the voice session so the Host releases the microphone.\n' +
+    'Add-Type -AssemblyName System.Net.Http\n' +
+    '\n' +
+    "$bunnyIcons['mic'] = 'M 12,2 a 3,3 0 0 0 -3,3 v 7 a 3,3 0 0 0 6,0 V 5 a 3,3 0 0 0 -3,-3 Z M 19,10 v 2 a 7,7 0 0 1 -14,0 v -2 M 12,19 v 3'\n" +
+    '$bunnyVoiceHotkeyId = 0x4246\n' +
+    '# Product chord: Ctrl+Alt+Space (MOD_ALT 0x1 | MOD_CONTROL 0x2 | MOD_NOREPEAT 0x4000, VK_SPACE 0x20).\n' +
+    '# -HotkeyTest (a dedicated live check only) registers Ctrl+Alt+Shift+F12 instead, so a test never reaches a running product Island.\n' +
+    '$bunnyVoiceChord = if ($HotkeyTest) { @(0x4007, 0x7B) } else { @(0x4003, 0x20) }\n' +
+    '$bunnyVoicePollMs = 200\n' +
+    '$bunnyVoiceFreshMs = 1000\n' +
+    '$bunnyVoiceHoldMs = 350\n' +
+    "# A quick tap latches tap-to-talk: the turn stays open until the next tap, this deadline, or the Host's own cap.\n" +
+    '$bunnyVoiceTapLatchMs = 10000\n' +
+    '$bunnyVoiceFlightTimeoutMs = 12000\n' +
+    "$bunnyNativeKeysDefinition = @'\n" +
+    '[System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]\n' +
+    'public static extern bool RegisterHotKey(System.IntPtr hWnd, int id, uint fsModifiers, uint vk);\n' +
+    '[System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]\n' +
+    'public static extern bool UnregisterHotKey(System.IntPtr hWnd, int id);\n' +
+    '[System.Runtime.InteropServices.DllImport("user32.dll")]\n' +
+    'public static extern short GetAsyncKeyState(int vKey);\n' +
+    "'@\n" +
+    '\n' +
+    '$script:bunnyVoiceSnapshot = $null\n' +
+    '$script:bunnyVoiceOkAt = 0\n' +
+    '$script:bunnyVoiceError = $null\n' +
+    "$script:bunnyVoiceShortcutNote = ''\n" +
+    '$script:bunnyVoiceQueue = New-Object System.Collections.ArrayList\n' +
+    '$script:bunnyVoiceFlight = $null\n' +
+    '$script:bunnyVoiceLastPoll = 0\n' +
+    '$script:bunnyVoiceOpenPolling = $false\n' +
+    '$script:bunnyVoiceUiSeen = $null\n' +
+    '$script:bunnyVoiceUiEpoch = $null\n' +
+    '$script:bunnyVoiceTapLatched = $false\n' +
+    '$script:bunnyVoiceTapAt = 0\n' +
+    '$script:bunnyVoiceHttp = $null\n' +
+    '$script:bunnyVoiceListening = $false\n' +
+    '$script:bunnyVoiceListenAt = 0\n' +
+    '$script:bunnyVoiceHeld = $false\n' +
+    '$script:bunnyVoiceHeldAt = 0\n' +
+    '$script:bunnyVoiceMouseAt = 0\n' +
+    "# Pointer activation that Click will report: the Click that follows a mouse release is the pointer's own, never a toggle.\n" +
+    '$script:bunnyVoicePointerClick = $false\n' +
+    '$script:bunnyVoicePointerUpAt = 0\n' +
+    '# Outcome of the last listen.start: known (the Host answered with its turn), none (refused or never sent), unknown (lost).\n' +
+    "$script:bunnyVoiceStartState = 'none'\n" +
+    '$script:bunnyVoiceStartTurn = $null\n' +
+    "# True while the Host may hold this Island's session (an open or listen was sent or queued and no close has been).\n" +
+    '$script:bunnyVoiceOpenSent = $false\n' +
+    '$script:bunnyVoiceUpdating = $false\n' +
+    "$script:bunnyVoiceLayoutKey = ''\n" +
+    '$script:bunnyVoiceRegistered = $false\n' +
+    '$script:bunnyVoiceHwnd = [IntPtr]::Zero\n' +
+    '$script:bunnyVoiceHook = $null\n' +
+    '\n' +
+    'function Get-BunnyNowMs { [DateTimeOffset]::Now.ToUnixTimeMilliseconds() }\n' +
+    '\n' +
+    'function Get-BunnyVoiceClient {\n' +
+    '  if (-not $script:bunnyVoiceHttp) {\n' +
+    '    $client = [System.Net.Http.HttpClient]::new()\n' +
+    '    $client.Timeout = [TimeSpan]::FromSeconds(8)\n' +
+    '    $script:bunnyVoiceHttp = $client\n' +
+    '  }\n' +
+    '  return $script:bunnyVoiceHttp\n' +
+    '}\n' +
+    '\n' +
+    'function New-BunnyVoiceRequestMessage([string]$Action, $Data) {\n' +
+    '  $credentials = Get-Content -LiteralPath $bunnyCredentialPath -Raw | ConvertFrom-Json\n' +
+    "  $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Post, 'http://127.0.0.1:' + [string]$credentials.port + '/command')\n" +
+    "  $request.Headers.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', [string]$credentials.token)\n" +
+    "  $request.Content = [System.Net.Http.StringContent]::new((@{ action = $Action; data = $Data } | ConvertTo-Json -Depth 8 -Compress), [Text.Encoding]::UTF8, 'application/json')\n" +
+    '  return $request\n' +
+    '}\n' +
+    '\n' +
+    'function Add-BunnyVoiceRequest([string]$Action, $Data = @{}, [bool]$Urgent = $false) {\n' +
+    "  if ($Action -eq 'voice.state' -and $script:bunnyVoiceQueue.Count -gt 0) { return }\n" +
+    '  $item = @{ action = $Action; data = $Data }\n' +
+    "  if ($Action -eq 'voice.session.open' -or $Action -eq 'voice.listen.start') { $script:bunnyVoiceOpenSent = $true }\n" +
+    "  if ($Action -eq 'voice.session.close') { $script:bunnyVoiceOpenSent = $false }\n" +
+    '  if ($Urgent) { $script:bunnyVoiceQueue.Insert(0, $item) } else { [void]$script:bunnyVoiceQueue.Add($item) }\n' +
+    '  Invoke-BunnyVoicePump\n' +
+    '}\n' +
+    '\n' +
+    'function Start-BunnyVoiceFlight {\n' +
+    '  $item = $script:bunnyVoiceQueue[0]\n' +
+    '  $script:bunnyVoiceQueue.RemoveAt(0)\n' +
+    '  # The queue is single-flight FIFO, so a release is dequeued only after the listen.start before it has settled. Bind it to\n' +
+    '  # the turn that start was answered with (never to an older snapshot). A start whose answer was lost has no known turn:\n' +
+    '  # the release then goes unbound and ends whatever capture the Host holds. The Host ignores a release whose turn is stale.\n' +
+    "  if ([string]$item.action -eq 'voice.listen.end' -and -not $item.data.turnId -and $script:bunnyVoiceStartState -eq 'known' -and $script:bunnyVoiceStartTurn) {\n" +
+    '    $item.data = @{ turnId = [string]$script:bunnyVoiceStartTurn }\n' +
+    '  }\n' +
+    '  try {\n' +
+    '    $request = New-BunnyVoiceRequestMessage ([string]$item.action) $item.data\n' +
+    "    $script:bunnyVoiceFlight = @{ action = [string]$item.action; send = (Get-BunnyVoiceClient).SendAsync($request); read = $null; response = $null; stage = 'send'; at = Get-BunnyNowMs }\n" +
+    '  } catch {\n' +
+    '    # The request was never sent, so the Host holds no capture from it.\n' +
+    "    Set-BunnyVoiceStartOutcome ([string]$item.action) 'none' $null\n" +
+    "    $script:bunnyVoiceError = 'Voice request could not be sent'\n" +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'function Set-BunnyVoiceStartOutcome([string]$Action, [string]$Outcome, $Turn) {\n' +
+    "  if ($Action -ne 'voice.listen.start') { return }\n" +
+    '  $script:bunnyVoiceStartState = $Outcome\n' +
+    "  $script:bunnyVoiceStartTurn = if ($Outcome -eq 'known' -and $Turn) { [string]$Turn } else { $null }\n" +
+    '}\n' +
+    '\n' +
+    'function Set-BunnyVoiceFlightLost($Flight) {\n' +
+    '  # No answer arrived (timeout, unreachable, unreadable): a listen.start may still have opened a capture on the Host.\n' +
+    "  Set-BunnyVoiceStartOutcome ([string]$Flight.action) 'unknown' $null\n" +
+    '}\n' +
+    '\n' +
+    "function Complete-BunnyVoiceResponse([int]$Status, [string]$Text, [string]$Action = '') {\n" +
+    '  $body = $null\n' +
+    '  try { $body = $Text | ConvertFrom-Json } catch { $body = $null }\n' +
+    '  if ($Status -ge 200 -and $Status -lt 300 -and $body -and $body.data) {\n' +
+    '    Set-BunnyVoiceSnapshot $body.data\n' +
+    '    $inputTurn = if ($body.data.inputTurnId) { $body.data.inputTurnId } else { $body.data.turnId }\n' +
+    "    Set-BunnyVoiceStartOutcome $Action 'known' $inputTurn\n" +
+    '    return\n' +
+    '  }\n' +
+    '  # The Host answered and refused (or failed) before it captured anything.\n' +
+    "  Set-BunnyVoiceStartOutcome $Action 'none' $null\n" +
+    "  $script:bunnyVoiceError = if ($body -and $body.error) { [string]$body.error } else { 'Voice request failed (HTTP ' + $Status + ')' }\n" +
+    '}\n' +
+    '\n' +
+    'function Invoke-BunnyVoicePump {\n' +
+    "  try { Invoke-BunnyVoicePumpCore } catch { $script:bunnyVoiceFlight = $null; $script:bunnyVoiceError = 'Voice client error: ' + $_.Exception.Message }\n" +
+    '}\n' +
+    '\n' +
+    'function Invoke-BunnyVoicePumpCore {\n' +
+    '  $flight = $script:bunnyVoiceFlight\n' +
+    '  if ($flight) {\n' +
+    '    if ((Get-BunnyNowMs) - [double]$flight.at -gt $bunnyVoiceFlightTimeoutMs) {\n' +
+    '      # The late HTTP result is dropped with the reference; it can never reach the snapshot.\n' +
+    '      $script:bunnyVoiceFlight = $null\n' +
+    '      Set-BunnyVoiceFlightLost $flight\n' +
+    "      $script:bunnyVoiceError = 'Voice request timed out'\n" +
+    "    } elseif ($flight.stage -eq 'send') {\n" +
+    '      if ($flight.send.IsFaulted -or $flight.send.IsCanceled) {\n' +
+    '        $script:bunnyVoiceFlight = $null\n' +
+    '        Set-BunnyVoiceFlightLost $flight\n' +
+    "        $script:bunnyVoiceError = 'Host unreachable for voice'\n" +
+    '      } elseif ($flight.send.IsCompleted) {\n' +
+    '        $flight.response = $flight.send.Result\n' +
+    '        $flight.read = $flight.response.Content.ReadAsStringAsync()\n' +
+    "        $flight.stage = 'read'\n" +
+    '      }\n' +
+    '    }\n' +
+    '    $flight = $script:bunnyVoiceFlight\n' +
+    "    if ($flight -and $flight.stage -eq 'read' -and $flight.read.IsCompleted) {\n" +
+    '      $script:bunnyVoiceFlight = $null\n' +
+    "      if ($flight.read.IsFaulted) { Set-BunnyVoiceFlightLost $flight; $script:bunnyVoiceError = 'Voice response could not be read' }\n" +
+    '      else { Complete-BunnyVoiceResponse ([int]$flight.response.StatusCode) $flight.read.Result ([string]$flight.action) }\n' +
+    '    }\n' +
+    '  }\n' +
+    '  if (-not $script:bunnyVoiceFlight -and $script:bunnyVoiceQueue.Count -gt 0) { Start-BunnyVoiceFlight }\n' +
+    '}\n' +
+    '\n' +
+    'function Test-BunnyVoiceNewer($Candidate, $Current) {\n' +
+    '  # Within one Host epoch the monotonic voice.revision decides; across epochs, or when a snapshot has no revision yet,\n' +
+    '  # updatedAt decides (the earlier rule). A Host restart starts a new epoch, so its revisions never compare with the old.\n' +
+    '  if (-not $Current) { return $true }\n' +
+    '  if (-not $Candidate) { return $false }\n' +
+    '  if ($null -ne $Candidate.revision -and $null -ne $Current.revision -and [string]$Candidate.hostEpoch -eq [string]$Current.hostEpoch) {\n' +
+    '    return ([double]$Candidate.revision -ge [double]$Current.revision)\n' +
+    '  }\n' +
+    '  return ([double]$Candidate.updatedAt -ge [double]$Current.updatedAt)\n' +
+    '}\n' +
+    '\n' +
+    'function Get-BunnyVoiceSource {\n' +
+    '  # The 2 s /state snapshot and the 200 ms voice poll are both real Host facts; the newer one wins.\n' +
+    '  $fromPoll = $script:bunnyVoiceSnapshot\n' +
+    '  $fromState = if ($bunnySnapshot) { $bunnySnapshot.voice } else { $null }\n' +
+    '  if (-not $fromPoll) { return $fromState }\n' +
+    '  if (-not $fromState) { return $fromPoll }\n' +
+    '  if (Test-BunnyVoiceNewer $fromPoll $fromState) { return $fromPoll }\n' +
+    '  return $fromState\n' +
+    '}\n' +
+    '\n' +
+    'function Invoke-BunnyVoiceIntent($Snap) {\n' +
+    '  # One-shot UI request from the Host. Opened once per seq, scoped to the Host epoch that numbered it: a Host restart\n' +
+    '  # restarts seq at 1, so a new epoch starts its floor at 0 and an old seq never replays. The first seen seq only s'... 32224 more characters
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/island-voice.test.mjs:100:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `# M-A-3 T10: native voice client for the Island. Voice is an input/output modality. This file sends voice.* Host\n# actions and renders the Host VoiceSnapshot. It never authorizes anything, never fabricates text or a level, and\n# animates nothing from timers. Requests run off the UI thread: one FIFO queue, one in-flight HttpClient request,\n# and a 100 ms DispatcherTimer that only inspects finished tasks. Closing the Island never calls agent or mission\n# actions; it closes the voice session so the Host releases the microphone.\nAdd-Type -AssemblyName System.Net.Http\n\n$bunnyIcons['mic'] = 'M 12,2 a 3,3 0 0 0 -3,3 v 7 a 3,3 0 0 0 6,0 V 5 a 3,3 0 0 0 -3,-3 Z M 19,10 v 2 a 7,7 0 0 1 -14,0 v -2 M 12,19 v 3'\n$bunnyVoiceHotkeyId = 0x4246\n# Product chord: Ctrl+Alt+Space (MOD_ALT 0x1 | MOD_CONTROL 0x2 | MOD_NOREPEAT 0x4000, VK_SPACE 0x20).\n# -HotkeyTest (a dedicated live check only) registers Ctrl+Alt+Shift+F12 instead, so a test never reaches a running product Island.\n$bunnyVoiceChord = if ($HotkeyTest) { @(0x4007, 0x7B) } else { @(0x4003, 0x20) }\n$bunnyVoicePollMs = 200\n$bunnyVoiceFreshMs = 1000\n$bunnyVoiceHoldMs = 350\n# A quick tap latches tap-to-talk: the turn stays open until the next tap, this deadline, or the Host's own cap.\n$bunnyVoiceTapLatchMs = 10000\n$bunnyVoiceFlightTimeoutMs = 12000\n$bunnyNativeKeysDefinition = @'\n[System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]\npublic static extern bool RegisterHotKey(System.IntPtr hWnd, int id, uint fsModifiers, uint vk);\n[System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]\npublic static extern bool UnregisterHotKey(System.IntPtr hWnd, int id);\n[System.Runtime.InteropServices.DllImport("user32.dll")]\npublic static extern short GetAsyncKeyState(int vKey);\n'@\n\n$script:bunnyVoiceSnapshot = $null\n$script:bunnyVoiceOkAt = 0\n$script:bunnyVoiceError = $null\n$script:bunnyVoiceShortcutNote = ''\n$script:bunnyVoiceQueue = New-Object System.Collections.ArrayList\n$script:bunnyVoiceFlight = $null\n$script:bunnyVoiceLastPoll = 0\n$script:bunnyVoiceOpenPolling = $false\n$script:bunnyVoiceUiSeen = $null\n$script:bunnyVoiceUiEpoch = $null\n$script:bunnyVoiceTapLatched = $false\n$script:bunnyVoiceTapAt = 0\n$script:bunnyVoiceHttp = $null\n$script:bunnyVoiceListening = $false\n$script:bunnyVoiceListenAt = 0\n$script:bunnyVoiceHeld = $false\n$script:bunnyVoiceHeldAt = 0\n$script:bunnyVoiceMouseAt = 0\n# Pointer activation that Click will report: the Click that follows a mouse release is the pointer's own, never a toggle.\n$script:bunnyVoicePointerClick = $false\n$script:bunnyVoicePointerUpAt = 0\n# Outcome of the last listen.start: known (the Host answered with its turn), none (refused or never sent), unknown (lost).\n$script:bunnyVoiceStartState = 'none'\n$script:bunnyVoiceStartTurn = $null\n# True while the Host may hold this Island's session (an open or listen was sent or queued and no close has been).\n$script:bunnyVoiceOpenSent = $false\n$script:bunnyVoiceUpdating = $false\n$script:bunnyVoiceLayoutKey = ''\n$script:bunnyVoiceRegistered = $false\n$script:bunnyVoiceHwnd = [IntPtr]::Zero\n$script:bunnyVoiceHook = $null\n\nfunction Get-BunnyNowMs { [DateTimeOffset]::Now.ToUnixTimeMilliseconds() }\n\nfunction Get-BunnyVoiceClient {\n  if (-not $script:bunnyVoiceHttp) {\n    $client = [System.Net.Http.HttpClient]::new()\n    $client.Timeout = [TimeSpan]::FromSeconds(8)\n    $script:bunnyVoiceHttp = $client\n  }\n  return $script:bunnyVoiceHttp\n}\n\nfunction New-BunnyVoiceRequestMessage([string]$Action, $Data) {\n  $credentials = Get-Content -LiteralPath $bunnyCredentialPath -Raw | ConvertFrom-Json\n  $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Post, 'http://127.0.0.1:' + [string]$credentials.port + '/command')\n  $request.Headers.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', [string]$credentials.token)\n  $request.Content = [System.Net.Http.StringContent]::new((@{ action = $Action; data = $Data } | ConvertTo-Json -Depth 8 -Compress), [Text.Encoding]::UTF8, 'application/json')\n  return $request\n}\n\nfunction Add-BunnyVoiceRequest([string]$Action, $Data = @{}, [bool]$Urgent = $false) {\n  if ($Action -eq 'voice.state' -and $script:bunnyVoiceQueue.Count -gt 0) { return }\n  $item = @{ action = $Action; data = $Data }\n  if ($Action -eq 'voice.session.open' -or $Action -eq 'voice.listen.start') { $script:bunnyVoiceOpenSent = $true }\n  if ($Action -eq 'voice.session.close') { $script:bunnyVoiceOpenSent = $false }\n  if ($Urgent) { $script:bunnyVoiceQueue.Insert(0, $item) } else { [void]$script:bunnyVoiceQueue.Add($item) }\n  Invoke-BunnyVoicePump\n}\n\nfunction Start-BunnyVoiceFlight {\n  $item = $script:bunnyVoiceQueue[0]\n  $script:bunnyVoiceQueue.RemoveAt(0)\n  # The queue is single-flight FIFO, so a release is dequeued only after the listen.start before it has settled. Bind it to\n  # the turn that start was answered with (never to an older snapshot). A start whose answer was lost has no known turn:\n  # the release then goes unbound and ends whatever capture the Host holds. The Host ignores a release whose turn is stale.\n  if ([string]$item.action -eq 'voice.listen.end' -and -not $item.data.turnId -and $script:bunnyVoiceStartState -eq 'known' -and $script:bunnyVoiceStartTurn) {\n    $item.data = @{ turnId = [string]$script:bunnyVoiceStartTurn }\n  }\n  try {\n    $request = New-BunnyVoiceRequestMessage ([string]$item.action) $item.data\n    $script:bunnyVoiceFlight = @{ action = [string]$item.action; send = (Get-BunnyVoiceClient).SendAsync($request); read = $null; response = $null; stage = 'send'; at = Get-BunnyNowMs }\n  } catch {\n    # The request was never sent, so the Host holds no capture from it.\n    Set-BunnyVoiceStartOutcome ([string]$item.action) 'none' $null\n    $script:bunnyVoiceError = 'Voice request could not be sent'\n  }\n}\n\nfunction Set-BunnyVoiceStartOutcome([string]$Action, [string]$Outcome, $Turn) {\n  if ($Action -ne 'voice.listen.start') { return }\n  $script:bunnyVoiceStartState = $Outcome\n  $script:bunnyVoiceStartTurn = if ($Outcome -eq 'known' -and $Turn) { [string]$Turn } else { $null }\n}\n\nfunction Set-BunnyVoiceFlightLost($Flight) {\n  # No answer arrived (timeout, unreachable, unreadable): a listen.start may still have opened a capture on the Host.\n  Set-BunnyVoiceStartOutcome ([string]$Flight.action) 'unknown' $null\n}\n\nfunction Complete-BunnyVoiceResponse([int]$Status, [string]$Text, [string]$Action = '') {\n  $body = $null\n  try { $body = $Text | ConvertFrom-Json } catch { $body = $null }\n  if ($Status -ge 200 -and $Status -lt 300 -and $body -and $body.data) {\n    Set-BunnyVoiceSnapshot $body.data\n    $inputTurn = if ($body.data.inputTurnId) { $body.data.inputTurnId } else { $body.data.turnId }\n    Set-BunnyVoiceStartOutcome $Action 'known' $inputTurn\n    return\n  }\n  # The Host answered and refused (or failed) before it captured anything.\n  Set-BunnyVoiceStartOutcome $Action 'none' $null\n  $script:bunnyVoiceError = if ($body -and $body.error) { [string]$body.error } else { 'Voice request failed (HTTP ' + $Status + ')' }\n}\n\nfunction Invoke-BunnyVoicePump {\n  try { Invoke-BunnyVoicePumpCore } catch { $script:bunnyVoiceFlight = $null; $script:bunnyVoiceError = 'Voice client error: ' + $_.Exception.Message }\n}\n\nfunction Invoke-BunnyVoicePumpCore {\n  $flight = $script:bunnyVoiceFlight\n  if ($flight) {\n    if ((Get-BunnyNowMs) - [double]$flight.at -gt $bunnyVoiceFlightTimeoutMs) {\n      # The late HTTP result is dropped with the reference; it can never reach the snapshot.\n      $script:bunnyVoiceFlight = $null\n      Set-BunnyVoiceFlightLost $flight\n      $script:bunnyVoiceError = 'Voice request timed out'\n    } elseif ($flight.stage -eq 'send') {\n      if ($flight.send.IsFaulted -or $flight.send.IsCanceled) {\n        $script:bunnyVoiceFlight = $null\n        Set-BunnyVoiceFlightLost $flight\n        $script:bunnyVoiceError = 'Host unreachable for voice'\n      } elseif ($flight.send.IsCompleted) {\n        $flight.response = $flight.send.Result\n        $flight.read = $flight.response.Content.ReadAsStringAsync()\n        $flight.stage = 'read'\n      }\n    }\n    $flight = $script:bunnyVoiceFlight\n    if ($flight -and $flight.stage -eq 'read' -and $flight.read.IsCompleted) {\n      $script:bunnyVoiceFlight = $null\n      if ($flight.read.IsFaulted) { Set-BunnyVoiceFlightLost $flight; $script:bunnyVoiceError = 'Voice response could not be read' }\n      else { Complete-BunnyVoiceResponse ([int]$flight.response.StatusCode) $flight.read.Result ([string]$flight.action) }\n    }\n  }\n  if (-not $script:bunnyVoiceFlight -and $script:bunnyVoiceQueue.Count -gt 0) { Start-BunnyVoiceFlight }\n}\n\nfunction Test-BunnyVoiceNewer($Candidate, $Current) {\n  # Within one Host epoch the monotonic voice.revision decides; across epochs, or when a snapshot has no revision yet,\n  # updatedAt decides (the earlier rule). A Host restart starts a new epoch, so its revisions never compare with the old.\n  if (-not $Current) { return $true }\n  if (-not $Candidate) { return $false }\n  if ($null -ne $Candidate.revision -and $null -ne $Current.revision -and [string]$Candidate.hostEpoch -eq [string]$Current.hostEpoch) {\n    return ([double]$Candidate.revision -ge [double]$Current.revision)\n  }\n  return ([double]$Candidate.updatedAt -ge [double]$Current.updatedAt)\n}\n\nfunction Get-BunnyVoiceSource {\n  # The 2 s /state snapshot and the 200 ms voice poll are both real Host facts; the newer one wins.\n  $fromPoll = $script:bunnyVoiceSnapshot\n  $fromState = if ($bunnySnapshot) { $bunnySnapshot.voice } else { $null }\n  if (-not $fromPoll) { return $fromState }\n  if (-not $fromState) { return $fromPoll }\n  if (Test-BunnyVoiceNewer $fromPoll $fromState) { return $fromPoll }\n  return $fromState\n}\n\nfunction Invoke-BunnyVoiceIntent($Snap) {\n  # One-shot UI request from the Host. Opened once per seq, scoped to the Host epoch that numbered it: a Host restart\n  # restarts seq at 1, so a new epoch starts its floor at 0 and an old seq never replays. The first seen seq only s`... 32224 more characters,
+    expected: /\$snap\.level -and \(\(\$now - \[double\]\$snap\.level\.at\) -lt \$bunnyVoiceFreshMs\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:974:1
+✖ whisper: the staged runtime and model match native/voice/whisper-pin.json and the build record (1.9652ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:975:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:990:1
+✖ whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error (0.8946ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:991:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1012:1
+✖ whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final (0.831ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:1013:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1039:1
+✖ whisper: silence never becomes a final (no VAD onset, so stt.none no_speech) (0.7186ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:1040:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1057:1
+✖ whisper: noise-only input never becomes a final with words (0.7222ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:1058:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1071:1
+✖ whisper: capture.abort that lands during the final decode never emits a final (0.7624ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:1072:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1090:1
+✖ whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently (0.6807ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13/source-checkout/scripts/voice-worker.test.mjs:1091:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

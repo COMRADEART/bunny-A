@@ -1,0 +1,91 @@
+
+> pretest
+> npm run build:ownership
+
+
+> build:ownership
+> node scripts/build-owned-process.mjs
+
+{"schema":"bunny-native-build/1","architecture":"windows-x64","nodeApi":8,"sourceSha256":"48022a425582aac5ce8a2657525152875df8e3143158198fbd92753e0f4b9706","binarySha256":"54087a9506f999f7f51cceb9da716ec516ef6c64178fae68fc379098e6c390ce","compilerSha256":"f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0","compilerVersion":"gcc.exe (Rev5, Built by MSYS2 project) 16.1.0","flags":["-std=c11","-O2","-Wall","-Wextra","-Werror","-shared","-s","-static-libgcc","-Wl,--no-insert-timestamp","-Wl,--image-base,0x180000000","-Wl,--nxcompat","-Wl,--dynamicbase"]}
+
+> test
+> node --test scripts/*.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/orch/*.test.ts src/lib/bunny-host/agent-machine.test.ts src/lib/bunny-host/agent-replay.test.ts src/lib/bunny-host/agent-store.test.ts src/lib/bunny-host/codex-compatibility.test.ts src/lib/bunny-host/codex-probe.test.ts src/lib/bunny-host/execution-scope.test.ts src/lib/bunny-host/failure.test.ts src/lib/bunny-host/git-helpers-ownership.test.ts src/lib/bunny-host/host.test.ts src/lib/bunny-host/learning.test.ts src/lib/bunny-host/m2.test.ts src/lib/bunny-host/ma2-t10.test.ts src/lib/bunny-host/model-capability.test.ts src/lib/bunny-host/owned-process-group.test.ts src/lib/bunny-host/presentation.test.ts src/lib/bunny-host/provider-usage.test.ts src/lib/bunny-host/release-identity.test.ts src/lib/bunny-host/routing-matrix.test.ts src/lib/bunny-host/routing-store.test.ts src/lib/bunny-host/routing.test.ts src/lib/bunny-host/state-marker.test.ts src/lib/bunny-host/stop-ownership.test.ts src/lib/bunny-host/t3-manager.test.ts src/lib/bunny-missions/*.test.ts && node --experimental-strip-types --test --test-force-exit src/lib/bunny-host/agent-runtime.test.ts src/lib/bunny-host/agent-recovery.test.ts
+
+✔ non-canvas app with no custom card gets a soft BRAND NOTE (utility exception) (6.099ms)
+✔ non-canvas app with a compliant card is silent (6.0138ms)
+✔ card file without site.json card=custom warns (5.3733ms)
+✔ card file with missing site.json warns for card=custom (3.4196ms)
+✔ card file with invalid site.json warns for card=custom (4.377ms)
+✔ oversized card warns for non-canvas apps too (5.7754ms)
+✔ canvas app with no card warns 'missing' and missing og:type (4.222ms)
+✔ canvas card without type still warns for og:type (5.9104ms)
+✔ oversized card warns on the scraper budget (jpg and legacy png) (12.2969ms)
+✔ compliant game (custom card + site.json type + x-banner) is silent (4.7829ms)
+✔ __root.tsx og:type no longer satisfies the canvas gate (20.0119ms)
+✔ oversized x-banner warns on the same scraper budget as og.jpg (5.7789ms)
+✔ legacy png + site.json type still needs the X feed card (4.7349ms)
+✔ siteDeclaresOgTypeGame reads the site contract (0.1741ms)
+✔ a fresh og-pending marker silences the whole gate view (2.8907ms)
+✔ a stale og-pending marker is ignored and the warnings return (4.0239ms)
+✔ the marker goes stale on the clock, not on the file (3.5007ms)
+✔ no marker means nothing is in flight (2.2048ms)
+✔ parseBrandCheckArgs takes --game, --placeholder-ok and --root, and rejects the rest (0.2775ms)
+✔ cli: a game missing its card reports JSON and exits 1 (154.0077ms)
+✔ cli: a compliant game passes (171.4044ms)
+✔ cli: the task's own marker is reported, not honoured (142.6539ms)
+✔ cli: a bad argument fails with JSON on stderr (104.9858ms)
+✔ cli: a non-game with no card fails too — the pass exists to produce one (114.7259ms)
+✔ cli: --placeholder-ok is how a plain-utility pass reports no card as expected (205.8092ms)
+✔ cli: a non-game with a compliant card passes (107.9807ms)
+✔ SKILL.md and AGENTS.md name the marker path and bound this script uses (1.7182ms)
+✔ the sections that own the brand-task prohibition never affirm a wait (2.0115ms)
+✔ SKILL.md tells the pass to self-check with the flag this CLI accepts (1.0307ms)
+✔ normalizes whitespace before hashing (1.4057ms)
+✔ nullish and blank body text normalize to the empty string (0.1767ms)
+✔ body text prefix is normalized and capped (0.1647ms)
+✔ identical runs do not diverge (0.7132ms)
+✔ status change diverges (0.3312ms)
+✔ title change diverges (0.1312ms)
+✔ title comparison is skipped when either side lacks one (0.131ms)
+✔ canvas disappearing diverges; canvas appearing does not (0.3624ms)
+✔ horizontal overflow appearing diverges; clearing does not (0.2592ms)
+✔ new console errors diverge (0.3142ms)
+✔ errors already present in the baseline do not re-diverge (0.2347ms)
+✔ body text collapse diverges (0.142ms)
+✔ body text dropping to zero reports collapse (0.1359ms)
+✔ zero-length baseline reports growth via the hash branch, not collapse (0.1127ms)
+✔ hash mismatch with a trivial length delta and same page start is tolerated (0.0569ms)
+✔ hash mismatch with a trivial length delta but changed page start diverges (0.0638ms)
+✔ prefix check is skipped when either side lacks a prefix (0.0855ms)
+✔ length-delta tolerance boundary: 50 tolerated, 51 diverges (500-char baseline) (0.0628ms)
+✔ length-delta floor dominates small baselines: 20 tolerated, 21 diverges (100-char baseline) (0.0577ms)
+✔ collapse boundary: exactly half is 'changed', one below is 'collapsed' (0.0879ms)
+✔ missing baseline viewport diverges (0.084ms)
+✔ empty or null baseline diverges for every viewport (0.103ms)
+✔ degenerate current verdict fails closed (0.2093ms)
+✔ multiple signals across viewports all accumulate (0.0777ms)
+✔ baselineComparison round-trips a valid baseline (0.1297ms)
+✔ baselineComparison fails closed on malformed or wrong-shape baselines (0.1664ms)
+✔ parseSmokeArgs defaults (0.1592ms)
+✔ parseSmokeArgs consumes --baseline without shifting positionals (0.0626ms)
+✔ parseSmokeArgs rejects a trailing --baseline flag (0.0453ms)
+✔ parseSmokeArgs supports the --baseline= form (0.0521ms)
+✔ parseSmokeArgs rejects unknown flags instead of treating them as positionals (0.0578ms)
+✔ parseSmokeArgs env fallback and flag precedence (0.07ms)
+✔ derivedPaths handles .png, .PNG, and extensionless inputs (0.1616ms)
+✔ exitCodeFor: clean run exits 0 (0.0898ms)
+✔ exitCodeFor: errors in any single viewport exit 2 (0.0582ms)
+✔ exitCodeFor: navigation failure in any viewport exits 1, beating errors (0.0714ms)
+✔ exitCodeFor: 4xx boundary and missing status (0.0623ms)
+✔ exitCodeFor: no viewport data is a failure (0.0424ms)
+✔ browser-smoke wires the guard and verdict helpers (0.4512ms)
+✔ browser-smoke file I/O only touches guarded paths (0.4669ms)
+✔ defaultScreenshotPath stays inside the allowed output root on each platform (0.0725ms)
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+✔ M-A-1D: the production release pin is the reviewed M-A-1 code candidate (377.0324ms)
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (459.5512ms)
+✖ M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release (1274.8408ms)
+✖ M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release (8855.1174ms)

@@ -1,0 +1,62 @@
+20:10:34.898 agents {"A":"a642daae-4341-4d1e-bee1-d58b4d10f9ee","B":"2df358be-7aec-4081-a959-a6628f442f8c","C":"e2d3c54b-ce73-4c45-8857-b1ad688b6f6f","D":"5a3e826a-fdb3-41ae-8e83-e5556b966a59","E":"b79c57b5-b697-484d-b411-3bd28322638f","F":"d02b90e5-b124-48d7-8ad6-2306d8e1345e","G":"cb5277fb-3584-4803-83d7-b1066f7f8bdf","H":"8310d3a5-ee24-4efc-b59b-a44e68fcba4d"}
+20:10:34.899 PASS eight real user Agents created through agent.create {"created":8}
+20:10:34.923 PASS personal_agents.configure {"1":"a642daae-4341-4d1e-bee1-d58b4d10f9ee","2":"2df358be-7aec-4081-a959-a6628f442f8c","3":"e2d3c54b-ce73-4c45-8857-b1ad688b6f6f","4":"5a3e826a-fdb3-41ae-8e83-e5556b966a59"} 
+20:10:35.368 PASS agent.start A 
+20:10:35.851 PASS agent.start B 
+20:10:36.338 PASS agent.start C 
+20:10:36.810 PASS agent.start D 
+20:10:37.221 PASS A (research, no verification) reaches COMPLETED with unverified steps {"state":"COMPLETED","label":"Completed · 6 unverified","basis":{"kind":"mission-result","verifiedSteps":0,"unverifiedSteps":6}}
+20:10:37.222 PASS B (write + compare) is VERIFIED from the Host mission result {"state":"VERIFIED","label":"Completed and verified","basis":{"kind":"mission-result","verifiedSteps":1,"unverifiedSteps":0}}
+20:10:37.222 PASS C (terminal.exec test) asks permission: WAITING_FOR_USER {"state":"WAITING_FOR_USER","label":"Needs you","basis":{"kind":"agent-state","agentState":"WAITING_FOR_USER"}}
+20:10:37.222 PASS D (delete) asks permission: WAITING_FOR_USER {"state":"WAITING_FOR_USER","label":"Needs you","basis":{"kind":"agent-state","agentState":"WAITING_FOR_USER"}}
+20:10:37.251 island launched by this run, pid 18152
+20:11:02.600 checkpoint cp1-first-load-waiting "chat strip [[\"sword\",\"WAITING_FOR_USER\",null],[\"chakra\",\"WAITING_FOR_USER\",null],[\"spear\",\"VERIFIED\",null],[\"gada\",\"COMPLETED\",null]]; cue deltas []"
+20:11:06.612 PASS nothing auto-grants: C and D still WAITING_FOR_USER after 4 s with no answer {"C":"WAITING_FOR_USER","D":"WAITING_FOR_USER"}
+20:11:07.466 PASS mission.respond allow_once on C 
+20:11:08.312 PASS mission.respond allow_once on C 
+20:11:29.135 FAIL wait: C TESTING after allow_once {"timeoutMs":20000}
+20:11:29.135 FAIL C leaves WAITING_FOR_USER only after the Host acknowledged (ackAt precedes first non-waiting poll) {"firstTesting":null}
+20:11:42.035 checkpoint cp2-testing "chat strip [[\"chakra\",\"FAILED\",\"failed\"],[\"sword\",\"WAITING_FOR_USER\",null],[\"spear\",\"VERIFIED\",null],[\"gada\",\"COMPLETED\",null]]; cue deltas [{\"t\":1791835868514,\"kind\":\"data-cue\",\"value\":\"failed\",\"weapon\":\"cha
+20:12:42.040 FAIL wait: C VERIFIED {"timeoutMs":60000}
+20:12:42.040 FAIL C reaches VERIFIED (test ran, verification passed) while the page stays open 
+20:12:56.273 checkpoint cp3-c-verified-live "chat strip [[\"chakra\",\"FAILED\",\"failed\"],[\"sword\",\"WAITING_FOR_USER\",null],[\"spear\",\"VERIFIED\",null],[\"gada\",\"COMPLETED\",null]]; cue deltas []"
+20:12:56.308 PASS personal_agents.configure {"2":"b79c57b5-b697-484d-b411-3bd28322638f"} 
+20:12:56.752 PASS agent.start E 
+20:12:57.227 PASS E asks permission before its test step 
+20:12:58.074 PASS mission.respond allow_once on E 
+20:12:58.944 PASS mission.respond allow_once on E 
+20:13:19.794 FAIL wait: E TESTING {"timeoutMs":20000}
+20:13:19.794 FAIL E TESTING is derived from the terminal.exec test command 
+20:13:19.802 FAIL agent.pause accepted by the Host "A finished agent cannot be paused."
+20:13:39.904 FAIL wait: E PAUSED {"timeoutMs":20000}
+20:13:39.904 FAIL E shows PAUSED from Host AgentState PAUSED 
+20:13:52.789 checkpoint cp4-paused "chat strip [[\"spear\",\"FAILED\",\"failed\"],[\"chakra\",\"FAILED\",\"failed\"],[\"sword\",\"WAITING_FOR_USER\",null]]; cue deltas [{\"t\":1791835979122,\"kind\":\"data-cue\",\"value\":\"failed\",\"weapon\":\"spear\",\"state\":\"FAILED\",
+20:13:55.326 FAIL agent.resume accepted by the Host "The agent is not paused."
+20:15:25.411 FAIL wait: E finished {"timeoutMs":90000}
+20:15:25.411 FAIL E resumes and finishes 
+20:15:25.443 PASS personal_agents.configure {"3":"8310d3a5-ee24-4efc-b59b-a44e68fcba4d"} 
+20:15:25.884 PASS agent.start H 
+20:15:26.040 PASS H (background runner) waits for permission before the UI is closed 
+20:15:38.805 checkpoint cp5-before-close "chat strip [[\"chakra\",\"WAITING_FOR_USER\",null],[\"spear\",\"FAILED\",\"failed\"],[\"sword\",\"WAITING_FOR_USER\",null]]; cue deltas []"
+20:15:39.118 checkpoint cp6-close-ui "web page closed (browser context closed)"
+20:15:39.408 island (pid 18152) closed
+20:15:41.774 PASS mission.respond allow_once on H 
+20:15:42.631 PASS mission.respond allow_once on H 
+20:17:13.445 FAIL wait: H COMPLETED with UI closed {"timeoutMs":90000}
+20:17:13.445 FAIL with the UI closed the Host keeps the Mission running to completion {"state":"FAILED"}
+20:17:14.971 island launched by this run, pid 46428
+20:17:30.773 checkpoint cp7-reopen-after-background "reopened; strip [[\"chakra\",\"FAILED\",null],[\"spear\",\"FAILED\",null],[\"sword\",\"WAITING_FOR_USER\",null]]"
+20:17:31.656 PASS mission.respond deny on D 
+20:17:32.465 PASS denied delete ends the Agent FAILED (Host AgentState FAILED) {"presentation":{"state":"FAILED","label":"Failed","basis":{"kind":"agent-state","agentState":"FAILED"}},"failure":"AUTHORITY_LOST"}
+20:17:45.148 checkpoint cp8-failed "chat strip [[\"sword\",\"FAILED\",\"failed\"],[\"chakra\",\"FAILED\",null],[\"spear\",\"FAILED\",null]]; cue deltas [{\"t\":1791836251815,\"kind\":\"data-cue\",\"value\":\"failed\",\"weapon\":\"sword\",\"state\":\"FAILED\",\"slot\":null},{
+20:17:45.184 PASS personal_agents.configure {"4":"d02b90e5-b124-48d7-8ad6-2306d8e1345e"} 
+20:17:45.638 PASS agent.start F 
+20:17:45.948 PASS F (delete ask) waits for the user 
+20:17:46.007 PASS agent.stop accepted by the Host 
+20:17:46.229 PASS stopped Agent shows STOPPED from Host AgentState {"state":"STOPPED","label":"Stopped","basis":{"kind":"agent-state","agentState":"STOPPED"}}
+20:17:59.010 checkpoint cp9-stopped "chat strip [[\"sword\",\"STOPPED\",null],[\"chakra\",\"FAILED\",null],[\"spear\",\"FAILED\",null]]; cue deltas [{\"t\":1791836252792,\"kind\":\"data-cue\",\"value\":null,\"weapon\":\"sword\",\"state\":\"FAILED\",\"slot\":\"4\"}]"
+20:17:59.089 PASS agent.start G 
+20:17:59.642 PASS G (failing verification) settles at a Host-recorded state {"state":"WAITING_FOR_USER","failure":null}
+20:18:12.216 checkpoint cp10-final "chat strip [[\"sword\",\"STOPPED\",null],[\"chakra\",\"FAILED\",null]]; cue deltas []"
+20:18:13.460 island (pid 46428) closed
+20:18:13.574 DONE checks passed: 32 / 46

@@ -1,0 +1,69 @@
+{
+  "round": 4,
+  "verdicts": [
+    {
+      "id": "F03-D1-cmd-rem-prefix",
+      "kind": "PRE_EXISTING",
+      "severity": "HIGH",
+      "issue": "commentLine drops any cmd/bat line matching /^[ \\t]*@?(rem\\b|::)/i, but cmd.exe ends REM only at a delimiter (space, comma, semicolon, equals). Lines like `rem:x & node *.md`, `rem-x & node *.md`, `rem.x & node *.md`, `rem/x & ...` and `rem+x & ...` are therefore judged as comments while cmd runs the text after `&`. A runner glob hidden this way classifies PHONE_SAFE_DOCUMENT in both HEAD and the working tree.",
+      "evidence": "Probe (classifyDeviceWrite, dest hold.md at root, consumer build.cmd): `rem:x & node *.md`, `rem-x & node *.md` => HEAD=PHONE_SAFE_DOCUMENT, WT=PHONE_SAFE_DOCUMENT. Control `node *.md` => EXECUTION_RELEVANT in both. Real cmd.exe run of temp .cmd files: `rem:x & echo RAN-COLON`, `rem-x & echo RAN-DASH`, `rem.x & echo RAN-DOT`, `rem/x & ...`, `rem+x & ...` all execute the echo; `rem, echo` and `rem ...` do not. Literal names (`rem:x & node zq\\hold.md`) are still refused by the whole-file text check, so only glob or computed runners escape. Not a regression: HEAD also dropped `rem\\b` lines.",
+      "disposition": "FIXED (pre-existing HIGH): REM is a comment only when followed by a cmd delimiter or line end"
+    },
+    {
+      "id": "F03-D1-inert-exports-imports-patterns",
+      "kind": "NEW_CODE_BYPASS",
+      "severity": "MEDIUM",
+      "issue": "INERT_PACKAGE_KEYS exempts exports, imports, main and module from the package.json rest scan. Node executes these targets when code requires the package, and .md is loaded as CommonJS. Pattern targets with a glob such as exports {\"./*\":\"./*/*.md\"} or imports {\"#*\":\"./*.md\"} therefore name the destination without being checked and classify PHONE_SAFE_DOCUMENT. Literal paths in these keys are still caught by the whole-file text check, so only glob pattern targets get through.",
+      "evidence": "Probe (dest zq/hold.md): {\"imports\":{\"#*\":\"./*/*.md\"}} => HEAD=PHONE_SAFE_DOCUMENT, WT=PHONE_SAFE_DOCUMENT; {\"exports\":{\"./*\":\"./*/*.md\"}} => both PHONE_SAFE. Dest hold.md at root: {\"exports\":{\"./*\":\"./*.md\"}}, {\"imports\":{\"#*\":\"./*.md\"}}, {\"module\":\"./*.md\"} => both PHONE_SAFE. Control: {\"bin\":{\"x\":\"./*.md\"}} (not inert) => WT EXECUTION_RELEVANT. Literal {\"main\":\"zq/hold.md\"} and {\"main\":\"zq/hold.md\"} => refused in both (whole-text check). HEAD also safe because HEAD scanned only scripts, so this is not a regression, but the new exemption list is what leaves it safe.",
+      "disposition": "FIXED: main, module, exports, imports removed from the inert key list"
+    },
+    {
+      "id": "F03-D1-escapedName-folder-and-cmd-separator",
+      "kind": "PRE_EXISTING",
+      "severity": "HIGH",
+      "issue": "escapedName checks only whether the whole decoded word equals the leaf (or matches a glob or computed form). Folder-qualified escaped names are not decoded to the full path, so `zq/ho\\ld.md` (sh expands to zq/hold.md) and `zq/hold\\.md` slip through. For cmd, the backslash path separator is consumed as an escape by `[\\\\^](.)`, so `zq\\ho^ld.md` and `zq\\h^old.md` decode to the wrong name. The same gap appears in package.json script strings.",
+      "evidence": "Probe (dest zq/hold.md): sh `node zq/ho\\ld.md` => HEAD=PHONE_SAFE_DOCUMENT, WT=PHONE_SAFE_DOCUMENT; sh `node zq/hold\\.md` => both PHONE_SAFE; cmd `node zq\\ho^ld.md` => both PHONE_SAFE; cmd `node zq/ho^ld.md` => both PHONE_SAFE; cmd `node zq\\h^old.md` => both PHONE_SAFE; package.json script `node zq/ho\\\\ld.md` (JSON) => both PHONE_SAFE. Real execution confirmed: bash `echo zq/ho\\ld.md` and `ls zq/ho\\ld.md` both expand to zq/hold.md; cmd.exe `echo zq/ho^ld.md` prints zq\\hold.md. Control: sh `node zq/ho\\ld.md`-style escaped leaf alone (`hold` without folder) and `node zq\\hold.md` in sh (decodes to zqhold.md, correctly safe) are handled as expected. Not a regression because HEAD was also safe.",
+      "disposition": "FIXED (pre-existing HIGH): sh and cmd readings, last path segment judged"
+    },
+    {
+      "id": "F03-D1-program-source-literal-only",
+      "kind": "PRE_EXISTING",
+      "severity": "MEDIUM",
+      "issue": "PROGRAM_SOURCE only matches glob text that appears as a single string literal. A program that builds the glob by concatenation (`'*' + '.md'`) or enumerates the folder and requires each file (readdirSync + require) names or runs the destination without any matching literal, so the source file classifies PHONE_SAFE_DOCUMENT.",
+      "evidence": "Probe (dest hold.md at root): build.js `const g = '*' + '.md'; require('child_process').execSync('node ' + g);` => HEAD=PHONE_SAFE_DOCUMENT, WT=PHONE_SAFE_DOCUMENT. build.js `fs.readdirSync('.').filter(endsWith('.md')).forEach(require)` => both PHONE_SAFE. Control build.py with `glob.glob('*' + '.md')` => HEAD safe, WT EXECUTION_RELEVANT (WT is stricter here). Static-analysis limit rather than a regression.",
+      "disposition": "RESIDUAL (disclosed D1 class): globs assembled by concatenation or folder enumeration in program code are not evaluated"
+    },
+    {
+      "id": "F03-D1-no-regression-shell-hash",
+      "kind": "NONE",
+      "severity": "NONE",
+      "issue": "No case was found where HEAD refused and the working tree is safe. The new scanLine '#' handling holds for every sh, Makefile, PowerShell and YAML form tested: a hidden glob after a real comment or after `$(`, `${x#y}`, `echo \\ #`, `\\#`, a quoted `#` or a `#` after a quote is refused in both trees, and `node zq/*.md # c` is refused. PowerShell `# ...` and `\"x`\" # ...` behave as in the PowerShell comment grammar (verified with powershell.exe). The probes did not show a runner hidden by scanLine that the real interpreter runs in these shell and PowerShell forms.",
+      "evidence": "Probes (HEAD and WT agree, all EXECUTION_RELEVANT): sh `node zq/*.md # c`, `echo ${x#y} ; node zq/*.md`, `echo \\ # ; node zq/*.md`, `echo x \\# ; node zq/*.md`, `echo \"#\" ; node zq/*.md`, `echo 'a'# ; node zq/*.md`, `echo $(echo a #) ; node zq/*.md`, `echo \"a\\\" # \" ; node zq/*.md`. Makefile recipe `node zq/*.md # c`, `node r.js \\# zq/*.md`, continuation after `\\`, `X = a # node zq/*.md`. PowerShell `Write-Output 'a' # ; node zq/*.md`, `<# x #> node zq/*.md`, here-string, `a#b; node zq/*.md`. Note: `echo a#b ; node zq/*.md` is correctly refused.",
+      "disposition": "no defect"
+    },
+    {
+      "id": "F03-D1-yaml-literal-folded-plain",
+      "kind": "NONE",
+      "severity": "NONE",
+      "issue": "No YAML bypass found. Literal block lines are judged per line, folded and plain continuation lines span, and a literal-misdetected `-|` line followed by a glob runner is still refused because the glob line is judged alone. A quoted '#' is handled and a YAML comment is correctly ignored.",
+      "evidence": "Probes (ci.yml, dest zq/hold.md): literal `run: |` with `node zq/*.md` => EXECUTION_RELEVANT in both; folded `run: >` => both EXECUTION_RELEVANT; `run: node\\n  zq/*.md` => both; `run: npx\\n  - ls zq/*.md` => both; `run: echo x-|\\n  node zq/*.md` => both; `run: node -|\\n  ls zq/*.md` => both; `run: \"echo a # \" ; node zq/*.md` => both; `run: echo hi # node zq/*.md` (YAML comment) => both EXECUTION_RELEVANT (conservative); `run: echo a#b ; node zq/*.md` => both.",
+      "disposition": "no defect"
+    },
+    {
+      "id": "F03-D1-lint-staged-and-make-suffix",
+      "kind": "NONE",
+      "severity": "NONE",
+      "issue": "No lint-staged bypass found. A string command gets the glob appended and is judged; a command array is judged per entry; a readonly command with a plugin option is refused. Make suffix rules (`.md.html:`, `.SUFFIXES: .md`) are newly refused in the working tree, and HEAD missed them.",
+      "evidence": "Probes: package.json lint-staged {\"*.md\":\"node r.js\"} => WT EXECUTION_RELEVANT, HEAD safe; {\"*.md\":[\"prettier --plugin=./x.js\"]} => WT EXECUTION_RELEVANT; {\"*.md\":[\"prettier --write\"]} => both PHONE_SAFE_DOCUMENT (correct, not a runner); Makefile `.md.html:` and `.SUFFIXES: .md` with `.md:` => WT EXECUTION_RELEVANT, HEAD PHONE_SAFE. Pattern rule `%.md: %.txt` => both refused.",
+      "disposition": "no defect"
+    }
+  ],
+  "postRepairAudit": {
+    "corpusPairs": 2428,
+    "regressions": 0,
+    "threw": 0,
+    "fuzzPairs": 10000,
+    "fuzzHeadRefusedNowSafe": 4,
+    "fuzzNote": "same 4 as round 3: glob only inside a trailing sh comment, which the shell never runs"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "decision": "D3: effective authority = Host policy ∩ Mission authorization ∩ Agent envelope ∩ device permissions ∩ exact Host-offered operation. A narrowed Agent consent is not restored by a one-time device answer; valid in-scope one-time answers keep working.",
+  "source": "F01 §7 item 3 (round-4 HIGH disposition): nine T9/T9R tests encoded \"a device may answer a one-time ask for an Agent planned file step after the workstation narrowed the consent\".",
+  "method": "Each test was inspected individually. None was deleted or skipped and no assertion was inverted. Each fixture that relied on narrowing was changed to an in-scope ask_every_time grant, so the original property (exact offer, stale revision refused, substitution refused, race resolves once, ...) is still asserted on a valid answer. A device write now lands only after a workstation promotion. Negative regressions assert that the narrowed case is refused.",
+  "tests": [
+    {
+      "test": "remote-device: T9 F12-F15/F19-F22/F50 (G2)",
+      "originalRequirement": "F12-F15: device answers only exact Host offers; stale revision refused; F19-F22/F50: Pause/Resume reissue asks at the current revision; a device write answer lands only inside the owner's consent.",
+      "before": "Agent consent narrowed by adjust removing filesystem.write; asserted the write ask is answerable remotely and that device allow_once writes result.txt directly.",
+      "after": "Consent keeps filesystem.write plus a workstation capability.grant filesystem.write ask_every_time; the stale-revision check uses a non-narrowing adjust (maximumActions 10); device allow_once is staged, a device promotion attempt is WORKSTATION_REQUIRED, the workstation promotes, then result.txt is asserted.",
+      "authorizationRationale": "F02 D3: a device may not answer a write outside the Agent's current consent; the positive path is kept as an in-scope ask, and F02 D2 requires workstation promotion before the file lands."
+    },
+    {
+      "test": "remote-device: T9 F12-F15/F19-F22/F50 (G2) paused answer",
+      "originalRequirement": "F21: a device answer while the Agent is paused is refused with a reason.",
+      "before": "assert.match(error, /paused/).",
+      "after": "status 400, code WORKSTATION_REQUIRED, error is a non-empty reason.",
+      "authorizationRationale": "The device consent check now runs before the pause message, so the reason text is the generic device refusal. The refusal itself still holds; the assertion keeps the security property and drops the wording that the new order shadows."
+    },
+    {
+      "test": "remote-remediation: all make()-based tests (substitution x3, offline, client-loss, lost-ack, cross-project, four-way, concurrent desktop/phone)",
+      "originalRequirement": "Device one-time answer on an in-scope write must reach the project only through the Host's reviewed path; a consent-narrowed write must not be answerable.",
+      "before": "make() narrowed filesystem.write out of consent for every fixture; device allow_once on the write landed the file directly.",
+      "after": "make() keeps filesystem.write in consent and adds a workstation ask_every_time grant by default; make(name, project, narrowed=true) keeps the old narrowing for the new negative regression. Each positive path calls promoteStaged(f, missionId), which asserts a device cannot promote and that the workstation promotion returns 200 before the file is asserted.",
+      "authorizationRationale": "F02 D2/D3: device writes are staged and promoted by the workstation; the positive path is an in-scope ask."
+    },
+    {
+      "test": "remote-remediation: T9R remote approval cannot substitute {agentId,missionId,projectId}",
+      "originalRequirement": "A device answer cannot substitute Agent, Mission or Project; A's consent does not authorize B's resource.",
+      "before": "device allow_once on A (narrowed) expected 200 and receipt.txt on disk.",
+      "after": "device allow_once on A (in scope) expected 200; promoteStaged; then receipt.txt = Agent A and project B untouched. The substitution 400 and bus-replay not-allow assertions are unchanged.",
+      "authorizationRationale": "Positive path moved to a staged, promoted write; the negative checks are unchanged."
+    },
+    {
+      "test": "remote-remediation: T9R offline approval is refused after reconnect",
+      "originalRequirement": "Stale and replayed approvals are refused; only the fresh Host offer executes.",
+      "before": "fresh device allow_once expected 200 then receipt.txt.",
+      "after": "same, plus promoteStaged before the file is asserted.",
+      "authorizationRationale": "F02 D2 staging."
+    },
+    {
+      "test": "remote-remediation: T9R client-only connection loss during admitted work",
+      "originalRequirement": "Client-only socket loss does not interrupt Host-side admitted work; same Host epoch; one Agent; one write.",
+      "before": "HeldFilesystem held filesystem.write (the adapter call the device write now never reaches), so the test awaited fs.entered with no timeout.",
+      "after": "HeldFilesystem holds filesystem.compare for receipt.txt (the write step's verification, which runs after promotion); promoteStaged precedes; fs.entered is raced against a 15 s timeout.",
+      "authorizationRationale": "A staged device write never reaches the adapter, so the in-flight work is the verification that runs after promotion. The timeout prevents a silent hang."
+    },
+    {
+      "test": "remote-remediation: T9R F-02 workstation revocation (self sign-out part)",
+      "originalRequirement": "F02 D5: self sign-out ends the device's own authority; workstation-granted approvals are independent.",
+      "before": "assert.equal(envelope(signedOut).revokedAt, null) and state ready, documented as keeping the approvals the user gave.",
+      "after": "assert.ok(envelope(signedOut).revokedAt); state stopped; workstation envelope (owner) still revokedAt null and state ready.",
+      "authorizationRationale": "New contract: the envelope the device granted is revoked on its own sign-out. The owner-envelope invariant is kept and asserted explicitly. This inverts the legacy assertion deliberately and is safer."
+    },
+    {
+      "test": "remote-remediation: T9R lost command acknowledgment",
+      "originalRequirement": "Applied approval and Pause/Stop replay by operationId cause one effect.",
+      "before": "device allow_once on narrowed write expected 200.",
+      "after": "in-scope write; device allow_once 200 and replay unchanged; promoteStaged before COMPLETED is awaited.",
+      "authorizationRationale": "F02 D2 staging. The writes count still counts the staged succeeded run, which is 1."
+    },
+    {
+      "test": "remote-remediation: T9R four-way phone/desktop race",
+      "originalRequirement": "Exactly one of the four racing answers wins; the losers are refused.",
+      "before": "every non-200 response code must be REFUSED.",
+      "after": "responses[0] (device allow_batch) must be non-200; losers must be REFUSED or WORKSTATION_REQUIRED; if a device allow_once wins it is promoted by the workstation before settle.",
+      "authorizationRationale": "Under the ask_every_time grant a device batch is refused outright (WORKSTATION_REQUIRED) or loses the race (REFUSED). The one-winner and single-effect checks are unchanged. This is a relaxation of the loser code, documented here."
+    }
+  ],
+  "addedNegativeRegressions": [
+    "T9 F02 D3 (negative regression): a device cannot answer a write that the owner's narrowed Agent consent no longer covers",
+    "T9R F-02 narrowed consent: a device answer outside the Agent's current consent is refused and stages nothing"
+  ],
+  "resultAtAuthoring": {
+    "testsPassed": 30,
+    "testsTotal": 30
+  },
+  "finalResult": "see regression-inventory.json and full-test-results.log (source commit)"
+}

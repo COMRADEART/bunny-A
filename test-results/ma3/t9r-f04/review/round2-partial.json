@@ -1,0 +1,147 @@
+{
+  "reviews": [
+    {
+      "lens": "native2",
+      "summary": "Read-only review of native/bunny-owned-process.c after round-1 repairs. Launch failure paths, handle ownership on success and failure, the finalize and close ordering, the writer-thread cancel loop, the write/endInput budget and env checks, and the terminate_group(g,0) accounting showed no double close, UAF, leak or bypass. One LOW residual finding: the interactive stdin write is synchronous on the Host main thread and depends on CreatePipe honoring nSize as a quota, which the documentation does not guarantee.",
+      "repairVerdicts": [],
+      "rows": [
+        {
+          "lens": "native2",
+          "id": "F04-R2-N1",
+          "severity": "LOW",
+          "title": "Interactive write blocks the Host main thread on a quota the API does not guarantee",
+          "file": "native/bunny-owned-process.c",
+          "line": 234,
+          "reproduction": "launch(...,true) creates CreatePipe(..., MAX_INTERACTIVE_INPUT) at line 144. write_input_owned (line 227) then calls a synchronous WriteFile on the Node main thread (line 234) with no timeout and no overlapped I/O. The cumulative budget of 512 KiB (line 232) is only safe if the kernel really sizes the pipe quota to that value. The CreatePipe documentation calls nSize 'only a suggestion'. If the quota is smaller, a provider child that stops reading stdin lets the WriteFile block once the quota fills. The Host event loop then freezes and cannot run Stop, timeout or close, and the blocked WriteFile is never cancelled because no other thread owns it. The C comment at lines 225-226 presents the no-block property as a guarantee.",
+          "rootCause": "The no-block property depends on an undocumented quota-honoring behavior of CreatePipe, and the write is performed synchronously on the thread that also drives every containment decision. Unlike the payload path, which uses a Host writer thread that close_group can cancel, interactive writes have no cancellation or timeout path.",
+          "repair": "Either (a) perform interactive writes from a Host-owned writer thread that is cancelled by close_group, as the payload path does, and surface completion asynchronously, or (b) check the pipe's free space before each write (NtQueryInformationFile FilePipeLocalInfo or a PeekNamedPipe-based check) and fail closed instead of blocking when the write would not fit. Add a native test that stops reading and asserts the Host write returns within a bound. Note: the current callers (codex-probe) send only a few small JSON-RPC lines, so the practical exposure is residual rather than reachable today. Not verified by running the code; this is from reading the source and the CreatePipe documentation.",
+          "votes": [
+            {
+              "refuted": true,
+              "severityIfReal": "LOW",
+              "reasoning": "Refuted as a defect. The finding's premise is that CreatePipe(..., MAX_INTERACTIVE_INPUT) might yield a pipe quota smaller than 512 KiB, so the synchronous WriteFile in write_input_owned (native/bunny-owned-process.c:227-235) could block. The code makes this unreachable under the documented behavior. The budget check at line 232 caps cumulative bytes at MAX_INTERACTIVE_INPUT (512 KiB, line 42) via g->inputWritten, so total buffered bytes can never exceed the requested nSize. A blocking anonymous-pipe write only stalls when buffered data would exceed the quota, so the write cannot block while the quota is at least nSize. The \"only a suggestion\" wording in CreatePipe documentation allows the system to round the size, and in practice the NT pipe quota is set from nSize, so the quota is not reduced below the request. The residual risk is that the no-block property is an undocumented-in-API assumption (the C comment at lines 225-226 overstates it as a guarantee). That is a documentation and hardening gap, not a reachable defect. Also, the Host closes its own read end (handles[0]) in the done block (line ~166), so a child that exits produces ERROR_NO_DATA/BROKEN_PIPE and the write fails rather than blocks. The only caller (codex-probe) sends small JSON-RPC lines, which the finding itself concedes. Not run; read-only source review. Severity if it were real would be LOW, but as stated it is not a real defect."
+            }
+          ],
+          "confirmed": false
+        }
+      ]
+    },
+    {
+      "lens": "truth",
+      "summary": "Read-only review of M-A-3 T9R-F04 uncommitted diff against b693167 with focus on truthfulness of containment claims and liveness coverage. Five confirmed findings (one MEDIUM, four LOW); no BLOCKER/HIGH found. Did not run tests or touch processes. Items confirmed correct and not reported: stopContained wording for unconfirmed/admitted cases, the native terminate/close semantics re C1 (accepted), the containedSession stop-before-launch path, restart hold keys, and watchContainedJob settle logic for contained attempts.",
+      "repairVerdicts": [],
+      "rows": [
+        {
+          "lens": "truth",
+          "id": "F04-L1",
+          "severity": "MEDIUM",
+          "title": "Restart reconciliation records containment \"empty\" from a process-table absence, contradicting the README and contract",
+          "file": "src/lib/bunny-host/owned-process-group.server.ts",
+          "line": 128,
+          "reproduction": "A provider-session record with containment \"running\" and recorded member identities is left on disk when the Host exits. On restart, reconcileInterruptedProviderSessions (manager.server.ts:240-249) runs possiblyAlive over a process-table read (process-tree.server.ts processTable). When no recorded identity matches (for example the process is gone, or the Get-CimInstance read returns zero rows with exit 0), it calls reconcileProviderSession (owned-process-group.server.ts:124-129), which writes record.containment=\"empty\" and closed=true. No kernel ActiveProcesses reading exists after restart because the job is gone. The durable record and the event text (manager.server.ts:248, 'independent process-table read') therefore present a sample-based result as a kernel-backed 'empty'.",
+          "rootCause": "native/README.md:46-47 says a session ends as \"empty\" only on ActiveProcesses = 0, 'never because a process sample lacked a row'. contracts.ts defines \"empty\" the same way (kernel accounting, not the absence of rows in a sample). reconcileProviderSession reuses the same state word for the sample-absence outcome, so the README and the stored evidence disagree. An empty processTable() result is also accepted as a valid sample, since stdout that splits to no rows yields [] with no error.",
+          "repair": "Give the restart outcome its own state (for example containment \"unverified_absent\" or a reviewRequired-style flag) instead of \"empty\", and have the event say 'no recorded identity was found in a process-table read; kernel accounting unavailable after restart'. Treat an empty process-table result as a failed read (retry) rather than as a clean sample. Update native/README.md:46-47 if the wording stays.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Partially real, but overstated at MEDIUM.\n\nConfirmed in code:\n- owned-process-group.server.ts:127-128 reconcileProviderSession writes record.containment=\"empty\" and closed=true from a process-table absence check. No kernel ActiveProcesses reading exists on that path, because the job handle died with the previous Host.\n- contracts.ts:72 defines \"empty\" as kernel job accounting. native/README.md:46-47 says a session ends as \"empty\" only on ActiveProcesses = 0, never because a sample lacked a row. The stored state word therefore contradicts the documented contract for this outcome.\n- manager.server.ts:248 emits the event with \"independent process-table read\", so the event text is honest about its source. The durable record word is the mislabel.\n- The README restart paragraph (native/README.md:49-52) does not claim \"empty\" for restart, so the contradiction is with the state word and contracts.ts, not with that paragraph.\n- possiblyAlive (manager.server.ts:39-45) returns false when a PID is absent, and processTable (process-tree.server.ts:8-18) returns [] for empty stdout with exit 0. A zero-row read is therefore accepted as a clean sample, and check() (manager.server.ts:244, reading via .catch(() => null)) does not treat [] as a failed read. Get-CimInstance normally fails with a non-zero exit, which would be retried, so the zero-row-exit-0 path is unlikely but has no guard such as checking the host's own PID.\n\nWhy not MEDIUM: nothing is killed or falsely reported as safe to a user in a dangerous way. The kernel's KILL_ON_JOB_CLOSE already ended members when the previous Host's last job handle closed, and \"empty\" records are skipped on later restarts (owned-process-group.server.ts:109). The impact is a truthfulness/labeling defect in durable state plus a missing sanity guard on empty samples. Repair: a distinct state such as \"unverified_absent\", or stop writing \"empty\" on this path, and treat a zero-row table as a failed read."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted: the defect is real but its severity is LOW, not MEDIUM.\n\nCode path confirmed:\n- owned-process-group.server.ts:124-129 reconcileProviderSession sets record.containment=\"empty\" and closed=true with no kernel accounting read.\n- manager.server.ts:240-249 calls it when possiblyAlive (manager.server.ts:39-47) finds no recorded identity in a processTable() read. The event text at manager.server.ts:248 says \"independent process-table read\", not kernel accounting.\n- native/README.md:46-47 and contracts.ts:72 both say \"empty\" means ActiveProcesses = 0 and never comes from a sample lacking a row. So the stored state contradicts the documented contract.\n- readProviderSessions (owned-process-group.server.ts ~line 107) then skips any record with closed && containment===\"empty\", so the sample-based label permanently suppresses future restart checks.\n\nThe empty-sample nuance is also real: process-tree.server.ts:8-15 maps stdout that splits to no rows to [] with no error, so a zero-row successful read is accepted as a clean sample. A failed exec does not reach this path, because readProcesses().catch returns null and the check retries.\n\nWhy LOW rather than MEDIUM: the physical outcome is likely correct. The job's KILL_ON_JOB_CLOSE fired when the crashed Host's job handle closed, so the members were already ended by the kernel. The defect is a truthfulness and labeling error in the durable record and the event wording, not a surviving process or a missed kill. A zero-row successful Get-CimInstance result is implausible in practice. The repair stands: give the restart outcome its own state (for example unverified_absent), reword the event, and treat an empty process table as a failed read."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "truth",
+          "id": "F04-L2",
+          "severity": "LOW",
+          "title": "native/README.md says terminate waits 1.5 s, but the native code no longer waits",
+          "file": "native/README.md",
+          "line": 43,
+          "reproduction": "README line 43-44: '`terminate` calls `TerminateJobObject`, waits up to 1.5 s for accounting to reach zero, and keeps the handle'. native/bunny-owned-process.c:241 terminate_owned calls terminate_group(g,0), which returns after one accounting query. The JS side (adapters.server.ts terminateJob, 100 ms poll for up to 30 s) does the waiting. Conversely, close_group (c:78) still blocks the main thread for up to 1500 ms, and the README does not mention that blocking window.",
+          "rootCause": "README was not updated for the NATIVE-1/C4 repair (terminate returns immediately; JS polls). The documented wait location is wrong, and the remaining synchronous 1.5 s wait in close is undocumented.",
+          "repair": "Replace the README sentence with: terminate issues TerminateJobObject and returns the current ActiveProcesses at once; the Host polls every 100 ms up to 30 s and retries with backoff. Note that close waits up to 1.5 s synchronously on the main thread before the handle is dropped.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Confirmed as a real, documentation-only defect. native/README.md:43-44 says `terminate` \"waits up to 1.5 s for accounting to reach zero\". The code does not: native/bunny-owned-process.c:241-250 terminate_group(g,0) sets deadline = now+0, so the poll loop never runs and only one ActiveProcesses query is returned. terminate_owned at c:262 calls it that way, and the JS side (adapters.server.ts:306) polls owned.terminate() every 100 ms until 0 or 30 s. The README is stale relative to the NATIVE-1/C4 repair. The 1.5 s wait it describes now belongs to close: close_group (c:78) calls terminate_group(g,1500) on the main thread, and the writer-join loop at c:83 can add further blocking (first wait 1500 ms, then up to 19 more 100 ms waits). The README never mentions the close blocking window, and the README is the stated contract, so the mismatch is real. The finding's proposed repair understates the close window, which is up to ~3.4 s beyond the 1.5 s job wait, not just 1.5 s. No runtime behavior is wrong, so LOW stands."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "truth",
+          "id": "F04-L3",
+          "severity": "LOW",
+          "title": "Host-run Windows jobs without a session are invisible to liveCodeExecutions, F01 hold and F02 promotion",
+          "file": "src/lib/bunny-missions/manager.server.ts",
+          "line": 2725,
+          "reproduction": "The manual verification.record action (http.server.ts:664) calls verifyTask on a completed task, which runs python hello.py through runWindowsOwnedProcess (verification.server.ts:29, owner action verification.python) for up to 10 s. By that point TaskManager has already removed the session (manager.server.ts:1752 this.sessions.delete in finally), and the job is in neither bus.liveCode (bus.server.ts:331, set only for runsCode/git./github. actions) nor the lingering map. liveCodeExecutions (manager.server.ts:2725-2741) therefore returns nothing, so a paired-device change (remoteMutationHeld, line ~2753) or a staged promotion (line ~2646) proceeds during the run. The same gap applies to provider probes (adapters.server.ts:88 runWindowsOwnedProcess; codex-probe.server.ts:42-43 containedTransport), which are Windows jobs with no session. The in-loop verifySpec path is covered because the session entry still exists during it.",
+          "rootCause": "liveCodeExecutions is built from bus.liveCode, tasks.sessions and tasks.lingering only. Host-initiated owned jobs (verification, probes) register with none of them, so the lens 'every live contained job' does not hold for them. Practical exposure is limited: the verification source is pinned to a single print line, and probes run the provider catalogue calls rather than user code.",
+          "repair": "Register each Host-run owned job in a live set consulted by liveCodeExecutions (for example a Map keyed by operationId, added before spawn and removed on close with its final accounting), or document in native/README.md that Host verification and probe jobs are outside the F01/F02 hold by design.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted; the gap is real but narrow. Verified in code: (1) liveCodeExecutions (manager.server.ts:2725-2741) is built only from bus.liveCode, tasks.sessions and tasks.lingering. (2) bus.server.ts:331 registers liveCode only for runsCode or git./github. actions, and bus.server.ts:372 deletes it on settle. (3) http.server.ts:661-664 handles verification.record through verifyTask directly, bypassing the bus, so no liveCode entry exists for the python job, and it is local-only (workstation). (4) verification.server.ts:29 runs the interpreter through runWindowsOwnedProcess with owner verification.python, and nothing registers it with the manager. (5) manager.server.ts:2646 promotion and manager.server.ts:2753 remoteMutationHeld both consult liveCodeExecutions, so both proceed during a verification run. The impact is narrow. The run is pinned to the exact one-line hello.py (verification.server.ts:36-37 content check). A promotion to hello.py would have to land in the window between the content check and python reading the file, and that promotion has already been workstation-approved. The effect is that a verification could report on bytes other than those checked, and the F01/F02 \"cannot read the change mid-run\" contract is not upheld for this job class. native/README.md does not document host verification or probe jobs as excluded, so this is not a documented out-of-contract class. Provider probes (adapters.server.ts:88) run in host cwd with catalogue calls and are weaker still. LOW is the justified severity."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted. Code confirms the gap: liveCodeExecutions (manager.server.ts:2725-2741) is built only from bus.liveCode, tasks.sessions and tasks.lingering. bus.server.ts:331 adds to liveCode only for runsCode, git. and github. actions. The session is deleted in the finally block at manager.server.ts:1752 before any later verification. http.server.ts:661-664 (verification.record, local-only) calls verifyTask after completion, and verification.server.ts:29-47 runs python in a Windows job with owner action verification.python. That job is in none of the three sets, so remoteMutationHeld (manager.server.ts:2753) and the promotion hold (~2646) do not see it. Nothing else prevents it: the native README has no documented exclusion for verification or probe jobs, so this is not a documented out-of-contract class.\n\nRefinement the finding does not state: verifyTask reads hello.py and checks it against the pinned print line, then spawns python on the path. A paired-device write landing between that read and python's own read would execute unreviewed content, a TOCTOU that the F01 hold would otherwise close. This needs an already-approved device write to hello.py inside a window of roughly tens of milliseconds to 10 s, so exposure is narrow, which supports LOW.\n\nThe probe half of the claim is weaker. adapters.server.ts:88-92 runs fixed provider-catalogue argv with no user code, so it adds little to the exposure. The finding is still a real, if narrow, invariant gap, so it stands as LOW with the probe part downgraded in weight."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "truth",
+          "id": "F04-L4",
+          "severity": "LOW",
+          "title": "Launch-failure close records \"empty\" with no kernel count when the handle is null",
+          "file": "src/lib/bunny-host/owned-process-group.server.ts",
+          "line": 186,
+          "reproduction": "containedSession's non-launched catch calls group?.close(\"failed\") (adapters.server.ts, the refusal branch). OwnedProcessGroup.close (owned-process-group.server.ts:183-187) initialises active=0 and only reads the native count when this.handle is non-null. When native.launch threw, the handle is null, so the record's containment is set to \"empty\" with activeProcesses 0 with no kernel reading. The session is then settled as state \"refused\", admitted false, and stopContained/watchContainedJob treat it as settled with the detail 'No provider process was admitted'. The native failure paths (bunny-owned-process.c:168 and :172) do call close_group, so the root is probably gone, but the JS record asserts 'empty' from the null handle rather than from accounting.",
+          "rootCause": "close() treats a null handle as zero active processes. The 'empty' claim for a provider record is not conditioned on a kernel reading on this path.",
+          "repair": "When the handle is null and the record is a provider record, set containment to \"unconfirmed\" (or a distinct 'native-launch-failed' value) rather than \"empty\", or have native launch return the close count in its error object so the JS side can record it. Keep the 'refused' wording only when the native layer reports that no root was resumed.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Partly real, narrower than stated. The JS side is as described: OwnedProcessGroup.spawn (owned-process-group.server.ts:162) leaves this.handle null when native.launch throws, and close() (line 186) then records active=0 and containment \"empty\" with no kernel reading (the containment field is set because provider records start with containment \"running\"). adapters.server.ts:358 calls group.close(\"failed\") on that path and then settles state \"refused\", admitted false, with \"No provider process was admitted\" (line 362).\n\nThe finding's own premise is wrong for one native path. In bunny-owned-process.c, the failures at line 168 (ResumeThread) and at line 172 (input-writer CreateThread) both call close_group, but they are not equivalent. At line 168 the root is still suspended and never ran, so the \"refused / nothing admitted\" text is accurate. At line 172 ResumeThread has already succeeded, so the provider root has executed and may have spawned children. close_group then returns the kernel ActiveProcesses count from terminate_group (native line 74-79), but fail() (line 45-48) throws with only a stage and Win32 code, so that count is discarded. The JS catch then writes \"refused / admitted:false / empty / no process admitted\" for a root that did run, with no reading behind it. The job's KILL_ON_JOB_CLOSE still terminates members, so this is a truthfulness and accounting gap, not a demonstrated containment escape. Severity stays LOW. The repair in the finding is sound: return the count in the error object, or report \"unconfirmed\" when the root was resumed."
+            },
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Not refuted, but the finding is only partly right and understates the reachable case.\n\nConfirmed in code:\n- owned-process-group.server.ts close(): `let active=0; if(this.handle){active=this.native.close(this.handle)...}`. When native.launch throws, `this.handle` stays null (spawn assigns it only on success), so close() writes activeProcesses 0 and, for a provider record (containment set to \"running\" in the constructor), containment \"empty\" with no kernel reading.\n- adapters.server.ts ~357-363: a thrown error without `launched:true` takes the refusal branch: `group?.close(\"failed\")`, then `settle({state:\"refused\", admitted:false, ...})`, with the reason \"Containment unavailable — execution refused\".\n\nWhere the finding is imprecise: the native launch failure paths are not all \"no root ran\".\n- bunny-owned-process.c:168 (ResumeThread fails): the root was never resumed, and close_group kills the job. \"Empty\" is effectively true, though unmeasured.\n- Earlier failures (CreateProcess, IsProcessInJob, napi_create_external): no root was resumed. \"Empty\" is effectively true, though unmeasured.\n- bunny-owned-process.c:170-172 (CreateThread for the stdin writer fails): ResumeThread has already succeeded at line 168, so the root ran. Line 172 then calls close_group and returns NULL, and the JS side receives a plain throw with no `launched` flag. The record and session then state admitted:false, state \"refused\", containment \"empty\", and the detail that no provider process was admitted. The root was resumed, may have executed briefly and may have spawned children, which were then killed by the job close. The native count from close_group is discarded.\n\nThe writer path is taken on every provider launch (the prompt is always piped in), but CreateThread failure is rare (resource exhaustion), so the reachable window is narrow. Containment is not escaped: kill-on-close plus terminate_group(1500) kills all members. The defect is a truthfulness/accounting gap in the admitted flag and the \"empty\" containment claim, not a containment bypass. The repair should be native-side: have launch throw with `launched:true` (or return the close count) once ResumeThread has succeeded, so the JS side settles by accounting. A null-handle-to-\"unconfirmed\" change alone would not fix the admitted:false claim for the resumed-root case. Severity LOW is justified."
+            }
+          ],
+          "confirmed": true
+        },
+        {
+          "lens": "truth",
+          "id": "F04-L5",
+          "severity": "LOW",
+          "title": "Stop message says processes were terminated 'at Stop' when the count comes from an earlier root-exit termination",
+          "file": "src/lib/bunny-host/manager.server.ts",
+          "line": 1885,
+          "reproduction": "containedSession's done path terminates the job when the root exits (adapters.server.ts terminateJob), recording terminatedAtEnd from that earlier point. If the task is still in state running when a user Stop arrives (between done resolving and the loop's state update), stopContained calls session.stop(), which does nothing because group.live is false. It then reads state 'empty' and emits 'process(es) in the job at Stop were terminated with it', using the count from the earlier root-exit termination, not from Stop.",
+          "rootCause": "stopContained reuses terminatedAtEnd without recording which event produced it, so the 'at Stop' wording is not tied to the event that measured the count.",
+          "repair": "Change the text to 'in the job when it ended' unless the Stop itself performed the termination (for example by checking whether stop() called terminateJob), or record a terminatedBy field alongside terminatedAtEnd.",
+          "votes": [
+            {
+              "refuted": false,
+              "severityIfReal": "LOW",
+              "reasoning": "Confirmed as a real but cosmetic wording defect; not refuted. Code path: src/lib/bunny-host/manager.server.ts:1877-1885. stopContained calls session.stop() and then reads session.containment(). The stop() closure in src/lib/bunny-host/adapters.server.ts:391-394 only calls terminateJob when group.live is true. If the root already exited, terminateJob ran earlier (adapters.server.ts:296-330) and set terminatedAtEnd to the count measured at that root-exit point (line 303, `present`). When Stop then arrives, job.state is still \"empty\" and the manager emits \"...process(es) in the job at Stop were terminated with it\". The count is correct for the root-exit termination, but the \"at Stop\" timing is false.\n\nThe window is reachable. manager.server.ts:1523 resumes on session.done, and the loop then runs async work before the state moves to completed (for example the verify branch at ~1545, when current.verify is set). While the task is still \"running\" or \"verifying\" and not yet terminal, stopNow proceeds: canTransition(running, stopped) passes, and the stopContained text is produced. Nothing elsewhere prevents this.\n\nImpact is limited. The processes were in fact terminated by the job, and no kill authority or accounting is wrong. Only the attribution of the event in the user-visible stop reason is misleading. Repair as the finding suggests: word it \"in the job when it ended\" unless stop() itself performed the termination, or record a terminatedBy field next to terminatedAtEnd."
+            }
+          ],
+          "confirmed": true
+        }
+      ]
+    }
+  ]
+}

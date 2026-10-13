@@ -1,0 +1,105 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "library",
+      "test": "attempt ceiling: a step at its ceiling asks the user even when the failure was the Host restart",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T2: persisted validated facts do not make Codex routable after Host restart",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T3: Host restart marks active task failed and never claims session recovery",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "persisted provider state is shown after a Host restart but nothing routes until re-probed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T9R Host restart: same Host UUID, Agent and Mission; new epoch; pre-restart approval refused; paired device survives",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 restart fences old continuous-session callbacks",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V44 a Host restart never revives a voice session: the new Host starts closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T10-XG-13: Host restart invalidates a pending request; explicit retry creates a fresh decision",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "Host restart retains non-authoritative identity but must revalidate it before reuse",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E38: a Host restart invalidates staged changes and the old approval stays dead",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E23a: a Host restart invalidates a pending device offer; the device cannot answer it afterwards",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-E23b: a device answer held across a Host restart is stamped INVALIDATED_BY_HOST_RESTART and never executes",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-ST1: a Host restart invalidates a STAGED change (content kept), fails the step; Retry re-stages and promotion works once",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F02-R2-6: a promotion interrupted by a Host restart is reconciled from disk and, if it did not land, listed for review",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "recovery after a Host restart: interrupted steps are reported, never resumed; retry starts a fresh child",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "F01-8: a Host restart rejects stale remote approvals and trusted-desktop grants from the earlier epoch",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "A07/A08: pause survives a real Host restart; nothing resumes by itself; resume completes under the same envelope",
+      "result": "PASS"
+    },
+    {
+      "suite": "agent",
+      "test": "T11-I05: a Host restart mid-team reconciles once through the Coordinator; members open new generations and the team completes",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "V44 Host restart does not revive stale voice approvals: a Host epoch change drops the held proposal",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "policy": "Old voice operations are epoch-fenced; capture never restores without valid explicit-start policy."
+  },
+  "limitations": []
+}

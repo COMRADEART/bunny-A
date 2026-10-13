@@ -1,4 +1,10 @@
 import type { MissionSnapshot } from "../bunny-missions/types.ts";
+import type { OperationalHealth } from "./failure.server.ts";
+import type { ModelCapabilitySnapshot } from "./model-capability.server.ts";
+import type { ProviderUsageServiceSnapshot } from "./provider-usage.server.ts";
+import type { HostPresentation } from "./presentation.ts";
+import type { ReleaseIdentity } from "./release-identity.server.ts";
+import type { AgentSnapshot } from "./agent-types.ts";
 import type { Mode, OrchTask, Project, ProviderId, ProviderLive, HostSample, TaskConstraints, ProviderFeatures, TaskProgress, TokenUsage, UsageWindow, VerifySpec, ProcessInfo, TaskState, ProviderExecutionScope } from "../orch/types.ts";
 
 /** missionId is null for direct-task and system events (and for every event written before schema v3). */
@@ -9,24 +15,49 @@ export type PerformanceProfile = {
   /** Below this many tasks the profile is shown but has no routing weight. */
   minimumSamples?: number; sufficient?: boolean;
 };
+export type HostIdentity = { hostId: string; epoch: string; startedAt: number };
+export type SnapshotViewer =
+  | { kind: "workstation" }
+  | { kind: "device"; deviceId: string; name: string; role: "paired-device"; pairedAt: number; expiresAt: number; lastSeenAt: number | null; rights: string[] };
 export type HostSnapshot = {
   app: "Bunny-A";
   instanceId: string;
+  release?: ReleaseIdentity | null;
+  health?: OperationalHealth;
   tasks: OrchTask[];
   projects: Project[];
   providers: ProviderLive[];
   samples: HostSample[];
   events: HostEvent[];
   cursor: number;
+  /** Read-only, privacy-safe activity over the existing journal and capability records. */
+  presentation?: HostPresentation;
+  /** M-A-3 T10: workstation-only voice session state. Absent for paired devices and older Hosts. */
+  voice?: import("./voice/voice-protocol.ts").VoiceSnapshot;
   performance: PerformanceProfile[];
   remoteConfigured: boolean;
   remoteUrl?: string | null;
-  devices?: {id:string;name:string;createdAt:number}[];
+  devices?: {id:string;name:string;createdAt:number;expiresAt?:number;lastSeenAt?:number|null}[];
+  /** M-A-3 T9: stable installation identity plus the per-boot epoch (the instanceId). Optional: older clients ignore it. */
+  hostIdentity?: HostIdentity;
+  /** M-A-3 T9: who this snapshot was projected for. Never carries a credential or its hash. */
+  viewer?: SnapshotViewer;
   thermal: {cpuWarn:number;gpuWarn:number;autoStop:boolean};
   /** M-A-0 mission layer. Optional: older clients ignore it; when missions are disabled it reports enabled:false. */
   missions?: MissionSnapshot;
+  /** M-A-3 T1 per-model capability facts (probed only). Optional: older clients ignore it. */
+  modelCapabilities?: ModelCapabilitySnapshot;
+  /** M-A-3 T2 normalized provider usage truth (derived from registry state and Bunny's own counters). Optional: older clients ignore it. */
+  providerUsage?: ProviderUsageServiceSnapshot;
+  /** M-A-3 T4 durable Agent runtime snapshot (agent-level continuity state). Optional: older clients ignore it. */
+  agents?: AgentSnapshot;
+  /** M-A-3 T13 Personal Agent slots projected onto live Host facts (presentation only). Optional: older clients ignore it. */
+  personalAgents?: import("./personal-agents.ts").PersonalAgentsSnapshot;
+  /** M-A-3 T13.1 Laya/Jev intelligence state (no secrets; credential existence only). Absent for paired devices. */
+  intelligence?: import("./intelligence-snapshot.ts").IntelligenceSnapshot;
 };
-export type SubmitTask = { prompt: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope };
+/** `routingPrompt` and `modelOverride` are set in-process by the caller that knows the selection context; HTTP validates both. */
+export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; /** M-A-3 T3 §27: MANUAL exact-model selection; only honored where a real model surface exists. */ modelOverride?: string | null; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope; /** M-A-3 T13.1: Host-owned decision assistance (advisory only); never accepted from HTTP bodies. */ decisionAssistance?: import("./intelligence.ts").DecisionAdvice | null };
 export type AdapterResult = { ok: boolean; output: string; error?: string; stopped?: boolean; exitCode?: number | null };
 export type AdapterHooks = {
   event: (type: string, detail: string) => void;
@@ -39,6 +70,24 @@ export type AdapterHooks = {
   rateLimits?: (windows: UsageWindow[], status?: string) => void;
   /** Raw provider stdout/stderr lines, kept in the Host's private session transcript. */
   raw?: (stream: "stdout" | "stderr", text: string) => void;
+  /** M-A-3 T9R-F04: who owns a contained provider process (job record identity; confers no authority). */
+  owner?: ProviderProcessOwner;
+};
+export type ProviderProcessOwner = { dataDirectory: string | null; hostGeneration: string; taskId: string; missionId: string | null; agentId: string | null };
+/**
+ * M-A-3 T9R-F04: lifetime of a local provider process tree as the Windows job reports it. "empty" is kernel
+ * accounting (ActiveProcesses 0 after the job was terminated), never the absence of rows in a process sample.
+ */
+export type SessionContainment = {
+  mechanism: "windows-job-object";
+  state: "launching" | "running" | "terminating" | "empty" | "unconfirmed" | "refused";
+  /** A provider process was created in the job (false: stopped or refused before any process existed). */
+  admitted: boolean;
+  operationId: string | null; rootPid: number | null; rootCreatedAt: number | null;
+  activeProcesses: number | null; totalProcesses: number | null;
+  /** Processes still in the job when the root ended or Stop arrived; all were terminated with the job. */
+  terminatedAtEnd: number | null;
+  detail: string;
 };
 export type RunningSession = {
   stop: () => Promise<void>;
@@ -46,6 +95,8 @@ export type RunningSession = {
   /** Root process of the owned session, when there is one. */
   pid?: () => number | null;
   sendInput?: (input: string) => Promise<void>;
+  /** Present only for a job-contained local process tree (M-A-3 T9R-F04). */
+  containment?: () => SessionContainment;
 };
 /**
  * Provider adapter contract. Session-level operations (getSession, streamEvents, stop, sendInput by

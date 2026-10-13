@@ -1,0 +1,59 @@
+{
+  "hostDeathDuringSpeech": [
+    {
+      "id": "B10",
+      "title": "Host disconnect during speech (Host process killed; F04 job closes; worker and its audio die)",
+      "turnIdInterrupted": "t14-typed-326bd6c7",
+      "generationBefore": 9,
+      "workerPidsBefore": "29748",
+      "hostKilledAt": 1791690242962,
+      "workerGoneAfterMs": 341,
+      "detectionToSilenceMs": null,
+      "staleSpeechResumed": false,
+      "finalState": "HOST_DEAD",
+      "note": "Audible stop is the worker process ending with the Host's job (waveOut handle released by the OS). Process-exit time includes the poll interval."
+    }
+  ],
+  "deterministic": [
+    {
+      "suite": "scripts",
+      "name": "V46: Listening requires worker capture AND a fresh poll; otherwise the panel says Reconnecting",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V44 a Host restart never revives a voice session: the new Host starts closed",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "V21 late model deltas and worker playback events from the cancelled generation never restart speech",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-XG-13: Host restart invalidates a pending request; explicit retry creates a fresh decision",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "name": "T10-XG-05: restart discards a one-time decision that has not begun GUI execution",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V21 late model callbacks do not restart playback: a finished session never reads Speaking",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V43 voice state survives UI reconnect: a parsed dashboard snapshot is the same truth and stale reads reconnect",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "name": "V44 Host restart does not revive stale voice approvals: a Host epoch change drops the held proposal",
+      "result": "PASS"
+    }
+  ]
+}

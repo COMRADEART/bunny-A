@@ -1,0 +1,33 @@
+{"probe":"SR06-EVENT-ALIAS","leakedFields":["tasks.0.latestEvent.detail"]}
+✖ SR06-EVENT-ALIAS: remote project.get must mask provider-output aliases on active team Tasks (2764.7893ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3116.6109
+
+✖ failing tests:
+
+test at test-results\ma3\t11\review-surfaces\sr06-alias-probes.test.ts:26:1
+✖ SR06-EVENT-ALIAS: remote project.get must mask provider-output aliases on active team Tasks (2764.7893ms)
+  AssertionError [ERR_ASSERTION]: Remote Project detail must not publish provider output via latest activity
+  + actual - expected
+  
+  + [
+  +   'tasks.0.latestEvent.detail'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t11/review-surfaces/sr06-alias-probes.test.ts:42:12)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'tasks.0.latestEvent.detail' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

@@ -4,10 +4,14 @@ import { analyze } from "../orch/router.ts";
 import type { Mode, ProviderId, TaskType, VerifySpec } from "../orch/types.ts";
 import { validateVerifySpec } from "../bunny-host/verification.server.ts";
 import { validateGraph } from "./machine.ts";
+import { operationContract } from "./cross-app.ts";
 import type { ArtifactType, JsonValue, MissionLimits, MissionStep, StepExecutor, VerificationCriterion } from "./types.ts";
 
 export const PLANNER_ID = "bunny-planner-deterministic-v1";
 export type StepDraft = {
+  crossApp?: import("./cross-app.ts").CrossAppMetadata;
+  /** M-A-3 T11: Host-built team metadata; step references inside it use draft keys until plan() assigns ids. */
+  team?: import("./team.ts").StepTeam;
   key: string; role: string; objective: string; dependsOn: string[]; executor: StepExecutor; requiredCapabilities: string[];
   reasoning: MissionStep["reasoning"]; access: "read" | "write"; isolation: "shared" | "worktree"; preferences: MissionStep["preferences"];
   providerConstraints: MissionStep["providerConstraints"]; verification: VerificationCriterion[]; expectedArtifacts: ArtifactType[];
@@ -136,6 +140,17 @@ function criteria(value: unknown): VerificationCriterion[] {
   if (!Array.isArray(value) || value.length > 6) throw new Error("verification must be an array of at most 6 criteria.");
   return value.map((raw) => {
     const item = raw as Record<string, unknown>;
+    if (!item || typeof item !== "object") throw new Error("Invalid verification criterion.");
+    if (item.kind === "capability") {
+      const expect = item.expect as Record<string, unknown> | undefined;
+      const contract = typeof item.action === "string" ? operationContract(item.action) : null;
+      const params = item.params ?? {};
+      if (!contract || contract.sideEffect !== "READ" || !params || typeof params !== "object" || Array.isArray(params) || JSON.stringify(params).length > 8000
+        || !expect || typeof expect.field !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,40}$/.test(expect.field) || ["__proto__", "constructor", "prototype"].includes(expect.field)
+        || !Object.hasOwn(expect, "equals") && (typeof expect.contains !== "string" || !expect.contains.length || expect.contains.length > 2000)) throw new Error("Capability verification needs a supported read operation and a concrete bounded expectation.");
+      return { kind: "capability", action: item.action as string, params: params as Record<string, JsonValue>, expect: { field: expect.field, ...(Object.hasOwn(expect, "equals") ? { equals: expect.equals as JsonValue } : { contains: expect.contains as string }) } };
+    }
+    if (item.kind === "capability_run" && Number.isSafeInteger(item.expectExit) && typeof item.stdoutIncludes === "string" && item.stdoutIncludes.length > 0 && item.stdoutIncludes.length <= 2000) return { kind: "capability_run", expectExit: Number(item.expectExit), stdoutIncludes: item.stdoutIncludes };
     if (item.kind === "task_spec") return { kind: "task_spec", spec: validateVerifySpec(item.spec) as VerifySpec };
     if (item.kind === "file_exists" && typeof item.path === "string" && item.path.length < 500) return { kind: "file_exists", path: item.path, ...(typeof item.contains === "string" ? { contains: item.contains.slice(0, 2000) } : {}) };
     if (item.kind === "command" && typeof item.command === "string" && Array.isArray(item.args) && item.args.every((arg) => typeof arg === "string") && item.args.length <= 32) return { kind: "command", command: item.command, args: item.args as string[], expectExit: Number.isInteger(item.expectExit) ? Number(item.expectExit) : 0, ...(typeof item.timeoutMs === "number" ? { timeoutMs: Math.min(item.timeoutMs, 30 * 60_000) } : {}) };
@@ -168,7 +183,23 @@ export function explicitPlan(value: unknown, context: Pick<PlanContext, "mode" |
     const access = item.access === "write" ? "write" : "read";
     const isolation = item.isolation === "worktree" ? "worktree" : "shared";
     const timeoutMs = Math.max(30_000, Math.min(Number(item.timeoutMs ?? (executor.kind === "model" ? MODEL_TIMEOUT[context.mode] : 10 * 60_000)) || 60_000, 60 * 60_000));
+    let crossApp: StepDraft["crossApp"];
+    if (item.crossApp !== undefined) {
+      if (item.crossApp !== true && (!item.crossApp || typeof item.crossApp !== "object" || Array.isArray(item.crossApp))) throw new Error("Invalid cross-app metadata.");
+      const inputs = item.crossApp === true ? [] : (item.crossApp as Record<string, unknown>).inputs ?? [];
+      if (!Array.isArray(inputs) || inputs.length > 1) throw new Error("Cross-app input references must be a bounded array.");
+      crossApp = { version: "ma3.cross-app.v1", inputs: inputs.map(rawInput => {
+        const ref = rawInput as Record<string, unknown>;
+        if (!ref || ref.parameter !== "content" || ref.field !== "text" || !Number.isInteger(ref.step) || !(deps as number[]).includes(Number(ref.step))
+          || executor.kind !== "capability" || executor.action !== "filesystem.write") throw new Error("Only a verified dependency's text may supply file content; executable/resource identities remain concrete.");
+        return { parameter: "content", field: "text", stepId: `s${Number(ref.step) + 1}` };
+      }) };
+      if (executor.kind === "capability" && !operationContract(executor.action)) throw new Error("Unsupported cross-app operation; no adapter invented.");
+      if (executor.kind === "skill") throw new Error("Cross-app skill expansion requires a reviewed pinned operation catalog; use explicit bounded steps.");
+      if (!criteria(item.verification).length) throw new Error("Every cross-app step requires an independent postcondition.");
+    }
     return draft(`s${index + 1}`, {
+      ...(crossApp ? { crossApp } : {}),
       role, objective, executor, dependsOn: (deps as number[]).map((dep) => `s${dep + 1}`), access, isolation, timeoutMs,
       reasoning: executor.kind === "model" ? "standard" : "none",
       requiredCapabilities: executor.kind === "capability" ? [executor.action] : access === "write" ? ["filesystem.write"] : [],

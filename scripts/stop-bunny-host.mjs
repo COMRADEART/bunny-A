@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
-const credentials=JSON.parse(readFileSync(".bunny-a/credentials.json","utf8"));
+import { join } from "node:path";
+import { developmentStateDirectory } from "../src/lib/bunny-host/state-paths.server.ts";
+const credentials=JSON.parse(readFileSync(join(developmentStateDirectory(),"credentials.json"),"utf8"));
 const root=`http://127.0.0.1:${credentials.port}`;
 const health=await (await fetch(`${root}/health`)).json();
 if(health.app!=="Bunny-A" || health.instanceId!==credentials.instanceId || health.pid!==credentials.pid) throw new Error("Host ownership mismatch; no process stopped.");

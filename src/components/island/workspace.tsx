@@ -1,1 +1,1 @@
-export { Island } from "./desktop";
+export { Island } from "./premium";

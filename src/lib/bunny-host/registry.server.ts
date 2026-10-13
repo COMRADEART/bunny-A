@@ -2,6 +2,7 @@ import type { ProviderId, ProviderLive } from "../orch/types.ts";
 import { FEATURES, providerBase } from "./adapters.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
 import type { HostDatabase } from "./persistence.server.ts";
+import { safeError } from "./failure.server.ts";
 
 export type RegistryTiming = {
   /** Full probes spawn CLIs (version, sign-in, catalogue); run them rarely. */
@@ -17,7 +18,8 @@ export const SESSION_USAGE = "Reported by the provider during a Bunny-A session"
 
 /** Fields whose change is a real status change. Usage percentages and probe timestamps are not. */
 export function materialSignature(provider: ProviderLive): string {
-  return JSON.stringify([provider.availability, provider.installed, provider.authenticatedState ?? null, provider.version ?? null, provider.executable ?? null, provider.current_model, [...(provider.models ?? [])].sort(), [...(provider.capabilities ?? [])].sort()]);
+  const security = provider.securityCompatibility;
+  return JSON.stringify([provider.availability, provider.installed, provider.authenticatedState ?? null, provider.version ?? null, provider.executable ?? null, provider.current_model, [...(provider.models ?? [])].sort(), [...(provider.capabilities ?? [])].sort(), security ? [security.policyVersion, security.compatibilityClass, security.reason, security.executable?.executablePath, security.executable?.sha256, security.readIsolationValidated, security.writeIsolationValidated] : null]);
 }
 export function describeChange(before: ProviderLive | undefined, after: ProviderLive): string {
   if (!before) return `${after.name}: ${after.availability.replaceAll("_", " ")}${after.version ? ` (${after.version})` : ""}`;
@@ -26,6 +28,8 @@ export function describeChange(before: ProviderLive | undefined, after: Provider
   if ((before.authenticatedState ?? null) !== (after.authenticatedState ?? null)) parts.push(`sign-in ${before.authenticatedState ?? "unknown"} → ${after.authenticatedState ?? "unknown"}`);
   if ((before.version ?? null) !== (after.version ?? null)) parts.push(`version ${before.version ?? "none"} → ${after.version ?? "none"}`);
   if ((before.executable ?? null) !== (after.executable ?? null)) parts.push(`executable ${after.executable ?? "removed"}`);
+  const oldSecurity = before.securityCompatibility; const security = after.securityCompatibility;
+  if (JSON.stringify([oldSecurity?.policyVersion, oldSecurity?.compatibilityClass, oldSecurity?.reason, oldSecurity?.executable?.sha256]) !== JSON.stringify([security?.policyVersion, security?.compatibilityClass, security?.reason, security?.executable?.sha256])) parts.push(`Mission compatibility ${security?.compatibilityClass ?? "check required"}${security ? `: ${security.reason}` : ""}`);
   if (before.current_model !== after.current_model) parts.push(`model ${before.current_model ?? "none"} → ${after.current_model ?? "none"}`);
   if (!parts.length) parts.push("models or capabilities changed");
   return `${after.name}: ${parts.join(", ")}`;
@@ -77,15 +81,17 @@ export class ProviderRegistry {
         if (!due && adapter.health) next = await adapter.health(previous!);
         if (!next) { next = await adapter.detect(); this.fullAt.set(adapter.id, now); if (next.usageObservedAt) this.usageAt.set(adapter.id, now); }
         else if (adapter.usage && now - (this.usageAt.get(adapter.id) ?? 0) >= this.timing.usageMs && next.authenticated) {
-          const usage = await adapter.usage().catch(() => null);
+          // T2: a usage read that yields nothing is recorded as a failed attempt on the live record;
+          // previous windows survive untouched, so the usage service can show them as stale rather than current.
+          const attempt = await adapter.usage().then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
           this.usageAt.set(adapter.id, now);
-          next = applyUsage({ ...next }, usage);
+          next = attempt.ok && attempt.value ? applyUsage({ ...next }, attempt.value) : this.markUsageFailure({ ...next }, now, attempt.ok ? null : attempt.error);
         }
+        next.features = adapter.capabilities?.() ?? next.features ?? FEATURES[adapter.id];
       } catch (error) {
-        next = { ...providerBase(adapter.id), availability: "unknown", detail: `Discovery failed: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`, probedAt: now };
+        next = { ...providerBase(adapter.id), availability: "unknown", detail: `Discovery failed: ${safeError(error).message.split("\n")[0]}`, probedAt: now };
         this.fullAt.set(adapter.id, now);
       }
-      next.features = adapter.capabilities?.() ?? next.features ?? FEATURES[adapter.id];
       // Usage that only arrives inside sessions (Claude Code) survives re-probes, keeping its report time.
       if (!adapter.usage && !next.usageWindows?.length && previous?.usageWindows?.length && previous.usage_note === SESSION_USAGE) next = applyUsage(next, { windows: previous.usageWindows, observedAt: previous.usageObservedAt ?? now }, SESSION_USAGE);
       next = this.withLimit(next, now);
@@ -100,11 +106,15 @@ export class ProviderRegistry {
     const adapter = this.adapters.find((candidate) => candidate.id === id);
     const current = this.providers.get(id);
     if (!adapter?.usage || !current?.authenticated) return;
-    const usage = await adapter.usage().catch(() => null);
+    const attempt = await adapter.usage().then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
     this.usageAt.set(id, Date.now());
-    const next = applyUsage({ ...current }, usage);
+    const next = attempt.ok && attempt.value ? applyUsage({ ...current }, attempt.value) : this.markUsageFailure({ ...current }, Date.now(), attempt.ok ? null : attempt.error);
     this.providers.set(id, next);
     this.db.db.prepare("UPDATE providers SET record=? WHERE id=?").run(JSON.stringify(next), id);
+  }
+  /** Marks a usage read that produced no data. Previous windows are never erased or overwritten. */
+  private markUsageFailure(live: ProviderLive, now: number, error: unknown): ProviderLive {
+    return { ...live, usage_failed_at: now, ...(error ? { usage_error: safeError(error).message.split("\n")[0] } : {}) };
   }
   /** Usage windows a running session reported itself (Claude Code rate-limit events), with the provider's verdict. */
   recordSessionUsage(id: ProviderId, windows: ProviderLive["usageWindows"], status?: string) {
@@ -129,6 +139,8 @@ export class ProviderRegistry {
 export function applyUsage(live: ProviderLive, usage: { windows: NonNullable<ProviderLive["usageWindows"]>; observedAt: number } | null, note?: string): ProviderLive {
   if (!usage) return live;
   live.usageWindows = usage.windows; live.usageObservedAt = usage.observedAt;
+  // Fresh provider-reported data reasserts itself: a previous failed attempt no longer applies.
+  live.usage_failed_at = null; live.usage_error = null;
   const kinds = new Set(usage.windows.map((window) => window.kind));
   live.usageCapabilities = { ...(live.usageCapabilities ?? { tokenUsage: false, activeJobs: true, source: "provider" }), shortWindow: kinds.has("short"), weekly: kinds.has("weekly"), resetTime: usage.windows.some((window) => window.resetsAt !== null) } as NonNullable<ProviderLive["usageCapabilities"]>;
   live.usage_note = usage.windows.length ? note ?? live.usage_note : "Usage unavailable";

@@ -1,0 +1,122 @@
+{
+  "failuresRetained": true,
+  "unresolvedRequiredGateFailures": 0,
+  "repairs": [
+    {
+      "evidence": [
+        "baseline-regression.log",
+        "baseline-regression-elevated.log",
+        "baseline-ui.log"
+      ],
+      "issue": "Sandbox Windows temp/ownership restrictions",
+      "repair": "Ordinary approved baseline rerun; all 950 pass"
+    },
+    {
+      "evidence": [
+        "typecheck-attempt1.log",
+        "typecheck-attempt2.log",
+        "typecheck-attempt3.log",
+        "typecheck-attempt4.log",
+        "typecheck.log",
+        "lint-attempt1.log",
+        "lint.log"
+      ],
+      "issue": "Integration typing/lint",
+      "repair": "Narrowing/JsonValue projection and control-character validation repaired"
+    },
+    {
+      "evidence": [
+        "integration-attempt1.log",
+        "integration-attempt2.log",
+        "integration-attempt3.log"
+      ],
+      "issue": "Runner force-exit/socket handling; T5 guard precedence; standalone scratch location",
+      "repair": "Existing runner contracts/guard precedence preserved, Mission-state workspace fallback"
+    },
+    {
+      "evidence": [
+        "focused-attempt1.log",
+        "focused-attempt2.log",
+        "focused-attempt3.log",
+        "focused-final.log"
+      ],
+      "issue": "Sandbox rename; invalid new-test close call",
+      "repair": "Approved rerun; remove nonexistent fixture method"
+    },
+    {
+      "evidence": [
+        "full-regression-attempt1.log",
+        "full-regression.log"
+      ],
+      "issue": "T7 introduced generic command-data leak; existing T5 assertion detected it",
+      "repair": "Explicit Project action projection whitelist; original test unchanged and new regression"
+    },
+    {
+      "evidence": [
+        "full-regression-attempt2.log",
+        "helper-cleanup-rerun.log",
+        "full-regression.log"
+      ],
+      "issue": "Pre-existing Git-helper cleanup EPERM during concurrent fixture suites",
+      "repair": "Isolated unchanged helper passes; isolated final full run passes"
+    },
+    {
+      "evidence": [
+        "full-regression-attempt3.log",
+        "full-regression.log",
+        "source-provenance.json"
+      ],
+      "issue": "New retention test expected zero after inserting stopped Agent",
+      "repair": "Correct new fixture count only, commit 8b71167; final 989 pass"
+    },
+    {
+      "evidence": [
+        "ui-fixture-repair.json",
+        "project-ui-acceptance.json"
+      ],
+      "issue": "Pending fixture lacked independent verification; absent desktop sheet",
+      "repair": "Canonical API stopped rejected seed/replaced it; route Mission links through existing Home"
+    },
+    {
+      "evidence": [
+        "smoke-dev.log",
+        "smoke-built-attempt1.log",
+        "smoke-built-final.log",
+        "smoke-built-aligned.log",
+        "smoke-built-pin.log"
+      ],
+      "issue": "Shadowed browser runtime / unavailable baseline / mismatched fixture data",
+      "repair": "Installed browser, completed sequential baseline, same inherited T6 Host; final exact-pin comparison no divergence"
+    },
+    {
+      "evidence": [
+        "production-before.json",
+        "production-final.json"
+      ],
+      "issue": "Initial shadowed LOCALAPPDATA probe; missing full initial production byte snapshot",
+      "repair": "Absolute-path read-only final audit; initial byte equality remains explicitly NOT TESTED"
+    },
+    {
+      "evidence": [
+        "preview-refresh.json",
+        "preview-refresh.log"
+      ],
+      "issue": "Preview fixture down",
+      "repair": "Idempotent unchanged startup starts only down disposable Host; no process terminated"
+    },
+    {
+      "evidence": [
+        "long-path-project.json"
+      ],
+      "issue": "Approval review usage limit; first invocation did not execute",
+      "repair": "Normal approval retry after user continuation succeeded"
+    },
+    {
+      "evidence": [
+        "regression-inventory.json"
+      ],
+      "issue": "Assembly compared raw checkout CRLF against Git blobs",
+      "repair": "Git-filtered hash comparison proves every existing test unchanged"
+    }
+  ]
+}

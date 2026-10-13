@@ -1,0 +1,125 @@
+{
+  "classification": "DERIVED retained observations plus final source-pinned SYNTHETIC/fixture regression; not a new human/device trial",
+  "sourceCommit": "86cc164d103edb97b7c39de0f520bc37d40e1db4",
+  "tests": [
+    {
+      "suite": "library",
+      "test": "T4: restart marks history interrupted without trusting a persisted PID or handle",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F4: a follow-up answers an Agent or a Mission from its canonical state; unrecorded values are said to be unrecorded",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r5: typed input drops a held fragment, so stale words can never confirm a newer proposal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r5: a spoken control after a held fragment is routed on its own, never joined into chat",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r5: a fragment built turn never confirms, and mute drops a held fragment",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R2-authz#3 a named target is kept alongside an ordinal word, so the session can check the name",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F4 follow-up questions are agent_followup with their focus, never chat",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 review r5: Bunny acting in any tense, Agent/Mission state and noun-participle fragments are claims; negated, hypothetical and figurative uses are not",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "V34 an ambiguous agent name asks for clarification and the next turn picks by ordinal",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-privacy#0 a paired device never receives a voice turn's prompt, its spoken history or its transcript",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "R1-authz#0 pickCandidate takes only an exact name or a bare ordinal as a clarification answer",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F4: a follow-up answers a finished Agent from its live state, and reports no invented progress",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F4: a follow-up with no referent is answered from the general status, and an ordinal with no referent asks",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F4: the referent expires after referentTtlMs and is never reused",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F4: a name that is no Host subject, with no referent, is an ordinary question and goes to chat",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F8: a Host-facts answer is kept in the spoken history, marked as Host facts, and the history ends with the session",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "T12 F8: a proposal id never reaches the spoken history or a chat prompt",
+      "result": "PASS"
+    },
+    {
+      "suite": "library",
+      "test": "A28 new generation retains history and requires fresh reviewed consent",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T5: retention gap discards UI history and marks canonical resync",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T5: a fast restart requests full canonical history even without connection loss",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "T5: a 500-event backlog resumes the delivered cursor instead of skipping history",
+      "result": "PASS"
+    },
+    {
+      "suite": "ui",
+      "test": "missing sensors remain unavailable and gaps remain in telemetry history",
+      "result": "PASS"
+    }
+  ],
+  "observations": {
+    "endurance": "42 minutes / 23 spoken turns",
+    "liveRechecks": "live-recheck-results.json",
+    "source": "voice-endurance-results.json"
+  },
+  "limitations": [
+    "The 30+ turn aim was not achieved.",
+    "Warm substantive model answers remain slow under Agent load."
+  ]
+}

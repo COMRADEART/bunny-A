@@ -1,0 +1,1 @@
+Aborted first attempt (git-archive checkout: not a git repository, native whisper runtime not staged). 8 environmental script failures: 1 release test needs a git repository, 7 whisper tests need the ignored native/voice/vendor runtime. Stopped during the library lane. Not counted; superseded by regression-final, run in a detached git worktree of the same pin.

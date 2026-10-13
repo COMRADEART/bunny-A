@@ -58,9 +58,11 @@ if (process.platform !== "win32") {
     }
     mkdirSync(join(root, ".grok"), { recursive: true });
     const log = openSync(join(root, ".grok/preview-windows.log"), "a");
+    const lastBuild = JSON.parse(readFileSync(join(root, "node_modules/.nitro/last-build.json"), "utf8"));
+    const desktop = lastBuild.outputDir === "../../../.output" && JSON.parse(readFileSync(join(root, ".output/nitro.json"), "utf8")).preset === "node-middleware";
     const child = spawn(
       process.execPath,
-      [wrapper, process.execPath, join(root, "node_modules/vite/bin/vite.js"), "preview"],
+      desktop ? [wrapper, process.execPath, join(root, "scripts/preview-node-middleware.mjs")] : [wrapper, process.execPath, join(root, "node_modules/vite/bin/vite.js"), "preview"],
       {
         cwd: root,
         detached: true,

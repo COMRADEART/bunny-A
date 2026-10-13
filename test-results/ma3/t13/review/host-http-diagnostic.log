@@ -1,0 +1,95 @@
+Bunny-A Host ready on loopback (db168074-2cd5-4ee1-bcf6-54e98bf865d5).
+✖ T13 configure saves the four slots durably: a Host restart on the same state reads them back (1009.5771ms)
+Bunny-A Host ready on loopback (d15dd05e-8c48-4095-a65c-7116678aa6f6).
+✖ T13 configure refuses a stale view, an invalid binding and malformed slots; nothing changes on refusal (459.4231ms)
+Bunny-A Host ready on loopback (0314ddfb-ec07-44ec-834f-421c1129f260).
+✖ T13 configure is workstation-only: a paired device is refused and reads the same slots read-only (1079.1923ms)
+Bunny-A Host ready on loopback (1be0bac1-ae9e-4a47-b106-bca5e332ec29).
+✖ T13 the save is journaled and touches no Agent or Mission; the schema and user_version are unchanged (1081.1383ms)
+Bunny-A Host ready on loopback (7c537762-81ca-4881-837a-0deed0d0fc00).
+✖ T13 the personal agents projection rides on the workstation snapshot before any device redaction (1129.1355ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5218.5332
+
+✖ failing tests:
+
+test at src\lib\bunny-host\personal-agents-host.test.ts:98:1
+✖ T13 configure saves the four slots durably: a Host restart on the same state reads them back (1009.5771ms)
+  Error: EPERM, Permission denied: \\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-3QEkzO '\\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-3QEkzO'
+      at rmSync (node:fs:1222:18)
+      at cleanup (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:95:3)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:130:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\\AC\\Temp\\bunny-t13-personal-3QEkzO',
+    syscall: 'rm'
+  }
+
+test at src\lib\bunny-host\personal-agents-host.test.ts:134:1
+✖ T13 configure refuses a stale view, an invalid binding and malformed slots; nothing changes on refusal (459.4231ms)
+  Error: EPERM, Permission denied: \\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-LOVJcj '\\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-LOVJcj'
+      at rmSync (node:fs:1222:18)
+      at cleanup (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:95:3)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:176:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\\AC\\Temp\\bunny-t13-personal-LOVJcj',
+    syscall: 'rm'
+  }
+
+test at src\lib\bunny-host\personal-agents-host.test.ts:180:1
+✖ T13 configure is workstation-only: a paired device is refused and reads the same slots read-only (1079.1923ms)
+  Error: EPERM, Permission denied: \\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-vw5PpB '\\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-vw5PpB'
+      at rmSync (node:fs:1222:18)
+      at cleanup (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:95:3)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:210:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\\AC\\Temp\\bunny-t13-personal-vw5PpB',
+    syscall: 'rm'
+  }
+
+test at src\lib\bunny-host\personal-agents-host.test.ts:214:1
+✖ T13 the save is journaled and touches no Agent or Mission; the schema and user_version are unchanged (1081.1383ms)
+  Error: EPERM, Permission denied: \\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-4ZOqo7 '\\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-4ZOqo7'
+      at rmSync (node:fs:1222:18)
+      at cleanup (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:95:3)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:260:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\\AC\\Temp\\bunny-t13-personal-4ZOqo7',
+    syscall: 'rm'
+  }
+
+test at src\lib\bunny-host\personal-agents-host.test.ts:264:1
+✖ T13 the personal agents projection rides on the workstation snapshot before any device redaction (1129.1355ms)
+  Error: EPERM, Permission denied: \\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-gpLAH0 '\\?\C:\Users\allam\AppData\Local\Packages\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\AC\Temp\bunny-t13-personal-gpLAH0'
+      at rmSync (node:fs:1222:18)
+      at cleanup (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:95:3)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/personal-agents-host.test.ts:280:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\allam\\AppData\\Local\\Packages\\sandbox.{8cb4af55-caf9-4b32-a792-04ab6314709a}\\AC\\Temp\\bunny-t13-personal-gpLAH0',
+    syscall: 'rm'
+  }

@@ -1,0 +1,203 @@
+{
+  "schema": "bunny-review/1",
+  "round": 4,
+  "scope": "git diff a23fd8e..e80d313 (08aab35, e80d313)",
+  "method": "3 independent lens reviewers (host-races, worker-vad, authority-intent), each finding adversarially verified by a separate agent",
+  "reviewedAt": "2026-10-11",
+  "findings": [
+    {
+      "id": "M-A-3-T10-D1",
+      "severity": "MEDIUM",
+      "file": "src/lib/bunny-host/voice/voice-intent.ts",
+      "title": "Lead word before a question lets sensitive synonym and exec phrasing reach chat",
+      "scenario": "normalizeTranscript strips the lead word, and the stripped rest matches QUESTION. isSensitive() then returns false before its SYN_WINDOW, SYN_STANDALONE and EXEC checks, and classifyTranscript skips the raw-text recheck because QUESTION now matches normalized. Probe results (proposalPending false). \"Stop, is it okay to accept it?\": before sensitive_refused, now chat. \"No, is it ok to restart the server\": before sensitive_refused, now chat. \"No, is it okay to reboot the machine\": before sensitive_refused, now chat. \"sorry, is it ok to ship it\": before sensitive_refused, now chat. \"wait, should i ratify it\" with a pending proposal: before sensitive_refused, now chat. Direct verbs (approve, run npm, delete) are still refused. The chat path submits a model task (tool-free per the module contract), so no privileged action runs, but the invariant that sensitive phrasing is refused, and R3-intent#0 (a request wrapped as a question is not an information question), are broken for these phrasings.",
+      "fix": "Apply the sensitive checks to the text with the lead word still present, or run isSensitive over both the raw string and the stripped string before the QUESTION short-circuit, e.g. if (isSensitive(raw) || isSensitive(normalized)) return sensitive_refused, evaluated before any QUESTION exemption. Add regression tests for 'Stop, is it okay to accept it?' and 'No, is it ok to restart the server'.",
+      "disposition": "DISCLOSED LOW (lead-word variants equal the pre-existing bare QUESTION exemption; tool-free chat grants nothing)"
+    },
+    {
+      "id": "M-A-3-T10-D2",
+      "severity": "MEDIUM",
+      "file": "src/lib/bunny-host/voice/voice-intent.ts",
+      "title": "No with a question no longer cancels a pending proposal, so a later yes confirms it",
+      "scenario": "A stop or approval proposal is pending (voiceConfirmable, TTL 30 s from VOICE_LIMITS.proposalTtlMs). The user says \"No, what is the agent doing?\". Before the delta, the stripped-free text hit CANCEL (the ^no lookahead), so the classifier returned cancel and the dispatch cleared snap.proposal. After the delta, the lead \"no\" is stripped and the rest is classified as agent_status (verified by probe with proposalPending=true). dispatch's agent_status branch does not touch snap.proposal, so the rejected proposal stays live. A \"Yes\" within 30 s returns confirm, and dispatch calls executeProposal(proposal, 'voice'). The user's rejection is silently dropped and a rejected action runs on voice confirmation.",
+      "fix": "Keep the cancel semantics for a lead no/nope/never mind when proposalPending is true: classify a lead-negation with a pending proposal as cancel before stripping, or have dispatch clear snap.proposal on any turn that began with a negation lead. Add a test: proposalPending=true, 'No, what is the agent doing?' must not leave a confirmable proposal.",
+      "disposition": "FIXED aed363b (negation lead with pending proposal cancels)"
+    },
+    {
+      "id": "M-A-3-T10-D3",
+      "severity": "LOW",
+      "file": "src/lib/bunny-host/voice/voice-intent.ts",
+      "title": "Stop followed by a question drops a real stop request to status",
+      "scenario": "With no proposal pending, \"Stop, what is the agent doing?\" previously gave a confirm-gated agent.stop proposal. It now gives agent_status, so the stop is silently not offered. This fails safe (nothing is stopped), but a user who meant to stop gets a status answer and must repeat the command.",
+      "fix": "Accept as intended, or answer with a short clarification (\"Did you want me to stop the agent?\") when the lead was a control verb and a question follows, instead of silently reclassifying.",
+      "disposition": "REFUTED"
+    },
+    {
+      "id": "M-A-3-T10-D4",
+      "severity": "LOW",
+      "file": "src/lib/bunny-host/voice/voice-session.server.ts",
+      "title": "close() dedupe ignores the second caller's source label",
+      "scenario": "close(source) returns this.closingPromise when one is in flight, without using the new source. Two closes (for example a hotkey release, then a button close) produce a journal entry and lastClose.source that name only the first caller. Label-only, no authority effect. The label itself is sanitized, and no injection path was found.",
+      "fix": "Record the first caller's label deliberately, or document it. Do not expect per-caller attribution from lastClose.",
+      "disposition": "FIXED aed363b (second close journals its label)"
+    },
+    {
+      "id": "T10-VAD-1",
+      "severity": "MEDIUM",
+      "file": "native/voice/BunnyVoiceWorker.cs",
+      "line": 1074,
+      "title": "Sticky speechPeak lets one loud section end a turn during later soft speech",
+      "scenario": "Within one utterance, speechPeak is set at onset and never decays. Any section whose smoothed level reaches about 0.05 rms sets endThreshold to the absolute cap 0.004 for the rest of the utterance. Simulated with the Vad rule: speech onset at 0.006 for 0.5 s, then 0.08 for 0.5 s, then soft speech at 0.003 for 3 s, then true silence. SpeechEnd fires at frame 119 (about 2.4 s into the soft speech), so the turn is finalized while the user is still talking. The same input with soft speech at 0.006 does not end early (frame 269). Before 08aab35 the end threshold was floor*3 (about 0.0006), so this premature end is new. A click inside speech produces the same effect. The selftest click case uses soft speech at 0.006, which is above the 0.004 cap, so it does not exercise this path.",
+      "fix": "Let speechPeak decay (for example speechPeak = max(smooth, speechPeak * 0.995) per frame), or derive the end threshold from a recent-window peak rather than the utterance-lifetime peak. Add a selftest with soft speech between floor*3 and EndPeakCap that follows a loud section, asserting no SpeechEnd during the soft span.",
+      "disposition": "FIXED aed363b (cap 0.002, peak decay, selftest softAfterLoudEndFrame)"
+    },
+    {
+      "id": "T10-VAD-2",
+      "severity": "MEDIUM",
+      "file": "native/voice/BunnyVoiceWorker.cs",
+      "line": 1076,
+      "title": "Peak-relative end rule leaves the reported never-ends bug in place for softer speakers",
+      "scenario": "The rule only treats noise as silence when noise is below 8% of the speech peak, so it works only when the peak is more than about 12.5x the noise. Speech peak 0.01 with room noise 0.0012 gives endThreshold max(0.0006, 0.0008) = 0.0008. The noise is then counted as speech for as long as it persists, so the turn runs to the 30 s cap. Only the single operating point (peak 0.02, noise 0.0012) is covered by selftest. The test name, 'room noise above the calibrated floor still ends the turn', overstates what is verified.",
+      "fix": "Either make the threshold depend on a measured noise estimate taken in-turn (for example a slow minimum tracker during speech) instead of only the speech peak, or narrow the claim and add selftest points at lower peaks, and document the limit in the code comment.",
+      "disposition": "DISCLOSED limitation (energy end needs speech peak >= ~12x room noise; release/second tap/30 s cap end the turn)"
+    },
+    {
+      "id": "T10-VAD-3",
+      "severity": "LOW",
+      "file": "native/voice/BunnyVoiceWorker.cs",
+      "line": 1080,
+      "title": "speechMs now counts only frames above the peak-relative end threshold",
+      "scenario": "speechMs feeds two consumers: the SpeechEnd gate (speechMs >= 250) and WhisperGate.Reject's hallucination guard (speechMs < 1000 for 'thank you', 'bye', etc.). Because soft frames under the new endThreshold are no longer counted, speechMs drops for utterances that have soft portions. A genuine short or soft utterance can now be rejected as a hallucination, or dropped by the 250 ms gate, where it was accepted before. This is a semantic change the commit does not mention.",
+      "fix": "Keep a separate counter for the end rule, or count speechMs against the pre-existing threshold, and leave the gates as they were.",
+      "disposition": "FIXED aed363b (speechMs counts onset-threshold frames)"
+    },
+    {
+      "id": "T10-TEST-1",
+      "severity": "LOW",
+      "file": "scripts/voice-worker.test.mjs",
+      "line": 502,
+      "title": "Click selftest does not test the property its comment claims",
+      "scenario": "The comment says a single transient must not raise the end threshold above soft speech, but the soft speech in the selftest is 0.006, which is above the 0.004 cap. The assertion passes because of the cap alone and says nothing about speech below the cap, which is where T10-VAD-1 breaks.",
+      "fix": "Add a case with soft speech at about 0.002-0.003 following a loud section, and assert no SpeechEnd during that span.",
+      "disposition": "REFUTED"
+    },
+    {
+      "id": "H-RELAUNCH-WAKE",
+      "severity": "MEDIUM",
+      "file": "src/lib/bunny-host/voice/voice-session.server.ts",
+      "line": 425,
+      "title": "Waiting press refused INTERNAL when a settle-triggered relaunch races the wake",
+      "scenario": "Worker stdin is above the soft budget (384 KiB) and the FSM is TRANSCRIBING. Press B calls listenStart, passes the top-of-function relaunch check (state is not IDLE yet), and parks in waitTranscribed. The previous final is empty, so onNone runs settleIdle: setState('IDLE') wakes B (continuation queued as a microtask). settleIdle then sees needsRelaunch() true and calls detach('relaunch', relaunchIfIdle). detach invokes work() synchronously, so doRelaunch runs and sets this.worker = null before its first await. B resumes with this.snap.open still true but !this.worker, and returns refuse('INTERNAL','Voice is not open.'). The press is dropped with a misleading error and overwrites snap.error, even though the session is healthy and the fresh worker arrives moments later. The same post-wait path also never re-checks the relaunch or the hard stdin budget before capture.start, so a waiter that resumes into a non-IDLE state can send a capture over the budget.",
+      "fix": "After waitTranscribed resolves, re-run the relaunch gate before judging the press: if (this.relaunching || this.needsRelaunch()) await this.relaunchIfIdle(); then re-check open/worker/muted/closing/epoch. Alternatively, treat (!this.worker && this.relaunching) as a bounded wait rather than a refusal. Add a test: soft budget exceeded, press during TRANSCRIBING, final resolves to IDLE with no speech, expect the press to capture on the fresh worker, not INTERNAL.",
+      "disposition": "FIXED aed363b (mutation-checked test)"
+    },
+    {
+      "id": "L-WORKER-EXIT-WAIT",
+      "severity": "LOW",
+      "file": "src/lib/bunny-host/voice/voice-session.server.ts",
+      "line": 1243,
+      "title": "Worker exit does not wake transcription waiters; the error is then overwritten",
+      "scenario": "A press is parked in waitTranscribed and the worker process exits. onWorkerExit sets worker=null and WORKER_EXITED, but never calls setState or the waiter wake, and the FSM stays TRANSCRIBING. The press sits for the full 8 s transcribeWaitMs, then refuse('INTERNAL','Voice is not open.') overwrites the WORKER_EXITED error, so the user sees 'Voice hit an internal error' instead of 'The voice component stopped. Start voice again.'",
+      "fix": "In onWorkerExit, after clearing the worker, wake transcribedWaiters (or move them to the same wake path as resetAfterClose). In the post-wait branch, do not overwrite an existing WORKER_EXITED error with INTERNAL.",
+      "disposition": "REFUTED"
+    },
+    {
+      "id": "L-BUSY-TRANSCRIBING-COPY",
+      "severity": "LOW",
+      "file": "src/components/island/voice-model.ts",
+      "line": 26,
+      "title": "BUSY_TRANSCRIBING has no client copy and falls to the generic message",
+      "scenario": "A press that outlasts the 8 s wait receives BUSY_TRANSCRIBING. voiceErrorMessage has no case for it, so the island shows 'Voice hit an error.' instead of a retry hint. The protocol comment describes this as a truthful code, but the user-facing copy loses the 'try again in a moment' meaning.",
+      "fix": "Add case 'BUSY_TRANSCRIBING': return 'Still transcribing your last question. Try again in a moment.' and a matching model test.",
+      "disposition": "FIXED aed363b"
+    },
+    {
+      "id": "L-CLOSE-SOURCE-SHADOW",
+      "severity": "LOW",
+      "file": "src/lib/bunny-host/voice/voice-session.server.ts",
+      "line": 330,
+      "title": "A second close with a different source is silently dropped while one is in flight",
+      "scenario": "close() returns the existing closingPromise when one is in flight, so the second caller's source label is discarded. lastClose and the journal then name only the first caller (for example 'desktop_button' when the island sent 'island_exit'). This is receipt accuracy only, not an authority issue.",
+      "fix": "Record the most recent requested source on the in-flight close (or record each request's label in the journal), or document that the first label wins.",
+      "disposition": "FIXED aed363b (duplicate of D4)"
+    },
+    {
+      "id": "L-CAPTURE-STOP-REASON-UNVALIDATED",
+      "severity": "LOW",
+      "file": "src/lib/bunny-host/voice/voice-session.server.ts",
+      "line": 1167,
+      "title": "captureStopReason copies an unvalidated worker string into the client snapshot",
+      "scenario": "captureStopReason is String(event.reason).slice(0,16) with no pattern check. lastClose.source is regex-validated, but this value is not. The worker is trusted, so the risk is low, but a malformed or future reason string reaches the snapshot and clients unsanitized.",
+      "fix": "Validate against /^[a-z_]{1,16}$/ (or the documented set end|vad|max|abort|mute) and otherwise store null.",
+      "disposition": "REFUTED"
+    }
+  ],
+  "verdicts": [
+    {
+      "real": true,
+      "severity": "LOW",
+      "reason": "Confirmed in src/lib/bunny-host/voice/voice-session.server.ts lines 329-336: close(source) returns this.closingPromise when a close is in flight, and the second caller's source is dropped. doClose(source) therefore writes lastClose.source and the voice.session_closed journal line for the first caller only. The scenario is reachable: http.server.ts line 1151 forwards data.source from each close request, so two overlapping closes with different labels produce a label naming only the first. The effect is label-only. Both closes perform the same teardown, no authority, confirmation or generation check depends on source, and no UI reads lastClose.source (the only reader is the test at voice-session.test.ts:1503-1507, which does not cover overlapping closes). The label is still sanitized by the regex at line 331, so no injection path. The existing V25 test at voice-session.test.ts:1434 covers concurrent-close joining but asserts only on open state, not on source. Real but minor: wrong attribution in a diagnostic field, with no security or state impact."
+    },
+    {
+      "real": true,
+      "severity": "LOW",
+      "reason": "Verified by running classifyTranscript (file:// import, node --experimental-strip-types). The reported outputs reproduce: \"Stop, is it okay to accept it?\", \"No, is it ok to restart the server\", \"No, is it okay to reboot the machine\", \"sorry, is it ok to ship it\", and \"wait, should i ratify it\" (proposalPending true or false) all classify as chat. Before e80d313 the lead-word forms hit SYN_WINDOW or EXEC and returned sensitive_refused. Direct verbs (\"wait, approve it\", \"No, run npm install\") are still refused.\n\nThe defect is not newly introduced by the delta. The bare forms \"is it okay to accept it?\", \"is it ok to restart the server\", \"is it okay to reboot the machine\", and \"should i ratify it\" already return chat, because isSensitive() returns false on QUESTION before the SYN_WINDOW/SYN_STANDALONE/EXEC checks (fixcheck#4 and the R3-intent#0 tests intend this). e80d313 makes the lead-word variants equivalent to the bare question, so the delta exposes an existing QUESTION-exemption gap rather than creating a new authority path.\n\nImpact is limited. Chat is a tool-free model turn, and no privileged action, approval, or proposal confirmation occurs (the confirm path needs CONFIRM/isConfirmLead, which these phrasings don't match). The worst case is a prose \"yes, go ahead\" from the model, which grants nothing. The suggested fix (isSensitive on the raw string before the QUESTION exemption) would also break the existing bare-question chat contract, so it is not a drop-in fix. Severity downgraded from MEDIUM to LOW."
+    },
+    {
+      "real": true,
+      "severity": "LOW",
+      "reason": "Partially confirmed, with the impact narrowed. The classifier change is real: with proposalPending=true, \"No, what is the agent doing?\" went from cancel (pre-delta, probed against a23fd8e's voice-intent.ts) to agent_status (post-delta, probed against e80d313). Dispatch's agent_status branch (voice-session.server.ts ~L732) does not clear snap.proposal, so the proposal survives, as the finding says. But the finding's stop scenario is wrong: proposeAgentControl sets confirmVia to \"voice_or_screen\" only for agent.pause; agent.stop and agent.resume get \"screen\". executeProposal (L826-827) refuses a voice confirm unless confirmVia === \"voice_or_screen\", so a later spoken \"yes\" cannot execute a stop. The reachable case is a pending pause proposal: \"No, what is the agent doing?\" then \"yes\" within the 30 s TTL pauses the agent after the user rejected it. Pause is reversible and the TTL still applies, so this is wrong-state behavior, not an authority break. The non-lead variant \"What is the agent doing?\" already leaves a pending proposal alive, so the delta only widens an existing gap. Suggested fix: when a turn starts with a negation lead and a proposal is pending, clear the proposal or classify as cancel before stripping. Add a test for proposalPending=true with \"No, what is the agent doing?\" that asserts no confirmable pause proposal remains."
+    },
+    {
+      "real": true,
+      "severity": "MEDIUM",
+      "reason": "Verified in native/voice/BunnyVoiceWorker.cs. In Vad.Feed (line 1077), endThreshold = max(threshold, min(speechPeak * 0.08, 0.004)), and threshold = max(floor * 3, 0.0006). With a calibrated floor near 0.0002, a speech peak of 0.01 and steady room noise of 0.0012, endThreshold is 0.0008, so each noise frame resets silenceMs and the turn runs to the 30 s cap. The rule only classifies noise as silence when noise is below 8% of the peak, that is, when the peak is more than about 12.5x the noise. The selftest at lines 2804-2810 covers only the peak 0.02 / noise 0.0012 point, so the claim is narrower than the test name suggests. Caveats: this is a residual gap in a fix for a condition that already existed before this delta (the old floor*3 rule had the same failure at every peak level), so it is not a regression. It is still a real, user-reachable wrong behavior in the fix this delta claims to deliver, so MEDIUM is the right severity. No file was edited and the test suite was not run."
+    },
+    {
+      "real": false,
+      "severity": "NONE",
+      "reason": "The finding's core claim is inaccurate. The click selftest (native/voice/BunnyVoiceWorker.cs ~2816-2822, test at scripts/voice-worker.test.mjs:502-510) asserts the property its comment describes: after a 0.5 click, endThreshold = max(0.0006, min(peak*0.08, 0.004)) = 0.004 (the cap binds because the smoothed peak is ~0.1), and the 0.006 soft speech sits above it, so no SpeechEnd fires. Without the cap, 8% of the clicked peak (~0.008) would exceed 0.006 and the turn would end, so the assertion does exercise the cap. The comment's wording (\"holds the end threshold at 0.004, below the speech\") is accurate. The finding's remaining point, that below-cap soft speech after a click is untested, is a coverage suggestion rather than a defect in this delta. The below-cap case without a click is covered by the Part-B noisy-tail test (0.0012 noise, end at frame 149). Any real defect in the below-cap-after-click behavior belongs to the separate T10-VAD-1 item, not to this test comment. No file was edited and no test was run."
+    },
+    {
+      "real": true,
+      "severity": "LOW",
+      "reason": "Confirmed in src/lib/bunny-host/voice/voice-session.server.ts lines 329-336: close(source) returns the in-flight closingPromise and discards the second caller's source, so lastClose (line 364) and the voice.session_closed journal line (line 365) name only the first caller. The in-flight dedupe predates a23fd8e (it is at line 327 there); the source parameter, lastClose and the label are new in 08aab35, so the mislabel is exposed by this delta. The scenario is reachable: an island close and a desktop close overlapping while doClose is awaiting relaunching, settling or stopInference. Impact is receipt/diagnostic only: lastClose is consumed nowhere except the snapshot (grep finds only voice-protocol.ts type and the session file), and the close itself still completes once for both callers, so no authority, epoch or generation invariant is affected. Not HIGH or MEDIUM. Fix is a one-line change (record the latest requested label, or log each request) or documenting first-wins."
+    },
+    {
+      "real": false,
+      "severity": "NONE",
+      "reason": "The main claim is refuted. onWorkerExit (voice-session.server.ts:1241-1258) calls this.setError(\"WORKER_EXITED\", ...), and setError (line 1427) calls setState(\"ERROR\") whenever canTransition(fsm.state, \"ERROR\"). TRANSCRIBING -> ERROR is a legal edge (voice-fsm.ts:13). setState (line 1365) then wakes every entry in transcribedWaiters synchronously. So a press parked in waitTranscribed wakes immediately on worker exit. It does not sit for the full 8 s transcribeWaitMs, and the \"never calls setState\" premise is false.\n\nThe residual overwrite is real but not a new defect. After the wake, the post-wait guard at line 425 (`!this.worker`) returns refuse(\"INTERNAL\", \"Voice is not open.\"), which replaces snap.error = WORKER_EXITED. The same overwrite already happens on the pre-existing top-of-function guard at line 411 for any press arriving after the worker is gone. It is cosmetic (the state stays ERROR and the user sees an error message), and it is not introduced by the a23fd8e..e80d313 delta. Not reportable as a delta defect at LOW or above."
+    },
+    {
+      "real": true,
+      "severity": "LOW",
+      "reason": "Confirmed in native/voice/BunnyVoiceWorker.cs. Before 08aab35, Vad.Feed counted a frame into speechMs when rms > threshold (floor*3, min 0.0006). Now it counts only when rms > endThreshold = max(threshold, min(speechPeak*0.08, 0.004)) (lines ~1077-1080). speechMs is then read by two consumers: the SpeechEnd gate (line ~1091, speechMs >= 250) and WhisperGate.Reject via PublishOnset/speechMsPub (line ~1258, speechMs < 1000 for \"you\", \"bye\", \"thank you\", etc.). The finding's mechanism is real: quiet in-speech frames between threshold and 8% of the smoothed peak no longer count. The commit message describes the end-rule change but not the speechMs side effect.\n\nRefuting factors: the impact is narrow. The 250 ms gate only misfires when the pre-change counted total was in roughly [250, 250+X) ms, where X is the excluded quiet frames. Real word decay falls below 8% of the peak slowly, because the smoothed peak lags, so the excluded share is usually small. The hallucination guard change only affects phrases that are already short, and \"bye\" or \"thank you\" are not agent-authority commands, so the effect is a conservative false rejection, not a security break. When the 250 ms gate does fire, the turn is not finalized by VAD (no SpeechEnd event, so Finish(\"vad\") is skipped). That is pre-existing behavior for any sub-250 utterance, not introduced here. I did not run a test; the C# was not executed. The conclusion rests on reading the code."
+    },
+    {
+      "real": true,
+      "severity": "LOW",
+      "reason": "Confirmed, copy-only. BUSY_TRANSCRIBING is new in this delta: it is added to VoiceErrorCode in src/lib/bunny-host/voice/voice-protocol.ts (line 54, absent at a23fd8e) and emitted by voice-session.server.ts:427 when listen.start arrives during TRANSCRIBING past the wait bound. The island receives it as snapshot.error.code, and voice-model.ts:94 passes it to voiceErrorMessage(). That switch (src/components/island/voice-model.ts lines 23-60) has no case for it, so it falls to default and shows \"Voice hit an error.\" with error tone. The scenario is reachable: a press that outlasts the 8 s transcribeWaitMs gets this code. The message is not wrong, only generic, and it loses the \"try again in a moment\" meaning. The BUSY_PLAYBACK code has its own copy, so the gap is specific to this delta. No state, authority, or race defect is involved. The V49 copy test in voice-model.test.ts does not cover this code, so nothing would catch a regression. The suggested fix (a case plus a test) is appropriate."
+    },
+    {
+      "real": false,
+      "severity": "NONE",
+      "reason": "Refuted. The scenario needs the worker to emit a non-enum capture.stopped reason, and the worker cannot do that. Its stop reasons come from fixed literals (\"end\", \"abort\", \"mute\", \"shutdown\", \"vad\", \"max\", \"error\"), and the only way to inject an arbitrary string is a same-user replacement of native/voice, which the disclosed out-of-contract list already covers. Even then, the value is capped at 16 chars, is only copied into snap.timing.captureStopReason, and cannot authorize or change any privileged path. No UI in the delta consumes captureStopReason (grep of src/**/*.tsx and the island/store finds nothing), and React escapes text anyway. The unvalidated copy is a hygiene nit with no concrete user-facing or security impact in this delta. Note: parseWorkerEvent (voice-worker.server.ts:252) checks only ev/t/mono shape, so the TypeScript union is not enforced at runtime, but that gap is pre-existing and the trusted-worker boundary makes it non-exploitable here."
+    },
+    {
+      "real": true,
+      "severity": "MEDIUM",
+      "reason": "Verified by reading the code; the scenario is real. In native/voice/BunnyVoiceWorker.cs, Vad.Feed (lines 1074-1078) updates speechPeak = max(smooth) and never decays it. speechPeak is reset only at onset (line 1050). endThreshold = max(threshold, min(speechPeak*0.08, EndPeakCap=0.004)), so once the utterance has had any section near 0.05 rms, every in-speech frame at or below 0.004 counts as silence for the rest of the utterance. Whisper mode never calls MarkEvidence (StartRecognizer returns early when whisper != null, lines 1362-1366), so msSinceEvidence stays int.MaxValue and the HypothesisHoldMs gate (line 1087) never blocks SpeechEnd. Hand trace of the finding's input (20 ms frames, calibration at 0.0002, speech 0.006 then 0.08, then 0.003): endThreshold reaches 0.004 around frame 49, and 0.003 is silenced from frame 70. 45 silent frames (900 ms) gives SpeechEnd near frame 114. The finding's 119 is a small indexing difference; the mechanism is the same. At 0.006 soft speech, no end fires. Before 08aab35 the end threshold was about 0.0006, so this early end is new. Two limits on severity: it needs roughly a 26 dB level drop inside one utterance, and the new rule was a deliberate choice to treat sub-0.004 frames as silence. The defect is that the cap does not stop a loud section from making ordinary soft speech end a turn, which contradicts the comment's stated purpose. I did not compile or run the C# selftest; the verdict rests on reading the code and a hand trace."
+    },
+    {
+      "real": true,
+      "severity": "MEDIUM",
+      "reason": "Confirmed by reading the code (not by running a test). The race is real and the scenario's core mechanics hold. In listenStart (voice-session.server.ts ~L424-425) a press that waits in TRANSCRIBING resumes and refuses with INTERNAL \"Voice is not open.\" when `!this.worker`. On the empty-final path, onFinal -> onNone -> settleIdle calls setState('IDLE') first, which runs waitTranscribed's done() and resolve(). The continuation is only a queued microtask. settleIdle then synchronously reaches detach('relaunch', relaunchIfIdle) -> doRelaunch, which sets this.worker = null before its first await. So the press resumes with snap.open true and no worker, and the press is dropped. The worker is fresh moments later, so the session is healthy. The relaunch gate (needsRelaunch, IDLE-only) is not re-checked after the wait. The waiting path is new in 08aab35, so the race is exposed by this delta. Correction to the finding: the claim that the post-wait path can send a capture over the budget is overstated. tryWorker enforces hardBudget and calls endForBudget instead of overrunning it, so the impact is a dropped press with a misleading error, plus a possible session end if a non-empty final resumes into a non-IDLE state while stdin is past the hard budget. The suggested fix (re-run the relaunch gate after waitTranscribed, then re-check open/worker/closing/epoch) is sound. No file was edited and no test was run."
+    },
+    {
+      "real": false,
+      "severity": "LOW",
+      "reason": "Finding D3 as written is not a defect. The cited example is unchanged: \"Stop, what is the agent doing?\" classified as agent_status before e80d313 too, because STATUS is checked before CONTROL in classifyTranscript, and the new code gives agent_status as well (verified by running old a23fd8e and new voice-intent.ts side by side). The commit's stated intent is that a lead word is dropped only when a question follows, so \"Stop, what's the status\" and \"stop, is it done yet\" now become chat instead of agent_control. That is deliberate and fails safe: no stop is proposed or executed. Adjacent real defect exposed by the same change: INTERRUPT_LEAD includes \"no\" and \"nope\", and CANCEL-style rejection is lost when a question follows. Old vs new with proposalPending=true: \"No, what is the capital of France\" gives cancel before and chat after; \"No, what is the agent doing?\" gives cancel before and agent_status after. chat and agent_status dispatch never clear snap.proposal (only cancel, confirm, expiry and executeProposal do; see voice-session.server.ts controlCancel and dispatch). A pending agent.pause proposal (confirmVia voice_or_screen, 30 s TTL, proposeAgentControl) therefore survives the user's \"no\", and a following \"yes\" within 30 s pauses the agent. Stop proposals are confirmVia \"screen\", so a voice \"yes\" cannot stop an agent; the on-screen button still requires an explicit click. Impact is LOW (pause is reversible, and it needs a yes within the TTL). Suggested fix: do not strip \"no\"/\"nope\" as a lead word, or treat a leading \"no\" with a pending proposal as a cancel. Scratch probes: scratchpad/probe2.ts and probe3.ts."
+    }
+  ],
+  "fixCommit": "aed363b"
+}

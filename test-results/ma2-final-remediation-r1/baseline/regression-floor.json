@@ -1,0 +1,70 @@
+{
+  "recordedAt": "2026-10-07T02:52:22.496Z",
+  "classification": "STATIC VERIFIED",
+  "packageScripts": {
+    "build:ownership": "node scripts/build-owned-process.mjs",
+    "pretest": "npm run build:ownership",
+    "dev": "node scripts/with-app-env.mjs node node_modules/vite/bin/vite.js dev --host 0.0.0.0 --port 8080",
+    "build": "node scripts/with-app-env.mjs node node_modules/vite/bin/vite.js build && npm run db:migrate",
+    "db:migrate": "node scripts/migrate.mjs",
+    "build:dev": "node scripts/with-app-env.mjs node node_modules/vite/bin/vite.js build --mode development",
+    "preview": "node scripts/with-app-env.mjs node node_modules/vite/bin/vite.js preview",
+    "preview:restart": "node scripts/preview-platform.mjs restart",
+    "preview:stop": "node scripts/preview-platform.mjs stop",
+    "typecheck": "tsc --noEmit",
+    "check:auth": "node scripts/check-auth-invariant.mjs",
+    "test": "node --test scripts/*.test.mjs && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/orch/*.test.ts src/lib/bunny-host/*.test.ts src/lib/bunny-missions/*.test.ts",
+    "lint": "eslint .",
+    "test:ui": "node --experimental-strip-types --test src/components/island/*.test.ts",
+    "format": "prettier --write .",
+    "host": "node --experimental-strip-types scripts/bunny-host.mjs"
+  },
+  "previousObserved": {
+    "recordedAt": "2026-10-07T01:55:55.624Z",
+    "classification": "DISPOSABLE LIVE VERIFIED",
+    "checks": [
+      {
+        "name": "full-tests",
+        "command": "npm test",
+        "start": "2026-10-07T01:53:57.524Z",
+        "end": "2026-10-07T01:55:55.623Z",
+        "code": 1,
+        "signal": null
+      },
+      {
+        "name": "ui-tests",
+        "command": "npm run test:ui",
+        "start": "2026-10-07T01:53:57.548Z",
+        "end": "2026-10-07T01:53:58.214Z",
+        "code": 0,
+        "signal": null
+      },
+      {
+        "name": "typecheck",
+        "command": "npm run typecheck",
+        "start": "2026-10-07T01:53:57.561Z",
+        "end": "2026-10-07T01:54:09.700Z",
+        "code": 0,
+        "signal": null
+      },
+      {
+        "name": "lint",
+        "command": "npm run lint",
+        "start": "2026-10-07T01:53:57.579Z",
+        "end": "2026-10-07T01:54:05.827Z",
+        "code": 0,
+        "signal": null
+      },
+      {
+        "name": "normal-build",
+        "command": "npm run build",
+        "start": "2026-10-07T01:53:57.595Z",
+        "end": "2026-10-07T01:54:13.811Z",
+        "code": 0,
+        "signal": null
+      }
+    ]
+  },
+  "actualCurrentCounts": "Pending current full execution; historical numbers are not current counts",
+  "deletedTestFiles": ""
+}

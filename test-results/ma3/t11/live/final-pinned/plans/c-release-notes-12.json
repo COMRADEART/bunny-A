@@ -1,0 +1,213 @@
+{
+  "mission": "Release notes team 12",
+  "missionId": "177ee4a7-0016-468a-b55a-dc91e412a836",
+  "phase": "review",
+  "state": "waiting_for_approval",
+  "planReference": "team:9d35d5f021c3ab17f5faa802fb5fe28c175801d7663c70c57c16f6e046ad10f5",
+  "planRevisions": 0,
+  "rejected": [],
+  "members": [
+    {
+      "agentId": "5a018dbf-779f-46cf-9ea4-43ab762285fc",
+      "role": "planner"
+    },
+    {
+      "agentId": "7a963d10-a021-4639-b2bc-9957df275848",
+      "role": "researcher"
+    },
+    {
+      "agentId": "05117efd-93b9-47eb-a4a2-384e95f31640",
+      "role": "documenter"
+    },
+    {
+      "agentId": "bc2aaa28-a21b-43c5-9438-de5f5a00a084",
+      "role": "implementer"
+    },
+    {
+      "agentId": "23a33a4f-16f1-470a-9e7a-d4dbef344fc9",
+      "role": "tester"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "plan",
+      "role": "planner",
+      "kind": "plan",
+      "objective": "Propose a bounded team plan for the objective as one JSON document.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t1",
+      "role": "researcher",
+      "kind": "observe",
+      "objective": "Read the project's Git history.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t2",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Write the Markdown document from the Git history.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t3",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the HTML changelog from the verified Git history.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4",
+      "role": "documenter",
+      "kind": "write_file",
+      "objective": "Save the Markdown document.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t5",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML changelog page.",
+      "dependsOn": [
+        "t3"
+      ],
+      "dormant": false,
+      "target": "changelog.html",
+      "requirements": null
+    },
+    {
+      "key": "t6",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny check the Markdown document against requirement R1.",
+      "dependsOn": [
+        "t4"
+      ],
+      "dormant": false,
+      "target": "README.md",
+      "requirements": [
+        "R1"
+      ]
+    },
+    {
+      "key": "t7",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny check the HTML changelog page against requirements R2 and R3.",
+      "dependsOn": [
+        "t5"
+      ],
+      "dormant": false,
+      "target": "changelog.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t2_r1",
+      "role": "documenter",
+      "kind": "generate_markdown",
+      "objective": "Write the Markdown document from the Git history.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t4_r1",
+      "role": "documenter",
+      "kind": "write_file",
+      "objective": "Save the Markdown document.",
+      "dependsOn": [
+        "t2_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": null
+    },
+    {
+      "key": "t6_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny check the Markdown document against requirement R1.",
+      "dependsOn": [
+        "t4_r1"
+      ],
+      "dormant": true,
+      "target": "README.md",
+      "requirements": [
+        "R1"
+      ]
+    },
+    {
+      "key": "t3_r1",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Build the HTML changelog from the verified Git history.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t5_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML changelog page.",
+      "dependsOn": [
+        "t3_r1"
+      ],
+      "dormant": true,
+      "target": "changelog.html",
+      "requirements": null
+    },
+    {
+      "key": "t7_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny check the HTML changelog page against requirements R2 and R3.",
+      "dependsOn": [
+        "t5_r1"
+      ],
+      "dormant": true,
+      "target": "changelog.html",
+      "requirements": [
+        "R2",
+        "R3"
+      ]
+    }
+  ]
+}

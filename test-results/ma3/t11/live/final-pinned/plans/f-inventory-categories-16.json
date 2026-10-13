@@ -1,0 +1,213 @@
+{
+  "mission": "Inventory categories team 16",
+  "missionId": "947bfb51-5a81-408f-b019-38f9afe93d8e",
+  "phase": "review",
+  "state": "waiting_for_approval",
+  "planReference": "team:2a0936351676db1e885d26d9fc4ddea1f540ab2a839d1cc946a712c53cd65a60",
+  "planRevisions": 0,
+  "rejected": [],
+  "members": [
+    {
+      "agentId": "a92266a0-c3a5-46c8-8d92-8c37833bd61b",
+      "role": "planner"
+    },
+    {
+      "agentId": "9ae78766-1dd3-41d0-9ea4-efba600b2a1b",
+      "role": "researcher"
+    },
+    {
+      "agentId": "6e2859a3-41d9-4668-a4f6-dd7c21667b49",
+      "role": "implementer"
+    },
+    {
+      "agentId": "6a46c9df-d62a-4c0a-9e35-8b1a14c9886b",
+      "role": "tester"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "plan",
+      "role": "planner",
+      "kind": "plan",
+      "objective": "Propose a bounded team plan for the objective as one JSON document.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t1",
+      "role": "researcher",
+      "kind": "generate_json",
+      "objective": "Generate a JSON dataset from the inventory.csv file.",
+      "dependsOn": [],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t2",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Create the HTML page with grouped items by category.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t3",
+      "role": "researcher",
+      "kind": "generate_markdown",
+      "objective": "Generate a markdown document with a restock note.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": false,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t4",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page to the output folder.",
+      "dependsOn": [
+        "t2"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t5",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the markdown document to the output folder.",
+      "dependsOn": [
+        "t3"
+      ],
+      "dormant": false,
+      "target": "restock-note.md",
+      "requirements": null
+    },
+    {
+      "key": "t6",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the HTML file meets the requirements.",
+      "dependsOn": [
+        "t4"
+      ],
+      "dormant": false,
+      "target": "index.html",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t7",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the markdown file meets the requirements.",
+      "dependsOn": [
+        "t5"
+      ],
+      "dormant": false,
+      "target": "restock-note.md",
+      "requirements": [
+        "R4"
+      ]
+    },
+    {
+      "key": "t2_r1",
+      "role": "implementer",
+      "kind": "generate_html",
+      "objective": "Create the HTML page with grouped items by category.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t4_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the HTML page to the output folder.",
+      "dependsOn": [
+        "t2_r1"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": null
+    },
+    {
+      "key": "t6_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the HTML file meets the requirements.",
+      "dependsOn": [
+        "t4_r1"
+      ],
+      "dormant": true,
+      "target": "index.html",
+      "requirements": [
+        "R1",
+        "R2",
+        "R3"
+      ]
+    },
+    {
+      "key": "t3_r1",
+      "role": "researcher",
+      "kind": "generate_markdown",
+      "objective": "Generate a markdown document with a restock note.",
+      "dependsOn": [
+        "t1"
+      ],
+      "dormant": true,
+      "target": null,
+      "requirements": null
+    },
+    {
+      "key": "t5_r1",
+      "role": "implementer",
+      "kind": "write_file",
+      "objective": "Save the markdown document to the output folder.",
+      "dependsOn": [
+        "t3_r1"
+      ],
+      "dormant": true,
+      "target": "restock-note.md",
+      "requirements": null
+    },
+    {
+      "key": "t7_r1",
+      "role": "tester",
+      "kind": "verify_output",
+      "objective": "Have Bunny verify the markdown file meets the requirements.",
+      "dependsOn": [
+        "t5_r1"
+      ],
+      "dormant": true,
+      "target": "restock-note.md",
+      "requirements": [
+        "R4"
+      ]
+    }
+  ]
+}

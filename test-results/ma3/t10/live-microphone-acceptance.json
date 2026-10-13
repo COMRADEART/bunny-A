@@ -1,0 +1,55 @@
+{
+  "classification": "LIVE human speech, real microphone",
+  "sessions": {
+    "sapi": {
+      "classification": "LIVE human speech, real microphone + real speakers (prompts spoken by Bunny); text/level receipts only, no audio retained",
+      "phrases": 10,
+      "finals": 10,
+      "exactOrNear": 0,
+      "meanWer": 0.95,
+      "meanConfidence": 0.048
+    },
+    "whisper": {
+      "classification": "LIVE human speech, real microphone + real speakers (prompts spoken by Bunny); text/level receipts only, no audio retained",
+      "engine": {
+        "engine": "whisper.cpp v1.9.4",
+        "recognizer": "ggml-base.en",
+        "culture": "en",
+        "local": true
+      },
+      "phrases": 10,
+      "finals": 10,
+      "exactOrNear": 8,
+      "meanWer": 0.167,
+      "meanConfidence": 0.751
+    }
+  },
+  "islandConversation": [
+    {
+      "final": "What is my agent doing?",
+      "source": "hotkey",
+      "captureStopReason": "vad"
+    },
+    {
+      "final": "Did the test pass?",
+      "source": "hotkey",
+      "captureStopReason": "end"
+    },
+    {
+      "final": "Tell me a story about a rabbit.",
+      "source": "hotkey",
+      "captureStopReason": "end"
+    },
+    {
+      "final": "Stop what is the capital of France?",
+      "source": "hotkey",
+      "captureStopReason": "end"
+    },
+    {
+      "final": "What is the capital of France?",
+      "source": "hotkey",
+      "captureStopReason": "end"
+    }
+  ],
+  "endpointing": "turn t1 ended by voice activity (captureStopReason vad); other turns ended by hotkey release (end)"
+}

@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import {fork,execFileSync} from 'node:child_process';
+import {createServer} from 'node:net';
+import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,existsSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {resolve,join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {verifyRelease,importClosure,sourceCheck} from '../../../scripts/bunny-release.mjs';
+const evidence=resolve('test-results/ma3/t9r'),pkg=join(evidence,'windows-package/Bunny-A-Windows-MA3-T9R-TEST');
+const manifest=JSON.parse(readFileSync(join(pkg,'release-manifest.json'))),source=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+assert.equal(manifest.sourceCommit,source);assert.equal(manifest.toolingCommit,source);assert.equal(manifest.version,'1.0.0-MA3-T9R-TEST');
+const validation={manifest:verifyRelease(pkg),closure:importClosure(pkg),source:sourceCheck(resolve('.'),pkg)};
+const parent=mkdtempSync(join(tmpdir(),'bunny-t9r-package-runtime-')),state=join(parent,'state'),workspace=join(parent,'workspace');
+mkdirSync(state);mkdirSync(workspace);
+const node=join(pkg,'runtime/node.exe');assert.ok(existsSync(node));
+const init=join(parent,'init.mjs');
+writeFileSync(init,`import {HostDatabase} from ${JSON.stringify(pathToFileURL(join(pkg,'src/lib/bunny-host/persistence.server.ts')).href)};
+import {createHash,randomBytes} from 'node:crypto';import {mkdirSync,writeFileSync} from 'node:fs';import {join} from 'node:path';
+const state=${JSON.stringify(state)},db=new HostDatabase(join(state,'host.sqlite'));
+const schema=db.db.prepare('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').all();db.close();
+for(const name of ['credentials','settings','runtime','logs','backups','cloudflared','sessions'])mkdirSync(join(state,name));
+writeFileSync(join(state,'state-layout.json'),JSON.stringify({schema:'bunny-state/2',stateRoot:state,databaseUserVersion:3,databaseSchemaSha256:createHash('sha256').update(JSON.stringify(schema)).digest('hex')}));
+writeFileSync(join(state,'credentials/credentials.json'),JSON.stringify({token:randomBytes(32).toString('base64url')}));
+writeFileSync(join(state,'settings/remote.json'),'{}');`);
+execFileSync(node,['--experimental-strip-types',init],{windowsHide:true,stdio:'pipe'});
+const socket=createServer();await new Promise(done=>socket.listen(0,'127.0.0.1',done));const port=socket.address().port;await new Promise(done=>socket.close(done));
+const wrapper=join(parent,'boot.mjs');
+writeFileSync(wrapper,`const {host}=await import(${JSON.stringify(pathToFileURL(join(pkg,'Bunny-Host.mjs')).href)});if(!host)throw Error('Packaged entry failed');
+process.send({pid:process.pid,token:host.token});process.on('message',message=>{if(message==='close')void host.close().then(()=>process.exit(0));});`);
+const env={...process.env,BUNNY_STATE_LAYOUT:'2',BUNNY_HOST_DATA_DIRECTORY:state,BUNNY_HOST_WORKSPACE:workspace,BUNNY_HOST_PORT:String(port),BUNNY_HOST_CREDENTIALS_FILE:join(state,'credentials/credentials.json'),BUNNY_REMOTE_CONFIG:join(state,'settings/remote.json')};
+delete env.DATABASE_URL;delete env.BUNNY_RELEASE_ROOT;delete env.BUNNY_REMOTE_ORIGIN;
+const startedAt=new Date().toISOString(),child=fork(wrapper,[],{execPath:node,execArgv:['--experimental-strip-types'],cwd:parent,env,windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
+let log='';child.stdout.on('data',bytes=>{log+=bytes;});child.stderr.on('data',bytes=>{log+=bytes;});
+let forced=false;
+try {
+ const ready=await Promise.race([new Promise((done,reject)=>{child.once('message',done);child.once('exit',code=>reject(Error('Owned packaged Host exited '+code)));}),new Promise((_,reject)=>setTimeout(()=>reject(Error('Packaged Host readiness deadline')),45000))]);
+ const response=await fetch(`http://127.0.0.1:${port}/state`,{headers:{authorization:'Bearer '+ready.token}});assert.equal(response.status,200);const snapshot=await response.json();
+ assert.equal(snapshot.release.sourceCommit,source);assert.equal(snapshot.release.version,manifest.version);assert.equal(snapshot.tasks.length,0);assert.equal(snapshot.agents.agents.length,0);
+ const closed=new Promise(done=>child.once('exit',done));child.send('close');await Promise.race([closed,new Promise((_,reject)=>setTimeout(()=>reject(Error('Packaged close deadline')),15000))]);
+ const after=verifyRelease(pkg);
+ writeFileSync(join(evidence,'windows-package-results.json'),JSON.stringify({result:'PASS',classification:'LIVE bundled node.exe, actual packaged Bunny-Host.mjs and native dependencies in fresh installed-layout disposable state',sourceCommit:source,toolingCommit:source,release:manifest.release,version:manifest.version,validation,after,boot:{result:'PASS',pid:ready.pid,startedAt,finishedAt:new Date().toISOString(),stateDirectory:state,release:snapshot.release,health:snapshot.health,tasks:0,agents:0,gracefulClose:true},gatewayBoot:{result:'NOT TESTED',reason:'Packaged Bunny-Server.mjs fixes the gateway at 127.0.0.1:8084, occupied by protected installed production. No port takeover or package source mutation performed. The same built gateway is separately live verified on disposable test listeners.'},installPerformed:false,productionRestart:false},null,2)+'\n');
+ console.log('Packaged Host boot, release identity, graceful shutdown and unchanged manifest: PASS. Production gateway port preserved.');
+}catch(error){writeFileSync(join(evidence,'package-boot-failure.json'),JSON.stringify({result:'FAIL',message:error.message,startedAt,finishedAt:new Date().toISOString()},null,2));throw error;}
+finally{if(child.exitCode===null){forced=true;child.kill();}writeFileSync(join(evidence,'package-runtime.log'),log);if(forced)console.error('Only the exact owned package child required cleanup.');}

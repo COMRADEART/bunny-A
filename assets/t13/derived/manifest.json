@@ -1,0 +1,987 @@
+{
+  "schema": "bunny-a.t13.character-assets.v1",
+  "source": {
+    "path": "assets/t13/source/bunny-a-showcase-original.png",
+    "originalName": "Bunny A Futuristic AI Interface Showcase.png",
+    "suppliedBy": "user (local Downloads, 2026-10-12)",
+    "width": 1536,
+    "height": 1024,
+    "sha256": "e390442a70b8c6620f37d9b59b48260e864e051b838185bac5ef70cb631fc7fd"
+  },
+  "tooling": {
+    "python": "3.12.10",
+    "pillow": "12.3.0",
+    "numpy": "2.4.6"
+  },
+  "processing": [
+    "crop at native resolution (no resampling)",
+    "rectangular exclusion of overlapping board UI-chip fragments where listed",
+    "alpha = clip((max(R,G,B) - bg - floor) / 0.30)^0.85, bg = 20th percentile of crop border, floor 0.02 (0.16 for spear.hero/sword.hero)",
+    "colour unblended against bg where alpha > 0; 4 px edge feather; exclusions box-blurred 2 px",
+    "usage rule: dark visors/faces key toward transparent, so art is always composited on a dark character well"
+  ],
+  "assets": [
+    {
+      "id": "bunny.idle",
+      "role": "bunny-state",
+      "note": "Companion States board: Idle",
+      "sourceRect": {
+        "x": 1150,
+        "y": 765,
+        "width": 81,
+        "height": 79
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/bunny.idle.png",
+        "sha256": "6a4307eba15340a292de33d8e719e9ffc66f20b2f5d5d3e544f786400fae1dbf"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/bunny.idle.alpha.png",
+        "sha256": "a1f87ecb6a246253a97956db8364dfbabd897a18f35f861d05c9c8816ca2e337"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/bunny.idle.png",
+        "sha256": "a1f87ecb6a246253a97956db8364dfbabd897a18f35f861d05c9c8816ca2e337"
+      }
+    },
+    {
+      "id": "bunny.listening",
+      "role": "bunny-state",
+      "note": "Companion States board: Listening",
+      "sourceRect": {
+        "x": 1244,
+        "y": 765,
+        "width": 81,
+        "height": 79
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/bunny.listening.png",
+        "sha256": "8545ea95eb2bade387088e49906ec1f6807b1427a426d56f0779b9f79bf932a4"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/bunny.listening.alpha.png",
+        "sha256": "1cb6f8d69445369fdca72d489b8567e5fa003400b3a74e280072d326f8acab06"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/bunny.listening.png",
+        "sha256": "1cb6f8d69445369fdca72d489b8567e5fa003400b3a74e280072d326f8acab06"
+      }
+    },
+    {
+      "id": "bunny.speaking",
+      "role": "bunny-state",
+      "note": "Companion States board: Speaking",
+      "sourceRect": {
+        "x": 1337,
+        "y": 765,
+        "width": 83,
+        "height": 79
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/bunny.speaking.png",
+        "sha256": "391fcad3757003e0d4854ab302290593f710a4f18146c9608a07ef7bfba30451"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/bunny.speaking.alpha.png",
+        "sha256": "1df21098f4a02d05c6d5b1dcf9c4c7e92ab3b7e9dd109274d2e38a71a89acaa5"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/bunny.speaking.png",
+        "sha256": "1df21098f4a02d05c6d5b1dcf9c4c7e92ab3b7e9dd109274d2e38a71a89acaa5"
+      }
+    },
+    {
+      "id": "bunny.thinking",
+      "role": "bunny-state",
+      "note": "Companion States board: Thinking",
+      "sourceRect": {
+        "x": 1432,
+        "y": 765,
+        "width": 85,
+        "height": 79
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/bunny.thinking.png",
+        "sha256": "3d75559ba80feed120c65021ee5841189df6b7a490b1787df892beadf9bb149d"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/bunny.thinking.alpha.png",
+        "sha256": "2af3567d5508ee84fd660174b02820832dcde7b26629f6ed47db327c11253588"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/bunny.thinking.png",
+        "sha256": "2af3567d5508ee84fd660174b02820832dcde7b26629f6ed47db327c11253588"
+      }
+    },
+    {
+      "id": "bunny.interrupted",
+      "role": "bunny-state",
+      "note": "Companion States board: Interrupted",
+      "sourceRect": {
+        "x": 1150,
+        "y": 878,
+        "width": 81,
+        "height": 80
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/bunny.interrupted.png",
+        "sha256": "4a8e46efc13c79b97bc309d80d1a6575af2b048d5c7e2f689331e91c8e9121d1"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/bunny.interrupted.alpha.png",
+        "sha256": "727b74aa786ca896b00b5a1e4ed9d15700775f6ad2e53afb46147ba804504e71"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/bunny.interrupted.png",
+        "sha256": "727b74aa786ca896b00b5a1e4ed9d15700775f6ad2e53afb46147ba804504e71"
+      }
+    },
+    {
+      "id": "bunny.happy",
+      "role": "bunny-state",
+      "note": "Companion States board: Happy",
+      "sourceRect": {
+        "x": 1244,
+        "y": 878,
+        "width": 81,
+        "height": 80
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/bunny.happy.png",
+        "sha256": "10127dde89f82f5cca70ebf2276dc76937d864a49493a3085274b03d1b97d9a1"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/bunny.happy.alpha.png",
+        "sha256": "099deea83a52cf83d40c4504d4d7b1df4c00f0c8fc268f6d343abe2ee19c9d2e"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/bunny.happy.png",
+        "sha256": "099deea83a52cf83d40c4504d4d7b1df4c00f0c8fc268f6d343abe2ee19c9d2e"
+      }
+    },
+    {
+      "id": "bunny.sleeping",
+      "role": "bunny-state",
+      "note": "Companion States board: Sleeping",
+      "sourceRect": {
+        "x": 1337,
+        "y": 878,
+        "width": 83,
+        "height": 80
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/bunny.sleeping.png",
+        "sha256": "ea4984a491a68e366e28b354c3a6f984ab65460e2120ee917a91d9928cdb3d57"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/bunny.sleeping.alpha.png",
+        "sha256": "8bb9279284cea3af6a1e9a8558899d792eeb3a326f00f487db9f382f6dcbffee"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/bunny.sleeping.png",
+        "sha256": "8bb9279284cea3af6a1e9a8558899d792eeb3a326f00f487db9f382f6dcbffee"
+      }
+    },
+    {
+      "id": "bunny.processing",
+      "role": "bunny-state",
+      "note": "Companion States board: Processing",
+      "sourceRect": {
+        "x": 1432,
+        "y": 878,
+        "width": 85,
+        "height": 80
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/bunny.processing.png",
+        "sha256": "ab097dd82f9e42d081d84c1af2115889a716ef69680f313754773f02a5518ce6"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/bunny.processing.alpha.png",
+        "sha256": "6f0c692f4b41497eae6a85616c67babd184f6308933d257e9abb334380effe9a"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/bunny.processing.png",
+        "sha256": "6f0c692f4b41497eae6a85616c67babd184f6308933d257e9abb334380effe9a"
+      }
+    },
+    {
+      "id": "bunny.hero",
+      "role": "bunny-hero",
+      "note": "Mobile home screen hero",
+      "sourceRect": {
+        "x": 1143,
+        "y": 124,
+        "width": 119,
+        "height": 126
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/bunny.hero.png",
+        "sha256": "162ec0cd27518b4d99a092d925d3bc63eabc175cf295739f5f711c8057ff9444"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/bunny.hero.alpha.png",
+        "sha256": "534661cfe6a884b247be046badcb52760057415433a39371127ec4a29de2fbe5"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/bunny.hero.png",
+        "sha256": "534661cfe6a884b247be046badcb52760057415433a39371127ec4a29de2fbe5"
+      }
+    },
+    {
+      "id": "gada.hero",
+      "role": "weapon-hero",
+      "note": "Gada panel hero",
+      "sourceRect": {
+        "x": 38,
+        "y": 809,
+        "width": 242,
+        "height": 135
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/gada.hero.png",
+        "sha256": "942f90ab9faff8bcc7ac25fa9d4c000997451cd575b94e5c7f917f62568e1e81"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/gada.hero.alpha.png",
+        "sha256": "0dbacee9eb51475d43483f30d816cb1ee306328ed287228e4f0d850c86d8553e"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/gada.hero.png",
+        "sha256": "0dbacee9eb51475d43483f30d816cb1ee306328ed287228e4f0d850c86d8553e"
+      }
+    },
+    {
+      "id": "gada.portrait",
+      "role": "weapon-portrait",
+      "note": "Mobile Agent Details hero",
+      "sourceRect": {
+        "x": 1345,
+        "y": 118,
+        "width": 165,
+        "height": 127
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/gada.portrait.png",
+        "sha256": "e1af54a112c20e0b14f51769cce2a87d5d78b65b77254f33d70a860e66b8ac3b"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/gada.portrait.alpha.png",
+        "sha256": "923fde6f3879a35c59377f2d5c37bfd2377947d7c08af7e6b259f68955aac783"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/gada.portrait.png",
+        "sha256": "923fde6f3879a35c59377f2d5c37bfd2377947d7c08af7e6b259f68955aac783"
+      }
+    },
+    {
+      "id": "gada.pose1",
+      "role": "weapon-pose",
+      "note": "Gada pose tile 1",
+      "sourceRect": {
+        "x": 30,
+        "y": 947,
+        "width": 57,
+        "height": 49
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/gada.pose1.png",
+        "sha256": "d48be813a5a68ebfb594de8ca67a68b378d28df0325323372449b97363d9fc78"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/gada.pose1.alpha.png",
+        "sha256": "0fbf56a636595cb6e1b54caab5a6ec560f7cd5aacfe43042e74b32d80f89bd90"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/gada.pose1.png",
+        "sha256": "0fbf56a636595cb6e1b54caab5a6ec560f7cd5aacfe43042e74b32d80f89bd90"
+      }
+    },
+    {
+      "id": "gada.pose2",
+      "role": "weapon-pose",
+      "note": "Gada pose tile 2",
+      "sourceRect": {
+        "x": 95,
+        "y": 947,
+        "width": 41,
+        "height": 49
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/gada.pose2.png",
+        "sha256": "c5137d718f68fcb1c6f0ebed5d564cd627e3631624753e1a8c0d78b31c163b1e"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/gada.pose2.alpha.png",
+        "sha256": "8a07a97b145ca6d5f66ec81196d8a3771056145d1a9bfebf66429b7714bd1d7d"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/gada.pose2.png",
+        "sha256": "8a07a97b145ca6d5f66ec81196d8a3771056145d1a9bfebf66429b7714bd1d7d"
+      }
+    },
+    {
+      "id": "gada.pose3",
+      "role": "weapon-pose",
+      "note": "Gada pose tile 3",
+      "sourceRect": {
+        "x": 143,
+        "y": 947,
+        "width": 42,
+        "height": 49
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/gada.pose3.png",
+        "sha256": "7f6bffcb1e89fd00cd4e83868a4af421f4530d740b7f7e1600cfb8713f479bbc"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/gada.pose3.alpha.png",
+        "sha256": "28b2a3c507030ab4d5812be73264793d4576beb0f5ddb11a4915d0559d48e0a2"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/gada.pose3.png",
+        "sha256": "28b2a3c507030ab4d5812be73264793d4576beb0f5ddb11a4915d0559d48e0a2"
+      }
+    },
+    {
+      "id": "gada.pose4",
+      "role": "weapon-pose",
+      "note": "Gada pose tile 4",
+      "sourceRect": {
+        "x": 192,
+        "y": 947,
+        "width": 43,
+        "height": 49
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/gada.pose4.png",
+        "sha256": "f58f94e77e40c13d4be2cd937f48e37d3561bbff695feccd425553760edbe17f"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/gada.pose4.alpha.png",
+        "sha256": "59cf49d13c48ef601a9f877796fc7fd1abc4d66ee6ad58407711daf91f5f250d"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/gada.pose4.png",
+        "sha256": "59cf49d13c48ef601a9f877796fc7fd1abc4d66ee6ad58407711daf91f5f250d"
+      }
+    },
+    {
+      "id": "gada.pose5",
+      "role": "weapon-pose",
+      "note": "Gada pose tile 5",
+      "sourceRect": {
+        "x": 242,
+        "y": 947,
+        "width": 52,
+        "height": 49
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/gada.pose5.png",
+        "sha256": "ad3c3a1f13c3f5b9d5a00e04fc6a053f72e84489c5ebec81c617d89b5d2ad5e4"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/gada.pose5.alpha.png",
+        "sha256": "f475867651b0e401c5e9f98871b803927f4d891756343acff289140dbc67ed77"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/gada.pose5.png",
+        "sha256": "f475867651b0e401c5e9f98871b803927f4d891756343acff289140dbc67ed77"
+      }
+    },
+    {
+      "id": "gada.compact",
+      "role": "weapon-compact",
+      "note": "Mobile home agent row",
+      "sourceRect": {
+        "x": 1118,
+        "y": 288,
+        "width": 34,
+        "height": 62
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/gada.compact.png",
+        "sha256": "c61aa75751223c75d808e2bc3c31087d0f83fdcd2343c45e013507670ae847b2"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/gada.compact.alpha.png",
+        "sha256": "6c96de60e1cb83d8cb69109290fbf69510945ae3a688a0ada50e246d48cb69ce"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/gada.compact.png",
+        "sha256": "6c96de60e1cb83d8cb69109290fbf69510945ae3a688a0ada50e246d48cb69ce"
+      }
+    },
+    {
+      "id": "spear.hero",
+      "role": "weapon-hero",
+      "note": "Spear panel faced hero; Testing/Complete chip fragments excluded",
+      "sourceRect": {
+        "x": 461,
+        "y": 766,
+        "width": 55,
+        "height": 168
+      },
+      "exclusions": [
+        {
+          "x": 461,
+          "y": 786,
+          "width": 14,
+          "height": 29
+        },
+        {
+          "x": 500,
+          "y": 786,
+          "width": 16,
+          "height": 29
+        }
+      ],
+      "opaque": {
+        "path": "assets/t13/derived/spear.hero.png",
+        "sha256": "b182c2ab212ef8efa45c30971ddf984ee51c32a4fdbf03bdcf14132a5fa1c2b3"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/spear.hero.alpha.png",
+        "sha256": "0c850d628a891b2f2ca7d9735cfd80c367b42d5d79712b5631678ca1e3cfd747"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/spear.hero.png",
+        "sha256": "0c850d628a891b2f2ca7d9735cfd80c367b42d5d79712b5631678ca1e3cfd747"
+      }
+    },
+    {
+      "id": "spear.alt",
+      "role": "weapon-alt",
+      "note": "Spear panel second hero (no face)",
+      "sourceRect": {
+        "x": 344,
+        "y": 808,
+        "width": 56,
+        "height": 128
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/spear.alt.png",
+        "sha256": "1a0dcb5c7bb0f5befc011feb08a3ac250b39a8689fd5f2069a890ffbfc1a9a53"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/spear.alt.alpha.png",
+        "sha256": "3eea2c46d3f027601a2e45049766391665b24a2f86dd0809d6ca6a0895fe633a"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/spear.alt.png",
+        "sha256": "3eea2c46d3f027601a2e45049766391665b24a2f86dd0809d6ca6a0895fe633a"
+      }
+    },
+    {
+      "id": "spear.pose1",
+      "role": "weapon-pose",
+      "note": "Spear pose tile 1",
+      "sourceRect": {
+        "x": 317,
+        "y": 937,
+        "width": 46,
+        "height": 59
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/spear.pose1.png",
+        "sha256": "341f32e0b84a1f6cd89097eef756211238edfd5cd9fb0d7234314546074df86f"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/spear.pose1.alpha.png",
+        "sha256": "c59fbf55188d25e54dec4a5bc0b8f38e0bc97333d29d091d4dc63acfe3b4f28e"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/spear.pose1.png",
+        "sha256": "c59fbf55188d25e54dec4a5bc0b8f38e0bc97333d29d091d4dc63acfe3b4f28e"
+      }
+    },
+    {
+      "id": "spear.pose2",
+      "role": "weapon-pose",
+      "note": "Spear pose tile 2",
+      "sourceRect": {
+        "x": 369,
+        "y": 937,
+        "width": 44,
+        "height": 59
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/spear.pose2.png",
+        "sha256": "122edb809664ba2560b20879c16572dac7998a0a77ad96366a545dbf601d1416"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/spear.pose2.alpha.png",
+        "sha256": "907d2195b27a19f0cc41688bca1116d5f4aa05c62b53026a131edc08450dcefc"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/spear.pose2.png",
+        "sha256": "907d2195b27a19f0cc41688bca1116d5f4aa05c62b53026a131edc08450dcefc"
+      }
+    },
+    {
+      "id": "spear.pose3",
+      "role": "weapon-pose",
+      "note": "Spear pose tile 3",
+      "sourceRect": {
+        "x": 427,
+        "y": 937,
+        "width": 39,
+        "height": 59
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/spear.pose3.png",
+        "sha256": "ce9e45c290959e9dba822fa43a90f79ffcde282250ca72fe4a65a12462fc3520"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/spear.pose3.alpha.png",
+        "sha256": "a3099aed1b591f4ddbca42f3e1cc961a1e0322be59cdab0c616cb504810ddff1"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/spear.pose3.png",
+        "sha256": "a3099aed1b591f4ddbca42f3e1cc961a1e0322be59cdab0c616cb504810ddff1"
+      }
+    },
+    {
+      "id": "spear.pose4",
+      "role": "weapon-pose",
+      "note": "Spear pose tile 4",
+      "sourceRect": {
+        "x": 472,
+        "y": 937,
+        "width": 37,
+        "height": 59
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/spear.pose4.png",
+        "sha256": "9f809c9070eda5eb4771e4e4bd450dd37c1dc90b997d5dfe405999e0b1d1b6e2"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/spear.pose4.alpha.png",
+        "sha256": "224461b8bde377b7c0f9a8036206bc702b710ba4bebe9098d2f82b27f093ad40"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/spear.pose4.png",
+        "sha256": "224461b8bde377b7c0f9a8036206bc702b710ba4bebe9098d2f82b27f093ad40"
+      }
+    },
+    {
+      "id": "spear.pose5",
+      "role": "weapon-pose",
+      "note": "Spear pose tile 5",
+      "sourceRect": {
+        "x": 515,
+        "y": 937,
+        "width": 42,
+        "height": 59
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/spear.pose5.png",
+        "sha256": "e6ab2a39f786129e1eaca72ff0ea5b5949a4fe9d324dcde4f9768ce8ac4ab53d"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/spear.pose5.alpha.png",
+        "sha256": "27f93cdfd27a3811034a794178482eca7cc110d83f17a539d48289879c4a022d"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/spear.pose5.png",
+        "sha256": "27f93cdfd27a3811034a794178482eca7cc110d83f17a539d48289879c4a022d"
+      }
+    },
+    {
+      "id": "spear.compact",
+      "role": "weapon-compact",
+      "note": "Mobile home agent row",
+      "sourceRect": {
+        "x": 1162,
+        "y": 288,
+        "width": 29,
+        "height": 62
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/spear.compact.png",
+        "sha256": "adea4d2548423ad4aa42b92b3d637d9fa25ffb3ebb1dfd06363ff3bd7665e22c"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/spear.compact.alpha.png",
+        "sha256": "7f01b3a3357afa1dce51a8b34118e16eedb61d2bfb72bd5bdf81273edd5721ac"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/spear.compact.png",
+        "sha256": "7f01b3a3357afa1dce51a8b34118e16eedb61d2bfb72bd5bdf81273edd5721ac"
+      }
+    },
+    {
+      "id": "chakra.hero",
+      "role": "weapon-hero",
+      "note": "Vishnu Chakra panel hero (unobstructed)",
+      "sourceRect": {
+        "x": 586,
+        "y": 834,
+        "width": 116,
+        "height": 97
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/chakra.hero.png",
+        "sha256": "3eabdee2e9ef4b0c0e64c524814f96e0486d2e6a96e6801ed6b37fbc4fbc3556"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/chakra.hero.alpha.png",
+        "sha256": "59c336a8310625a57f39afe9ee7778e6ed3714f32619e9611c7c712e26239a2d"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/chakra.hero.png",
+        "sha256": "59c336a8310625a57f39afe9ee7778e6ed3714f32619e9611c7c712e26239a2d"
+      }
+    },
+    {
+      "id": "chakra.pose1",
+      "role": "weapon-pose",
+      "note": "Chakra pose tile 1",
+      "sourceRect": {
+        "x": 580,
+        "y": 935,
+        "width": 51,
+        "height": 61
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/chakra.pose1.png",
+        "sha256": "74749934e470a6ba744eb97c7a013fb650b345b9b7fb2c7c4289374e9774e37d"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/chakra.pose1.alpha.png",
+        "sha256": "82fc7acd5f4deeeb807ac37e110a7c2db5a83e2bf02af05e7592fba5998cedf3"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/chakra.pose1.png",
+        "sha256": "82fc7acd5f4deeeb807ac37e110a7c2db5a83e2bf02af05e7592fba5998cedf3"
+      }
+    },
+    {
+      "id": "chakra.pose2",
+      "role": "weapon-pose",
+      "note": "Chakra pose tile 2",
+      "sourceRect": {
+        "x": 637,
+        "y": 935,
+        "width": 59,
+        "height": 61
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/chakra.pose2.png",
+        "sha256": "c08f849a82050afc713f00848345ca02185db79a261238356bdb6b26df104aa4"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/chakra.pose2.alpha.png",
+        "sha256": "e6c32c640c8a4d9b5fdb7d50658df771e7541ee01f0dafd0bc6960e0fcc3c062"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/chakra.pose2.png",
+        "sha256": "e6c32c640c8a4d9b5fdb7d50658df771e7541ee01f0dafd0bc6960e0fcc3c062"
+      }
+    },
+    {
+      "id": "chakra.pose3",
+      "role": "weapon-pose",
+      "note": "Chakra pose tile 3",
+      "sourceRect": {
+        "x": 704,
+        "y": 935,
+        "width": 62,
+        "height": 61
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/chakra.pose3.png",
+        "sha256": "2cbc259456cf413377fd22ccc02dd2b14cd836af4d7ae4263aba35fc9996f3e0"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/chakra.pose3.alpha.png",
+        "sha256": "1ed276a454d3f0ef7a282ab5c2bfa4623d6a0d3110e38aee306127bf607e6fe4"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/chakra.pose3.png",
+        "sha256": "1ed276a454d3f0ef7a282ab5c2bfa4623d6a0d3110e38aee306127bf607e6fe4"
+      }
+    },
+    {
+      "id": "chakra.pose4",
+      "role": "weapon-pose",
+      "note": "Chakra pose tile 4",
+      "sourceRect": {
+        "x": 772,
+        "y": 935,
+        "width": 63,
+        "height": 61
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/chakra.pose4.png",
+        "sha256": "9abe2264f656df86307ce44ad61706efd7b926e4f7d0323ea8fce5cdbf9b8167"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/chakra.pose4.alpha.png",
+        "sha256": "9ec68f56bab07aaafbc677a00631dfe1db3221b33f4734afb05c3935625b0670"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/chakra.pose4.png",
+        "sha256": "9ec68f56bab07aaafbc677a00631dfe1db3221b33f4734afb05c3935625b0670"
+      }
+    },
+    {
+      "id": "chakra.compact",
+      "role": "weapon-compact",
+      "note": "Mobile home agent row",
+      "sourceRect": {
+        "x": 1198,
+        "y": 293,
+        "width": 49,
+        "height": 54
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/chakra.compact.png",
+        "sha256": "bf0cb2850adaae58243408057d9b7681f9912e36c4f18594c1dbf2e637e22dfa"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/chakra.compact.alpha.png",
+        "sha256": "da7d7fc61e25c241ab92d647ce6d061485c173b255caef121a167abe85d9581e"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/chakra.compact.png",
+        "sha256": "da7d7fc61e25c241ab92d647ce6d061485c173b255caef121a167abe85d9581e"
+      }
+    },
+    {
+      "id": "sword.hero",
+      "role": "weapon-hero",
+      "note": "Sword panel faced hero; Testing/Complete chip fragments excluded",
+      "sourceRect": {
+        "x": 1014,
+        "y": 767,
+        "width": 78,
+        "height": 167
+      },
+      "exclusions": [
+        {
+          "x": 1014,
+          "y": 784,
+          "width": 23,
+          "height": 32
+        },
+        {
+          "x": 1068,
+          "y": 784,
+          "width": 24,
+          "height": 32
+        }
+      ],
+      "opaque": {
+        "path": "assets/t13/derived/sword.hero.png",
+        "sha256": "e4622d6c3f176df13b9a72b58c12bfb248a8c1cf5e44b222af66bee8207d5f95"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/sword.hero.alpha.png",
+        "sha256": "5697b731f7e60e539d628535ec9dbebba488264dcb878d8c7f38e935c521e4dd"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/sword.hero.png",
+        "sha256": "5697b731f7e60e539d628535ec9dbebba488264dcb878d8c7f38e935c521e4dd"
+      }
+    },
+    {
+      "id": "sword.alt1",
+      "role": "weapon-alt",
+      "note": "Sword panel hero 1",
+      "sourceRect": {
+        "x": 866,
+        "y": 836,
+        "width": 48,
+        "height": 98
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/sword.alt1.png",
+        "sha256": "d21266a6535b3640729cedee4497374f76e316032784aa9058b1b55892cb474b"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/sword.alt1.alpha.png",
+        "sha256": "52dbd1c5c9749d42f25f29ddcac41e30e3bc27d09fdf5e6f059e73b86437090b"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/sword.alt1.png",
+        "sha256": "52dbd1c5c9749d42f25f29ddcac41e30e3bc27d09fdf5e6f059e73b86437090b"
+      }
+    },
+    {
+      "id": "sword.alt2",
+      "role": "weapon-alt",
+      "note": "Sword panel hero 2",
+      "sourceRect": {
+        "x": 938,
+        "y": 836,
+        "width": 48,
+        "height": 98
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/sword.alt2.png",
+        "sha256": "a0912a34bb2b98d4b6ce8e424029e09c7d01e9a16c313b48fed62ce6b23547a9"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/sword.alt2.alpha.png",
+        "sha256": "925c72ce4d18bde233ff0e13bcb4678f14745902f744713486a13082c311762d"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/sword.alt2.png",
+        "sha256": "925c72ce4d18bde233ff0e13bcb4678f14745902f744713486a13082c311762d"
+      }
+    },
+    {
+      "id": "sword.pose1",
+      "role": "weapon-pose",
+      "note": "Sword pose tile 1",
+      "sourceRect": {
+        "x": 859,
+        "y": 937,
+        "width": 57,
+        "height": 58
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/sword.pose1.png",
+        "sha256": "4cbb60cde4e1cee1d4dc8583b2fc7de13e421c757ac66082a63b11e03ebe1e72"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/sword.pose1.alpha.png",
+        "sha256": "b9ea7d2ade4e8fd48aed2ca31e3c00b35098611a5fd57faea9429728d5f80812"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/sword.pose1.png",
+        "sha256": "b9ea7d2ade4e8fd48aed2ca31e3c00b35098611a5fd57faea9429728d5f80812"
+      }
+    },
+    {
+      "id": "sword.pose2",
+      "role": "weapon-pose",
+      "note": "Sword pose tile 2",
+      "sourceRect": {
+        "x": 923,
+        "y": 937,
+        "width": 62,
+        "height": 58
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/sword.pose2.png",
+        "sha256": "3c653ec80bed6b9f582da9f48dac9c0afd997b2b75f391380efe7a45d352aae1"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/sword.pose2.alpha.png",
+        "sha256": "d6b38ecc16c5d5ce38d0c3bba9db9a4339e46c2eb3e612512bf09da71f5ce95f"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/sword.pose2.png",
+        "sha256": "d6b38ecc16c5d5ce38d0c3bba9db9a4339e46c2eb3e612512bf09da71f5ce95f"
+      }
+    },
+    {
+      "id": "sword.pose3",
+      "role": "weapon-pose",
+      "note": "Sword pose tile 3",
+      "sourceRect": {
+        "x": 992,
+        "y": 937,
+        "width": 51,
+        "height": 58
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/sword.pose3.png",
+        "sha256": "1210ff2cd77fe305b94266d1223c63a6ef06cfc775e8efcd6551a5c1abf65e5a"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/sword.pose3.alpha.png",
+        "sha256": "41addf22083994dfcfb6d05b7ce10b4c57eda74ca72b3f024bed86b3d0c308fb"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/sword.pose3.png",
+        "sha256": "41addf22083994dfcfb6d05b7ce10b4c57eda74ca72b3f024bed86b3d0c308fb"
+      }
+    },
+    {
+      "id": "sword.pose4",
+      "role": "weapon-pose",
+      "note": "Sword pose tile 4",
+      "sourceRect": {
+        "x": 1050,
+        "y": 937,
+        "width": 60,
+        "height": 58
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/sword.pose4.png",
+        "sha256": "5a549f22506cb12139c50376860e72e3b7cf630fe622cb150059070a83cccd4f"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/sword.pose4.alpha.png",
+        "sha256": "e1bea9f3aefc1aea5a1faa8362f2f2b8ac916e968281b463499cd72c0b171a7b"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/sword.pose4.png",
+        "sha256": "e1bea9f3aefc1aea5a1faa8362f2f2b8ac916e968281b463499cd72c0b171a7b"
+      }
+    },
+    {
+      "id": "sword.compact",
+      "role": "weapon-compact",
+      "note": "Mobile home agent row",
+      "sourceRect": {
+        "x": 1254,
+        "y": 288,
+        "width": 28,
+        "height": 62
+      },
+      "exclusions": [],
+      "opaque": {
+        "path": "assets/t13/derived/sword.compact.png",
+        "sha256": "14a6fbe68a4b1d053c3718f653954b71b4aefd326325243bf3c5e75fa06d568a"
+      },
+      "alpha": {
+        "path": "assets/t13/derived/sword.compact.alpha.png",
+        "sha256": "9c55d217f918ddfcac1e1e3c19f5076435e16e53a2ed883273c071c5dc82b837"
+      },
+      "runtime": {
+        "path": "public/bunny-a/characters/sword.compact.png",
+        "sha256": "9c55d217f918ddfcac1e1e3c19f5076435e16e53a2ed883273c071c5dc82b837"
+      }
+    }
+  ]
+}

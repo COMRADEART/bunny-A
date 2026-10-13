@@ -1,0 +1,22 @@
+{
+  "classification": "LIVE disposable Host disconnect/restart with SIMULATED phone browser origin",
+  "result": "PASS for tested disconnect",
+  "observed": [
+    "After failed reads, status became Offline and retained snapshot was labeled stale",
+    "Controls and artifact fetches were disabled while offline",
+    "Fresh disposable Host process reconnected automatically, with same Host UUID and a new-epoch notice",
+    "A different pinned Host required explicit trust and disabled controls",
+    "No queued approval was automatically replayed",
+    "Lost Stop acknowledgment was resolved by operation.status and a duplicate replay caused no second effect"
+  ],
+  "evidence": [
+    "browser-offline-final.txt",
+    "browser-reconnected.txt",
+    "remote-protocol-results.json",
+    "ui-test-results.log",
+    "fixture-response-offline-disconnect.json",
+    "fixture-response-offline-reconnect.json"
+  ],
+  "phoneNetworkDisconnectionWhileAgentRuns": "NOT TESTED",
+  "physicalBackgroundSuspension": "NOT TESTED"
+}

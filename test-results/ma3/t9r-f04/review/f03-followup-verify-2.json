@@ -1,0 +1,185 @@
+{
+  "round": 2,
+  "verdicts": [
+    {
+      "id": "F03-FOLLOWUP-1",
+      "repaired": false,
+      "newIssue": "The per-line exemption in readOnlyStatement is only exact when a shell statement sits on one physical line. Statements that continue across lines (backslash-newline, quoted newline, YAML folded scalars, cmd caret line-end) let a runner receive a read-only glob line without any line being judged. Single-line hiding forms (separators, substitutions, pipes into runners, comments, env prefixes) are refused as intended; the controls G1, G3, G6, G7, G8, G9 and 'ls *.md | node render.js' all return EXECUTION_RELEVANT. The repair is open for multi-line statements.",
+      "severity": "HIGH",
+      "evidence": "Probes run with classifyDeviceWrite(\"notes.md\") against temp fixtures (deleted after). WORKING: build.sh = \"node render.js \\\\\\nls *.md\\n\" (backslash-newline) -> PHONE_SAFE_DOCUMENT; Makefile = \"docs:\\n\\tnode render.js \\\\\\n\\tls *.md\\n\" -> PHONE_SAFE_DOCUMENT; build.sh = \"node render.js \\\"\\nls\\\" *.md\\n\" -> PHONE_SAFE_DOCUMENT. Controls refused: build.sh \"ls *.md | node render.js\" -> EXECUTION_RELEVANT (HEAD allowed); build.sh \"grep -l x *.md | while read f\\ndo node \\\"$f\\\"\\ndone\" -> EXECUTION_RELEVANT; build.ps1 \"ls *.md | ForEach-Object { node $_ }\" -> EXECUTION_RELEVANT; build.cmd \"for %f in (*.md) do node %f\" -> EXECUTION_RELEVANT; Makefile \"docs: *.md\\n\\tnode render.js $^\" -> EXECUTION_RELEVANT.",
+      "hunter": 1,
+      "disposition": "repair extended — see verification 3"
+    },
+    {
+      "id": "NEW-1",
+      "repaired": false,
+      "newIssue": "sh backslash-newline continuation: a runner on the first physical line, with the destination glob on a read-only continuation line. The joined command is `node render.js ls *.md`, so node receives the expanded notes.md. Only the glob line is judged, and it reads as `ls *.md`. Not a regression: HEAD also allowed it.",
+      "severity": "HIGH",
+      "evidence": "build.sh = 'node render.js ' + backslash + LF + 'ls *.md' + LF -> WORKING PHONE_SAFE_DOCUMENT (plain document); HEAD PHONE_SAFE_DOCUMENT. CRLF variant (backslash + CR + LF) -> PHONE_SAFE_DOCUMENT. Makefile recipe 'docs:' / TAB 'node render.js ' + backslash + LF / TAB 'ls *.md' -> WORKING PHONE_SAFE_DOCUMENT. Note: the glob line is exempt because readOnlyStatement sees only 'ls *.md'.",
+      "hunter": 1,
+      "disposition": "FIXED: statementsSpanLines — a file with a backslash/caret/backtick line end gets no exemptions"
+    },
+    {
+      "id": "NEW-2",
+      "repaired": false,
+      "newIssue": "REGRESSION vs HEAD. A package.json script value that contains a backslash-newline continuation and a read-only glob line is now allowed. HEAD refused it, but only by accident: referenceText turned the backslash into '/', JSON.parse then failed, and the whole text was matched as one line where 'ls' is not a word. The working tree now parses the raw JSON, so the value is split per line and the glob line 'ls *.md' is exempt.",
+      "severity": "HIGH",
+      "evidence": "package.json = JSON.stringify({scripts:{docs: 'node render.js ' + backslash + LF + 'ls *.md'}}) (JSON raw: \"node render.js \\\\\\nls *.md\") -> WORKING PHONE_SAFE_DOCUMENT; HEAD EXECUTION_RELEVANT (named by project metadata (package.json)). This is the only HEAD-refused / working-allowed case found in the probes. Consider this a regression to fix before F03-FOLLOWUP-1 can be called repaired.",
+      "hunter": 1,
+      "disposition": "FIXED (regression): multi-line package.json scripts void exemptions"
+    },
+    {
+      "id": "NEW-3",
+      "repaired": false,
+      "newIssue": "sh multi-line quoting: the runner opens a double quote at the end of one line, and a read-only glob line closes the quote with `ls\"`. The argument becomes one quoted newline-containing word, then ` *.md` is expanded, so the runner receives notes.md. The line that closes the quote is read as program `ls` with args `*.md`. Pre-existing (HEAD also allowed).",
+      "severity": "HIGH",
+      "evidence": "build.sh = 'node render.js \"' + LF + 'ls\" *.md' + LF -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT. Single-quote variant of the same shape was not separately probed.",
+      "hunter": 1,
+      "disposition": "FIXED: unbalanced quotes void exemptions"
+    },
+    {
+      "id": "NEW-4",
+      "repaired": false,
+      "newIssue": "YAML folded scalars (run: >) join physical lines with spaces, so a read-only glob line and a following runner line form one command, or a runner line precedes the glob line. The classifier judges the lines separately. Pre-existing (HEAD also allowed). Folded-scalar CI steps are common.",
+      "severity": "HIGH",
+      "evidence": "ci.yml = 'jobs:' / '  d:' / '    steps:' / '      - run: >' / '          ls *.md' / '          | node render.js' -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT. Variant with '          node render.js' then '          ls *.md' (folded to 'node render.js ls *.md') -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT.",
+      "hunter": 1,
+      "disposition": "FIXED: YAML block scalars void exemptions"
+    },
+    {
+      "id": "NEW-5",
+      "repaired": false,
+      "newIssue": "Windows cmd caret line-end continuation: '^' before the line end joins lines in a .cmd file. The glob line `grep -l x *.md ^` is exempt, and the joined continuation `| node render.js` is judged on its own line with no glob. Pre-existing (HEAD also allowed). '^' is not in UNSAFE_SHELL_LINE.",
+      "severity": "MEDIUM",
+      "evidence": "build.cmd = 'grep -l x *.md ^' + CRLF + '| node render.js' + CRLF -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT. Caveat: cmd does not glob-expand for node, so the consumption depends on render.js reading names from stdin.",
+      "hunter": 1,
+      "disposition": "FIXED: caret continuation (cmd) voids exemptions"
+    },
+    {
+      "id": "NEW-6",
+      "repaired": false,
+      "newIssue": "A runner names the destination by a shell expansion the classifier does not model: brace expansion ({a,b}.md, notes.{md,txt}) or a partly quoted name (\"notes\".md, no\"tes.md\"). Neither is a glob, and the literal token 'notes.md' does not appear in the text, so tokenIn misses it. Brace expansion is bash-only (dash, the Debian /bin/sh, does not brace-expand). Quote-splitting works in every POSIX shell. Pre-existing (HEAD also allowed).",
+      "severity": "MEDIUM",
+      "evidence": "build.sh = 'node render.js {notes,x}.md' -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT. build.sh = 'node render.js notes.{md,txt}' -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT. build.sh = 'node render.js \"notes\".md' -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT.",
+      "hunter": 1,
+      "disposition": "FIXED: computedName — braces and partly quoted names count"
+    },
+    {
+      "id": "NEW-7",
+      "repaired": false,
+      "newIssue": "The runner builds the destination name from variables: a shell variable (\"$N.md\"), a cmd variable (%N%.md) or a make variable ($(N).md). The classifier does not evaluate assignments, and the variable-free text does not contain the destination name. Pre-existing (HEAD also allowed).",
+      "severity": "MEDIUM",
+      "evidence": "build.sh = 'N=notes' / 'node render.js \"$N.md\"' -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT. build.cmd = 'set N=notes' / 'node render.js %N%.md' -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT. Makefile = 'N := notes' / 'docs:' / TAB 'node render.js $(N).md' -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT.",
+      "hunter": 1,
+      "disposition": "FIXED: computedName — $N.md, %N%.md, $(N).md count"
+    },
+    {
+      "id": "NEW-8",
+      "repaired": false,
+      "newIssue": "A make pattern rule (%.html: %.md) names the destination's extension through a pattern, not a glob, so the classifier ignores it. If a default-goal target (all: notes.html) depends on it, make runs the recipe on notes.md. Pre-existing (HEAD also allowed). Exploitable only if make runs against that Makefile.",
+      "severity": "MEDIUM",
+      "evidence": "Makefile = 'all: notes.html' / '%.html: %.md' / TAB 'node render.js $< > $@' -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT.",
+      "hunter": 1,
+      "disposition": "FIXED: computedName — make pattern %.md counts"
+    },
+    {
+      "id": "NEW-9",
+      "repaired": false,
+      "newIssue": "Windows 8.3 alias: a cmd consumer names the destination by its short name (ARCHIT~1.MD for architecture-decisions.md). Windows resolves the alias to the long file. The classifier handles 8.3 only in the destination path, not in consumer text. Pre-existing (HEAD also allowed). Long names on NTFS get aliases by default.",
+      "severity": "MEDIUM",
+      "evidence": "build.cmd = 'node render.js ARCHIT~1.MD' (CRLF) with destination architecture-decisions.md -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT. Control with long name 'node render.js architecture-decisions.md' -> EXECUTION_RELEVANT (named).",
+      "hunter": 1,
+      "disposition": "FIXED: computedName — 8.3 alias (~) with the extension counts"
+    },
+    {
+      "id": "NEW-10",
+      "repaired": false,
+      "newIssue": "The comment filter in shellLines drops any line starting with 'rem' followed by a non-word character, so 'rem=1 && node render.js *.md' (valid sh: sets a variable, then runs node) is removed before the glob check and classified PHONE_SAFE. Pre-existing (HEAD also allowed). The filter is /^[ \\t]*(#|rem\\b|::|\\/\\/)/ and is applied to sh text.",
+      "severity": "MEDIUM",
+      "evidence": "build.sh = 'rem=1 && node render.js *.md' -> WORKING PHONE_SAFE_DOCUMENT; HEAD PHONE_SAFE_DOCUMENT. Controls: build.sh 'node render.js *.md' -> EXECUTION_RELEVANT (both trees); build.sh 'prettier --write *.md' -> PHONE_SAFE_DOCUMENT (both trees, expected allow).",
+      "hunter": 1,
+      "disposition": "FIXED: commentLine — rem/:: are comments only in cmd/bat"
+    },
+    {
+      "id": "F03-FOLLOWUP-1",
+      "repaired": false,
+      "newIssue": "Partly repaired. The 15 round-1 probe lines (R1-R15: 2>&1 pipes, quoted # and ;, rg --pre, remark --use, prettier --plugin=, ./grep, npx ./ls, PATH=, GIT_EXTERNAL_DIFF=, n*, *.m?, *.m[d], grep 2>&1 | node, >list.txt; xargs) are now EXECUTION_RELEVANT. The class is still open: a glob that names the destination in a shell or config consumer still classifies PHONE_SAFE_DOCUMENT through a backslash-newline continuation, ./* or ** forms, nested braces, a leading ] in a bracket class, option-valued standalone globs, and non-shell pytest config. See NEW-1 to NEW-6.",
+      "severity": "HIGH",
+      "evidence": "Probe harness in $TEMP\\f03probe (fixtures created and deleted per case; classifyDeviceWrite('notes.md', base=fixture, write, plain-text content)). Current tree: R1-R15 all EXECUTION_RELEVANT. R16 'markdownlint --rules *.md' PHONE_SAFE_DOCUMENT (HEAD also PHONE_SAFE). Control 'node run.js *.md' and 'ls *.md | xargs node run.js' in a Makefile: EXECUTION_RELEVANT.",
+      "hunter": 2,
+      "disposition": "repair extended — see verification 3"
+    },
+    {
+      "id": "NEW-1",
+      "repaired": false,
+      "newIssue": "Backslash-newline continuation joins a read-only glob stage to a runner on the next line. The glob line ends 'ls *.md\\' with no space, so the glob word becomes '*.md/' after referenceText, and the runner sits on a line with no glob, so it is never judged. The shell joins the two lines into 'ls *.md| xargs ...'. The shell-line backslash rule in UNSAFE_SHELL_LINE is dead code for all shell consumers, because referenceText already turned every backslash into '/' before shellLines runs.",
+      "severity": "HIGH",
+      "evidence": "Makefile 'lint:' NL TAB 'ls *.md\\' NL TAB '| xargs node run.js' -> HEAD PHONE_SAFE_DOCUMENT, NOW PHONE_SAFE_DOCUMENT. Same in run.sh ('ls *.md\\' NL '| xargs node run.js') and in package.json scripts ('ls *.md\\\\\\n| xargs node'). Control with a space before the backslash ('ls *.md \\') -> EXECUTION_RELEVANT, but only because the stray '/' argument is refused. Real shell check in a temp folder with notes.md: run.sh = 'ls *.md\\' NL '| xargs -I{} echo \"CONSUMED {}\"' prints 'CONSUMED notes.md'.",
+      "hunter": 2,
+      "disposition": "FIXED: statementsSpanLines (raw text, so the backslash is seen before reference normalisation)"
+    },
+    {
+      "id": "NEW-2",
+      "repaired": false,
+      "newIssue": "Root-level glob forms './*' and '**' are missed. bareGlob requires '*' preceded by whitespace, quote, '=' or '(', so '/*' is not seen. globNamesLeaf returns false for a last segment of '*' or '**'. RUNS_GLOB has no '.' (dot-source) entry, so bareGlob does not fire for '. ./*' either. The probe reports below are for the Makefile form unless noted.",
+      "severity": "HIGH",
+      "evidence": "Makefile 'node ./*' -> HEAD PHONE_SAFE, NOW PHONE_SAFE. Makefile 'node **' -> PHONE_SAFE both. Makefile '. ./*' -> PHONE_SAFE both (control '. n*' -> EXECUTION_RELEVANT). package.json scripts '. ./*' -> PHONE_SAFE. Real shell in temp folder with notes.md containing 'echo PWNED_BY_DOT_SOURCE': sh -c '. ./*' prints PWNED_BY_DOT_SOURCE; sh -c 'echo **' lists notes.md. Note: bare '. *' without a slash fails in sh (PATH lookup), so only the './*' form is a real execution path.",
+      "hunter": 2,
+      "disposition": "FIXED: computedName — ./* and ** count"
+    },
+    {
+      "id": "NEW-3",
+      "repaired": false,
+      "newIssue": "Nested braces hide a glob. extensionGlob's brace alternative and globNamesLeaf's brace parse both stop at the first '}', so '*.{m{d,x},txt}' expands in bash to '*.md' (and '*.mx', '*.txt') but matches nothing in our check.",
+      "severity": "MEDIUM",
+      "evidence": "Makefile 'node *.{m{d,x},txt}' -> HEAD PHONE_SAFE, NOW PHONE_SAFE. Makefile 'bash *.{m{d,x},txt}' -> PHONE_SAFE both. package.json script 'bash *.{m{d,x},txt}' -> PHONE_SAFE. Real sh: echo *.{m{d,x},txt} prints 'notes.md *.mx *.txt'. Control '*.{md,txt}' is refused.",
+      "hunter": 2,
+      "disposition": "FIXED: globNamesLeaf fails closed on nested braces"
+    },
+    {
+      "id": "NEW-4",
+      "repaired": false,
+      "newIssue": "A bracket class whose first member is ']' is built as an empty JavaScript class, so the glob never matches. globNamesLeaf takes '[]o]' verbatim (the first ']' is skipped via indexOf(']', i+2)). Other bracket forms ([!x], [mM], [n]) and escaped characters were checked and behave fail-closed or correctly.",
+      "severity": "LOW",
+      "evidence": "Makefile 'node n[]o]tes.md' -> HEAD PHONE_SAFE, NOW PHONE_SAFE. Real sh: echo n[]o]tes.md prints notes.md. Control 'node [n]otes.md' -> EXECUTION_RELEVANT.",
+      "hunter": 2,
+      "disposition": "FIXED: globNamesLeaf fails closed on a ]-first class"
+    },
+    {
+      "id": "NEW-5",
+      "repaired": false,
+      "newIssue": "A standalone glob used as the value of an option that loads a program or module is accepted. readOnlyStatement's argument check returns true for any argument containing a glob character before it tests PROGRAM_OPTION, and --rules, --custom-formatter and --custom-syntax are not in PROGRAM_OPTION. Whether the tool actually loads the destination as code depends on the tool, which I did not run.",
+      "severity": "MEDIUM",
+      "evidence": "Makefile 'markdownlint --rules *.md' -> HEAD PHONE_SAFE, NOW PHONE_SAFE. Makefile 'stylelint --custom-formatter n*.md' -> HEAD PHONE_SAFE, NOW PHONE_SAFE. Controls: 'remark --use *.md' -> EXECUTION_RELEVANT now (HEAD allowed); 'eslint --rulesdir *.md' -> EXECUTION_RELEVANT now (HEAD allowed).",
+      "hunter": 2,
+      "disposition": "FIXED: SAFE_OPTION allow-list (--rules, --custom-formatter not allowed)"
+    },
+    {
+      "id": "NEW-6",
+      "repaired": false,
+      "newIssue": "Non-shell consumers (TOML, INI, Python) use only extensionGlob, so a pytest doctest glob that matches the destination but has no literal '*.<ext>' is missed. pytest runs '>>>' examples in every text file its doctest glob matches. This is pre-existing: HEAD gives the same result.",
+      "severity": "MEDIUM",
+      "evidence": "pyproject.toml 'addopts = \"--doctest-glob=*.m?\"' -> HEAD PHONE_SAFE, NOW PHONE_SAFE. pytest.ini 'doctest_glob = n*' -> PHONE_SAFE both. pytest.ini 'doctest_glob = *' -> PHONE_SAFE both. pytest.ini 'doctest_glob = [n]otes.md' -> PHONE_SAFE both. noxfile.py 's.run(\"pytest\", \"--doctest-glob=n*\")' -> PHONE_SAFE both. Control pyproject 'addopts = \"--doctest-glob=*.md\"' -> EXECUTION_RELEVANT both. Not run through pytest itself.",
+      "hunter": 2,
+      "disposition": "FIXED: config globs that run/collect files match the destination name (n*, *.m?, [n]otes.md, lone *)"
+    },
+    {
+      "id": "NEW-7",
+      "repaired": false,
+      "newIssue": "Regression vs HEAD: whitespace variants of 'git add' and 'git diff' are now exempt. HEAD matched the literal string 'git add' and refused tabs or double spaces. The new parser splits on /\\s+/ and exempts them. Impact is low: git add and git diff run no project program unless a clean filter or external diff is configured in .git/config, which the scan does not read.",
+      "severity": "LOW",
+      "evidence": "Makefile 'git<TAB>add *.md' -> HEAD EXECUTION_RELEVANT, NOW PHONE_SAFE_DOCUMENT. Makefile 'git  add *.md' (two spaces) -> HEAD EXECUTION_RELEVANT, NOW PHONE_SAFE_DOCUMENT. Control 'git add *.md' -> PHONE_SAFE both.",
+      "hunter": 2,
+      "disposition": "FIXED (regression): git read-only form is exactly git add / git diff"
+    },
+    {
+      "id": "NEW-8",
+      "repaired": false,
+      "newIssue": "package.json duplicate 'scripts' keys: only the last object is scanned (JSON.parse keeps the last, and rest excludes 'scripts' entirely). npm also takes the last, so npm would not run the first, but other JSON readers may take the first. Pre-existing.",
+      "severity": "LOW",
+      "evidence": "package.json '{\"scripts\":{\"x\":\"node run.js *.md\"},\"scripts\":{\"y\":\"echo hi\"}}' -> HEAD PHONE_SAFE_DOCUMENT, NOW PHONE_SAFE_DOCUMENT.",
+      "hunter": 2,
+      "disposition": "ACCEPTED LOW (pre-existing): duplicate scripts keys — npm itself takes the last object, which is the one scanned"
+    }
+  ]
+}
