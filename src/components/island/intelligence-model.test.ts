@@ -50,8 +50,11 @@ test("T13.1 UI: saved, tested and eligible stay distinct facts", () => {
   assert.match(saved.find((row) => row.key === "credential")!.detail, /Saving does not test the key/);
   const discovery = jevDistinctions(snapshot({ hasCredential: true, lastTest: { at: 1, ok: true, latencyMs: 90, inferenceVerified: false, answeredBy: null, detail: "x" } }), []);
   assert.match(discovery.find((row) => row.key === "tested")!.detail, /decision inference not tested/);
-  const assisted = jevDistinctions(snapshot({ usable: true }), [task({ decision: { decision_assistance: { source: "jev", action: "accept", confidence: 0.9 } } as OrchTask["decision"] }), task({ state: "completed", decision: { decision_assistance: { source: "jev", action: "accept", confidence: 0.9 } } as OrchTask["decision"] })]);
-  assert.equal(assisted.find((row) => row.key === "selected")!.detail, "1 active Task took hosted advice.");
+  const accepted = (changed: boolean, state: OrchTask["state"] = "running") => task({ state, decision: { decision_assistance: { source: "jev", action: "accept", confidence: 0.9, changed } } as OrchTask["decision"] });
+  const assisted = jevDistinctions(snapshot({ usable: true }), [accepted(true), accepted(true, "completed"), accepted(false)]);
+  assert.equal(assisted.find((row) => row.key === "selected")!.detail, "1 active Task switched model on hosted advice.");
+  const agreed = jevDistinctions(snapshot({ usable: true }), [accepted(false)]);
+  assert.equal(agreed.find((row) => row.key === "selected")!.value, false, "advice that matched the router's own pick selected nothing");
 });
 
 test("T13.1 UI: Laya facts never claim availability or routing that the Host did not report", () => {

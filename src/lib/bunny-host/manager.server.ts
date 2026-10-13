@@ -435,7 +435,12 @@ export class TaskManager {
     ];
     // Usage truth is re-derived from the fresh probes; it never probes on its own.
     await this.providerUsage.refresh();
+    await this.refreshLayaDigests();
     this.announce(changes);
+  }
+  /** Only when the runtime lists a Laya model: no Laya, no extra runtime call. */
+  private async refreshLayaDigests() {
+    if (LayaRegistry.layaRecords(this.modelCapabilities.snapshot()).length) await this.laya.refreshDigests();
   }
   /** Periodic refresh: cheap health checks, full probes only when due. */
   async refreshProviders() {
@@ -444,6 +449,7 @@ export class TaskManager {
       ...(await this.modelCapabilities.refresh()),
     ];
     await this.providerUsage.refresh();
+    await this.refreshLayaDigests();
     this.announce(changes);
   }
   async configureProviderPath(id: ProviderId, path: string | null) {
@@ -664,7 +670,7 @@ export class TaskManager {
     }
     this.emit(this.db.event("intelligence.laya_benchmarked", null, `Laya ${model}: local benchmark started.`));
     return run.then(
-      (rows) => this.emit(this.db.event("intelligence.laya_benchmarked", null, `Laya ${model}: ${rows.filter((row) => row.passed).length} of ${rows.length} local benchmarks passed.`)),
+      (rows) => this.emit(this.db.event("intelligence.laya_benchmarked", null, `Laya ${model}: ${rows.filter((row) => row.passed).length} of ${rows.length} benchmarked task classes passed.`)),
       () => this.emit(this.db.event("intelligence.laya_benchmarked", null, `Laya ${model}: the local benchmark did not finish.`)),
     ).catch(() => undefined); // the Host may be closing; the run is simply not reported
   }
@@ -851,10 +857,11 @@ export class TaskManager {
     // model string, but the default candidate's identity is (provider, null). A provider yields
     // either DISCOVERED models or a PROVIDER_DEFAULT candidate, never both, so normalizing every
     // exclude entry for the default-selected provider to model null is exact, never over-broad.
+    const launched = record.assistance?.adopted ?? record.selected;
     const defaultSelected =
-      !!record.selected &&
-      record.selected.provider_id === task.provider &&
-      record.selected.model_id === null;
+      !!launched &&
+      launched.provider_id === task.provider &&
+      launched.model_id === null;
     const normalizeModel = (provider: ProviderId, model: string | null): string | null =>
       defaultSelected && provider === task.provider && model !== null ? null : (model ?? null);
     const exclude = options?.exclude ?? [];
@@ -1074,6 +1081,7 @@ export class TaskManager {
     // M-A-3 T13.1: hosted decision assistance is one advisory input. BunnyRouter validates it against the eligible
     // set and refuses any switch that widens locality or tool access; manual choices and Mission work never use it.
     let assistanceRecord: RoutingDecisionRecord["assistance"] = null;
+    let launchedModelId = selection?.model_id ?? null;
     if (selection) {
       const routerKey = candidateKey(selection.provider_id, selection.model_id);
       const advice = !delegated && routingMode === "auto" ? (input.decisionAssistance ?? null) : null;
@@ -1083,6 +1091,7 @@ export class TaskManager {
         advice,
         thresholds: this.jev.policy.thresholds,
         currentGeneration: this.jev.generation,
+        now: this.jev.clock(),
       });
       if (advice) assistanceRecord = { source: "jev", recommended: advice.recommendedKey, confidence: advice.confidence, action: outcome.action, reason: outcome.reason, answeredBy: advice.answeredBy };
       if (outcome.action === "accept" && outcome.finalKey !== routerKey) {
@@ -1093,10 +1102,13 @@ export class TaskManager {
           decision.recommended_model = routed.model;
           decision.effort_mode = routed.effort;
           decision.selection_reason = outcome.reason;
+          launchedModelId = chosen.model_id;
+          // `selected` keeps BunnyRouter's own pick for audit; `adopted` is what launched, and reroutes start from it.
+          if (assistanceRecord) assistanceRecord.adopted = { provider_id: chosen.provider_id, model_id: chosen.model_id };
         }
       }
       if (advice) {
-        decision.decision_assistance = { source: "jev", action: outcome.action, confidence: advice.confidence };
+        decision.decision_assistance = { source: "jev", action: outcome.action, confidence: advice.confidence, changed: !!assistanceRecord?.adopted };
         this.lastAssistance = { at: Date.now(), source: "jev", action: outcome.action, detail: outcome.reason, recommended: advice.recommendedKey, confidence: advice.confidence };
       }
     }
@@ -1167,7 +1179,7 @@ export class TaskManager {
         this.db.event(
           "routing.selected",
           task.id,
-          `Selected ${routed.provider} · ${selection.model_id ? routed.model : "provider default (exact model unknown)"}${routed.effort ? ` · effort ${routed.effort}` : " · provider default effort"} from ${pipeline.selection.order.length} eligible of ${pipeline.candidates.length} candidates.`,
+          `Selected ${routed.provider} · ${launchedModelId ? routed.model : "provider default (exact model unknown)"}${routed.effort ? ` · effort ${routed.effort}` : " · provider default effort"} from ${pipeline.selection.order.length} eligible of ${pipeline.candidates.length} candidates.`,
           task.mission?.missionId ?? null,
         ),
       );

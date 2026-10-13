@@ -20,6 +20,7 @@ import {
   budgetCheck,
   candidateKey,
   evaluateDecisions,
+  looksSecret,
   parseJevPolicy,
   parseModelList,
   requestCostUsd,
@@ -134,19 +135,37 @@ function scripted(id: ProviderId) {
   return { adapter, state, launched };
 }
 
-/** Laya runtime fake: answers each benchmark from a table, so pass/fail is scripted per task class. */
-function layaRuntime(answers: Partial<Record<"general" | "math" | "extraction" | "reasoning", string>> = { general: "BUNNY-LAYA-OK", math: "60", extraction: "4471", reasoning: "Ola" }): LayaRuntime & { prompts: string[] } {
+type LayaClass = "general" | "math" | "extraction" | "reasoning";
+/** Each benchmark prompt's correct answer: [prompt marker, class, answer]. */
+const LAYA_ANSWERS: [string, LayaClass, string][] = [
+  ["BUNNY-LAYA-OK", "general", "BUNNY-LAYA-OK"], ["word READY", "general", "READY"],
+  ["17 multiplied", "math", "60"], ["144 divided", "math", "7"],
+  ["Invoice 4471", "extraction", "4471"], ["Order A-2291", "extraction", "Lisbon"],
+  ["Who is the youngest", "reasoning", "Ola"], ["Which is the lightest", "reasoning", "pen"],
+];
+/**
+ * Laya runtime fake. Per task class: "pass" answers both checks correctly, "half" only the first, "wrong" answers
+ * neither, and an omitted class does not answer. `digest` is the installed build; change it to simulate a re-pull.
+ */
+function layaRuntime(script: Partial<Record<LayaClass, "pass" | "half" | "wrong">> = { general: "pass", math: "pass", extraction: "pass", reasoning: "pass" }): LayaRuntime & { prompts: string[]; digest: string | null } {
   const prompts: string[] = [];
-  return {
+  const runtime = {
     prompts,
-    generate: async (_model, prompt) => {
+    digest: "sha256:fixture-build-1" as string | null,
+    generate: async (_model: string, prompt: string) => {
       prompts.push(prompt);
-      const cls = prompt.includes("BUNNY-LAYA-OK") ? "general" : prompt.includes("17 multiplied") ? "math" : prompt.includes("Invoice") ? "extraction" : "reasoning";
-      const output = answers[cls];
-      return output === undefined ? { ok: false, output: "" } : { ok: true, output };
+      const index = LAYA_ANSWERS.findIndex(([marker]) => prompt.includes(marker));
+      assert.ok(index >= 0, `unscripted benchmark prompt: ${prompt}`);
+      const [, cls, answer] = LAYA_ANSWERS[index];
+      const mode = script[cls];
+      if (!mode) return { ok: false, output: "" };
+      const first = LAYA_ANSWERS.findIndex(([, other]) => other === cls) === index;
+      return { ok: true, output: mode === "pass" || (mode === "half" && first) ? answer : "I am not sure." };
     },
     loadedBytes: async () => 4.5 * 1024 ** 3,
+    digests: async () => (runtime.digest ? new Map([["laya:7b", runtime.digest]]) : new Map<string, string>()),
   };
+  return runtime;
 }
 
 /** A Host TaskManager with fixture registries, scripted providers and injected intelligence seams. */
@@ -308,6 +327,7 @@ test("K08 [SIMULATED] an invalid key is refused locally with an accurate message
     for (const bad of ["", "short", "has space inside it", "x".repeat(600)])
       await assert.rejects(() => env.service.saveKey(bad), /Enter a valid API key/);
     assert.equal(env.secrets.hasCredential(), false);
+    env.service.configure(policy());
     await env.service.saveKey(KEY_A);
     const after = await env.service.testConnection();
     assert.equal(after.state, "AUTH_FAILED");
@@ -581,7 +601,7 @@ test("R02 [SIMULATED] Laya present: capabilities come from the runtime's own pro
 });
 
 test("R03 [SIMULATED] an unsupported task class never routes to Laya, even after other classes pass", async () => {
-  const env = await managerFixture({ ollamaTags: ["qwen3:8b", "laya:7b"], runtime: layaRuntime({ general: "BUNNY-LAYA-OK" }) });
+  const env = await managerFixture({ ollamaTags: ["qwen3:8b", "laya:7b"], runtime: layaRuntime({ general: "pass" }) });
   try {
     const layaRow = (task: OrchTask) => env.routing.decision(task.routingDecisionId!)!.candidates_considered.find((row) => row.model_id === "laya:7b");
     const before = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints: { localOnly: true } });
@@ -597,19 +617,48 @@ test("R03 [SIMULATED] an unsupported task class never routes to Laya, even after
 });
 
 test("R04 [SIMULATED] performance is claimed only from a recorded local benchmark", async () => {
-  const runtime = layaRuntime({ general: "BUNNY-LAYA-OK", math: "61", extraction: "4471" });
+  const runtime = layaRuntime({ general: "pass", math: "half", extraction: "pass" });
   const env = await managerFixture({ ollamaTags: ["qwen3:8b", "laya:7b"], runtime });
   try {
     assert.equal(env.tasks.snapshot().intelligence!.laya.models[0].benchmarks.length, 0);
     await env.tasks.benchmarkLaya("laya:7b");
-    assert.equal(runtime.prompts.length, 4);
+    assert.equal(runtime.prompts.length, 8, "two checks per task class");
     const model = env.tasks.snapshot().intelligence!.laya.models[0];
     assert.deepEqual(Object.fromEntries(model.benchmarks.map((row) => [row.taskClass, row.passed])), { extraction: true, general: true, math: false, reasoning: false });
+    assert.match(model.benchmarks.find((row) => row.taskClass === "math")!.detail, /1 of 2 checks matched/, "one lucky answer does not pass a class");
+    assert.match(model.benchmarks.find((row) => row.taskClass === "reasoning")!.detail, /did not answer/);
     assert.deepEqual(model.eligibleTaskClasses.sort(), ["extraction", "general"]);
     assert.equal(model.routingEligible, true);
     assert.match(model.memoryRequirement ?? "", /4\.5 GB while loaded \(measured\)/);
     assert.throws(() => env.tasks.benchmarkLaya("qwen3:8b"), /not installed/, "only Laya-named local models are benchmarked");
-    assert.ok(env.db.events(0).some((event) => event.type === "intelligence.laya_benchmarked" && /2 of 4 local benchmarks passed/.test(event.detail)));
+    assert.ok(env.db.events(0).some((event) => event.type === "intelligence.laya_benchmarked" && /2 of 4 benchmarked task classes passed/.test(event.detail)));
+  } finally { env.cleanup(); }
+});
+
+test("R04b [SIMULATED] a benchmark counts only for the exact build it measured; no digest, no benchmark", async () => {
+  const runtime = layaRuntime();
+  const env = await managerFixture({ ollamaTags: ["qwen3:8b", "laya:7b"], runtime });
+  try {
+    await env.tasks.benchmarkLaya("laya:7b");
+    const layaRow = (task: OrchTask) => env.routing.decision(task.routingDecisionId!)!.candidates_considered.find((row) => row.model_id === "laya:7b");
+    assert.equal(env.tasks.snapshot().intelligence!.laya.models[0].routingEligible, true);
+    const before = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints: { localOnly: true } });
+    assert.ok(!layaRow(before)?.exclusion_reasons.some((reason) => /benchmark/.test(reason)));
+    // The same tag is re-pulled as a different build: the old results stop counting at the next refresh.
+    runtime.digest = "sha256:fixture-build-2";
+    await env.tasks.refreshProviders();
+    const model = env.tasks.snapshot().intelligence!.laya.models[0];
+    assert.equal(model.benchmarks.length, 0);
+    assert.equal(model.routingEligible, false);
+    assert.equal(model.memoryRequirement, null, "a measurement of the previous build is not shown");
+    const after = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints: { localOnly: true } });
+    assert.ok(layaRow(after)?.exclusion_reasons.some((reason) => /no passed benchmark/.test(reason)));
+    // A runtime that reports no digest cannot be benchmarked at all.
+    runtime.digest = null;
+    const sent = runtime.prompts.length;
+    await env.tasks.benchmarkLaya("laya:7b");
+    assert.equal(runtime.prompts.length, sent, "no inference without an identified build");
+    assert.ok(env.db.events(0).some((event) => event.type === "intelligence.laya_benchmarked" && /did not finish/.test(event.detail)));
   } finally { env.cleanup(); }
 });
 
@@ -851,6 +900,12 @@ test("R18 [SIMULATED] selection results record actual provenance", async () => {
     assert.equal(record.assistance?.action, "accept");
     assert.equal(candidateKey(task.provider, task.model), advised.recommendedKey, "the Task runs what was recorded");
     assert.equal(candidateKey(record.selected!.provider_id, record.selected!.model_id), routerKey, "the record keeps BunnyRouter's own selection alongside the advice");
+    assert.equal(candidateKey(record.assistance!.adopted!.provider_id, record.assistance!.adopted!.model_id), advised.recommendedKey, "the record names what actually launched");
+    assert.equal(task.decision.decision_assistance?.changed, true);
+    assert.equal(task.decision.decision_assistance?.action, "accept");
+    const unchanged = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints: { localOnly: true }, decisionAssistance: advice({ recommendedKey: routerKey, generation: jevOf(env).generation }) });
+    assert.equal(unchanged.decision.decision_assistance?.changed, false, "agreeing with the router is not a switch");
+    assert.equal(env.routing.decision(unchanged.routingDecisionId!)!.assistance?.adopted, undefined);
     assert.match(task.decision.selection_reason ?? "", /BunnyRouter validated and adopted it/);
     assert.ok(env.db.taskEvents(task.id).some((event) => event.type === "routing.assisted" && /TypeSafe|jev/i.test(event.detail)));
     assert.equal(env.tasks.snapshot().intelligence!.lastAssistance?.source, "jev");
@@ -900,6 +955,160 @@ test("R20 [SIMULATED] a restart keeps routing configuration and never resurrects
       assert.equal(second.net.calls.length, 0);
     } finally { second.close(); }
   } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+// ------------------------------------------- review findings (independent review of c8c46c9) ----
+
+test("RV-B1 [SIMULATED] Test connection while hosted decisions are off sends nothing", async () => {
+  const env = jevFixture((call) => decisionReply(call.body, KEYS[0]));
+  try {
+    await env.service.saveKey(KEY_A);
+    for (const decisionTest of [false, true]) {
+      const tested = await env.service.testConnection({ decisionTest });
+      assert.equal(tested.state, "DISABLED");
+      assert.match(tested.lastError ?? "", /Turn on hosted decision assistance before testing; nothing was sent/);
+    }
+    assert.equal(env.net.calls.length, 0);
+  } finally { env.cleanup(); }
+});
+
+test("RV-B2 [SIMULATED] concurrent requests cannot overshoot the request ceiling or the concurrency limit", async () => {
+  for (const { limits, refusal } of [
+    { limits: { maxRequestsPerDay: 1, maxConcurrent: 4 }, refusal: /Daily request limit/ },
+    { limits: { maxRequestsPerDay: 5, maxConcurrent: 1 }, refusal: /concurrency limit/ },
+  ]) {
+    let release!: () => void;
+    const gate = new Promise<void>((done) => { release = done; });
+    const env = jevFixture(async (call) => { await gate; return decisionReply(call.body, KEYS[0]); });
+    try {
+      env.service.configure(policy({}, limits));
+      await env.service.saveKey(KEY_A);
+      const first = env.service.advise({ state: STATE, eligibleKeys: KEYS });
+      await assert.rejects(() => env.service.advise({ state: STATE, eligibleKeys: KEYS }), refusal);
+      release();
+      await first;
+      assert.equal(env.net.decisions().length, 1, `${JSON.stringify(limits)}: exactly one request left this computer`);
+    } finally { env.cleanup(); }
+  }
+});
+
+test("RV-B3 [SIMULATED] a request still in flight when the Host stops stays counted as unknown usage", async () => {
+  const stop = new AbortController();
+  const env = jevFixture((_call, signal) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })))));
+  try {
+    env.service.configure(policy({}, { maxTokensPerDay: 1_000_000, timeoutMs: 60_000 }));
+    await env.service.saveKey(KEY_A);
+    const orphan = env.service.advise({ state: STATE, eligibleKeys: KEYS, signal: stop.signal }).catch(() => undefined);
+    await until(() => env.net.decisions().length === 1, "request sent");
+    // The Host "restarts" while that request is pending.
+    const fresh = env.reopen();
+    const usage = fresh.service.usage();
+    assert.equal(usage.dayRequests, 1, "the pending request is still counted");
+    assert.equal(usage.unknownUsageRows, 1, "with unknown usage");
+    await assert.rejects(() => fresh.service.advise({ state: STATE, eligibleKeys: KEYS }), /strict token ceiling fails closed/);
+    assert.equal(env.net.decisions().length, 1);
+    stop.abort();
+    await orphan;
+  } finally { env.cleanup(); }
+});
+
+test("RV-B4 [SIMULATED] the secret filter refuses common credential shapes and passes ordinary text", () => {
+  const secrets = [
+    "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXk=",
+    "-----BEGIN RSA PRIVATE KEY-----",
+    "use sk-proj-abcdefghijklmnop", "ts_live_ABCDEFGHIJKLMNOPQRST", "xai-ABCDEFGHIJKLMNOPQRSTUVWX",
+    "Authorization: Bearer abcdefgh12345678", "api_key=abc123", "API-KEY: x", "password: hunter2", "pwd=x", "client_secret = y", "token: z",
+    "AKIAABCDEFGHIJKLMNOP", "ghp_ABCDEFGHIJKLMNOPQRSTUVWX", "github_pat_ABCDEFGHIJKLMNOPQRSTUV", "glpat-ABCDEFGHIJKLMNOPQRST",
+    "xoxb-1234567890-abcdef", "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ0123456", "sk_live_ABCDEFGHIJKLMNOPQR", "rk_test_ABCDEFGHIJKLMNOPQR",
+    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJlX2hlcmU", "postgres://admin:s3cret@db.internal:5432/app",
+  ];
+  for (const text of secrets) assert.equal(looksSecret(`Please deploy this: ${text}`), true, text);
+  const ordinary = [
+    "Summarize the tradeoffs of two approaches", "Design a password reset page", "Explain token bucket rate limiting",
+    "Write a secret santa picker", "https://docs.typesafe.ai/api", "Ask about sk-learn pipelines", "The key insight is caching",
+  ];
+  for (const text of ordinary) assert.equal(looksSecret(text), false, text);
+  assert.throws(() => buildDecisionState({ taskClass: "general", eligibleKeys: KEYS, mode: "balanced", privacy: { allowDecisionMetadata: true, allowTaskDescription: true }, taskDescription: secrets[0] }), /appears to contain a secret/);
+});
+
+test("RV-S1 [SIMULATED] an oversized chunked response is cut off, not buffered", async () => {
+  let reads = 0;
+  let cancelled = false;
+  const chunk = new Uint8Array(64 * 1024).fill(0x20);
+  const client = new TypeSafeJevClient({
+    apiKey: async () => KEY_A,
+    fetchFn: async () => ({
+      status: 200,
+      headers: { get: () => null },
+      text: async () => { throw new Error("must stream, not buffer"); },
+      body: { getReader: () => ({ read: async () => { reads++; return reads > 1_000 ? { done: true } : { done: false, value: chunk }; }, cancel: async () => { cancelled = true; } }) },
+    }),
+  });
+  await assert.rejects(() => client.listModels(1_000), /exceeded the size limit/);
+  assert.ok(reads <= 5, `stopped after ${reads} chunks`);
+  assert.equal(cancelled, true);
+});
+
+test("RV-S3 [SIMULATED] a caller cancelling mid-flight leaves usage unknown but does not trip the breaker", async () => {
+  const env = jevFixture((_call, signal) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })))));
+  try {
+    env.service.configure(policy({}, { timeoutMs: 60_000 }));
+    await env.service.saveKey(KEY_A);
+    for (let i = 0; i < 3; i++) {
+      const dropped = new AbortController();
+      const pending = env.service.advise({ state: STATE, eligibleKeys: KEYS, signal: dropped.signal });
+      await until(() => env.net.decisions().length === i + 1, "request sent");
+      dropped.abort();
+      await assert.rejects(pending, /cancelled/);
+    }
+    assert.equal(env.service.usage().unknownUsageRows, 3, "a sent request may have been billed");
+    assert.equal(env.service.snapshot().state, "SAVED_NOT_VERIFIED", "cancellation says nothing about TypeSafe");
+    assert.equal(env.service.usable(), true, "three cancellations are not three provider failures");
+  } finally { env.cleanup(); }
+});
+
+test("RV-S6 [SIMULATED] the circuit breaker and a refused key survive a Host restart", async () => {
+  const outage = jevFixture(() => ({ status: 503 }));
+  try {
+    outage.service.configure(policy());
+    await outage.service.saveKey(KEY_A);
+    for (let i = 0; i < 3; i++) await assert.rejects(() => outage.service.advise({ state: STATE, eligibleKeys: KEYS }));
+    const fresh = outage.reopen();
+    assert.equal(fresh.service.usable(), false);
+    await assert.rejects(() => fresh.service.advise({ state: STATE, eligibleKeys: KEYS }), /cooling down/);
+    assert.equal(outage.net.decisions().length, 3, "a restart is not a free retry");
+  } finally { outage.cleanup(); }
+  const refused = jevFixture(() => ({ status: 401 }));
+  try {
+    refused.service.configure(policy());
+    await refused.service.saveKey(KEY_A);
+    await assert.rejects(() => refused.service.advise({ state: STATE, eligibleKeys: KEYS }));
+    const fresh = refused.reopen();
+    assert.equal(fresh.service.snapshot().state, "AUTH_FAILED");
+    await assert.rejects(() => fresh.service.advise({ state: STATE, eligibleKeys: KEYS }), /replace it/);
+    assert.equal(refused.net.calls.length, 1);
+  } finally { refused.cleanup(); }
+});
+
+test("RV-S7 [SIMULATED] the billable decision test obeys the same budget and refused-key guards", async () => {
+  const env = jevFixture((call) => (call.url.endsWith("/v1/models") ? { status: 200, body: { models: [{ name: "jev-1.13.0" }] } } : decisionReply(call.body, "connectivity")));
+  try {
+    env.service.configure(policy({}, { maxRequestsPerDay: 1 }));
+    await env.service.saveKey(KEY_A);
+    await env.service.advise({ state: STATE, eligibleKeys: KEYS }).catch(() => undefined);
+    const sent = env.net.calls.length;
+    const tested = await env.service.testConnection({ decisionTest: true });
+    assert.match(tested.lastError ?? "", /Decision test not sent: Daily request limit/);
+    assert.equal(env.net.calls.length, sent, "refused before even the discovery call");
+    assert.equal(env.net.decisions().length, 1);
+  } finally { env.cleanup(); }
+});
+
+test("R13b [STATIC] Personal Agent code never names Laya, TypeSafe or Jev, so neither can be bound to an Agent", () => {
+  const root = join(import.meta.dirname, "..", "..");
+  const files = sourceFiles(root).filter((file) => /personal-agent|personal_agent|PersonalAgent/i.test(file));
+  assert.ok(files.length > 0);
+  for (const file of files) assert.ok(!/laya|typesafe|\bjev/i.test(readFileSync(file, "utf8")), `${relative(root, file)} names no model resource`);
 });
 
 test("T13.1 contract: model list parsing, question library bounds and response validation", () => {

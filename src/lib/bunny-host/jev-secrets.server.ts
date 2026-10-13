@@ -10,6 +10,7 @@
 import { execFile } from "node:child_process";
 import type { HostDatabase } from "./persistence.server.ts";
 import { registerDiagnosticSecret } from "./failure.server.ts";
+import { systemTool } from "./system-tools.server.ts";
 
 export interface SecretProtector {
   readonly kind: "dpapi" | "test";
@@ -38,7 +39,7 @@ export class DpapiProtector implements SecretProtector {
     return new Promise((resolve, reject) => {
       if (process.platform !== "win32") return reject(new Error("Windows secret protection is unavailable on this platform."));
       const child = execFile(
-        "powershell.exe",
+        systemTool("powershell.exe"),
         ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", DPAPI_SCRIPT],
         { windowsHide: true, timeout: 20_000, maxBuffer: 64 * 1024, env: { ...process.env, BUNNY_DPAPI_MODE: mode } },
         (error, stdout) => {

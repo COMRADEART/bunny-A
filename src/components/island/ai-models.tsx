@@ -94,7 +94,7 @@ export function AiModelsSettings() {
             role="tab"
             id={`${base}-tab-${index}`}
             aria-selected={section === name}
-            aria-controls={`${base}-panel-${index}`}
+            aria-controls={section === name ? `${base}-panel-${index}` : undefined}
             tabIndex={section === name ? 0 : -1}
             onClick={() => setSection(name)}
             onKeyDown={(event) => onTabKey(event, index)}
@@ -105,7 +105,7 @@ export function AiModelsSettings() {
       </div>
       <div role="tabpanel" id={`${base}-panel-${SECTIONS.indexOf(section)}`} aria-labelledby={`${base}-tab-${SECTIONS.indexOf(section)}`} tabIndex={0} className="ai-panel">
         {section === "Routing preferences" ? (
-          <RoutingPreferences intelligence={intelligence} />
+          <RoutingPreferences key={JSON.stringify(intelligence?.jev.thresholds ?? null)} intelligence={intelligence} />
         ) : !intelligence ? (
           <p className="caption">
             {store.viewer?.kind === "device"
@@ -115,7 +115,7 @@ export function AiModelsSettings() {
         ) : section === "Connections" ? (
           <Connections intelligence={intelligence} />
         ) : (
-          <PrivacyUsage intelligence={intelligence} />
+          <PrivacyUsage key={JSON.stringify(intelligence.jev.limits)} intelligence={intelligence} />
         )}
       </div>
     </>
@@ -349,8 +349,8 @@ function JevCard({ intelligence }: { intelligence: IntelligenceSnapshot }) {
           ))}
         </select>
       </Row>
-      <Row label="Test connection" detail={lastTestLine(jev.lastTest)}>
-        <button className="btn secondary" disabled={busy || !jev.hasCredential} onClick={async () => {
+      <Row label="Test connection" detail={jev.enabled ? lastTestLine(jev.lastTest) : "Turn on hosted decision assistance to test. Nothing is sent while it is off."}>
+        <button className="btn secondary" disabled={busy || !jev.enabled || !jev.hasCredential} onClick={async () => {
           setStatus("Testing…");
           if (await store.testIntelligence(false, setStatus)) setStatus("Test finished. See the result above.");
         }}>
@@ -363,7 +363,7 @@ function JevCard({ intelligence }: { intelligence: IntelligenceSnapshot }) {
             <input type="checkbox" checked={billableOk} onChange={(event) => setBillableOk(event.target.checked)} />
             I understand this is billable
           </label>
-          <button className="btn secondary" disabled={busy || !jev.hasCredential || !billableOk} onClick={async () => {
+          <button className="btn secondary" disabled={busy || !jev.enabled || !jev.hasCredential || !billableOk} onClick={async () => {
             setBillableOk(false);
             setStatus("Testing…");
             if (await store.testIntelligence(true, setStatus)) setStatus("Decision test finished. See the result above.");
@@ -470,11 +470,12 @@ function PrivacyUsage({ intelligence }: { intelligence: IntelligenceSnapshot }) 
     timeout: String(jev.limits.timeoutMs / 1000),
     money: jev.limits.monetaryCapUsdPerDay === null ? "" : String(jev.limits.monetaryCapUsdPerDay),
   }));
+  const whole = (value: number | null) => (value !== null && Number.isInteger(value) ? value : null);
   const parsed = {
-    perSession: boundedNumber(draft.perSession, 0, 10_000),
-    perDay: boundedNumber(draft.perDay, 0, 100_000),
-    tokens: draft.tokens.trim() === "" ? null : boundedNumber(draft.tokens, 0, 100_000_000),
-    concurrent: boundedNumber(draft.concurrent, 1, 4),
+    perSession: whole(boundedNumber(draft.perSession, 0, 10_000)),
+    perDay: whole(boundedNumber(draft.perDay, 0, 100_000)),
+    tokens: draft.tokens.trim() === "" ? null : whole(boundedNumber(draft.tokens, 0, 100_000_000)),
+    concurrent: whole(boundedNumber(draft.concurrent, 1, 4)),
     timeout: boundedNumber(draft.timeout, 1, 30),
     money: draft.money.trim() === "" ? null : boundedNumber(draft.money, 0, 10_000),
   };
@@ -498,10 +499,10 @@ function PrivacyUsage({ intelligence }: { intelligence: IntelligenceSnapshot }) 
         Hosted decisions never receive Project content, private files, transcripts, voice audio, credentials, repository source
         or Agent scratch. Only you can change these settings, on this PC.
       </p>
-      <Row label="Share routing metadata" detail="Task category, model keys BunnyRouter found eligible, depth and the local-only flag. Required for hosted decisions.">
+      <Row label="Share routing metadata" detail="Task category, the model keys BunnyRouter found eligible and your depth setting. Required for hosted decisions.">
         <Switch label="Share routing metadata with TypeSafe" checked={jev.privacy.allowDecisionMetadata} disabled={busy} onChange={(next) => configure(policy({ privacy: { ...jev.privacy, allowDecisionMetadata: next, allowTaskDescription: next && jev.privacy.allowTaskDescription } }), next ? "Metadata sharing on." : "Metadata sharing off.")} />
       </Row>
-      <Row label="Include my request text" detail="Off by default. Text that looks like a key or password is never sent.">
+      <Row label="Include my request text" detail="Off by default. A request that contains anything shaped like a key, token or password is never sent.">
         <Switch label="Include request text in hosted decisions" checked={jev.privacy.allowTaskDescription} disabled={busy || !jev.privacy.allowDecisionMetadata} onChange={(next) => configure(policy({ privacy: { ...jev.privacy, allowTaskDescription: next } }), next ? "Request text sharing on." : "Request text sharing off.")} />
       </Row>
       <h3 className="ai-heading">Usage</h3>
@@ -533,7 +534,7 @@ function PrivacyUsage({ intelligence }: { intelligence: IntelligenceSnapshot }) 
         <Row label="Timeout">{field("timeout", "Hosted request timeout in seconds", "s")}</Row>
         <Row label="Daily spending limit" detail="Estimated from TypeSafe's published price. Leave empty for none.">{field("money", "Daily spending limit in US dollars", "USD")}</Row>
         <p className="caption" role="status" aria-live="polite">
-          {!valid ? "Check the highlighted limits: whole numbers within range." : status}
+          {!valid ? "Check the limits: request, token and concurrency limits are whole numbers within range." : status}
         </p>
         <button type="submit" className="btn secondary" disabled={!valid || busy}>
           Save limits

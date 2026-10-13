@@ -29,6 +29,8 @@ export type LayaSnapshot = { status: LayaStatus; enabled: boolean; models: LayaM
 export type LayaRuntime = {
   generate: (model: string, prompt: string, signal: AbortSignal) => Promise<{ ok: boolean; output: string }>;
   loadedBytes: (model: string) => Promise<number | null>;
+  /** Installed model name → content digest, or null when the runtime cannot be read. */
+  digests: () => Promise<Map<string, string> | null>;
 };
 
 async function ollamaGenerate(model: string, prompt: string, signal: AbortSignal) {
@@ -57,14 +59,33 @@ async function ollamaLoadedBytes(model: string) {
     return null;
   }
 }
-export const OLLAMA_LAYA_RUNTIME: LayaRuntime = { generate: ollamaGenerate, loadedBytes: ollamaLoadedBytes };
+async function ollamaDigests() {
+  try {
+    const response = await fetch("http://127.0.0.1:11434/api/tags", { signal: AbortSignal.timeout(3000) });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { models?: { name?: unknown; digest?: unknown }[] };
+    const digests = new Map<string, string>();
+    for (const row of body.models ?? []) if (typeof row.name === "string" && typeof row.digest === "string" && row.digest) digests.set(row.name, row.digest);
+    return digests;
+  } catch {
+    return null;
+  }
+}
+export const OLLAMA_LAYA_RUNTIME: LayaRuntime = { generate: ollamaGenerate, loadedBytes: ollamaLoadedBytes, digests: ollamaDigests };
 
-/** Deterministic checks: the model's own output is compared, never trusted as proof of other work. */
+/**
+ * Deterministic checks: the model's own output is compared, never trusted as proof of other work. A task class
+ * passes only when every one of its checks passes.
+ */
 export const LAYA_BENCHMARKS: { taskClass: keyof typeof LAYA_BENCHMARK_COVERS; prompt: string; expect: RegExp }[] = [
   { taskClass: "general", prompt: "Reply with exactly this text and nothing else: BUNNY-LAYA-OK", expect: /^\W*BUNNY-LAYA-OK\W*$/ },
+  { taskClass: "general", prompt: "Reply with only the single word READY in capital letters.", expect: /^\W*READY\W*$/ },
   { taskClass: "math", prompt: "What is 17 multiplied by 3, plus 9? Reply with only the number.", expect: /^\D*60\D*$/ },
+  { taskClass: "math", prompt: "What is 144 divided by 12, minus 5? Reply with only the number.", expect: /^\D*7\D*$/ },
   { taskClass: "extraction", prompt: "From the text 'Invoice 4471 was paid on 2026-03-14 by Ana.' reply with only the invoice number.", expect: /^\D*4471\D*$/ },
+  { taskClass: "extraction", prompt: "From the text 'Order A-2291 ships to Lisbon on 4 May.' reply with only the destination city.", expect: /^\W*lisbon\W*$/i },
   { taskClass: "reasoning", prompt: "Mira is older than Jun. Jun is older than Ola. Who is the youngest? Reply with only the name.", expect: /^\W*ola\W*$/i },
+  { taskClass: "reasoning", prompt: "A box is heavier than a ball. The ball is heavier than a pen. Which is the lightest? Reply with only that one word.", expect: /^\W*(?:the\s+)?pen\W*$/i },
 ];
 
 const ENABLED_KEY = "laya_enabled_v1";
@@ -74,13 +95,17 @@ export class LayaRegistry {
   private readonly db: HostDatabase;
   private readonly runtime: LayaRuntime;
   private benchmarking: string | null = null;
+  /** Digests the local runtime last reported. A benchmark counts only for the exact build it measured. */
+  private installed = new Map<string, string>();
   enabled = true;
 
   constructor(db: HostDatabase, runtime: LayaRuntime = OLLAMA_LAYA_RUNTIME) {
     this.db = db;
     this.runtime = runtime;
     this.db.db.exec("CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)");
-    this.db.db.exec("CREATE TABLE IF NOT EXISTS laya_benchmarks(model TEXT NOT NULL, task_class TEXT NOT NULL, passed INTEGER NOT NULL, detail TEXT NOT NULL, latency_ms INTEGER, at INTEGER NOT NULL, PRIMARY KEY(model, task_class))");
+    this.db.db.exec("CREATE TABLE IF NOT EXISTS laya_benchmarks(model TEXT NOT NULL, task_class TEXT NOT NULL, passed INTEGER NOT NULL, detail TEXT NOT NULL, latency_ms INTEGER, at INTEGER NOT NULL, digest TEXT, PRIMARY KEY(model, task_class))");
+    const columns = this.db.db.prepare("PRAGMA table_info(laya_benchmarks)").all() as { name: string }[];
+    if (!columns.some((column) => column.name === "digest")) this.db.db.exec("ALTER TABLE laya_benchmarks ADD COLUMN digest TEXT");
     const row = this.db.db.prepare("SELECT value FROM settings WHERE key=?").get(ENABLED_KEY) as { value: string } | undefined;
     if (row) this.enabled = row.value !== "false";
   }
@@ -90,11 +115,20 @@ export class LayaRegistry {
     this.db.db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(ENABLED_KEY, String(enabled));
   }
 
+  /** Reads installed digests from the local runtime (no model is loaded). An unreadable runtime keeps the last view. */
+  async refreshDigests(): Promise<void> {
+    const digests = await this.runtime.digests();
+    if (digests) this.installed = digests;
+  }
+
+  /** Benchmarks for the build currently installed under each name; results for a replaced build no longer count. */
   benchmarks(model?: string): LayaBenchmark[] {
     const rows = (model
-      ? this.db.db.prepare("SELECT model, task_class AS taskClass, passed, detail, latency_ms AS latencyMs, at FROM laya_benchmarks WHERE model=? ORDER BY task_class").all(model)
-      : this.db.db.prepare("SELECT model, task_class AS taskClass, passed, detail, latency_ms AS latencyMs, at FROM laya_benchmarks ORDER BY model, task_class").all()) as { model: string; taskClass: string; passed: number; detail: string; latencyMs: number | null; at: number }[];
-    return rows.map((row) => ({ model: row.model, taskClass: row.taskClass, passed: !!row.passed, detail: row.detail, latencyMs: row.latencyMs, at: row.at }));
+      ? this.db.db.prepare("SELECT model, task_class AS taskClass, passed, detail, latency_ms AS latencyMs, at, digest FROM laya_benchmarks WHERE model=? ORDER BY task_class").all(model)
+      : this.db.db.prepare("SELECT model, task_class AS taskClass, passed, detail, latency_ms AS latencyMs, at, digest FROM laya_benchmarks ORDER BY model, task_class").all()) as { model: string; taskClass: string; passed: number; detail: string; latencyMs: number | null; at: number; digest: string | null }[];
+    return rows
+      .filter((row) => row.digest !== null && row.digest === this.installed.get(row.model))
+      .map((row) => ({ model: row.model, taskClass: row.taskClass, passed: !!row.passed, detail: row.detail, latencyMs: row.latencyMs, at: row.at }));
   }
 
   private memory(): Record<string, number> {
@@ -126,7 +160,7 @@ export class LayaRegistry {
         local: record.local,
         capabilities: layaCapabilityMatrix(record),
         contextWindow: record.contextWindow ?? null,
-        memoryRequirement: typeof memory[record.model] === "number" ? `${(memory[record.model] / 1024 ** 3).toFixed(1)} GB while loaded (measured)` : null,
+        memoryRequirement: benchmarks.length && typeof memory[record.model] === "number" ? `${(memory[record.model] / 1024 ** 3).toFixed(1)} GB while loaded (measured)` : null,
         benchmarks,
         eligibleTaskClasses,
         routingEligible: this.enabled && record.local && runtimeUp && eligibleTaskClasses.length > 0,
@@ -156,12 +190,25 @@ export class LayaRegistry {
 
   private async run(model: string): Promise<LayaBenchmark[]> {
     try {
-      for (const task of LAYA_BENCHMARKS) {
-        const started = performance.now();
-        const result = await this.runtime.generate(model, task.prompt, AbortSignal.timeout(120_000));
-        const latencyMs = Math.round(performance.now() - started);
-        const passed = result.ok && task.expect.test(result.output.trim());
-        this.record(model, task.taskClass, passed, !result.ok ? "The local runtime did not answer." : passed ? "Output matched the expected answer." : "Output did not match the expected answer.", latencyMs);
+      await this.refreshDigests();
+      const digest = this.installed.get(model);
+      if (!digest) throw new Error("The local runtime did not report this model's digest; the benchmark was not run.");
+      const classes = [...new Set(LAYA_BENCHMARKS.map((task) => task.taskClass))];
+      for (const taskClass of classes) {
+        const checks = LAYA_BENCHMARKS.filter((task) => task.taskClass === taskClass);
+        let matched = 0;
+        let silent = false;
+        let totalMs = 0;
+        for (const task of checks) {
+          const started = performance.now();
+          const result = await this.runtime.generate(model, task.prompt, AbortSignal.timeout(120_000));
+          totalMs += performance.now() - started;
+          if (!result.ok) silent = true;
+          else if (task.expect.test(result.output.trim())) matched++;
+        }
+        const passed = matched === checks.length;
+        const detail = silent ? "The local runtime did not answer every check." : `${matched} of ${checks.length} checks matched the expected answer.`;
+        this.record(model, digest, taskClass, passed, detail, Math.round(totalMs / checks.length));
       }
       const bytes = await this.runtime.loadedBytes(model);
       if (bytes !== null) {
@@ -174,9 +221,9 @@ export class LayaRegistry {
     }
   }
 
-  private record(model: string, taskClass: string, passed: boolean, detail: string, latencyMs: number) {
+  private record(model: string, digest: string, taskClass: string, passed: boolean, detail: string, latencyMs: number) {
     this.db.db
-      .prepare("INSERT INTO laya_benchmarks(model,task_class,passed,detail,latency_ms,at) VALUES(?,?,?,?,?,?) ON CONFLICT(model,task_class) DO UPDATE SET passed=excluded.passed, detail=excluded.detail, latency_ms=excluded.latency_ms, at=excluded.at")
-      .run(model, taskClass, passed ? 1 : 0, detail.slice(0, 300), latencyMs, Date.now());
+      .prepare("INSERT INTO laya_benchmarks(model,task_class,passed,detail,latency_ms,at,digest) VALUES(?,?,?,?,?,?,?) ON CONFLICT(model,task_class) DO UPDATE SET passed=excluded.passed, detail=excluded.detail, latency_ms=excluded.latency_ms, at=excluded.at, digest=excluded.digest")
+      .run(model, taskClass, passed ? 1 : 0, detail.slice(0, 300), latencyMs, Date.now(), digest);
   }
 }

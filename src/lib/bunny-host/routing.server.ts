@@ -519,7 +519,7 @@ export type RoutingDecisionRecord = {
   reroutes: number;
   terminal_note?: string;
   /** M-A-3 T13.1: hosted decision-assistance provenance, present only when hosted advice was consulted (never authority, never a secret). */
-  assistance?: { source: "jev"; recommended: string | null; confidence: number | null; action: string; reason: string; answeredBy: string | null } | null;
+  assistance?: { source: "jev"; recommended: string | null; confidence: number | null; action: string; reason: string; answeredBy: string | null; adopted?: { provider_id: ProviderId; model_id: string | null } } | null;
 };
 
 const CANDIDATE_CAP = 24;

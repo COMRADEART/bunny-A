@@ -18,10 +18,10 @@ import type { ProviderAdapter } from "./contracts.ts";
 type Body = Record<string, any>;
 const KEY = "ts_live_FIXTURE_HOST_KEY_0123456789";
 
-function neverLaunches(): ProviderAdapter {
+function neverLaunches(id: "claude" | "codex" = "claude"): ProviderAdapter {
   return {
-    id: "claude",
-    detect: async () => ({ ...providerBase("claude"), installed: true, authenticated: true, availability: "ready", capabilities: ["text"], current_model: "fixture" }),
+    id,
+    detect: async () => ({ ...providerBase(id), installed: true, authenticated: true, availability: "ready", capabilities: ["text"], current_model: "fixture" }),
     usage: async () => null,
     launch: () => {
       throw new Error("The T13.1 Host fixture must never launch a provider.");
@@ -29,16 +29,29 @@ function neverLaunches(): ProviderAdapter {
   };
 }
 
-async function boot(port: number) {
+/** Answers model discovery, and a System One request by choosing the first offered candidate. */
+const jevReply = (url: string, body: string | undefined) => {
+  if (url.endsWith("/v1/models")) return { models: [{ name: "jev-1.13.0" }] };
+  const questions = (JSON.parse(body ?? "{}") as { questions: Record<string, { type: string; criteria: Record<string, unknown> }> }).questions;
+  const answers = Object.fromEntries(Object.entries(questions).map(([id, question]) => {
+    if (question.type === "noul") return [id, { type: "noul", noul: 0.1 }];
+    if (question.type === "score") return [id, { type: "score", score: 1, legend: { "1": "Simple" }, probabilities: { "1": 0.8, "2": 0.1, "3": 0.1 }, confidence: 0.8 }];
+    const keys = Object.keys(question.criteria);
+    return [id, { type: "choice", choice: keys[0], probabilities: Object.fromEntries(keys.map((key, i) => [key, i === 0 ? 0.9 : 0.1 / Math.max(1, keys.length - 1)])), confidence: 0.9 }];
+  }));
+  return { model: "jev-1.13.0", answers, usage: { input_tokens: 100, output_tokens: 0 } };
+};
+
+async function boot(port: number, adapters: ProviderAdapter[] = [neverLaunches()]) {
   const directory = mkdtempSync(join(tmpdir(), "bunny-t131-host-"));
   const root = join(directory, "project");
   mkdirSync(root, { recursive: true });
   const calls: string[] = [];
-  const jevFetch: FetchLike = async (url) => {
+  const jevFetch: FetchLike = async (url, init) => {
     calls.push(url);
-    return { status: 200, headers: { get: () => null }, text: async () => JSON.stringify({ models: [{ name: "jev-1.13.0" }] }) };
+    return { status: 200, headers: { get: () => null }, text: async () => JSON.stringify(jevReply(url, init.body)) };
   };
-  const host = await startHost({ dataDirectory: directory, root, port, adapters: [neverLaunches()], intelligence: { jevFetch, jevProtector: new TestProtector() } });
+  const host = await startHost({ dataDirectory: directory, root, port, adapters, intelligence: { jevFetch, jevProtector: new TestProtector() } });
   const base = `http://127.0.0.1:${port}`;
   const command = async (action: string, data: unknown = {}, token = host.token) => {
     const response = await fetch(`${base}/command`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, data }) });
@@ -129,5 +142,23 @@ test("R07/R16 [SIMULATED] a forged decisionAssistance in a submit body is ignore
     assert.equal(task.decision.decision_assistance, undefined);
     assert.equal(task.state, "waiting_for_approval");
     assert.equal(h.calls.length, 0);
+  } finally { await h.close(); }
+});
+
+test("RV-S2 [SIMULATED] a paired phone's Task submit never spends the owner's hosted allowance", async () => {
+  const h = await boot(43833, [neverLaunches("claude"), neverLaunches("codex")]);
+  try {
+    assert.equal((await h.command("intelligence.credential.save", { apiKey: KEY })).status, 200);
+    const configured = await h.command("intelligence.configure", { policy: { enabled: true, privacy: { allowDecisionMetadata: true }, limits: { maxRequestsPerSession: 5, maxRequestsPerDay: 5 } } });
+    assert.equal(configured.status, 200, configured.text);
+    const decisions = () => h.calls.filter((url) => url.endsWith("/v1/systemone")).length;
+    const phone = await h.pair();
+    const fromPhone = await h.command("submit", { prompt: "Say hello in one short sentence.", mode: "balanced" }, phone);
+    assert.equal(fromPhone.status, 200, fromPhone.text);
+    assert.equal(decisions(), 0, "a phone submit routes locally without a hosted call");
+    const fromOwner = await h.command("submit", { prompt: "Say hello in one short sentence.", mode: "balanced" });
+    assert.equal(fromOwner.status, 200, fromOwner.text);
+    assert.equal(decisions(), 1, "positive control: the same submit from the workstation does consult TypeSafe");
+    assert.ok(!fromPhone.text.includes(KEY) && !fromOwner.text.includes(KEY));
   } finally { await h.close(); }
 });

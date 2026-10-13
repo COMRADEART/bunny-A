@@ -289,7 +289,26 @@ export function parseJevPolicy(raw: unknown): JevPolicy {
   };
 }
 
-const SECRET_TEXT = /\b(?:sk-[\w-]{8,}|ts[-_][\w-]{16,}|Bearer\s+\S+|api[_-]?key\s*[:=]|password\s*[:=]|secret\s*[:=]|token\s*[:=]|-----BEGIN)/i;
+const SECRET_PATTERNS: readonly RegExp[] = [
+  /-----BEGIN [A-Z0-9 ]{2,40}-----/i,
+  /\bsk-[\w-]{8,}/,
+  /\bts[-_][\w-]{16,}/,
+  /\bxai-[A-Za-z0-9]{20,}/,
+  /\bBearer\s+\S{8,}/i,
+  /\b(?:api[_-]?key|apikey|access[_-]?key|client[_-]?secret|password|passwd|pwd|secret|token)\s*[:=]/i,
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}/,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}/,
+  /\bglpat-[A-Za-z0-9_-]{20,}/,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
+  /\bAIza[0-9A-Za-z_-]{30,}/,
+  /\b[sr]k_(?:live|test)_[A-Za-z0-9]{16,}/,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/,
+  /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:[^\s@/]+@/i,
+];
+
+/** True when text contains something shaped like a credential; such text is never sent to a hosted service. */
+export const looksSecret = (text: string) => SECRET_PATTERNS.some((pattern) => pattern.test(text));
 
 /**
  * Builds the only state Jev may receive: minimal structured metadata by
@@ -308,7 +327,7 @@ export function buildDecisionState(input: { taskClass: string; eligibleKeys: rea
   };
   if (input.privacy.allowTaskDescription && input.taskDescription) {
     const text = input.taskDescription.slice(0, 2000);
-    if (SECRET_TEXT.test(text)) throw new Error("The request appears to contain a secret; it was not sent.");
+    if (looksSecret(text)) throw new Error("The request appears to contain a secret; it was not sent.");
     state.task_description = text;
   }
   return state;

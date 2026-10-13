@@ -55,13 +55,13 @@ export function layaDistinctions(snapshot: IntelligenceSnapshot, tasks: readonly
 export function jevDistinctions(snapshot: IntelligenceSnapshot, tasks: readonly OrchTask[]): Distinction[] {
   const jev = snapshot.jev;
   const tested = jev.lastTest?.ok === true;
-  const assisted = tasks.filter((task) => ACTIVE.has(task.state) && task.decision.decision_assistance?.action === "accept").length;
+  const assisted = tasks.filter((task) => ACTIVE.has(task.state) && task.decision.decision_assistance?.action === "accept" && task.decision.decision_assistance.changed === true).length;
   return [
     { key: "enabled", label: "Remote enabled", value: jev.enabled, detail: jev.enabled ? "You turned hosted decisions on." : "Off by default. No request is sent." },
     { key: "credential", label: "API key saved", value: jev.hasCredential, detail: jev.hasCredential ? `Encrypted with ${jev.credentialProtection}. Saving does not test the key.` : "No key saved." },
     { key: "tested", label: "Remote tested", value: tested, detail: tested ? (jev.lastTest!.inferenceVerified ? "Model discovery and a decision request succeeded." : "Model discovery succeeded; decision inference not tested.") : "Not tested since the key was saved." },
     { key: "eligible", label: "Eligible for routing", value: jev.usable, detail: jev.usable ? "BunnyRouter may ask for advice on the next automatic Task." : "BunnyRouter decides locally." },
-    { key: "selected", label: "Advice used for a Task", value: assisted > 0, detail: assisted ? `${assisted} active Task${assisted === 1 ? "" : "s"} took hosted advice.` : "No active Task took hosted advice." },
+    { key: "selected", label: "Advice used for a Task", value: assisted > 0, detail: assisted ? `${assisted} active Task${assisted === 1 ? "" : "s"} switched model on hosted advice.` : "No active Task switched model on hosted advice." },
   ];
 }
 

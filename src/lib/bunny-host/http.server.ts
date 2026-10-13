@@ -752,8 +752,16 @@ export async function startHost(
             if (device && (submitted.verify || submitted.constraints.workingDirectory))
               throw new WorkstationRequiredError("Task folders and verification checks are set on the workstation (Windows Host).");
             // M-A-3 T13.1: optional, owner-enabled hosted advice. Null (the common case) leaves routing unchanged;
-            // the Host fetches it itself, so no client field can supply or shape it.
-            const decisionAssistance = await manager.assistDecision(submitted);
+            // the Host fetches it itself, so no client field can supply or shape it. A paired device never spends the
+            // owner's hosted allowance or sends its text to TypeSafe. A dropped connection cancels the wait.
+            let decisionAssistance = null;
+            if (local) {
+              const dropped = new AbortController();
+              const onClose = () => { if (!res.writableEnded) dropped.abort(); };
+              res.once("close", onClose);
+              try { decisionAssistance = await manager.assistDecision(submitted, dropped.signal); }
+              finally { res.off("close", onClose); }
+            }
             task = manager.submit({ ...submitted, decisionAssistance });
             break;
           }
