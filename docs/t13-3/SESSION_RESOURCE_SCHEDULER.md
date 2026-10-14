@@ -65,8 +65,8 @@ A priority never widens eligibility. A tool-requiring Task still cannot go to a 
 | Detect | `classifyFailure` maps the result to `QUOTA_CONSTRAINED`, and `classifyTaskFailure` maps it to `provider_rate_limited` |
 | Preserve checkpoint | Completed Mission steps are never re-run. Only the failed step changes state |
 | Mark accurately | The attempt is recorded with taxonomy `QUOTA_CONSTRAINED` and the ledger row settles as `failed` |
-| Unresolved side effects | For a **write** step Bunny cannot prove what landed. The TaskManager refuses the reroute (`QUOTA_PAUSE`) and the step's retry verdict is `waitForUser`, so the Mission moves to `waiting_for_user` |
-| Read work | Keeps the bounded T3 reroute (two alternates at most), because it has no side effects |
+| Unresolved side effects | For **write** work Bunny cannot prove what landed. The TaskManager refuses the reroute (`QUOTA_PAUSE`) and the step's retry verdict is `waitForUser`, so the Mission moves to `waiting_for_user`. Gate J (owner decision): a direct Chat or `/submit` task with no declared scope counts as write work, and a persistent transport failure pauses write work the same way (`WRITE_PAUSE`, Mission category `provider_write_paused`) |
+| Read work | Only work that **declares** read access keeps the bounded T3 reroute (two alternates at most), because it has no side effects |
 | Destination consent | Any reroute still passes the T13.2 cross-vendor switch rule (`CROSS_VENDOR_SWITCH`, `switchAllowlist`) and per-account consent |
 | Context | Bunny sends no context of its own. A reroute relaunches the same Task prompt only to a destination the owner already allowed |
 | Expired authority | Mission envelope expiry or revocation and stale connection authority refuse resumed cloud work (existing T9/T13.2 checks) |
@@ -80,7 +80,7 @@ All four Agents may run at the same time. `admitStep` is consulted before each r
 | --- | --- | --- |
 | Per-Agent concurrent steps | 2 (1–8) | `AGENT_CAP` |
 | Shared ceiling across all Agents | 4 (1–16) | `SHARED_CEILING` |
-| Fair turn | Waiting Agents are ranked by priority, then by fewer live steps, then by longest wait | `FAIR_TURN` |
+| Fair turn | Waiting Agents are ranked by aged priority (one rank higher per minute held, up to high: `FAIRNESS_AGING_MS`), then by fewer live steps, then by longest wait, so no Agent is starved | `FAIR_TURN` |
 | Memory pressure | 95% of system memory (50–100). It applies only while another Agent step is live, so it never starves the only Agent | `MEMORY_PRESSURE` |
 
 A held step stays `ready`; it is not failed. The Mission records a `mission.step.held` event, and every held Mission is ticked again when any step leaves a live state or the settings change. Missions that no Personal Agent owns are not affected.

@@ -78,6 +78,10 @@ dropped by `prune`, which runs at every Host start.
   `host:summary`. Its `sources` list the turn ids, and its trust is that of its least-trusted source (user turns
   map to `host`). Its revision increases with each fold. The folded buds are then removed, so context survives
   compaction without unbounded growth.
+  Gate J (review F6): only the Host-facts answer of an Agent reply is folded, never its "From memory" lines, because
+  those quote memories that keep their own trust (model notes, untrusted outside text). `summarize()` also runs
+  `admit()`'s steering check on every folded non-user source, so instruction-shaped text lowers the summary to
+  `untrusted`. The steering check is a pattern list (defence in depth); recall still labels every memory by trust.
 
 ## 5. Refusals
 

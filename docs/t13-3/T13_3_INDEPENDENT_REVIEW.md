@@ -2,6 +2,8 @@
 
 Status: the review's blocker and its medium findings are fixed in source commit `fd54c2b`. The remaining low and info items are fixed or listed below as limitations.
 
+**Superseded in part by Gate J.** F4, F6, F11 and F12, documented here as limitations, are repaired. F7 is hardened, and F2 has its `mission.respond` test. A second review of those repairs, and its confirmation pass, are in `T13_3_REVIEW_2.md`. The final source is `fc915a0`.
+
 ## What this review is, and what it is not
 
 The review was done by a separate reviewer agent. It had no authoring context and was asked to break the eight T13.3 invariants against the code at Gate H (`88c3413` plus evidence `4d2401b`). It read the code, ran all 67 focused T13.3 tests (all passed), and reproduced its findings against a real disposable Host. Its verdict was **REQUEST CHANGES**.
