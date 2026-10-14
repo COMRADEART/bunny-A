@@ -48,7 +48,7 @@ T13 made the **slot** (1–4) the durable Personal Agent identity and the weapon
 | Foreground speaker vs ownership | Not modelled | Separate persisted foreground identity (Gate B) |
 | Lotus layered memory, Agent/Project scoping, poisoning protection | Mission-scoped memory only | Lotus store, scoped recall, trust ceilings, correction, compaction, export/forget, scoped share (Gate C); no model prompt reads it yet |
 | Dynamic bounded child workers with lifecycle | Fixed T11 role catalogue | Workers as child Missions with eligibility, budgets, Host-only verdicts, cancellation, catalogue and reviewed composed abilities (Gate D); model-backed abilities not run live; Part F planning additions not implemented |
-| Harness Manager (detect/install/test) | T13.2 detection and native dispatch for Codex/Claude/Ollama only | Gate E |
+| Harness Manager (detect/install/test) | T13.2 detection and native dispatch for Codex/Claude/Ollama only | Harness views over the T13.2 registry, stepped `--version` test, disable/enable/remove through the dispatch gate, guided pinned install the owner runs (Gate E); still only Codex/Claude/Ollama route Tasks, and no live inference was run |
 | Active-session ledger, quota-aware failover | Provider usage windows, connection caps, reservations | Session dimension + failover protocol (Gate F) |
 | Evaluation-gated routing changes | Policy candidate/promote, verified-only learning weights | Shadow test and versioned rollback (Gate G) |
 | Five character styles | One art set, weapon-specific motion | Gate H |
