@@ -1,6 +1,6 @@
 # Bunny A MA3 T13.3: architecture and gate record
 
-Status: **in progress**. Gates A–G are implemented, each with its own source and evidence commits. Gates H–I have not started. No verdict is issued until Gate I.
+Status: **in progress**. Gates A–H are implemented, each with its own source and evidence commits. Gate I has not started. No verdict is issued until Gate I.
 
 ## Gate A: baseline
 
@@ -52,7 +52,7 @@ T13 made the **slot** (1–4) the durable Personal Agent identity and the weapon
 | Active-session ledger, quota-aware failover | Provider usage windows, connection caps, reservations | Per-session ledger keyed by the T13.2 reservation, UNKNOWN cost and allowance, a write-step quota pause, owner routing priority and Personal Agent fair admission (Gate F, `SESSION_RESOURCE_SCHEDULER.md`); CPU/GPU are not measured and cloud cost stays UNKNOWN |
 | Evaluation-gated routing changes | Policy candidate/promote, verified-only learning weights | Bounded three-number policy, attributable replay, bounded proposal, shadow test beside live routing, owner accept/reject, versioned rollback (Gate G, `ADAPTIVE_FEEDBACK.md`); no candidate accepted on live evidence yet |
 | Voice personalization | T12 duplex voice, one instruction and voice | Per-speaker identity and installed voice, Bunny answer length, reply language, notification frequency, text-free ratings off by default (Gate G); pace and interruption preference not adjustable |
-| Five character styles | One art set, weapon-specific motion | Gate H |
+| Five character styles | One art set, weapon-specific motion | Five styles over the same canonical art, any weapon in any style, per-slot appearance on the Host (presentation only), Studio Appearance panel with a live Notch preview, native Notch skins with speaker and working marks, measured web and native cost (Gate H, `CHARACTER_STYLE_SYSTEM.md`); native draws material effects but not the web accent overlays, and battery impact is not measured |
 
 ## Gate plan (in order; a gate is complete only with executed evidence)
 
@@ -101,3 +101,12 @@ Full contract: `ADAPTIVE_FEEDBACK.md`. Source: `routing-feedback.ts` (pure), `le
 - Only Host-verified outcomes count; user likes and dislikes are shown and never counted. Stopped and rerouted Tasks are excluded.
 - The voice session reads an optional `persona` port per turn (speaker, instruction, installed voice). With defaults and Bunny in the foreground the prompt and voice are unchanged; T12 turn-taking and interruption are untouched.
 - `routing.learning.*` and `personalization.*` are workstation-only; `routingLearning` and `voicePersonalization` are stripped from device snapshots.
+
+## Gate H contract (implemented)
+
+Full contract: `CHARACTER_STYLE_SYSTEM.md`. Source: `character-style.ts` (pure registry), `character-style.server.ts` (`CharacterAppearanceStore`; additive table `personal_agent_appearance`), Host wiring in `http.server.ts`, web `character-style-model.ts`, `character-styles.css`, `character-appearance.tsx`, native `Bunny-Island.Characters.ps1` and `Bunny-Island.Weapons.ps1`.
+
+- Five styles (Glossy Inflatable, Cel-Shaded, Arcade, Comic Book, SNES Pixel Art). Signature defaults are Gada → Glossy, Spear → Cel, Chakra → Arcade and Sword → Comic. They are defaults only, and every weapon accepts every style.
+- `personal_agent.appearance` and `personal_agent.appearance_reset` are workstation-only and presentation-only. They never touch a Mission, owner, profile, conversation, configuration revision or the foreground speaker. `characterAppearance` reaches device snapshots so a phone draws the same look; a device cannot change it.
+- The canonical art is unchanged, and pixel art is derived from it at runtime. Whether a character moves still comes only from the Host-derived state; reduced motion, intensity off and high contrast are honoured on web and native.
+- The Notch keeps the four-edge rule. It marks the foreground Personal Agent as the speaker and marks working Agents from Host states; Bunny speaking marks no Agent.

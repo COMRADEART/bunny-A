@@ -1,0 +1,232 @@
+[
+  {
+    "id": "H-M1",
+    "what": "appearance validation accepts unknown keys",
+    "file": "src/lib/bunny-host/character-style.ts",
+    "test": "src/components/island/character-style.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "H03 appearance validation is strict: unknown keys and values are refused, partial updates keep the rest"
+    ]
+  },
+  {
+    "id": "H-M1h",
+    "what": "appearance validation accepts unknown keys (Host)",
+    "file": "src/lib/bunny-host/character-style.ts",
+    "test": "src/lib/bunny-host/character-appearance-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 H reset returns a slot to its signature; invalid or authority-shaped input is refused and changes nothing"
+    ]
+  },
+  {
+    "id": "H-M2",
+    "what": "a chosen style is ignored (always the signature)",
+    "file": "src/lib/bunny-host/character-style.ts",
+    "test": "src/components/island/character-style.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "H02 every weapon accepts every style",
+      "H04 a slot with no chosen style follows its weapon's signature, including after a weapon swap"
+    ]
+  },
+  {
+    "id": "H-M3",
+    "what": "style motion runs whatever the Host state",
+    "file": "src/components/island/character-style-model.ts",
+    "test": "src/components/island/character-style.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "H05 style motion runs only where the Host-derived state runs the base loop: never on a settled or offline state",
+      "H08 WAITING slows the style accent with the base loop; a style never adds a cue or a state"
+    ]
+  },
+  {
+    "id": "H-M4",
+    "what": "high contrast keeps the decorative layers",
+    "file": "src/components/island/character-style-model.ts",
+    "test": "src/components/island/character-style.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "H07 high contrast removes decorative overlays and the accent loop and adds a solid outline"
+    ]
+  },
+  {
+    "id": "H-M5",
+    "what": "intensity off is ignored",
+    "file": "src/components/island/character-style-model.ts",
+    "test": "src/components/island/character-style.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "H06 reduced motion and intensity off stop every style loop; subtle halves the amplitude but keeps the state signal"
+    ]
+  },
+  {
+    "id": "H-M6",
+    "what": "pixel sprites keep cells below the alpha cut",
+    "file": "src/components/island/character-style-model.ts",
+    "test": "src/components/island/character-style.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "H11 compact and hero pixel sprites stay recognizable: silhouette overlap and four-way identification against the originals"
+    ]
+  },
+  {
+    "id": "H-M7",
+    "what": "pixel sprites may upscale small art",
+    "file": "src/components/island/character-style-model.ts",
+    "test": "src/components/island/character-style.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "H10 pixel sprites: 15-bit colour, one-bit alpha, the long side fits the grid, aspect kept"
+    ]
+  },
+  {
+    "id": "H-M8",
+    "what": "the speaker mark goes to every slot",
+    "file": "src/components/island/character-style-model.ts",
+    "test": "src/components/island/character-style.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "H13 the Notch marks the active speaker apart from the Agents still working, from Host facts only"
+    ]
+  },
+  {
+    "id": "H-M9",
+    "what": "the Notch edge rule is swapped",
+    "file": "src/components/island/character-style-model.ts",
+    "test": "src/components/island/character-style.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "H12 all four Notch placements keep the four-edge rule: top/bottom left of Bunny in a row, left/right above Bunny in a column"
+    ]
+  },
+  {
+    "id": "H-M10",
+    "what": "appearance commands accepted from a paired device",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/character-appearance-host.test.ts",
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  },
+  {
+    "id": "H-M11",
+    "what": "reset keeps the stored row",
+    "file": "src/lib/bunny-host/character-style.server.ts",
+    "test": "src/lib/bunny-host/character-appearance-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 H reset returns a slot to its signature; invalid or authority-shaped input is refused and changes nothing"
+    ]
+  },
+  {
+    "id": "H-M12",
+    "what": "characterAppearance missing from the snapshot",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/character-appearance-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 H every weapon wears every style with no Mission, owner, identity or configuration change; it survives a restart",
+      "T13.3 H reset returns a slot to its signature; invalid or authority-shaped input is refused and changes nothing",
+      "T13.3 H a weapon swap keeps the chosen look; a paired device draws the styles but cannot change them"
+    ]
+  },
+  {
+    "id": "H-M13",
+    "what": "native pixel art drawn with smooth scaling",
+    "file": "install/Bunny-Island.Characters.ps1",
+    "test": "scripts/island-notch.test.mjs",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 H native chips: all four weapons wear all five styles; pixel art is nearest-neighbour, the others keep the art smooth"
+    ]
+  },
+  {
+    "id": "H-M14",
+    "what": "native high contrast keeps the material effect",
+    "file": "install/Bunny-Island.Characters.ps1",
+    "test": "scripts/island-notch.test.mjs",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 H native chips: intensity, the Island animation switch and high contrast (per Agent or system) control the skin"
+    ]
+  },
+  {
+    "id": "H-M15",
+    "what": "native intensity off still animates",
+    "file": "install/Bunny-Island.Characters.ps1",
+    "test": "scripts/island-notch.test.mjs",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 H native chips: intensity, the Island animation switch and high contrast (per Agent or system) control the skin"
+    ]
+  },
+  {
+    "id": "H-M16",
+    "what": "native speaker mark on every Agent while one speaks",
+    "file": "install/Bunny-Island.Characters.ps1",
+    "test": "scripts/island-notch.test.mjs",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 H the Notch marks the active speaker apart from the Agents still working, from Host facts only"
+    ]
+  },
+  {
+    "id": "H-M17",
+    "what": "native unknown style passes through instead of the signature",
+    "file": "install/Bunny-Island.Characters.ps1",
+    "test": "scripts/island-notch.test.mjs",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 H native chips: no style falls back to the signature; unknown values never pass through"
+    ]
+  },
+  {
+    "id": "H-M18",
+    "what": "native material effect re-rendered every frame (no art cache)",
+    "file": "install/Bunny-Island.Weapons.ps1",
+    "test": "scripts/island-notch.test.mjs",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 H a material effect is cached at device scale, so a moving chip does not re-run the shader every frame"
+    ]
+  }
+]
