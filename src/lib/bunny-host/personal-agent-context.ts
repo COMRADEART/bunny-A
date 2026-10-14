@@ -2,6 +2,7 @@ import type { AgentSnapshot } from "./agent-types.ts";
 import type { MissionView } from "../bunny-missions/types.ts";
 import { looksSecret } from "./intelligence.ts";
 import type { LotusMemory } from "./lotus.ts";
+import type { AgentWorker, WorkerAbility } from "./workers.ts";
 import { SLOT_IDS, WEAPON_LABEL, clean, type SlotId, type WeaponId } from "./personal-agents.ts";
 
 /**
@@ -111,9 +112,17 @@ export type PersonalAgentContextSlot = {
   turns: ConversationTurn[];
   /** T13.3 Gate C: Lotus memories this Agent may read (its own scope and its Projects), newest first, bounded. */
   memories: LotusMemory[];
+  /** T13.3 Gate D: this Agent's child workers, newest first, bounded. */
+  workers: AgentWorker[];
 };
 /** Workstation-only projection; paired devices never receive it (private conversation and preferences). */
-export type PersonalAgentContextSnapshot = { schema: typeof PERSONAL_AGENT_CONTEXT_SCHEMA; foreground: ConversationIdentity; slots: PersonalAgentContextSlot[] };
+export type PersonalAgentContextSnapshot = {
+  schema: typeof PERSONAL_AGENT_CONTEXT_SCHEMA;
+  foreground: ConversationIdentity;
+  slots: PersonalAgentContextSlot[];
+  /** T13.3 Gate D: the worker ability catalogue, shared by all four Agents. */
+  abilities: WorkerAbility[];
+};
 
 // ---------------------------------------------------------------------------------------------------------------
 // Replies from Host facts only.

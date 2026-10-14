@@ -3,6 +3,7 @@ import { useIsland } from "@/store/use-island";
 import { WEAPON_LABEL } from "@/lib/bunny-host/personal-agents";
 import { CONTEXT_LIMITS, type ConversationIdentity } from "@/lib/bunny-host/personal-agent-context";
 import { AgentMemory } from "./memory";
+import { AgentWorkers } from "./workers";
 
 /** Host states in which an owned Agent is actually doing work; "not started" or "paused" never reads as working. */
 const WORKING = new Set(["PLANNING", "RUNNING", "VERIFYING", "WAITING_FOR_DEPENDENCY"]);
@@ -102,6 +103,13 @@ export function AgentConversation() {
               </button>
             </form>
             <AgentMemory slot={own.slot} name={nameOf(own.slot)} memories={own.memories ?? []} />
+            <AgentWorkers
+              slot={own.slot}
+              name={nameOf(own.slot)}
+              workers={own.workers ?? []}
+              abilities={context.abilities ?? []}
+              ownedMissionIds={own.owned.flatMap((row) => (row.missionId ? [row.missionId] : []))}
+            />
           </>
         )}
         {refusal && (
