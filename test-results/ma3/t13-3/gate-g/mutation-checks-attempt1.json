@@ -1,0 +1,165 @@
+[
+  {
+    "id": "M1",
+    "what": "an unaccepted (pre-Gate-G) active policy drives live weights",
+    "file": "src/lib/bunny-host/learning.server.ts",
+    "test": "src/lib/bunny-host/routing-learning.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G engine: a policy promoted before Gate G keeps live weights at the base"
+    ]
+  },
+  {
+    "id": "M2",
+    "what": "acceptance skips the shadow verified-count requirement",
+    "file": "src/lib/bunny-host/routing-feedback.ts",
+    "test": "src/lib/bunny-host/routing-learning.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G rules: a shadow run is accepted only with enough verified live decisions and no risked success",
+      "T13.3 G engine: shadow → accept → rollback, with every refusal path"
+    ]
+  },
+  {
+    "id": "M3",
+    "what": "an unverified outcome counts as shadow-verified evidence",
+    "file": "src/lib/bunny-host/routing-feedback.ts",
+    "test": "src/lib/bunny-host/routing-learning.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G rules: a shadow run is accepted only with enough verified live decisions and no risked success"
+    ]
+  },
+  {
+    "id": "M4",
+    "what": "replay attributes outcomes to decisions the active policy would not make again",
+    "file": "src/lib/bunny-host/routing-feedback.ts",
+    "test": "src/lib/bunny-host/routing-learning.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G rules: replay attributes outcomes only where the active policy still picks what ran"
+    ]
+  },
+  {
+    "id": "M5",
+    "what": "a stopped task's outcome is attributed",
+    "file": "src/lib/bunny-host/learning.server.ts",
+    "test": "src/lib/bunny-host/routing-learning.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G engine: base weights are live; Bunny proposes from verified evidence; praise is never counted as success"
+    ]
+  },
+  {
+    "id": "M6",
+    "what": "routing-improvement commands accepted from a paired device",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/routing-learning.test.ts",
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  },
+  {
+    "id": "M7",
+    "what": "routingLearning projected to devices",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/routing-learning.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G Host: routing-improvement commands are workstation-only, refuse honestly and persist"
+    ]
+  },
+  {
+    "id": "M8",
+    "what": "live routing uses the shadow policy's weights",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  },
+  {
+    "id": "M9",
+    "what": "the personalized instruction drops the action-refusal rules",
+    "file": "src/lib/bunny-host/voice/voice-personalization.ts",
+    "test": "src/lib/bunny-host/voice/voice-personalization.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G §21 rules: Bunny's default instruction is unchanged; a Personal Agent speaks as itself with every rule kept"
+    ]
+  },
+  {
+    "id": "M10",
+    "what": "ratings are written to disk while remembering is off",
+    "file": "src/lib/bunny-host/voice/voice-personalization.server.ts",
+    "test": "src/lib/bunny-host/voice/voice-personalization.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G §21 store: ratings reach disk only while remembered, hold no text, and forget deletes them"
+    ]
+  },
+  {
+    "id": "M11",
+    "what": "a timeout counts as the user interrupting",
+    "file": "src/lib/bunny-host/voice/voice-session.server.ts",
+    "test": "src/lib/bunny-host/voice/voice-session.test.ts",
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  },
+  {
+    "id": "M12",
+    "what": "the per-identity voice is ignored",
+    "file": "src/lib/bunny-host/voice/voice-session.server.ts",
+    "test": "src/lib/bunny-host/voice/voice-session.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G §21: switching Bunny → Gada changes the speaker, instruction and installed voice per turn; answers are kept without text"
+    ]
+  },
+  {
+    "id": "M13",
+    "what": "an uninstalled voice name is accepted",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/voice/voice-personalization.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G §21 Host: preferences are workstation-only, voices must be installed, ratings need a real answer, and settings persist"
+    ]
+  },
+  {
+    "id": "M14",
+    "what": "voicePersonalization projected to devices",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/voice/voice-personalization.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 G §21 Host: preferences are workstation-only, voices must be installed, ratings need a real answer, and settings persist"
+    ]
+  }
+]

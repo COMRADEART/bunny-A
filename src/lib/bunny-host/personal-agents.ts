@@ -82,7 +82,7 @@ export function isUserFacingAgent(row: Pick<AgentSnapshot["agents"][number], "te
   return !row.team || row.team.role === "coordinator";
 }
 
-const clean = (value: unknown, max: number, field: string): string => {
+export const clean = (value: unknown, max: number, field: string): string => {
   if (value === undefined || value === null) return "";
   if (typeof value !== "string") throw new Error(`${field} must be text.`);
   // Control characters (C0, DEL, C1) and bidi overrides or isolates never reach a label, so a name cannot spoof its

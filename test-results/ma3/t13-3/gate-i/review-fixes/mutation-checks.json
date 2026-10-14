@@ -1,0 +1,84 @@
+[
+  {
+    "id": "F1-M1",
+    "what": "worker Project memory appended to the child Mission objective again",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker"
+    ]
+  },
+  {
+    "id": "F1-M2",
+    "what": "worker Project memory never reaches the model prompt",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker"
+    ]
+  },
+  {
+    "id": "F2-M1",
+    "what": "a paired device may approve, start or retry a worker's child Mission",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker"
+    ]
+  },
+  {
+    "id": "F3-M1",
+    "what": "Studio save re-records every focused Agent's owner",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/personal-agent-context-host.test.ts",
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  },
+  {
+    "id": "F3-M2",
+    "what": "assign leaves the old slot focused on the moved Agent",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/personal-agent-context-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 B rebinding a slot in the Studio transfers ownership explicitly; assign accepts only user-facing Agents"
+    ]
+  },
+  {
+    "id": "F5-M1",
+    "what": "lotus.writeAll writes one by one (no admit-first, no transaction)",
+    "file": "src/lib/bunny-host/lotus.server.ts",
+    "test": "src/lib/bunny-host/lotus.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 C store: writeAll stores every memory or none"
+    ]
+  },
+  {
+    "id": "F7-M1",
+    "what": "harness.enable resumes every paused route",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/harnesses-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 E harness views, stepped tests, and disable/enable/remove enforced by the dispatch gate"
+    ]
+  }
+]

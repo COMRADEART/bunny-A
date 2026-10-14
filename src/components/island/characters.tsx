@@ -16,7 +16,10 @@ import {
   type TransitionCue,
 } from "./character-model.ts";
 import { advanceHappyMemo, companionCue, companionDescriptor, type CompanionDescriptor, type HappyMemo } from "./companion-model.ts";
+import type { CharacterAppearance, CharacterAppearanceView } from "../../lib/bunny-host/character-style.ts";
+import { PIXEL_GRID, appearanceFor, notchRole, pixelSprite, stillFor, stylePresentation } from "./character-style-model.ts";
 import "./characters.css";
+import "./character-styles.css";
 
 /**
  * T13 character components. Art is the user's own board character (public/bunny-a/characters) drawn on a dark well in
@@ -166,6 +169,41 @@ function BadgeGlyph({ kind }: { kind: keyof typeof BADGE_TONE }) {
 
 const EFFECT_PARTS = [0, 1, 2, 3, 4, 5];
 
+/** Pixel sprites are derived once per art file and grid, from the same canonical PNG the other styles draw. */
+const spriteCache = new Map<string, string>();
+
+function usePixelSprite(url: string | null, grid: number, enabled: boolean): string | null {
+  const key = url ? `${url}@${grid}` : "";
+  const [sprite, setSprite] = useState<{ key: string; data: string } | null>(null);
+  useEffect(() => {
+    if (!enabled || !url || spriteCache.has(key)) return;
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled) return;
+      const source = document.createElement("canvas");
+      source.width = image.naturalWidth;
+      source.height = image.naturalHeight;
+      const context = source.getContext("2d", { willReadFrequently: true });
+      if (!context) return;
+      context.drawImage(image, 0, 0);
+      const out = pixelSprite(context.getImageData(0, 0, source.width, source.height).data, source.width, source.height, grid);
+      const target = document.createElement("canvas");
+      target.width = out.width;
+      target.height = out.height;
+      target.getContext("2d")?.putImageData(new ImageData(out.data, out.width, out.height), 0, 0);
+      spriteCache.set(key, target.toDataURL("image/png"));
+      setSprite({ key, data: spriteCache.get(key)! });
+    };
+    image.src = url;
+    return () => {
+      cancelled = true;
+    };
+  }, [key, url, grid, enabled]);
+  if (!enabled || !url) return null;
+  return spriteCache.get(key) ?? (sprite?.key === key ? sprite.data : null);
+}
+
 export type WeaponCharacterProps = {
   weapon: WeaponId;
   /** The display state: pass displayState(presentation, live) so an offline view shows OFFLINE. */
@@ -186,6 +224,8 @@ export type WeaponCharacterProps = {
   displayName?: string | null;
   basis?: PresentationBasis | null;
   note?: string | null;
+  /** The slot's character style. Null or absent draws the weapon's signature style. */
+  appearance?: CharacterAppearance | null;
 };
 
 export function WeaponCharacter({
@@ -200,21 +240,28 @@ export function WeaponCharacter({
   displayName,
   basis,
   note,
+  appearance = null,
 }: WeaponCharacterProps) {
   const ref = useRef<HTMLSpanElement>(null);
   useAnimationGate(ref, paused);
-  const { cue, clear } = useObservedCue(state, weaponCue, celebrate && !reduced, ref);
+  const still = stillFor(reduced, appearance);
+  const { cue, clear } = useObservedCue(state, weaponCue, celebrate && !still, ref);
   const url = weaponArtUrl(weapon, state, size);
+  const look = stylePresentation({ weapon, state, appearance, reduced });
+  const sprite = usePixelSprite(url, PIXEL_GRID[size], look.pixel);
   if (!url) return null;
-  const motion = characterMotion(weapon, state, reduced);
+  const motion = characterMotion(weapon, state, still);
   const overlay = characterOverlay(state);
   const text = label ?? characterLabel({ weapon, displayName, state, basis, note });
+  const scaled = (ms: number | null | undefined) => `${Math.round((ms ?? 0) * look.periodScale)}ms`;
   const style = {
-    "--wc-base-ms": `${motion.base?.ms ?? 0}ms`,
-    "--wc-counter-ms": `${motion.base?.counterMs ?? 0}ms`,
-    "--wc-ease": motion.base?.ease ?? motion.effect?.ease ?? "linear",
+    "--wc-base-ms": scaled(motion.base?.ms),
+    "--wc-counter-ms": scaled(motion.base?.counterMs),
+    "--wc-ease": look.ease ?? motion.base?.ease ?? motion.effect?.ease ?? "linear",
     "--wc-effect-ms": `${motion.effect?.ms ?? 0}ms`,
     "--wc-halo-ms": `${motion.halo?.ms ?? 0}ms`,
+    "--wc-accent-ms": `${look.accent?.ms ?? 0}ms`,
+    "--wc-amp": look.amplitude,
     "--wc-opacity": overlay.opacity,
   } as CSSProperties;
   return (
@@ -225,7 +272,11 @@ export function WeaponCharacter({
       data-state={state}
       data-size={size}
       data-slot={slot}
-      data-reduced={reduced ? "true" : "false"}
+      data-reduced={still ? "true" : "false"}
+      data-style={look.style}
+      data-accent={look.accent?.kind ?? "none"}
+      data-decor={look.decorations ? "true" : "false"}
+      data-contrast={look.outline ? "high" : undefined}
       data-tone={overlay.tone}
       data-ring={overlay.ring}
       data-ring-pulse={motion.ringPulse ? "true" : undefined}
@@ -242,10 +293,18 @@ export function WeaponCharacter({
     >
       <span className="wc-well">
         <span className="wc-body">
-          <img className="wc-art" src={url} alt={text} draggable={false} decoding="async" />
+          <img
+            className="wc-art"
+            src={sprite ?? url}
+            alt={text}
+            draggable={false}
+            decoding="async"
+            data-pixel={look.pixel ? (sprite ? "ready" : "pending") : undefined}
+          />
         </span>
         <span className="wc-halo" aria-hidden="true" />
         <span className="wc-glint" aria-hidden="true" />
+        <span className="wc-skin" aria-hidden="true" />
         <span className="wc-fx" data-prim={motion.effect?.primitive ?? "none"} aria-hidden="true">
           {EFFECT_PARTS.map((part) => (
             <i key={part} style={{ "--wc-i": part } as CSSProperties} />
@@ -346,6 +405,9 @@ export function WeaponStrip({
   now,
   reduced = false,
   unslottedAgents = 0,
+  appearances = null,
+  speaker = null,
+  celebrate = true,
 }: {
   slots: readonly PersonalAgentView[];
   connection: Pick<Connection, "state" | "snapshotAt">;
@@ -353,6 +415,11 @@ export function WeaponStrip({
   reduced?: boolean;
   /** User-facing Agents outside every slot. Shown as a neutral count, never as a character. */
   unslottedAgents?: number;
+  appearances?: CharacterAppearanceView | null;
+  /** The Host's conversational identity (personalAgentContext.foreground). Workstation only; absent on devices. */
+  speaker?: number | "bunny" | null;
+  /** Off for previews, so a second copy of the strip never replays a transition cue. */
+  celebrate?: boolean;
 }) {
   const live = hostLive(connection, now);
   // Only slots that are active and bound to an Agent: an unassigned slot has nothing to draw.
@@ -361,6 +428,7 @@ export function WeaponStrip({
     <div className="wc-strip" role="list" aria-label="Personal Agents">
       {shown.map((slot) => {
         const state = displayState(slot.presentation.state, live);
+        const role = notchRole(slot.slot, state, live ? speaker : null);
         const label = characterLabel({
           weapon: slot.weapon,
           displayName: slot.displayName,
@@ -368,9 +436,28 @@ export function WeaponStrip({
           basis: live ? slot.presentation.basis : null,
           note: live ? null : "Host connection not live",
         });
+        const spoken = role.speaking ? `${label}, speaking now` : label;
         return (
-          <span key={slot.slot} role="listitem" className="wc-strip-item" title={label}>
-            <WeaponCharacter key={slot.agentId ?? "unassigned"} weapon={slot.weapon} state={state} slot={slot.slot} size="compact" celebrate reduced={reduced} label={label} />
+          <span
+            key={slot.slot}
+            role="listitem"
+            className="wc-strip-item"
+            title={spoken}
+            data-speaking={role.speaking ? "true" : undefined}
+            data-working={role.working ? "true" : undefined}
+          >
+            <WeaponCharacter
+              key={slot.agentId ?? "unassigned"}
+              weapon={slot.weapon}
+              state={state}
+              slot={slot.slot}
+              size="compact"
+              celebrate={celebrate}
+              reduced={reduced}
+              label={spoken}
+              appearance={appearanceFor(appearances, slot.slot)}
+            />
+            {role.speaking ? <span className="wc-speaker" aria-hidden="true" /> : null}
           </span>
         );
       })}

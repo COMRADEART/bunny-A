@@ -1,0 +1,386 @@
+/* T13.3 Gate H character styles. A style is drawn over the same canonical art (characters.css stays the base): it changes
+   the well, the art's material filter and one accent loop. Decorations are gated by data-decor (off in high contrast);
+   the accent runs only when data-accent is set, which character-style-model.ts does only while the Host-derived state
+   runs the base loop. Animates transform, opacity and filter only. */
+
+.wc-weapon {
+  --wc-neon: color-mix(in srgb, var(--wc-accent) 40%, #2ef2ff);
+}
+.wc-skin {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.wc-skin::before,
+.wc-skin::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------- Glossy Inflatable */
+
+.wc-weapon[data-style="glossy"] .wc-well {
+  border-radius: 32%;
+  background: radial-gradient(120% 95% at 50% 22%, #252c42 0%, #07080d 74%);
+}
+.wc-weapon[data-style="glossy"][data-decor="true"] .wc-art {
+  filter: saturate(1.15) brightness(1.06) drop-shadow(0 0 2px color-mix(in srgb, var(--wc-accent) 60%, transparent));
+}
+.wc-weapon[data-style="glossy"][data-decor="true"] .wc-skin::before {
+  inset: 9% 34% 60% 14%;
+  border-radius: 50%;
+  opacity: 0.5;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0));
+  transform: rotate(-24deg);
+}
+.wc-weapon[data-style="glossy"][data-decor="true"] .wc-skin::after {
+  inset: 6%;
+  border-radius: 34%;
+  opacity: 1;
+  box-shadow: inset 0 -6px 12px color-mix(in srgb, var(--wc-accent) 22%, transparent), inset 0 3px 8px rgba(255, 255, 255, 0.1);
+}
+.wc-weapon[data-accent="orb-pulse"] .wc-art {
+  transform-origin: 50% 92%;
+  animation: wc-style-squash var(--wc-accent-ms) var(--wc-ease) infinite;
+}
+.wc-weapon[data-accent="orb-pulse"] .wc-halo {
+  animation: wc-style-orb var(--wc-accent-ms) ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------- Cel-Shaded */
+
+.wc-weapon[data-style="cel"] .wc-well {
+  border-radius: 18%;
+  background: linear-gradient(160deg, #1f2638 0 52%, #0d1019 52% 100%);
+}
+.wc-weapon[data-style="cel"][data-decor="true"] .wc-art {
+  filter: contrast(1.3) saturate(1.35) drop-shadow(1px 0 0 #05060a) drop-shadow(-1px 0 0 #05060a) drop-shadow(0 1px 0 #05060a)
+    drop-shadow(0 -1px 0 #05060a);
+}
+.wc-weapon[data-style="cel"][data-decor="true"] .wc-skin::after {
+  opacity: 1;
+  background: linear-gradient(200deg, rgba(255, 255, 255, 0.08) 0 30%, transparent 30%);
+}
+.wc-weapon[data-accent="light-sweep"] .wc-skin::before {
+  inset: -10% 0;
+  background: linear-gradient(115deg, transparent 44%, rgba(255, 255, 255, 0.55) 44% 50%, transparent 50%);
+  animation: wc-style-sweep var(--wc-accent-ms) cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+/* ---------------------------------------------------------------- Arcade */
+
+.wc-weapon[data-style="arcade"] .wc-well {
+  background: radial-gradient(circle at 50% 50%, #1b0f33 0%, #05040b 70%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wc-neon) 55%, transparent);
+}
+.wc-weapon[data-style="arcade"][data-decor="true"] .wc-art {
+  filter: saturate(1.4) drop-shadow(0 0 1.5px var(--wc-neon)) drop-shadow(0 0 5px color-mix(in srgb, var(--wc-neon) 55%, transparent));
+}
+.wc-weapon[data-style="arcade"][data-decor="true"] .wc-skin::after {
+  opacity: 0.35;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.6) 0 1px, transparent 1px 3px);
+}
+.wc-weapon[data-accent="radial-pulse"] .wc-skin::before {
+  inset: 12%;
+  border-radius: 50%;
+  border: 1.5px solid var(--wc-neon);
+  animation: wc-style-radial var(--wc-accent-ms) ease-out infinite;
+}
+
+/* ---------------------------------------------------------------- Comic Book */
+
+.wc-weapon[data-style="comic"] .wc-well {
+  border-radius: 14%;
+  background: repeating-conic-gradient(from 0deg at 50% 56%, #1d2131 0 9deg, #12141f 9deg 18deg);
+  box-shadow: inset 0 0 0 2px #000;
+}
+.wc-weapon[data-style="comic"][data-decor="true"] .wc-art {
+  filter: contrast(1.2) drop-shadow(1.5px 0 0 #000) drop-shadow(-1.5px 0 0 #000) drop-shadow(0 1.5px 0 #000) drop-shadow(0 -1.5px 0 #000)
+    drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55));
+}
+.wc-weapon[data-style="comic"][data-decor="true"] .wc-skin::after {
+  opacity: 0.55;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.24) 0.9px, transparent 1.2px) 0 0 / 4px 4px;
+  -webkit-mask-image: linear-gradient(135deg, transparent 45%, #000 100%);
+  mask-image: linear-gradient(135deg, transparent 45%, #000 100%);
+}
+.wc-weapon[data-accent="ink-sheen"] .wc-skin::before {
+  inset: -10% 0;
+  background:
+    linear-gradient(120deg, transparent 40%, rgba(255, 255, 255, 0.6) 48%, transparent 56%),
+    repeating-linear-gradient(160deg, transparent 0 7px, rgba(255, 255, 255, 0.28) 7px 8px);
+  -webkit-mask-image: linear-gradient(90deg, #000 0 60%, transparent 85%);
+  mask-image: linear-gradient(90deg, #000 0 60%, transparent 85%);
+  animation: wc-style-sheen var(--wc-accent-ms) cubic-bezier(0.3, 0, 0, 1) infinite;
+}
+
+/* ---------------------------------------------------------------- SNES Pixel Art (universal) */
+
+.wc-weapon[data-style="pixel"] .wc-well {
+  border-radius: 4px;
+  background: #10131d;
+  box-shadow: inset 0 0 0 2px #05060a, inset 2px 2px 0 2px #262c40;
+}
+.wc-weapon[data-style="pixel"] .wc-art {
+  image-rendering: pixelated;
+}
+.wc-weapon[data-style="pixel"] .wc-halo {
+  background: none;
+}
+.wc-weapon[data-style="pixel"][data-base="chakra-rotate"] .wc-body {
+  animation-timing-function: steps(16, end);
+}
+.wc-weapon[data-accent="pixel-blink"] .wc-skin::before {
+  inset: auto;
+  top: 14%;
+  right: 16%;
+  width: 8%;
+  height: 8%;
+  background: #fff;
+  box-shadow: calc(var(--wc-box, 96px) * -0.5) calc(var(--wc-box, 96px) * 0.45) 0 0 var(--wc-accent);
+  animation: wc-style-blink var(--wc-accent-ms) steps(1, end) infinite;
+}
+
+/* ---------------------------------------------------------------- high contrast (per Agent, and forced colors) */
+
+.wc-weapon[data-contrast="high"] .wc-well {
+  background: #000;
+  box-shadow: inset 0 0 0 2px #fff;
+}
+.wc-weapon[data-contrast="high"] .wc-halo,
+.wc-weapon[data-contrast="high"] .wc-glint,
+.wc-weapon[data-contrast="high"] .wc-skin {
+  display: none;
+}
+.wc-weapon[data-contrast="high"] .wc-badge {
+  background: #000;
+  border-width: 2px;
+}
+@media (forced-colors: active) {
+  .wc-skin {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- Notch roles: who is speaking, who is still working */
+
+.wc-strip-item {
+  position: relative;
+}
+.wc-strip-item[data-speaking="true"] {
+  outline: 2px solid var(--wc-ink, #eef1fa);
+  outline-offset: 2px;
+}
+.wc-speaker {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: -7px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--wc-ink, #eef1fa);
+}
+.wc-strip-item[data-working="true"]::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wc-blue);
+  box-shadow: 0 0 0 2px #07080d;
+}
+
+/* ---------------------------------------------------------------- Studio: Appearance · Character style */
+
+.bunny-app.t8-app .ca-panel {
+  display: grid;
+  gap: var(--s3, 12px);
+  margin-top: var(--s3, 12px);
+}
+.bunny-app.t8-app .ca-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s3, 12px);
+}
+.bunny-app.t8-app .ca-figure {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin: 0;
+}
+.bunny-app.t8-app .ca-styles,
+.bunny-app.t8-app .ca-intensity {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.bunny-app.t8-app .ca-styles {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.bunny-app.t8-app .ca-styles legend,
+.bunny-app.t8-app .ca-intensity legend {
+  margin-bottom: 6px;
+  font-size: var(--text-sm, 13px);
+  color: var(--muted);
+}
+.bunny-app.t8-app .ca-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--r-sm, 10px);
+  border: 1px solid var(--border);
+  background: var(--field);
+  color: var(--fg);
+  cursor: pointer;
+}
+.bunny-app.t8-app .ca-option[data-selected] {
+  border-color: var(--fg);
+}
+.bunny-app.t8-app .ca-option:focus-within {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+.bunny-app.t8-app .ca-option input {
+  margin-top: 3px;
+}
+.bunny-app.t8-app .ca-option-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.bunny-app.t8-app .ca-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: var(--text-xs, 11px);
+  font-weight: 500;
+}
+.bunny-app.t8-app .ca-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3, 12px);
+}
+.bunny-app.t8-app .ca-intensity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.bunny-app.t8-app .ca-intensity label,
+.bunny-app.t8-app .ca-check,
+.bunny-app.t8-app .ca-edge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg);
+  font-size: var(--text-sm, 13px);
+}
+.bunny-app.t8-app .ca-edge select {
+  padding: 4px 8px;
+  border-radius: var(--r-sm, 10px);
+  border: 1px solid var(--border);
+  background: var(--field);
+  color: var(--fg);
+  font: inherit;
+}
+.bunny-app.t8-app .ca-notch-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bunny-app.t8-app .ca-notch-head h4 {
+  margin: 0;
+}
+.bunny-app.t8-app .ca-notch {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  background: #07080d;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.bunny-app.t8-app .ca-notch[data-axis="column"] {
+  flex-direction: column;
+}
+.bunny-app.t8-app .ca-notch[data-axis="column"] .wc-strip {
+  flex-direction: column;
+  gap: 10px;
+}
+.bunny-app.t8-app .ca-notch .wc-strip {
+  gap: 10px;
+}
+
+/* ---------------------------------------------------------------- motion off: pseudo-elements are not matched by `*` */
+
+.wc-weapon[data-reduced="true"] .wc-skin::before,
+.wc-weapon[data-reduced="true"] .wc-skin::after,
+.bunny-app[data-motion="reduced"] .wc-skin::before,
+.bunny-app[data-motion="off"] .wc-skin::before,
+.t8-app[data-motion="reduced"] .wc-skin::before,
+.t8-app[data-motion="off"] .wc-skin::before {
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wc-skin::before,
+  .wc-skin::after {
+    animation: none !important;
+  }
+}
+.wc-weapon[data-paused="true"] .wc-skin::before,
+.wc-weapon[data-paused="true"] .wc-skin::after {
+  animation-play-state: paused !important;
+}
+
+/* ---------------------------------------------------------------- keyframes: style accents (amplitude via --wc-amp) */
+
+@keyframes wc-style-squash {
+  0%,
+  100% { transform: scale(1, 1); }
+  45% { transform: scale(calc(1 + 0.035 * var(--wc-amp, 1)), calc(1 - 0.035 * var(--wc-amp, 1))); }
+  70% { transform: scale(calc(1 - 0.015 * var(--wc-amp, 1)), calc(1 + 0.015 * var(--wc-amp, 1))); }
+}
+@keyframes wc-style-orb {
+  0%,
+  100% { opacity: 0.3; transform: scale(0.96); }
+  50% { opacity: calc(0.3 + 0.35 * var(--wc-amp, 1)); transform: scale(1.04); }
+}
+@keyframes wc-style-sweep {
+  0% { opacity: 0; transform: translate3d(-70%, 0, 0); }
+  15% { opacity: calc(0.9 * var(--wc-amp, 1)); }
+  45% { opacity: 0; transform: translate3d(70%, 0, 0); }
+  100% { opacity: 0; transform: translate3d(70%, 0, 0); }
+}
+@keyframes wc-style-radial {
+  0% { opacity: calc(0.85 * var(--wc-amp, 1)); transform: scale(0.6); }
+  70% { opacity: 0; transform: scale(1.25); }
+  100% { opacity: 0; transform: scale(1.25); }
+}
+@keyframes wc-style-sheen {
+  0% { opacity: 0; transform: translate3d(-60%, 0, 0); }
+  20% { opacity: calc(0.85 * var(--wc-amp, 1)); }
+  50% { opacity: 0; transform: translate3d(60%, 0, 0); }
+  100% { opacity: 0; transform: translate3d(60%, 0, 0); }
+}
+@keyframes wc-style-blink {
+  0%,
+  100% { opacity: 0; }
+  25% { opacity: calc(1 * var(--wc-amp, 1)); }
+  50% { opacity: 0; }
+  75% { opacity: calc(0.6 * var(--wc-amp, 1)); }
+}

@@ -1,0 +1,137 @@
+node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+At line:1 char:1
++ & "c:\Program Files\nodejs/node.exe" "c:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+> pretest
+> npm run build:ownership && npm run build:voice
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` 
+for supported config options.
+
+> build:ownership
+> node scripts/build-owned-process.mjs
+
+{"schema":"bunny-native-build/1","architecture":"windows-x64","nodeApi":8,"sourceSha256":"8ebba0e42fc0934fba6793a516c637c553292f27b48a0e49d3421025ff1864d8","binarySha256":"72c8807293ee12811e23ac30260a72e835f1f53135194cb30766269229f62e33","compilerSha256":"f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0","compilerVersion":"gcc.exe (Rev5, Built by MSYS2 project) 16.1.0","flags":["-std=c11","-O2","-Wall","-Wextra","-Werror","-shared","-s","-static-libgcc","-Wl,--no-insert-timestamp","-Wl,--image-base,0x180000000","-Wl,--nxcompat","-Wl,--dynamicbase"]}
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` 
+for supported config options.
+
+> build:voice
+> node scripts/build-voice-worker.mjs
+
+build:voice up to date
+build:whisper-shim up to date
+{"schema":"bunny-voice-worker-build/1","protocol":"bunny-voice/1","source":"native/voice/BunnyVoiceWorker.cs","sourceSha256":"63ae2c4b8a4eb70d32a74b79566a463baa688f124939ac7989c0cbcbaf1a2681","binary":"native/voice/bunny-voice-worker.exe","binarySha256":"44e3d80a719a8ae24682e084d4a97efac39973e327f6c02db4dbdbb573083632","compiler":{"path":"C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe","sha256":"46809206887326d2d24db1eff1f3064de972c3451abe766b49111450a5e08e00","version":"Microsoft (R) Visual C# Compiler version 4.8.9221.0"},"systemSpeech":{"path":"C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System.Speech\\v4.0_4.0.0.0__31bf3856ad364e35\\System.Speech.dll","sha256":"59aa7929fc874d5b124cf86995c0c66d27e4c9b0340c43645cd897c3162ba8cb"},"architecture":"windows-x64","builtAt":"2026-10-12T10:34:48.740Z","whisperShim":{"source":"native/voice/whisper-shim.c","sourceSha256":"eaefdfef6344ab4354cf3a4f2ededa665f675b81afbe5381af053c43379db8d0","binarySha256":"f53b88c88041a0d0f9af3fa472028413e176ff7dc6562711af3fa3ae7e66aae4","linkedAgainst":{"whisper.dll":"b7bb4ba92bd36b8afe0c00059ca6a0f69c6767193bfb5f0761e9ed27b1087803","ggml.dll":"c6e88687d6aa0238f2e834a87958f38d2dc96075a6a7bf6fb8b9cd728a0faed2","ggml-base.dll":"a5241b52206f61c9dfd6f0f53a8ef19076f9528ead2db1e039a66d7e03817bfc"},"compiler":{"path":"C:\\msys64\\ucrt64\\bin\\gcc.exe","sha256":"f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0","version":"gcc.exe (Rev5, Built by MSYS2 project) 16.1.0"},"whisperVersion":"whisper.cpp v1.9.4 (927cfce)"}}
+
+> test
+> node --test --test-concurrency=1 scripts/*.test.mjs && node --experimental-strip-types --test --test-concurrency=1 src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/orch/*.test.ts src/lib/bunny-host/agent-machine.test.ts src/lib/bunny-host/agent-replay.test.ts src/lib/bunny-host/agent-store.test.ts src/lib/bunny-host/codex-compatibility.test.ts src/lib/bunny-host/codex-probe.test.ts src/lib/bunny-host/execution-scope.test.ts src/lib/bunny-host/failure.test.ts src/lib/bunny-host/git-helpers-ownership.test.ts src/lib/bunny-host/host.test.ts src/lib/bunny-host/learning.test.ts src/lib/bunny-host/m2.test.ts src/lib/bunny-host/ma2-t10.test.ts src/lib/bunny-host/model-capability.test.ts src/lib/bunny-host/owned-process-group.test.ts src/lib/bunny-host/provider-containment.test.ts src/lib/bunny-host/presentation.test.ts src/lib/bunny-host/provider-usage.test.ts src/lib/bunny-host/release-identity.test.ts src/lib/bunny-host/routing-matrix.test.ts src/lib/bunny-host/routing-store.test.ts src/lib/bunny-host/routing.test.ts src/lib/bunny-host/state-marker.test.ts src/lib/bunny-host/stop-ownership.test.ts src/lib/bunny-host/t3-manager.test.ts src/lib/bunny-host/personal-agents.test.ts src/lib/bunny-host/personal-agents-host.test.ts src/lib/bunny-host/personal-agent-context.test.ts src/lib/bunny-host/personal-agent-context-host.test.ts src/lib/bunny-host/intelligence.test.ts src/lib/bunny-host/intelligence-host.test.ts src/lib/bunny-host/connections.test.ts src/lib/bunny-host/connections-host.test.ts src/lib/bunny-host/project-workspace.test.ts src/lib/bunny-host/remote-device.test.ts src/lib/bunny-host/remote-remediation.test.ts src/lib/bunny-host/voice/*.test.ts src/lib/bunny-missions/*.test.ts && node --experimental-strip-types --test --test-force-exit --test-concurrency=1 src/lib/bunny-host/agent-runtime.test.ts src/lib/bunny-host/agent-recovery.test.ts src/lib/bunny-host/agent-team.test.ts src/lib/bunny-host/agent-team-matrix.test.ts src/lib/bunny-host/agent-team-lifecycle.test.ts src/lib/bunny-host/agent-team-handoff.test.ts src/lib/bunny-host/agent-team-surfaces.test.ts src/lib/bunny-host/personal-agents-team.test.ts
+
+Γ£ö non-canvas app with no custom card gets a soft BRAND NOTE (utility exception) (3.8412ms)
+Γ£ö non-canvas app with a compliant card is silent (3.7506ms)
+Γ£ö card file without site.json card=custom warns (2.9682ms)
+Γ£ö card file with missing site.json warns for card=custom (2.5613ms)
+Γ£ö card file with invalid site.json warns for card=custom (46.776ms)
+Γ£ö oversized card warns for non-canvas apps too (4.1408ms)
+Γ£ö canvas app with no card warns 'missing' and missing og:type (2.6791ms)
+Γ£ö canvas card without type still warns for og:type (2.9466ms)
+Γ£ö oversized card warns on the scraper budget (jpg and legacy png) (7.3552ms)
+Γ£ö compliant game (custom card + site.json type + x-banner) is silent (3.946ms)
+Γ£ö __root.tsx og:type no longer satisfies the canvas gate (3.6598ms)
+Γ£ö oversized x-banner warns on the same scraper budget as og.jpg (3.4578ms)
+Γ£ö legacy png + site.json type still needs the X feed card (2.6849ms)
+Γ£ö siteDeclaresOgTypeGame reads the site contract (0.1242ms)
+Γ£ö a fresh og-pending marker silences the whole gate view (2.0213ms)
+Γ£ö a stale og-pending marker is ignored and the warnings return (3.3222ms)
+Γ£ö the marker goes stale on the clock, not on the file (3.119ms)
+Γ£ö no marker means nothing is in flight (1.6207ms)
+Γ£ö parseBrandCheckArgs takes --game, --placeholder-ok and --root, and rejects the rest (0.2828ms)
+Γ£ö cli: a game missing its card reports JSON and exits 1 (59.4113ms)
+Γ£ö cli: a compliant game passes (66.8889ms)
+Γ£ö cli: the task's own marker is reported, not honoured (73.6977ms)
+Γ£ö cli: a bad argument fails with JSON on stderr (52.9678ms)
+Γ£ö cli: a non-game with no card fails too ΓÇö the pass exists to produce one (59.2927ms)
+Γ£ö cli: --placeholder-ok is how a plain-utility pass reports no card as expected (155.8804ms)
+Γ£ö cli: a non-game with a compliant card passes (73.2514ms)
+Γ£ö SKILL.md and AGENTS.md name the marker path and bound this script uses (0.7579ms)
+Γ£ö the sections that own the brand-task prohibition never affirm a wait (0.9753ms)
+Γ£ö SKILL.md tells the pass to self-check with the flag this CLI accepts (0.3207ms)
+Γ£ö normalizes whitespace before hashing (1.2812ms)
+Γ£ö nullish and blank body text normalize to the empty string (0.1243ms)
+Γ£ö body text prefix is normalized and capped (0.1001ms)
+Γ£ö identical runs do not diverge (0.5917ms)
+Γ£ö status change diverges (0.2585ms)
+Γ£ö title change diverges (0.1142ms)
+Γ£ö title comparison is skipped when either side lacks one (0.116ms)
+Γ£ö canvas disappearing diverges; canvas appearing does not (0.1852ms)
+Γ£ö horizontal overflow appearing diverges; clearing does not (0.1549ms)
+Γ£ö new console errors diverge (0.1475ms)
+Γ£ö errors already present in the baseline do not re-diverge (0.1164ms)
+Γ£ö body text collapse diverges (0.0934ms)
+Γ£ö body text dropping to zero reports collapse (0.1029ms)
+Γ£ö zero-length baseline reports growth via the hash branch, not collapse (0.0877ms)
+Γ£ö hash mismatch with a trivial length delta and same page start is tolerated (0.0523ms)
+Γ£ö hash mismatch with a trivial length delta but changed page start diverges (0.0648ms)
+Γ£ö prefix check is skipped when either side lacks a prefix (0.0898ms)
+Γ£ö length-delta tolerance boundary: 50 tolerated, 51 diverges (500-char baseline) (0.0645ms)
+Γ£ö length-delta floor dominates small baselines: 20 tolerated, 21 diverges (100-char baseline) (0.0536ms)
+Γ£ö collapse boundary: exactly half is 'changed', one below is 'collapsed' (0.0571ms)
+Γ£ö missing baseline viewport diverges (0.0566ms)
+Γ£ö empty or null baseline diverges for every viewport (0.0731ms)
+Γ£ö degenerate current verdict fails closed (0.1461ms)
+Γ£ö multiple signals across viewports all accumulate (0.0716ms)
+Γ£ö baselineComparison round-trips a valid baseline (0.1162ms)
+Γ£ö baselineComparison fails closed on malformed or wrong-shape baselines (0.2032ms)
+Γ£ö parseSmokeArgs defaults (0.1678ms)
+Γ£ö parseSmokeArgs consumes --baseline without shifting positionals (0.0604ms)
+Γ£ö parseSmokeArgs rejects a trailing --baseline flag (0.0468ms)
+Γ£ö parseSmokeArgs supports the --baseline= form (0.0526ms)
+Γ£ö parseSmokeArgs rejects unknown flags instead of treating them as positionals (0.0561ms)
+Γ£ö parseSmokeArgs env fallback and flag precedence (0.0604ms)
+Γ£ö derivedPaths handles .png, .PNG, and extensionless inputs (0.1777ms)
+Γ£ö exitCodeFor: clean run exits 0 (0.0906ms)
+Γ£ö exitCodeFor: errors in any single viewport exit 2 (0.0575ms)
+Γ£ö exitCodeFor: navigation failure in any viewport exits 1, beating errors (0.0778ms)
+Γ£ö exitCodeFor: 4xx boundary and missing status (0.0645ms)
+Γ£ö exitCodeFor: no viewport data is a failure (0.0512ms)
+Γ£ö browser-smoke wires the guard and verdict helpers (0.9641ms)
+Γ£ö browser-smoke file I/O only touches guarded paths (0.8732ms)
+Γ£ö defaultScreenshotPath stays inside the allowed output root on each platform (0.0847ms)
+warning: in the working copy of 'install/Bunny-Release-Info.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'install/Bunny-State.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'install/Start-Bunny-Release.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'install/release-pin.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/bunny-state-migration.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/install-bunny-release.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/migrate-bunny-state.ps1', LF will be replaced by CRLF the next time Git touches it
+Γ£ö M-A-1D: the production release pin is the reviewed M-A-1 code candidate (71.2627ms)
+Γ£ö M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (18595.1893ms)
+Γ£ö M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release (8299.8942ms)
+Γ£ö M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release (14402.9538ms)
+Γ£ö T10-XG-06: rollback refuses a paused Mission with a live desktop grant, even outside the snapshot page (139.8412ms)
+Γ£ö T10 rollback preflight preserves the idle positive control, and refuses enabled scheduling (94.2176ms)
+Γ£ö T10 rollback preflight refuses orphan grant and interrupted or waiting work independently (149.4247ms)
+Γ£ö MA2 T1: the read-only SQLite snapshot includes committed WAL rows (240.8694ms)
+Γ£ö MA2 T1: all 23 tables and non-database files survive migration (388.5822ms)
+Γ£ö MA2 T1: an unexpected changed task field fails preservation (349.6487ms)
+Γ£ö MA2 T1: new telemetry is allowed, but missing historical events fail (387.6936ms)
+Γ£ö MA2 T1: active tasks refuse migration before copy (220.2219ms)
+Γ£ö MA2 T1: active missions refuse migration before copy (214.7465ms)
+Γ£ö MA2 T1: unknown schema refuses migration (217.9059ms)
+Γ£ö MA2 T1: an occupied stage is never overwritten (205.2506ms)
+Γ£ö MA2 T1: state cannot be installed inside a Git checkout (187.4964ms)
+Γ£ö MA2 T1: a source directory junction fails preflight (187.6699ms)
+Γ£ö MA2 T1: a target junction cannot hide a repository dependency (191.6352ms)
+Γ£ö MA2 T1: copied hard-linked files become independent files (315.4651ms)
+Γ£ö MA2 T1: git clean in a disposable checkout cannot delete migrated state (475.5636ms)
+Γ£ö MA2 T1: a named-tunnel configuration needs an explicit credential inventory (208.9737ms)
+Γ£ö MA2 T1: the installed tunnel uses application state and rejects a missing or changed client (383.5697ms)
+Γ£ö MA2 T1: installed Host state fails closed without an explicit path or database (197.3602ms)
+Γ£ö MA2 T1: installed Host resolves flat canonical state and moved credentials (357.0962ms)
+Γ£ö MA2 T1: a truncated database and unknown layout fail closed without creating state (320.4298ms)
+Γ£ö MA2 T1: a retired production source cannot become development state (196.4712ms)
+Γ£ö MA2 T1 Windows controller: complete cutover and idempotent retry (18847.3274ms)
+Γ£ö MA2 T1 Windows controller: after-copy (17721.714ms)

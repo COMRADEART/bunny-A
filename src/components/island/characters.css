@@ -446,22 +446,23 @@
 
 /* ---------------------------------------------------------------- keyframes: base loops */
 
+/* --wc-amp (T13.3 Gate H) scales the hover: 1 full, 0.5 subtle. Undefined elsewhere, so the default is the T13 motion. */
 @keyframes wc-gada-float {
   0%,
   100% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  30% { transform: translate3d(0, -2px, 0) rotate(0deg); }
-  60% { transform: translate3d(0, -1px, 0) rotate(-2deg); }
-  80% { transform: translate3d(0, 0, 0) rotate(-1deg); }
+  30% { transform: translate3d(0, calc(-2px * var(--wc-amp, 1)), 0) rotate(0deg); }
+  60% { transform: translate3d(0, calc(-1px * var(--wc-amp, 1)), 0) rotate(calc(-2deg * var(--wc-amp, 1))); }
+  80% { transform: translate3d(0, 0, 0) rotate(calc(-1deg * var(--wc-amp, 1))); }
 }
 @keyframes wc-spear-float {
   0%,
   100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -1.5px, 0); }
+  50% { transform: translate3d(0, calc(-1.5px * var(--wc-amp, 1)), 0); }
 }
 @keyframes wc-sword-hover {
   0%,
   100% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  50% { transform: translate3d(0, -1.5px, 0) rotate(1deg); }
+  50% { transform: translate3d(0, calc(-1.5px * var(--wc-amp, 1)), 0) rotate(calc(1deg * var(--wc-amp, 1))); }
 }
 @keyframes wc-chakra-rotate {
   from { transform: rotate(0deg); }

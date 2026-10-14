@@ -5,6 +5,7 @@ import { NAMES, ProviderStatus } from "./ui";
 import { Pairing } from "./phone";
 import { MissionSettings } from "./mission";
 import { AiModelsSettings } from "./ai-models";
+import { NotificationFrequencySetting, VoicePersonalization } from "./voice-personalization";
 
 const GROUPS = [
   "General",
@@ -14,6 +15,7 @@ const GROUPS = [
   "Workspace",
   "Devices",
   "Notifications",
+  "Voice",
   "Runtime diagnostics",
   "Appearance",
   "About Bunny",
@@ -179,8 +181,11 @@ export function Settings() {
             </>
           ) : group === "Devices" ? (
             <Pairing compact />
+          ) : group === "Voice" ? (
+            <VoicePersonalization />
           ) : group === "Notifications" ? (
             <>
+              <NotificationFrequencySetting />
               <Setting
                 label="Browser notifications"
                 detail="Foreground session events; background phone push is unavailable."

@@ -5,6 +5,7 @@ import { VoiceSessionManager, REFUSAL_TEXT, REDIRECT_TEXT, TOOLS_TEXT, MISSION_P
 import { deviceTask, VOICE_TURN_DEVICE_LABEL } from "../device-authority.server.ts";
 import type { VoiceWorkerPort } from "./voice-worker.server.ts";
 import { VOICE_LIMITS, VOICE_PROTOCOL, type WorkerCommand, type WorkerEvent, type VoiceMode } from "./voice-protocol.ts";
+import { DEFAULT_VOICE_PREFERENCES, personalizedInstruction } from "./voice-personalization.ts";
 
 /** In-process fake worker: records every command and lets the test emit worker events. */
 class FakeWorker implements VoiceWorkerPort {
@@ -61,7 +62,7 @@ function finishSpeech(h: ReturnType<typeof setup>) {
   h.worker.emit({ ev: "playback.idle", turn: snap.turnId, gen: snap.generation });
 }
 
-function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?: VoiceAgentRow[]; silentDevices?: boolean; silentReady?: boolean; softBudget?: number; hardBudget?: number; sttNotice?: string | null; /** T12: Mission rows the Host reports, and the canonical Mission ports (stop, draft, projects). */ missions?: MissionFact[]; missionPort?: boolean; projects?: { id: string; name: string }[]; draftFails?: boolean; stopFails?: boolean; /** T12 RES-01/02: the facts window: only the newest N Missions (by updatedAt) are reported by facts(). Canonical ports are not windowed. */ missionWindow?: number } = {}) {
+function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?: VoiceAgentRow[]; silentDevices?: boolean; silentReady?: boolean; softBudget?: number; hardBudget?: number; sttNotice?: string | null; /** T12: Mission rows the Host reports, and the canonical Mission ports (stop, draft, projects). */ missions?: MissionFact[]; missionPort?: boolean; projects?: { id: string; name: string }[]; draftFails?: boolean; stopFails?: boolean; /** T12 RES-01/02: the facts window: only the newest N Missions (by updatedAt) are reported by facts(). Canonical ports are not windowed. */ missionWindow?: number; /** T13.3: the foreground Personal Agent's own status answer (null while Bunny answers). */ personalStatus?: () => { text: string; live: { id: string; missionId: string | null }[] } | null; /** T13.3 Gate G: the per-turn speaker, instruction and voice. */ persona?: () => { speaker: "bunny" | "1" | "2" | "3" | "4"; instruction: string; voice: string | null }; /** T13.3 Gate G: installed voices the fake worker reports. */ voices?: string[] } = {}) {
   let clock = 1_000;
   const timers: { at: number; fn: () => void; done: boolean }[] = [];
   const schedule = (fn: () => void, ms: number) => {
@@ -148,6 +149,7 @@ function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?:
       row.state = action === "agent.pause" ? "PAUSED" : action === "agent.stop" ? "STOPPED" : "RUNNING";
       row.revision += 1;
     },
+    ...(options.personalStatus ? { personalStatus: options.personalStatus } : {}),
     ...(options.missionPort
       ? {
           missionStop: async (missionId: string) => {
@@ -186,11 +188,12 @@ function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?:
       worker.silentDevices = options.silentDevices ?? false;
       worker.sttNotice = options.sttNotice ?? null;
       workers.push(worker);
-      if (!options.silentReady) setImmediate(() => worker.emit(ready));
+      if (!options.silentReady) setImmediate(() => worker.emit(options.voices ? { ...ready, tts: { ...ready.tts, voices: options.voices } } : ready));
       return worker;
     },
     chat,
     agents,
+    ...(options.persona ? { persona: options.persona } : {}),
     journal: (type, detail) => journal.push([type, detail]),
     now: () => clock,
     schedule,
@@ -1904,6 +1907,23 @@ test("T12 F4: the referent expires after referentTtlMs and is never reused", asy
   assert.equal(h.session.snapshot().answer, "2 agents are active: Builder, Tester. Say the name of the one you mean.");
 });
 
+test("T13.3 B: the foreground Personal Agent answers status from its own Missions; Bunny's answer is unchanged otherwise", async () => {
+  let speaker: "bunny" | "gada" = "gada";
+  const h = setup({
+    agents: [{ id: "a1", name: "Builder", state: "RUNNING", revision: 1 }, { id: "a2", name: "Tester", state: "RUNNING", revision: 1 }],
+    personalStatus: () => (speaker === "gada" ? { text: "Website redesign: working, 1 of 3 steps done, 0 verified by the Host.", live: [{ id: "a1", missionId: "m1" }] } : null),
+  });
+  await h.open();
+  await h.session.text("what is my agent doing");
+  await h.flush();
+  assert.equal(h.session.snapshot().answer, "Website redesign: working, 1 of 3 steps done, 0 verified by the Host.");
+  assert.equal(h.session.snapshot().clarification, null, "the foreground Agent's own work needs no disambiguation");
+  speaker = "bunny";
+  await h.session.text("what is my agent doing");
+  await h.flush();
+  assert.equal(h.session.snapshot().answer, "2 agents are active: Builder, Tester. Say the name of the one you mean.");
+});
+
 test("T12 F4: a name that is no Host subject, with no referent, is an ordinary question and goes to chat", async () => {
   const h = setup();
   await h.open();
@@ -2169,4 +2189,99 @@ test("T12 review r6: a claim split across two streamed chunks is still replaced"
   const spoken = h.worker.ofOp("speak").map((command) => command.text);
   assert.ok(spoken.includes(SPOKEN_ACTION_CLAIM_TEXT), `the second half was replaced (${JSON.stringify(spoken)})`);
   assert.ok(!spoken.some((text) => /shut the agent down/i.test(text)), "the claim's second half is never spoken");
+});
+
+// ---- M-A-3 T13.3 Gate G (§21): voice personalization ------------------------------------------------------------
+
+const GADA = { kind: "agent" as const, slot: 1 as const, name: "Gada", personality: "Calm and exact.", style: "concise" as const };
+/** One spoken model turn: a final, streamed text, and (unless `open`) the end of the answer. */
+async function spokenTurn(h: ReturnType<typeof setup>, question: string, answer: string, taskId: string, open = false) {
+  await h.session.listenStart();
+  const turn = h.session.snapshot().turnId!;
+  h.worker.emit({ ev: "stt.final", turn, gen: h.session.snapshot().generation, text: question, confidence: 0.9 });
+  await h.flush();
+  h.chat.text(taskId, answer);
+  if (!open) h.chat.done(taskId);
+  await h.flush();
+  return turn;
+}
+
+test("T13.3 G §21: without personalization Bunny's instruction and voice are exactly as before", async () => {
+  const h = setup();
+  await h.open();
+  await spokenTurn(h, "What is two plus two?", "Two plus two is four. ", "task-1");
+  assert.ok(h.chat.submits[0].startsWith(`${SPOKEN_CHAT_INSTRUCTION}\n\n`));
+  assert.equal(personalizedInstruction(SPOKEN_CHAT_INSTRUCTION, { kind: "bunny" }, DEFAULT_VOICE_PREFERENCES), SPOKEN_CHAT_INSTRUCTION);
+  assert.ok(h.worker.ofOp("speak").every((command) => command.voice === null));
+});
+
+test("T13.3 G §21: switching Bunny → Gada → Sword changes the speaker, instruction and installed voice per turn; answers are kept without text", async () => {
+  const SWORD = { kind: "agent" as const, slot: 4 as const, name: "Sword", personality: "Direct.", style: "detailed" as const };
+  let foreground: "bunny" | "1" | "4" = "bunny";
+  const persona = () =>
+    foreground === "bunny"
+      ? { speaker: "bunny" as const, instruction: SPOKEN_CHAT_INSTRUCTION, voice: null }
+      : foreground === "1"
+        ? { speaker: "1" as const, instruction: personalizedInstruction(SPOKEN_CHAT_INSTRUCTION, GADA, DEFAULT_VOICE_PREFERENCES), voice: "Microsoft David Desktop" }
+        : { speaker: "4" as const, instruction: personalizedInstruction(SPOKEN_CHAT_INSTRUCTION, SWORD, DEFAULT_VOICE_PREFERENCES), voice: "Microsoft Zira Desktop" };
+  const h = setup({ persona, voices: ["Microsoft David Desktop", "Microsoft Zira Desktop"] });
+  h.setTasks(["task-1", "task-2", "task-3"].map((taskId) => ({ taskId, provider: "ollama", model: "qwen3:8b", state: "waiting_for_approval", hasMission: false, mayLaunch: true })));
+  await h.open();
+  assert.deepEqual(h.session.installedVoices(), ["Microsoft David Desktop", "Microsoft Zira Desktop"]);
+  const first = await spokenTurn(h, "What is two plus two?", "Two plus two is four. ", "task-1");
+  finishSpeech(h);
+  const bunnySpeaks = h.worker.ofOp("speak").length;
+  foreground = "1";
+  const second = await spokenTurn(h, "What is the capital of France?", "Paris is the capital of France. ", "task-2");
+  assert.ok(h.chat.submits[1].startsWith("You are Gada, one of the user's Personal Agents, speaking through Bunny. Your owner describes your personality as: Calm and exact. Answer in one or two short spoken sentences without markdown."));
+  assert.ok(h.chat.submits[1].includes("You cannot take any action."), "the action-refusal rules are kept word for word");
+  assert.ok(bunnySpeaks > 0 && h.worker.ofOp("speak").slice(0, bunnySpeaks).every((command) => command.voice === null));
+  const gadaSpeaks = h.worker.ofOp("speak").slice(bunnySpeaks);
+  assert.ok(gadaSpeaks.length > 0 && gadaSpeaks.every((command) => command.voice === "Microsoft David Desktop"));
+  finishSpeech(h);
+  const beforeSword = h.worker.ofOp("speak").length;
+  foreground = "4";
+  const third = await spokenTurn(h, "What is the largest planet?", "Jupiter is the largest planet. ", "task-3");
+  assert.ok(h.chat.submits[2].startsWith("You are Sword, one of the user's Personal Agents, speaking through Bunny. Your owner describes your personality as: Direct."));
+  assert.ok(!h.chat.submits[2].includes("Gada"), "one Agent's identity never leaks into another's turn");
+  const swordSpeaks = h.worker.ofOp("speak").slice(beforeSword);
+  assert.ok(swordSpeaks.length > 0 && swordSpeaks.every((command) => command.voice === "Microsoft Zira Desktop"));
+  const answers = h.session.recentAnswers();
+  assert.deepEqual(answers.map((row) => [row.turnId, row.speaker, row.interrupted]), [[first, "bunny", false], [second, "1", false], [third, "4", false]]);
+  assert.equal(answers[1].chars, "Paris is the capital of France.".length);
+  assert.ok(!JSON.stringify(answers).includes("Paris"), "an answer is remembered by length only, never its text");
+});
+
+test("T13.3 G §21: a user interruption marks the answer interrupted; an inference timeout does not", async () => {
+  const h = setup({ persona: () => ({ speaker: "1", instruction: SPOKEN_CHAT_INSTRUCTION, voice: null }) });
+  await h.open();
+  const streaming = await spokenTurn(h, "Tell me a long story", "Once upon a time there was a long story that keeps going. ", "task-1", true);
+  h.worker.emit({ ev: "playback.started", turn: streaming, gen: h.session.snapshot().generation, seq: 0 });
+  await h.session.listenStart();
+  assert.deepEqual(h.session.recentAnswers().map((row) => [row.turnId, row.speaker, row.interrupted]), [[streaming, "1", true]], "interrupted while still streaming");
+  assert.deepEqual(h.chat.stops, ["task-1"], "T12 barge-in is unchanged: only the voice turn's own inference stops");
+
+  const h2 = setup();
+  await h2.open();
+  const finished = await spokenTurn(h2, "What is two plus two?", "Two plus two is four. ", "task-1");
+  h2.worker.emit({ ev: "playback.started", turn: finished, gen: h2.session.snapshot().generation, seq: 0 });
+  await h2.session.listenStart();
+  assert.deepEqual(h2.session.recentAnswers().map((row) => row.interrupted), [true], "a finished answer cut off while playing");
+
+  const h3 = setup();
+  await h3.open();
+  await spokenTurn(h3, "Tell me a long story", "Once upon a time there was a long story that keeps going. ", "task-1", true);
+  assert.ok(h3.worker.ofOp("speak").length > 0, "part of the answer was already spoken when it timed out");
+  h3.advance(VOICE_LIMITS.inferenceTimeoutMs + 1);
+  await h3.flush();
+  assert.equal(h3.session.snapshot().lastInterrupt?.source, "timeout");
+  assert.deepEqual(h3.session.recentAnswers(), [], "a timed-out answer is neither finished nor a user interruption");
+});
+
+test("T13.3 G §21: a persona that cannot be read leaves Bunny speaking exactly as before", async () => {
+  const h = setup({ persona: () => { throw new Error("profile unavailable"); } });
+  await h.open();
+  await spokenTurn(h, "What is two plus two?", "Two plus two is four. ", "task-1");
+  assert.ok(h.chat.submits[0].startsWith(`${SPOKEN_CHAT_INSTRUCTION}\n\n`));
+  assert.deepEqual(h.session.recentAnswers().map((row) => row.speaker), ["bunny"]);
 });

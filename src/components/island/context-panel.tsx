@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Activity, ChevronRight, MessageSquare, PanelRightClose, PanelRightOpen, ShieldCheck } from "lucide-react";
 import { useIsland } from "@/store/use-island";
 import { WeaponCharacter, usePrefersReducedMotion } from "./characters";
+import { appearanceFor } from "./character-style-model";
 import { displayState, hostLive } from "./character-model";
 import { CONNECTION_LABEL } from "./connection-model";
 import { approvalCount, pendingApprovalItems } from "./approvals-model";
@@ -105,6 +106,7 @@ export function ContextPanel({ now }: { now: number }) {
               size="compact" celebrate
               reduced={systemReduced || store.appearance.motion !== "full"}
               displayName={row.name}
+              appearance={appearanceFor(store.characterAppearance, row.slot)}
             />
             <span className="cx-copy">
               <strong>{row.bound ? row.name : WEAPON_LABEL[row.weapon]}</strong>

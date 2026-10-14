@@ -10,10 +10,10 @@ import { bunnyRoute, eligibility, inferredConstraints, runsLocally } from "./rou
 import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask ,
 } from "./contracts.ts";
-import { PolicyEngine } from "./learning.server.ts";
+import { PolicyEngine, toRecorded } from "./learning.server.ts";
 import { classifyRequirements, effortRequirement, type TaskRequirements ,
 } from "../orch/router-requirements.ts";
-import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, type RoutingDecisionRecord, type RoutingFailureTaxonomy ,
+import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, QUOTA_WRITE_PAUSE, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
 } from "./routing.server.ts";
 import { RoutingDecisionStore } from "./routing-store.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
@@ -34,6 +34,7 @@ import { JevService, type FetchLike } from "./typesafe-jev.server.ts";
 import { applyDecisionAdvice, buildDecisionState, candidateKey, isLayaModel, layaExclusion, type DecisionAdvice } from "./intelligence.ts";
 import type { IntelligenceSnapshot } from "./intelligence-snapshot.ts";
 import { ConnectionRegistry, type ConnectionSeams } from "./connections.server.ts";
+import { SessionLedger } from "./session-ledger.server.ts";
 import { locate, systemContext } from "./discovery.server.ts";
 import { consentedVendorsFor, vendorFor, type ApprovedRoute } from "./connections.ts";
 
@@ -76,6 +77,13 @@ export type ManagerOptions = {
 
 export class TaskManager {
   connections: ConnectionRegistry;
+  sessionLedger: SessionLedger;
+  /** M-A-3 T13.3 Gate F: owner routing priority (setting `routing_priority`). */
+  routingPriority: RoutingPriority = "balanced";
+  setRoutingPriority(priority: RoutingPriority) {
+    this.db.db.prepare("INSERT INTO settings(key,value) VALUES('routing_priority',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(priority);
+    this.routingPriority = priority;
+  }
   projects: ProjectRegistry;
   workspaceRootConfigured: boolean;
   db: HostDatabase;
@@ -180,6 +188,7 @@ export class TaskManager {
     this.jevSecrets = new JevSecretStore(db, options.intelligence?.jevProtector);
     this.jev = new JevService(db, this.jevSecrets, { sessionId: this.instanceId, fetchFn: options.intelligence?.jevFetch, now: options.intelligence?.now });
     this.connections = new ConnectionRegistry({db,sessionId:this.instanceId,locate:id=>locate(systemContext(this.providerPaths()),id).launch,...options.connections,emit:(type,detail)=>this.emit(db.event(type,null,detail))});
+    this.sessionLedger = new SessionLedger(db, this.instanceId);
     this.connections.onRevoked((connectionId,reason)=>{ for (const id of this.sessions.keys()) if (db.get(id).connectionRoute?.connectionId===connectionId) this.stopInBackground(id,reason); });
     this.sessionDirectory = options.sessionDirectory ?? null;
     this.readProcesses = options.processTable ?? processTable;
@@ -192,6 +201,8 @@ export class TaskManager {
       .prepare("SELECT value FROM settings WHERE key=?")
       .get(PERSONAL_AGENTS_SETTING) as { value: string } | undefined;
     this.personalAgents = parsePersonalAgentsConfig(savedPersonalAgents?.value ?? null);
+    const savedPriority = (db.db.prepare("SELECT value FROM settings WHERE key='routing_priority'").get() as { value: string } | undefined)?.value;
+    if (ROUTING_PRIORITIES.includes(savedPriority as RoutingPriority)) this.routingPriority = savedPriority as RoutingPriority;
     this.bus.setMaxListeners(100);
     // UI reconnect never calls this. A new Host instance genuinely cannot attach
     // to an old non-interactive pipe; keep session/PID evidence without killing it.
@@ -729,21 +740,23 @@ export class TaskManager {
     });
     const modelSnapshot = this.modelCapabilities.snapshot();
     const usage = this.providerUsage.snapshot();
+    const learning = { taskType: input.taskType ?? "general", mode: input.mode, weights: this.policy.liveWeights(), signal: this.policy.learningSignal() };
     const candidates = buildCandidates({
       providers: input.providers,
       modelSnapshot,
       usage,
       requirements,
-      constraints: input.constraints,
+      constraints: this.routingPriority === "local_only" ? { ...input.constraints, localOnly: true } : input.constraints,
+      priority: this.routingPriority,
       override: input.override ?? "auto",
       modelOverride: input.modelOverride,
       mode: input.mode,
-      empirical: (provider) => this.db.learned(provider, input.taskType ?? "general"),
+      empirical: (provider) => learning.signal(provider, learning.taskType, learning.mode, learning.weights),
       layaGate: (model, taskClass) => (!isLayaModel(model) ? null : !this.laya.enabled ? `Laya routing is turned off in Settings; ${model} is not eligible.` : layaExclusion(model, taskClass, this.laya.benchmarks(model))),
       connectionGate: (provider,model)=>{ const gate=this.connections.evaluate({kind:"advice",provider,model,projectId:input.projectId??null,origin:"workstation",route:null});return gate.ok?null:gate.reason; },
     });
     const selection = selectRoutingCandidate({ candidates, requirements });
-    return { requirements, candidates, selection, modelSnapshot, usage };
+    return { requirements, candidates, selection, modelSnapshot, usage, learning };
   }
   /** §11: the Task's effort requirement resolved through the provider's real effort contract; null = PROVIDER_DEFAULT. */
   private nativeEffort(
@@ -788,7 +801,7 @@ export class TaskManager {
     terminalNote?: string;
     assistance?: RoutingDecisionRecord["assistance"];
   }): RoutingDecisionRecord {
-    return safeDecisionRecord({
+    const record = safeDecisionRecord({
       id: input.id,
       taskId: input.taskId,
       missionId: input.missionId,
@@ -807,6 +820,15 @@ export class TaskManager {
       terminalNote: input.terminalNote,
       assistance: input.assistance,
     });
+    this.policy.recordShadow({
+      decisionId: input.id,
+      taskId: input.taskId,
+      taskType: input.pipeline.learning.taskType,
+      mode: input.pipeline.learning.mode,
+      candidates: record.candidates_considered.map(toRecorded),
+      selected: record.selected ? { provider: record.selected.provider_id, model: record.selected.model_id } : null,
+    });
+    return record;
   }
   /** §5 clarity: the readable reasons a pipeline pass produced no eligible candidate. */
   private pipelineFailure(pipeline: ReturnType<TaskManager["routingPipeline"]>): string {
@@ -1047,6 +1069,7 @@ export class TaskManager {
       constraints,
       override: input.override,
       modelOverride: input.modelOverride,
+      taskType: decision.task_type,
     });
     const selection = pipeline.selection.selected;
     const routingDecisionId = crypto.randomUUID();
@@ -1234,6 +1257,7 @@ export class TaskManager {
       constraints: task.constraints ?? {},
       override: provider,
       modelOverride,
+      taskType: task.decision.task_type,
     });
     const selection = pipeline.selection.selected;
     const routingDecisionId = task.routingDecisionId ?? crypto.randomUUID();
@@ -1575,6 +1599,7 @@ export class TaskManager {
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingProgress: TaskProgress | null = null;
     let reportedUsage: TokenUsage | null = null;
+    let settledUsage: TokenUsage | null = null;
     const flush = () => {
       if (flushTimer) {
         clearTimeout(flushTimer);
@@ -1610,6 +1635,7 @@ export class TaskManager {
         const gate=this.connections.evaluate({kind:"launch",provider:current.provider,model:current.model,projectId:current.projectId,origin:current.connectionRoute?.approvedBy??"workstation",route:current.connectionRoute??null});
         if(!gate.ok)throw new CommandRefusedError(`${gate.code}: ${gate.reason}`);
         connectionReservation=this.connections.recordDispatch(gate.connectionId,id);
+        this.sessionLedger.reserve(connectionReservation,gate.connectionId,this.connections.views().find((row)=>row.id===gate.connectionId)?.billing??"unknown",current);
       },
       childEnvironment:()=>{
         const current=this.db.get(id);
@@ -1847,7 +1873,11 @@ export class TaskManager {
         }[] = [];
         for (;;) {
           const result = await session.done;
-          if(connectionReservation!==null)this.connections.settle(connectionReservation,result.ok);
+          if(connectionReservation!==null){
+            this.connections.settle(connectionReservation,result.ok);
+            this.sessionLedger.settle(connectionReservation,result.ok,this.db.get(id),reportedUsage!==settledUsage?reportedUsage:null);
+            settledUsage=reportedUsage;
+          }
           this.missionAttemptSettled?.(this.db.get(id), result.ok);
           flush();
           this.stopTree(id);
@@ -1977,6 +2007,8 @@ export class TaskManager {
               exhaustNow(
                 `Manual model selection is fixed; the task failed instead of re-routing. ${action.reason}`,
               );
+            else if (taxonomy === "QUOTA_CONSTRAINED" && current.executionScope?.access === "write")
+              exhaustNow(QUOTA_WRITE_PAUSE);
             else if (action.action === "retry-same") {
               sameRetries += 1;
               const label = `${current.provider}${current.model==="auto" ? " · provider default" : ` · ${current.model}`}`;

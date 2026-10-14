@@ -10,6 +10,7 @@ import {
   type PresentationState,
 } from "../../lib/bunny-host/personal-agents.ts";
 import { COMPANION_STATES } from "../../lib/bunny-host/voice/voice-companion.ts";
+import { CHARACTER_STYLES, CHARACTER_STYLE_LABEL, DEFAULT_APPEARANCE, SIGNATURE_STYLE } from "../../lib/bunny-host/character-style.ts";
 import type { Connection } from "./connection-model.ts";
 import { BunnyCompanion, WeaponCharacter, WeaponStrip } from "./characters.tsx";
 import { COMPANION_LABEL } from "./companion-model.ts";
@@ -91,6 +92,57 @@ export function DesignPreview() {
           Reduced motion
         </button>
       </header>
+
+      <section className="dp-section" aria-labelledby="dp-styles">
+        <h2 id="dp-styles">Character styles: every weapon in every style (fixture state: Coding)</h2>
+        <p className="dp-note">
+          The same canonical art in each style. Signature looks are marked; any weapon can wear any style. The last two rows are
+          the subtle intensity and the high-contrast alternative.
+        </p>
+        <div className="dp-grid dp-grid-weapons" role="table" aria-label="Weapon characters by style">
+          <div role="row" className="dp-row dp-head">
+            <span role="columnheader">Style</span>
+            {WEAPONS.map((weapon) => (
+              <span role="columnheader" key={weapon}>
+                {WEAPON_LABEL[weapon]}
+              </span>
+            ))}
+          </div>
+          {CHARACTER_STYLES.map((style) => (
+            <div role="row" className="dp-row" key={style} data-style-row={style}>
+              <span role="cell" className="dp-state">
+                {CHARACTER_STYLE_LABEL[style]} <code>{style}</code>
+              </span>
+              {WEAPONS.map((weapon) => (
+                <span role="cell" key={weapon} className="dp-style-cell">
+                  <WeaponCharacter weapon={weapon} state="CODING" size="pose" reduced={reduced} displayName={WEAPON_LABEL[weapon]} appearance={{ ...DEFAULT_APPEARANCE, style }} />
+                  <WeaponCharacter weapon={weapon} state="CODING" size="compact" reduced={reduced} displayName={WEAPON_LABEL[weapon]} appearance={{ ...DEFAULT_APPEARANCE, style }} />
+                  {SIGNATURE_STYLE[weapon] === style ? <small>Signature</small> : null}
+                </span>
+              ))}
+            </div>
+          ))}
+          {([["Subtle", { intensity: "subtle" }], ["High contrast", { highContrast: true }]] as const).map(([name, patch]) => (
+            <div role="row" className="dp-row" key={name}>
+              <span role="cell" className="dp-state">{name} (signature styles)</span>
+              {WEAPONS.map((weapon) => (
+                <span role="cell" key={weapon} className="dp-style-cell">
+                  <WeaponCharacter weapon={weapon} state="CODING" size="pose" reduced={reduced} displayName={WEAPON_LABEL[weapon]} appearance={{ ...DEFAULT_APPEARANCE, ...patch }} />
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+        <h3>Notch strip: Gada speaking, the others still working (fixture)</h3>
+        <WeaponStrip
+          slots={FIXTURE_SLOTS.map((slot, index) => (index === 0 ? slot : { ...slot, presentation: { ...slot.presentation, state: "CODING", label: presentationLabel("CODING") } }))}
+          connection={FIXTURE_CONNECTION}
+          now={FIXTURE_NOW}
+          reduced={reduced}
+          speaker={1}
+          celebrate={false}
+        />
+      </section>
 
       <section className="dp-section" aria-labelledby="dp-weapons">
         <h2 id="dp-weapons">Weapons: every presentation state, pose size</h2>

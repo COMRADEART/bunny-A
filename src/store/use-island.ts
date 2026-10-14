@@ -29,6 +29,13 @@ import {
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
 import type { PersonalAgentsSnapshot } from "@/lib/bunny-host/personal-agents";
+import type { PersonalAgentContextSnapshot } from "@/lib/bunny-host/personal-agent-context";
+import type { HarnessView } from "@/lib/bunny-host/harnesses";
+import type { SessionLedgerView } from "@/lib/bunny-host/session-ledger";
+import type { SchedulerView } from "@/lib/bunny-host/fairness";
+import type { RoutingLearningView } from "@/lib/bunny-host/routing-feedback";
+import { notificationAllowed, type VoicePersonalizationView } from "@/lib/bunny-host/voice/voice-personalization";
+import type { CharacterAppearanceView } from "@/lib/bunny-host/character-style";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import {
   parseAccountIntent,
@@ -196,6 +203,30 @@ type Island = Preferences & {
   agents: AgentSnapshot | null;
   /** M-A-3 T13: the four Personal Agent slots as the Host projected them (presentation only). */
   personalAgents: PersonalAgentsSnapshot | null;
+  /** M-A-3 T13.3: ownership, profiles, conversations and the speaking identity (workstation only; null on devices). */
+  personalAgentContext: PersonalAgentContextSnapshot | null;
+  /** M-A-3 T13.3: one `personal_agent.*` command. True only on the Host's acknowledgment. */
+  /** The Host's answer (its `data` carries replies and exports), or null when refused or not sent. */
+  personalAgentCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** M-A-3 T13.3 Gate E: harness views and tests (workstation only; null on devices). */
+  harnesses: HarnessView[] | null;
+  /** One `harness.*` command; the Host's answer or null when refused. */
+  harnessCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** M-A-3 T13.3 Gate F: this Host run's usage ledger and the scheduler settings (workstation only; null on devices). */
+  sessionLedger: SessionLedgerView | null;
+  scheduler: SchedulerView | null;
+  /** One `scheduler.*` command; the Host's answer or null when refused. */
+  schedulerCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** M-A-3 T13.3 Gate G: routing-improvement evidence and policy lifecycle (workstation only; null on devices). */
+  routingLearning: RoutingLearningView | null;
+  /** One `routing.learning.*` command; the Host's answer or null when refused. */
+  routingLearningCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** M-A-3 T13.3 Gate G: voice preferences, answer ratings and advice (workstation only; null on devices). */
+  voicePersonalization: VoicePersonalizationView | null;
+  /** M-A-3 T13.3 Gate H: per-slot character style. Presentation only; devices receive it too. */
+  characterAppearance: CharacterAppearanceView | null;
+  /** One `personalization.*` command; the Host's answer or null when refused. */
+  personalizationCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
   voice: VoiceSnapshot | null;
   /** Local receipt time of the last voice answer; a stale value means voice is reconnecting, not listening. */
@@ -718,6 +749,13 @@ export const useIsland = create<Island>((set, get) => {
       missions: snapshot.missions ?? null,
       agents: snapshot.agents ?? null,
       personalAgents: snapshot.personalAgents ?? null,
+      personalAgentContext: snapshot.personalAgentContext ?? null,
+      harnesses: snapshot.harnesses?.harnesses ?? null,
+      sessionLedger: snapshot.sessionLedger ?? null,
+      scheduler: snapshot.scheduler ?? null,
+      routingLearning: snapshot.routingLearning ?? null,
+      voicePersonalization: snapshot.voicePersonalization ?? null,
+      characterAppearance: snapshot.characterAppearance ?? null,
       intelligence: snapshot.intelligence ?? null,
       connections: snapshot.connections ?? null,
       deviceConnections: snapshot.deviceConnections ?? [],
@@ -756,7 +794,7 @@ export const useIsland = create<Island>((set, get) => {
         ].includes(event.type)
       ) {
         if (event.type === "thermal.warning") get().note(event.detail);
-        notify(
+        if (notificationAllowed(event.type, get().voicePersonalization?.preferences.notificationFrequency ?? "all")) notify(
           event.type === "thermal.warning" ? event.detail : event.type.replaceAll(".", " "),
           event.taskId ?? event.missionId ?? event.type,
         );
@@ -777,6 +815,13 @@ export const useIsland = create<Island>((set, get) => {
       pairingRequired: true,
       agents: null,
       personalAgents: null,
+      personalAgentContext: null,
+      harnesses: null,
+      sessionLedger: null,
+      scheduler: null,
+      routingLearning: null,
+      voicePersonalization: null,
+      characterAppearance: null,
       intelligence: null,
       connections: null,
       deviceConnections: [],
@@ -1174,6 +1219,18 @@ export const useIsland = create<Island>((set, get) => {
     missions: null,
     agents: null,
     personalAgents: null,
+    personalAgentContext: null,
+    personalAgentCommand: (action, data, onRefused) => command(action, data, "personal-agent", onRefused),
+    harnesses: null,
+    harnessCommand: (action, data, onRefused) => command(action, data, "harness", onRefused),
+    sessionLedger: null,
+    scheduler: null,
+    schedulerCommand: (action, data, onRefused) => command(action, data, "scheduler", onRefused),
+    routingLearning: null,
+    routingLearningCommand: (action, data, onRefused) => command(action, data, "routing-learning", onRefused),
+    voicePersonalization: null,
+    characterAppearance: null,
+    personalizationCommand: (action, data, onRefused) => command(action, data, "personalization", onRefused),
     intelligence: null,
     connections: null,
     deviceConnections: [],

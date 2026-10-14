@@ -12,9 +12,12 @@ import {
   type WeaponId,
 } from "@/lib/bunny-host/personal-agents";
 import { WeaponCharacter, usePrefersReducedMotion } from "./characters";
+import { appearanceFor } from "./character-style-model";
+import { CharacterAppearancePanel } from "./character-appearance";
 import { agentControls, type AgentView } from "./workspace-model";
 import { displayState, hostLive } from "./character-model";
 import { Empty } from "./ui";
+import { AgentConversation } from "./conversation";
 import {
   authorityFacts,
   bindAgent,
@@ -104,7 +107,8 @@ export function Studio() {
   const agents = store.agents?.agents ?? [];
   const boundAgent = current?.agentId ? agents.find((agent) => agent.id === current.agentId) ?? null : null;
   const authority = authorityFacts(boundAgent?.authorization ?? null);
-  const others = agents.filter((agent) => isUserFacingAgent(agent) && !slotted.has(agent.id));
+  const owned = new Set(store.personalAgentContext?.slots.flatMap((row) => row.owned.map((agent) => agent.agentId)) ?? []);
+  const others = agents.filter((agent) => isUserFacingAgent(agent) && !slotted.has(agent.id) && !owned.has(agent.id));
 
   const edit = (slot: SlotId, patch: Partial<StudioSlot>) => {
     setDraft((rows) => rows.map((row) => (row.slot === slot ? { ...row, ...patch } : row)));
@@ -171,6 +175,7 @@ export function Studio() {
                     displayName={slot.displayName}
                     basis={live ? view?.presentation.basis ?? null : null}
                     note={live ? null : "Host connection not live"}
+                    appearance={appearanceFor(store.characterAppearance, slot.slot)}
                   />
                 </div>
                 <strong>{slot.displayName || WEAPON_LABEL[slot.weapon]}</strong>
@@ -197,6 +202,8 @@ export function Studio() {
           })}
         </div>
       </section>
+
+      <AgentConversation />
 
       {current && (
         <section className="t8-section" aria-labelledby="studio-editor" onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setSelected(null); } }}>
@@ -348,6 +355,16 @@ export function Studio() {
                 {notice}
               </p>
             )}
+          </div>
+
+          <div className="t8-surface" style={{ padding: 16, marginTop: 12 }}>
+            <CharacterAppearancePanel
+              slot={current.slot}
+              weapon={saved.find((row) => row.slot === current.slot)?.weapon ?? current.weapon}
+              displayName={saved.find((row) => row.slot === current.slot)?.displayName ?? current.displayName}
+              editable={mode.editable}
+              reduced={systemReduced || store.appearance.motion !== "full"}
+            />
           </div>
 
           <div className="t8-surface" style={{ padding: 16, marginTop: 12 }} aria-labelledby="authority-title">

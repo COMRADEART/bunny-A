@@ -1,0 +1,40 @@
+PASS panel renders with five styles and the signature tag
+PASS start from signature (reset before QA)
+PASS keyboard focus reaches the style group {"tag":"INPUT","name":"ca-style-1","value":"glossy","text":"","focusVisible":true}
+PASS ArrowRight selects Cel-Shaded and the Host saves it
+PASS focus stays on the chosen radio after the Host answers, and is visible {"tag":"INPUT","name":"ca-style-1","value":"cel","text":"","focusVisible":true}
+PASS a second ArrowRight selects Arcade
+PASS Tab moves to the animation intensity group {"tag":"INPUT","name":"ca-intensity-1","value":"full","text":"","focusVisible":true}
+PASS ArrowRight sets intensity Subtle
+PASS Tab moves to High contrast {"tag":"INPUT","name":null,"value":null,"text":"","focusVisible":true}
+PASS Space turns high contrast on (solid outline, no decorations) in all three previews
+PASS high contrast hides the decorative skin layer
+PASS Tab reaches Reset to signature {"tag":"BUTTON","name":null,"value":null,"text":"Reset to signature (Glossy Inflatable)","focusVisible":true}
+PASS Enter on Reset returns Gada to Glossy Inflatable (signature), Full
+PASS Notch preview top: Agents left of Bunny {"axis":"row","order":{"stripBeforeBunnyX":true,"stripAboveBunnyY":false}}
+PASS Notch preview bottom: Agents left of Bunny {"axis":"row","order":{"stripBeforeBunnyX":true,"stripAboveBunnyY":false}}
+PASS Notch preview left: Agents above Bunny {"axis":"column","order":{"stripBeforeBunnyX":false,"stripAboveBunnyY":true}}
+PASS Notch preview right: Agents above Bunny {"axis":"column","order":{"stripBeforeBunnyX":false,"stripAboveBunnyY":true}}
+PASS the Notch preview marks exactly one active speaker (the Host's foreground) and the Agents the Host reports working {"speaking":1,"working":2}
+PASS no completion celebration plays in the preview
+PASS style glossy: saved and drawn in all three previews ["glossy","glossy","glossy"]
+PASS style cel: saved and drawn in all three previews ["cel","cel","cel"]
+PASS style arcade: saved and drawn in all three previews ["arcade","arcade","arcade"]
+PASS style comic: saved and drawn in all three previews ["comic","comic","comic"]
+PASS style pixel: saved and drawn in all three previews ["pixel","pixel","pixel"]
+PASS pixel art draws with pixelated scaling
+PERF baseline-reduced-motion: fps=60 p95=16.8ms renderer=4.32% gpuProc=1.46% gpuUtil={"samples":5,"mean":0,"max":0} animated=0
+PERF baseline-gada-intensity-off: fps=60 p95=16.8ms renderer=12.79% gpuProc=23.8% gpuUtil={"samples":5,"mean":29.721,"max":30.527} animated=3
+PERF style-glossy: fps=60 p95=16.8ms renderer=15.72% gpuProc=24.78% gpuUtil={"samples":5,"mean":29.848,"max":30.44} animated=9
+PERF style-cel: fps=60 p95=16.7ms renderer=17.49% gpuProc=24.62% gpuUtil={"samples":5,"mean":29.624,"max":29.82} animated=9
+PERF style-arcade: fps=60 p95=16.8ms renderer=16.52% gpuProc=25.26% gpuUtil={"samples":5,"mean":29.476,"max":29.65} animated=9
+PERF style-comic: fps=60 p95=16.8ms renderer=17.36% gpuProc=25.55% gpuUtil={"samples":5,"mean":29.593,"max":29.754} animated=9
+PERF style-pixel: fps=60 p95=16.8ms renderer=16.33% gpuProc=24.84% gpuUtil={"samples":5,"mean":28.666,"max":29.34} animated=9
+PASS every style was measured (frames, main thread, renderer and GPU process CPU)
+PASS reduced motion: every character is still (no animation on body, skin or halo, including pseudo-elements) {"total":13,"reducedAttr":13,"moving":0}
+PASS forced colours: the decorative skin layer is hidden and the controls stay visible {"skins":0,"radiosVisible":true}
+PASS design preview shows all four weapons in all five styles {"distinct":20}
+PASS style changes left every Mission and Agent fact unchanged {"before":{"missions":["Gada worker: Run tests0 of 1 step · 0 verifiedStopped","Game prototypeSpear · 0 of 1 step · 0 verifiedNeeds approval","Release notesGada · 0 of 1 step · 0 verifiedNeeds approval","Website redesignGada · 0 of 1 step · 0 verifiedNeeds approval"],"agents":["Gada, Planning. Open Studio.","Spear, Planning. Open Studio.","Vishnu Chakra, Set up in Studio. Open Studio.","Sword, Set up in Studio. Open Studio."]},"after":{"missions":["Gada worker: Run tests0 of 1 step · 0 verifiedStopped","Game prototypeSpear · 0 of 1 step · 0 verifiedNeeds approval","Release notesGada · 0 of 1 step · 0 verifiedNeeds approval","Website redesignGada · 0 of 1 step · 0 verifiedNeeds approval"],"agents":["Gada, Planning. Open Studio.","Spear, Planning. Open Studio.","Vishnu Chakra, Set up in Studio. Open Studio.","Sword, Set up in Studio. Open Studio."]}}
+FAIL QA script completed "locator.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('button', { name: 'Agents', exact: true })\n\n    at openStudioSlot1 (C:\\Users\\allam\\Documents\\new\\bun-router\\test-results\\ma3\\t13-3\\gate-h\\browser\\appearance-qa.mjs:45:67)\n    at async file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13-3/gate-h/browser/appearance-qa.mjs:301:3"
+FAIL no console errors on desktop or mobile ["desktop pageerror: Error: Switched to client rendering because the server rendering errored:\n\nFailed to load url ./character-styles.css (resolved id: ./character-styles.css) in C:/Users/allam/Documents/new/bun-router/src/components/island/characters.tsx. Does the file exist?","desktop pageerror: Error: Switched to client rendering because the server rendering errored:\n\nFailed to load url ./character-styles.css (resolved id: ./character-styles.css) in C:/Users/allam/Documents/new/bun-router/src/components/island/characters.tsx. Does the file exist?","mobile pageerror: Error: Switched to client rendering because the server rendering errored:\n\nFailed to load url ./character-styles.css (resolved id: ./character-styles.css) in C:/Users/allam/Documents/new/bun-router/src/components/island/characters.tsx. Does the file exist?"]
+checks: 32; failed: 2 → QA script completed | no console errors on desktop or mobile

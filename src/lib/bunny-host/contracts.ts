@@ -53,6 +53,18 @@ export type HostSnapshot = {
   agents?: AgentSnapshot;
   /** M-A-3 T13 Personal Agent slots projected onto live Host facts (presentation only). Optional: older clients ignore it. */
   personalAgents?: import("./personal-agents.ts").PersonalAgentsSnapshot;
+  /** M-A-3 T13.3: per-Personal-Agent ownership, profile and conversation. Absent for paired devices. */
+  personalAgentContext?: import("./personal-agent-context.ts").PersonalAgentContextSnapshot;
+  /** M-A-3 T13.3 Gate E: workstation only; stripped from device snapshots. */
+  harnesses?: { schema: string; harnesses: import("./harnesses.ts").HarnessView[] };
+  /** M-A-3 T13.3 Gate F: this Host run's usage ledger. Workstation only; stripped from device snapshots. */
+  sessionLedger?: import("./session-ledger.ts").SessionLedgerView;
+  /** M-A-3 T13.3 Gate F: routing priority and Personal Agent fairness. Workstation only. */
+  scheduler?: import("./fairness.ts").SchedulerView;
+  routingLearning?: import("./routing-feedback.ts").RoutingLearningView;
+  voicePersonalization?: import("./voice/voice-personalization.ts").VoicePersonalizationView;
+  /** M-A-3 T13.3 Gate H: per-slot character style. Presentation only; paired devices receive it to draw the same look. */
+  characterAppearance?: import("./character-style.ts").CharacterAppearanceView;
   /** M-A-3 T13.1 Laya/Jev intelligence state (no secrets; credential existence only). Absent for paired devices. */
   intelligence?: import("./intelligence-snapshot.ts").IntelligenceSnapshot;
   connections?: import("./connections.server.ts").ConnectionsSnapshot;
