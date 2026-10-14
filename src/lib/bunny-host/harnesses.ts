@@ -36,7 +36,7 @@ const npm = (pkg: string, version: string, integrity: string, source: string): G
   uninstall: `npm uninstall -g ${pkg}`,
   integrity,
   source,
-  note: "npm checks the downloaded package against this registry integrity hash. Run it yourself in a terminal; Bunny never runs installers.",
+  note: `npm checks the download against the registry's own record, not against this pinned hash. To confirm it is the version Bunny reviewed, compare this hash with \`npm view ${pkg}@${version} dist.integrity\` first. Run it yourself in a terminal; Bunny never runs installers.`,
 });
 
 /** Pinned from the npm registry and the winget manifest on 2026-10-13. */

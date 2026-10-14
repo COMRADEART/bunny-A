@@ -99,6 +99,15 @@ test("T13.3 C store: dedupe, correction history, promotion, scoped retrieval, ex
   assert.equal(store.get(a.memory.id), null);
 });
 
+test("T13.3 C store: writeAll stores every memory or none", () => {
+  const store = new LotusStore(new HostDatabase(":memory:"));
+  const note = (value: string) => ({ scope: "project:alpha" as const, layer: "outer" as const, key: "Note", value, trust: "user" as const, provenance: "handoff:agent:1" });
+  assert.throws(() => store.writeAll([note("First"), note("password=hunter2hunter2")], 1), /credential/);
+  assert.equal(store.export("project:alpha", 2).memories.length, 0, "a refused share writes nothing");
+  assert.equal(store.writeAll([note("First"), note("Second")], 3).length, 2);
+  assert.deepEqual(store.export("project:alpha", 4).memories.map((m) => m.value).sort(), ["First", "Second"]);
+});
+
 test("T13.3 C store: compaction folds buds into one versioned summary; retention drops stale outer petals and holds caps", () => {
   const store = new LotusStore(new HostDatabase(":memory:"));
   const buds = ["one", "two"].map((value, i) => store.write({ scope: "agent:1", layer: "bud", key: "turn", value, trust: "user", provenance: "user:conversation" }, i + 1).memory);

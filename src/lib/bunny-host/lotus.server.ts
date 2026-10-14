@@ -92,6 +92,20 @@ export class LotusStore {
     return { memory, duplicate: false };
   }
 
+  /** Stores several memories together: every input is admitted before anything is written, then all are written or none. */
+  writeAll(raws: LotusInput[], now: number): { memory: LotusMemory; duplicate: boolean }[] {
+    for (const raw of raws) admit(raw);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const written = raws.map((raw) => this.write(raw, now));
+      this.db.exec("COMMIT");
+      return written;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   /** The user's correction replaces the value, becomes user-trusted and wins over any inference with the same name. */
   correct(id: string, value: unknown, now: number): LotusMemory {
     const current = this.require(id);

@@ -28,7 +28,18 @@ export class HarnessStore {
   constructor(db: HostDatabase) {
     this.db = db;
     db.db.exec(`CREATE TABLE IF NOT EXISTS harness_tests(harness TEXT PRIMARY KEY,record TEXT NOT NULL,at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS harness_paused(harness TEXT NOT NULL,route TEXT NOT NULL,PRIMARY KEY(harness,route));
       INSERT OR IGNORE INTO migrations(key) VALUES('bunny-a.harnesses.v1');`);
+  }
+  /** Routes that harness.disable paused, so harness.enable resumes those and never one the owner paused separately. */
+  markPaused(harness: HarnessId, route: string) {
+    this.db.db.prepare("INSERT OR IGNORE INTO harness_paused VALUES(?,?)").run(harness, route);
+  }
+  pausedRoutes(harness: HarnessId): string[] {
+    return (this.db.db.prepare("SELECT route FROM harness_paused WHERE harness=?").all(harness) as { route: string }[]).map((row) => row.route);
+  }
+  clearPaused(harness: HarnessId) {
+    this.db.db.prepare("DELETE FROM harness_paused WHERE harness=?").run(harness);
   }
   save(test: HarnessTest) {
     this.db.db

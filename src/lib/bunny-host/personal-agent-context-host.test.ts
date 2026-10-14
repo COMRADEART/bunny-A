@@ -202,7 +202,23 @@ test("T13.3 B rebinding a slot in the Studio transfers ownership explicitly; ass
     assert.match(ghost.body.error, /your own Agents/);
     const back = await h.command("personal_agent.assign", { slot: 2, agentId });
     assert.equal(back.status, 200);
-    assert.deepEqual(contextOf((await h.state()).body, 2).owned.map((row: Body) => row.agentId), [agentId]);
+    const assigned = (await h.state()).body;
+    assert.deepEqual(contextOf(assigned, 2).owned.map((row: Body) => row.agentId), [agentId]);
+    assert.equal(assigned.personalAgents.slots[3].agent?.id ?? null, null, "the old slot stops focusing an Agent it no longer owns");
+
+    // An unrelated Studio save keeps the assignment.
+    const current = assigned.personalAgents;
+    const renamed = await h.command("personal_agents.configure", {
+      slots: current.slots.map((slot: Body) => ({
+        slot: slot.slot, weapon: slot.weapon, displayName: slot.slot === 3 ? "Chakra" : slot.displayName, description: slot.description, purpose: slot.purpose,
+        style: slot.style, responsibilities: slot.responsibilities, active: slot.active, agentId: slot.agent?.id ?? null,
+      })),
+      expectRevision: current.revision,
+    });
+    assert.equal(renamed.status, 200, JSON.stringify(renamed.body));
+    const saved = (await h.state()).body;
+    assert.deepEqual(contextOf(saved, 2).owned.map((row: Body) => row.agentId), [agentId]);
+    assert.deepEqual(contextOf(saved, 4).owned, []);
   });
 });
 

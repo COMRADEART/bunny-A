@@ -7,6 +7,7 @@ import { startHost } from "./http.server.ts";
 import { providerBase } from "./adapters.server.ts";
 import { FilesystemCapability, GitCapability, TerminalCapability } from "../bunny-missions/capabilities/local.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
+import type { OrchTask } from "../orch/types.ts";
 
 /**
  * M-A-3 T13.3 Gate D at the real Host HTTP surface: worker admission, the full lifecycle through a real child Mission,
@@ -27,14 +28,27 @@ function neverLaunches(): ProviderAdapter {
   };
 }
 
-async function boot(directory: string, port: number) {
+/** A ready provider that records each launched task and answers it at once. */
+function recording(launched: OrchTask[]): ProviderAdapter {
+  const base = neverLaunches();
+  return {
+    ...base,
+    detect: async () => ({ ...(await base.detect()), capabilities: ["text", "filesystem"] }),
+    launch: (task) => {
+      launched.push(task);
+      return { done: Promise.resolve({ ok: true, output: "Notes: the release is on track." }), stop: async () => {} };
+    },
+  };
+}
+
+async function boot(directory: string, port: number, adapter: ProviderAdapter = neverLaunches()) {
   const root = join(directory, "project");
   mkdirSync(root, { recursive: true });
   const host = await startHost({
     dataDirectory: directory,
     root,
     port,
-    adapters: [neverLaunches()],
+    adapters: [adapter],
     missions: { adapters: [new FilesystemCapability(), new TerminalCapability(), new GitCapability(directory)] },
   });
   const base = `http://127.0.0.1:${port}`;
@@ -61,14 +75,14 @@ async function boot(directory: string, port: number) {
   return { host, command, state, pair, directory, close: () => host.close() };
 }
 
-async function withHost(port: number, work: (h: Host, reboot: () => Promise<Host>) => Promise<void>) {
+async function withHost(port: number, work: (h: Host, reboot: () => Promise<Host>) => Promise<void>, adapter?: ProviderAdapter) {
   const directory = mkdtempSync(join(tmpdir(), "bunny-t13-3-workers-"));
   let h: Host | undefined;
   try {
-    h = await boot(directory, port);
+    h = await boot(directory, port, adapter);
     await work(h, async () => {
       await h!.close();
-      h = await boot(directory, port);
+      h = await boot(directory, port, adapter);
       return h;
     });
   } finally {
@@ -239,4 +253,39 @@ test("T13.3 D a described ability waits for review, then runs its approved skill
     ok(await h.command("worker.ability.remove", { id: ability.id }));
     assert.ok(!(await h.state()).body.personalAgentContext.abilities.some((row: Body) => row.id === ability.id));
   });
+});
+
+test("T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker", async () => {
+  const launched: OrchTask[] = [];
+  await withHost(43884, async (h) => {
+    const alpha = await project(h, "Alpha site");
+    const parent = await delegate(h, 1, "Alpha release", alpha);
+    ok(await h.command("lotus.remember", { scope: `project:${alpha}`, key: "Release codename", value: "Kestrel" }));
+    const phone = await h.pair("Phone");
+
+    const worker = ok(await h.command("worker.propose", { slot: 1, parentMissionId: parent, ability: "research", objective: "Summarize the Alpha release", projectId: alpha })).data.worker as Body;
+    assert.deepEqual(worker.context, ["Release codename: Kestrel (Project note, you told me)"]);
+    const child = worker.childMissionId as string;
+    await until(async () => (await h.state()).body.missions.missions.find((m: Body) => m.id === child)?.state === "waiting_for_approval", "child Mission approval");
+    const view = ok(await h.command("mission.get", { id: child })).data as Body;
+    assert.equal(view.mission.objective, "Summarize the Alpha release", "the Mission carries the objective only");
+    assert.deepEqual(view.mission.steps.map((step: Body) => step.objective), ["Summarize the Alpha release"]);
+
+    assert.doesNotMatch(JSON.stringify((await h.state(phone.token)).body), /Kestrel/, "device /state");
+    assert.doesNotMatch(JSON.stringify((await h.command("mission.get", { id: child }, phone.token)).body), /Kestrel/, "device mission.get");
+    for (const [action, data] of [
+      ["mission.approve", { id: child, start: true }],
+      ["mission.start", { id: child }],
+      ["mission.retry", { id: child }],
+    ] as const) {
+      const result = await h.command(action, data, phone.token);
+      assert.equal(result.body.code, "WORKSTATION_REQUIRED", `${action}: ${JSON.stringify(result.body)}`);
+    }
+    assert.equal((await h.state()).body.missions.missions.find((m: Body) => m.id === child).state, "waiting_for_approval", "the device changed nothing");
+
+    await approve(h, child);
+    await until(async () => launched.length > 0, "the model launch");
+    assert.match(launched[0].prompt, /Context from the Project's memory[\s\S]*Release codename: Kestrel/, "the model prompt carries the labelled memory");
+    assert.doesNotMatch(JSON.stringify((await h.state(phone.token)).body), /Kestrel/, "device /state after the run");
+  }, recording(launched));
 });
