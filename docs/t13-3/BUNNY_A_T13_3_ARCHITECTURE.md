@@ -1,6 +1,6 @@
 # Bunny A MA3 T13.3: architecture and gate record
 
-Status: **in progress**. Gate A is complete and Gate B is implemented. Gates C–I have not started. No verdict is issued until Gate I.
+Status: **in progress**. Gates A–F are implemented, each with its own source and evidence commits. Gates G–I have not started. No verdict is issued until Gate I.
 
 ## Gate A: baseline
 
@@ -49,7 +49,7 @@ T13 made the **slot** (1–4) the durable Personal Agent identity and the weapon
 | Lotus layered memory, Agent/Project scoping, poisoning protection | Mission-scoped memory only | Lotus store, scoped recall, trust ceilings, correction, compaction, export/forget, scoped share (Gate C); no model prompt reads it yet |
 | Dynamic bounded child workers with lifecycle | Fixed T11 role catalogue | Workers as child Missions with eligibility, budgets, Host-only verdicts, cancellation, catalogue and reviewed composed abilities (Gate D); model-backed abilities not run live; Part F planning additions not implemented |
 | Harness Manager (detect/install/test) | T13.2 detection and native dispatch for Codex/Claude/Ollama only | Harness views over the T13.2 registry, stepped `--version` test, disable/enable/remove through the dispatch gate, guided pinned install the owner runs (Gate E); still only Codex/Claude/Ollama route Tasks, and no live inference was run |
-| Active-session ledger, quota-aware failover | Provider usage windows, connection caps, reservations | Session dimension + failover protocol (Gate F) |
+| Active-session ledger, quota-aware failover | Provider usage windows, connection caps, reservations | Per-session ledger keyed by the T13.2 reservation, UNKNOWN cost and allowance, a write-step quota pause, owner routing priority and Personal Agent fair admission (Gate F, `SESSION_RESOURCE_SCHEDULER.md`); CPU/GPU are not measured and cloud cost stays UNKNOWN |
 | Evaluation-gated routing changes | Policy candidate/promote, verified-only learning weights | Shadow test and versioned rollback (Gate G) |
 | Five character styles | One art set, weapon-specific motion | Gate H |
 
