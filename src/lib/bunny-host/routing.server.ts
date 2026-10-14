@@ -124,7 +124,9 @@ export type CandidateInput = {
  * M-A-3 T13.3 Gate F (§18): quota exhaustion during write work pauses instead of switching providers, because Bunny
  * cannot confirm which side effects already landed. Read work keeps the bounded reroute.
  */
-export const TRANSPORT_WRITE_PAUSE = "WRITE_PAUSE: the connection kept failing during work that may write files. Bunny paused instead of switching providers, because it cannot confirm which changes already landed. Review the workspace, then retry or choose another account.";
+export const TRANSPORT_WRITE_PAUSE = "WRITE_PAUSE: the connection failed during work that may write files. Outcome uncertain — reconciliation required. Bunny paused instead of retrying on this or any other provider, because a connection failure does not prove that nothing landed. Review the workspace and any external effects, then retry or close.";
+/** T13.3 N-C: any other failure of write work after its attempt may have started. */
+export const OUTCOME_UNCERTAIN_PAUSE = "OUTCOME_UNCERTAIN: the attempt may have started changing files or external systems before it failed. Outcome uncertain — reconciliation required. Bunny paused instead of retrying on this or any other provider, because it cannot confirm what already landed. Review the workspace and any external effects, then retry or close.";
 export const QUOTA_WRITE_PAUSE = "QUOTA_PAUSE: the provider's quota ran out during write work. Bunny paused instead of switching providers, because it cannot confirm which changes already landed. Completed steps are kept; review the workspace, then retry or choose another account.";
 
 import type { RoutingPriority } from "./fairness.ts";

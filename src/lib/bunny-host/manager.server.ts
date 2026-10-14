@@ -13,7 +13,7 @@ import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapt
 import { PolicyEngine, toRecorded } from "./learning.server.ts";
 import { classifyRequirements, effortRequirement, type TaskRequirements ,
 } from "../orch/router-requirements.ts";
-import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, QUOTA_WRITE_PAUSE, TRANSPORT_WRITE_PAUSE, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
+import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, QUOTA_WRITE_PAUSE, TRANSPORT_WRITE_PAUSE, OUTCOME_UNCERTAIN_PAUSE, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
 } from "./routing.server.ts";
 import { RoutingDecisionStore } from "./routing-store.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
@@ -223,6 +223,11 @@ export class TaskManager {
             error:
               "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.",
             finishedAt: Date.now(),
+            // T13.3 N-C: an interrupted attempt of work not declared read may already have changed things; a restart
+            // never clears that, and nothing replays it until the owner reconciles.
+            ...(task.executionScope?.access !== "read"
+              ? { reconciliation: { required: true, reason: "OUTCOME_UNCERTAIN: the Host restarted while this work was in progress, so it may have changed files or external systems. Outcome uncertain — reconciliation required.", at: Date.now() } }
+              : {}),
           },
           "task.failed",
           "Host restarted; session recovery unsupported.",
@@ -1410,6 +1415,33 @@ export class TaskManager {
     return launched;
   }
   /**
+   * M-A-3 T13.3 N-C: the owner's reconciliation of an uncertain outcome (the Host route admits the workstation only).
+   * A terminal task never reopens, so "retry" submits a linked task pinned to the same provider and model, which waits
+   * for a fresh approval and passes the same connection consent at dispatch. "close" records the review and ends there.
+   * A Mission's own child is reconciled through its Mission.
+   */
+  reconcile(id: string, resolution: unknown, by: string): { task: OrchTask; retry: OrchTask | null } {
+    const task = this.db.get(id);
+    if (task.mission) throw new CommandRefusedError("A Mission's task is reconciled through its Mission.");
+    if (task.state !== "failed" || !task.reconciliation?.required) throw new CommandRefusedError("This task has no uncertain outcome waiting for reconciliation.");
+    if (resolution !== "retry" && resolution !== "close") throw new CommandRefusedError("Resolution must be retry or close.");
+    // The exact model is pinned only when routing offered it as a selectable candidate; a provider default (or a model the
+    // provider merely reported) pins the provider alone, as a manual selection would.
+    const considered = task.routingDecisionId
+      ? this.routingStore.decision(task.routingDecisionId)?.candidates_considered.find((row) => row.provider_id === task.provider && row.model_id === task.model)
+      : undefined;
+    const retry = resolution === "retry"
+      ? this.submit({ prompt: task.prompt, mode: task.mode, projectId: task.projectId ?? null, override: task.provider, modelOverride: considered && considered.candidate_kind !== "PROVIDER_DEFAULT" ? task.model : null, constraints: task.constraints, verify: task.verify ?? null, ...(task.executionScope ? { executionScope: task.executionScope } : {}) })
+      : null;
+    const reconciled = this.update(
+      task,
+      { reconciliation: { ...task.reconciliation, required: false, resolution, resolvedBy: by, resolvedAt: Date.now(), ...(retry ? { retryTaskId: retry.id } : {}) } },
+      "task.reconciled",
+      retry ? `${by} reviewed the uncertain outcome and asked for a retry; task ${retry.id} on ${retry.provider} waits for a fresh approval.` : `${by} reviewed the uncertain outcome and closed the task.`,
+    );
+    return { task: reconciled, retry };
+  }
+  /**
    * Mission-delegated approval: the user approved the mission's authorization envelope, not this child.
    * `check` re-validates the child against that envelope at launch time; anything outside it is refused
    * so the mission stops and asks. Recorded as `approval.delegated`, never as a user click.
@@ -1866,6 +1898,7 @@ export class TaskManager {
         let sameRetries = 0;
         let alternates = 0;
         let escalations = 0;
+        let preDispatchRetries = 0;
         const attempted: {
           provider_id: ProviderId;
           model_id: string | null;
@@ -1894,6 +1927,7 @@ export class TaskManager {
             return;
           }
           let state: TaskState = result.stopped ? "stopped" : result.ok ? "completed" : "failed";
+          let uncertain: string | null = null;
           let verification = current.verification ?? null;
           let error = result.error ?? null;
           if (state === "completed" && current.verify) {
@@ -2002,17 +2036,24 @@ export class TaskManager {
               reroutesUsed: alternates,
               policyAllows: true,
             });
+            // T13.3 N-C (owner decision 2026-10-14; supersedes the F4/N5 special cases): work not declared read may write
+            // files or external systems, so once its attempt may have started it is never re-executed automatically, on
+            // the same candidate or another. Only an adapter-certified pre-dispatch failure (dispatched:false) earns one
+            // bounded retry. Bunny-A's own failed check of a finished attempt is a verified terminal outcome and keeps the
+            // §24 repair. A connection failure is never taken as proof that nothing landed.
+            const writeWork = current.executionScope?.access !== "read";
+            const mayHaveStarted = result.dispatched !== false;
+            if (writeWork && mayHaveStarted && taxonomy !== "VERIFICATION_FAILED")
+              uncertain = taxonomy === "QUOTA_CONSTRAINED" ? QUOTA_WRITE_PAUSE : taxonomy === "TRANSIENT_TRANSPORT" ? TRANSPORT_WRITE_PAUSE : OUTCOME_UNCERTAIN_PAUSE;
             if (action.action === "fail") exhaustNow(action.reason);
             else if (current.routingMode === "manual" && action.action !== "retry-same")
               exhaustNow(
                 `Manual model selection is fixed; the task failed instead of re-routing. ${action.reason}`,
               );
-            // T13.3 F4: an unscoped direct task may write files, so only declared read work reroutes on quota.
-            else if (taxonomy === "QUOTA_CONSTRAINED" && current.executionScope?.access !== "read")
-              exhaustNow(QUOTA_WRITE_PAUSE);
-            // T13.3 N5: the same rule when a transport failure persists; the attempt ran, so its writes may have landed.
-            else if (taxonomy === "TRANSIENT_TRANSPORT" && action.action === "reroute" && current.executionScope?.access !== "read")
-              exhaustNow(TRANSPORT_WRITE_PAUSE);
+            else if (uncertain) exhaustNow(uncertain);
+            // Counts the one pre-dispatch retry of write work as it is taken.
+            else if (writeWork && !mayHaveStarted && preDispatchRetries++ >= 1)
+              exhaustNow("The provider could not be started again; nothing was sent to it. Retry when it is available.");
             else if (action.action === "retry-same") {
               sameRetries += 1;
               const label = `${current.provider}${current.model==="auto" ? " · provider default" : ` · ${current.model}`}`;
@@ -2082,6 +2123,7 @@ export class TaskManager {
               exitCode: result.exitCode ?? null,
               activity: activityLabel(`task.${state}`),
               verification,
+              ...(state === "failed" && uncertain ? { reconciliation: { required: true, reason: uncertain, at: Date.now() } } : {}),
               usage: reportedUsage ?? latest.usage ?? null,
               latestEvent: this.activity(
                 latest,

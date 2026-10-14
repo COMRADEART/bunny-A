@@ -1252,6 +1252,14 @@ export async function startHost(
             task = manager.feedback(text(data.id, 200), data.value);
             break;
           }
+          case "task.reconcile": {
+            // M-A-3 T13.3 N-C: only the owner at the workstation decides what happens after an uncertain outcome.
+            if (!local) throw new WorkstationRequiredError("An uncertain outcome is reconciled on the workstation (Windows Host).");
+            const reconciled = manager.reconcile(text(data.id, 200), data.resolution, actor);
+            task = reconciled.task;
+            extra = { data: { task: reconciled.task, retry: reconciled.retry } };
+            break;
+          }
           case "provider.configure_path":
             if (!local)
               throw new Error("Executable paths can only be configured on the workstation.");

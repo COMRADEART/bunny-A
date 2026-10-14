@@ -14,7 +14,7 @@ function id(value: unknown): string { const out = text(value, 200); if (!/^[A-Za
 function object(value: unknown): Record<string, unknown> { if (value === undefined) return {}; if (!value || typeof value !== "object" || Array.isArray(value)) throw new CommandRefusedError("Expected an object."); return value as Record<string, unknown>; }
 
 export const MISSION_ACTIONS = new Set([
-  "mission.create", "mission.plan", "mission.replan", "mission.approve", "mission.start", "mission.stop", "mission.retry", "mission.respond", "mission.get", "mission.configure", "mission.revoke_batch",
+  "mission.create", "mission.plan", "mission.replan", "mission.approve", "mission.start", "mission.stop", "mission.retry", "mission.respond", "mission.get", "mission.configure", "mission.revoke_batch", "mission.reconcile",
   "mission.staging.list", "mission.staging.inspect",
   "inbox.ack", "capability.run", "capability.grant", "capability.revoke_grant", "capability.refresh",
   "skill.run", "skill.versions", "skill.repair", "skill.verify", "skill.record",
@@ -71,6 +71,8 @@ export async function missionCommand(missions: MissionManager, action: string, d
     }
     case "mission.stop": return { mission: await missions.stop(id(data.id), access.actor) };
     case "mission.retry": return { mission: missions.retry(id(data.id), access.actor) };
+    // M-A-3 T13.3 N-C: never in REMOTE; only the workstation reconciles an uncertain outcome.
+    case "mission.reconcile": return { mission: await missions.reconcile(id(data.id), id(data.stepId), data.resolution, access.actor) };
     case "mission.respond": {
       if (!access.local && Object.keys(data).some(key => !["requestId", "decision", "maxActions", "ttlMs"].includes(key)))
         throw new CommandRefusedError("Remote approval can only answer the exact Host request; Agent, Mission and Project binding cannot be supplied by a device.");

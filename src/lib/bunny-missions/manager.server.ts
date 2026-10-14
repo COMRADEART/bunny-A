@@ -29,7 +29,7 @@ import { FilesystemCapability, GitCapability, NotificationsCapability, TerminalC
 import { agentPrompt, type DependencyResult } from "./context.ts";
 import { Inbox } from "./inbox.server.ts";
 import {
-  assertMissionTransition, assertStepTransition, blockedBy, classifyTaskFailure, MISSION_ACTIVE, missionProgress, readySteps, retryVerdict, STEP_DONE, validateGraph,
+  assertMissionTransition, assertStepTransition, blockedBy, classifyTaskFailure, enforcedIdempotent, uncertainRun, MISSION_ACTIVE, missionProgress, readySteps, retryVerdict, STEP_DONE, validateGraph,
 } from "./machine.ts";
 import { MissionMemory } from "./memory.server.ts";
 import { scopedPath } from "./paths.server.ts";
@@ -1820,6 +1820,8 @@ export class MissionManager {
         permission: ({ action: string; risk: string; reason: string } & Pick<PermissionDecision, "desktopRequired" | "desktopOperation" | "remoteReview">) | null;
         /** M-A-3 T9R-F02 (D2): the executor's write was staged, not applied; the step waits for workstation promotion. */
         staged?: string | null;
+        /** M-A-3 T13.3 N-C: why a failed non-read run's outcome is unknown (null when it is known or enforced-idempotent). */
+        uncertain?: string | null;
       };
       // M-A-3 T11: a team write takes its content from the producer's verified handoff and its pre-image guard from
       // what this Mission last wrote there; a destination already holding these exact bytes is not written again.
@@ -1854,6 +1856,7 @@ export class MissionManager {
         const stagedOutput = outcome.result?.output && typeof outcome.result.output === "object" ? (outcome.result.output as { staged?: boolean; stagingId?: string }) : null;
         result = {
           staged: status === "succeeded" && stagedOutput?.staged === true && typeof stagedOutput.stagingId === "string" ? stagedOutput.stagingId : null,
+          uncertain: uncertainRun(outcome.run),
           ok: status === "succeeded",
           summary: outcome.run?.summary ?? outcome.decision.reason,
           artifactIds: outcome.artifactIds,
@@ -1892,6 +1895,7 @@ export class MissionManager {
           timeoutMs: step.timeoutMs,
         });
         result = {
+          uncertain: run.ok ? null : uncertainRun(run.runs.at(-1) ?? null),
           ok: run.ok,
           summary: run.ok
             ? `Skill ${run.skill} v${run.version} passed: ${run.runs.map((r) => r.summary).join(" · ").slice(0, 600)}`
@@ -1981,6 +1985,7 @@ export class MissionManager {
             ? "permission_required"
             : (result.category ?? "capability_failed"),
           result.summary,
+          result.uncertain ?? null,
         );
         return;
       }
@@ -3645,6 +3650,8 @@ export class MissionManager {
         current,
         classifyTaskFailure(task.error ?? task.stopReason, task.state),
         task.error ?? task.stopReason ?? `Child task ${task.state}.`,
+        // T13.3 N-C: the TaskManager's own record of an uncertain write outcome, never the error text.
+        task.reconciliation?.required ? task.reconciliation.reason : null,
       );
       return;
     }
@@ -3944,7 +3951,8 @@ export class MissionManager {
     }
     this.schedule(mission.id);
   }
-  stepFailed(mission: Mission, step: MissionStep, category: FailureCategory, detail: string) {
+  /** `uncertain`: why the failed attempt may have changed something (T13.3 N-C); such a step never retries automatically. */
+  stepFailed(mission: Mission, step: MissionStep, category: FailureCategory, detail: string, uncertain: string | null = null) {
     const owned = this.store.step(step.id);
     if (
       this.closed ||
@@ -3973,14 +3981,16 @@ export class MissionManager {
             : attempt,
         )
       : step.attempts;
-    const verdict = retryVerdict(
-      category,
-      attempts.length,
-      step.maxRetries,
-      this.accounting(mission.id).retries,
-      mission.budget.maxRetries,
-      step.scope?.access,
-    );
+    const verdict = uncertain
+      ? { retry: false, reroute: false, waitForUser: true, reason: `Outcome uncertain — reconciliation required. ${uncertain}` }
+      : retryVerdict(
+          category,
+          attempts.length,
+          step.maxRetries,
+          this.accounting(mission.id).retries,
+          mission.budget.maxRetries,
+          step.scope?.access,
+        );
     if (verdict.retry) {
       // Reroute only when another provider could take the step; otherwise retry where it is.
       const failedProvider = step.accounting.provider ?? step.attempts.at(-1)?.provider ?? null;
@@ -4026,6 +4036,7 @@ export class MissionManager {
         finishedAt: Date.now(),
         attempts,
         failure: { category, detail: detail.slice(0, 2000) },
+        ...(uncertain ? { reconciliation: { required: true, reason: uncertain.slice(0, 1000), at: Date.now() } } : {}),
         approvedOnce: null,
       },
       "mission.step.failed",
@@ -4639,6 +4650,27 @@ export class MissionManager {
       this.stopping.delete(id);
     }
   }
+  /**
+   * M-A-3 T13.3 N-C: the owner's decision about a step whose outcome is uncertain. "retry" records the review and runs
+   * the normal bounded Retry (same Mission and step, a fresh child task, fresh approvals); "stop" stops the Mission. The
+   * workstation only: MISSION_ACTIONS admits it and the device REMOTE set does not.
+   */
+  async reconcile(id: string, stepId: string, resolution: unknown, by: string): Promise<MissionView> {
+    const step = this.store.step(stepId);
+    if (step.missionId !== id) throw new CommandRefusedError("That step is not part of this Mission.");
+    if (step.state !== "failed" || !step.reconciliation?.required) throw new CommandRefusedError("This step has no uncertain outcome waiting for reconciliation.");
+    if (resolution !== "retry" && resolution !== "stop") throw new CommandRefusedError("Resolution must be retry or stop.");
+    const before = step.reconciliation;
+    this.setStep(step, { reconciliation: { ...before, required: false, resolution, resolvedBy: by, resolvedAt: Date.now() } }, "mission.step.reconciled", `${by} reviewed the uncertain outcome of ${step.role} and chose ${resolution}.`);
+    if (resolution === "stop") return await this.stop(id, by);
+    try {
+      return this.retry(id, by);
+    } catch (error) {
+      // A refused Retry leaves the step exactly as uncertain as it was.
+      this.setStep(this.store.step(stepId), { reconciliation: before });
+      throw error;
+    }
+  }
   retry(id: string, by: string): MissionView {
     this.requireEnabled();
     let mission = this.store.mission(id);
@@ -4659,6 +4691,10 @@ export class MissionManager {
     const retryable = [...before.filter((step) => step.state === "failed" && !step.team?.supersededBy), ...waitingPromotion];
     if (!retryable.length && !before.some((step) => step.state === "blocked"))
       throw new Error("No failed step to retry.");
+    // T13.3 N-C: a step whose last attempt may already have taken effect is never replayed before the owner reconciles it.
+    const unreconciled = retryable.filter((step) => step.reconciliation?.required);
+    if (unreconciled.length)
+      throw new CommandRefusedError(`OUTCOME_UNCERTAIN: ${unreconciled.map((step) => step.role).join(", ")} may already have taken effect. Review it, then reconcile (mission.reconcile) before retrying.`);
     for (const step of retryable)
       // Explicit retries are still bounded: at most twice the automatic per-step limit plus one.
       if (step.attempts.length > step.maxRetries * 2 + 1)
@@ -5098,6 +5134,14 @@ export class MissionManager {
               }
             : attempt,
         );
+        // T13.3 N-C: an interrupted step that could write may already have taken effect. Retry stays available, but only
+        // after the owner reconciles; read-only work and Host-enforced idempotent writes need no reconciliation.
+        const mayHaveWritten =
+          step.executor.kind === "model"
+            ? step.scope?.access !== "read"
+            : step.executor.kind === "capability"
+              ? (this.bus.riskOf(step.executor.action, step.executor.params) ?? "EXECUTE") !== "READ" && !enforcedIdempotent(step.executor.action, step.executor.params)
+              : true;
         this.setStep(
           step,
           {
@@ -5105,6 +5149,7 @@ export class MissionManager {
             finishedAt: now,
             attempts,
             failure: { category: "host_restart", detail },
+            ...(mayHaveWritten ? { reconciliation: { required: true, reason: `OUTCOME_UNCERTAIN: the Host restarted while ${step.role} was running, so it may already have changed files or external systems.`, at: now } } : {}),
           },
           "mission.step.failed",
           `${step.role} interrupted by Host restart: ${detail}`,

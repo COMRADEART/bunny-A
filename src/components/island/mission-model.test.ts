@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { agentDetail, agentRows, batchButtonLabel, batchOfferLines, batchStatusLabel, focusMission, justFinished, permissionLabel, progressFraction, progressLabel, scopeSummary } from "./mission-model.ts";
+import { agentDetail, agentRows, stepActivity, batchButtonLabel, batchOfferLines, batchStatusLabel, focusMission, justFinished, permissionLabel, progressFraction, progressLabel, scopeSummary } from "./mission-model.ts";
 import type { BatchView, MissionSnapshot, MissionStep, MissionView } from "../../lib/bunny-missions/types.ts";
 import type { OrchTask } from "../../lib/orch/types.ts";
 
@@ -125,4 +125,10 @@ test("T9: the batch status line reports the canonical count and each ended reaso
   ended("scope_mismatch", /it reached a window outside its approval after 3 of 8/);
   ended("mission_ended", /the mission ended after 3 of 8/);
   ended("host_restart", /the Host restarted after 3 of 8/);
+});
+
+test("T13.3 N-C: a step whose outcome is uncertain shows reconciliation required, never retry available", () => {
+  const failed = step("1", "Writer", "failed", { failure: { category: "host_restart", detail: "x" }, reconciliation: { required: true, reason: "OUTCOME_UNCERTAIN: x", at: 1 } });
+  assert.equal(stepActivity(failed, null), "Outcome uncertain — reconciliation required");
+  assert.equal(stepActivity({ ...failed, reconciliation: undefined }, null), "Interrupted · retry available");
 });

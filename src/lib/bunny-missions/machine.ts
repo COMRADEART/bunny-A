@@ -1,4 +1,4 @@
-import type { FailureCategory, MissionLimits, MissionProgress, MissionState, MissionStep, StepState } from "./types.ts";
+import type { CapabilityRun, FailureCategory, MissionLimits, MissionProgress, MissionState, MissionStep, StepState } from "./types.ts";
 
 const MISSION_NEXT: Record<MissionState, MissionState[]> = {
   draft: ["planning", "stopped"],
@@ -122,6 +122,21 @@ export function retryVerdict(category: FailureCategory, attempts: number, maxRet
     case "capability_failed": return budgetLeft ? { retry: true, reroute: category === "provider_failed", waitForUser: false, reason: "Bounded retry." } : no("Retry limit reached.");
     case "capability_unavailable": return no("Capability unavailable on this Host.");
   }
+}
+
+/**
+ * M-A-3 T13.3 N-C: duplicate protection the Host itself enforces. Only these may replay after an uncertain outcome; a
+ * plan's, step's or caller's claim of idempotency never counts. Today: filesystem.write under a pre-image guard (a
+ * landed write is detected and reported as applied, a changed file is refused).
+ */
+export function enforcedIdempotent(action: string, params: Record<string, unknown>): boolean {
+  return action === "filesystem.write" && typeof params.expectBeforeSha256 === "string";
+}
+
+/** Why a failed capability run's outcome is unknown: it started, it was not read-only, and nothing enforces dedup. */
+export function uncertainRun(run: Pick<CapabilityRun, "uncertain" | "risk" | "action" | "params" | "status" | "summary"> | null): string | null {
+  if (!run?.uncertain || run.risk === "READ" || enforcedIdempotent(run.action, run.params)) return null;
+  return `OUTCOME_UNCERTAIN: ${run.action} started and then ${run.status === "timeout" ? "timed out" : "failed"} (${run.summary.slice(0, 200)}), so it may already have taken effect.`;
 }
 
 /** Classifies a finished child task's error text into a mission failure category. */

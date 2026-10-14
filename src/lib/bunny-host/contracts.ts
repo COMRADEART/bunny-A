@@ -72,7 +72,11 @@ export type HostSnapshot = {
 };
 /** `routingPrompt` and `modelOverride` are set in-process by the caller that knows the selection context; HTTP validates both. */
 export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; /** M-A-3 T3 §27: MANUAL exact-model selection; only honored where a real model surface exists. */ modelOverride?: string | null; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope; /** M-A-3 T13.1: Host-owned decision assistance (advisory only); never accepted from HTTP bodies. */ decisionAssistance?: import("./intelligence.ts").DecisionAdvice | null };
-export type AdapterResult = { ok: boolean; output: string; error?: string; stopped?: boolean; exitCode?: number | null };
+/**
+ * `dispatched: false` is the adapter's certificate that no provider process or request was started for this attempt (a
+ * proven pre-dispatch failure). Anything else, including absence, means the attempt may have started (M-A-3 T13.3 N-C).
+ */
+export type AdapterResult = { ok: boolean; output: string; error?: string; stopped?: boolean; exitCode?: number | null; dispatched?: false };
 export type AdapterHooks = {
   beforeDispatch?: () => Promise<void>;
   childEnvironment?: () => Record<string, string>;

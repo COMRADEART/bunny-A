@@ -174,7 +174,7 @@ export class OllamaAdapter implements ProviderAdapter {
   }
   launch(task: OrchTask, hooks: AdapterHooks): RunningSession {
     const controller = new AbortController();
-    const done = Promise.resolve().then(async()=>{await hooks.beforeDispatch?.();if(controller.signal.aborted)return {ok:false,stopped:true,output:"",error:"Stopped before local inference.",log:"Stopped before local inference.",receipt:null};hooks.event("agent.started", `Ollama generation requested · ${task.model}.`);return execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt, localOnly: !!(task.constraints?.localOnly || task.constraints?.offlineOnly), ...(task.constraints?.contextTokens ? { numCtx: task.constraints.contextTokens } : {}), ...(task.constraints?.outputTokens ? { numPredict: task.constraints.outputTokens } : {}), ...(task.constraints?.responseFormat ? { format: task.constraints.responseFormat } : {}) }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs });}).then((result) => {
+    const done = Promise.resolve().then(async()=>{await hooks.beforeDispatch?.();if(controller.signal.aborted)return {ok:false,stopped:true,output:"",error:"Stopped before local inference.",log:"Stopped before local inference.",receipt:null,dispatched:false as const};hooks.event("agent.started", `Ollama generation requested · ${task.model}.`);return execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt, localOnly: !!(task.constraints?.localOnly || task.constraints?.offlineOnly), ...(task.constraints?.contextTokens ? { numCtx: task.constraints.contextTokens } : {}), ...(task.constraints?.outputTokens ? { numPredict: task.constraints.outputTokens } : {}), ...(task.constraints?.responseFormat ? { format: task.constraints.responseFormat } : {}) }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs });}).then((result) => {
       // M-A-3 T11: Ollama's own final message is the receipt: served model, token counts and durations. Counts are
       // provider-reported, never estimated; when the provider sends no final message nothing is recorded.
       if (result.ok && result.receipt) {
@@ -215,7 +215,8 @@ export function parseAgentEvent(provider: ProviderId, event: Record<string, unkn
 export function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer:CodexNormalizer|ClaudeNormalizer=id === "codex" ? new CodexNormalizer() : new ClaudeNormalizer(), spawnChild:typeof spawn=spawn): RunningSession {
   if(hooks.beforeDispatch){
     let owned: RunningSession|null=null,stopped=false;
-    const done=(async()=>{await hooks.beforeDispatch!();if(stopped)return {ok:false,stopped:true,output:"",error:"Stopped before provider dispatch."};owned=spawnUnwrappedSession(id,launch,args,task,{...hooks,beforeDispatch:undefined},sessionId,normalizer,spawnChild);return owned.done;})().catch(()=>({ok:false,output:"",error:"Provider dispatch refused: connection authority changed or could not be freshly verified."}));
+    // M-A-3 T13.3 N-C: dispatched:false is certified only while no provider process has been asked to start.
+    const done=(async():Promise<AdapterResult>=>{await hooks.beforeDispatch!();if(stopped)return {ok:false,stopped:true,output:"",error:"Stopped before provider dispatch.",dispatched:false};owned=spawnUnwrappedSession(id,launch,args,task,{...hooks,beforeDispatch:undefined},sessionId,normalizer,spawnChild);return owned.done;})().catch(():AdapterResult=>owned?{ok:false,output:"",error:"Provider session failed after dispatch."}:{ok:false,output:"",error:"Provider dispatch refused: connection authority changed or could not be freshly verified.",dispatched:false});
     return {done,stop:async()=>{stopped=true;await owned?.stop();},pid:()=>owned?.pid?.()??null,
       get sendInput(){return owned?.sendInput;},
       ...(process.platform==="win32"&&spawnChild===spawn?{containment:()=>owned?.containment?.()??{mechanism:"windows-job-object" as const,state:stopped?"empty" as const:"launching" as const,admitted:false,operationId:null,rootPid:null,rootCreatedAt:null,activeProcesses:0,totalProcesses:0,terminatedAtEnd:0,detail:stopped?"Stopped before any provider process was admitted.":"Waiting for a fresh account authorization check; no provider process admitted."}}:{}),
@@ -225,7 +226,7 @@ export function spawnSession(id: "codex" | "claude", launch: Launchable, args: s
 }
 function spawnUnwrappedSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer:CodexNormalizer|ClaudeNormalizer, spawnChild:typeof spawn): RunningSession {
   if (process.platform === "win32" && spawnChild === spawn) return containedSession(id, launch, args, task, hooks, sessionId, normalizer);
-  let child: ChildProcess | null = null; let stopped = false; let output = ""; let stderr = ""; let buffer = ""; let providerError: string | null = null;
+  let child: ChildProcess | null = null; let stopped = false; let spawned = false; let output = ""; let stderr = ""; let buffer = ""; let providerError: string | null = null;
   const terminate = async (userStop=false) => {
     if(userStop) stopped=true;
     if (!child || child.exitCode !== null || child.signalCode !== null || !child.pid) return;
@@ -246,6 +247,7 @@ function spawnUnwrappedSession(id: "codex" | "claude", launch: Launchable, args:
       event: (type, detail) => { if (type === "agent.error") providerError = detail; hooks.event(type, detail); },
     };
     child.once("spawn", () => boundary(() => {
+      spawned = true;
       hooks.session(id === "claude" ? sessionId : null, child!.pid ?? null);
       hooks.event("agent.started", `${NAMES[id]} process started (PID ${child!.pid}).`);
     }));
@@ -264,7 +266,8 @@ function spawnUnwrappedSession(id: "codex" | "claude", launch: Launchable, args:
     }));
     child.stderr!.on("data", (chunk) => boundary(() => { const text = chunk.toString(); stderr = (stderr + text).slice(-16000); hooks.raw?.("stderr", text); }));
     child.stdout!.on("error",fail);child.stderr!.on("error",fail);
-    child.once("error", (error) => resolve({ ok: false, output, error: safeError(error).message }));
+    // M-A-3 T13.3 N-C: an error before "spawn" (for example ENOENT) means no provider process ever started.
+    child.once("error", (error) => resolve({ ok: false, output, error: safeError(error).message, ...(spawned ? {} : { dispatched: false as const }) }));
     child.once("close", (code) => resolve({ ok: code === 0 && !stopped && !providerError, output, error: stopped ? "Stopped." : providerError ?? (code === 0 ? undefined : safeError(firstLine(stderr) || `Process exited ${code}`).message), stopped, exitCode: code }));
     child.stdin!.on("error", fail);
     child.stdin!.end(task.prompt);
@@ -385,10 +388,11 @@ function containedSession(id: "codex" | "claude", launch: Launchable, args: stri
       try { group?.close("failed"); } catch { /* the refusal below stands */ }
       await closePipes().catch(() => {});
       markEmpty();
-      if (stopped) { settle({ state: "empty", admitted: false, activeProcesses: 0, detail: "Stopped before the provider process was admitted." }); return { ok: false, output: "", error: "Stopped.", stopped: true }; }
+      if (stopped) { settle({ state: "empty", admitted: false, activeProcesses: 0, detail: "Stopped before the provider process was admitted." }); return { ok: false, output: "", error: "Stopped.", stopped: true, dispatched: false }; }
       settle({ state: "refused", admitted: false, detail: reason });
       hooks.event("provider.containment_refused", reason);
-      return { ok: false, output: "", error: reason };
+      // M-A-3 T13.3 N-C: this launch never produced a process.
+      return { ok: false, output: "", error: reason, dispatched: false };
     }
     const record = group.inspectHistory();
     settle({ state: "running", admitted: true, operationId: record.operationId, rootPid: record.launcherPid, rootCreatedAt: record.launcherCreatedAt, detail: "Provider process tree is running inside its Bunny-owned Windows job." });

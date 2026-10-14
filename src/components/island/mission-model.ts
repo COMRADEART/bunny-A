@@ -2,7 +2,7 @@ import type { OrchTask } from "../../lib/orch/types.ts";
 import type { MissionProgress, MissionSnapshot, MissionState, MissionStep, MissionView, StepState } from "../../lib/bunny-missions/types.ts";
 import { batchButtonLabel, batchOfferLines, batchStatusLabel, targetLabelOf } from "../../lib/bunny-missions/batch-labels.ts";
 import { finitePlan } from "./ui-model.ts";
-import { publicEventLabel } from "../../lib/bunny-host/presentation.ts";
+import { publicEventLabel, UNCERTAIN_LABEL } from "../../lib/bunny-host/presentation.ts";
 
 /** Missions the Bar treats as live: they get the expanded strip. */
 export const LIVE_MISSION: MissionState[] = ["planning", "waiting_for_approval", "ready", "running", "waiting_for_user", "verifying"];
@@ -55,6 +55,7 @@ export function agentRows(mission: MissionView, tasks: OrchTask[], max = 3): { r
 /** Latest normalized activity: the child task's own event for model steps, the capability/skill for deterministic ones. */
 export function stepActivity(step: MissionStep, task: OrchTask | null): string {
   if (step.state === "waiting_for_approval") return "Needs your permission";
+  if (step.state === "failed" && step.reconciliation?.required) return UNCERTAIN_LABEL;
   if (step.state === "failed") return ["host_restart","host_failure"].includes(step.failure?.category ?? "") ? "Interrupted · retry available" : step.failure ? `Failed: ${step.failure.category.replaceAll("_", " ")}` : "Failed";
   if (step.state === "blocked") return "Blocked by a failed dependency";
   if (step.state === "stopped") return "Stopped";

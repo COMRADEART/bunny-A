@@ -11,6 +11,7 @@ import { TaskManager } from "./manager.server.ts";
 import { RoutingDecisionStore } from "./routing-store.server.ts";
 import { PROVIDER_EFFORT_CONTRACTS, ROUTING_POLICY, ROUTING_POLICY_VERSION, type RoutingDecisionRecord } from "./routing.server.ts";
 import { toRecorded } from "./learning.server.ts";
+import { taskStatus, UNCERTAIN_LABEL } from "./presentation.ts";
 import { empiricalPoints, repick } from "./routing-feedback.ts";
 import { CODEX_SECURITY_POLICY_VERSION, CODEX_COMPATIBILITY_MAX_AGE_MS, type CodexCompatibilityProfile } from "../orch/compatibility.ts";
 import type { AdapterHooks, AdapterResult, ProviderAdapter } from "./contracts.ts";
@@ -403,7 +404,7 @@ test("T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerout
   } finally { env.cleanup(); }
 });
 
-test("T13.3 N5: an unscoped task whose transport keeps failing pauses instead of rerouting; a declared read task still reroutes", async () => {
+test("T13.3 N-C 1/2: after a connection failure declared read work retries and reroutes; unscoped work pauses at once with reconciliation", async () => {
   for (const scope of [undefined, { access: "read" as const }]) {
     const env = await t3Fixture(["codex", "claude"]);
     try {
@@ -412,20 +413,79 @@ test("T13.3 N5: an unscoped task whose transport keeps failing pauses instead of
       env.tasks.approve(task.id);
       await until(() => env.parts.claude.launched.length === 1, "first launch");
       env.parts.claude.launched[0].finish({ ok: false, output: "", error: "stream reset: socket hang up", exitCode: 1 });
-      await until(() => env.parts.claude.launched.length === 2, "bounded same-candidate retry");
-      env.parts.claude.launched[1].finish({ ok: false, output: "", error: "request timed out", exitCode: 1 });
       if (scope) {
+        await until(() => env.parts.claude.launched.length === 2, "bounded same-candidate retry of read work");
+        env.parts.claude.launched[1].finish({ ok: false, output: "", error: "request timed out", exitCode: 1 });
         await until(() => env.parts.codex.launched.length === 1, "read work reroutes", () => eventsOf(env, task.id).slice(-6));
         env.parts.codex.launched[0].finish({ ok: true, output: "done", exitCode: 0 });
         await until(() => env.db.get(task.id).state === "completed", "completion");
+        assert.equal(env.db.get(task.id).reconciliation, undefined, "read work never needs reconciliation");
       } else {
+        // The exact N-C case: a missing scope is treated as write, and a connection failure is not proof nothing landed.
         await until(() => env.db.get(task.id).state === "failed", "paused failure", () => eventsOf(env, task.id).slice(-6));
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        assert.equal(env.parts.codex.launched.length, 0, "no second provider repeats possibly-landed writes");
-        assert.match(env.db.get(task.id).error ?? "", /WRITE_PAUSE/);
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        assert.equal(env.parts.claude.launched.length, 1, "no same-provider replay");
+        assert.equal(env.parts.codex.launched.length, 0, "no cross-provider replay");
+        const paused = env.db.get(task.id);
+        assert.match(paused.error ?? "", /WRITE_PAUSE/);
+        assert.equal(paused.reconciliation?.required, true);
+        assert.match(paused.reconciliation?.reason ?? "", /reconciliation required/);
+        assert.equal(taskStatus(paused).label, UNCERTAIN_LABEL, "the owner sees the honest state");
       }
     } finally { env.cleanup(); }
   }
+});
+
+test("T13.3 N-C 4: a same-provider retry of write work is refused, even on a MANUAL pin", async () => {
+  const env = await t3Fixture(["codex", "claude"]);
+  try {
+    const task = env.tasks.submit({ prompt: FILE_TASK, mode: "balanced", override: "codex", modelOverride: "gpt-5.3-codex", executionScope: { access: "write" } });
+    env.tasks.approve(task.id);
+    await until(() => env.parts.codex.launched.length === 1, "manual launch");
+    env.parts.codex.launched[0].finish({ ok: false, output: "", error: "transient network error ECONNRESET", exitCode: 1 });
+    await until(() => env.db.get(task.id).state === "failed", "paused", () => eventsOf(env, task.id).slice(-4));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(env.parts.codex.launched.length, 1, "the same provider and account are not asked twice");
+    assert.equal(env.db.get(task.id).reconciliation?.required, true);
+  } finally { env.cleanup(); }
+});
+
+test("T13.3 N-C 5: write work is not moved to another provider after any failure that may have started it", async () => {
+  const env = await t3Fixture(["codex", "claude"]);
+  try {
+    await env.tasks.connections.command("connections.policy.set", {policy:{...env.tasks.connections.policy(),switchAllowlist:["openai","anthropic"]}}, "workstation");
+    const task = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
+    env.tasks.approve(task.id);
+    await until(() => env.parts.claude.launched.length === 1, "claude launch");
+    // A provider refusal reroutes read work; for write work the attempt may already have acted before it refused.
+    env.parts.claude.launched[0].finish({ ok: false, output: "", error: "I can't comply with that request.", exitCode: 1 });
+    await until(() => env.db.get(task.id).state === "failed", "paused", () => eventsOf(env, task.id).slice(-4));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(env.parts.codex.launched.length, 0);
+    assert.match(env.db.get(task.id).error ?? "", /OUTCOME_UNCERTAIN/);
+    assert.ok(!eventsOf(env, task.id).some(([type]) => type === "routing.rerouted"));
+  } finally { env.cleanup(); }
+});
+
+test("T13.3 N-C 6: a proven pre-dispatch failure earns exactly one bounded retry, and needs no reconciliation", async () => {
+  const env = await t3Fixture(["codex", "claude"]);
+  try {
+    await env.tasks.connections.command("connections.policy.set", {policy:{...env.tasks.connections.policy(),switchAllowlist:["openai","anthropic"]}}, "workstation");
+    const task = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
+    env.tasks.approve(task.id);
+    await until(() => env.parts.claude.launched.length === 1, "claude launch");
+    // The adapter certifies that no provider process was started (dispatched:false), as spawnSession does on a refused
+    // authority check or a spawn error.
+    env.parts.claude.launched[0].finish({ ok: false, output: "", error: "Provider dispatch refused: connection authority changed or could not be freshly verified.", dispatched: false });
+    await until(() => env.parts.claude.launched.length + env.parts.codex.launched.length === 2, "the one bounded retry", () => eventsOf(env, task.id).slice(-6));
+    const second = env.parts.codex.launched[0] ?? env.parts.claude.launched[1];
+    second.finish({ ok: false, output: "", error: "Provider dispatch refused: connection authority changed or could not be freshly verified.", dispatched: false });
+    await until(() => env.db.get(task.id).state === "failed", "bounded failure", () => eventsOf(env, task.id).slice(-6));
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(env.parts.claude.launched.length + env.parts.codex.launched.length, 2, "exactly one retry");
+    assert.match(env.db.get(task.id).error ?? "", /nothing was sent/);
+    assert.equal(env.db.get(task.id).reconciliation, undefined, "nothing started, so nothing is uncertain");
+  } finally { env.cleanup(); }
 });
 
 test("T3 §24/R24: a failed Bunny-A verification escalates the effort once on the same candidate, then exhausts honestly", async () => {
@@ -467,7 +527,9 @@ test("T3 §24/R24: a failed Bunny-A verification escalates the effort once on th
 test("T3 §5/§22/§23: a MANUAL selection retries its own candidate once and then fails instead of ever rerouting", async () => {
   const env = await t3Fixture(["codex", "claude"]);
   try {
-    const task = env.tasks.submit({ prompt: FILE_TASK, mode: "balanced", override: "codex", modelOverride: "gpt-5.3-codex" });
+    // T13.3 N-C (owner decision 2026-10-14): the same-candidate retry is kept for declared read work only; unscoped work
+    // counts as write and pauses instead ("T13.3 N-C: same-provider ..."). This baseline therefore declares read.
+    const task = env.tasks.submit({ prompt: FILE_TASK, mode: "balanced", override: "codex", modelOverride: "gpt-5.3-codex", executionScope: { access: "read" } });
     env.tasks.approve(task.id);
     await until(() => env.parts.codex.launched.length === 1, "manual launch");
     env.parts.codex.launched[0].finish({ ok: false, output: "", error: "transient network error ECONNRESET", exitCode: 1 });
@@ -530,5 +592,79 @@ test("T13.3 G §20: a shadow policy scores every live decision beside it and nev
     await until(() => env.db.get(task.id).state === "completed", "completion");
     const shadow = env.tasks.policy.view().candidates.find((candidate) => candidate.id === "shadow-fixture")!.shadow!;
     assert.deepEqual([shadow.decisions, shadow.verified], [1, 0], "a completed but unverified Task is not verified evidence");
+  } finally { env.cleanup(); }
+});
+test("T13.3 N-C 9: a restart preserves an uncertain outcome and turns an interrupted write attempt into one", async () => {
+  const env = await t3Fixture(["codex", "claude"]);
+  const restarted: TaskManager[] = [];
+  try {
+    const uncertain = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
+    env.tasks.approve(uncertain.id);
+    await until(() => env.parts.claude.launched.length === 1, "launch");
+    env.parts.claude.launched[0].finish({ ok: false, output: "", error: "stream reset", exitCode: 1 });
+    await until(() => env.db.get(uncertain.id).reconciliation?.required === true, "uncertain");
+    // Two attempts are still running when the Host stops: one may write, one is declared read.
+    const writing = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
+    const reading = env.tasks.submit({ prompt: RESEARCH, mode: "balanced", executionScope: { access: "read" } });
+    env.tasks.approve(writing.id);
+    env.tasks.approve(reading.id);
+    await until(() => env.parts.claude.launched.length === 3, "both running");
+    env.tasks.dispose();
+    const next = new TaskManager(env.db, env.tasks.defaultRoot, [], { modelRegistry: new ModelCapabilityRegistry(env.db, { availableProviders: () => [] }) });
+    restarted.push(next);
+    assert.equal(next.db.get(uncertain.id).reconciliation?.required, true, "a restart never clears an uncertain outcome");
+    assert.equal(next.db.get(writing.id).state, "failed");
+    assert.equal(next.db.get(writing.id).reconciliation?.required, true, "an interrupted write attempt may already have taken effect");
+    assert.match(next.db.get(writing.id).reconciliation?.reason ?? "", /Host restarted/);
+    assert.equal(next.db.get(reading.id).reconciliation, undefined, "an interrupted read attempt needs no reconciliation");
+    // The old process's sessions end now; a late result never revives a task the restart already settled.
+    for (const row of env.parts.claude.launched.slice(1)) row.finish({ ok: true, output: "late", exitCode: 0 });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    assert.equal(next.db.get(writing.id).state, "failed");
+    assert.equal(next.db.get(writing.id).reconciliation?.required, true);
+  } finally { for (const manager of restarted) manager.dispose(); env.cleanup(); }
+});
+
+test("T13.3 N-C 10/11: reconciliation is explicit; a retry is a linked task pinned to the same destination that waits for a fresh approval and can be cancelled", async () => {
+  const env = await t3Fixture(["codex", "claude"]);
+  try {
+    const fail = async (task: OrchTask, index: number) => {
+      env.tasks.approve(task.id);
+      await until(() => env.parts.claude.launched.length === index + 1, "launch");
+      env.parts.claude.launched[index].finish({ ok: false, output: "", error: "stream reset", exitCode: 1 });
+      await until(() => env.db.get(task.id).reconciliation?.required === true, "uncertain");
+    };
+    const original = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
+    await fail(original, 0);
+    assert.throws(() => env.tasks.reconcile(original.id, "replay", "workstation"), /retry or close/);
+    const done = env.tasks.submit({ prompt: RESEARCH, mode: "balanced", executionScope: { access: "read" } });
+    env.tasks.approve(done.id);
+    await until(() => env.parts.claude.launched.length === 2, "read launch");
+    env.parts.claude.launched[1].finish({ ok: true, output: "ok", exitCode: 0 });
+    await until(() => env.db.get(done.id).state === "completed", "completed");
+    assert.throws(() => env.tasks.reconcile(done.id, "retry", "workstation"), /no uncertain outcome/);
+
+    const { task, retry } = env.tasks.reconcile(original.id, "retry", "workstation");
+    assert.ok(retry);
+    assert.equal(task.state, "failed", "the original keeps its identity and history; a terminal task never reopens");
+    assert.deepEqual([task.reconciliation?.required, task.reconciliation?.resolution, task.reconciliation?.resolvedBy, task.reconciliation?.retryTaskId], [false, "retry", "workstation", retry.id]);
+    assert.equal(retry.state, "waiting_for_approval", "a fresh approval is required; the old approval is never reused");
+    assert.deepEqual([retry.provider, retry.routingMode], [env.db.get(original.id).provider, "manual"], "the destination stays pinned");
+    assert.deepEqual(retry.executionScope, original.executionScope);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(env.parts.claude.launched.length, 2, "nothing launched before the approval");
+    assert.throws(() => env.tasks.reconcile(original.id, "retry", "workstation"), /no uncertain outcome/, "one reconciliation per outcome");
+    env.tasks.approve(retry.id);
+    await until(() => env.parts.claude.launched.length === 3, "approved retry launches on the pinned provider");
+    assert.equal(env.parts.codex.launched.length, 0);
+    await env.tasks.stop(retry.id, "Owner cancelled the retry.");
+    await until(() => env.db.get(retry.id).state === "stopped", "cancellation still works");
+    assert.equal(env.db.get(retry.id).reconciliation, undefined, "a cancelled attempt is not an uncertain failure");
+
+    const closed = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
+    await fail(closed, 3);
+    const result = env.tasks.reconcile(closed.id, "close", "workstation");
+    assert.equal(result.retry, null);
+    assert.deepEqual([result.task.state, result.task.reconciliation?.resolution], ["failed", "close"]);
   } finally { env.cleanup(); }
 });

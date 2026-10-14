@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HostDatabase } from "../bunny-host/persistence.server.ts";
@@ -12,6 +12,7 @@ import type { AdapterHooks, AdapterResult, ProviderAdapter } from "../bunny-host
 import type { OrchTask, ProviderId, ProviderLive } from "../orch/types.ts";
 import { MissionManager } from "./manager.server.ts";
 import { classifyTaskFailure, retryVerdict } from "./machine.ts";
+import { missionCommand } from "./commands.server.ts";
 import { FilesystemCapability } from "./capabilities/local.server.ts";
 import { simulatedCodexProfile } from "../bunny-host/testing/codex.test.ts";
 
@@ -86,18 +87,18 @@ const until = async (check: () => boolean, label: string, timeout = 4000) => {
   const start = Date.now();
   while (!check()) { if (Date.now() - start > timeout) throw new Error(`Timed out waiting for ${label}`); await new Promise((r) => setTimeout(r, 10)); }
 };
-async function setup(providers: ProviderId[]) {
+async function setup(providers: ProviderId[], filesystem: FilesystemCapability = new FilesystemCapability()) {
   const dir = mkdtempSync(join(tmpdir(), "bunny-t13-3-sched-"));
   const root = join(dir, "project"); mkdirSync(root, { recursive: true });
   const db = new HostDatabase(join(dir, "host.sqlite"));
   const launched: Launched[] = [];
   const tasks = new TaskManager(db, root, providers.map((id) => fakeAdapter(id, launched)), { modelRegistry: new ModelCapabilityRegistry(db, { availableProviders: () => [] }) });
   await tasks.discover();
-  const missions = new MissionManager(tasks, { dataDirectory: dir, adapters: [new FilesystemCapability()] });
+  const missions = new MissionManager(tasks, { dataDirectory: dir, adapters: [filesystem] });
   missions.configure({ enabled: true }, "test");
   await missions.bus.refreshHealth();
   const cleanup = async () => { await missions.close(); try { db.close(); } catch { /* already closed */ } rmSync(dir, { recursive: true, force: true }); };
-  return { tasks, missions, launched, cleanup };
+  return { tasks, missions, launched, cleanup, root };
 }
 const model = (role: string, objective: string, dependsOn: number[] = [], extra: Record<string, unknown> = {}) => ({ role, objective, dependsOn, executor: { kind: "model" }, ...extra });
 
@@ -151,25 +152,36 @@ test("T13.3 F quota exhaustion in a write step pauses at the last verified step 
   } finally { await env.cleanup(); }
 });
 
-test("T13.3 N-B: a write step whose transport keeps failing pauses for the owner; the Mission never moves it to another provider", async () => {
+test("T13.3 N-C 3/10: a Mission write step never replays after an uncertain failure; it waits for the owner's reconciliation", async () => {
   const env = await setup(["claude", "codex"]);
   try {
     const view = env.missions.create({ objective: "Edit", mode: "balanced", origin: "workstation", steps: [model("Writer", "Edit file", [], { access: "write", maxRetries: 2 })] });
     env.missions.approve(view.id, "workstation");
     await until(() => env.launched.length === 1, "writer");
     const provider = env.launched[0].task.provider;
-    // Every attempt the Host makes fails on transport; it may retry the same candidate, then must pause.
-    for (let i = 0; env.missions.mission(view.id).state !== "waiting_for_user" && i < 6; i++) {
-      await until(() => env.launched.length > i || env.missions.mission(view.id).state === "waiting_for_user", `attempt ${i + 1}`);
-      if (env.launched.length > i) env.launched[i].finish({ ok: false, output: "", error: "stream reset: socket hang up" });
-      await new Promise((r) => setTimeout(r, 30));
-    }
+    const firstTask = env.launched[0].task.id;
+    // A plain crash after dispatch: the Mission's own retry budget (maxRetries 2) would have replayed it before N-C.
+    env.launched[0].finish({ ok: false, output: "", error: "provider crashed" });
     await until(() => env.missions.mission(view.id).state === "waiting_for_user", "paused for the owner");
     await new Promise((r) => setTimeout(r, 80));
-    assert.ok(env.launched.every((row) => row.task.provider === provider), `no provider switch: ${env.launched.map((row) => row.task.provider).join(", ")}`);
+    assert.equal(env.launched.length, 1, "no automatic replay on any provider");
     const [edited] = env.missions.store.steps(view.id);
-    assert.equal(edited.failure?.category, "provider_write_paused");
-    assert.match(edited.failure?.detail ?? "", /WRITE_PAUSE/);
+    assert.equal(edited.state, "failed");
+    assert.equal(edited.reconciliation?.required, true);
+    assert.equal(env.tasks.db.get(firstTask).reconciliation?.required, true, "the child task records it too");
+    // Ordinary Retry and a paired device cannot bypass it.
+    assert.throws(() => env.missions.retry(view.id, "workstation"), /OUTCOME_UNCERTAIN/);
+    await assert.rejects(missionCommand(env.missions, "mission.reconcile", { id: view.id, stepId: edited.id, resolution: "retry" }, { local: false, actor: "device:phone" }), /workstation/);
+    assert.equal(env.launched.length, 1);
+    // The owner reviewed the workspace and chose to retry: same Mission, same step, a fresh child task.
+    await missionCommand(env.missions, "mission.reconcile", { id: view.id, stepId: edited.id, resolution: "retry" }, { local: true, actor: "workstation" });
+    await until(() => env.launched.length === 2, "the reconciled retry");
+    assert.equal(env.launched[1].task.mission?.stepId, edited.id);
+    assert.notEqual(env.launched[1].task.id, firstTask);
+    assert.equal(env.missions.store.step(edited.id).reconciliation?.resolution, "retry");
+    assert.equal(env.launched[1].task.provider, provider);
+    env.launched[1].finish({ ok: true, output: "edited" });
+    await until(() => env.missions.mission(view.id).state === "completed", "completed after reconciliation");
   } finally { await env.cleanup(); }
 });
 
@@ -192,5 +204,48 @@ test("T13.3 F quota exhaustion in a read step still reroutes within bounds", asy
     assert.notEqual(env.launched[1].task.provider, firstProvider);
     env.launched[1].finish({ ok: true, output: "ok" });
     await until(() => env.missions.mission(view.id).state === "completed", "done");
+  } finally { await env.cleanup(); }
+});
+
+/** A real filesystem capability whose first write lands and then loses its connection (an uncertain outcome). */
+class LandsThenDrops extends FilesystemCapability {
+  calls = 0;
+  override async execute(...args: Parameters<FilesystemCapability["execute"]>) {
+    const result = await super.execute(...args);
+    if (args[0] === "filesystem.write" && this.calls++ === 0) throw new Error("connection reset after the write was sent");
+    return result;
+  }
+}
+const writeStep = (params: Record<string, unknown>) => ({ role: "Writer", objective: "write the file", dependsOn: [], maxRetries: 2, executor: { kind: "capability", action: "filesystem.write", params } });
+
+test("T13.3 N-C 7: a write with Host-enforced duplicate protection retries after an uncertain outcome and lands exactly once", async () => {
+  const flaky = new LandsThenDrops();
+  const env = await setup([], flaky);
+  try {
+    const view = env.missions.create({ objective: "Write once", mode: "fast", origin: "workstation", steps: [writeStep({ path: "out.txt", content: "hello", expectBeforeSha256: "absent" })] });
+    env.missions.approve(view.id, "workstation");
+    await until(() => ["completed", "failed", "waiting_for_user"].includes(env.missions.mission(view.id).state), "mission end", 20_000);
+    const [step] = env.missions.store.steps(view.id);
+    assert.equal(env.missions.mission(view.id).state, "completed", JSON.stringify(step.failure));
+    assert.equal(flaky.calls, 2, "one uncertain attempt, one guarded retry");
+    assert.equal(readFileSync(join(env.root, "out.txt"), "utf8"), "hello");
+    assert.equal(step.reconciliation, undefined, "the pre-image guard made the replay safe, so nothing waits for the owner");
+    assert.match(step.result?.summary ?? "", /Already applied/, "the retry detected the landed write instead of writing again");
+  } finally { await env.cleanup(); }
+});
+
+test("T13.3 N-C 8: a claim of idempotency the Host does not enforce is ignored; the uncertain write waits for the owner", async () => {
+  const flaky = new LandsThenDrops();
+  const env = await setup([], flaky);
+  try {
+    // No pre-image guard. The step says it is idempotent and carries a key; neither is a mechanism the Host enforces.
+    const view = env.missions.create({ objective: "Claimed idempotent", mode: "fast", origin: "workstation", steps: [writeStep({ path: "claimed.txt", content: "hello", overwrite: true, idempotent: true, idempotencyKey: "claimed-1" })] });
+    env.missions.approve(view.id, "workstation");
+    await until(() => ["completed", "failed", "waiting_for_user"].includes(env.missions.mission(view.id).state), "mission end", 20_000);
+    const [step] = env.missions.store.steps(view.id);
+    assert.equal(env.missions.mission(view.id).state, "waiting_for_user", JSON.stringify(step.failure));
+    assert.equal(flaky.calls, 1, "no replay");
+    assert.equal(step.reconciliation?.required, true);
+    assert.match(step.reconciliation?.reason ?? "", /OUTCOME_UNCERTAIN: filesystem.write started/);
   } finally { await env.cleanup(); }
 });

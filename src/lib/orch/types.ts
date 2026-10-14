@@ -197,6 +197,23 @@ export type TaskLog = { at: number; line: string };
  */
 export type ProviderExecutionScope = { access: "read" | "write" };
 
+/**
+ * M-A-3 T13.3 N-C: write work whose attempt may have started and then failed has an uncertain outcome. The Host never
+ * replays it automatically; the owner reconciles first (review what landed, then retry or close). Resolution is kept as
+ * history; a new uncertain failure replaces it.
+ */
+export type Reconciliation = {
+  required: boolean;
+  /** Why the outcome is uncertain (taxonomy-specific, shown to the owner). */
+  reason: string;
+  at: number;
+  resolution?: "retry" | "close" | "stop";
+  resolvedBy?: string;
+  resolvedAt?: number;
+  /** A direct task's retry is a new linked task (terminal tasks never reopen). */
+  retryTaskId?: string;
+};
+
 export type OrchTask = {
   connectionRoute?: import("../bunny-host/connections.ts").ApprovedRoute | null;
   proposedRoute?: import("../bunny-host/connections.ts").ApprovedRoute | null;
@@ -249,6 +266,8 @@ export type OrchTask = {
   /** Who launched it: a direct user approval or a mission-delegated approval under an authorization envelope. */
   approval?: { kind: "user" | "mission"; at: number; authorizationId?: string; missionId?: string; stepId?: string } | null;
   executionScope?: ProviderExecutionScope;
+  /** M-A-3 T13.3 N-C: set when a failed write attempt may have started; blocks every replay until reconciled. */
+  reconciliation?: Reconciliation;
   // M-A-3 T3 additions (additive): per-Task dynamic-model routing facts.
   /** The provider-native effort/reasoning level selected for THIS Task; null when the provider does not expose one. */
   effort?: string | null;

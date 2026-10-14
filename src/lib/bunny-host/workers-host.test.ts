@@ -367,3 +367,45 @@ test("T13.3 N1: pausing a Personal Agent holds its workers' child Missions", asy
     // Without the pause the same worker runs to VERIFIED within this window (first test); the N1 mutation check proves the gate holds it.
   });
 });
+
+test("T13.3 N-C 12: an interrupted write-capable worker is uncertain after a restart; all four Personal Agents keep their Mission context", async () => {
+  await withHost(43887, async (h, reboot) => {
+    // A Project whose tests run long enough to be interrupted by the restart.
+    const path = join(h.directory, "slow-project");
+    mkdirSync(path, { recursive: true });
+    writeFileSync(join(path, "package.json"), JSON.stringify({ name: "fixture", private: true, scripts: { test: 'node -e "setTimeout(()=>{},120000)"' } }));
+    const alpha = ok(await h.command("project.add", { name: "Slow site", path })).data.id as string;
+    const parents = [await delegate(h, 1, "Gada release", alpha), await delegate(h, 2, "Spear release", alpha), await delegate(h, 3, "Chakra release", alpha), await delegate(h, 4, "Sword release", alpha)];
+    const contextOf = async (target: Host) => (await target.state()).body.personalAgentContext.slots.map((row: Body) => ({ slot: row.slot, owned: row.owned.map((agent: Body) => [agent.agentId, agent.missionId]), name: row.profile?.name ?? row.name ?? null }));
+    const before = await contextOf(h);
+    assert.equal(before.length, 4);
+    for (const [index, parent] of parents.entries()) assert.ok(before[index].owned.some(([, missionId]: string[]) => missionId === parent), `slot ${index + 1} owns its Mission`);
+
+    const worker = ok(await h.command("worker.propose", { slot: 1, parentMissionId: parents[0], ability: "test", objective: "Run the slow tests", projectId: alpha })).data.worker as Body;
+    await approve(h, worker.childMissionId);
+    await until(async () => (await h.state()).body.missions.missions.find((m: Body) => m.id === worker.childMissionId)?.state === "running", "worker running");
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    h = await reboot();
+    const child = ok(await h.command("mission.get", { id: worker.childMissionId })).data.mission as Body;
+    const [step] = child.steps as Body[];
+    assert.equal(step.state, "failed");
+    assert.equal(step.failure.category, "host_restart");
+    assert.equal(step.reconciliation?.required, true, "the interrupted run may already have changed things");
+    assert.deepEqual(await contextOf(h), before, "every Personal Agent keeps its ownership and Mission context");
+
+    // Neither an ordinary Retry nor a phone can replay it; only the workstation's reconciliation does.
+    const retried = await h.command("mission.retry", { id: worker.childMissionId });
+    assert.equal(retried.status, 400);
+    assert.match(String(retried.body.error), /OUTCOME_UNCERTAIN/);
+    const phone = await h.pair("Phone");
+    const remote = await h.command("mission.reconcile", { id: worker.childMissionId, stepId: step.id, resolution: "retry" }, phone.token);
+    assert.equal(remote.body.code, "WORKSTATION_REQUIRED", JSON.stringify(remote.body));
+    const remoteTask = await h.command("task.reconcile", { id: "any", resolution: "retry" }, phone.token);
+    assert.notEqual(remoteTask.status, 200);
+    assert.equal(ok(await h.command("mission.get", { id: worker.childMissionId })).data.mission.steps[0].reconciliation.required, true, "the phone changed nothing");
+    const reconciled = ok(await h.command("mission.reconcile", { id: worker.childMissionId, stepId: step.id, resolution: "stop" }));
+    assert.equal(reconciled.mission.steps[0].reconciliation.resolution, "stop");
+    assert.deepEqual(await contextOf(h), before, "reconciliation changes no Personal Agent's context");
+  });
+});

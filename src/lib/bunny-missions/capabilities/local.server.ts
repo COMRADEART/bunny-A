@@ -110,6 +110,13 @@ export class FilesystemCapability implements CapabilityAdapter {
       if (content === null) throw new Error('Parameter "content" is required.');
       if (Buffer.byteLength(content) > READ_LIMIT) return fail("Write exceeds the bounded text size.");
       const existed = existsSync(path);
+      // M-A-3 T13.3 N-C: enforced duplicate protection. Under a pre-image guard, a file that already holds exactly this
+      // content is an earlier attempt's landed write: it is reported as applied and never written a second time.
+      if (typeof params.expectBeforeSha256 === "string" && existed && statSync(path).isFile() && statSync(path).size <= READ_LIMIT) {
+        const current = sha256(readFileSync(path));
+        if (current === sha256(content))
+          return ok(`Already applied: ${path} holds exactly this content; the pre-image guard prevented a second write.`, { path, bytes: Buffer.byteLength(content), created: false, sha256: current, beforeSha256: current, deduplicated: true }, [`${path} already holds the intended content (sha256 ${current}); nothing was written again`], { before: { sha256: current }, after: { sha256: current } });
+      }
       if (existed && params.overwrite !== true) return fail(`${path} already exists; overwrite was not requested.`);
       if (existed && statSync(path).isDirectory()) return fail(`${path} is a folder.`);
       if (existed && statSync(path).size > READ_LIMIT) return fail("Existing file exceeds the bounded text size.");

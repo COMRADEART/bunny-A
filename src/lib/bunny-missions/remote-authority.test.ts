@@ -241,8 +241,14 @@ test("F01-5: Retry never reuses a denied shell approval, and a spent grant never
     await env.missions.respond(ask.id, "allow_once", "workstation");
     await until(() => env.launched.length === 1, "single desktop-approved session");
     env.launched[0].finish({ ok: false, output: "", error: "provider crashed" });
+    // T13.3 N-C (owner decision 2026-10-14): a write session that crashed after dispatch is no longer retried
+    // automatically; it waits for reconciliation. The F01 property is kept on the reconciled retry instead.
+    await until(() => env.missions.store.steps(spent.id)[0].reconciliation?.required === true, "uncertain outcome recorded");
+    await settle();
+    assert.equal(env.launched.length, 1, "no automatic replay");
+    await env.missions.reconcile(spent.id, env.missions.store.steps(spent.id)[0].id, "retry", "workstation");
     const retry = await waitAsk(env, spent.id, "provider.execute");
-    assert.notEqual(retry.id, ask.id, "the automatic retry asks for fresh desktop authority");
+    assert.notEqual(retry.id, ask.id, "the reconciled retry asks for fresh desktop authority");
     await settle();
     assert.equal(env.launched.length, 1, "no second shell session from the spent grant");
   } finally { await env.cleanup(); }
