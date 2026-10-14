@@ -55,11 +55,16 @@ export type HostSnapshot = {
   personalAgents?: import("./personal-agents.ts").PersonalAgentsSnapshot;
   /** M-A-3 T13.1 Laya/Jev intelligence state (no secrets; credential existence only). Absent for paired devices. */
   intelligence?: import("./intelligence-snapshot.ts").IntelligenceSnapshot;
+  connections?: import("./connections.server.ts").ConnectionsSnapshot;
+  deviceConnections?: import("./connections.ts").DeviceConnectionView[];
 };
 /** `routingPrompt` and `modelOverride` are set in-process by the caller that knows the selection context; HTTP validates both. */
 export type SubmitTask = { prompt: string; routingPrompt?: string; mode: Mode; projectId?: string | null; override?: ProviderId | "auto"; /** M-A-3 T3 §27: MANUAL exact-model selection; only honored where a real model surface exists. */ modelOverride?: string | null; constraints?: TaskConstraints; verify?: VerifySpec | null; executionScope?: ProviderExecutionScope; /** M-A-3 T13.1: Host-owned decision assistance (advisory only); never accepted from HTTP bodies. */ decisionAssistance?: import("./intelligence.ts").DecisionAdvice | null };
 export type AdapterResult = { ok: boolean; output: string; error?: string; stopped?: boolean; exitCode?: number | null };
 export type AdapterHooks = {
+  beforeDispatch?: () => Promise<void>;
+  childEnvironment?: () => Record<string, string>;
+  billingSource?: (source: string) => void;
   event: (type: string, detail: string) => void;
   session: (sessionId: string | null, pid: number | null) => void;
   output: (text: string) => void;
@@ -103,6 +108,8 @@ export type RunningSession = {
  * task) live on the Host's TaskManager because the Host, not the adapter, owns sessions.
  */
 export interface ProviderAdapter {
+  /** Transient provider status identity, consumed only by the Host registry; never serialized. */
+  connectionIdentity?(): import("./connections.server.ts").NativeAccount | null;
   id: ProviderId;
   /** Full probe: locate, version, authentication, catalogue. Spawns CLIs, so the registry runs it sparingly. */
   detect(): Promise<ProviderLive>;

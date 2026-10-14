@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
   commandBunnyHost,
+  clearStaleLocalPairing,
   readBunnyHost,
   type HostCommandOk,
   type HostCommandResult,
@@ -29,6 +30,12 @@ import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
 import type { PersonalAgentsSnapshot } from "@/lib/bunny-host/personal-agents";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
+import {
+  parseAccountIntent,
+  type CatalogId,
+  type DeviceConnectionView,
+} from "@/lib/bunny-host/connections";
+import type { ConnectionsSnapshot } from "@/lib/bunny-host/connections.server";
 import type { JevPolicy } from "@/lib/bunny-host/intelligence";
 import { deepLinkFromSearch, type ShellSheet } from "@/components/island/nav-model";
 import type { VoiceMode, VoiceSnapshot } from "@/lib/bunny-host/voice/voice-protocol";
@@ -165,10 +172,17 @@ type Island = Preferences & {
   pairDevice: (code: string, name: string) => Promise<boolean>;
   /** Sign this device out: it revokes its own credential on the Host and clears its cookie. */
   signOutDevice: () => Promise<void>;
+  clearStalePairing: () => Promise<void>;
   performance: PerformanceProfile[];
   remoteConfigured: boolean;
   remoteUrl: string | null;
-  devices: { id: string; name: string; createdAt: number; expiresAt?: number; lastSeenAt?: number | null }[];
+  devices: {
+    id: string;
+    name: string;
+    createdAt: number;
+    expiresAt?: number;
+    lastSeenAt?: number | null;
+  }[];
   revokeDevice: (id: string) => void;
   pairCode: string | null;
   localOnly: boolean;
@@ -218,7 +232,13 @@ type Island = Preferences & {
   /** M-A-3 T11: the Coordinator approves the reviewed team plan by its exact reference, or asks the Planner to revise it. */
   approveTeamPlan: (coordinatorId: string, planReference: string | null) => Promise<void>;
   reviseTeamPlan: (coordinatorId: string, note: string) => Promise<void>;
-  createTeam: (input: { objective: string; name?: string; projectId?: string | null; requirements: unknown[]; outputDir?: string }) => Promise<void>;
+  createTeam: (input: {
+    objective: string;
+    name?: string;
+    projectId?: string | null;
+    requirements: unknown[];
+    outputDir?: string;
+  }) => Promise<void>;
   agentAuthorization: (
     id: string,
     action: "propose" | "approve" | "adjust" | "deny" | "revoke",
@@ -232,7 +252,9 @@ type Island = Preferences & {
   ) => Promise<void>;
   retryMission: (id: string) => Promise<void>;
   /** M-A-3 T9R-F02: workstation-only full view of a staged paired-device change (recorded by the Host as inspected). */
-  inspectStaged: (stagingId: string) => Promise<{ content: string; sha256: string; bytes: number } | null>;
+  inspectStaged: (
+    stagingId: string,
+  ) => Promise<{ content: string; sha256: string; bytes: number } | null>;
   respondMission: (
     requestId: string,
     decision: "allow_once" | "allow_batch" | "deny",
@@ -255,14 +277,28 @@ type Island = Preferences & {
   ) => Promise<boolean>;
   /** M-A-3 T13.1 Laya and TypeSafe Jev state (workstation only; null on paired devices and older Hosts). */
   intelligence: IntelligenceSnapshot | null;
+  connections: ConnectionsSnapshot | null;
+  deviceConnections: DeviceConnectionView[];
+  accountFocus: CatalogId | null;
+  connectionCommand: (
+    action: string,
+    data: Record<string, unknown>,
+    onRefused?: (caption: string) => void,
+  ) => Promise<boolean>;
   /**
    * M-A-3 T13.1 AI & Models settings. Each resolves true only on the Host's acknowledgment. The API key is passed
    * straight to the Host command and never stored in this store, preferences or any browser storage.
    */
-  configureIntelligence: (policy: JevPolicy, onRefused?: (caption: string) => void) => Promise<boolean>;
+  configureIntelligence: (
+    policy: JevPolicy,
+    onRefused?: (caption: string) => void,
+  ) => Promise<boolean>;
   saveIntelligenceKey: (apiKey: string, onRefused?: (caption: string) => void) => Promise<boolean>;
   removeIntelligenceKey: (onRefused?: (caption: string) => void) => Promise<boolean>;
-  testIntelligence: (decisionTest: boolean, onRefused?: (caption: string) => void) => Promise<boolean>;
+  testIntelligence: (
+    decisionTest: boolean,
+    onRefused?: (caption: string) => void,
+  ) => Promise<boolean>;
   configureLaya: (enabled: boolean, onRefused?: (caption: string) => void) => Promise<boolean>;
   benchmarkLaya: (model: string, onRefused?: (caption: string) => void) => Promise<boolean>;
   configureMissions: (patch: { enabled?: boolean; triggersEnabled?: boolean }) => void;
@@ -390,7 +426,9 @@ export const COMMAND_TIMEOUT_MS = 50_000;
 const PIN_KEY = "bunny-a.remote-host.v1";
 function loadPin(): string | null {
   try {
-    const value = JSON.parse(localStorage.getItem(PIN_KEY) ?? "null") as { hostId?: unknown } | null;
+    const value = JSON.parse(localStorage.getItem(PIN_KEY) ?? "null") as {
+      hostId?: unknown;
+    } | null;
     return typeof value?.hostId === "string" ? value.hostId : null;
   } catch {
     return null;
@@ -420,7 +458,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 function newOperationId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+    return crypto.randomUUID();
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -429,7 +468,11 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Android Chrome throws for the page Notification constructor; a notification never breaks Host truth. */
 function notify(body: string, tag: string) {
   try {
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted")
+    if (
+      typeof window !== "undefined" &&
+      "Notification" in window &&
+      Notification.permission === "granted"
+    )
       new Notification("Bunny-A", { body, tag });
   } catch {
     /* Unsupported constructor (mobile): the in-app attention badge still shows it. */
@@ -465,7 +508,8 @@ export const useIsland = create<Island>((set, get) => {
     set({ voice: next, voiceSupported: true, voiceNotice: null });
     const plan = planUiIntent(next.uiIntent, voiceSeen, next.hostEpoch ?? "");
     voiceSeen = plan.seen;
-    if (plan.target) set({ sheet: plan.target.sheet, agentFocus: plan.target.agentFocus ?? get().agentFocus });
+    if (plan.target)
+      set({ sheet: plan.target.sheet, agentFocus: plan.target.agentFocus ?? get().agentFocus });
     if (next.open) ensureVoicePolling();
     else {
       stopVoicePolling();
@@ -484,9 +528,11 @@ export const useIsland = create<Island>((set, get) => {
         await runPress(pressOpened(press, !!get().voice?.open));
       } else if (effect.type === "listen_start") {
         ensureVoicePolling();
+        // prettier-ignore
         const { snapshot, outcome } = await voiceCallOutcome("voice.listen.start", pressListenPayload());
         // The release is bound to the turn this start was answered with, never to an earlier snapshot.
         pressTurn = snapshot?.turnId ?? null;
+        // prettier-ignore
         const started: StartOutcome = snapshot ? "started" : outcome === "refused" ? "refused" : "unknown";
         await runPress(pressStarted(press, started));
       } else {
@@ -500,8 +546,10 @@ export const useIsland = create<Island>((set, get) => {
       }
     }
   };
-  const voiceCall = async (action: string, data: Record<string, unknown> = {}): Promise<VoiceSnapshot | null> =>
-    (await voiceCallOutcome(action, data)).snapshot;
+  const voiceCall = async (
+    action: string,
+    data: Record<string, unknown> = {},
+  ): Promise<VoiceSnapshot | null> => (await voiceCallOutcome(action, data)).snapshot;
   /** A transport failure or timeout is "unknown": the Host may have acted. A Host answer that is not ok is "refused". */
   const voiceCallOutcome = async (
     action: string,
@@ -531,10 +579,18 @@ export const useIsland = create<Island>((set, get) => {
     // A voice reply is protected Host state too. An old principal/process must not restore it after sign-out,
     // revocation or a Host switch, or restart push-to-talk effects using the old request's answer.
     const current = get();
-    if (!voiceReplyCurrent({ generation, connection: admitted.connection.state, instanceId, hostId, hostEpoch }, {
-      generation: accessGeneration, connection: current.connection.state, instanceId: current.hostInstanceId,
-      hostId: current.hostIdentity?.hostId, hostEpoch: current.hostIdentity?.epoch,
-    }))
+    if (
+      !voiceReplyCurrent(
+        { generation, connection: admitted.connection.state, instanceId, hostId, hostEpoch },
+        {
+          generation: accessGeneration,
+          connection: current.connection.state,
+          instanceId: current.hostInstanceId,
+          hostId: current.hostIdentity?.hostId,
+          hostEpoch: current.hostIdentity?.epoch,
+        },
+      )
+    )
       return { snapshot: null, outcome: "unknown" };
     if (result.ok) {
       const next = parseVoiceSnapshot(result.data);
@@ -592,7 +648,12 @@ export const useIsland = create<Island>((set, get) => {
         void refreshVoice();
       }
     });
-  const apply = (snapshot: HostSnapshot, after = 0, order = ++requestOrder, generation = accessGeneration) => {
+  const apply = (
+    snapshot: HostSnapshot,
+    after = 0,
+    order = ++requestOrder,
+    generation = accessGeneration,
+  ) => {
     const state = get();
     // A response admitted before sign-out/revocation cannot repopulate a cleared protected view.
     if (generation !== accessGeneration || state.connection.state === "pairing") return;
@@ -618,7 +679,8 @@ export const useIsland = create<Island>((set, get) => {
       pinned = identity.hostId;
       savePin(pinned);
     }
-    const hostChanged = viewer?.kind === "device" && !!identity && !!pinned && identity.hostId !== pinned;
+    const hostChanged =
+      viewer?.kind === "device" && !!identity && !!pinned && identity.hostId !== pinned;
     set({ hostIdentity: identity, viewer, pinnedHostId: pinned });
     get().connectionEvent({ type: "read-ok", at: Date.now(), hostChanged });
     const ollama = snapshot.providers.find((p) => p.id === "ollama");
@@ -657,6 +719,8 @@ export const useIsland = create<Island>((set, get) => {
       agents: snapshot.agents ?? null,
       personalAgents: snapshot.personalAgents ?? null,
       intelligence: snapshot.intelligence ?? null,
+      connections: snapshot.connections ?? null,
+      deviceConnections: snapshot.deviceConnections ?? [],
       providerUsage: snapshot.providerUsage ?? null,
       modelCapabilities: snapshot.modelCapabilities ?? null,
       cpuWarn: snapshot.thermal?.cpuWarn ?? 90,
@@ -714,6 +778,8 @@ export const useIsland = create<Island>((set, get) => {
       agents: null,
       personalAgents: null,
       intelligence: null,
+      connections: null,
+      deviceConnections: [],
       voice: null,
       voiceReceivedAt: 0,
       voicePressing: false,
@@ -763,24 +829,27 @@ export const useIsland = create<Island>((set, get) => {
       set({ uncertain: [...get().uncertain, row] });
     get().note(commandCaption({ code: "OUTCOME_UNKNOWN", message: "", outcome: "unknown" }));
     try {
-    for (let attempt = 1; attempt <= 6; attempt++) {
-      if (!get().uncertain.some((item) => item.operationId === row.operationId)) return;
-      await get().refreshOllama();
-      const current = get();
-      if (current.connection.state === "pairing") return forget(row.operationId, "This device must pair again.");
-      if (current.host === "online" && current.connection.state !== "host-changed") {
-        const sameEpoch = !!row.epoch && current.hostIdentity?.epoch === row.epoch;
-        if (!sameEpoch) return forget(row.operationId, reconcileCaption("unknown", false));
-        const status = await command("operation.status", { operationId: row.operationId });
-        const data = status?.data as { state?: string; error?: string | null } | undefined;
-        if (data?.state && data.state !== "in_progress")
-          return forget(row.operationId, reconcileCaption(data.state, true, data.error));
+      for (let attempt = 1; attempt <= 6; attempt++) {
+        if (!get().uncertain.some((item) => item.operationId === row.operationId)) return;
+        await get().refreshOllama();
+        const current = get();
+        if (current.connection.state === "pairing")
+          return forget(row.operationId, "This device must pair again.");
+        if (current.host === "online" && current.connection.state !== "host-changed") {
+          const sameEpoch = !!row.epoch && current.hostIdentity?.epoch === row.epoch;
+          if (!sameEpoch) return forget(row.operationId, reconcileCaption("unknown", false));
+          const status = await command("operation.status", { operationId: row.operationId });
+          const data = status?.data as { state?: string; error?: string | null } | undefined;
+          if (data?.state && data.state !== "in_progress")
+            return forget(row.operationId, reconcileCaption(data.state, true, data.error));
+        }
+        await sleep(backoffMs(attempt));
       }
-      await sleep(backoffMs(attempt));
-    }
-    // An in-progress or unreachable operation remains uncertain. A later successful refresh checks again;
-    // elapsed time is never authority to unlock a conflicting control.
-    get().note("The Host has not confirmed this action yet. Controls stay paused while it is checked.");
+      // An in-progress or unreachable operation remains uncertain. A later successful refresh checks again;
+      // elapsed time is never authority to unlock a conflicting control.
+      get().note(
+        "The Host has not confirmed this action yet. Controls stay paused while it is checked.",
+      );
     } finally {
       reconciling.delete(row.operationId);
     }
@@ -807,21 +876,30 @@ export const useIsland = create<Island>((set, get) => {
       else before.note(caption);
       return null;
     }
-    if (targetId && (before.pending[targetId] || before.uncertain.some((row) => row.targetId === targetId))) {
+    if (
+      targetId &&
+      (before.pending[targetId] || before.uncertain.some((row) => row.targetId === targetId))
+    ) {
       before.note("Bunny is still confirming the previous action on this item.");
       return null;
     }
     const operationId = mutating ? newOperationId() : undefined;
     const generation = accessGeneration;
     const identity = before.hostIdentity;
-    const expect = mutating && identity ? { hostId: identity.hostId, epoch: identity.epoch } : undefined;
+    const expect =
+      mutating && identity ? { hostId: identity.hostId, epoch: identity.epoch } : undefined;
     if (targetId) set({ pending: { ...get().pending, [targetId]: action } });
     const order = ++requestOrder;
     let result: HostCommandResult;
     try {
       result = await withTimeout(
         commandBunnyHost({
-          data: { action, data, ...(operationId ? { operationId } : {}), ...(expect ? { expect } : {}) },
+          data: {
+            action,
+            data,
+            ...(operationId ? { operationId } : {}),
+            ...(expect ? { expect } : {}),
+          },
         }),
         COMMAND_TIMEOUT_MS,
       );
@@ -851,21 +929,35 @@ export const useIsland = create<Island>((set, get) => {
       return null;
     }
     if (result.outcome === "unknown" && operationId) {
-      void reconcile({ operationId, action, targetId, since: Date.now(), epoch: identity?.epoch ?? null });
+      void reconcile({
+        operationId,
+        action,
+        targetId,
+        since: Date.now(),
+        epoch: identity?.epoch ?? null,
+      });
       return null;
     }
     const caption = commandCaption(result);
     if (onRefused) onRefused(caption);
     else get().note(caption);
-    if (result.code === "HOST_EPOCH_CHANGED" || result.code === "HOST_IDENTITY_CHANGED") void get().refreshOllama();
+    if (result.code === "HOST_EPOCH_CHANGED" || result.code === "HOST_IDENTITY_CHANGED")
+      void get().refreshOllama();
     return null;
   };
   const agentRevision = (id: string) =>
     get().agents?.agents.find((agent) => agent.id === id)?.authorization?.revision;
   const requestTarget = (requestId: string) =>
-    get().agents?.agents.find((agent) => agent.authorization?.pending.some((item) => item.id === requestId) ||
-      get().missions?.missions.find((mission) => mission.id === agent.missionId)?.requests.some((request) => request.id === requestId))?.id ??
-    get().missions?.missions.find((mission) => mission.requests.some((request) => request.id === requestId))?.id ??
+    get().agents?.agents.find(
+      (agent) =>
+        agent.authorization?.pending.some((item) => item.id === requestId) ||
+        get()
+          .missions?.missions.find((mission) => mission.id === agent.missionId)
+          ?.requests.some((request) => request.id === requestId),
+    )?.id ??
+    get().missions?.missions.find((mission) =>
+      mission.requests.some((request) => request.id === requestId),
+    )?.id ??
     requestId;
   return {
     voice: null,
@@ -995,9 +1087,14 @@ export const useIsland = create<Island>((set, get) => {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ code: code.trim(), name: name.trim() || "Phone" }),
         });
-        const result = (await response.json().catch(() => ({}))) as { error?: string; hostId?: string | null };
+        const result = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          hostId?: string | null;
+        };
         if (!response.ok) {
-          get().note(result.error ?? "Pairing failed. Check the one-time code on your workstation.");
+          get().note(
+            result.error ?? "Pairing failed. Check the one-time code on your workstation.",
+          );
           return false;
         }
         if (result.hostId) {
@@ -1017,7 +1114,26 @@ export const useIsland = create<Island>((set, get) => {
     signOutDevice: async () => {
       try {
         const response = await fetch("/api/bunny-pair", { method: "DELETE" });
-        const result = (await response.json().catch(() => ({}))) as { revoked?: boolean; hostUnreachable?: boolean };
+        if (!response.ok) {
+          get().note("Sign out was refused. This browser's pairing has not changed.");
+          return;
+        }
+        const result = (await response.json().catch(() => ({}))) as {
+          signedOut?: boolean;
+          revoked?: boolean;
+          hostUnreachable?: boolean;
+          localPairingCleared?: boolean;
+        };
+        if (!result.signedOut) {
+          get().note("Sign out was not confirmed. This browser pairing has not changed.");
+          return;
+        }
+        if (result.localPairingCleared) {
+          savePin(null);
+          set({ pinnedHostId: null });
+          window.location.reload();
+          return;
+        }
         get().note(
           result.revoked
             ? "This phone is signed out and its access was revoked on the Host."
@@ -1027,10 +1143,27 @@ export const useIsland = create<Island>((set, get) => {
         );
       } catch {
         get().note("Sign out could not reach the Host. Revoke this device from your workstation.");
+        return;
       }
       savePin(null);
       set({ pinnedHostId: null });
       enterPairing("PAIRING_REQUIRED");
+    },
+    clearStalePairing: async () => {
+      try {
+        const result = await clearStaleLocalPairing();
+        if (!result.cleared) {
+          get().note(
+            "Pairing recovery is available only on the workstation with a stale browser pairing.",
+          );
+          return;
+        }
+        savePin(null);
+        set({ pinnedHostId: null });
+        window.location.reload();
+      } catch {
+        get().note("Browser pairing recovery was refused. No pairing was changed.");
+      }
     },
     performance: [],
     remoteConfigured: false,
@@ -1042,6 +1175,11 @@ export const useIsland = create<Island>((set, get) => {
     agents: null,
     personalAgents: null,
     intelligence: null,
+    connections: null,
+    deviceConnections: [],
+    accountFocus: null,
+    connectionCommand: async (action, data, onRefused) =>
+      (await command(action, data, "accounts", onRefused)) !== null,
     providerUsage: null,
     modelCapabilities: null,
     hostHealth: null,
@@ -1070,11 +1208,22 @@ export const useIsland = create<Island>((set, get) => {
       await command("agent.team.approve", { id, ...(planReference ? { planReference } : {}) }, id);
     },
     reviseTeamPlan: async (id, note) => {
-      await command("agent.team.revise", { id, ...(note.trim() ? { note: note.trim().slice(0, 600) } : {}) }, id);
+      await command(
+        "agent.team.revise",
+        { id, ...(note.trim() ? { note: note.trim().slice(0, 600) } : {}) },
+        id,
+      );
     },
     createTeam: async (input) => {
-      await command("agent.create", { objective: input.objective, ...(input.name ? { name: input.name } : {}), ...(input.projectId ? { projectId: input.projectId } : {}),
-        team: { requirements: input.requirements, ...(input.outputDir ? { outputDir: input.outputDir } : {}) } });
+      await command("agent.create", {
+        objective: input.objective,
+        ...(input.name ? { name: input.name } : {}),
+        ...(input.projectId ? { projectId: input.projectId } : {}),
+        team: {
+          requirements: input.requirements,
+          ...(input.outputDir ? { outputDir: input.outputDir } : {}),
+        },
+      });
     },
     agentAuthorization: async (id, action, revision, patch) => {
       await command(
@@ -1095,8 +1244,12 @@ export const useIsland = create<Island>((set, get) => {
     },
     inspectStaged: async (stagingId) => {
       const result = await command("mission.staging.inspect", { stagingId }, stagingId);
-      const data = result?.data as { content?: unknown; sha256?: unknown; bytes?: unknown } | undefined;
-      return data && typeof data.content === "string" && typeof data.sha256 === "string" && typeof data.bytes === "number"
+      const data = result?.data as
+        { content?: unknown; sha256?: unknown; bytes?: unknown } | undefined;
+      return data &&
+        typeof data.content === "string" &&
+        typeof data.sha256 === "string" &&
+        typeof data.bytes === "number"
         ? { content: data.content, sha256: data.sha256, bytes: data.bytes }
         : null;
     },
@@ -1113,17 +1266,28 @@ export const useIsland = create<Island>((set, get) => {
     },
     configurePersonalAgents: async (slots, expectRevision, onRefused) => {
       // The Host re-validates every slot and refuses a stale revision; a success is only what the Host acknowledged.
-      const result = await command("personal_agents.configure", { slots, expectRevision }, null, onRefused);
+      const result = await command(
+        "personal_agents.configure",
+        { slots, expectRevision },
+        null,
+        onRefused,
+      );
       return result !== null;
     },
     configureIntelligence: async (policy, onRefused) =>
       (await command("intelligence.configure", { policy }, "intelligence", onRefused)) !== null,
     saveIntelligenceKey: async (apiKey, onRefused) =>
-      (await command("intelligence.credential.save", { apiKey }, "intelligence", onRefused)) !== null,
+      (await command("intelligence.credential.save", { apiKey }, "intelligence", onRefused)) !==
+      null,
     removeIntelligenceKey: async (onRefused) =>
       (await command("intelligence.credential.remove", {}, "intelligence", onRefused)) !== null,
     testIntelligence: async (decisionTest, onRefused) =>
-      (await command("intelligence.test", decisionTest ? { decisionTest: true, confirmBillable: true } : {}, "intelligence", onRefused)) !== null,
+      (await command(
+        "intelligence.test",
+        decisionTest ? { decisionTest: true, confirmBillable: true } : {},
+        "intelligence",
+        onRefused,
+      )) !== null,
     configureLaya: async (enabled, onRefused) =>
       (await command("intelligence.laya.configure", { enabled }, "laya", onRefused)) !== null,
     benchmarkLaya: async (model, onRefused) =>
@@ -1187,7 +1351,10 @@ export const useIsland = create<Island>((set, get) => {
           const resync = needsCanonicalResync(get().hostInstanceId, read.snapshot, after);
           apply(read.snapshot, after, order, generation);
           if (resync) {
-            const canonical = await withTimeout(readBunnyHost({ data: { after: 0 } }), READ_TIMEOUT_MS);
+            const canonical = await withTimeout(
+              readBunnyHost({ data: { after: 0 } }),
+              READ_TIMEOUT_MS,
+            );
             if (generation !== accessGeneration) return;
             if (canonical.ok) apply(canonical.snapshot, 0, ++requestOrder, generation);
             else failRead(canonical);
@@ -1198,7 +1365,8 @@ export const useIsland = create<Island>((set, get) => {
       })().finally(() => {
         if (refreshing === refreshJob) refreshing = null;
         if (generation === accessGeneration && get().canAct())
-          for (const row of get().uncertain) if (!reconciling.has(row.operationId)) void reconcile(row);
+          for (const row of get().uncertain)
+            if (!reconciling.has(row.operationId)) void reconcile(row);
       });
       refreshing = refreshJob;
       return refreshing;
@@ -1264,6 +1432,16 @@ export const useIsland = create<Island>((set, get) => {
     submit: () => {
       const { prompt, mode, projectId, autoRoute, override, localOnly } = get();
       if (!prompt.trim() || get().submitting) return;
+      const accountIntent = parseAccountIntent(prompt);
+      if (accountIntent) {
+        set({ sheet: "settings", accountFocus: accountIntent.catalog, prompt: "" });
+        get().note(
+          get().viewer?.kind === "device"
+            ? "Manage AI accounts on your Windows PC."
+            : "Opened AI account settings. Complete sign-in with the provider; Bunny never asks for passwords.",
+        );
+        return;
+      }
       if (get().host !== "online") {
         get().note(
           get().pairingRequired

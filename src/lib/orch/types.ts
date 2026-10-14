@@ -198,6 +198,8 @@ export type TaskLog = { at: number; line: string };
 export type ProviderExecutionScope = { access: "read" | "write" };
 
 export type OrchTask = {
+  connectionRoute?: import("../bunny-host/connections.ts").ApprovedRoute | null;
+  proposedRoute?: import("../bunny-host/connections.ts").ApprovedRoute | null;
   id: string;
   title: string;
   prompt: string;

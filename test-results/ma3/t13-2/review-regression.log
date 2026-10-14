@@ -1,0 +1,168 @@
+Bunny-A Host ready on loopback (ce4dfd45-ddeb-4753-aca0-b74b318caa53).
+✔ T13.2 A07/A08 [SIMULATED] real Host denies every phone credential and provider authorization operation (2285.2063ms)
+Bunny-A Host ready on loopback (b9b3c2fd-da8f-49d7-be06-5b67d53d19c3).
+✔ T13.2 A10/R05/R08 [SIMULATED] Host disconnect cancels active work and refuses queued approvals (1629.1271ms)
+Bunny-A Host ready on loopback (54599d4a-4a24-45ed-8195-2e4720520701).
+✔ T13.2 R07 [SIMULATED] forged advice and routes in actual HTTP submit cannot authorize a provider switch (1653.898ms)
+Bunny-A Host ready on loopback (7d7b8ab9-63f5-47c5-8f8e-36da56d9db27).
+✔ T13.2 R02/R10 [SIMULATED] metadata key check cannot confer inference rights or trigger native sign-in (2012.7152ms)
+✔ K01 [SIMULATED] no API key: a Task routes and runs locally; no TypeSafe request is made (334.6135ms)
+✔ K02 [SIMULATED] hosted decisions disabled (default): a saved key still yields zero decision calls (327.554ms)
+✔ K03 [SIMULATED] a saved key is never in settings JSON or plaintext anywhere in the database file (145.6061ms)
+✔ K03 [LIVE] Windows DPAPI protects the key for this user; ciphertext holds no plaintext (818.5489ms)
+✔ K04 [SIMULATED] the saved secret is absent from every snapshot the Host serves (273.7084ms)
+✔ K07 [STATIC] only the Host's TypeSafe adapter and manager can reach credential storage; no Agent, Mission or voice module imports it (121.0695ms)
+✔ K08 [SIMULATED] an invalid key is refused locally with an accurate message; a rejected key reads as AUTH_FAILED (156.3578ms)
+✔ K09 [SIMULATED] key rotation: only the new key is sent after a replace (174.5768ms)
+✔ K10 [SIMULATED] removing the key blocks every later call (152.4969ms)
+✔ K11 [SIMULATED] 401/403 from a revoked account pause hosted decisions until the key is replaced (342.4053ms)
+✔ K12 [SIMULATED] 429 never causes an unbounded retry: discovery retries once, decisions never, then a cooldown (1193.4664ms)
+✔ K13 [SIMULATED] a provider timeout falls back to the Local Decision Policy and records unknown usage (1347.6607ms)
+✔ K14 [SIMULATED] redirects are refused and the credential is never forwarded (150.8489ms)
+✔ K15 [SIMULATED] journal, usage rows, errors and diagnostics never contain the key (790.9059ms)
+✔ K16 [SIMULATED] a Host restart exposes no raw credential and never resurrects Connected (337.3805ms)
+✔ K17 [SIMULATED] a connection test does not claim inference; only the explicit decision test does (161.7168ms)
+✔ K18 [SIMULATED] billing controls block requests at the configured request, token and spending limits (611.7588ms)
+✔ K19 [SIMULATED] unknown usage fails closed under strict ceilings (299.6969ms)
+✔ K20 [SIMULATED] ordinary settings changes and snapshot reads make no API call (409.5376ms)
+✔ R01 [SIMULATED] Laya absent: Missing, no models, nothing fabricated; offline runtime reads Offline (259.6199ms)
+✔ R02 [SIMULATED] Laya present: capabilities come from the runtime's own probe; unprobed facts stay unknown (241.2197ms)
+✔ R03 [SIMULATED] an unsupported task class never routes to Laya, even after other classes pass (338.7329ms)
+✔ R04 [SIMULATED] performance is claimed only from a recorded local benchmark (276.178ms)
+✔ R04b [SIMULATED] a benchmark counts only for the exact build it measured; no digest, no benchmark (362.6563ms)
+✔ R05 [SIMULATED] a recommendation outside the eligible set is rejected and the router choice stands (534.2215ms)
+✔ R06 [SIMULATED] advice can never move work to a tool-capable or hosted provider the route did not already have (0.2548ms)
+✔ R07 [SIMULATED] accepted advice cannot override Host permissions: approval is still required and constraints hold (294.0562ms)
+✔ R08 [SIMULATED] advice cannot enable shell execution: response extras are dropped and no command field exists (294.744ms)
+✔ R09 [SIMULATED] advice cannot authorize filesystem mutation: scope, folder and verification are unchanged (293.8075ms)
+✔ R10 [SIMULATED] hosted decisions receive metadata only: no prompt text, Project path or file content by default (245.489ms)
+✔ R11 [SIMULATED] a TypeSafe outage preserves local conversation end to end (622.9939ms)
+✔ R12 [SIMULATED] cancellation and policy changes reject stale decisions (157.0596ms)
+✔ R13 [SIMULATED] Personal Agent identity never changes with routing (297.0097ms)
+✔ R14 [SIMULATED] Mission-delegated (internal Agent) Tasks never take hosted advice (317.6ms)
+✔ R15 [STATIC] voice and Mission cancellation stay separate from hosted decisions (7.547ms)
+✔ R16 [SIMULATED] untrusted Project text cannot rewrite decision policy (277.2737ms)
+✔ R17 [SIMULATED] decision uncertainty triggers the documented fallback (0.6553ms)
+✔ R18 [SIMULATED] selection results record actual provenance (382.9325ms)
+✔ R19 [SIMULATED] a provider that went away or a Laya that was turned off does not stay eligible (371.3215ms)
+✔ R20 [SIMULATED] a restart keeps routing configuration and never resurrects revoked authority (334.7683ms)
+✔ RV-B1 [SIMULATED] Test connection while hosted decisions are off sends nothing (134.9604ms)
+✔ RV-B2 [SIMULATED] concurrent requests cannot overshoot the request ceiling or the concurrency limit (290.1391ms)
+✔ RV-B3 [SIMULATED] a request still in flight when the Host stops stays counted as unknown usage (178.0406ms)
+✔ RV-B4 [SIMULATED] the secret filter refuses common credential shapes and passes ordinary text (0.8311ms)
+✔ RV-S1 [SIMULATED] an oversized chunked response is cut off, not buffered (0.5425ms)
+✔ RV-S3 [SIMULATED] a caller cancelling mid-flight leaves usage unknown but does not trip the breaker (379.9321ms)
+✔ RV-S6 [SIMULATED] the circuit breaker and a refused key survive a Host restart (327.1427ms)
+✔ RV-S7 [SIMULATED] the billable decision test obeys the same budget and refused-key guards (144.0776ms)
+✔ R13b [STATIC] Personal Agent code never names Laya, TypeSafe or Jev, so neither can be bound to an Agent (10.5333ms)
+✔ T13.1 contract: model list parsing, question library bounds and response validation (0.3319ms)
+✔ Codex detection: npm shim resolves to its real script; a signed-out CLI is authentication_required, never ready (419.0336ms)
+✔ Claude detection: loggedIn=false requires sign-in; unreadable auth stays Unknown; missing CLI is not_installed (404.1912ms)
+✔ Codex ready requires a real catalogue: a signed-in CLI without one is unavailable, not ready (534.9228ms)
+✔ discovery parses npm shims and Cursor Agent version folders without executing anything (1.5485ms)
+✔ detect-only providers are reported but never routable (214.3107ms)
+✔ hard localOnly constraint excludes cloud providers outright, whatever their score (3.7144ms)
+✔ MA1: local-only routing never inherits an Ollama cloud-hosted default; other routing is unchanged (0.9183ms)
+✖ MA1: a stale local-only task whose model is cloud-hosted is refused at launch (233.2645ms)
+✔ automatic routing for a file-and-run task: text-only Ollama is ineligible and the decision is structured (0.5876ms)
+✔ requiresGit and a specific working directory are hard requirements (0.4671ms)
+✔ usage: official windows place short inside and weekly outside; nothing exposed means Usage unavailable (0.3944ms)
+✔ event normalization: only evidence-backed activity, plans give determinate progress, duplicates collapse (2.1815ms)
+✔ Claude Code usage comes from its own rate_limit_event, captured verbatim from a real session (0.2741ms)
+✔ session-reported usage survives re-probes with its report time; a provider refusal blocks routing until reset (1.8723ms)
+✔ registry publishes provider.status_changed only on material change and persists state (1.4581ms)
+✔ periodic refresh does not re-run full probes before their interval (1.2866ms)
+✔ Host-owned sessions: state, latest activity and progress survive any client; stop affects only its task (45.4123ms)
+✔ real task lifecycle: running → Bunny-A verifying → completed only when Bunny-A's own disk read matches (142.2419ms)
+✔ a required working directory must be an approved project folder (13.1542ms)
+✔ process tree: descendants follow parent links and reject reused PIDs; survivors need the same start time (0.4939ms)
+✔ persisted provider state is shown after a Host restart but nothing routes until re-probed (7.0855ms)
+✔ Ollama stays a routable local executor with no quota claims (86.009ms)
+✔ the session transcript is private evidence on disk (33.2938ms)
+✔ F04 J01-J04/J07: provider root is created suspended inside its job, prompt delivered exactly, record persisted (1168.6618ms)
+✔ F04 J11-J15/J18/J45: children, grandchildren, short-lived, detached and orphaned descendants are members and end with the session (5841.2098ms)
+✔ F04 J16/J17: explicit breakaway is refused by the kernel; a member's own permissive nested job cannot leave Bunny's job (2503.4941ms)
+✔ F04 J29-J31/J42: Stop terminates the exact job by handle; unrelated same-image process survives; result is kernel accounting (1955.3453ms)
+✖ F04 J05/J21/J44: an admission failure refuses execution and starts nothing; no fallback launcher exists (689.1508ms)
+✔ F04 J47/J48: concurrent sessions are isolated; stopping A leaves B running (2467.5652ms)
+✔ F04 J35/J09/J46: abrupt Host death (TerminateProcess, no cleanup code) ends the whole contained tree; unrelated survives (2765.0051ms)
+✔ F04 J29/J43/J42: TaskManager Stop reports kernel-verified job emptiness; the job is live code until then (1786.9805ms)
+✔ F04 J37-J41/J32: restart reconciles interrupted job records by full identity, kills nothing, and holds while identity is alive (3094.6822ms)
+✔ F04 J08/J10: the native job handle carries no SET_ATTRIBUTES right and the module exposes no PID/handle-based job API (0.7214ms)
+✔ F04 R1-BYPASS-1: verification never runs a python.exe planted in (or on PATH inside) the task folder; the real one runs in a job (1781.2367ms)
+✔ F04 R1-BYPASS-2: the Codex app-server probe runs in a job with interactive stdin and leaves nothing behind (1293.0118ms)
+✔ F04 R1-STOP-3/NATIVE-1/STOP-1: Stop before admission is not admitted; native terminate does not block; done waits for accounting (936.822ms)
+✔ F04 R1-RESTART-01..04/R1-startup: identity gaps fail closed, unreadable records never stop the Host, survivors block relaunch of the same work (283.6938ms)
+✔ F04 R1-LOW-2/SHUT-1: Mission processes on Windows are always job-owned; shutdown awaits stops in flight (297.3025ms)
+✔ F04 R2-L1: restart absence is recorded as absent_after_restart, never kernel 'empty'; an empty table read is not absence (10235.0923ms)
+✔ F04 R2-L3/L4: Host verification jobs count as live code while open; a refused native launch is recorded as refused (775.1264ms)
+✔ F04 R3-BYPASS-CWD-1: Host tools are launched by absolute path; no bare system-tool name remains in Host source (740.6001ms)
+✔ F04 R3-HOLD-4: an unreadable record that becomes readable is reconciled before its hold is released (10247.3749ms)
+✔ F04 R3-R2-01/R2-03: a parseable malformed record is held, never a startup failure; alias-style reparse entries resolve (206.5693ms)
+✔ F04 R4-R3-1/FINAL-1: a throwing native terminate or event hook never escapes Stop and never strands accounting (1778.1083ms)
+✔ F04 R4-R3-2: a PATH folder inside the working folder whose name starts with '..' is still inside (665.6691ms)
+✔ F04 R4-R3-3: a reconcile failure in the unreadable-record hold keeps the hold and retries (20277.9949ms)
+✔ F04 R5-FOLDER: a provider-sessions folder unreadable at startup is released only after every record in it is reconciled (10244.4694ms)
+✔ F04 R5-GEN/SPLIT: a re-read never returns or rewrites this Host's own live records; a failed annotate never skips close (940.5282ms)
+✔ T3 §20/§35/§32: the launched configuration is the selected candidate, end to end, deterministically (320.4225ms)
+✔ T3 §5 legacy parity: a fact-less Host routes exactly like pre-T3 BunnyRouter — no effort knob, no routing events, honest record (296.9252ms)
+✔ T3 §5/§27 MANUAL provider override on a fact-less Host: the legacy decision carries it; retarget keeps it explicit (268.6116ms)
+✔ T3 §27/R29: a MANUAL exact model executes exactly that model (291.4909ms)
+✔ T3 §27: an impossible manual selection fails clearly and persists nothing (215.2009ms)
+✔ T3 §17/§27/R30: a MANUAL model that disappears before launch refuses the click and waits — never rerouted, never silent (268.7358ms)
+✔ T3 §17/§28/R31: an AUTO task whose selected Codex evidence goes stale reroutes at launch to the next eligible candidate (332.8723ms)
+✔ T3 §22/R22: a quota-constrained attempt reroutes to the next candidate within the bounded recovery (345.963ms)
+✔ T3 §24/R24: a failed Bunny-A verification escalates the effort once on the same candidate, then exhausts honestly (305.1858ms)
+✔ T3 §5/§22/§23: a MANUAL selection retries its own candidate once and then fails instead of ever rerouting (313.0103ms)
+ℹ tests 112
+ℹ suites 0
+ℹ pass 110
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 112371.7533
+
+✖ failing tests:
+
+test at src\lib\bunny-host\m2.test.ts:131:1
+✖ MA1: a stale local-only task whose model is cloud-hosted is refused at launch (233.2645ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /not local inference/. Input:
+  
+  'CommandRefusedError: MODE_NOT_DISPATCHABLE: ollama:native_cli:default cannot run Tasks in this release.'
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/m2.test.ts:144:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: CommandRefusedError: MODE_NOT_DISPATCHABLE: ollama:native_cli:default cannot run Tasks in this release.
+        at TaskManager.launch (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts:1439:31)
+        at TaskManager.approve (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/manager.server.ts:1378:27)
+        at file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/m2.test.ts:144:33
+        at getActual (node:assert:611:5)
+        at strict.throws (node:assert:759:24)
+        at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/m2.test.ts:144:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async Test.run (node:internal/test_runner/test:1332:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:911:7),
+    expected: /not local inference/,
+    operator: 'throws',
+    diff: 'simple'
+  }
+
+test at src\lib\bunny-host\provider-containment.test.ts:152:1
+✖ F04 J05/J21/J44: an admission failure refuses execution and starts nothing; no fallback launcher exists (689.1508ms)
+  AssertionError [ERR_ASSERTION]: production spawnSession call passes a launcher: spawnSession(id,launch,args,task,{...hooks,beforeDispatch:undefined},sessionId,normalizer,spawnChild)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/provider-containment.test.ts:171:77)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

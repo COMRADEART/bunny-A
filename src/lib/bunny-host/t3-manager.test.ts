@@ -298,6 +298,8 @@ test("T3 §17/§27/R30: a MANUAL model that disappears before launch refuses the
 test("T3 §17/§28/R31: an AUTO task whose selected Codex evidence goes stale reroutes at launch to the next eligible candidate", async () => {
   const env = await t3Fixture(["codex", "claude"]);
   try {
+    // T13.2: this recovery fixture explicitly authorizes both cloud destination vendors.
+    await env.tasks.connections.command("connections.policy.set", {policy:{...env.tasks.connections.policy(),switchAllowlist:["openai","anthropic"]}}, "workstation");
     const task = env.tasks.submit({ prompt: REPO_TASK, mode: "balanced" });
     assert.equal(task.provider, "codex");
     assert.equal(task.model, "gpt-5.3", "repository_coding: the catalogue-preferred Codex model wins AUTO on the 91 coding rank");
@@ -331,6 +333,8 @@ test("T3 §17/§28/R31: an AUTO task whose selected Codex evidence goes stale re
 test("T3 §22/R22: a quota-constrained attempt reroutes to the next candidate within the bounded recovery", async () => {
   const env = await t3Fixture(["codex", "claude"]);
   try {
+    // T13.2: this recovery fixture explicitly authorizes both cloud destination vendors.
+    await env.tasks.connections.command("connections.policy.set", {policy:{...env.tasks.connections.policy(),switchAllowlist:["openai","anthropic"]}}, "workstation");
     const task = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
     assert.equal(task.provider, "claude", "research prefers Claude on policy priors");
     env.tasks.approve(task.id);

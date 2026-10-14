@@ -172,6 +172,12 @@ const LABELS: Record<string, string> = {
   "personal_agents.configured": "Personal Agents updated",
   // M-A-3 T13.1 AI & Models settings and advisory routing provenance.
   "routing.assisted": "Decision assistance reviewed",
+  "routing.consent_denied": "Provider switch requires approval",
+  "connections.changed": "AI account updated",
+  "connections.configured": "Routing privacy updated",
+  "connections.checked": "AI account checked",
+  "connections.retention": "Usage history rolled up",
+  "connections.review_requested": "AI account review requested",
   "intelligence.configured": "AI & Models settings updated",
   "intelligence.credential_saved": "API key saved",
   "intelligence.credential_removed": "API key removed",

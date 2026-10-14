@@ -1767,6 +1767,24 @@
   color: var(--negative);
 }
 /* M-A-3 T13.1 Settings → AI & Models */
+.bunny-app .account-grid { display: grid; gap: var(--space-4, 16px); }
+.bunny-app .account-card { min-width: 0; }
+.bunny-app .account-card[data-focused="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bunny-app .account-mode { display: grid; gap: 8px; margin-block: 12px; }
+.bunny-app .account-mode select, .bunny-app .account-mode input, .bunny-app .account-connect input { min-height: 44px; width: 100%; max-width: 100%; }
+.bunny-app .account-facts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-block: 16px; }
+.bunny-app .account-facts dt { font-weight: 600; }
+.bunny-app .account-facts dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.bunny-app .account-connect { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-block: 16px; }
+.bunny-app .account-connect label { display: grid; gap: 8px; flex: 1 1 240px; }
+.bunny-app .account-check { display: flex; gap: 12px; align-items: center; min-height: 44px; }
+.bunny-app .account-check input { width: 20px; height: 20px; flex-shrink: 0; }
+.bunny-app .account-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-block: 16px; }
+.bunny-app .account-actions .button { min-height: 44px; }
+.bunny-app .account-limitation { display: flex; gap: 8px; align-items: start; padding-block: 8px; }
+.bunny-app .account-allowlist { border: 0; padding: 0; margin-block: 16px; }
+.bunny-app .account-audit { padding-left: 20px; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .bunny-app .account-facts { grid-template-columns: minmax(0,1fr); } }
 .bunny-app .ai-tabs {
   display: flex;
   flex-wrap: wrap;

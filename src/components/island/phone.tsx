@@ -993,6 +993,12 @@ function SettingsView({ view }: { view: View }) {
         ) : null}
       </section>
       <section className="pc-card" aria-label="Appearance">
+        <h2 className="pc-h3">AI accounts</h2>
+        <p className="pc-muted">Sign-in and provider permissions are managed on your Windows PC.</p>
+        {store.deviceConnections.map(row=><p className="pc-line" key={`${row.catalog}:${row.mode}`}><strong>{row.name}</strong> · {row.status.replaceAll("_"," ")} · {row.billing.replaceAll("_"," ")}</p>)}
+        <button type="button" className="btn" disabled={!store.canAct()} onClick={()=>void store.connectionCommand("connections.review_request",{})}>Request owner review</button>
+      </section>
+      <section className="pc-card" aria-label="Appearance">
         <h2 className="pc-h3">Appearance</h2>
         <p className="pc-label">Theme</p>
         <div className="pc-segment" role="group" aria-label="Theme">

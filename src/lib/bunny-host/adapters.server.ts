@@ -6,6 +6,8 @@ import type { OrchTask, ProviderFeatures, ProviderId, ProviderLive, UsageWindow 
 import { CODEX_COMPATIBILITY_MAX_AGE_MS, CODEX_SECURITY_POLICY_VERSION, codexMissionExclusion } from "../orch/compatibility.ts";
 import type { AdapterHooks, AdapterResult, ProviderAdapter, RunningSession, SessionContainment } from "./contracts.ts";
 import { probeCodexCatalog } from "./codex-probe.server.ts";
+import { scrubChildEnvironment } from "./connections.ts";
+import type { NativeAccount } from "./connections.server.ts";
 import { CODEX_READ_DISABLED_FEATURES, CodexCompatibilityGate, emptyCodexCompatibility, executableStamp } from "./codex-compatibility.server.ts";
 export { CODEX_READ_DISABLED_FEATURES } from "./codex-compatibility.server.ts";
 import { hasTool, locate, systemContext, type DiscoveryContext, type Launchable } from "./discovery.server.ts";
@@ -85,12 +87,13 @@ export function providerBase(id: ProviderId): ProviderLive {
 type ProbeResult = { code: number | null; stdout: string; stderr: string; timedOut: boolean; error?: string };
 /** Runs a provider CLI directly (no shell) with a hard timeout and closed stdin. */
 export function probe(launch: Launchable, args: string[], timeout = 15000): Promise<ProbeResult> {
+  const env = scrubChildEnvironment(process.env).env;
   // M-A-3 T9R-F04: on Windows a probe runs in its own Bunny-owned job (NUL stdin); refused if containment is unavailable.
-  if (process.platform === "win32") return runWindowsOwnedProcess(launch.command, [...launch.args, ...args], { cwd: process.cwd(), signal: new AbortController().signal, timeoutMs: timeout, maxOutput: 1024 * 1024, owner: { action: "provider.probe" } })
+  if (process.platform === "win32") return runWindowsOwnedProcess(launch.command, [...launch.args, ...args], { cwd: process.cwd(), signal: new AbortController().signal, timeoutMs: timeout, maxOutput: 64 * 1024, env, owner: { action: "provider.probe" } })
     .then((result): ProbeResult => ({ code: result.timedOut ? null : result.exitCode, stdout: result.stdout, stderr: result.stderr, timedOut: result.timedOut }))
     .catch((error: unknown): ProbeResult => ({ code: null, stdout: "", stderr: "", timedOut: false, error: `Containment unavailable — probe refused: ${safeError(error).message}` }));
   return new Promise((resolve) => {
-    const child = trackOwnedChild(execFile(launch.command, [...launch.args, ...args], { timeout, windowsHide: true, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    const child = trackOwnedChild(execFile(launch.command, [...launch.args, ...args], { timeout, windowsHide: true, maxBuffer: 1024 * 1024, env }, (error, stdout, stderr) => {
       const failure = error as (NodeJS.ErrnoException & { killed?: boolean; code?: number | string }) | null;
       resolve({
         code: failure ? (typeof failure.code === "number" ? failure.code : null) : 0,
@@ -171,8 +174,7 @@ export class OllamaAdapter implements ProviderAdapter {
   }
   launch(task: OrchTask, hooks: AdapterHooks): RunningSession {
     const controller = new AbortController();
-    hooks.event("agent.started", `Ollama generation requested · ${task.model}.`);
-    const done = execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt, localOnly: !!(task.constraints?.localOnly || task.constraints?.offlineOnly), ...(task.constraints?.contextTokens ? { numCtx: task.constraints.contextTokens } : {}), ...(task.constraints?.outputTokens ? { numPredict: task.constraints.outputTokens } : {}), ...(task.constraints?.responseFormat ? { format: task.constraints.responseFormat } : {}) }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs }).then((result) => {
+    const done = Promise.resolve().then(async()=>{await hooks.beforeDispatch?.();if(controller.signal.aborted)return {ok:false,stopped:true,output:"",error:"Stopped before local inference.",log:"Stopped before local inference.",receipt:null};hooks.event("agent.started", `Ollama generation requested · ${task.model}.`);return execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt, localOnly: !!(task.constraints?.localOnly || task.constraints?.offlineOnly), ...(task.constraints?.contextTokens ? { numCtx: task.constraints.contextTokens } : {}), ...(task.constraints?.outputTokens ? { numPredict: task.constraints.outputTokens } : {}), ...(task.constraints?.responseFormat ? { format: task.constraints.responseFormat } : {}) }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs });}).then((result) => {
       // M-A-3 T11: Ollama's own final message is the receipt: served model, token counts and durations. Counts are
       // provider-reported, never estimated; when the provider sends no final message nothing is recorded.
       if (result.ok && result.receipt) {
@@ -199,6 +201,7 @@ export function parseAgentEvent(provider: ProviderId, event: Record<string, unkn
     if (item.progress) hooks.progress?.(item.progress);
     if (item.usage) hooks.usage?.(item.usage);
     if (item.rateLimits) hooks.rateLimits?.(item.rateLimits, item.limitStatus);
+    if (item.billingSource) hooks.billingSource?.(item.billingSource);
     if (item.type) hooks.event(item.type, item.detail);
   }
 }
@@ -210,6 +213,17 @@ export function parseAgentEvent(provider: ProviderId, event: Record<string, unkn
  * faults into the legacy child-process path; production callers never pass it.
  */
 export function spawnSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer:CodexNormalizer|ClaudeNormalizer=id === "codex" ? new CodexNormalizer() : new ClaudeNormalizer(), spawnChild:typeof spawn=spawn): RunningSession {
+  if(hooks.beforeDispatch){
+    let owned: RunningSession|null=null,stopped=false;
+    const done=(async()=>{await hooks.beforeDispatch!();if(stopped)return {ok:false,stopped:true,output:"",error:"Stopped before provider dispatch."};owned=spawnUnwrappedSession(id,launch,args,task,{...hooks,beforeDispatch:undefined},sessionId,normalizer,spawnChild);return owned.done;})().catch(()=>({ok:false,output:"",error:"Provider dispatch refused: connection authority changed or could not be freshly verified."}));
+    return {done,stop:async()=>{stopped=true;await owned?.stop();},pid:()=>owned?.pid?.()??null,
+      get sendInput(){return owned?.sendInput;},
+      ...(process.platform==="win32"&&spawnChild===spawn?{containment:()=>owned?.containment?.()??{mechanism:"windows-job-object" as const,state:stopped?"empty" as const:"launching" as const,admitted:false,operationId:null,rootPid:null,rootCreatedAt:null,activeProcesses:0,totalProcesses:0,terminatedAtEnd:0,detail:stopped?"Stopped before any provider process was admitted.":"Waiting for a fresh account authorization check; no provider process admitted."}}:{}),
+    };
+  }
+  return spawnUnwrappedSession(id,launch,args,task,hooks,sessionId,normalizer,spawnChild);
+}
+function spawnUnwrappedSession(id: "codex" | "claude", launch: Launchable, args: string[], task: OrchTask, hooks: AdapterHooks, sessionId: string, normalizer:CodexNormalizer|ClaudeNormalizer, spawnChild:typeof spawn): RunningSession {
   if (process.platform === "win32" && spawnChild === spawn) return containedSession(id, launch, args, task, hooks, sessionId, normalizer);
   let child: ChildProcess | null = null; let stopped = false; let output = ""; let stderr = ""; let buffer = ""; let providerError: string | null = null;
   const terminate = async (userStop=false) => {
@@ -224,7 +238,7 @@ export function spawnSession(id: "codex" | "claude", launch: Launchable, args: s
   };
   const boundary=(work:()=>void)=>{try {work();} catch(error) {fail(error);}};
   const done = new Promise<AdapterResult>((resolve) => {
-    const env = { ...process.env }; delete env.CLAUDECODE;
+    const env = hooks.childEnvironment?.() ?? scrubChildEnvironment(process.env).env;
     child = trackOwnedChild(spawnChild(launch.command, [...launch.args, ...args], { cwd: task.cwd, windowsHide: true, shell: false, stdio: ["pipe", "pipe", "pipe"], env }));
     const capture: AdapterHooks = {
       ...hooks,
@@ -348,7 +362,7 @@ function containedSession(id: "codex" | "claude", launch: Launchable, args: stri
     try {
       out = await outputPipe(onStdout); err = await outputPipe(onStderr);
       if (stopped) throw new Error("Stopped before launch.");
-      const env = { ...process.env }; delete env.CLAUDECODE;
+      const env = hooks.childEnvironment?.() ?? scrubChildEnvironment(process.env).env;
       const owner = hooks.owner;
       group = new OwnedProcessGroup(launch.command, task.cwd ?? process.cwd(), {
         action: `provider.${id}`, missionId: owner?.missionId ?? null, ...(owner?.dataDirectory ? { dataDirectory: owner.dataDirectory } : {}),
@@ -409,6 +423,8 @@ function containedSession(id: "codex" | "claude", launch: Launchable, args: stri
 }
 
 export class CodexAdapter extends CliBase implements ProviderAdapter {
+  private account: NativeAccount | null = null;
+  connectionIdentity() { return this.account; }
   id = "codex" as const;
   detected: ProviderLive | null = null;
   security: CodexCompatibilityGate;
@@ -443,7 +459,8 @@ export class CodexAdapter extends CliBase implements ProviderAdapter {
       return this.detected = live;
     }
     live.authenticated = true; live.authenticatedState = "authenticated";
-    const catalogue = await probeCodexCatalog(launch.command, launch.args).catch(() => null);
+    const catalogue = await probeCodexCatalog(launch.command, launch.args, true).catch(() => null);
+    this.account = catalogue?.account ? { principal:catalogue.account.email, method:catalogue.account.type, plan:catalogue.account.planType } : null;
     live.capabilities = this.agentCapabilities();
     if (!catalogue || !catalogue.model) {
       live.availability = "unavailable";
@@ -505,6 +522,8 @@ export class CodexAdapter extends CliBase implements ProviderAdapter {
 }
 
 export class ClaudeAdapter extends CliBase implements ProviderAdapter {
+  private account: NativeAccount | null = null;
+  connectionIdentity() { return this.account; }
   id = "claude" as const;
   detected: ProviderLive | null = null;
   capabilities() { return FEATURES.claude; }
@@ -517,8 +536,9 @@ export class ClaudeAdapter extends CliBase implements ProviderAdapter {
     if (version.code !== 0) { live.availability = "unavailable"; live.detail = `Claude Code found at ${launch.path}, but \`claude --version\` failed: ${version.timedOut ? "timed out" : version.error || firstLine(version.stderr) || `exit ${version.code}`}.`; return this.detected = live; }
     live.version = firstLine(version.stdout);
     const auth = await probe(launch, ["auth", "status"]);
-    let state: { loggedIn?: unknown; authMethod?: unknown } | null = null;
-    try { state = JSON.parse(auth.stdout) as { loggedIn?: unknown; authMethod?: unknown }; } catch { state = null; }
+    let state: { loggedIn?: unknown; authMethod?: unknown; apiProvider?: unknown; email?: unknown; orgId?: unknown; subscriptionType?: unknown } | null = null;
+    try { state = JSON.parse(auth.stdout); } catch { state = null; }
+    this.account = state ? {principal:typeof state.email==="string"?state.email:null,workspace:typeof state.orgId==="string"?state.orgId:null,method:state.authMethod==="claude.ai"&&state.apiProvider==="firstParty"?"claude.ai":"other",plan:typeof state.subscriptionType==="string"?state.subscriptionType:null}:null;
     live.evidence = [...(live.evidence ?? []), `claude auth status → exit ${auth.code ?? "error"}${state ? `, loggedIn=${String(state.loggedIn)}` : ", unreadable"}`];
     if (!state || typeof state.loggedIn !== "boolean") {
       live.authenticatedState = "unknown"; live.availability = "unknown";
@@ -562,18 +582,19 @@ export function codexLaunchArgs(task: OrchTask, platform = process.platform): st
   const read = task.executionScope?.access === "read";
   // Ignore extensions and execpolicy from user config; restore only trusted native Windows sandbox policy;
   // switch off tool-adding defaults and web search, which do not come from user config.
-  const isolation = task.executionScope ? ["--ignore-user-config", "--ignore-rules", ...(platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : []), ...CODEX_READ_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature]), "-c", 'web_search="disabled"'] : [];
+  const isolation = ["--ignore-user-config", "--ignore-rules", ...(platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : []), ...CODEX_READ_DISABLED_FEATURES.flatMap((feature) => ["--disable", feature]), "-c", 'web_search="disabled"'];
   // M-A-3 T3 §11: the Task's contracted reasoning-effort knob (router-selected). Scoped (mission)
   // sessions keep their exact verified argv; an effort override there is a documented T3 limitation.
   const effort = task.executionScope || !task.effort ? [] : ["-c", `model_reasoning_effort="${task.effort}"`];
-  return ["exec", "--json", "--sandbox", read ? "read-only" : "workspace-write", ...isolation, ...effort, "--skip-git-repo-check", "--cd", task.cwd!, "--model", task.model, "-"];
+  return ["exec", "--json", "-c", 'model_provider="openai"', "--sandbox", read ? "read-only" : "workspace-write", ...isolation, ...effort, "--skip-git-repo-check", "--cd", task.cwd!, "--model", task.model, "-"];
 }
 /** Claude read/write contracts verified with installed Claude Code 2.1.288 help. */
 export function claudeLaunchArgs(task: OrchTask, sessionId: string, platform = process.platform): string[] {
   const read = task.executionScope?.access === "read";
   const tools = read ? "Read" : platform === "win32" ? "Read,Write,Edit,Bash,PowerShell" : "Read,Write,Edit,Bash";
   return ["--print", "--verbose", "--output-format", "stream-json", "--session-id", sessionId, "--safe-mode", "--strict-mcp-config",
-    ...(read ? ["--restricted", "--tools", "Read", "--disallowedTools", "Write,Edit,Bash,PowerShell", "--setting-sources", ""] : []),
+    "--setting-sources", "", "--settings", '{"disableAllHooks":true}',
+    ...(read ? ["--restricted", "--tools", "Read", "--disallowedTools", "Write,Edit,Bash,PowerShell"] : []),
     "--permission-mode", read ? "dontAsk" : "acceptEdits", "--permission-prompts", "none", "--allowedTools", tools, "--"];
 }
 

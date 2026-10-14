@@ -5,6 +5,7 @@
  * checked first and always wins over a control phrase ("stop the agent and run rm -rf" is sensitive_refused).
  */
 import type { VoiceTurnKind } from "./voice-protocol.ts";
+import { parseAccountIntent } from "../connections.ts";
 
 export type VoiceIntent = {
   kind: VoiceTurnKind;
@@ -569,6 +570,8 @@ export function classifyTranscript(
   const normalized = normalizeTranscript(transcript);
   const make = (kind: VoiceTurnKind, target = "", ordinal: number | null = null, focus?: string): VoiceIntent => ({ kind, target, ordinal, normalized, ...(focus ? { focus } : {}) });
   if (!normalized) return make("empty");
+  const account=parseAccountIntent(normalized);
+  if(account)return make("account",account.catalog,null,account.verb);
   const pending = options.proposalPending === true;
   // fixcheck#0: the filler stripper removes a leading "ok"/"okay", so "okay it" is checked on the raw wording too.
   const raw = transcript.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim().replace(/[\s.!?,;:]+$/, "");

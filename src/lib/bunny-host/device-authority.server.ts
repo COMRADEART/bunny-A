@@ -5,6 +5,7 @@ import type { ActionManifest, RiskClass } from "../bunny-missions/types.ts";
 import type { HostSnapshot, SnapshotViewer } from "./contracts.ts";
 import type { OrchTask } from "../orch/types.ts";
 import type { ProjectDetail } from "./project-types.ts";
+import { connectionDeviceView } from "./connections.ts";
 import { publicTask } from "./presentation.ts";
 import { isRemoteOllamaTag } from "../orch/exec.server.ts";
 
@@ -55,6 +56,7 @@ export type DeviceRight = "read" | "supervise" | "answer" | "chat" | "self";
  * the canonical mission/agent command paths; "self" actions only ever target the calling device.
  */
 export const DEVICE_RIGHTS: Readonly<Record<string, DeviceRight>> = {
+  "connections.review_request": "chat",
   "agent.list": "read",
   "agent.get": "read",
   "mission.get": "read",
@@ -412,6 +414,8 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
       : snapshot.agents,
     // M-A-3 T13.1: credential state, provider limits and usage are workstation-owner settings.
     intelligence: undefined,
+    connections: undefined,
+    deviceConnections: snapshot.connections?.accounts.map(connectionDeviceView),
   };
 }
 
@@ -502,6 +506,8 @@ export function deviceTask<T extends Pick<OrchTask, "prompt" | "routingPrompt" |
   const voiceTurn = !task.mission && task.routingPrompt !== undefined;
   return {
     ...task,
+    connectionRoute: undefined,
+    proposedRoute: undefined,
     ...(task.mission ? { prompt: task.routingPrompt ?? "Mission step (Bunny's full prompt stays on the Host)." } : {}),
     ...(voiceTurn ? { prompt: VOICE_TURN_DEVICE_LABEL, routingPrompt: VOICE_TURN_DEVICE_LABEL } : {}),
     cwd: undefined,

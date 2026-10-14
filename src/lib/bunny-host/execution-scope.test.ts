@@ -21,7 +21,7 @@ function assertScopedIsolation(args: string[], sandbox: "read-only" | "workspace
   assert.ok(args.includes("--ignore-user-config"), "all user-configured MCP/plugin/integration definitions are omitted");
   assert.ok(args.includes("--ignore-rules"), "user/project execpolicy cannot expand execution authority");
   const overrides = args.flatMap((arg, index) => arg === "-c" || arg === "--config" ? [args[index + 1]] : []);
-  assert.deepEqual(overrides, [...(platform === "win32" ? ['windows.sandbox="elevated"'] : []), 'web_search="disabled"'], "only trusted platform sandbox configuration is restored; web search is off");
+  assert.deepEqual(overrides, ['model_provider="openai"', ...(platform === "win32" ? ['windows.sandbox="elevated"'] : []), 'web_search="disabled"'], "only trusted platform sandbox configuration is restored; web search is off");
   // Literal list, independent of the production constant: features whose tools ignore config.toml (M-A-1 live evidence).
   const disabled = args.flatMap((arg, index) => arg === "--disable" ? [args[index + 1]] : []);
   assert.deepEqual(disabled, ["apps", "plugins", "remote_plugin", "multi_agent", "multi_agent_v2", "image_generation", "browser_use", "browser_use_external", "computer_use", "tool_suggest", "hooks", "skill_mcp_dependency_install"], "account apps, plugins and tool-adding defaults are switched off");
@@ -29,9 +29,21 @@ function assertScopedIsolation(args: string[], sandbox: "read-only" | "workspace
   assert.ok(!args.includes("--approve-for-me") && !args.includes("--dangerously-bypass-approvals-and-sandbox"));
 }
 
-function assertLegacyCodexArgs(args: string[], task: OrchTask) {
-  // Exact pre-R1 argv for unscoped direct tasks, independent of the production helper.
-  assert.deepEqual(args, ["exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check", "--cd", task.cwd, "--model", task.model, "-"]);
+function assertLegacyCodexArgs(args: string[], task: OrchTask, platform = process.platform) {
+  // T13.2 also isolates direct tasks: preserve workspace authority while pinning provider/configuration.
+  assertWriteIsolation(args, platform);
+  assert.deepEqual(args, [
+    "exec", "--json", "-c", 'model_provider="openai"', "--sandbox", "workspace-write",
+    "--ignore-user-config", "--ignore-rules", ...(platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : []),
+    "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
+    "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
+    "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
+    "--skip-git-repo-check", "--cd", task.cwd, "--model", task.model, "-",
+  ], "the entire independent direct vector rejects extra flags and outside roots");
+  assert.deepEqual(args.slice(-6), ["--skip-git-repo-check", "--cd", task.cwd, "--model", task.model, "-"]);
+  assert.equal(args[args.indexOf("--cd") + 1], task.cwd);
+  assert.equal(args[args.indexOf("--model") + 1], task.model);
+  assert.equal(args.at(-1), "-");
 }
 
 /** Real adapters and owned process launch, with an argv-echo executable rather than a model CLI. */
@@ -75,15 +87,15 @@ for (const platform of ["win32", "linux", "darwin"] as const) test(`MA0R2: Codex
   assertReadIsolation(codexLaunchArgs(read, platform), platform);
   assertWriteIsolation(codexLaunchArgs({ ...read, executionScope: { access: "write" } } as OrchTask, platform), platform);
   const legacy = { ...read, executionScope: undefined } as OrchTask;
-  assertLegacyCodexArgs(codexLaunchArgs(legacy, platform), legacy);
+  assertLegacyCodexArgs(codexLaunchArgs(legacy, platform), legacy, platform);
 });
 
-test("MA1: Codex read argv is the exact contract verified against live codex-cli 0.153.4 sessions", () => {
+test("MA1/T13.2: Codex read argv retains verified isolation and pins the approved native provider", () => {
   // A live read Mission with only the R1 flags registered 228 ChatGPT connector tools (codex_apps) and a
   // remote-plugin MCP server; this exact argv registered none (test-results/ma1/codex-read).
   const read = { cwd: "C:\\fixture", model: "fixture-model", executionScope: { access: "read" } } as OrchTask;
   assert.deepEqual(codexLaunchArgs(read, "win32"), [
-    "exec", "--json", "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules", "-c", 'windows.sandbox="elevated"',
+    "exec", "--json", "-c", 'model_provider="openai"', "--sandbox", "read-only", "--ignore-user-config", "--ignore-rules", "-c", 'windows.sandbox="elevated"',
     "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
     "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
     "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
@@ -91,19 +103,19 @@ test("MA1: Codex read argv is the exact contract verified against live codex-cli
   ]);
 });
 
-test("MA1: Codex mission write argv keeps workspace-write without user extensions; direct tasks are unchanged", () => {
+test("MA1/T13.2: Codex mission and direct write argv retain workspace authority with isolated extensions", () => {
   // A live write Mission with the pre-R1 argv spawned node_repl, the computer-use REPL and a plugin MCP server
   // directly under codex.exe, outside the sandbox runner (test-results/ma1/codex-write).
   const write = { cwd: "C:\\fixture", model: "fixture-model", executionScope: { access: "write" } } as OrchTask;
   assert.deepEqual(codexLaunchArgs(write, "win32"), [
-    "exec", "--json", "--sandbox", "workspace-write", "--ignore-user-config", "--ignore-rules", "-c", 'windows.sandbox="elevated"',
+    "exec", "--json", "-c", 'model_provider="openai"', "--sandbox", "workspace-write", "--ignore-user-config", "--ignore-rules", "-c", 'windows.sandbox="elevated"',
     "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
     "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
     "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
     "--skip-git-repo-check", "--cd", "C:\\fixture", "--model", "fixture-model", "-",
   ]);
   const direct = { cwd: "C:\\fixture", model: "fixture-model" } as OrchTask;
-  assert.deepEqual(codexLaunchArgs(direct, "win32"), ["exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check", "--cd", "C:\\fixture", "--model", "fixture-model", "-"]);
+  assertLegacyCodexArgs(codexLaunchArgs(direct, "win32"), direct, "win32");
 });
 
 const until = async (check: () => boolean, label: string, detail?: () => unknown) => {
@@ -135,6 +147,7 @@ process.stdin.resume(); process.stdin.on('end',()=>{
   const live = { ...providerBase("codex"), installed: true, authenticated: true, availability: "ready" as const, capabilities: ["text", "filesystem", "terminal"], models: ["fixture-model"], current_model: "fixture-model", securityCompatibility: security.profile };
   codex.detected = live;
   codex.launchTarget = { command: process.execPath, args: [script], path: script, kind: "node-script", source: "disposable fixture" };
+  codex.connectionIdentity = () => ({ principal: "fixture-codex@example.invalid", method: "chatgpt" });
   codex.detect = async () => live;
   codex.health = async () => live;
   codex.usage = async () => null; // Never probe the installed CLI, account or any model service.

@@ -176,13 +176,25 @@ test("T2: stale evidence, an unknown policy, or a claimed VALIDATED profile with
   assert.match(codexMissionExclusion(codex, "read")!, /identity is incomplete/);
   assert.equal(CODEX_SECURITY_POLICY_VERSION, 1);
 });
-test("T2: direct legacy task still starts with the exact pre-T2 argv despite unvalidated compatibility", async () => {
+test("T2/T13.2: direct legacy task retains workspace authority with a pinned native provider despite unvalidated compatibility", async () => {
   const env = await fixture({ version: "codex-cli 0.999.0" }); const lines: string[] = [];
   try {
     const task = { ...env.task, executionScope: undefined, mission: undefined };
     assert.equal(eligibility({ ...ready(), securityCompatibility: env.profile }, {}), null);
     const result = await env.adapter.launch(task, { ...hooks, raw: (_stream, line) => lines.push(line) }).done;
-    assert.equal(result.ok, true); assert.deepEqual(JSON.parse(lines[0]).argv, ["exec", "--json", "--sandbox", "workspace-write", "--skip-git-repo-check", "--cd", env.dir, "--model", "fixture", "-"]);
+    assert.equal(result.ok, true); const args = JSON.parse(lines[0]).argv as string[];
+    assert.equal(args[args.indexOf("--sandbox") + 1], "workspace-write");
+    assert.equal(args[args.indexOf("-c") + 1], 'model_provider="openai"');
+    assert.ok(args.includes("--ignore-user-config") && args.includes("--ignore-rules"));
+    assert.deepEqual(args, [
+      "exec", "--json", "-c", 'model_provider="openai"', "--sandbox", "workspace-write",
+      "--ignore-user-config", "--ignore-rules", ...(process.platform === "win32" ? ["-c", 'windows.sandbox="elevated"'] : []),
+      "--disable", "apps", "--disable", "plugins", "--disable", "remote_plugin", "--disable", "multi_agent", "--disable", "multi_agent_v2",
+      "--disable", "image_generation", "--disable", "browser_use", "--disable", "browser_use_external", "--disable", "computer_use",
+      "--disable", "tool_suggest", "--disable", "hooks", "--disable", "skill_mcp_dependency_install", "-c", 'web_search="disabled"',
+      "--skip-git-repo-check", "--cd", env.dir, "--model", "fixture", "-",
+    ], "exact direct argv preserves the closed native surface");
+    assert.deepEqual(args.slice(-6), ["--skip-git-repo-check", "--cd", env.dir, "--model", "fixture", "-"]);
     assert.deepEqual(codexLaunchArgs(task), JSON.parse(lines[0]).argv);
   } finally { env.cleanup(); }
 });
