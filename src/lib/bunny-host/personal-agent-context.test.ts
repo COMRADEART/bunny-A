@@ -70,7 +70,9 @@ test("T13.3 B store: one owner per Agent, explicit transfer, per-slot turns, bou
     store.appendTurn(1, "user", "Gada private", "user", 1);
     store.appendTurn(2, "user", "Spear private", "user", 1);
     assert.deepEqual(store.turns(1).map((turn) => turn.text), ["Gada private"], "a slot reads only its own turns");
-    for (let index = 0; index < CONTEXT_LIMITS.retainedTurns + 5; index++) store.appendTurn(1, "agent", `t${index}`, "host-facts", index);
+    const dropped: string[] = [];
+    for (let index = 0; index < CONTEXT_LIMITS.retainedTurns + 5; index++) dropped.push(...store.appendTurn(1, "agent", `t${index}`, "host-facts", index).dropped.map((turn) => turn.text));
+    assert.deepEqual(dropped, ["Gada private", "t0", "t1", "t2", "t3", "t4"], "trimmed turns are handed back oldest first for compaction");
     const retained = db.db.prepare("SELECT COUNT(*) AS n FROM personal_agent_turns WHERE slot=1").get() as { n: number };
     assert.equal(Number(retained.n), CONTEXT_LIMITS.retainedTurns);
     assert.equal(store.turns(1).length, CONTEXT_LIMITS.projectedTurns);

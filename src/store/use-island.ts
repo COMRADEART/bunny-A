@@ -200,7 +200,8 @@ type Island = Preferences & {
   /** M-A-3 T13.3: ownership, profiles, conversations and the speaking identity (workstation only; null on devices). */
   personalAgentContext: PersonalAgentContextSnapshot | null;
   /** M-A-3 T13.3: one `personal_agent.*` command. True only on the Host's acknowledgment. */
-  personalAgentCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<boolean>;
+  /** The Host's answer (its `data` carries replies and exports), or null when refused or not sent. */
+  personalAgentCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
   voice: VoiceSnapshot | null;
   /** Local receipt time of the last voice answer; a stale value means voice is reconnecting, not listening. */
@@ -1182,7 +1183,7 @@ export const useIsland = create<Island>((set, get) => {
     agents: null,
     personalAgents: null,
     personalAgentContext: null,
-    personalAgentCommand: async (action, data, onRefused) => (await command(action, data, "personal-agent", onRefused)) !== null,
+    personalAgentCommand: (action, data, onRefused) => command(action, data, "personal-agent", onRefused),
     intelligence: null,
     connections: null,
     deviceConnections: [],

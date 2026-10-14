@@ -26,7 +26,9 @@ import { AGENT_ACTIONS, AgentRuntime, agentCommand } from "./agent-runtime.serve
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
 import { SLOT_IDS, isUserFacingAgent, projectPersonalAgents, type SlotId } from "./personal-agents.ts";
 import { PersonalAgentContextStore } from "./personal-agent-context.server.ts";
-import { PERSONAL_AGENT_CONTEXT_SCHEMA, answerFromOwnFacts, cleanTurn, parseIdentity, parseSlot, personalAgentName, validateProfile } from "./personal-agent-context.ts";
+import { PERSONAL_AGENT_CONTEXT_SCHEMA, answerFromOwnFacts, cleanTurn, parseIdentity, parseSlot, personalAgentName, validateProfile, type ConversationTurn } from "./personal-agent-context.ts";
+import { LotusStore } from "./lotus.server.ts";
+import { parseLayer, parseScope, rank, render, type LotusMemory, type LotusScope } from "./lotus.ts";
 import { VoiceSessionManager, type ListenSource, type InterruptSource } from "./voice/voice-session.server.ts";
 import { launchVoiceWorker } from "./voice/voice-worker.server.ts";
 import { hostFactsFrom, pendingApprovalFacts, type ApprovalFact } from "./voice/voice-answers.server.ts";
@@ -366,6 +368,67 @@ export async function startHost(
     if (previous === slot) return;
     manager.emit(db.event("personal_agent.owner", null, previous === null ? `Personal Agent ${slot} owns Agent ${agentId}.` : `Agent ${agentId} moved from Personal Agent ${previous} to ${slot} on the workstation.`));
   };
+  // M-A-3 T13.3 Gate C: Lotus memory. Every read names its scopes, and the Host derives them from ownership; a request never does.
+  const lotus = new LotusStore(db);
+  lotus.prune(Date.now());
+  /** Verified Mission facts and user decisions, read in place as inner-petal sources. They are never copied into Lotus. */
+  const missionFacts = (slot: SlotId, list: readonly { id: string; projectId: string | null }[]): LotusMemory[] =>
+    list.flatMap((mission) =>
+      missions.memory
+        .entries(mission.id, { verified: true })
+        .filter((entry) => entry.kind === "verified_fact" || entry.kind === "user_decision")
+        .slice(-20)
+        .map((entry) => ({
+          id: `mission-memory:${entry.id}`,
+          scope: (mission.projectId ? `project:${mission.projectId}` : `agent:${slot}`) as LotusScope,
+          layer: "inner" as const,
+          key: entry.key,
+          value: entry.value,
+          trust: entry.kind === "user_decision" ? ("user" as const) : ("host" as const),
+          provenance: `host:mission:${mission.id}`,
+          sources: [],
+          revision: 1,
+          createdAt: entry.createdAt,
+          updatedAt: entry.createdAt,
+        })),
+    );
+  /** Projects in which a Personal Agent owns a Mission: the only shared boundaries it may read. */
+  const ownProjects = (slot: SlotId) => [...new Set(ownFacts(slot).missions.flatMap((mission) => (mission.projectId ? [mission.projectId] : [])))];
+  const memoryScopes = (slot: SlotId): LotusScope[] => [`agent:${slot}`, ...ownProjects(slot).map((id) => `project:${id}` as LotusScope)];
+  /**
+   * The stem. Without `projectId`: the Agent's own scope plus its Projects. With `projectId`: that Project only — the
+   * minimum slice a child worker receives — and only when the Agent owns a Mission there.
+   */
+  const recall = (slot: SlotId, query: string, limit: number, projectId: string | null = null): LotusMemory[] => {
+    const facts = ownFacts(slot);
+    if (projectId && !facts.missions.some((mission) => mission.projectId === projectId))
+      throw new CommandRefusedError("This Personal Agent has no Mission in that Project, so it cannot read its memory.");
+    const scopes: LotusScope[] = projectId ? [`project:${projectId}`] : memoryScopes(slot);
+    const inScope = projectId ? facts.missions.filter((mission) => mission.projectId === projectId) : facts.missions;
+    return rank([...lotus.list(scopes), ...missionFacts(slot, inScope)], query, Date.now(), limit);
+  };
+  /** Session compaction: turns that fall out of retention are folded into the Agent's versioned "Earlier conversation". */
+  const compactTurns = (slot: SlotId, dropped: readonly ConversationTurn[], name: string) => {
+    if (!dropped.length) return;
+    lotus.compact(
+      `agent:${slot}`,
+      "Earlier conversation",
+      dropped.map((turn) => ({
+        id: `turn:${turn.id}`,
+        scope: `agent:${slot}` as LotusScope,
+        layer: "bud" as const,
+        key: turn.role === "user" ? "You" : name,
+        value: turn.text,
+        trust: turn.role === "user" ? ("user" as const) : ("host" as const),
+        provenance: "host:conversation",
+        sources: [],
+        revision: 1,
+        createdAt: turn.at,
+        updatedAt: turn.at,
+      })),
+      Date.now(),
+    );
+  };
   missions.missionPauseGate = (missionId) => agents.blockedForMission(missionId);
   // M-A-3 T9R-F02 (D3/D5): admission-time liveness of the device behind a one-time answer or a staged change. A
   // revoked, signed-out or expired device's earlier answers never authorize anything again.
@@ -450,6 +513,20 @@ export async function startHost(
             }),
             profile: personalContext.profile(slot),
             turns: personalContext.turns(slot),
+            memories: (() => {
+              const projectScopes = new Set<LotusScope>();
+              for (const agentId of personalContext.owned(slot)) {
+                const missionId = byId.get(agentId)?.missionId;
+                if (!missionId) continue;
+                try {
+                  const projectId = missions.mission(missionId).projectId;
+                  if (projectId) projectScopes.add(`project:${projectId}`);
+                } catch {
+                  // A Mission whose row is no longer retained adds no Project boundary.
+                }
+              }
+              return lotus.list([`agent:${slot}`, ...projectScopes]).slice(0, 60);
+            })(),
           })),
         };
       })(),
@@ -1022,10 +1099,98 @@ export async function startHost(
             const slot = refused(() => parseSlot(data.slot));
             const question = refused(() => cleanTurn(data.text));
             const now = Date.now();
-            personalContext.appendTurn(slot, "user", question, "user", now);
-            const reply = answerFromOwnFacts({ ...ownFacts(slot), question });
-            const turn = personalContext.appendTurn(slot, "agent", reply, "host-facts", now);
-            extra = { data: { slot, reply: turn } };
+            const facts = ownFacts(slot);
+            const asked = personalContext.appendTurn(slot, "user", question, "user", now);
+            // Recall is labelled by trust ("you told me", "a model's unverified note", quoted outside text); it never restates as fact what was only inferred.
+            const remembered = recall(slot, question, 3);
+            const answer = answerFromOwnFacts({ ...facts, question });
+            const reply = remembered.length ? `${answer}\nFrom memory:\n${remembered.map((memory) => `- ${render(memory)}`).join("\n")}` : answer;
+            const answered = personalContext.appendTurn(slot, "agent", reply.slice(0, 4000), "host-facts", now);
+            compactTurns(slot, [...asked.dropped, ...answered.dropped], facts.name);
+            extra = { data: { slot, reply: answered.turn } };
+            break;
+          }
+          case "lotus.remember": {
+            if (!local) throw new WorkstationRequiredError("Lotus memory is kept on the workstation (Windows Host).");
+            const scope = refused(() => parseScope(data.scope));
+            if (scope.startsWith("project:")) refused(() => projects.detail(scope.slice("project:".length), 0, 1));
+            // Text the user pastes from a web page or a repository is evidence about that source, never an authority.
+            const origin = data.origin === "web" || data.origin === "repository" ? data.origin : "user";
+            const { memory, duplicate } = refused(() =>
+              lotus.write(
+                {
+                  scope,
+                  layer: data.layer === undefined ? "central" : parseLayer(data.layer),
+                  key: data.key as string,
+                  value: data.value as string,
+                  trust: origin === "user" ? "user" : "untrusted",
+                  provenance: origin === "user" ? "user:studio" : `user:pasted-${origin}`,
+                },
+                Date.now(),
+              ),
+            );
+            manager.emit(db.event("lotus.remembered", null, `${duplicate ? "Refreshed" : "Saved"} a ${memory.layer} memory in ${scope}.`));
+            extra = { data: { memory, duplicate } };
+            break;
+          }
+          case "lotus.correct": {
+            if (!local) throw new WorkstationRequiredError("Lotus memory is kept on the workstation (Windows Host).");
+            const memory = refused(() => lotus.correct(String(data.id ?? "").slice(0, 100), data.value, Date.now()));
+            manager.emit(db.event("lotus.corrected", null, `Corrected a memory in ${memory.scope} (revision ${memory.revision}).`));
+            extra = { data: { memory } };
+            break;
+          }
+          case "lotus.promote": {
+            if (!local) throw new WorkstationRequiredError("Lotus memory is kept on the workstation (Windows Host).");
+            const memory = refused(() => lotus.promote(String(data.id ?? "").slice(0, 100), parseLayer(data.layer), "user", Date.now()));
+            manager.emit(db.event("lotus.promoted", null, `Moved a memory in ${memory.scope} to the ${memory.layer} layer.`));
+            extra = { data: { memory } };
+            break;
+          }
+          case "lotus.forget": {
+            if (!local) throw new WorkstationRequiredError("Lotus memory is kept on the workstation (Windows Host).");
+            const id = String(data.id ?? "").slice(0, 100);
+            const scope = lotus.get(id)?.scope;
+            if (!lotus.forget(id)) throw new CommandRefusedError("That memory no longer exists.");
+            manager.emit(db.event("lotus.forgotten", null, `Forgot a memory in ${scope}, with every earlier revision.`));
+            break;
+          }
+          case "lotus.export": {
+            if (!local) throw new WorkstationRequiredError("Lotus memory is exported only on the workstation (Windows Host).");
+            extra = { data: lotus.export(refused(() => parseScope(data.scope)), Date.now()) };
+            break;
+          }
+          case "lotus.share": {
+            // Explicit, scoped handoff: copies of chosen Agent memories become notes of one Project the Agent works in.
+            // Other Agents in that Project then read them; nobody reads the Agent's private scope.
+            if (!local) throw new WorkstationRequiredError("Sharing memory between Agents requires the workstation (Windows Host).");
+            const slot = refused(() => parseSlot(data.slot));
+            const projectId = typeof data.projectId === "string" ? data.projectId.slice(0, 120) : "";
+            if (!ownProjects(slot).includes(projectId)) throw new CommandRefusedError("A Personal Agent can share memory only into a Project it has a Mission in.");
+            const ids = Array.isArray(data.ids) ? data.ids.filter((id): id is string => typeof id === "string").slice(0, 20) : [];
+            if (!ids.length) throw new CommandRefusedError("Choose at least one memory to share.");
+            const shared = ids.map((id) => {
+              const memory = lotus.get(id);
+              if (!memory || memory.scope !== `agent:${slot}`) throw new CommandRefusedError("A Personal Agent can share only its own memories.");
+              return refused(() =>
+                lotus.write(
+                  { scope: `project:${projectId}`, layer: memory.layer, key: memory.key, value: memory.value, trust: memory.trust, provenance: `handoff:agent:${slot}`, sources: [memory.id] },
+                  Date.now(),
+                ),
+              ).memory;
+            });
+            manager.emit(db.event("lotus.shared", null, `Personal Agent ${slot} shared ${shared.length} ${shared.length === 1 ? "memory" : "memories"} into Project ${projectId}.`));
+            extra = { data: { shared } };
+            break;
+          }
+          case "lotus.recall": {
+            // Authorized retrieval: rendered, labelled lines only. With projectId it is the minimal slice a child worker receives.
+            if (!local) throw new WorkstationRequiredError("Lotus memory is read only on the workstation (Windows Host).");
+            const slot = refused(() => parseSlot(data.slot));
+            const query = typeof data.query === "string" ? data.query.slice(0, 500) : "";
+            const projectId = typeof data.projectId === "string" && data.projectId ? data.projectId.slice(0, 120) : null;
+            const limit = Number.isInteger(data.limit) && (data.limit as number) > 0 ? Math.min(data.limit as number, 12) : 6;
+            extra = { data: { lines: recall(slot, query, limit, projectId).map(render) } };
             break;
           }
           case "verification.record": {

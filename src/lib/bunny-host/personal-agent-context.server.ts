@@ -63,11 +63,14 @@ export class PersonalAgentContextStore {
     this.db.prepare("INSERT INTO personal_agent_profiles(slot,record) VALUES(?,?) ON CONFLICT(slot) DO UPDATE SET record=excluded.record").run(profile.slot, JSON.stringify(profile));
   }
 
-  appendTurn(slot: SlotId, role: TurnRole, text: string, basis: TurnBasis, at: number): ConversationTurn {
+  /** Appends a turn and returns the oldest turns that fell outside retention, so the caller can compact them. */
+  appendTurn(slot: SlotId, role: TurnRole, text: string, basis: TurnBasis, at: number): { turn: ConversationTurn; dropped: ConversationTurn[] } {
     const result = this.db.prepare("INSERT INTO personal_agent_turns(slot,at,role,text,basis) VALUES(?,?,?,?,?)").run(slot, at, role, text, basis);
-    this.db.prepare("DELETE FROM personal_agent_turns WHERE slot=? AND id NOT IN (SELECT id FROM personal_agent_turns WHERE slot=? ORDER BY id DESC LIMIT ?)")
-      .run(slot, slot, CONTEXT_LIMITS.retainedTurns);
-    return { id: Number(result.lastInsertRowid), slot, at, role, text, basis };
+    const dropped = this.db
+      .prepare("SELECT id,slot,at,role,text,basis FROM personal_agent_turns WHERE slot=? ORDER BY id DESC LIMIT -1 OFFSET ?")
+      .all(slot, CONTEXT_LIMITS.retainedTurns) as ConversationTurn[];
+    if (dropped.length) this.db.prepare(`DELETE FROM personal_agent_turns WHERE id IN (${dropped.map(() => "?").join(",")})`).run(...dropped.map((turn) => turn.id));
+    return { turn: { id: Number(result.lastInsertRowid), slot, at, role, text, basis }, dropped: dropped.reverse() };
   }
   /** The newest `limit` turns of ONE slot, oldest first. */
   turns(slot: SlotId, limit: number = CONTEXT_LIMITS.projectedTurns): ConversationTurn[] {

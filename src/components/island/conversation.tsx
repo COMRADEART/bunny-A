@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useIsland } from "@/store/use-island";
 import { WEAPON_LABEL } from "@/lib/bunny-host/personal-agents";
 import { CONTEXT_LIMITS, type ConversationIdentity } from "@/lib/bunny-host/personal-agent-context";
+import { AgentMemory } from "./memory";
 
 /** Host states in which an owned Agent is actually doing work; "not started" or "paused" never reads as working. */
 const WORKING = new Set(["PLANNING", "RUNNING", "VERIFYING", "WAITING_FOR_DEPENDENCY"]);
@@ -79,7 +80,7 @@ export function AgentConversation() {
             </p>
             <ol aria-label={`Conversation with ${nameOf(own.slot)}`} style={{ listStyle: "none", padding: 0, margin: "8px 0", display: "grid", gap: 6 }}>
               {own.turns.map((turn) => (
-                <li key={turn.id}>
+                <li key={turn.id} style={{ whiteSpace: "pre-line" }}>
                   <strong>{turn.role === "user" ? "You" : nameOf(own.slot)}:</strong> {turn.text}
                 </li>
               ))}
@@ -100,6 +101,7 @@ export function AgentConversation() {
                 {sending ? "Sending…" : "Send"}
               </button>
             </form>
+            <AgentMemory slot={own.slot} name={nameOf(own.slot)} memories={own.memories ?? []} />
           </>
         )}
         {refusal && (

@@ -1,6 +1,7 @@
 import type { AgentSnapshot } from "./agent-types.ts";
 import type { MissionView } from "../bunny-missions/types.ts";
 import { looksSecret } from "./intelligence.ts";
+import type { LotusMemory } from "./lotus.ts";
 import { SLOT_IDS, WEAPON_LABEL, clean, type SlotId, type WeaponId } from "./personal-agents.ts";
 
 /**
@@ -108,6 +109,8 @@ export type PersonalAgentContextSlot = {
   owned: { agentId: string; missionId: string | null; state: string }[];
   profile: PersonalAgentProfile;
   turns: ConversationTurn[];
+  /** T13.3 Gate C: Lotus memories this Agent may read (its own scope and its Projects), newest first, bounded. */
+  memories: LotusMemory[];
 };
 /** Workstation-only projection; paired devices never receive it (private conversation and preferences). */
 export type PersonalAgentContextSnapshot = { schema: typeof PERSONAL_AGENT_CONTEXT_SCHEMA; foreground: ConversationIdentity; slots: PersonalAgentContextSlot[] };
