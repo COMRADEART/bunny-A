@@ -28,6 +28,7 @@ import { VoiceChunker, chunkAnswer, type SpokenChunk } from "./voice-chunker.ts"
 import { claimsAction, classifyTranscript, controlAction, type VoiceIntent } from "./voice-intent.ts";
 import { VoiceTurnTaking, echoMatch, echoTokens, type TurnDecision } from "./voice-turn-taking.ts";
 import { answerApprovals, answerFollowUp, answerTeam, answerLastMission, answerModel, answerStatus, answerVerification, humanState, isTerminalAgent, missionLabel, MISSION_OVER, type AgentFact, type ApprovalFact, type FollowUpSubject, type MissionFact } from "./voice-answers.server.ts";
+import { RECENT_ANSWERS_MAX, type RecentAnswer, type SpeakerId } from "./voice-personalization.ts";
 
 export type ListenSource = "button" | "hotkey" | "push_to_talk" | "hands_free";
 export type InterruptSource = VoiceInterruptReceipt["source"];
@@ -145,6 +146,11 @@ export type VoiceSessionDeps = {
   chat: VoiceChatPort;
   agents: VoiceAgentPort;
   accounts?: () => import("../connections.ts").DeviceConnectionView[];
+  /**
+   * M-A-3 T13.3 Gate G: who is speaking this turn, the spoken-chat instruction for that speaker, and the installed voice
+   * to read it with. Optional: without it Bunny speaks with SPOKEN_CHAT_INSTRUCTION and the worker's default voice.
+   */
+  persona?: () => { speaker: SpeakerId; instruction: string; voice: string | null };
   /** Journal: a type and a coarse detail. Never transcripts, answers, audio or device secrets (V52). */
   journal: (type: string, detail: string) => void;
   now?: () => number;
@@ -158,7 +164,9 @@ type Clarification =
   | { purpose: "followup"; focus: string; candidates: Candidate[]; expiresAt: number };
 /** T12 F4: the ids a Host-facts answer named, in spoken order. Ids only: the state is always read again from live rows. */
 type Referent = { kind: "agents" | "missions"; ids: string[]; missionId: string | null; at: number; hostEpoch: string };
-type Inference = { taskId: string; turn: string; gen: number; chunker: VoiceChunker; spoken: string[]; done: boolean; received: boolean; claimBlocked?: boolean; tail?: string };
+type Inference = { taskId: string; turn: string; gen: number; chunker: VoiceChunker; spoken: string[]; done: boolean; received: boolean; claimBlocked?: boolean; tail?: string; speaker: SpeakerId; voice: string | null };
+/** Gate G: interruptions the user caused. A timeout, a lost Host or a closing session says nothing about answer length. */
+const USER_INTERRUPTS = new Set<InterruptSource>(["button", "hotkey", "push_to_talk", "mute", "new_turn", "acoustic", "speech_stop"]);
 /** T12: a reply held on speech onset. Keyed by output generation: a resume or a stale timer can never touch newer speech. */
 type Hold = { turn: string; gen: number; inputTurn: string; inputGen: number; cancelResume: (() => void) | null; cancelMax: (() => void) | null };
 /** T12: how the Host received a transcript: from the duplex lane, a push-to-talk capture, or typed text. */
@@ -213,6 +221,10 @@ export class VoiceSessionManager {
   /** R3-session#2: one close at a time; a second close joins the first instead of racing it. */
   private closingPromise: Promise<VoiceSnapshot> | null = null;
   private pendingAtTurn = false;
+  /** Gate G: recent model answers by turn id, length, speaker and interruption only (never their text). */
+  private answers: RecentAnswer[] = [];
+  /** Gate G: installed Windows voices the worker reported when it started. */
+  private voices: string[] = [];
   private readonly now: () => number;
   private readonly schedule: (fn: () => void, ms: number) => () => void;
   /** listen.start presses waiting for the previous turn's final (Part B live finding). */
@@ -331,6 +343,14 @@ export class VoiceSessionManager {
   }
 
   /** The VoiceSnapshot clients render. A copy: callers cannot mutate session state. */
+  /** Gate G: the recent model answers that may be rated, newest last. */
+  recentAnswers(): RecentAnswer[] {
+    return this.answers.map((row) => ({ ...row }));
+  }
+  installedVoices(): string[] {
+    return [...this.voices];
+  }
+
   snapshot(): VoiceSnapshot {
     // M-A-3 T13: the companion is re-derived at read time, so a time-based expression (receipt window, proposal expiry) ends
     // on its own. A change of expression is a change of view, so it advances the revision.
@@ -1499,8 +1519,9 @@ export class VoiceSessionManager {
       .slice(-VOICE_LIMITS.maxHistoryTurns)
       .map((item) => `User: ${item.user}\n${item.host ? "Assistant (Host facts, not a model answer)" : "Assistant"}: ${item.assistant}`)
       .join("\n");
+    const persona = this.persona();
     const prompt = [
-      SPOKEN_CHAT_INSTRUCTION,
+      persona?.instruction ?? SPOKEN_CHAT_INSTRUCTION,
       history,
       `User: ${transcript}`,
     ].filter(Boolean).join("\n\n");
@@ -1545,7 +1566,16 @@ export class VoiceSessionManager {
       model: task.model && task.model.trim() && !/^auto$/i.test(task.model.trim()) ? task.model : "UNKNOWN",
     };
     if (this.snap.timing) this.snap.timing = { ...this.snap.timing, admittedAt: this.now() };
-    this.startInference(task.taskId, turn);
+    this.startInference(task.taskId, turn, persona);
+  }
+
+  /** Gate G: a persona that cannot be read leaves Bunny speaking exactly as before. */
+  private persona(): { speaker: SpeakerId; instruction: string; voice: string | null } | null {
+    try {
+      return this.deps.persona?.() ?? null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -1574,7 +1604,7 @@ export class VoiceSessionManager {
     this.waitingVoiceTasks.clear();
   }
 
-  private startInference(taskId: string, turn: string) {
+  private startInference(taskId: string, turn: string, persona: { speaker: SpeakerId; voice: string | null } | null) {
     const current: Inference = {
       taskId,
       turn,
@@ -1583,6 +1613,8 @@ export class VoiceSessionManager {
       spoken: [],
       done: false,
       received: false,
+      speaker: persona?.speaker ?? "bunny",
+      voice: persona?.voice ?? null,
     };
     this.inference = current;
     this.cancelTaskOutput = this.deps.chat.onOutput(taskId, (event) => {
@@ -1629,11 +1661,11 @@ export class VoiceSessionManager {
     this.sendChunk(current, chunk);
   }
 
-  private sendChunk(current: { turn: string; gen: number; spoken: string[] }, chunk: SpokenChunk) {
+  private sendChunk(current: { turn: string; gen: number; spoken: string[]; voice: string | null }, chunk: SpokenChunk) {
     this.outstanding += 1;
     current.spoken.push(chunk.text);
     this.rememberSpoken(current.turn, current.gen, chunk.seq, chunk.text);
-    this.tryWorker({ op: "speak", turn: current.turn, gen: current.gen, seq: chunk.seq, text: chunk.text, device: -1, voice: null });
+    this.tryWorker({ op: "speak", turn: current.turn, gen: current.gen, seq: chunk.seq, text: chunk.text, device: -1, voice: current.voice });
     this.noteDuplexActivity();
   }
 
@@ -1652,6 +1684,7 @@ export class VoiceSessionManager {
       while (this.history.length > VOICE_LIMITS.maxHistoryTurns) this.history.shift();
       // A replaced claim is the Host's sentence, not the model's.
       this.setAnswer(answer, current.claimBlocked ? "refusal" : "model");
+      if (!current.claimBlocked) this.rememberAnswer({ turnId: current.turn, speaker: current.speaker, chars: answer.length, interrupted: false, at: this.now() });
     } else {
       this.setAnswer(state === "completed" ? "I didn't get an answer." : `That answer did not finish (${state}).`, "refusal");
     }
@@ -1714,7 +1747,7 @@ export class VoiceSessionManager {
       return;
     }
     this.setState("PROCESSING");
-    const current = { turn, gen: this.snap.generation, spoken: [] as string[] };
+    const current = { turn, gen: this.snap.generation, spoken: [] as string[], voice: this.persona()?.voice ?? null };
     for (const chunk of chunks) this.sendChunk(current, chunk);
     this.touch();
   }
@@ -1728,6 +1761,7 @@ export class VoiceSessionManager {
     const oldTurn = this.snap.turnId ?? "none";
     const wasPlaying = this.snap.playing || this.hold !== null;
     const hadInference = this.inference !== null;
+    if (USER_INTERRUPTS.has(source)) this.markInterrupted(oldTurn, wasPlaying, this.inference);
     this.snap.generation += 1;
     this.tryWorker({ op: "speak.cancel", gen: oldGen });
     this.forgetUnplayed(oldTurn, oldGen);
@@ -1742,6 +1776,24 @@ export class VoiceSessionManager {
     if (stopping) void stopping.then((ok) => this.acknowledgeInferenceStop(receipt, ok === true));
     this.setState("INTERRUPTED");
     this.deps.journal("voice.interrupted", `Speech interrupted (${source}).`);
+  }
+
+  private rememberAnswer(row: RecentAnswer) {
+    this.answers = [...this.answers.filter((item) => item.turnId !== row.turnId), row].slice(-RECENT_ANSWERS_MAX);
+  }
+
+  /**
+   * Gate G: the user cut a model answer short. A finished answer still playing is marked; an answer interrupted while it was
+   * still streaming is remembered with what had been spoken. Host-authored answers are never counted.
+   */
+  private markInterrupted(turn: string, wasPlaying: boolean, streaming: Inference | null) {
+    const finished = this.answers.find((row) => row.turnId === turn);
+    if (finished) {
+      if (wasPlaying) this.rememberAnswer({ ...finished, interrupted: true });
+      return;
+    }
+    if (streaming && streaming.turn === turn && !streaming.claimBlocked && streaming.spoken.length)
+      this.rememberAnswer({ turnId: turn, speaker: streaming.speaker, chars: streaming.spoken.join(" ").length, interrupted: true, at: this.now() });
   }
 
   private recordInterrupt(source: InterruptSource, inferenceStopped: boolean | null, wasPlaying: boolean, turn: string, gen: number, requested = false): VoiceInterruptReceipt {
@@ -2565,6 +2617,7 @@ export class VoiceSessionManager {
         this.duplexSupported = event.duplex?.supported === true;
         this.snap.duplex = freshDuplex(this.duplexSupported, this.snap.duplex?.stopped ?? null);
         this.snap.engines = { stt: event.stt.engine, tts: event.tts.engine, local: true };
+        this.voices = (Array.isArray(event.tts.voices) ? event.tts.voices : []).filter((name): name is string => typeof name === "string").map((name) => name.slice(0, 80)).slice(0, 32);
         this.readyResolve?.(true);
         this.readyResolve = null;
         return this.touch();

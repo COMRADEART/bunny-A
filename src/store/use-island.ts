@@ -33,6 +33,8 @@ import type { PersonalAgentContextSnapshot } from "@/lib/bunny-host/personal-age
 import type { HarnessView } from "@/lib/bunny-host/harnesses";
 import type { SessionLedgerView } from "@/lib/bunny-host/session-ledger";
 import type { SchedulerView } from "@/lib/bunny-host/fairness";
+import type { RoutingLearningView } from "@/lib/bunny-host/routing-feedback";
+import { notificationAllowed, type VoicePersonalizationView } from "@/lib/bunny-host/voice/voice-personalization";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import {
   parseAccountIntent,
@@ -214,6 +216,14 @@ type Island = Preferences & {
   scheduler: SchedulerView | null;
   /** One `scheduler.*` command; the Host's answer or null when refused. */
   schedulerCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** M-A-3 T13.3 Gate G: routing-improvement evidence and policy lifecycle (workstation only; null on devices). */
+  routingLearning: RoutingLearningView | null;
+  /** One `routing.learning.*` command; the Host's answer or null when refused. */
+  routingLearningCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** M-A-3 T13.3 Gate G: voice preferences, answer ratings and advice (workstation only; null on devices). */
+  voicePersonalization: VoicePersonalizationView | null;
+  /** One `personalization.*` command; the Host's answer or null when refused. */
+  personalizationCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
   voice: VoiceSnapshot | null;
   /** Local receipt time of the last voice answer; a stale value means voice is reconnecting, not listening. */
@@ -740,6 +750,8 @@ export const useIsland = create<Island>((set, get) => {
       harnesses: snapshot.harnesses?.harnesses ?? null,
       sessionLedger: snapshot.sessionLedger ?? null,
       scheduler: snapshot.scheduler ?? null,
+      routingLearning: snapshot.routingLearning ?? null,
+      voicePersonalization: snapshot.voicePersonalization ?? null,
       intelligence: snapshot.intelligence ?? null,
       connections: snapshot.connections ?? null,
       deviceConnections: snapshot.deviceConnections ?? [],
@@ -778,7 +790,7 @@ export const useIsland = create<Island>((set, get) => {
         ].includes(event.type)
       ) {
         if (event.type === "thermal.warning") get().note(event.detail);
-        notify(
+        if (notificationAllowed(event.type, get().voicePersonalization?.preferences.notificationFrequency ?? "all")) notify(
           event.type === "thermal.warning" ? event.detail : event.type.replaceAll(".", " "),
           event.taskId ?? event.missionId ?? event.type,
         );
@@ -803,6 +815,8 @@ export const useIsland = create<Island>((set, get) => {
       harnesses: null,
       sessionLedger: null,
       scheduler: null,
+      routingLearning: null,
+      voicePersonalization: null,
       intelligence: null,
       connections: null,
       deviceConnections: [],
@@ -1207,6 +1221,10 @@ export const useIsland = create<Island>((set, get) => {
     sessionLedger: null,
     scheduler: null,
     schedulerCommand: (action, data, onRefused) => command(action, data, "scheduler", onRefused),
+    routingLearning: null,
+    routingLearningCommand: (action, data, onRefused) => command(action, data, "routing-learning", onRefused),
+    voicePersonalization: null,
+    personalizationCommand: (action, data, onRefused) => command(action, data, "personalization", onRefused),
     intelligence: null,
     connections: null,
     deviceConnections: [],

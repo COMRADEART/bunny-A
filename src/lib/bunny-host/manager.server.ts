@@ -10,7 +10,7 @@ import { bunnyRoute, eligibility, inferredConstraints, runsLocally } from "./rou
 import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask ,
 } from "./contracts.ts";
-import { PolicyEngine } from "./learning.server.ts";
+import { PolicyEngine, toRecorded } from "./learning.server.ts";
 import { classifyRequirements, effortRequirement, type TaskRequirements ,
 } from "../orch/router-requirements.ts";
 import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, QUOTA_WRITE_PAUSE, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
@@ -740,6 +740,7 @@ export class TaskManager {
     });
     const modelSnapshot = this.modelCapabilities.snapshot();
     const usage = this.providerUsage.snapshot();
+    const learning = { taskType: input.taskType ?? "general", mode: input.mode, weights: this.policy.liveWeights(), signal: this.policy.learningSignal() };
     const candidates = buildCandidates({
       providers: input.providers,
       modelSnapshot,
@@ -750,12 +751,12 @@ export class TaskManager {
       override: input.override ?? "auto",
       modelOverride: input.modelOverride,
       mode: input.mode,
-      empirical: (provider) => this.db.learned(provider, input.taskType ?? "general"),
+      empirical: (provider) => learning.signal(provider, learning.taskType, learning.mode, learning.weights),
       layaGate: (model, taskClass) => (!isLayaModel(model) ? null : !this.laya.enabled ? `Laya routing is turned off in Settings; ${model} is not eligible.` : layaExclusion(model, taskClass, this.laya.benchmarks(model))),
       connectionGate: (provider,model)=>{ const gate=this.connections.evaluate({kind:"advice",provider,model,projectId:input.projectId??null,origin:"workstation",route:null});return gate.ok?null:gate.reason; },
     });
     const selection = selectRoutingCandidate({ candidates, requirements });
-    return { requirements, candidates, selection, modelSnapshot, usage };
+    return { requirements, candidates, selection, modelSnapshot, usage, learning };
   }
   /** §11: the Task's effort requirement resolved through the provider's real effort contract; null = PROVIDER_DEFAULT. */
   private nativeEffort(
@@ -800,7 +801,7 @@ export class TaskManager {
     terminalNote?: string;
     assistance?: RoutingDecisionRecord["assistance"];
   }): RoutingDecisionRecord {
-    return safeDecisionRecord({
+    const record = safeDecisionRecord({
       id: input.id,
       taskId: input.taskId,
       missionId: input.missionId,
@@ -819,6 +820,15 @@ export class TaskManager {
       terminalNote: input.terminalNote,
       assistance: input.assistance,
     });
+    this.policy.recordShadow({
+      decisionId: input.id,
+      taskId: input.taskId,
+      taskType: input.pipeline.learning.taskType,
+      mode: input.pipeline.learning.mode,
+      candidates: record.candidates_considered.map(toRecorded),
+      selected: record.selected ? { provider: record.selected.provider_id, model: record.selected.model_id } : null,
+    });
+    return record;
   }
   /** §5 clarity: the readable reasons a pipeline pass produced no eligible candidate. */
   private pipelineFailure(pipeline: ReturnType<TaskManager["routingPipeline"]>): string {
@@ -1059,6 +1069,7 @@ export class TaskManager {
       constraints,
       override: input.override,
       modelOverride: input.modelOverride,
+      taskType: decision.task_type,
     });
     const selection = pipeline.selection.selected;
     const routingDecisionId = crypto.randomUUID();
@@ -1246,6 +1257,7 @@ export class TaskManager {
       constraints: task.constraints ?? {},
       override: provider,
       modelOverride,
+      taskType: task.decision.task_type,
     });
     const selection = pipeline.selection.selected;
     const routingDecisionId = task.routingDecisionId ?? crypto.randomUUID();

@@ -9,7 +9,9 @@ import type { Launchable } from "./discovery.server.ts";
 import { HostDatabase } from "./persistence.server.ts";
 import { TaskManager } from "./manager.server.ts";
 import { RoutingDecisionStore } from "./routing-store.server.ts";
-import { PROVIDER_EFFORT_CONTRACTS, ROUTING_POLICY_VERSION, type RoutingDecisionRecord } from "./routing.server.ts";
+import { PROVIDER_EFFORT_CONTRACTS, ROUTING_POLICY, ROUTING_POLICY_VERSION, type RoutingDecisionRecord } from "./routing.server.ts";
+import { toRecorded } from "./learning.server.ts";
+import { empiricalPoints, repick } from "./routing-feedback.ts";
 import { CODEX_SECURITY_POLICY_VERSION, CODEX_COMPATIBILITY_MAX_AGE_MS, type CodexCompatibilityProfile } from "../orch/compatibility.ts";
 import type { AdapterHooks, AdapterResult, ProviderAdapter } from "./contracts.ts";
 import type { OrchTask, ProviderId, ProviderLive } from "../orch/types.ts";
@@ -441,5 +443,48 @@ test("T3 §5/§22/§23: a MANUAL selection retries its own candidate once and th
     const attempts = env.routing.attempts(task.id);
     assert.deepEqual(attempts.map((attempt) => [attempt.attemptIndex, attempt.provider, attempt.taxonomy]), [[0, "codex", "TRANSIENT_TRANSPORT"], [1, "codex", "PROVIDER_REFUSAL"]]);
     assert.ok(eventsOf(env, task.id).some(([type, detail]) => type === "routing.exhausted" && /all_eligible_models_failed \(codex · gpt-5\.3-codex → TRANSIENT_TRANSPORT; codex · gpt-5\.3-codex → PROVIDER_REFUSAL\)/.test(detail)));
+  } finally { env.cleanup(); }
+});
+
+test("T13.3 G §20: a shadow policy scores every live decision beside it and never changes what is dispatched", async () => {
+  const env = await t3Fixture(["codex", "claude", "ollama"]);
+  try {
+    const control = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
+    const controlRecord = env.routing.decision(control.routingDecisionId!)!;
+    // Verified history only in this task type's bucket: the shadow policy (per task type) sees it, the base policy does not.
+    for (let n = 0; n < 6; n++)
+      env.db.outcome({ id: `seed-${n}`, provider: "claude", decision: { task_type: control.decision.task_type, complexity: 0.5, scores: [] }, state: "completed", verification: { passed: false, detail: "fixture" }, startedAt: NOW, finishedAt: NOW + 1000, mode: "balanced", model: null } as unknown as OrchTask);
+    // SIMULATED gate passage: an extreme per-task-type policy is placed in shadow directly; the gate has its own tests.
+    const shadowWeights = { historyWeight: 2, latencyWeight: 0.05, perTaskType: true };
+    env.db.db.prepare("INSERT INTO policies VALUES(?,?,?,?)").run("shadow-fixture", JSON.stringify({ id: "shadow-fixture", workloadWeight: 0, ...shadowWeights }), JSON.stringify({ regressions: 0, promotable: true }), env.tasks.policy.active().id);
+    env.db.db.prepare("INSERT INTO policy_lifecycle(policy_id,state,proposed_by,created_at,shadow_started_at) VALUES('shadow-fixture','shadow','owner',?,?)").run(NOW, NOW);
+    assert.equal(env.tasks.policy.shadowPolicy()!.id, "shadow-fixture");
+
+    const task = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
+    assert.deepEqual({ provider: task.provider, model: task.model, effort: task.effort }, { provider: control.provider, model: control.model, effort: control.effort }, "dispatch is identical with and without a shadow run");
+    const record = env.routing.decision(task.routingDecisionId!)!;
+    assert.deepEqual(record.candidates_considered.map((row) => [row.provider_id, row.model_id, row.score]), controlRecord.candidates_considered.map((row) => [row.provider_id, row.model_id, row.score]));
+    const row = env.db.db.prepare("SELECT * FROM policy_shadow WHERE decision_id=?").get(task.routingDecisionId!) as { policy_id: string; task_id: string; live_provider: string; live_model: string; shadow_provider: string | null; shadow_model: string | null };
+    assert.deepEqual([row.policy_id, row.task_id, row.live_provider, row.live_model], ["shadow-fixture", task.id, record.selected!.provider_id, record.selected!.model_id]);
+    const signal = env.tasks.policy.learningSignal();
+    const livePoints = (provider: ProviderId, weights: ReturnType<typeof env.tasks.policy.liveWeights>) => empiricalPoints(signal(provider, task.decision.task_type, "balanced", weights), ROUTING_POLICY.weights.empirical);
+    assert.notEqual(livePoints("claude", shadowWeights), livePoints("claude", env.tasks.policy.liveWeights()), "the seeded evidence separates the two policies");
+    assert.deepEqual(
+      record.candidates_considered.map((row) => toRecorded(row).empirical),
+      record.candidates_considered.map((row) => livePoints(row.provider_id, env.tasks.policy.liveWeights())),
+      "every live score carries the accepted policy's empirical points, never the shadow's",
+    );
+    const expected = repick(record.candidates_considered.map(toRecorded), (candidate) => empiricalPoints(signal(candidate.provider, task.decision.task_type, "balanced", shadowWeights), ROUTING_POLICY.weights.empirical));
+    assert.deepEqual({ provider: row.shadow_provider, model: row.shadow_model }, { provider: expected!.provider, model: expected!.model }, "the shadow pick is the candidate policy replayed on this decision's own scores");
+    assert.equal(env.db.db.prepare("SELECT COUNT(*) n FROM policy_shadow WHERE decision_id=?").get(control.routingDecisionId!)!.n, 0, "no shadow row before the run started");
+
+    env.tasks.approve(task.id);
+    await until(() => env.parts[task.provider as ProviderId].launched.length === 1, "launch under shadow");
+    const launched = env.parts[task.provider as ProviderId].launched[0].task;
+    assert.deepEqual([launched.provider, launched.model], [record.selected!.provider_id, task.model], "the launched configuration is the live selection");
+    env.parts[task.provider as ProviderId].launched[0].finish({ ok: true, output: "done", exitCode: 0 });
+    await until(() => env.db.get(task.id).state === "completed", "completion");
+    const shadow = env.tasks.policy.view().candidates.find((candidate) => candidate.id === "shadow-fixture")!.shadow!;
+    assert.deepEqual([shadow.decisions, shadow.verified], [1, 0], "a completed but unverified Task is not verified evidence");
   } finally { env.cleanup(); }
 });

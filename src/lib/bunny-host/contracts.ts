@@ -61,6 +61,8 @@ export type HostSnapshot = {
   sessionLedger?: import("./session-ledger.ts").SessionLedgerView;
   /** M-A-3 T13.3 Gate F: routing priority and Personal Agent fairness. Workstation only. */
   scheduler?: import("./fairness.ts").SchedulerView;
+  routingLearning?: import("./routing-feedback.ts").RoutingLearningView;
+  voicePersonalization?: import("./voice/voice-personalization.ts").VoicePersonalizationView;
   /** M-A-3 T13.1 Laya/Jev intelligence state (no secrets; credential existence only). Absent for paired devices. */
   intelligence?: import("./intelligence-snapshot.ts").IntelligenceSnapshot;
   connections?: import("./connections.server.ts").ConnectionsSnapshot;

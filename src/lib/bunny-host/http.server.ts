@@ -50,7 +50,12 @@ import { PersonalAgentContextStore } from "./personal-agent-context.server.ts";
 import { PERSONAL_AGENT_CONTEXT_SCHEMA, answerFromOwnFacts, cleanTurn, parseIdentity, parseSlot, personalAgentName, validateProfile, type ConversationTurn } from "./personal-agent-context.ts";
 import { LotusStore } from "./lotus.server.ts";
 import { parseLayer, parseScope, rank, render, type LotusMemory, type LotusScope } from "./lotus.ts";
-import { VoiceSessionManager, type ListenSource, type InterruptSource } from "./voice/voice-session.server.ts";
+import { SPOKEN_CHAT_INSTRUCTION, VoiceSessionManager, type ListenSource, type InterruptSource } from "./voice/voice-session.server.ts";
+import { VoicePersonalizationStore } from "./voice/voice-personalization.server.ts";
+import {
+  FEEDBACK_RATINGS, SPEAKER_IDS, STYLE_VERBOSITY, personalizedInstruction, speakerFor, speakerId, voiceAdvice,
+  type FeedbackRating, type Speaker, type SpeakerId, type VoicePersonalizationView,
+} from "./voice/voice-personalization.ts";
 import { launchVoiceWorker } from "./voice/voice-worker.server.ts";
 import { hostFactsFrom, pendingApprovalFacts, type ApprovalFact } from "./voice/voice-answers.server.ts";
 import type { MissionState } from "../bunny-missions/types.ts";
@@ -675,6 +680,8 @@ export async function startHost(
         held: [...missions.admissionHolds].map(([missionId, reason]) => ({ missionId, slot: slotForMission(missionId), reason, since: heldSince.get(missionId) ?? null })),
         memoryUsedPercent: Math.round(memoryUsedPercent()),
       },
+      routingLearning: manager.policy.view(),
+      voicePersonalization: personalizationView(),
       personalAgentContext: (() => {
         const byId = new Map((canonical.agents?.agents ?? []).map((agent) => [agent.id, agent]));
         return {
@@ -709,12 +716,51 @@ export async function startHost(
       })(),
     };
   };
+  // M-A-3 T13.3 Gate G (§21): owner voice preferences. The foreground Personal Agent speaks as itself through Bunny.
+  const voicePreferences = new VoicePersonalizationStore(db);
+  function personalizationView(): VoicePersonalizationView {
+    const preferences = voicePreferences.preferences();
+    const speakers = SPEAKER_IDS.map((id) => {
+      const config = id === "bunny" ? null : manager.personalAgents.slots.find((row) => `${row.slot}` === id);
+      return config
+        ? { id, name: personalAgentName(config.weapon, config.displayName), verbosity: STYLE_VERBOSITY[config.style], source: "agent style" as const, voice: preferences.voices[id] ?? null }
+        : { id, name: "Bunny", verbosity: preferences.verbosity, source: "preference" as const, voice: preferences.voices[id] ?? null };
+    });
+    const answers = voice.recentAnswers();
+    const ratings = voicePreferences.rows();
+    const last = answers.at(-1);
+    return {
+      preferences,
+      speakers,
+      installedVoices: voice.installedVoices(),
+      lastAnswer: last ? { turnId: last.turnId, speaker: last.speaker, chars: last.chars, interrupted: last.interrupted } : null,
+      feedback: SPEAKER_IDS.map((id) => {
+        const own = ratings.filter((row) => row.speaker === id);
+        return { speaker: id, tooLong: own.filter((row) => row.rating === "too_long").length, tooShort: own.filter((row) => row.rating === "too_short").length, good: own.filter((row) => row.rating === "good").length };
+      }).filter((row) => row.tooLong + row.tooShort + row.good > 0),
+      storedFeedback: voicePreferences.stored().length,
+      interruptions: SPEAKER_IDS.map((id) => ({ speaker: id, answers: answers.filter((row) => row.speaker === id).length, interrupted: answers.filter((row) => row.speaker === id && row.interrupted).length })).filter((row) => row.answers > 0),
+      advice: voiceAdvice(ratings, answers, (id) => speakers.find((row) => row.id === id)!.verbosity),
+    };
+  }
+  const currentSpeaker = (): Speaker =>
+    speakerFor(
+      personalContext.foreground(),
+      manager.personalAgents.slots.map((row) => ({ slot: row.slot, name: personalAgentName(row.weapon, row.displayName), style: row.style })),
+      (slot) => personalContext.profile(slot).personality,
+    );
   // M-A-3 T10: the voice session. Workstation-only; the worker runs contained in a Bunny-owned job and nothing starts until a workstation opens it.
   const voice = new VoiceSessionManager({
     hostEpoch: hostIdentity.epoch,
     dataDirectory,
     launch: launchVoiceWorker,
     workerExtraArgs: options.voice?.workerExtraArgs,
+    persona: () => {
+      const speaker = currentSpeaker();
+      const preferences = voicePreferences.preferences();
+      const id = speakerId(speaker);
+      return { speaker: id, instruction: personalizedInstruction(SPOKEN_CHAT_INSTRUCTION, speaker, preferences), voice: preferences.voices[id] ?? null };
+    },
     chat: {
       submit: (prompt, routingPrompt) => {
         // Local, tool-free routing only: a voice turn never reaches a hosted or tool-capable route on its own.
@@ -866,7 +912,7 @@ export async function startHost(
     };
     // Voice is workstation-only: a device projection never carries it.
     if (principal.kind === "device") {
-      const { personalAgentContext: _private, harnesses: _harnesses, sessionLedger: _ledger, scheduler: _scheduler, ...shared } = withVerdicts;
+      const { personalAgentContext: _private, harnesses: _harnesses, sessionLedger: _ledger, scheduler: _scheduler, routingLearning: _learning, voicePersonalization: _voicePreferences, ...shared } = withVerdicts;
       const device = dashboardSnapshot(deviceSnapshot(shared, principal, presence));
       // M-A-3 T13: a device reads its slots only. The bindable list is a workstation Studio concern and reaches
       // beyond the Agents a device is shown (finished Agents are trimmed for devices), so it never leaves the workstation.
@@ -1560,8 +1606,74 @@ export async function startHost(
           }
           case "policy.promote":
             if (!local) throw new Error("Policy promotion requires workstation access.");
-            manager.policy.promote(text(data.id, 200));
+            manager.policy.promote(text(data.id, 200), manager.live());
             break;
+          case "routing.learning.propose":
+          case "routing.learning.candidate":
+          case "routing.learning.shadow":
+          case "routing.learning.accept":
+          case "routing.learning.reject":
+          case "routing.learning.rollback": {
+            // T13.3 Gate G: OBSERVE → EVALUATE → PROPOSE → SHADOW → ACCEPT/REJECT → VERSION/ROLLBACK, owner-decided on the workstation.
+            if (!local) throw new WorkstationRequiredError("Routing improvement is decided only on the workstation (Windows Host).");
+            const id = () => text(data.id, 200);
+            let detail: string;
+            try {
+              if (input.action === "routing.learning.propose") {
+                const result = manager.policy.proposeFromEvidence(manager.live());
+                detail = `Bunny proposed routing policy ${result.policy.id} from recorded evidence (${result.replay.decisions.improvements} measured improvement(s)).`;
+              } else if (input.action === "routing.learning.candidate") {
+                const result = manager.policy.candidate(Number(data.historyWeight), 0, manager.live(), data.latencyWeight === undefined ? 0 : Number(data.latencyWeight), data.perTaskType === true);
+                detail = `Routing policy ${result.policy.id} evaluated: ${result.replay.gate.ok ? "ready for a shadow test" : result.replay.gate.reason}`;
+              } else if (input.action === "routing.learning.shadow") {
+                detail = `Routing policy ${manager.policy.startShadow(id()).id} is being shadow tested; it never changes which model runs.`;
+              } else if (input.action === "routing.learning.accept") {
+                detail = `Routing policy ${manager.policy.accept(id(), manager.live()).id} accepted.`;
+              } else if (input.action === "routing.learning.reject") {
+                manager.policy.reject(id());
+                detail = `Routing policy ${id()} rejected.`;
+              } else {
+                detail = `Routing policy rolled back to ${manager.policy.rollback().id}.`;
+              }
+            } catch (error) {
+              throw new CommandRefusedError(error instanceof Error ? error.message : String(error));
+            }
+            manager.emit(db.event(input.action === "routing.learning.accept" || input.action === "routing.learning.rollback" ? "policy.changed" : "policy.evaluated", null, detail));
+            break;
+          }
+          case "personalization.preferences":
+          case "personalization.feedback":
+          case "personalization.feedback.forget": {
+            // T13.3 Gate G (§21): voice preferences and answer ratings belong to the workstation owner.
+            if (!local) throw new WorkstationRequiredError("Voice personalization is set only on the workstation (Windows Host).");
+            let detail: string;
+            if (input.action === "personalization.preferences") {
+              const requested = (data.preferences ?? {}) as { voices?: Record<string, unknown> };
+              const installed = voice.installedVoices();
+              for (const name of Object.values(requested.voices ?? {}))
+                if (typeof name === "string" && !installed.includes(name))
+                  throw new CommandRefusedError(installed.length ? "That voice is not installed on this PC." : "Open voice once so Bunny can list the voices installed on this PC.");
+              try {
+                voicePreferences.setPreferences(data.preferences);
+              } catch (error) {
+                throw new CommandRefusedError(error instanceof Error ? error.message : String(error));
+              }
+              detail = "Voice preferences changed.";
+            } else if (input.action === "personalization.feedback") {
+              const turnId = text(data.turnId, 120);
+              const rating = data.rating as FeedbackRating;
+              const answer = voice.recentAnswers().find((row) => row.turnId === turnId);
+              if (!answer) throw new CommandRefusedError("That answer is no longer available to rate.");
+              if (!FEEDBACK_RATINGS.includes(rating)) throw new CommandRefusedError("Unsupported feedback.");
+              voicePreferences.record(answer.speaker as SpeakerId, rating, Date.now());
+              detail = "Voice answer rated.";
+            } else {
+              voicePreferences.forget();
+              detail = "Voice feedback forgotten.";
+            }
+            manager.emit(db.event("voice.personalization", null, detail));
+            break;
+          }
           case "policy.rollback":
             if (!local) throw new Error("Policy rollback requires workstation access.");
             manager.policy.rollback();
