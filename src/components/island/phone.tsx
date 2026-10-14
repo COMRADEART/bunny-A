@@ -27,6 +27,7 @@ import type { CompanionView } from "../../lib/bunny-host/voice/voice-companion.t
 import type { PermissionRequest } from "../../lib/bunny-missions/types.ts";
 import { basisText, characterLabel, displayState } from "./character-model.ts";
 import { BunnyCompanion, WeaponCharacter, usePrefersReducedMotion, useHappyWindow } from "./characters";
+import { appearanceFor } from "./character-style-model";
 import { CONNECTION_LABEL } from "./connection-model.ts";
 import { companionView, COMPANION_LABEL, levelRingScale } from "./companion-model.ts";
 import { LIVE_MISSION } from "./mission-model.ts";
@@ -348,7 +349,7 @@ function SlotTile({ slot, view }: { slot: PersonalAgentView; view: View }) {
   });
   return (
     <button type="button" className="pc-slot" aria-label={label} onClick={() => view.go(agentRoute(slot.slot, "home"))}>
-      <WeaponCharacter key={slot.agentId ?? "unassigned"} weapon={slot.weapon} state={state} slot={slot.slot} size="compact" celebrate reduced={reduced} paused={!live} label={label} />
+      <WeaponCharacter key={slot.agentId ?? "unassigned"} weapon={slot.weapon} state={state} slot={slot.slot} size="compact" celebrate reduced={reduced} paused={!live} label={label} appearance={appearanceFor(view.store.characterAppearance, slot.slot)} />
       <span className="pc-slot-name">{slot.displayName}</span>
       <span className="pc-slot-state">{live ? slot.presentation.label : `Last known: ${slot.presentation.label}`}</span>
     </button>
@@ -433,7 +434,7 @@ function AgentsView({ view }: { view: View }) {
 function SlotCharacter({ slot, view }: { slot: PersonalAgentView; view: View }) {
   const state = displayState(slot.presentation.state, view.live);
   const label = characterLabel({ weapon: slot.weapon, displayName: slot.displayName, state, basis: view.live ? slot.presentation.basis : null, note: view.live ? null : "Host connection not live" });
-  return <WeaponCharacter weapon={slot.weapon} state={state} slot={slot.slot} size="compact" reduced={view.reduced} paused={!view.live} label={label} />;
+  return <WeaponCharacter weapon={slot.weapon} state={state} slot={slot.slot} size="compact" reduced={view.reduced} paused={!view.live} label={label} appearance={appearanceFor(view.store.characterAppearance, slot.slot)} />;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -503,7 +504,7 @@ function AgentDetailView({ slot, view }: { slot: SlotId; view: View }) {
   return (
     <div className="pc-stack">
       <section className="pc-hero-well" aria-label={`${row.displayName}`}>
-        <WeaponCharacter weapon={row.weapon} state={state} slot={row.slot} size="hero" reduced={reduced} paused={!live} label={label} />
+        <WeaponCharacter weapon={row.weapon} state={state} slot={row.slot} size="hero" reduced={reduced} paused={!live} label={label} appearance={appearanceFor(store.characterAppearance, row.slot)} />
       </section>
       <section className="pc-card">
         <h2 className="pc-name">{row.displayName}</h2>

@@ -12,6 +12,8 @@ import {
   type WeaponId,
 } from "@/lib/bunny-host/personal-agents";
 import { WeaponCharacter, usePrefersReducedMotion } from "./characters";
+import { appearanceFor } from "./character-style-model";
+import { CharacterAppearancePanel } from "./character-appearance";
 import { agentControls, type AgentView } from "./workspace-model";
 import { displayState, hostLive } from "./character-model";
 import { Empty } from "./ui";
@@ -173,6 +175,7 @@ export function Studio() {
                     displayName={slot.displayName}
                     basis={live ? view?.presentation.basis ?? null : null}
                     note={live ? null : "Host connection not live"}
+                    appearance={appearanceFor(store.characterAppearance, slot.slot)}
                   />
                 </div>
                 <strong>{slot.displayName || WEAPON_LABEL[slot.weapon]}</strong>
@@ -352,6 +355,16 @@ export function Studio() {
                 {notice}
               </p>
             )}
+          </div>
+
+          <div className="t8-surface" style={{ padding: 16, marginTop: 12 }}>
+            <CharacterAppearancePanel
+              slot={current.slot}
+              weapon={saved.find((row) => row.slot === current.slot)?.weapon ?? current.weapon}
+              displayName={saved.find((row) => row.slot === current.slot)?.displayName ?? current.displayName}
+              editable={mode.editable}
+              reduced={systemReduced || store.appearance.motion !== "full"}
+            />
           </div>
 
           <div className="t8-surface" style={{ padding: 16, marginTop: 12 }} aria-labelledby="authority-title">

@@ -65,6 +65,8 @@ export type MissionRow = {
   /** Set only when a slotted Personal Agent owns this Mission; otherwise the row shows a neutral icon. */
   weapon: WeaponId | null;
   weaponName: string | null;
+  /** The owning slot, for its character appearance. */
+  slot: number | null;
   /** The owning slot's Host presentation state, so the weapon art shows what the Host reports. */
   presentation: PresentationState | null;
   completed: number;
@@ -100,18 +102,18 @@ export function recentMissionRows(
   limit = 4,
   ownership: PersonalAgentContextSnapshot | null = null,
 ): MissionRow[] {
-  const owner = new Map<string, { weapon: WeaponId; name: string; presentation: PresentationState | null }>();
+  const owner = new Map<string, { weapon: WeaponId; name: string; slot: number; presentation: PresentationState | null }>();
   const slots = personalAgents?.slots ?? [];
   for (const row of ownership?.slots ?? []) {
     const slot = slots.find((candidate) => candidate.slot === row.slot);
     if (!slot) continue;
     for (const agent of row.owned) {
-      if (agent.missionId) owner.set(agent.missionId, { weapon: slot.weapon, name: slot.displayName || WEAPON_LABEL[slot.weapon], presentation: null });
+      if (agent.missionId) owner.set(agent.missionId, { weapon: slot.weapon, name: slot.displayName || WEAPON_LABEL[slot.weapon], slot: slot.slot, presentation: null });
     }
   }
   for (const slot of slots) {
     const missionId = slot.agent?.missionId;
-    if (missionId) owner.set(missionId, { weapon: slot.weapon, name: slot.displayName || WEAPON_LABEL[slot.weapon], presentation: slot.presentation.state });
+    if (missionId) owner.set(missionId, { weapon: slot.weapon, name: slot.displayName || WEAPON_LABEL[slot.weapon], slot: slot.slot, presentation: slot.presentation.state });
   }
   return [...missions]
     .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0) || a.id.localeCompare(b.id))
@@ -126,6 +128,7 @@ export function recentMissionRows(
         stateLabel: MISSION_STATE_LABEL[mission.state] ?? "Status unknown",
         weapon: who?.weapon ?? null,
         weaponName: who?.name ?? null,
+        slot: who?.slot ?? null,
         presentation: who?.presentation ?? null,
         ...counts,
         stepLabel: stepLabel(counts),

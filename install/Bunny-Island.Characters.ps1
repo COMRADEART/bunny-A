@@ -168,6 +168,33 @@ function Get-BunnyPngWidth([string]$Path) {
   return [int](($header[16] -shl 24) -bor ($header[17] -shl 16) -bor ($header[18] -shl 8) -bor $header[19])
 }
 
+# Height of a PNG from its IHDR chunk (bytes 20-23). Zero for anything that is not a PNG.
+function Get-BunnyPngHeight([string]$Path) {
+  $stream = [IO.File]::OpenRead($Path)
+  try {
+    $header = New-Object byte[] 24
+    if ($stream.Read($header, 0, 24) -lt 24) { return 0 }
+  } finally { $stream.Dispose() }
+  if ($header[0] -ne 0x89 -or $header[1] -ne 0x50) { return 0 }
+  return [int](($header[20] -shl 24) -bor ($header[21] -shl 16) -bor ($header[22] -shl 8) -bor $header[23])
+}
+
+# Pixel-art decode width for one art id: the longest side fits the grid, never upscaled (the web pixelSprite rule).
+$script:bunnyPixelWidthCache = @{}
+function Get-BunnyPixelDecodeWidth([string]$Id, [int]$Grid) {
+  $key = $Id + '@' + $Grid
+  if ($script:bunnyPixelWidthCache.ContainsKey($key)) { return $script:bunnyPixelWidthCache[$key] }
+  if ($Id -notmatch '^[a-z]+\.[a-z0-9]+$') { return $Grid }
+  $path = Join-Path $script:bunnyCharacterRoot ($Id + '.png')
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $Grid }
+  $width = Get-BunnyPngWidth $path; $height = Get-BunnyPngHeight $path
+  if ($width -le 0 -or $height -le 0) { return $Grid }
+  $scale = [Math]::Min(1.0, [double]$Grid / [Math]::Max($width, $height))
+  $result = [int][Math]::Max(1, [Math]::Round($width * $scale, [MidpointRounding]::AwayFromZero))
+  $script:bunnyPixelWidthCache[$key] = $result
+  return $result
+}
+
 # Character bitmap for the UI layer. Frozen, OnLoad, decoded no larger than the on-screen need (never upscaled), and cached
 # per id and width so a 2-second poll never reloads a file. Returns $null when the art is missing (the UI then draws nothing
 # for it rather than a letter or a generic circle).
@@ -189,3 +216,57 @@ function Get-BunnyCharacterSource([string]$Id, [int]$Width) {
 }
 
 $script:BunnyWeaponLabel = @{ gada = 'Gada'; spear = 'Spear'; chakra = 'Vishnu Chakra'; sword = 'Sword' }
+
+# M-A-3 T13.3 Gate H: character styles on the native chips. Mirrors src/lib/bunny-host/character-style.ts (registry and
+# signatures) and character-style-model.ts (intensity, contrast, Notch roles). A style is material only: the same compact
+# art, an effect and a scaling mode. It never changes what a chip reports, and motion still starts only from the Host state.
+$script:BunnyCharacterStyles = @('glossy', 'cel', 'arcade', 'comic', 'pixel')
+$script:BunnySignatureStyle = @{ gada = 'glossy'; spear = 'cel'; chakra = 'arcade'; sword = 'comic' }
+$script:BunnyStyleEffect = @{
+  glossy = @{ Kind = 'glow'; Color = '#FFD27A'; Blur = 8; Depth = 0; Opacity = 0.55 }
+  cel    = @{ Kind = 'outline'; Color = '#05060A'; Blur = 0; Depth = 1.2; Opacity = 1.0 }
+  arcade = @{ Kind = 'neon'; Color = '#2EF2FF'; Blur = 10; Depth = 0; Opacity = 0.8 }
+  comic  = @{ Kind = 'ink'; Color = '#000000'; Blur = 2.5; Depth = 0; Opacity = 1.0 }
+}
+# Pixel art decodes the compact art so its longest side is this many pixels (PIXEL_GRID.compact on the web) and draws it
+# with nearest-neighbour scaling (crisp blocks, no blur).
+$script:BunnyPixelGrid = 24
+$script:BunnyWorkingStates = @('PLANNING', 'RESEARCHING', 'CODING', 'TESTING', 'FILE_WORK', 'ACTIVE', 'VERIFYING')
+
+# The slot's appearance from the snapshot, or $null (the weapon's signature) when the Host has not sent one.
+function Get-BunnySlotAppearance($View, [int]$Slot) {
+  if (-not $View -or -not $View.slots) { return $null }
+  $row = @($View.slots | Where-Object { $_ -and [int]$_.slot -eq $Slot }) | Select-Object -First 1
+  if ($row) { return $row.appearance }
+  return $null
+}
+
+# Pure: weapon + appearance + the Island's animation switch + system high contrast in, the chip's skin out.
+# An unknown style falls back to the weapon's signature; per-Agent or system high contrast drops the effect for an outline.
+function Get-BunnyCharacterSkin([string]$Weapon, $Appearance, [bool]$Animate, [bool]$SystemHighContrast = $false) {
+  $chosen = if ($Appearance) { [string]$Appearance.style } else { '' }
+  $style = if ($script:BunnyCharacterStyles -contains $chosen) { $chosen } elseif ($script:BunnySignatureStyle.ContainsKey($Weapon)) { $script:BunnySignatureStyle[$Weapon] } else { 'glossy' }
+  $intensity = if ($Appearance -and [string]$Appearance.intensity -in @('full', 'subtle', 'off')) { [string]$Appearance.intensity } else { 'full' }
+  $contrast = [bool]($SystemHighContrast -or ($Appearance -and $Appearance.highContrast -eq $true))
+  $pixel = $style -eq 'pixel'
+  $effect = if ($contrast -or $pixel) { $null } else { $script:BunnyStyleEffect[$style] }
+  return @{
+    Style = $style
+    Signature = [bool]($script:BunnySignatureStyle[$Weapon] -eq $style)
+    Effect = $effect
+    Outline = $contrast
+    Scaling = if ($pixel) { 'NearestNeighbor' } else { 'HighQuality' }
+    DecodeWidth = 96
+    PixelGrid = if ($pixel) { $script:BunnyPixelGrid } else { 0 }
+    Steps = if ($pixel) { 4 } else { 0 }
+    Animate = [bool]($Animate -and $intensity -ne 'off')
+    Amplitude = switch ($intensity) { 'subtle' { 0.5 } 'off' { 0.0 } default { 1.0 } }
+    PeriodScale = if ($intensity -eq 'subtle') { 1.6 } else { 1.0 }
+  }
+}
+
+# The conversational speaker and the Agents still working, from Host facts only. Bunny speaking marks no Agent.
+function Get-BunnyNotchRole([int]$Slot, [string]$State, $Foreground) {
+  $speaking = [bool]($null -ne $Foreground -and [string]$Foreground -ne 'bunny' -and [string]$Foreground -eq [string]$Slot)
+  return @{ Speaking = $speaking; Working = [bool]($script:BunnyWorkingStates -contains $State) }
+}

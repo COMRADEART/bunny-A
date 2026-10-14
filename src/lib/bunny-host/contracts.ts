@@ -63,6 +63,8 @@ export type HostSnapshot = {
   scheduler?: import("./fairness.ts").SchedulerView;
   routingLearning?: import("./routing-feedback.ts").RoutingLearningView;
   voicePersonalization?: import("./voice/voice-personalization.ts").VoicePersonalizationView;
+  /** M-A-3 T13.3 Gate H: per-slot character style. Presentation only; paired devices receive it to draw the same look. */
+  characterAppearance?: import("./character-style.ts").CharacterAppearanceView;
   /** M-A-3 T13.1 Laya/Jev intelligence state (no secrets; credential existence only). Absent for paired devices. */
   intelligence?: import("./intelligence-snapshot.ts").IntelligenceSnapshot;
   connections?: import("./connections.server.ts").ConnectionsSnapshot;

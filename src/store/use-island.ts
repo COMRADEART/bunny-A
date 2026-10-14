@@ -35,6 +35,7 @@ import type { SessionLedgerView } from "@/lib/bunny-host/session-ledger";
 import type { SchedulerView } from "@/lib/bunny-host/fairness";
 import type { RoutingLearningView } from "@/lib/bunny-host/routing-feedback";
 import { notificationAllowed, type VoicePersonalizationView } from "@/lib/bunny-host/voice/voice-personalization";
+import type { CharacterAppearanceView } from "@/lib/bunny-host/character-style";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import {
   parseAccountIntent,
@@ -222,6 +223,8 @@ type Island = Preferences & {
   routingLearningCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T13.3 Gate G: voice preferences, answer ratings and advice (workstation only; null on devices). */
   voicePersonalization: VoicePersonalizationView | null;
+  /** M-A-3 T13.3 Gate H: per-slot character style. Presentation only; devices receive it too. */
+  characterAppearance: CharacterAppearanceView | null;
   /** One `personalization.*` command; the Host's answer or null when refused. */
   personalizationCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
@@ -752,6 +755,7 @@ export const useIsland = create<Island>((set, get) => {
       scheduler: snapshot.scheduler ?? null,
       routingLearning: snapshot.routingLearning ?? null,
       voicePersonalization: snapshot.voicePersonalization ?? null,
+      characterAppearance: snapshot.characterAppearance ?? null,
       intelligence: snapshot.intelligence ?? null,
       connections: snapshot.connections ?? null,
       deviceConnections: snapshot.deviceConnections ?? [],
@@ -817,6 +821,7 @@ export const useIsland = create<Island>((set, get) => {
       scheduler: null,
       routingLearning: null,
       voicePersonalization: null,
+      characterAppearance: null,
       intelligence: null,
       connections: null,
       deviceConnections: [],
@@ -1224,6 +1229,7 @@ export const useIsland = create<Island>((set, get) => {
     routingLearning: null,
     routingLearningCommand: (action, data, onRefused) => command(action, data, "routing-learning", onRefused),
     voicePersonalization: null,
+    characterAppearance: null,
     personalizationCommand: (action, data, onRefused) => command(action, data, "personalization", onRefused),
     intelligence: null,
     connections: null,

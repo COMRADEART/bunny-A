@@ -79,9 +79,18 @@ function New-BunnyWeaponChip([int]$SlotId) {
   [Windows.Media.RenderOptions]::SetBitmapScalingMode($image, [Windows.Media.BitmapScalingMode]::HighQuality)
   $halo = [Windows.Controls.Border]::new(); $halo.CornerRadius = [Windows.CornerRadius]::new(12); $halo.BorderThickness = [Windows.Thickness]::new(1.5); $halo.Opacity = 0; $halo.IsHitTestVisible = $false
   $badge = [Windows.Controls.TextBlock]::new(); $badge.FontSize = 9; $badge.FontWeight = 'Bold'; $badge.HorizontalAlignment = 'Right'; $badge.VerticalAlignment = 'Bottom'; $badge.Margin = [Windows.Thickness]::new(0, 0, 2, 0); $badge.IsHitTestVisible = $false
-  foreach ($element in @($image, $halo, $badge)) { [void]$grid.Children.Add($element) }
+  # T13.3 Gate H: a solid outline for high contrast, the active-speaker bar and the still-working dot. Hidden until the Host says so.
+  $outline = [Windows.Controls.Border]::new(); $outline.CornerRadius = [Windows.CornerRadius]::new(12); $outline.BorderThickness = [Windows.Thickness]::new(2); $outline.Visibility = 'Collapsed'; $outline.IsHitTestVisible = $false
+  $outline.SetResourceReference([Windows.Controls.Border]::BorderBrushProperty, 'BunnyText')
+  $speaker = [Windows.Shapes.Rectangle]::new(); $speaker.Height = 3; $speaker.RadiusX = 1.5; $speaker.RadiusY = 1.5; $speaker.VerticalAlignment = 'Bottom'; $speaker.Margin = [Windows.Thickness]::new(10, 0, 10, -1); $speaker.Visibility = 'Collapsed'; $speaker.IsHitTestVisible = $false
+  $speaker.SetResourceReference([Windows.Shapes.Shape]::FillProperty, 'BunnyText')
+  $working = [Windows.Shapes.Ellipse]::new(); $working.Width = 6; $working.Height = 6; $working.HorizontalAlignment = 'Right'; $working.VerticalAlignment = 'Top'; $working.Margin = [Windows.Thickness]::new(0, 1, 1, 0); $working.Visibility = 'Collapsed'; $working.IsHitTestVisible = $false
+  $working.SetResourceReference([Windows.Shapes.Shape]::FillProperty, 'BunnyAccent')
+  # The art sits alone in its own container so a bitmap cache there holds the image with its effect, apart from the halo.
+  $art = [Windows.Controls.Border]::new(); $art.Child = $image; $art.IsHitTestVisible = $false
+  foreach ($element in @($art, $halo, $outline, $badge, $speaker, $working)) { [void]$grid.Children.Add($element) }
   $chip.Content = $grid
-  $chip.Tag = @{ Slot = $SlotId; Key = ''; Scale = $scale; Rotate = $rotate; Move = $move; Image = $image; Halo = $halo; Badge = $badge }
+  $chip.Tag = @{ Slot = $SlotId; Key = ''; Scale = $scale; Rotate = $rotate; Move = $move; Art = $art; Image = $image; Halo = $halo; Badge = $badge; Outline = $outline; Speaker = $speaker; Working = $working; Skin = '' }
   $chip.Add_Click({ Show-BunnyWeaponDetail ([int]$this.Tag.Slot) })
   # Keyboard focus is visible: a 2 DIP accent border while the chip has focus (the same rule as the expanded slot rows).
   $chip.Add_GotKeyboardFocus({ $this.SetResourceReference([Windows.Controls.Control]::BorderBrushProperty, 'BunnyAccent'); $this.BorderThickness = [Windows.Thickness]::new(2) })
@@ -125,7 +134,19 @@ function Stop-BunnyWeaponStrip {
   foreach ($chip in @($script:bunnyWeaponChips.Values)) { Stop-BunnyWeaponMotion $chip; $chip.Tag.Key = '' }
 }
 
-function New-BunnyWeaponAnimation([double]$From, [double]$To, [double]$Ms, [bool]$Forever, [bool]$Reverse, [string]$Ease) {
+function New-BunnyWeaponAnimation([double]$From, [double]$To, [double]$Ms, [bool]$Forever, [bool]$Reverse, [string]$Ease, [int]$Steps = 0) {
+  if ($Steps -gt 0) {
+    # Pixel art moves in whole steps (discrete key frames), as a sprite animation does.
+    $stepped = [Windows.Media.Animation.DoubleAnimationUsingKeyFrames]::new()
+    $stepped.Duration = [Windows.Duration]::new([TimeSpan]::FromMilliseconds([Math]::Max(50, $Ms)))
+    for ($i = 0; $i -le $Steps; $i++) {
+      $time = [Windows.Media.Animation.KeyTime]::FromPercent([double]$i / $Steps)
+      [void]$stepped.KeyFrames.Add([Windows.Media.Animation.DiscreteDoubleKeyFrame]::new($From + ($To - $From) * $i / $Steps, $time))
+    }
+    $stepped.AutoReverse = $Reverse
+    $stepped.RepeatBehavior = if ($Forever) { [Windows.Media.Animation.RepeatBehavior]::Forever } else { [Windows.Media.Animation.RepeatBehavior]::new(1) }
+    return $stepped
+  }
   $animation = [Windows.Media.Animation.DoubleAnimation]::new($From, $To, [Windows.Duration]::new([TimeSpan]::FromMilliseconds([Math]::Max(50, $Ms))))
   $animation.AutoReverse = $Reverse
   $animation.RepeatBehavior = if ($Forever) { [Windows.Media.Animation.RepeatBehavior]::Forever } else { [Windows.Media.Animation.RepeatBehavior]::new(1) }
@@ -134,19 +155,22 @@ function New-BunnyWeaponAnimation([double]$From, [double]$To, [double]$Ms, [bool
   return $animation
 }
 
-# The base loop and the task effect for one chip. Called only when the motion key changes.
-function Start-BunnyWeaponMotion($Chip, $Base, $Motion) {
+# The base loop and the task effect for one chip. Called only when the motion key changes. The skin scales the hover
+# (subtle) and the period, steps it for pixel art, or stops it (intensity off); it never starts motion the state does not.
+function Start-BunnyWeaponMotion($Chip, $Base, $Motion, $Skin) {
   Stop-BunnyWeaponMotion $Chip
   $tag = $Chip.Tag
   $tag.Halo.Opacity = switch ($Motion.Ring) { 'amber-pulse' { 0.9 } 'green' { 0.9 } 'red' { 0.9 } 'task-breathe' { 0.5 } default { 0 } }
-  if (-not $bunnyAnimate -or -not $Base) { return }
-  $period = [double]$Base.PeriodMs / [Math]::Max(0.1, [double]$Motion.Speed)
+  if (-not $bunnyAnimate -or -not $Base -or ($Skin -and -not $Skin.Animate)) { return }
+  $amp = if ($Skin) { [double]$Skin.Amplitude } else { 1.0 }
+  $steps = if ($Skin) { [int]$Skin.Steps } else { 0 }
+  $period = [double]$Base.PeriodMs / [Math]::Max(0.1, [double]$Motion.Speed) * $(if ($Skin) { [double]$Skin.PeriodScale } else { 1.0 })
   if ($Motion.Loop -eq 'base') {
     switch ([string]$Base.Loop) {
-      'float-tilt' { $tag.Move.BeginAnimation([Windows.Media.TranslateTransform]::YProperty, (New-BunnyWeaponAnimation 0 -2 $period $true $true $Base.Ease)); $tag.Rotate.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty, (New-BunnyWeaponAnimation -2 2 ($period * 1.1) $true $true $Base.Ease)) }
-      'float-glint' { $tag.Move.BeginAnimation([Windows.Media.TranslateTransform]::YProperty, (New-BunnyWeaponAnimation 0 -1.5 $period $true $true $Base.Ease)) }
-      'spin' { $tag.Rotate.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty, (New-BunnyWeaponAnimation 0 360 $period $true $false $Base.Ease)) }
-      'hover-sheen' { $tag.Move.BeginAnimation([Windows.Media.TranslateTransform]::YProperty, (New-BunnyWeaponAnimation 0 -1.5 $period $true $true $Base.Ease)); $tag.Rotate.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty, (New-BunnyWeaponAnimation -1 1 $period $true $true $Base.Ease)) }
+      'float-tilt' { $tag.Move.BeginAnimation([Windows.Media.TranslateTransform]::YProperty, (New-BunnyWeaponAnimation 0 (-2 * $amp) $period $true $true $Base.Ease $steps)); $tag.Rotate.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty, (New-BunnyWeaponAnimation (-2 * $amp) (2 * $amp) ($period * 1.1) $true $true $Base.Ease $steps)) }
+      'float-glint' { $tag.Move.BeginAnimation([Windows.Media.TranslateTransform]::YProperty, (New-BunnyWeaponAnimation 0 (-1.5 * $amp) $period $true $true $Base.Ease $steps)) }
+      'spin' { $tag.Rotate.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty, (New-BunnyWeaponAnimation 0 360 $period $true $false $Base.Ease $(if ($steps) { 16 } else { 0 }))) }
+      'hover-sheen' { $tag.Move.BeginAnimation([Windows.Media.TranslateTransform]::YProperty, (New-BunnyWeaponAnimation 0 (-1.5 * $amp) $period $true $true $Base.Ease $steps)); $tag.Rotate.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty, (New-BunnyWeaponAnimation (-1 * $amp) (1 * $amp) $period $true $true $Base.Ease $steps)) }
     }
   }
   if ($Motion.Task -ne 'none') {
@@ -186,11 +210,34 @@ function Set-BunnyWeaponChip($Chip, $Slot, [bool]$Offline) {
   $base = $script:BunnyWeaponBase[$weapon]
   $state = if ($Offline) { 'OFFLINE' } else { [string]$Slot.presentation.state }
   $motion = Get-BunnyWeaponMotion $state
-  $source = if ($base) { Get-BunnyCharacterSource $base.Compact 96 } else { $null }
+  $skin = Get-BunnyCharacterSkin $weapon (Get-BunnySlotAppearance $bunnySnapshot.characterAppearance ([int]$Slot.slot)) ([bool]$bunnyAnimate) ([bool][Windows.SystemParameters]::HighContrast)
+  $decodeWidth = if ($base -and $skin.PixelGrid) { Get-BunnyPixelDecodeWidth $base.Compact $skin.PixelGrid } else { $skin.DecodeWidth }
+  $source = if ($base) { Get-BunnyCharacterSource $base.Compact $decodeWidth } else { $null }
   if ($source -and $tag.Image.Source -ne $source) { $tag.Image.Source = $source }
+  $skinKey = (@($skin.Style, [string]$skin.Outline) -join '|')
+  if ($skinKey -ne $tag.Skin) {
+    $tag.Skin = $skinKey
+    [Windows.Media.RenderOptions]::SetBitmapScalingMode($tag.Image, [Windows.Media.BitmapScalingMode]$skin.Scaling)
+    $tag.Image.Effect = if ($skin.Effect) {
+      $shadow = [Windows.Media.Effects.DropShadowEffect]::new()
+      $shadow.Color = [Windows.Media.ColorConverter]::ConvertFromString([string]$skin.Effect.Color)
+      $shadow.BlurRadius = [double]$skin.Effect.Blur; $shadow.ShadowDepth = [double]$skin.Effect.Depth; $shadow.Opacity = [double]$skin.Effect.Opacity
+      $shadow.Freeze(); $shadow
+    } else { $null }
+    # A shader effect re-runs every frame while the chip's transform animates. The cache is on the art's container, not on
+    # the image: WPF applies an element's own effect after its cache, so only a cached parent holds the effect's output.
+    $tag.Art.CacheMode = if ($skin.Effect) {
+      $cache = [Windows.Media.BitmapCache]::new(); $cache.RenderAtScale = [Math]::Max(1.0, [double](Get-BunnyDeviceScale).X); $cache
+    } else { $null }
+    $tag.Outline.Visibility = if ($skin.Outline) { 'Visible' } else { 'Collapsed' }
+  }
+  $role = Get-BunnyNotchRole ([int]$Slot.slot) $state $(if ($Offline -or -not $bunnySnapshot.personalAgentContext) { $null } else { $bunnySnapshot.personalAgentContext.foreground })
+  $tag.Speaker.Visibility = if ($role.Speaking) { 'Visible' } else { 'Collapsed' }
+  $tag.Working.Visibility = if ($role.Working) { 'Visible' } else { 'Collapsed' }
   $tag.Image.Opacity = if ($motion.Desaturate) { 0.55 } else { $motion.Opacity }
   $label = if ($Slot.presentation) { [string]$Slot.presentation.label } else { 'Status unknown' }
   if ($Offline) { $label = 'last known, Host offline: ' + $label }
+  if ($role.Speaking) { $label = $label + ', speaking now' }
   $name = (Get-BunnyWeaponLabel $weapon) + ' ' + [char]0x2014 + ' ' + [string]$Slot.displayName + ', ' + $label
   $Chip.ToolTip = $name
   [Windows.Automation.AutomationProperties]::SetName($Chip, $name)
@@ -199,8 +246,8 @@ function Set-BunnyWeaponChip($Chip, $Slot, [bool]$Offline) {
   $badgeInk = switch ($motion.Badge) { 'check-green' { 'BunnyPositive' } 'alert-amber' { 'BunnyWarning' } 'alert-red' { 'BunnyNegative' } 'check-neutral' { 'BunnyMuted' } default { 'BunnyMuted' } }
   $tag.Badge.Text = switch ($motion.Badge) { 'check-green' { [string][char]0x2713 } 'check-neutral' { [string][char]0x2713 } 'alert-amber' { '!' } 'alert-red' { '!' } 'pause' { 'II' } default { '' } }
   $tag.Badge.SetResourceReference([Windows.Controls.TextBlock]::ForegroundProperty, $badgeInk)
-  $key = (@($weapon, $state, $motion.Loop, $motion.Task, $motion.Ring, [string]$motion.Speed, [string]$bunnyAnimate) -join '|')
-  if ($key -ne $tag.Key) { $tag.Key = $key; Start-BunnyWeaponMotion $Chip $base $motion }
+  $key = (@($weapon, $state, $motion.Loop, $motion.Task, $motion.Ring, [string]$motion.Speed, [string]$bunnyAnimate, $skin.Style, [string]$skin.Animate, [string]$skin.Amplitude) -join '|')
+  if ($key -ne $tag.Key) { $tag.Key = $key; Start-BunnyWeaponMotion $Chip $base $motion $skin }
 }
 
 # The strip: bound slots in slot order, then the neutral count. Chips are reused; only the layout containers are rebuilt.

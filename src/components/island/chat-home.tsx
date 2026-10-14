@@ -4,6 +4,7 @@ import { Composer, Routing } from "./task";
 import { TaskRow } from "./desktop";
 import { Empty } from "./ui";
 import { WeaponCharacter, usePrefersReducedMotion } from "./characters";
+import { appearanceFor } from "./character-style-model";
 import { displayState, hostLive } from "./character-model";
 import { CHAT_QUESTION, composerChips, greetingFor, QUICK_ACTIONS, recentMissionRows, RECENT_MISSIONS_EMPTY } from "./chat-model";
 import { sheetForView } from "./nav-model";
@@ -96,6 +97,7 @@ export function ChatHome({ now }: { now: number }) {
                   size="compact"
                   reduced={systemReduced || store.appearance.motion !== "full"}
                   displayName={row.weaponName}
+                  appearance={appearanceFor(store.characterAppearance, row.slot)}
                 />
               ) : (
                 <span className="ch-neutral-icon" aria-hidden="true">

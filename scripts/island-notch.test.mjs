@@ -129,9 +129,30 @@ const cases = [
   { name: 'verifiedRebound', fn: 'Get-BunnyVerifiedTransitions', args: [{ '1': { State: 'CODING', AgentId: 'a' } }, { slots: [{ slot: 1, agentId: 'b', presentation: { state: 'VERIFIED' } }] }] },
   { name: 'verifiedOffline', fn: 'Get-BunnyVerifiedTransitions', args: [{ '1': { State: 'CODING', AgentId: 'a' } }, { slots: [{ slot: 1, agentId: 'a', presentation: { state: 'VERIFIED' } }] }, false] },
   { name: 'settledTransitions', fn: 'Get-BunnyObservedTransitions', args: [{ '1': { State: 'CODING', AgentId: 'a' }, '2': { State: 'CODING', AgentId: 'b' }, '3': { State: 'VERIFIED', AgentId: 'c' } }, { slots: [{ slot: 1, agentId: 'a', presentation: { state: 'FAILED' } }, { slot: 2, agentId: 'b', presentation: { state: 'COMPLETED' } }, { slot: 3, agentId: 'c', presentation: { state: 'COMPLETED' } }] }] },
+  // T13.3 Gate H: character styles on native chips. Every weapon × style, the signature fallback, intensity and contrast.
+  ...['gada', 'spear', 'chakra', 'sword'].flatMap((weapon) =>
+    ['glossy', 'cel', 'arcade', 'comic', 'pixel'].map((style) => ({ name: `skin_${weapon}_${style}`, fn: 'Get-BunnyCharacterSkin', args: [weapon, { style, intensity: 'full', highContrast: false }, true, false] })),
+  ),
+  ...['gada', 'spear', 'chakra', 'sword'].map((weapon) => ({ name: `skinSignature_${weapon}`, fn: 'Get-BunnyCharacterSkin', args: [weapon, null, true, false] })),
+  { name: 'skinUnknownStyle', fn: 'Get-BunnyCharacterSkin', args: ['sword', { style: 'vaporwave', intensity: 'turbo', highContrast: 'yes' }, true, false] },
+  { name: 'skinSubtle', fn: 'Get-BunnyCharacterSkin', args: ['gada', { style: null, intensity: 'subtle', highContrast: false }, true, false] },
+  { name: 'skinOff', fn: 'Get-BunnyCharacterSkin', args: ['gada', { style: null, intensity: 'off', highContrast: false }, true, false] },
+  { name: 'skinIslandStill', fn: 'Get-BunnyCharacterSkin', args: ['gada', { style: 'arcade', intensity: 'full', highContrast: false }, false, false] },
+  { name: 'skinAgentContrast', fn: 'Get-BunnyCharacterSkin', args: ['chakra', { style: 'arcade', intensity: 'full', highContrast: true }, true, false] },
+  { name: 'skinSystemContrast', fn: 'Get-BunnyCharacterSkin', args: ['gada', null, true, true] },
+  { name: 'appearanceRow', fn: 'Get-BunnySlotAppearance', args: [{ schema: 'bunny-a.character-appearance.v1', slots: [{ slot: 1, appearance: { style: 'pixel', intensity: 'full', highContrast: false } }, { slot: 2, appearance: { style: null, intensity: 'subtle', highContrast: false } }] }, 1] },
+  { name: 'appearanceMissing', fn: 'Get-BunnySlotAppearance', args: [null, 1] },
+  { name: 'roleGadaSpeaking', fn: 'Get-BunnyNotchRole', args: [1, 'IDLE', 1] },
+  { name: 'roleSwordWorking', fn: 'Get-BunnyNotchRole', args: [4, 'CODING', 1] },
+  { name: 'roleBunnySpeaking', fn: 'Get-BunnyNotchRole', args: [1, 'RESEARCHING', 'bunny'] },
+  { name: 'roleNoContext', fn: 'Get-BunnyNotchRole', args: [1, 'IDLE', null] },
+  { name: 'roleVerifiedNotWorking', fn: 'Get-BunnyNotchRole', args: [2, 'VERIFIED', 1] },
   // Character art: PNG width from the header (never decoded larger than need).
   { name: 'pngWidth', fn: 'Get-BunnyPngWidth', args: [join(artDir, 'gada.compact.png')] },
   { name: 'pngWidthNotPng', fn: 'Get-BunnyPngWidth', args: [charactersPath] },
+  { name: 'pngHeight', fn: 'Get-BunnyPngHeight', args: [join(artDir, 'gada.compact.png')] },
+  ...['gada', 'spear', 'chakra', 'sword'].map((weapon) => ({ name: `pixelWidth_${weapon}`, fn: 'Get-BunnyPixelDecodeWidth', args: [`${weapon}.compact`, 24] })),
+  { name: 'pixelWidthBadId', fn: 'Get-BunnyPixelDecodeWidth', args: ['..\\secrets', 24] },
 ];
 
 function runBatch() {
@@ -365,7 +386,9 @@ test('motion in the strip and the companion uses transforms and opacity only: no
 
 test('one-shots and loops only start on a state change: the strip keys each loop and never restarts it on a plain poll', () => {
   const weapons = readFileSync(weaponsPath, 'utf8');
-  assert.match(weapons, /if \(\$key -ne \$tag\.Key\) \{ \$tag\.Key = \$key; Start-BunnyWeaponMotion \$Chip \$base \$motion \}/);
+  assert.match(weapons, /if \(\$key -ne \$tag\.Key\) \{ \$tag\.Key = \$key; Start-BunnyWeaponMotion \$Chip \$base \$motion \$skin \}/);
+  // T13.3 Gate H: the key adds only the style, its intensity switch and amplitude, so a plain poll still never restarts a loop.
+  assert.match(weapons, /\$key = \(@\(\$weapon, \$state, \$motion\.Loop, \$motion\.Task, \$motion\.Ring, \[string\]\$motion\.Speed, \[string\]\$bunnyAnimate, \$skin\.Style, \[string\]\$skin\.Animate, \[string\]\$skin\.Amplitude\) -join '\|'\)/);
   const companion = readFileSync(companionPath, 'utf8');
   assert.match(companion, /if \(\$key -ne \$script:bunnyCompanionKey\) \{ \$script:bunnyCompanionKey = \$key; Start-BunnyCompanionMotion \$state \}/);
   assert.match(weapons, /function Set-BunnyWeaponChip[\s\S]*?\$Offline/, 'offline is drawn from the Host state, not from a stale timer');
@@ -378,7 +401,8 @@ test('animations stop when motion is off or reduced, when the system disables an
   const visual = readFileSync(join(install, 'Bunny-Island.Visual.ps1'), 'utf8');
   assert.match(visual, /function Set-BunnyJoin \{/);
   assert.match(weapons, /\$strip\.Visibility = 'Visible'; \$bunnyControls\.StripCapsule\.Visibility = 'Visible'; Set-BunnyJoin/);
-  assert.match(weapons, /if \(-not \$bunnyAnimate -or -not \$Base\) \{ return \}/);
+  // T13.3 Gate H added the per-Agent intensity to the same guard; the Island-wide conditions are unchanged.
+  assert.match(weapons, /if \(-not \$bunnyAnimate -or -not \$Base -or \(\$Skin -and -not \$Skin\.Animate\)\) \{ return \}/);
   const motion = readFileSync(join(install, 'Bunny-Island.Motion.ps1'), 'utf8');
   assert.match(motion, /\$script:bunnyAnimate=-not\$SmokeTest-and\[Windows\.SystemParameters\]::ClientAreaAnimation-and-not\[Windows\.SystemParameters\]::HighContrast-and\$bunnyPreferences\.motion-eq'full'/);
   assert.match(motion, /if\(-not\$bunnyWindow\.IsVisible-or\$bunnyWindow\.WindowState-eq'Minimized'\)\{\$script:bunnyAnimate=\$false\}/, 'a hidden or minimized native window has no animation permission');
@@ -467,5 +491,104 @@ test('the harness evidence receipts, when present, record every notch check as p
   if (!existsSync(receipts)) return;
   const summary = JSON.parse(readFileSync(receipts, 'utf8').replace(/^\uFEFF/, ''));
   assert.ok(summary.runs.length >= 13 * 4, 'every edge and state ran');
+  for (const run of summary.runs) for (const [key, value] of Object.entries(run.checks || {})) assert.equal(value, true, `${run.name} ${key}`);
+});
+
+test('T13.3 H native chips: all four weapons wear all five styles; pixel art is nearest-neighbour, the others keep the art smooth', { skip }, () => {
+  for (const weapon of ['gada', 'spear', 'chakra', 'sword']) {
+    for (const style of ['glossy', 'cel', 'arcade', 'comic', 'pixel']) {
+      const skin = get(`skin_${weapon}_${style}`);
+      assert.equal(skin.Style, style, `${weapon} wears ${style}`);
+      assert.equal(skin.Animate, true);
+      assert.equal(skin.Outline, false);
+      if (style === 'pixel') {
+        assert.equal(skin.Scaling, 'NearestNeighbor');
+        assert.equal(skin.PixelGrid, 24, 'pixel art decodes to the web compact grid and scales without blur');
+        assert.equal(skin.Steps, 4);
+        assert.equal(skin.Effect, null);
+      } else {
+        assert.equal(skin.Scaling, 'HighQuality');
+        assert.equal(skin.DecodeWidth, 96);
+        assert.equal(skin.PixelGrid, 0);
+        assert.ok(skin.Effect && skin.Effect.Kind, `${style} has a material effect`);
+      }
+    }
+  }
+});
+
+test('T13.3 H native pixel art fits the longest side to 24 px like the web pixelSprite, never upscaled', { skip }, () => {
+  const header = (weapon) => readFileSync(join(artDir, `${weapon}.compact.png`)).subarray(16, 24);
+  const gada = header('gada');
+  assert.equal(get('pngHeight'), gada.readUInt32BE(4));
+  for (const weapon of ['gada', 'spear', 'chakra', 'sword']) {
+    const bytes = header(weapon);
+    const width = bytes.readUInt32BE(0);
+    const height = bytes.readUInt32BE(4);
+    const expected = Math.max(1, Math.round(width * Math.min(1, 24 / Math.max(width, height))));
+    assert.equal(get(`pixelWidth_${weapon}`), expected, `${weapon} ${width}x${height}`);
+    assert.ok(expected <= width && Math.max(expected, Math.round(height * expected / width)) <= 24);
+  }
+  assert.equal(get('pixelWidthBadId'), 24, 'an id that is not an art name never reaches the file system');
+});
+
+test('T13.3 H native chips: no style falls back to the signature; unknown values never pass through', { skip }, () => {
+  assert.deepEqual(['gada', 'spear', 'chakra', 'sword'].map((weapon) => get(`skinSignature_${weapon}`).Style), ['glossy', 'cel', 'arcade', 'comic']);
+  for (const weapon of ['gada', 'spear', 'chakra', 'sword']) assert.equal(get(`skinSignature_${weapon}`).Signature, true);
+  const unknown = get('skinUnknownStyle');
+  assert.equal(unknown.Style, 'comic', "an unknown style shows Sword's signature");
+  assert.equal(unknown.Amplitude, 1);
+  assert.equal(unknown.Outline, false, 'a non-boolean contrast flag is not true');
+});
+
+test('T13.3 H native chips: intensity, the Island animation switch and high contrast (per Agent or system) control the skin', { skip }, () => {
+  const subtle = get('skinSubtle');
+  assert.equal(subtle.Amplitude, 0.5); assert.equal(subtle.PeriodScale, 1.6); assert.equal(subtle.Animate, true);
+  const off = get('skinOff');
+  assert.equal(off.Animate, false); assert.equal(off.Amplitude, 0);
+  assert.equal(get('skinIslandStill').Animate, false, 'reduced motion, Motion off or system animation off still win');
+  for (const name of ['skinAgentContrast', 'skinSystemContrast']) {
+    assert.equal(get(name).Effect, null, `${name}: no decorative effect`);
+    assert.equal(get(name).Outline, true, `${name}: solid outline`);
+  }
+  assert.equal(get('appearanceRow').style, 'pixel');
+  assert.equal(get('appearanceMissing'), null);
+});
+
+test('T13.3 H the Notch marks the active speaker apart from the Agents still working, from Host facts only', { skip }, () => {
+  assert.deepEqual(get('roleGadaSpeaking'), { Speaking: true, Working: false });
+  assert.deepEqual(get('roleSwordWorking'), { Speaking: false, Working: true });
+  assert.deepEqual(get('roleBunnySpeaking'), { Speaking: false, Working: true });
+  assert.deepEqual(get('roleNoContext'), { Speaking: false, Working: false });
+  assert.deepEqual(get('roleVerifiedNotWorking'), { Speaking: false, Working: false }, 'a finished Agent is not shown as working');
+});
+
+test('T13.3 H the chip applies the skin from the snapshot, keeps motion gated by the Host state, and names the speaker', () => {
+  const weapons = readFileSync(weaponsPath, 'utf8');
+  assert.match(weapons, /Get-BunnyCharacterSkin \$weapon \(Get-BunnySlotAppearance \$bunnySnapshot\.characterAppearance/);
+  assert.match(weapons, /\[Windows\.SystemParameters\]::HighContrast/);
+  assert.match(weapons, /\$decodeWidth = if \(\$base -and \$skin\.PixelGrid\) \{ Get-BunnyPixelDecodeWidth \$base\.Compact \$skin\.PixelGrid \} else \{ \$skin\.DecodeWidth \}/);
+  assert.match(weapons, /Get-BunnyCharacterSource \$base\.Compact \$decodeWidth/);
+  assert.match(weapons, /if \(-not \$bunnyAnimate -or -not \$Base -or \(\$Skin -and -not \$Skin\.Animate\)\) \{ return \}/);
+  assert.match(weapons, /if \(\$role\.Speaking\) \{ \$label = \$label \+ ', speaking now' \}/);
+  // Offline: the retained foreground is not presented as a live speaker.
+  assert.match(weapons, /\$\(if \(\$Offline -or -not \$bunnySnapshot\.personalAgentContext\) \{ \$null \}/);
+  // A style change alone never fires a one-shot: cues still come only from Get-BunnyObservedTransitions.
+  assert.equal((weapons.match(/Invoke-BunnyWeaponOneShot \$/g) || []).length, 1);
+});
+
+test('T13.3 H a material effect is cached at device scale, so a moving chip does not re-run the shader every frame', () => {
+  const weapons = readFileSync(weaponsPath, 'utf8');
+  assert.match(weapons, /\$art = \[Windows\.Controls\.Border\]::new\(\); \$art\.Child = \$image/);
+  assert.match(weapons, /\$tag\.Art\.CacheMode = if \(\$skin\.Effect\) \{/);
+  assert.match(weapons, /\[Windows\.Media\.BitmapCache\]::new\(\); \$cache\.RenderAtScale = \[Math\]::Max\(1\.0, \[double\]\(Get-BunnyDeviceScale\)\.X\)/);
+});
+
+test('T13.3 H the native style evidence receipts, when present, record every check as passing', () => {
+  const receipts = join(root, 'test-results', 'ma3', 't13-3', 'gate-h', 'notch', 'style-receipts.json');
+  if (!existsSync(receipts)) return;
+  const summary = JSON.parse(readFileSync(receipts, 'utf8').replace(/^\uFEFF/, ''));
+  const names = summary.runs.map((run) => run.name);
+  for (const edge of ['top', 'bottom', 'left', 'right']) assert.ok(names.includes(`edge-${edge}-gada-speaking`), `${edge} placement ran`);
+  for (const style of ['glossy', 'cel', 'arcade', 'comic', 'pixel']) assert.ok(names.includes(`style-${style}-all-agents`) && names.includes(`perf-${style}`), `${style} ran and was measured`);
   for (const run of summary.runs) for (const [key, value] of Object.entries(run.checks || {})) assert.equal(value, true, `${run.name} ${key}`);
 });

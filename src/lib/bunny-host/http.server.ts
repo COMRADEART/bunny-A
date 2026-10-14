@@ -52,6 +52,8 @@ import { LotusStore } from "./lotus.server.ts";
 import { parseLayer, parseScope, rank, render, type LotusMemory, type LotusScope } from "./lotus.ts";
 import { SPOKEN_CHAT_INSTRUCTION, VoiceSessionManager, type ListenSource, type InterruptSource } from "./voice/voice-session.server.ts";
 import { VoicePersonalizationStore } from "./voice/voice-personalization.server.ts";
+import { CharacterAppearanceStore } from "./character-style.server.ts";
+import { CHARACTER_STYLE_LABEL, resolvedStyle } from "./character-style.ts";
 import {
   FEEDBACK_RATINGS, SPEAKER_IDS, STYLE_VERBOSITY, personalizedInstruction, speakerFor, speakerId, voiceAdvice,
   type FeedbackRating, type Speaker, type SpeakerId, type VoicePersonalizationView,
@@ -682,6 +684,7 @@ export async function startHost(
       },
       routingLearning: manager.policy.view(),
       voicePersonalization: personalizationView(),
+      characterAppearance: appearanceStore.view(),
       personalAgentContext: (() => {
         const byId = new Map((canonical.agents?.agents ?? []).map((agent) => [agent.id, agent]));
         return {
@@ -718,6 +721,8 @@ export async function startHost(
   };
   // M-A-3 T13.3 Gate G (§21): owner voice preferences. The foreground Personal Agent speaks as itself through Bunny.
   const voicePreferences = new VoicePersonalizationStore(db);
+  // M-A-3 T13.3 Gate H (§25): presentation only. Paired devices draw it but cannot change it.
+  const appearanceStore = new CharacterAppearanceStore(db);
   function personalizationView(): VoicePersonalizationView {
     const preferences = voicePreferences.preferences();
     const speakers = SPEAKER_IDS.map((id) => {
@@ -1315,6 +1320,20 @@ export async function startHost(
             const identity = refused(() => parseIdentity(data.identity));
             personalContext.setForeground(identity);
             manager.emit(db.event("personal_agent.foreground", null, identity === "bunny" ? "Bunny is answering." : `Personal Agent ${identity} is answering.`));
+            break;
+          }
+          case "personal_agent.appearance":
+          case "personal_agent.appearance_reset": {
+            // Presentation only: never touches a Mission, an owner, a profile, the configuration revision or who answers.
+            if (!local) throw new WorkstationRequiredError("Character appearance is changed on the workstation (Windows Host).");
+            const slot = refused(() => parseSlot(data.slot));
+            const next = input.action === "personal_agent.appearance_reset"
+              ? appearanceStore.reset(slot)
+              : refused(() => appearanceStore.set(slot, data.appearance, Date.now()));
+            const weapon = manager.personalAgents.slots.find((row) => row.slot === slot)?.weapon;
+            const shown = weapon ? CHARACTER_STYLE_LABEL[resolvedStyle(weapon, next)] : "signature";
+            manager.emit(db.event("personal_agent.appearance", null, `Personal Agent ${slot} appearance: ${shown}${next.style === null ? " (signature)" : ""}.`));
+            extra = { data: { slot, appearance: next } };
             break;
           }
           case "personal_agent.converse": {

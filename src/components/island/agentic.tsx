@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useIsland } from "@/store/use-island";
 import { WeaponCharacter, usePrefersReducedMotion } from "./characters";
+import { appearanceFor } from "./character-style-model";
 import { displayState, hostLive } from "./character-model";
 import { AuthorizationCard, TeamsSection } from "./agent";
 import { parseRequirementLines, teamPanels } from "./team-model";
@@ -561,6 +562,7 @@ export function AgenticWorkspace() {
                       size="compact"
                       reduced={systemReduced || store.appearance.motion !== "full"}
                       displayName={slot.displayName}
+                      appearance={appearanceFor(store.characterAppearance, slot.slot)}
                     />
                   ) : (
                     <Layers size={20} aria-hidden="true" />
