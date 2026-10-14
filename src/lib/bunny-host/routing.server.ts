@@ -116,7 +116,32 @@ export type CandidateInput = {
   /** M-A-3 T13.1: Laya benchmark gate; returns an exclusion reason for an unbenchmarked Laya model. */
   layaGate?: (model: string, taskClass: string) => string | null;
   connectionGate?: (provider: ProviderId, model: string | null) => string | null;
+  /** M-A-3 T13.3 Gate F: the owner's routing priority. It only reorders eligible candidates; it never widens eligibility. */
+  priority?: RoutingPriority;
 };
+
+/**
+ * M-A-3 T13.3 Gate F (§18): quota exhaustion during write work pauses instead of switching providers, because Bunny
+ * cannot confirm which side effects already landed. Read work keeps the bounded reroute.
+ */
+export const QUOTA_WRITE_PAUSE = "QUOTA_PAUSE: the provider's quota ran out during write work. Bunny paused instead of switching providers, because it cannot confirm which changes already landed. Completed steps are kept; review the workspace, then retry or choose another account.";
+
+import type { RoutingPriority } from "./fairness.ts";
+export { ROUTING_PRIORITIES, type RoutingPriority } from "./fairness.ts";
+/** Points the owner's priority may add (doubled for lightweight work under minimize_cost); eligibility is decided before scoring. */
+export const PRIORITY_WEIGHT = 8;
+
+function priorityComponent(candidate: RoutingCandidate, requirements: TaskRequirements, priority: RoutingPriority | undefined): ScoreComponent | null {
+  const local = candidate.local_or_cloud === "local";
+  const lightweight = requirements.reasoning_complexity === "LOW" && (requirements.coding_complexity === "NONE" || requirements.coding_complexity === "LOW") && !requirements.needs_tools;
+  if (priority === "minimize_cost")
+    return { name: "priority", points: local ? PRIORITY_WEIGHT * (lightweight ? 2 : 1) : 0, detail: `Owner priority: minimize cost${lightweight ? " (lightweight work)" : ""}. Local models cost nothing; a cloud cost is never assumed free.` };
+  if (priority === "prioritize_quality")
+    return { name: "priority", points: round(rankFor(candidate.routing_profile, requirements.task_class) / 100 * PRIORITY_WEIGHT), detail: "Owner priority: quality (policy rank for this task class)." };
+  if (priority === "fastest")
+    return { name: "priority", points: round((candidate.routing_profile?.latency_rank ?? 50) / 100 * (PRIORITY_WEIGHT / 2) + (local ? PRIORITY_WEIGHT / 2 : 0)), detail: "Owner priority: fastest eligible (latency prior plus local advantage)." };
+  return null;
+}
 
 const rankFor = (profile: ModelRoutingProfile | null, taskClass: RoutingTaskClass): number => {
   if (!profile) return 50;
@@ -268,6 +293,9 @@ export function scoreCandidate(candidate: RoutingCandidate, requirements: TaskRe
 
   const empirical = input.empirical ? safeEmpirical(input.empirical, candidate) : 0;
   components.push({ name: "empirical", points: round(empirical * w.empirical), detail: "Bounded verified-success history (EMPIRICAL_HISTORY), zero below the minimum sample count." });
+
+  const priority = priorityComponent(candidate, requirements, input.priority);
+  if (priority) components.push(priority);
 
   const final = round(components.reduce((sum, c) => sum + c.points, 0));
   return { components, final };

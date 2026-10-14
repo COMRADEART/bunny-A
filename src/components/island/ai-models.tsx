@@ -3,6 +3,7 @@ import { Cpu, Cloud, Eye, EyeOff, KeyRound, ShieldCheck } from "lucide-react";
 import { useIsland } from "@/store/use-island";
 import { ConnectedAccounts, RoutingPrivacy } from "./accounts";
 import { HarnessManager } from "./harness-manager";
+import { SessionUsage } from "./session-usage";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import type { JevPolicy } from "@/lib/bunny-host/intelligence";
 import {
@@ -108,6 +109,11 @@ export function AiModelsSettings() {
       <div role="tabpanel" id={`${base}-panel-${SECTIONS.indexOf(section)}`} aria-labelledby={`${base}-tab-${SECTIONS.indexOf(section)}`} tabIndex={0} className="ai-panel">
         {section === "Connected Accounts" ? <ConnectedAccounts /> : section === "Harness Manager" ? <HarnessManager /> : section === "Routing & Privacy" ? <RoutingPrivacy /> : section === "Routing preferences" ? (
           <RoutingPreferences key={JSON.stringify(intelligence?.jev.thresholds ?? null)} intelligence={intelligence} />
+        ) : section === "Usage & limits" ? (
+          <>
+            <SessionUsage />
+            {intelligence ? <PrivacyUsage key={JSON.stringify(intelligence.jev.limits)} intelligence={intelligence} /> : null}
+          </>
         ) : !intelligence ? (
           <p className="caption">
             {store.viewer?.kind === "device"

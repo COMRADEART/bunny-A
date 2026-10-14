@@ -29,6 +29,9 @@ import { WorkerStore } from "./workers.server.ts";
 import { HarnessStore, probeHarness } from "./harnesses.server.ts";
 import { HARNESS_SCHEMA, harnessViews, judgeHarness } from "./harnesses.ts";
 import { CONNECTION_CATALOG } from "./connections.ts";
+import { freemem, totalmem } from "node:os";
+import { FAIRNESS_SETTING, ROUTING_PRIORITIES, admitStep, readFairness, validateFairness, type FairnessSettings, type RoutingPriority } from "./fairness.ts";
+import { sessionLedgerView } from "./session-ledger.ts";
 import {
   BUILTIN_ABILITIES,
   OPEN_STATES,
@@ -542,6 +545,41 @@ export async function startHost(
     } else syncWorker(worker);
   }
   missions.missionPauseGate = (missionId) => agents.blockedForMission(missionId);
+  // M-A-3 T13.3 Gate F: the Personal Agent that owns a Mission, directly or through one of its workers.
+  const slotForMission = (missionId: string | null): SlotId | null => {
+    if (!missionId) return null;
+    const worker = workerStore.byChild(missionId);
+    if (worker) return worker.slot;
+    const agent = agents.coordinatorFor(missionId);
+    return agent ? personalContext.ownerOf(agent.id) : null;
+  };
+  let fairness: FairnessSettings = readFairness((db.db.prepare("SELECT value FROM settings WHERE key=?").get(FAIRNESS_SETTING) as { value: string } | undefined)?.value);
+  const heldSince = new Map<string, number>();
+  const liveBySlot = (): Partial<Record<SlotId, number>> => {
+    const live: Partial<Record<SlotId, number>> = {};
+    for (const mission of missions.store.missionsIn(["running"])) {
+      const slot = slotForMission(mission.id);
+      if (slot === null) continue;
+      const count = missions.store.steps(mission.id).filter((step) => step.state === "running" || step.state === "verifying").length;
+      if (count) live[slot] = (live[slot] ?? 0) + count;
+    }
+    return live;
+  };
+  const memoryUsedPercent = () => (1 - freemem() / totalmem()) * 100;
+  missions.missionAdmissionGate = (missionId) => {
+    const slot = slotForMission(missionId);
+    if (slot === null) return null;
+    const now = Date.now();
+    for (const id of heldSince.keys()) if (id !== missionId && !missions.admissionHolds.has(id)) heldSince.delete(id);
+    const waiting = [...missions.admissionHolds.keys()].flatMap((id) => {
+      const other = id === missionId ? null : slotForMission(id);
+      return other === null ? [] : [{ slot: other, since: heldSince.get(id) ?? now }];
+    });
+    const verdict = admitStep({ slot, settings: fairness, live: liveBySlot(), waiting, since: heldSince.get(missionId) ?? now, memoryUsedPercent: memoryUsedPercent() });
+    if (verdict.admit) { heldSince.delete(missionId); return null; }
+    if (!heldSince.has(missionId)) heldSince.set(missionId, now);
+    return `${verdict.code}: ${verdict.reason}`;
+  };
   // M-A-3 T9R-F02 (D3/D5): admission-time liveness of the device behind a one-time answer or a staged change. A
   // revoked, signed-out or expired device's earlier answers never authorize anything again.
   missions.deviceActive = (actor) => {
@@ -621,6 +659,21 @@ export async function startHost(
           completed: harnessStore.completed(),
           platform: process.platform,
         }),
+      },
+      sessionLedger: sessionLedgerView({
+        sessionId: manager.instanceId,
+        rows: manager.sessionLedger.rows(),
+        connections: manager.connections.views(),
+        usage: manager.connections.usage(),
+        providerUsage: canonical.providerUsage?.providers ?? [],
+        slotFor: slotForMission,
+      }),
+      scheduler: {
+        priority: manager.routingPriority,
+        fairness,
+        live: liveBySlot(),
+        held: [...missions.admissionHolds].map(([missionId, reason]) => ({ missionId, slot: slotForMission(missionId), reason, since: heldSince.get(missionId) ?? null })),
+        memoryUsedPercent: Math.round(memoryUsedPercent()),
       },
       personalAgentContext: (() => {
         const byId = new Map((canonical.agents?.agents ?? []).map((agent) => [agent.id, agent]));
@@ -813,7 +866,7 @@ export async function startHost(
     };
     // Voice is workstation-only: a device projection never carries it.
     if (principal.kind === "device") {
-      const { personalAgentContext: _private, harnesses: _harnesses, ...shared } = withVerdicts;
+      const { personalAgentContext: _private, harnesses: _harnesses, sessionLedger: _ledger, scheduler: _scheduler, ...shared } = withVerdicts;
       const device = dashboardSnapshot(deviceSnapshot(shared, principal, presence));
       // M-A-3 T13: a device reads its slots only. The bindable list is a workstation Studio concern and reaches
       // beyond the Agents a device is shown (finished Agents are trimmed for devices), so it never leaves the workstation.
@@ -1462,6 +1515,23 @@ export async function startHost(
               if (input.action === "harness.remove") harnessStore.remove(entry.id);
               manager.emit(db.event(`harness.${input.action.slice(8)}d`, null, `${entry.name} ${input.action === "harness.remove" ? "removed from routing; uninstall it yourself if you no longer want it" : `${input.action.slice(8)}d`} on the workstation.`));
             }
+            break;
+          }
+          case "scheduler.priority": {
+            // T13.3 Gate F. Reorders eligible routes only; consent, budgets and privacy still gate every dispatch.
+            if (!local) throw new WorkstationRequiredError("Routing priority is set only on the workstation (Windows Host).");
+            if (!ROUTING_PRIORITIES.includes(data.priority as RoutingPriority)) throw new CommandRefusedError(`Priority must be one of ${ROUTING_PRIORITIES.join(", ")}.`);
+            manager.setRoutingPriority(data.priority as RoutingPriority);
+            manager.emit(db.event("scheduler.priority", null, `Routing priority set to ${data.priority}.`));
+            break;
+          }
+          case "scheduler.fairness": {
+            if (!local) throw new WorkstationRequiredError("Agent fairness is set only on the workstation (Windows Host).");
+            try { fairness = validateFairness(data.fairness, fairness); }
+            catch (error) { throw new CommandRefusedError(error instanceof Error ? error.message : String(error)); }
+            db.db.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(FAIRNESS_SETTING, JSON.stringify(fairness));
+            manager.emit(db.event("scheduler.fairness", null, `Agent fairness updated: shared ceiling ${fairness.sharedCeiling}.`));
+            for (const id of missions.admissionHolds.keys()) missions.schedule(id);
             break;
           }
           case "verification.record": {

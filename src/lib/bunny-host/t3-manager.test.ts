@@ -364,6 +364,24 @@ test("T3 §22/R22: a quota-constrained attempt reroutes to the next candidate wi
   } finally { env.cleanup(); }
 });
 
+test("T13.3 F §18: a quota-constrained WRITE attempt pauses instead of rerouting, even with the switch allowed", async () => {
+  const env = await t3Fixture(["codex", "claude"]);
+  try {
+    await env.tasks.connections.command("connections.policy.set", {policy:{...env.tasks.connections.policy(),switchAllowlist:["openai","anthropic"]}}, "workstation");
+    const task = env.tasks.submit({ prompt: RESEARCH, mode: "balanced", executionScope: { access: "write" } });
+    assert.equal(task.provider, "claude");
+    env.tasks.approve(task.id);
+    await until(() => env.parts.claude.launched.length === 1, "claude launch");
+    env.parts.claude.launched[0].finish({ ok: false, output: "", error: "usage limit reached (429)", exitCode: 1 });
+    await until(() => env.db.get(task.id).state === "failed", "paused failure", () => eventsOf(env, task.id).slice(-6));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(env.parts.codex.launched.length, 0, "no duplicate write on another provider");
+    assert.match(env.db.get(task.id).error ?? "", /QUOTA_PAUSE/);
+    assert.ok(!eventsOf(env, task.id).some(([type]) => type === "routing.rerouted"));
+    assert.deepEqual(env.routing.attempts(task.id).map((attempt) => attempt.taxonomy), ["QUOTA_CONSTRAINED"], "the attempt is recorded accurately");
+  } finally { env.cleanup(); }
+});
+
 test("T3 §24/R24: a failed Bunny-A verification escalates the effort once on the same candidate, then exhausts honestly", async () => {
   const env = await t3Fixture(["codex"]);
   try {

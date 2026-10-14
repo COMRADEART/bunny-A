@@ -57,6 +57,10 @@ export type HostSnapshot = {
   personalAgentContext?: import("./personal-agent-context.ts").PersonalAgentContextSnapshot;
   /** M-A-3 T13.3 Gate E: workstation only; stripped from device snapshots. */
   harnesses?: { schema: string; harnesses: import("./harnesses.ts").HarnessView[] };
+  /** M-A-3 T13.3 Gate F: this Host run's usage ledger. Workstation only; stripped from device snapshots. */
+  sessionLedger?: import("./session-ledger.ts").SessionLedgerView;
+  /** M-A-3 T13.3 Gate F: routing priority and Personal Agent fairness. Workstation only. */
+  scheduler?: import("./fairness.ts").SchedulerView;
   /** M-A-3 T13.1 Laya/Jev intelligence state (no secrets; credential existence only). Absent for paired devices. */
   intelligence?: import("./intelligence-snapshot.ts").IntelligenceSnapshot;
   connections?: import("./connections.server.ts").ConnectionsSnapshot;

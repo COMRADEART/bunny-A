@@ -98,9 +98,11 @@ export type RetryVerdict = { retry: boolean; reroute: boolean; waitForUser: bool
  * Category-specific retry policy. Retries are bounded per step and per mission; a user stop or a
  * denied permission is never retried automatically.
  */
-export function retryVerdict(category: FailureCategory, attempts: number, maxRetries: number, missionRetries: number, missionMaxRetries: number): RetryVerdict {
+export function retryVerdict(category: FailureCategory, attempts: number, maxRetries: number, missionRetries: number, missionMaxRetries: number, access?: "read" | "write"): RetryVerdict {
   const budgetLeft = attempts <= maxRetries && missionRetries < missionMaxRetries;
   const no = (reason: string, waitForUser = false): RetryVerdict => ({ retry: false, reroute: false, waitForUser, reason });
+  // M-A-3 T13.3 Gate F (§18): a write step whose provider ran out of quota may have left side effects; never reroute it blindly.
+  if (category === "provider_rate_limited" && access === "write") return no("The provider's quota ran out during write work. Paused at the last completed step; review the workspace before retrying or choosing another account.", true);
   switch (category) {
     case "user_stopped": return no("Stopped by the user; never retried automatically.");
     case "permission_required": return no("Waiting for the user to allow or deny the action.", true);

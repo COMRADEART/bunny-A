@@ -605,3 +605,26 @@ test("T3 §34: the adapter tool contract table matches the verified execution su
   assert.equal(resolveCapability("codex", null, "tools").value, true);
   assert.equal(resolveCapability("unknown-provider" as ProviderId, null, "tools").value, null, "UNKNOWN stays UNKNOWN");
 });
+test("T13.3 F §17: owner priority reorders eligible candidates only; balanced leaves the baseline untouched", () => {
+  const light = classifyRequirements({ prompt: "Say hello in one sentence", mode: "balanced" });
+  const input = (priority?: CandidateInput["priority"]) => baseInput({
+    providers: [live("claude"), live("ollama", { models: ["qwen3:8b"] })],
+    modelSnapshot: snapshot([ollamaSnapshot([fact({ model: "qwen3:8b" })])]),
+    requirements: light,
+    ...(priority ? { priority } : {}),
+  });
+  const pick = (priority?: CandidateInput["priority"]) => selectRoutingCandidate({ candidates: buildCandidates(input(priority)), requirements: light }).selected?.provider_id;
+  const baseline = buildCandidates(input());
+  assert.deepEqual(buildCandidates(input("balanced")).map((c) => [c.provider_id, c.final_score]), baseline.map((c) => [c.provider_id, c.final_score]), "balanced adds nothing");
+  assert.ok(baseline.every((c) => !c.score_components?.some((component) => component.name === "priority")));
+  assert.equal(pick("minimize_cost"), "ollama", "lightweight work prefers the free local model when cost matters");
+  const cost = buildCandidates(input("minimize_cost"));
+  assert.equal(pointsFor(cost.find((c) => c.provider_id === "claude")!, "priority"), 0, "a cloud plan is never assumed free");
+  const quality = buildCandidates(input("prioritize_quality"));
+  assert.ok(pointsFor(quality.find((c) => c.provider_id === "claude")!, "priority") > pointsFor(quality.find((c) => c.provider_id === "ollama")!, "priority"));
+  // A priority never makes an ineligible candidate eligible.
+  const heavy: TaskRequirements = { ...withComplexity("Refactor the repository and run the full test suite", "MAX"), needs_tools: true };
+  const toolsNeeded = buildCandidates({ ...input("minimize_cost"), requirements: heavy });
+  assert.ok(toolsNeeded.filter((c) => c.provider_id === "ollama").every((c) => c.eligibility !== "eligible"), "cost preference cannot route tool work to a tool-less model");
+  assert.equal(selectRoutingCandidate({ candidates: toolsNeeded, requirements: heavy }).selected?.provider_id, "claude", "heavy tool work still selects the stronger authorized provider");
+});

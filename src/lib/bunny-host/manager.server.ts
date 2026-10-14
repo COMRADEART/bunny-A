@@ -13,7 +13,7 @@ import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapt
 import { PolicyEngine } from "./learning.server.ts";
 import { classifyRequirements, effortRequirement, type TaskRequirements ,
 } from "../orch/router-requirements.ts";
-import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, type RoutingDecisionRecord, type RoutingFailureTaxonomy ,
+import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, QUOTA_WRITE_PAUSE, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
 } from "./routing.server.ts";
 import { RoutingDecisionStore } from "./routing-store.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
@@ -34,6 +34,7 @@ import { JevService, type FetchLike } from "./typesafe-jev.server.ts";
 import { applyDecisionAdvice, buildDecisionState, candidateKey, isLayaModel, layaExclusion, type DecisionAdvice } from "./intelligence.ts";
 import type { IntelligenceSnapshot } from "./intelligence-snapshot.ts";
 import { ConnectionRegistry, type ConnectionSeams } from "./connections.server.ts";
+import { SessionLedger } from "./session-ledger.server.ts";
 import { locate, systemContext } from "./discovery.server.ts";
 import { consentedVendorsFor, vendorFor, type ApprovedRoute } from "./connections.ts";
 
@@ -76,6 +77,13 @@ export type ManagerOptions = {
 
 export class TaskManager {
   connections: ConnectionRegistry;
+  sessionLedger: SessionLedger;
+  /** M-A-3 T13.3 Gate F: owner routing priority (setting `routing_priority`). */
+  routingPriority: RoutingPriority = "balanced";
+  setRoutingPriority(priority: RoutingPriority) {
+    this.db.db.prepare("INSERT INTO settings(key,value) VALUES('routing_priority',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(priority);
+    this.routingPriority = priority;
+  }
   projects: ProjectRegistry;
   workspaceRootConfigured: boolean;
   db: HostDatabase;
@@ -180,6 +188,7 @@ export class TaskManager {
     this.jevSecrets = new JevSecretStore(db, options.intelligence?.jevProtector);
     this.jev = new JevService(db, this.jevSecrets, { sessionId: this.instanceId, fetchFn: options.intelligence?.jevFetch, now: options.intelligence?.now });
     this.connections = new ConnectionRegistry({db,sessionId:this.instanceId,locate:id=>locate(systemContext(this.providerPaths()),id).launch,...options.connections,emit:(type,detail)=>this.emit(db.event(type,null,detail))});
+    this.sessionLedger = new SessionLedger(db, this.instanceId);
     this.connections.onRevoked((connectionId,reason)=>{ for (const id of this.sessions.keys()) if (db.get(id).connectionRoute?.connectionId===connectionId) this.stopInBackground(id,reason); });
     this.sessionDirectory = options.sessionDirectory ?? null;
     this.readProcesses = options.processTable ?? processTable;
@@ -192,6 +201,8 @@ export class TaskManager {
       .prepare("SELECT value FROM settings WHERE key=?")
       .get(PERSONAL_AGENTS_SETTING) as { value: string } | undefined;
     this.personalAgents = parsePersonalAgentsConfig(savedPersonalAgents?.value ?? null);
+    const savedPriority = (db.db.prepare("SELECT value FROM settings WHERE key='routing_priority'").get() as { value: string } | undefined)?.value;
+    if (ROUTING_PRIORITIES.includes(savedPriority as RoutingPriority)) this.routingPriority = savedPriority as RoutingPriority;
     this.bus.setMaxListeners(100);
     // UI reconnect never calls this. A new Host instance genuinely cannot attach
     // to an old non-interactive pipe; keep session/PID evidence without killing it.
@@ -734,7 +745,8 @@ export class TaskManager {
       modelSnapshot,
       usage,
       requirements,
-      constraints: input.constraints,
+      constraints: this.routingPriority === "local_only" ? { ...input.constraints, localOnly: true } : input.constraints,
+      priority: this.routingPriority,
       override: input.override ?? "auto",
       modelOverride: input.modelOverride,
       mode: input.mode,
@@ -1575,6 +1587,7 @@ export class TaskManager {
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingProgress: TaskProgress | null = null;
     let reportedUsage: TokenUsage | null = null;
+    let settledUsage: TokenUsage | null = null;
     const flush = () => {
       if (flushTimer) {
         clearTimeout(flushTimer);
@@ -1610,6 +1623,7 @@ export class TaskManager {
         const gate=this.connections.evaluate({kind:"launch",provider:current.provider,model:current.model,projectId:current.projectId,origin:current.connectionRoute?.approvedBy??"workstation",route:current.connectionRoute??null});
         if(!gate.ok)throw new CommandRefusedError(`${gate.code}: ${gate.reason}`);
         connectionReservation=this.connections.recordDispatch(gate.connectionId,id);
+        this.sessionLedger.reserve(connectionReservation,gate.connectionId,this.connections.views().find((row)=>row.id===gate.connectionId)?.billing??"unknown",current);
       },
       childEnvironment:()=>{
         const current=this.db.get(id);
@@ -1847,7 +1861,11 @@ export class TaskManager {
         }[] = [];
         for (;;) {
           const result = await session.done;
-          if(connectionReservation!==null)this.connections.settle(connectionReservation,result.ok);
+          if(connectionReservation!==null){
+            this.connections.settle(connectionReservation,result.ok);
+            this.sessionLedger.settle(connectionReservation,result.ok,this.db.get(id),reportedUsage!==settledUsage?reportedUsage:null);
+            settledUsage=reportedUsage;
+          }
           this.missionAttemptSettled?.(this.db.get(id), result.ok);
           flush();
           this.stopTree(id);
@@ -1977,6 +1995,8 @@ export class TaskManager {
               exhaustNow(
                 `Manual model selection is fixed; the task failed instead of re-routing. ${action.reason}`,
               );
+            else if (taxonomy === "QUOTA_CONSTRAINED" && current.executionScope?.access === "write")
+              exhaustNow(QUOTA_WRITE_PAUSE);
             else if (action.action === "retry-same") {
               sameRetries += 1;
               const label = `${current.provider}${current.model==="auto" ? " · provider default" : ` · ${current.model}`}`;

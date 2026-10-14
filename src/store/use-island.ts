@@ -31,6 +31,8 @@ import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
 import type { PersonalAgentsSnapshot } from "@/lib/bunny-host/personal-agents";
 import type { PersonalAgentContextSnapshot } from "@/lib/bunny-host/personal-agent-context";
 import type { HarnessView } from "@/lib/bunny-host/harnesses";
+import type { SessionLedgerView } from "@/lib/bunny-host/session-ledger";
+import type { SchedulerView } from "@/lib/bunny-host/fairness";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import {
   parseAccountIntent,
@@ -207,6 +209,11 @@ type Island = Preferences & {
   harnesses: HarnessView[] | null;
   /** One `harness.*` command; the Host's answer or null when refused. */
   harnessCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** M-A-3 T13.3 Gate F: this Host run's usage ledger and the scheduler settings (workstation only; null on devices). */
+  sessionLedger: SessionLedgerView | null;
+  scheduler: SchedulerView | null;
+  /** One `scheduler.*` command; the Host's answer or null when refused. */
+  schedulerCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
   voice: VoiceSnapshot | null;
   /** Local receipt time of the last voice answer; a stale value means voice is reconnecting, not listening. */
@@ -731,6 +738,8 @@ export const useIsland = create<Island>((set, get) => {
       personalAgents: snapshot.personalAgents ?? null,
       personalAgentContext: snapshot.personalAgentContext ?? null,
       harnesses: snapshot.harnesses?.harnesses ?? null,
+      sessionLedger: snapshot.sessionLedger ?? null,
+      scheduler: snapshot.scheduler ?? null,
       intelligence: snapshot.intelligence ?? null,
       connections: snapshot.connections ?? null,
       deviceConnections: snapshot.deviceConnections ?? [],
@@ -792,6 +801,8 @@ export const useIsland = create<Island>((set, get) => {
       personalAgents: null,
       personalAgentContext: null,
       harnesses: null,
+      sessionLedger: null,
+      scheduler: null,
       intelligence: null,
       connections: null,
       deviceConnections: [],
@@ -1193,6 +1204,9 @@ export const useIsland = create<Island>((set, get) => {
     personalAgentCommand: (action, data, onRefused) => command(action, data, "personal-agent", onRefused),
     harnesses: null,
     harnessCommand: (action, data, onRefused) => command(action, data, "harness", onRefused),
+    sessionLedger: null,
+    scheduler: null,
+    schedulerCommand: (action, data, onRefused) => command(action, data, "scheduler", onRefused),
     intelligence: null,
     connections: null,
     deviceConnections: [],
