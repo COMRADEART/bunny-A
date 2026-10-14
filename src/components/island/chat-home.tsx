@@ -27,7 +27,7 @@ export function ChatHome({ now }: { now: number }) {
   const live = hostLive(store.connection, now || Date.now());
   const isWorkstation = store.viewer?.kind !== "device";
   const voiceAvailable = isWorkstation && store.voiceSupported !== false;
-  const missions = recentMissionRows(store.missions?.missions ?? [], store.personalAgents);
+  const missions = recentMissionRows(store.missions?.missions ?? [], store.personalAgents, 4, store.personalAgentContext);
   const chips = composerChips(voiceAvailable);
 
   const onChip = (id: string) => {

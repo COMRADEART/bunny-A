@@ -15,6 +15,7 @@ import { WeaponCharacter, usePrefersReducedMotion } from "./characters";
 import { agentControls, type AgentView } from "./workspace-model";
 import { displayState, hostLive } from "./character-model";
 import { Empty } from "./ui";
+import { AgentConversation } from "./conversation";
 import {
   authorityFacts,
   bindAgent,
@@ -104,7 +105,8 @@ export function Studio() {
   const agents = store.agents?.agents ?? [];
   const boundAgent = current?.agentId ? agents.find((agent) => agent.id === current.agentId) ?? null : null;
   const authority = authorityFacts(boundAgent?.authorization ?? null);
-  const others = agents.filter((agent) => isUserFacingAgent(agent) && !slotted.has(agent.id));
+  const owned = new Set(store.personalAgentContext?.slots.flatMap((row) => row.owned.map((agent) => agent.agentId)) ?? []);
+  const others = agents.filter((agent) => isUserFacingAgent(agent) && !slotted.has(agent.id) && !owned.has(agent.id));
 
   const edit = (slot: SlotId, patch: Partial<StudioSlot>) => {
     setDraft((rows) => rows.map((row) => (row.slot === slot ? { ...row, ...patch } : row)));
@@ -197,6 +199,8 @@ export function Studio() {
           })}
         </div>
       </section>
+
+      <AgentConversation />
 
       {current && (
         <section className="t8-section" aria-labelledby="studio-editor" onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); setSelected(null); } }}>

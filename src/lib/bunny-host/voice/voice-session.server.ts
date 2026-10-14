@@ -111,6 +111,8 @@ export interface VoiceChatPort {
 export interface VoiceAgentPort {
   rows(): VoiceAgentRow[];
   facts(): { agents: AgentFact[]; missions: MissionFact[]; approvals: ApprovalFact[] };
+  /** M-A-3 T13.3: the foreground Personal Agent's status answer from its own Missions, or null while Bunny answers. Optional. */
+  personalStatus?(): { text: string; live: { id: string; missionId: string | null }[] } | null;
   /** T12 RES-02: every Mission that has not finished, read from canonical state (not the recency window). Optional. */
   activeMissions?(): MissionFact[];
   /** T12 RES-02: one Mission by id from canonical state, so a stop is confirmed against the record itself. Optional. */
@@ -1112,6 +1114,11 @@ export class VoiceSessionManager {
       .sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
     switch (kind) {
       case "agent_status": {
+        const own = this.deps.agents.personalStatus?.();
+        if (own) {
+          if (own.live.length > 0) this.setReferent("agents", own.live.map((agent) => agent.id), own.live.length === 1 ? own.live[0].missionId : null);
+          return own.text;
+        }
         const live = facts.agents.filter((agent) => !isTerminalAgent(agent.state));
         if (live.length > 0) this.setReferent("agents", live.map((agent) => agent.id), live.length === 1 ? live[0].missionId : null);
         return answerStatus(facts.agents, facts.missions);

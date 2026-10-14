@@ -53,6 +53,8 @@ export type HostSnapshot = {
   agents?: AgentSnapshot;
   /** M-A-3 T13 Personal Agent slots projected onto live Host facts (presentation only). Optional: older clients ignore it. */
   personalAgents?: import("./personal-agents.ts").PersonalAgentsSnapshot;
+  /** M-A-3 T13.3: per-Personal-Agent ownership, profile and conversation. Absent for paired devices. */
+  personalAgentContext?: import("./personal-agent-context.ts").PersonalAgentContextSnapshot;
   /** M-A-3 T13.1 Laya/Jev intelligence state (no secrets; credential existence only). Absent for paired devices. */
   intelligence?: import("./intelligence-snapshot.ts").IntelligenceSnapshot;
   connections?: import("./connections.server.ts").ConnectionsSnapshot;

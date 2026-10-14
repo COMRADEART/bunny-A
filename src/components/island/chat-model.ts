@@ -5,6 +5,7 @@
 import type { MissionState, MissionView } from "../../lib/bunny-missions/types.ts";
 import type { PersonalAgentsSnapshot, PresentationState, WeaponId } from "../../lib/bunny-host/personal-agents.ts";
 import { WEAPON_LABEL } from "../../lib/bunny-host/personal-agents.ts";
+import type { PersonalAgentContextSnapshot } from "../../lib/bunny-host/personal-agent-context.ts";
 import type { NavView } from "./nav-model.ts";
 
 export const CHAT_QUESTION = "What would you like to do today?";
@@ -89,16 +90,26 @@ export function stepLabel(counts: { completed: number; total: number; verified: 
 }
 
 /**
- * Recent Missions, newest activity first. The weapon comes from a slot whose bound Agent owns the Mission; a Mission with no
- * slotted Agent gets no weapon (the caller draws a neutral icon).
+ * Recent Missions, newest activity first. The weapon comes from the Personal Agent that owns the Mission (T13.3 ownership, or
+ * the slot's focused Agent); a Mission no Personal Agent owns gets no weapon (the caller draws a neutral icon). Only the focused
+ * Agent's Mission carries the slot's presentation, since that state describes the focused Agent and no other.
  */
 export function recentMissionRows(
   missions: readonly MissionView[],
   personalAgents: PersonalAgentsSnapshot | null,
   limit = 4,
+  ownership: PersonalAgentContextSnapshot | null = null,
 ): MissionRow[] {
-  const owner = new Map<string, { weapon: WeaponId; name: string; presentation: PresentationState }>();
-  for (const slot of personalAgents?.slots ?? []) {
+  const owner = new Map<string, { weapon: WeaponId; name: string; presentation: PresentationState | null }>();
+  const slots = personalAgents?.slots ?? [];
+  for (const row of ownership?.slots ?? []) {
+    const slot = slots.find((candidate) => candidate.slot === row.slot);
+    if (!slot) continue;
+    for (const agent of row.owned) {
+      if (agent.missionId) owner.set(agent.missionId, { weapon: slot.weapon, name: slot.displayName || WEAPON_LABEL[slot.weapon], presentation: null });
+    }
+  }
+  for (const slot of slots) {
     const missionId = slot.agent?.missionId;
     if (missionId) owner.set(missionId, { weapon: slot.weapon, name: slot.displayName || WEAPON_LABEL[slot.weapon], presentation: slot.presentation.state });
   }

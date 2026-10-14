@@ -29,6 +29,7 @@ import {
 import type { MissionSnapshot } from "@/lib/bunny-missions/types";
 import type { AgentSnapshot } from "@/lib/bunny-host/agent-types";
 import type { PersonalAgentsSnapshot } from "@/lib/bunny-host/personal-agents";
+import type { PersonalAgentContextSnapshot } from "@/lib/bunny-host/personal-agent-context";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import {
   parseAccountIntent,
@@ -196,6 +197,10 @@ type Island = Preferences & {
   agents: AgentSnapshot | null;
   /** M-A-3 T13: the four Personal Agent slots as the Host projected them (presentation only). */
   personalAgents: PersonalAgentsSnapshot | null;
+  /** M-A-3 T13.3: ownership, profiles, conversations and the speaking identity (workstation only; null on devices). */
+  personalAgentContext: PersonalAgentContextSnapshot | null;
+  /** M-A-3 T13.3: one `personal_agent.*` command. True only on the Host's acknowledgment. */
+  personalAgentCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<boolean>;
   /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
   voice: VoiceSnapshot | null;
   /** Local receipt time of the last voice answer; a stale value means voice is reconnecting, not listening. */
@@ -718,6 +723,7 @@ export const useIsland = create<Island>((set, get) => {
       missions: snapshot.missions ?? null,
       agents: snapshot.agents ?? null,
       personalAgents: snapshot.personalAgents ?? null,
+      personalAgentContext: snapshot.personalAgentContext ?? null,
       intelligence: snapshot.intelligence ?? null,
       connections: snapshot.connections ?? null,
       deviceConnections: snapshot.deviceConnections ?? [],
@@ -777,6 +783,7 @@ export const useIsland = create<Island>((set, get) => {
       pairingRequired: true,
       agents: null,
       personalAgents: null,
+      personalAgentContext: null,
       intelligence: null,
       connections: null,
       deviceConnections: [],
@@ -1174,6 +1181,8 @@ export const useIsland = create<Island>((set, get) => {
     missions: null,
     agents: null,
     personalAgents: null,
+    personalAgentContext: null,
+    personalAgentCommand: async (action, data, onRefused) => (await command(action, data, "personal-agent", onRefused)) !== null,
     intelligence: null,
     connections: null,
     deviceConnections: [],

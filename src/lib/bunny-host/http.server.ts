@@ -24,7 +24,9 @@ import { dashboardSnapshot, publicEventDetail, projectHostActivity } from "./pre
 import { releaseIdentity } from "./release-identity.server.ts";
 import { AGENT_ACTIONS, AgentRuntime, agentCommand } from "./agent-runtime.server.ts";
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
-import { isUserFacingAgent, projectPersonalAgents } from "./personal-agents.ts";
+import { SLOT_IDS, isUserFacingAgent, projectPersonalAgents, type SlotId } from "./personal-agents.ts";
+import { PersonalAgentContextStore } from "./personal-agent-context.server.ts";
+import { PERSONAL_AGENT_CONTEXT_SCHEMA, answerFromOwnFacts, cleanTurn, parseIdentity, parseSlot, personalAgentName, validateProfile } from "./personal-agent-context.ts";
 import { VoiceSessionManager, type ListenSource, type InterruptSource } from "./voice/voice-session.server.ts";
 import { launchVoiceWorker } from "./voice/voice-worker.server.ts";
 import { hostFactsFrom, pendingApprovalFacts, type ApprovalFact } from "./voice/voice-answers.server.ts";
@@ -335,6 +337,35 @@ export async function startHost(
   // runs the recovery walk after MissionManager.recover() has reconciled the mission rows.
   const agents = new AgentRuntime(db, missions);
   const projects = new ProjectService(missions, agents);
+  // M-A-3 T13.3: Personal Agent ownership, profiles and conversations. Context only; it owns no execution.
+  const personalContext = new PersonalAgentContextStore(db);
+  const refused = <T,>(work: () => T): T => {
+    try {
+      return work();
+    } catch (error) {
+      throw new CommandRefusedError(error instanceof Error ? error.message : "The Host refused this change.");
+    }
+  };
+  /** One Personal Agent's owned Agents and their Missions, read from canonical state. Never another slot's. */
+  const ownFacts = (slot: SlotId) => {
+    const config = manager.personalAgents.slots.find((row) => row.slot === slot)!;
+    const ids = personalContext.owned(slot);
+    const owned = ids.length ? agents.snapshot(ids.slice(0, 100)).agents : [];
+    const ownMissions = owned.flatMap((agent) => {
+      if (!agent.missionId) return [];
+      try {
+        return [missions.view(missions.mission(agent.missionId))];
+      } catch {
+        return [];
+      }
+    });
+    return { name: personalAgentName(config.weapon, config.displayName), owned, missions: ownMissions };
+  };
+  const recordOwner = (agentId: string, slot: SlotId, actor: string) => {
+    const previous = personalContext.assign(agentId, slot, actor, Date.now());
+    if (previous === slot) return;
+    manager.emit(db.event("personal_agent.owner", null, previous === null ? `Personal Agent ${slot} owns Agent ${agentId}.` : `Agent ${agentId} moved from Personal Agent ${previous} to ${slot} on the workstation.`));
+  };
   missions.missionPauseGate = (missionId) => agents.blockedForMission(missionId);
   // M-A-3 T9R-F02 (D3/D5): admission-time liveness of the device behind a one-time answer or a staged change. A
   // revoked, signed-out or expired device's earlier answers never authorize anything again.
@@ -406,6 +437,22 @@ export async function startHost(
         tasks: canonical.tasks,
         now: Date.now(),
       }),
+      personalAgentContext: (() => {
+        const byId = new Map((canonical.agents?.agents ?? []).map((agent) => [agent.id, agent]));
+        return {
+          schema: PERSONAL_AGENT_CONTEXT_SCHEMA,
+          foreground: personalContext.foreground(),
+          slots: SLOT_IDS.map((slot) => ({
+            slot,
+            owned: personalContext.owned(slot).flatMap((agentId) => {
+              const agent = byId.get(agentId);
+              return agent ? [{ agentId, missionId: agent.missionId, state: agent.state }] : [];
+            }),
+            profile: personalContext.profile(slot),
+            turns: personalContext.turns(slot),
+          })),
+        };
+      })(),
     };
   };
   // M-A-3 T10: the voice session. Workstation-only; the worker runs contained in a Bunny-owned job and nothing starts until a workstation opens it.
@@ -461,6 +508,13 @@ export async function startHost(
           // The consent revision the Agent's authorization carries; pause and stop ignore it, resume checks it.
           revision: row.authorization?.revision ?? 0,
         })),
+      personalStatus: () => {
+        const speaker = personalContext.foreground();
+        if (speaker === "bunny") return null;
+        const facts = ownFacts(speaker);
+        const live = facts.owned.filter((agent) => !["COMPLETED", "FAILED", "STOPPED"].includes(agent.state)).map((agent) => ({ id: agent.id, missionId: agent.missionId }));
+        return { text: answerFromOwnFacts({ ...facts, question: "" }), live };
+      },
       facts: () => {
         const tasks = manager.snapshot(0).tasks;
         const agentRows = agents.snapshot().agents;
@@ -558,7 +612,8 @@ export async function startHost(
     };
     // Voice is workstation-only: a device projection never carries it.
     if (principal.kind === "device") {
-      const device = dashboardSnapshot(deviceSnapshot(withVerdicts, principal, presence));
+      const { personalAgentContext: _private, ...shared } = withVerdicts;
+      const device = dashboardSnapshot(deviceSnapshot(shared, principal, presence));
       // M-A-3 T13: a device reads its slots only. The bindable list is a workstation Studio concern and reaches
       // beyond the Agents a device is shown (finished Agents are trimmed for devices), so it never leaves the workstation.
       if (!device.personalAgents) return device;
@@ -904,11 +959,73 @@ export async function startHost(
             // M-A-3 T13: presentation only. Devices are refused by default-deny; this guard keeps it workstation-only.
             if (!local) throw new WorkstationRequiredError("Personal Agent slots can only be set on the workstation (Windows Host).");
             // Refusals (validation, stale revision) arrive as CommandRefusedError from the manager; a write fault is not refused.
-            manager.configurePersonalAgents(
+            const configured = manager.configurePersonalAgents(
               data.slots,
               data.expectRevision,
               new Set(agents.snapshot().agents.filter(isUserFacingAgent).map((agent) => agent.id)),
             );
+            // M-A-3 T13.3: a slot's focused Agent is always owned by that slot. Rebinding on the workstation is an explicit transfer.
+            for (const slot of configured.slots) if (slot.agentId) recordOwner(slot.agentId, slot.slot, actor);
+            break;
+          }
+          case "personal_agent.delegate": {
+            // "Bunny, give Gada my website project": the existing agent.create admission, then ownership by the slot.
+            if (!local) throw new WorkstationRequiredError("Giving work to a Personal Agent requires the workstation (Windows Host).");
+            const slot = refused(() => parseSlot(data.slot));
+            const { slot: _slot, ...createData } = data;
+            const before = new Set(agents.snapshot().agents.map((agent) => agent.id));
+            extra = await agentCommand(agents, "agent.create", createData, actor);
+            const created = agents.snapshot().agents.find((agent) => !before.has(agent.id) && isUserFacingAgent(agent));
+            if (!created) throw new Error("The Agent was admitted but could not be identified for ownership.");
+            recordOwner(created.id, slot, actor);
+            const config = manager.personalAgents;
+            if (!config.slots.find((row) => row.slot === slot)?.agentId)
+              manager.configurePersonalAgents(
+                config.slots.map((row) => (row.slot === slot ? { ...row, agentId: created.id, active: true } : row)),
+                config.revision,
+                new Set(agents.snapshot().agents.filter(isUserFacingAgent).map((agent) => agent.id)),
+              );
+            extra = { ...extra, data: { agentId: created.id, slot } };
+            break;
+          }
+          case "personal_agent.assign": {
+            if (!local) throw new WorkstationRequiredError("Assigning work to a Personal Agent requires the workstation (Windows Host).");
+            const slot = refused(() => parseSlot(data.slot));
+            const agentId = typeof data.agentId === "string" ? data.agentId.slice(0, 200) : "";
+            if (!agents.snapshot().agents.some((agent) => agent.id === agentId && isUserFacingAgent(agent)))
+              throw new CommandRefusedError("A Personal Agent can only own one of your own Agents.");
+            recordOwner(agentId, slot, actor);
+            break;
+          }
+          case "personal_agent.profile": {
+            if (!local) throw new WorkstationRequiredError("Personal Agent profiles can only be edited on the workstation (Windows Host).");
+            const slot = refused(() => parseSlot(data.slot));
+            const previous = personalContext.profile(slot);
+            if (data.expectRevision !== undefined && data.expectRevision !== null && data.expectRevision !== previous.revision)
+              throw new CommandRefusedError(`This profile changed since it was loaded (current revision ${previous.revision}). Nothing was changed.`);
+            const { slot: _slot, expectRevision: _revision, ...edit } = data;
+            const next = refused(() => validateProfile(slot, edit, Date.now(), previous));
+            personalContext.saveProfile(next);
+            manager.emit(db.event("personal_agent.profile_saved", null, `Personal Agent ${slot} profile revision ${next.revision} saved.`));
+            break;
+          }
+          case "personal_agent.foreground": {
+            // Chooses who answers. It never pauses, stops, transfers or cancels any Agent or Mission.
+            if (!local) throw new WorkstationRequiredError("The conversation identity is chosen on the workstation (Windows Host).");
+            const identity = refused(() => parseIdentity(data.identity));
+            personalContext.setForeground(identity);
+            manager.emit(db.event("personal_agent.foreground", null, identity === "bunny" ? "Bunny is answering." : `Personal Agent ${identity} is answering.`));
+            break;
+          }
+          case "personal_agent.converse": {
+            if (!local) throw new WorkstationRequiredError("Personal Agent conversations stay on the workstation (Windows Host).");
+            const slot = refused(() => parseSlot(data.slot));
+            const question = refused(() => cleanTurn(data.text));
+            const now = Date.now();
+            personalContext.appendTurn(slot, "user", question, "user", now);
+            const reply = answerFromOwnFacts({ ...ownFacts(slot), question });
+            const turn = personalContext.appendTurn(slot, "agent", reply, "host-facts", now);
+            extra = { data: { slot, reply: turn } };
             break;
           }
           case "verification.record": {

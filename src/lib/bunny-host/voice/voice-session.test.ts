@@ -61,7 +61,7 @@ function finishSpeech(h: ReturnType<typeof setup>) {
   h.worker.emit({ ev: "playback.idle", turn: snap.turnId, gen: snap.generation });
 }
 
-function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?: VoiceAgentRow[]; silentDevices?: boolean; silentReady?: boolean; softBudget?: number; hardBudget?: number; sttNotice?: string | null; /** T12: Mission rows the Host reports, and the canonical Mission ports (stop, draft, projects). */ missions?: MissionFact[]; missionPort?: boolean; projects?: { id: string; name: string }[]; draftFails?: boolean; stopFails?: boolean; /** T12 RES-01/02: the facts window: only the newest N Missions (by updatedAt) are reported by facts(). Canonical ports are not windowed. */ missionWindow?: number } = {}) {
+function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?: VoiceAgentRow[]; silentDevices?: boolean; silentReady?: boolean; softBudget?: number; hardBudget?: number; sttNotice?: string | null; /** T12: Mission rows the Host reports, and the canonical Mission ports (stop, draft, projects). */ missions?: MissionFact[]; missionPort?: boolean; projects?: { id: string; name: string }[]; draftFails?: boolean; stopFails?: boolean; /** T12 RES-01/02: the facts window: only the newest N Missions (by updatedAt) are reported by facts(). Canonical ports are not windowed. */ missionWindow?: number; /** T13.3: the foreground Personal Agent's own status answer (null while Bunny answers). */ personalStatus?: () => { text: string; live: { id: string; missionId: string | null }[] } | null } = {}) {
   let clock = 1_000;
   const timers: { at: number; fn: () => void; done: boolean }[] = [];
   const schedule = (fn: () => void, ms: number) => {
@@ -148,6 +148,7 @@ function setup(options: { mode?: VoiceMode; platform?: NodeJS.Platform; agents?:
       row.state = action === "agent.pause" ? "PAUSED" : action === "agent.stop" ? "STOPPED" : "RUNNING";
       row.revision += 1;
     },
+    ...(options.personalStatus ? { personalStatus: options.personalStatus } : {}),
     ...(options.missionPort
       ? {
           missionStop: async (missionId: string) => {
@@ -1901,6 +1902,23 @@ test("T12 F4: the referent expires after referentTtlMs and is never reused", asy
   await h.session.text("did it finish");
   await h.flush();
   assert.equal(h.session.snapshot().clarification, null, "no stale pick is offered");
+  assert.equal(h.session.snapshot().answer, "2 agents are active: Builder, Tester. Say the name of the one you mean.");
+});
+
+test("T13.3 B: the foreground Personal Agent answers status from its own Missions; Bunny's answer is unchanged otherwise", async () => {
+  let speaker: "bunny" | "gada" = "gada";
+  const h = setup({
+    agents: [{ id: "a1", name: "Builder", state: "RUNNING", revision: 1 }, { id: "a2", name: "Tester", state: "RUNNING", revision: 1 }],
+    personalStatus: () => (speaker === "gada" ? { text: "Website redesign: working, 1 of 3 steps done, 0 verified by the Host.", live: [{ id: "a1", missionId: "m1" }] } : null),
+  });
+  await h.open();
+  await h.session.text("what is my agent doing");
+  await h.flush();
+  assert.equal(h.session.snapshot().answer, "Website redesign: working, 1 of 3 steps done, 0 verified by the Host.");
+  assert.equal(h.session.snapshot().clarification, null, "the foreground Agent's own work needs no disambiguation");
+  speaker = "bunny";
+  await h.session.text("what is my agent doing");
+  await h.flush();
   assert.equal(h.session.snapshot().answer, "2 agents are active: Builder, Tester. Say the name of the one you mean.");
 });
 

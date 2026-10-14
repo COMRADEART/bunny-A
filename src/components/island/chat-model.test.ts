@@ -89,6 +89,24 @@ test("T13 chat: an unnamed slot falls back to its weapon's name, not a placehold
   assert.equal(recentMissionRows([mission("m1", 1)] as never, personal)[0].weaponName, "Sword");
 });
 
+test("T13.3 chat: every Mission a Personal Agent owns carries its weapon; only the focused one carries the slot's live state", () => {
+  const personal = {
+    slots: [{ ...(slot(1, "gada", "m1", "Ledger") as object), presentation: { state: "RUNNING" } }, slot(2, "spear", null)],
+  } as never;
+  const ownership = {
+    slots: [
+      { slot: 1, owned: [{ agentId: "agent-1", missionId: "m1", state: "RUNNING" }, { agentId: "agent-9", missionId: "m2", state: "CREATED" }] },
+      { slot: 2, owned: [{ agentId: "agent-7", missionId: "m3", state: "PAUSED" }] },
+    ],
+  } as never;
+  const rows = recentMissionRows([mission("m1", 1), mission("m2", 2), mission("m3", 3), mission("m4", 4)] as never, personal, 4, ownership);
+  const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+  assert.deepEqual([byId.m1.weapon, byId.m1.presentation], ["gada", "RUNNING"]);
+  assert.deepEqual([byId.m2.weapon, byId.m2.weaponName, byId.m2.presentation], ["gada", "Ledger", null], "owned but not focused: the slot's state is not this Mission's");
+  assert.deepEqual([byId.m3.weapon, byId.m3.presentation], ["spear", null], "an unbound slot still owns its Missions");
+  assert.equal(byId.m4.weapon, null);
+});
+
 test("T13 chat: an empty Host has no Missions to show", () => {
   assert.deepEqual(recentMissionRows([], null), []);
 });
