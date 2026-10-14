@@ -108,6 +108,16 @@ function first(ctx: DiscoveryContext, id: ProviderId, names: string[], known: st
   return { launch: null, checked };
 }
 
+/** First launchable PATH match for harnesses that have no execution adapter (and so no `locate` case). */
+export function locateAny(ctx: DiscoveryContext, names: readonly string[]): Launchable | null {
+  for (const name of names)
+    for (const path of searchPath(ctx, name)) {
+      const launch = fromCandidate(ctx, path, "PATH", []);
+      if (launch) return launch;
+    }
+  return null;
+}
+
 function appData(ctx: DiscoveryContext) { return env(ctx, "APPDATA") ?? join(ctx, ctx.home, "AppData", "Roaming"); }
 function localAppData(ctx: DiscoveryContext) { return env(ctx, "LOCALAPPDATA") ?? join(ctx, ctx.home, "AppData", "Local"); }
 

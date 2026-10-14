@@ -104,10 +104,10 @@ export function probe(launch: Launchable, args: string[], timeout = 15000): Prom
     child.stdin?.end();
   });
 }
-const firstLine = (text: string) => text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "";
+export const firstLine = (text: string) => text.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "";
 const ESC = String.fromCharCode(27);
 /** Removes terminal colour codes (ESC [ … m) that some CLIs print even when piped. */
-const stripAnsi = (text: string) => text.split(ESC).map((part, index) => (index ? part.replace(/^\[[0-9;]*m/, "") : part)).join("");
+export const stripAnsi = (text: string) => text.split(ESC).map((part, index) => (index ? part.replace(/^\[[0-9;]*m/, "") : part)).join("");
 function fingerprint(path: string | null | undefined): string | null {
   if (!path) return null;
   try { const stat = statSync(path); return `${stat.size}:${stat.mtimeMs}`; } catch { return null; }

@@ -26,6 +26,9 @@ import { AGENT_ACTIONS, AgentRuntime, agentCommand } from "./agent-runtime.serve
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
 import { SLOT_IDS, clean, isUserFacingAgent, projectPersonalAgents, type SlotId } from "./personal-agents.ts";
 import { WorkerStore } from "./workers.server.ts";
+import { HarnessStore, probeHarness } from "./harnesses.server.ts";
+import { HARNESS_SCHEMA, harnessViews, judgeHarness } from "./harnesses.ts";
+import { CONNECTION_CATALOG } from "./connections.ts";
 import {
   BUILTIN_ABILITIES,
   OPEN_STATES,
@@ -291,6 +294,8 @@ export async function startHost(
     /** M-A-3 T13.1 test-only intelligence seams (fake transport/protector). Never reachable from HTTP. */
     intelligence?: ManagerOptions["intelligence"];
     connections?: ManagerOptions["connections"];
+    /** M-A-3 T13.3 Gate E test-only harness `--version` probe. Never reachable from HTTP. */
+    harnessProbe?: typeof probeHarness;
   } = {},
 ) {
   const paths = hostStatePaths(options.dataDirectory);
@@ -447,6 +452,7 @@ export async function startHost(
   // M-A-3 T13.3 Gate D: bounded child workers. Each admitted worker is one child Mission; MissionManager plans, asks
   // for approval, runs and verifies it. The ledger only admits, follows and closes.
   const workerStore = new WorkerStore(db);
+  const harnessStore = new HarnessStore(db);
   const skillTools = (skillId: string) => {
     try {
       return missions.skills.get(skillId).requirements;
@@ -606,6 +612,16 @@ export async function startHost(
         tasks: canonical.tasks,
         now: Date.now(),
       }),
+      harnesses: {
+        schema: HARNESS_SCHEMA,
+        harnesses: harnessViews({
+          accounts: manager.connections.views(),
+          providers: canonical.providers ?? [],
+          tests: harnessStore.tests(),
+          completed: harnessStore.completed(),
+          platform: process.platform,
+        }),
+      },
       personalAgentContext: (() => {
         const byId = new Map((canonical.agents?.agents ?? []).map((agent) => [agent.id, agent]));
         return {
@@ -797,7 +813,7 @@ export async function startHost(
     };
     // Voice is workstation-only: a device projection never carries it.
     if (principal.kind === "device") {
-      const { personalAgentContext: _private, ...shared } = withVerdicts;
+      const { personalAgentContext: _private, harnesses: _harnesses, ...shared } = withVerdicts;
       const device = dashboardSnapshot(deviceSnapshot(shared, principal, presence));
       // M-A-3 T13: a device reads its slots only. The bindable list is a workstation Studio concern and reaches
       // beyond the Agents a device is shown (finished Agents are trimmed for devices), so it never leaves the workstation.
@@ -1417,6 +1433,35 @@ export async function startHost(
             if (!workerStore.ability(id) || workerStore.ability(id)!.source !== "user") throw new CommandRefusedError("Only an ability you described can be removed.");
             workerStore.removeAbility(id);
             manager.emit(db.event("worker.ability_removed", null, `Ability ${id} removed on the workstation.`));
+            break;
+          }
+          case "harness.test":
+          case "harness.disable":
+          case "harness.enable":
+          case "harness.remove": {
+            // T13.3 Gate E. A harness test runs only the harness's own --version; disable/remove reuse the T13.2
+            // account lifecycle, so the dispatch gate refuses the harness. Bunny never runs an installer or uninstaller.
+            if (!local) throw new WorkstationRequiredError("Harnesses are managed only on the workstation (Windows Host).");
+            const entry = CONNECTION_CATALOG.find((row) => row.id === data.id && row.executables.length);
+            if (!entry) throw new CommandRefusedError("That harness is not in the catalogue.");
+            const routes = manager.connections.views().filter((row) => row.catalog === entry.id && row.support !== "unsupported");
+            if (input.action === "harness.test") {
+              const result = await (options.harnessProbe ?? probeHarness)(entry, manager.providerPaths());
+              const sessions = routes.filter((row) => row.dispatch).map((row) => row.session);
+              const signedIn = sessions.some((session) => session === "signed_in" || session === "not_required") ? true : sessions.includes("signed_out") ? false : null;
+              const completed = harnessStore.completed();
+              const completedTasks = routes.reduce((sum, row) => sum + (completed[row.id] ?? 0), 0);
+              const judged = judgeHarness(result, signedIn, completedTasks);
+              const test = harnessStore.save({ harness: entry.id, at: Date.now(), path: result.path, version: result.version, runs: result.runs, signedIn, completedTasks, ...judged });
+              manager.emit(db.event("harness.tested", null, `${entry.name}: ${judged.detail}`));
+              extra = { data: { test } };
+            } else {
+              const lifecycle = input.action === "harness.enable" ? "paused" : null;
+              const next = input.action === "harness.enable" ? "connections.resume" : input.action === "harness.disable" ? "connections.pause" : "connections.disconnect";
+              for (const row of routes) if (lifecycle === null ? row.lifecycle !== "disconnected" : row.lifecycle === lifecycle) await manager.connections.command(next, { id: row.id }, actor);
+              if (input.action === "harness.remove") harnessStore.remove(entry.id);
+              manager.emit(db.event(`harness.${input.action.slice(8)}d`, null, `${entry.name} ${input.action === "harness.remove" ? "removed from routing; uninstall it yourself if you no longer want it" : `${input.action.slice(8)}d`} on the workstation.`));
+            }
             break;
           }
           case "verification.record": {

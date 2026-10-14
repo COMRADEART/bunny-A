@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode 
 import { Cpu, Cloud, Eye, EyeOff, KeyRound, ShieldCheck } from "lucide-react";
 import { useIsland } from "@/store/use-island";
 import { ConnectedAccounts, RoutingPrivacy } from "./accounts";
+import { HarnessManager } from "./harness-manager";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import type { JevPolicy } from "@/lib/bunny-host/intelligence";
 import {
@@ -20,7 +21,7 @@ import {
   type Tone,
 } from "./intelligence-model";
 
-const SECTIONS = ["Connected Accounts", "Local & advice", "Routing & Privacy", "Routing preferences", "Usage & limits"] as const;
+const SECTIONS = ["Connected Accounts", "Harness Manager", "Local & advice", "Routing & Privacy", "Routing preferences", "Usage & limits"] as const;
 type Section = (typeof SECTIONS)[number];
 const REVEAL_MS = 20_000;
 
@@ -105,7 +106,7 @@ export function AiModelsSettings() {
         ))}
       </div>
       <div role="tabpanel" id={`${base}-panel-${SECTIONS.indexOf(section)}`} aria-labelledby={`${base}-tab-${SECTIONS.indexOf(section)}`} tabIndex={0} className="ai-panel">
-        {section === "Connected Accounts" ? <ConnectedAccounts /> : section === "Routing & Privacy" ? <RoutingPrivacy /> : section === "Routing preferences" ? (
+        {section === "Connected Accounts" ? <ConnectedAccounts /> : section === "Harness Manager" ? <HarnessManager /> : section === "Routing & Privacy" ? <RoutingPrivacy /> : section === "Routing preferences" ? (
           <RoutingPreferences key={JSON.stringify(intelligence?.jev.thresholds ?? null)} intelligence={intelligence} />
         ) : !intelligence ? (
           <p className="caption">
