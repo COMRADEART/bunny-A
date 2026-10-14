@@ -11,7 +11,7 @@ import { DEFAULT_FAIRNESS, FAIRNESS_AGING_MS, admitStep, readFairness, validateF
 import type { AdapterHooks, AdapterResult, ProviderAdapter } from "../bunny-host/contracts.ts";
 import type { OrchTask, ProviderId, ProviderLive } from "../orch/types.ts";
 import { MissionManager } from "./manager.server.ts";
-import { retryVerdict } from "./machine.ts";
+import { classifyTaskFailure, retryVerdict } from "./machine.ts";
 import { FilesystemCapability } from "./capabilities/local.server.ts";
 import { simulatedCodexProfile } from "../bunny-host/testing/codex.test.ts";
 
@@ -149,6 +149,35 @@ test("T13.3 F quota exhaustion in a write step pauses at the last verified step 
     assert.equal(edited.failure?.category, "provider_rate_limited");
     assert.match(edited.failure?.detail ?? "", /QUOTA_PAUSE|quota/i);
   } finally { await env.cleanup(); }
+});
+
+test("T13.3 N-B: a write step whose transport keeps failing pauses for the owner; the Mission never moves it to another provider", async () => {
+  const env = await setup(["claude", "codex"]);
+  try {
+    const view = env.missions.create({ objective: "Edit", mode: "balanced", origin: "workstation", steps: [model("Writer", "Edit file", [], { access: "write", maxRetries: 2 })] });
+    env.missions.approve(view.id, "workstation");
+    await until(() => env.launched.length === 1, "writer");
+    const provider = env.launched[0].task.provider;
+    // Every attempt the Host makes fails on transport; it may retry the same candidate, then must pause.
+    for (let i = 0; env.missions.mission(view.id).state !== "waiting_for_user" && i < 6; i++) {
+      await until(() => env.launched.length > i || env.missions.mission(view.id).state === "waiting_for_user", `attempt ${i + 1}`);
+      if (env.launched.length > i) env.launched[i].finish({ ok: false, output: "", error: "stream reset: socket hang up" });
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    await until(() => env.missions.mission(view.id).state === "waiting_for_user", "paused for the owner");
+    await new Promise((r) => setTimeout(r, 80));
+    assert.ok(env.launched.every((row) => row.task.provider === provider), `no provider switch: ${env.launched.map((row) => row.task.provider).join(", ")}`);
+    const [edited] = env.missions.store.steps(view.id);
+    assert.equal(edited.failure?.category, "provider_write_paused");
+    assert.match(edited.failure?.detail ?? "", /WRITE_PAUSE/);
+  } finally { await env.cleanup(); }
+});
+
+test("T13.3 N-D: an address or port containing 429 is not quota evidence", () => {
+  assert.equal(classifyTaskFailure("connect ECONNREFUSED 127.0.0.1:14290", "failed"), "provider_failed");
+  assert.equal(classifyTaskFailure("HTTP 429 Too Many Requests", "failed"), "provider_rate_limited");
+  const paused = retryVerdict(classifyTaskFailure("stream reset. all_eligible_models_failed — WRITE_PAUSE: the connection kept failing", "failed"), 1, 2, 0, 10, "write");
+  assert.deepEqual([paused.retry, paused.reroute, paused.waitForUser], [false, false, true]);
 });
 
 test("T13.3 F quota exhaustion in a read step still reroutes within bounds", async () => {

@@ -394,7 +394,7 @@ export function classifyFailure(input: { error?: string | null; stopped?: boolea
   if (input.stopped) return "EXECUTION_FAILED";
   const text = (input.error ?? "").slice(0, 4000);
   // T13.3 N7: quota is checked first, so "usage limit … no longer available" keeps the quota write pause.
-  if (/usage limit|not allowed right now|quota|rate limit|429/i.test(text) || input.usageLimitStatus === "rejected") return "QUOTA_CONSTRAINED";
+  if (/usage limit|not allowed right now|quota|rate limit|\b429\b/i.test(text) || input.usageLimitStatus === "rejected") return "QUOTA_CONSTRAINED";
   if (/no longer available|Model missing|no models? installed/i.test(text)) return "MODEL_UNAVAILABLE";
   if (/is offline|unreachable|ECONNREFUSED|connection refused|not configured|probe failed/i.test(text)) return "PROVIDER_UNAVAILABLE";
   if (/context (window|length)|too (long|large)|exceeds the (context|token)|maximum context/i.test(text)) return "CONTEXT_OVERFLOW";

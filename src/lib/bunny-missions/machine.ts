@@ -104,6 +104,7 @@ export function retryVerdict(category: FailureCategory, attempts: number, maxRet
   // M-A-3 T13.3 Gate F (§18): a write step whose provider ran out of quota may have left side effects; never reroute it blindly.
   if (category === "provider_rate_limited" && access === "write") return no("The provider's quota ran out during write work. Paused at the last completed step; review the workspace before retrying or choosing another account.", true);
   switch (category) {
+    case "provider_write_paused": return no("The connection kept failing during write work, so the Host paused instead of switching providers. Review the workspace before retrying or choosing another account.", true);
     case "user_stopped": return no("Stopped by the user; never retried automatically.");
     case "permission_required": return no("Waiting for the user to allow or deny the action.", true);
     case "permission_denied": return no("The user denied the action.");
@@ -129,7 +130,9 @@ export function classifyTaskFailure(error: string | null | undefined, state: str
   if (state === "stopped") return /runtime limit/.test(text) ? "timeout" : "user_stopped";
   if (/host process restarted|cannot reattach/.test(text)) return "host_restart";
   if (/verification failed/.test(text)) return "verification_failed";
-  if (/rate.?limit|usage limit|quota|429/.test(text)) return "provider_rate_limited";
+  // T13.3 N-B: the Host's own write pause wins over the transport error text it wraps.
+  if (/\bwrite_pause\b/.test(text)) return "provider_write_paused";
+  if (/rate.?limit|usage limit|quota|\b429\b/.test(text)) return "provider_rate_limited";
   if (/no ready executor|not eligible|not installed|needs sign-in|not signed in|unavailable/.test(text)) return "provider_unavailable";
   return "provider_failed";
 }

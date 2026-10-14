@@ -335,6 +335,18 @@ test("T13.3 F12: reassigning a parent Agent moves its open workers to the new sl
     refusedWith(await h.command("personal_agent.assign", { slot: 4, agentId }), /would have \d+ open workers \(limit/);
     assert.ok((await workersOf(h, 3)).some((worker) => worker.id === open.id), "the refused move left the worker where it was");
     assert.equal((await h.state()).body.personalAgentContext.slots.find((row: Body) => row.slot === 3).owned.some((row: Body) => row.agentId === agentId), true, "ownership did not change");
+
+    // N-A: a Studio save that swaps Agents nets out; slot 4 sits at its cap, gives 3 workers away and takes 1, so it is allowed.
+    const gamma = (await h.state()).body.agents.agents.find((row: Body) => row.missionId === others[1]).id as string;
+    const before = (await h.state()).body.personalAgents;
+    const swap = before.slots.map((row: Body) => ({
+      slot: row.slot, weapon: row.weapon, displayName: row.displayName, description: row.description, purpose: row.purpose,
+      style: row.style, responsibilities: row.responsibilities, active: row.active, agentId: row.slot === 3 ? gamma : row.slot === 4 ? agentId : null,
+    }));
+    ok(await h.command("personal_agents.configure", { slots: swap, expectRevision: before.revision }));
+    assert.ok((await workersOf(h, 4)).some((worker) => worker.id === open.id), "the swapped-in Agent's worker moved to slot 4");
+    assert.equal((await workersOf(h, 3)).filter((worker) => worker.state !== "CLOSED").length, 3, "the swapped-out Agent's three workers moved to slot 3");
+    assert.equal((await workersOf(h, 4)).filter((worker) => worker.state !== "CLOSED").length, 4, "slot 4 now holds its other Agent's three plus the one swapped in");
   });
 });
 

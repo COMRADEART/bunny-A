@@ -396,15 +396,20 @@ export async function startHost(
   // T13.3 F12/N3/N4: an Agent's open workers follow its owner (closed workers keep their history), within the cap.
   const movingWorkers = (agentId: string, slot: SlotId) =>
     workerStore.open().filter((worker) => worker.slot !== slot && agents.coordinatorFor(worker.parentMissionId)?.id === agentId);
-  const workerRoom = (agentId: string, slot: SlotId) => {
-    const moving = movingWorkers(agentId, slot).length;
-    const open = workerStore.open().filter((worker) => worker.slot === slot).length;
-    if (moving && open + moving > WORKER_LIMITS.openPerSlot)
-      throw new CommandRefusedError(`Personal Agent ${slot} would have ${open + moving} open workers (limit ${WORKER_LIMITS.openPerSlot}). Nothing was changed; let some finish or cancel them first.`);
+  /** Refuses, before anything changes, a set of ownership moves that would raise any slot above its open-worker cap. */
+  const workerRoom = (moves: readonly { agentId: string; slot: SlotId }[]) => {
+    const open = workerStore.open();
+    const target = new Map(moves.map((move) => [move.agentId, move.slot]));
+    const slotAfter = (worker: AgentWorker) => target.get(agents.coordinatorFor(worker.parentMissionId)?.id ?? "") ?? worker.slot;
+    for (const slot of new Set(moves.map((move) => move.slot))) {
+      const after = open.filter((worker) => slotAfter(worker) === slot).length;
+      if (after > WORKER_LIMITS.openPerSlot && after > open.filter((worker) => worker.slot === slot).length)
+        throw new CommandRefusedError(`Personal Agent ${slot} would have ${after} open workers (limit ${WORKER_LIMITS.openPerSlot}). Nothing was changed; let some finish or cancel them first.`);
+    }
   };
   const recordOwner = (agentId: string, slot: SlotId, actor: string) => {
-    for (const worker of movingWorkers(agentId, slot)) workerStore.save({ ...worker, slot, updatedAt: Date.now() });
     const previous = personalContext.assign(agentId, slot, actor, Date.now());
+    for (const worker of movingWorkers(agentId, slot)) workerStore.save({ ...worker, slot, updatedAt: Date.now() });
     if (previous === slot) return;
     manager.emit(db.event("personal_agent.owner", null, previous === null ? `Personal Agent ${slot} owns Agent ${agentId}.` : `Agent ${agentId} moved from Personal Agent ${previous} to ${slot} on the workstation.`));
   };
@@ -1288,8 +1293,8 @@ export async function startHost(
             // Refusals (validation, stale revision) arrive as CommandRefusedError from the manager; a write fault is not refused.
             const boundBefore = new Map(manager.personalAgents.slots.map((row) => [row.slot, row.agentId]));
             if (Array.isArray(data.slots))
-              for (const row of data.slots as { slot?: unknown; agentId?: unknown }[])
-                if (typeof row?.agentId === "string" && row.agentId !== boundBefore.get(row.slot as SlotId)) workerRoom(row.agentId, row.slot as SlotId);
+              workerRoom((data.slots as { slot?: unknown; agentId?: unknown }[]).flatMap((row) =>
+                typeof row?.agentId === "string" && row.agentId !== boundBefore.get(row.slot as SlotId) ? [{ agentId: row.agentId, slot: row.slot as SlotId }] : []));
             const configured = manager.configurePersonalAgents(
               data.slots,
               data.expectRevision,
@@ -1328,7 +1333,7 @@ export async function startHost(
             const agentId = typeof data.agentId === "string" ? data.agentId.slice(0, 200) : "";
             if (!agents.snapshot().agents.some((agent) => agent.id === agentId && isUserFacingAgent(agent)))
               throw new CommandRefusedError("A Personal Agent can only own one of your own Agents.");
-            workerRoom(agentId, slot);
+            workerRoom([{ agentId, slot }]);
             recordOwner(agentId, slot, actor);
             // A slot keeps focus only on an Agent it owns.
             const config = manager.personalAgents;

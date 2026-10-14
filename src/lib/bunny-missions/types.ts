@@ -34,6 +34,8 @@ export type StepState =
 export type FailureCategory =
   | "provider_unavailable"
   | "provider_rate_limited"
+  /** M-A-3 T13.3 N-B: the Host paused write work it could not safely move to another provider. */
+  | "provider_write_paused"
   | "provider_failed"
   | "capability_unavailable"
   | "capability_failed"
