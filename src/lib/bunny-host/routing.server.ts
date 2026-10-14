@@ -124,6 +124,7 @@ export type CandidateInput = {
  * M-A-3 T13.3 Gate F (§18): quota exhaustion during write work pauses instead of switching providers, because Bunny
  * cannot confirm which side effects already landed. Read work keeps the bounded reroute.
  */
+export const TRANSPORT_WRITE_PAUSE = "WRITE_PAUSE: the connection kept failing during work that may write files. Bunny paused instead of switching providers, because it cannot confirm which changes already landed. Review the workspace, then retry or choose another account.";
 export const QUOTA_WRITE_PAUSE = "QUOTA_PAUSE: the provider's quota ran out during write work. Bunny paused instead of switching providers, because it cannot confirm which changes already landed. Completed steps are kept; review the workspace, then retry or choose another account.";
 
 import type { RoutingPriority } from "./fairness.ts";
@@ -392,9 +393,10 @@ export function classifyFailure(input: { error?: string | null; stopped?: boolea
   if (input.policyDenied) return "POLICY_DENIED";
   if (input.stopped) return "EXECUTION_FAILED";
   const text = (input.error ?? "").slice(0, 4000);
+  // T13.3 N7: quota is checked first, so "usage limit … no longer available" keeps the quota write pause.
+  if (/usage limit|not allowed right now|quota|rate limit|429/i.test(text) || input.usageLimitStatus === "rejected") return "QUOTA_CONSTRAINED";
   if (/no longer available|Model missing|no models? installed/i.test(text)) return "MODEL_UNAVAILABLE";
   if (/is offline|unreachable|ECONNREFUSED|connection refused|not configured|probe failed/i.test(text)) return "PROVIDER_UNAVAILABLE";
-  if (/usage limit|not allowed right now|quota|rate limit|429/i.test(text) || input.usageLimitStatus === "rejected") return "QUOTA_CONSTRAINED";
   if (/context (window|length)|too (long|large)|exceeds the (context|token)|maximum context/i.test(text)) return "CONTEXT_OVERFLOW";
   if (/invalid json|parse error|malformed|unexpected end of json/i.test(text)) return "MALFORMED_RESULT";
   if (/\btool(s)?\b.{0,24}(?:not |un)supported|\bunsupported (tool|capability)|does not support tools?/i.test(text)) return "TOOL_UNSUPPORTED";

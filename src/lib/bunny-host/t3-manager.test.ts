@@ -403,6 +403,31 @@ test("T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerout
   } finally { env.cleanup(); }
 });
 
+test("T13.3 N5: an unscoped task whose transport keeps failing pauses instead of rerouting; a declared read task still reroutes", async () => {
+  for (const scope of [undefined, { access: "read" as const }]) {
+    const env = await t3Fixture(["codex", "claude"]);
+    try {
+      await env.tasks.connections.command("connections.policy.set", {policy:{...env.tasks.connections.policy(),switchAllowlist:["openai","anthropic"]}}, "workstation");
+      const task = env.tasks.submit({ prompt: RESEARCH, mode: "balanced", ...(scope ? { executionScope: scope } : {}) });
+      env.tasks.approve(task.id);
+      await until(() => env.parts.claude.launched.length === 1, "first launch");
+      env.parts.claude.launched[0].finish({ ok: false, output: "", error: "stream reset: socket hang up", exitCode: 1 });
+      await until(() => env.parts.claude.launched.length === 2, "bounded same-candidate retry");
+      env.parts.claude.launched[1].finish({ ok: false, output: "", error: "request timed out", exitCode: 1 });
+      if (scope) {
+        await until(() => env.parts.codex.launched.length === 1, "read work reroutes", () => eventsOf(env, task.id).slice(-6));
+        env.parts.codex.launched[0].finish({ ok: true, output: "done", exitCode: 0 });
+        await until(() => env.db.get(task.id).state === "completed", "completion");
+      } else {
+        await until(() => env.db.get(task.id).state === "failed", "paused failure", () => eventsOf(env, task.id).slice(-6));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        assert.equal(env.parts.codex.launched.length, 0, "no second provider repeats possibly-landed writes");
+        assert.match(env.db.get(task.id).error ?? "", /WRITE_PAUSE/);
+      }
+    } finally { env.cleanup(); }
+  }
+});
+
 test("T3 §24/R24: a failed Bunny-A verification escalates the effort once on the same candidate, then exhausts honestly", async () => {
   const env = await t3Fixture(["codex"]);
   try {

@@ -56,7 +56,7 @@ const RANK: Record<LotusLayer, number> = { bud: 0, outer: 1, inner: 2, central: 
 
 /** Text that tries to steer an agent is evidence about the source, never an instruction; it is held as untrusted. */
 const STEERING =
-  /\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|any)\b[^.\n]{0,20}\b(instructions?|rules?|prompts?|context)\b|\bsystem prompt\b|\byou are now\b|\bnew instructions?\b|\bact as\b[^.\n]{0,30}\b(admin|root|developer|system)\b|\b(grant|give) (yourself|me) (full |admin )?(access|permissions?)\b/i;
+  /\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|any|your|my|the)\b[^.\n]{0,20}\b(instructions?|rules?|prompts?|context|guidance|guidelines?|directions?|directives?)\b|\bsystem prompt\b|\byou are now\b|\bnew instructions?\b|\bact as\b[^.\n]{0,30}\b(admin|root|developer|system)\b|\b(grant|give) (yourself|me) (full |admin )?(access|permissions?)\b/i;
 
 export const isSteering = (text: string) => STEERING.test(text);
 

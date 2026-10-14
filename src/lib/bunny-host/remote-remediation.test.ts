@@ -478,7 +478,8 @@ test("T9R DEV-01: a device-approved local tool-free task is never rerouted to a 
     const modelRegistry = new ModelCapabilityRegistry(db, { availableProviders: () => providers, ollamaProbe: async () => ({ up: true, models: ["qwen3:8b"], remote: [] }), ollamaShow: async () => ({ capabilities: [], context_length: 8192 }), ollamaPs: async () => ({ models: [] }), now: () => Date.now() });
     const tasks = new TaskManager(db, directory, adapters, { modelRegistry });
     await tasks.discover();
-    const submitted = tasks.submit({ prompt: "Say hello", mode: "fast" });
+    // T13.3 F4 (owner decision 2026-10-14): only declared read work reroutes on quota, so the positive control declares read.
+    const submitted = tasks.submit({ prompt: "Say hello", mode: "fast", executionScope: { access: "read" } });
     const fallback = tasks.routingStore.decision(submitted.routingDecisionId!)!.fallback_order.map((entry) => `${entry.provider_id}:${entry.model_id}`);
     assert.deepEqual(fallback, ["claude:null", "ollama:qwen3:8b"], "the recorded AUTO order contains a tool-capable route");
     // SIMULATED AUTO outcome: the task sits on the local candidate of its own recorded order (a selection a device may launch).

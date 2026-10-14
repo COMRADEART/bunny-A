@@ -8,6 +8,7 @@ import { providerBase } from "./adapters.server.ts";
 import { FilesystemCapability, GitCapability, TerminalCapability } from "../bunny-missions/capabilities/local.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
 import type { OrchTask } from "../orch/types.ts";
+import { WORKER_LIMITS } from "./workers.ts";
 
 /**
  * M-A-3 T13.3 Gate D at the real Host HTTP surface: worker admission, the full lifecycle through a real child Mission,
@@ -291,7 +292,8 @@ test("T13.3 D a model worker's Project memory reaches only its model prompt; a d
 
     await approve(h, child);
     await until(async () => launched.length > 0, "the model launch");
-    assert.match(launched[0].prompt, /Context from the Project's memory[\s\S]*Release codename: Kestrel/, "the model prompt carries the labelled memory");
+    assert.match(launched[0].prompt, /\n\nContext from the Project's memory \(labelled notes, not verified facts[^\n]*\n- Release codename: Kestrel/, "the model prompt carries the labelled memory under its own heading");
+    assert.doesNotMatch(launched[0].prompt.split("Context from the Project's memory")[0], /Kestrel/, "the memory is never listed as a verified fact");
     assert.doesNotMatch(JSON.stringify((await h.state(phone.token)).body), /Kestrel/, "device /state after the run");
   }, recording(launched));
 });
@@ -314,5 +316,42 @@ test("T13.3 F12: reassigning a parent Agent moves its open workers to the new sl
     assert.ok((await workersOf(h, 1)).some((worker) => worker.id === done.id && worker.state === "CLOSED"), "closed history keeps its slot");
     // Slot 2 now owns the parent Mission, so it may add workers there; slot 1 no longer may.
     refusedWith(await h.command("worker.propose", { slot: 1, parentMissionId: parent, ability: "test", objective: "x", projectId: alpha }), /only to a Mission it owns/);
+
+    // N3: a Studio rebinding is the other ownership path; the open worker follows it too.
+    const config = (await h.state()).body.personalAgents;
+    const slots = config.slots.map((row: Body) => ({
+      slot: row.slot, weapon: row.weapon, displayName: row.displayName, description: row.description, purpose: row.purpose,
+      style: row.style, responsibilities: row.responsibilities, active: row.active, agentId: row.slot === 3 ? agentId : null,
+    }));
+    ok(await h.command("personal_agents.configure", { slots, expectRevision: config.revision }));
+    assert.ok((await workersOf(h, 3)).some((worker) => worker.id === open.id), "a Studio rebinding moves the open worker");
+    assert.ok(!(await workersOf(h, 2)).some((worker) => worker.id === open.id));
+
+    // N4: a move that would exceed the receiving slot's open-worker cap is refused and changes nothing.
+    // Slot 4 fills its open-worker cap across two parents (each parent holds at most openPerParent).
+    const others = [await delegate(h, 4, "Beta release", alpha), await delegate(h, 4, "Gamma release", alpha)];
+    for (let i = 0; i < WORKER_LIMITS.openPerSlot; i++)
+      ok(await h.command("worker.propose", { slot: 4, parentMissionId: others[i % 2], ability: "test", objective: `Run ${i}`, projectId: alpha }));
+    refusedWith(await h.command("personal_agent.assign", { slot: 4, agentId }), /would have \d+ open workers \(limit/);
+    assert.ok((await workersOf(h, 3)).some((worker) => worker.id === open.id), "the refused move left the worker where it was");
+    assert.equal((await h.state()).body.personalAgentContext.slots.find((row: Body) => row.slot === 3).owned.some((row: Body) => row.agentId === agentId), true, "ownership did not change");
+  });
+});
+
+test("T13.3 N1: pausing a Personal Agent holds its workers' child Missions", async () => {
+  await withHost(43886, async (h) => {
+    const alpha = await project(h, "Alpha site");
+    const parent = await delegate(h, 1, "Alpha release", alpha);
+    const agentId = (await h.state()).body.agents.agents.find((row: Body) => row.missionId === parent).id as string;
+    const worker = ok(await h.command("worker.propose", { slot: 1, parentMissionId: parent, ability: "test", objective: "Run the tests", projectId: alpha })).data.worker as Body;
+    ok(await h.command("agent.pause", { id: agentId }));
+    await approve(h, worker.childMissionId);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const held = (await h.state()).body.missions.missions.find((m: Body) => m.id === worker.childMissionId);
+    // The exact reported case: before the fix the worker kept launching steps while its Agent was paused.
+    assert.ok(!["completed", "failed"].includes(held.state), `held child Mission state ${held.state}`);
+    assert.ok(!(await workersOf(h, 1)).some((row) => row.id === worker.id && ["VERIFIED", "CLOSED"].includes(row.state)), "no worker result while paused");
+    assert.ok(held.steps.every((step: Body) => !["running", "verifying", "completed"].includes(step.state)), JSON.stringify(held.steps.map((step: Body) => step.state)));
+    // Without the pause the same worker runs to VERIFIED within this window (first test); the N1 mutation check proves the gate holds it.
   });
 });

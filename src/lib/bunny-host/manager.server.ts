@@ -13,7 +13,7 @@ import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapt
 import { PolicyEngine, toRecorded } from "./learning.server.ts";
 import { classifyRequirements, effortRequirement, type TaskRequirements ,
 } from "../orch/router-requirements.ts";
-import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, QUOTA_WRITE_PAUSE, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
+import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, QUOTA_WRITE_PAUSE, TRANSPORT_WRITE_PAUSE, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
 } from "./routing.server.ts";
 import { RoutingDecisionStore } from "./routing-store.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
@@ -2010,6 +2010,9 @@ export class TaskManager {
             // T13.3 F4: an unscoped direct task may write files, so only declared read work reroutes on quota.
             else if (taxonomy === "QUOTA_CONSTRAINED" && current.executionScope?.access !== "read")
               exhaustNow(QUOTA_WRITE_PAUSE);
+            // T13.3 N5: the same rule when a transport failure persists; the attempt ran, so its writes may have landed.
+            else if (taxonomy === "TRANSIENT_TRANSPORT" && action.action === "reroute" && current.executionScope?.access !== "read")
+              exhaustNow(TRANSPORT_WRITE_PAUSE);
             else if (action.action === "retry-same") {
               sameRetries += 1;
               const label = `${current.provider}${current.model==="auto" ? " · provider default" : ` · ${current.model}`}`;
