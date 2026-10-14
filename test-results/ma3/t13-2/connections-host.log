@@ -1,0 +1,46 @@
+Bunny-A Host ready on loopback (827184c7-ef26-405c-9589-2cb67ecc0143).
+✖ T13.2 A07/A08 [SIMULATED] real Host denies every phone credential and provider authorization operation (2104.0957ms)
+Bunny-A Host ready on loopback (52597dbb-3348-4783-851b-cf25e98d6cda).
+✔ T13.2 A10/R05/R08 [SIMULATED] Host disconnect cancels active work and refuses queued approvals (1800.1919ms)
+Bunny-A Host ready on loopback (3e4cf793-55fa-4c9b-9eb7-21ffe66b9c76).
+✔ T13.2 R07 [SIMULATED] forged advice and routes in actual HTTP submit cannot authorize a provider switch (1345.4713ms)
+Bunny-A Host ready on loopback (54aa8082-51da-4dcc-a496-ff07b309e115).
+✔ T13.2 R02/R10 [SIMULATED] metadata key check cannot confer inference rights or trigger native sign-in (1993.7155ms)
+✔ T3 §20/§35/§32: the launched configuration is the selected candidate, end to end, deterministically (325.8914ms)
+✔ T3 §5 legacy parity: a fact-less Host routes exactly like pre-T3 BunnyRouter — no effort knob, no routing events, honest record (274.2824ms)
+✔ T3 §5/§27 MANUAL provider override on a fact-less Host: the legacy decision carries it; retarget keeps it explicit (270.9241ms)
+✔ T3 §27/R29: a MANUAL exact model executes exactly that model (294.73ms)
+✔ T3 §27: an impossible manual selection fails clearly and persists nothing (216.9979ms)
+✔ T3 §17/§27/R30: a MANUAL model that disappears before launch refuses the click and waits — never rerouted, never silent (266.9853ms)
+✔ T3 §17/§28/R31: an AUTO task whose selected Codex evidence goes stale reroutes at launch to the next eligible candidate (330.8587ms)
+✔ T3 §22/R22: a quota-constrained attempt reroutes to the next candidate within the bounded recovery (330.6378ms)
+✔ T3 §24/R24: a failed Bunny-A verification escalates the effort once on the same candidate, then exhausts honestly (309.1238ms)
+✔ T3 §5/§22/§23: a MANUAL selection retries its own candidate once and then fails instead of ever rerouting (336.0506ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10760.052
+
+✖ failing tests:
+
+test at src\lib\bunny-host\connections-host.test.ts:22:1
+✖ T13.2 A07/A08 [SIMULATED] real Host denies every phone credential and provider authorization operation (2104.0957ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  400 !== 200
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router/src/lib/bunny-host/connections-host.test.ts:22:1155)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 400,
+    expected: 200,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
