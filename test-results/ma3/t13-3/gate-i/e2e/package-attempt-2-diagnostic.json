@@ -1,0 +1,171 @@
+{
+  "milestone": "MA3 T13.3 Gate I",
+  "purpose": "End-to-end across Gates B-H on one disposable Host",
+  "packaged": true,
+  "root": "package",
+  "port": 43894,
+  "startedAt": "2026-10-14T18:15:31.311Z",
+  "release": {
+    "name": "Bunny-A-Windows-MA3-T13-3-TEST",
+    "version": "0.0.0-ma3-t13.3.1",
+    "sourceCommit": "fd54c2b03c5beb9bba16c8992137f95a95fc2d6c",
+    "toolingCommit": "fd54c2b03c5beb9bba16c8992137f95a95fc2d6c"
+  },
+  "workerTimeout": {
+    "worker": [
+      [
+        "PROPOSED",
+        null
+      ],
+      [
+        "ELIGIBILITY_CHECK",
+        null
+      ],
+      [
+        "ADMITTED",
+        null
+      ],
+      [
+        "RUNNING",
+        null
+      ]
+    ],
+    "child": {
+      "state": "waiting_for_user",
+      "steps": [
+        [
+          "waiting_for_approval",
+          null
+        ]
+      ]
+    },
+    "events": [
+      [
+        "mission.planning",
+        "Planning with bunny-planner-deterministic-v1."
+      ],
+      [
+        "mission.planned",
+        "1 step(s): Worker. User-supplied plan; validated and bounded by Bunny."
+      ],
+      [
+        "mission.approval_required",
+        "Mission 2bc12d19-f1e7-4401-a972-509cfc94ac56 \"Gada worker: Run tests\" needs approval: READ, EXECUTE; capabilities filesystem.exists, filesystem.list, filesystem.read, notifications.send, terminal.exec; no model calls."
+      ],
+      [
+        "approval.mission_envelope",
+        "Mission envelope 4c3ce135-7c91-4101-be57-93ec651905b0 by workstation; provider sessions {\"steps\":[],\"maxSessions\":0,\"writeIncludesShell\":true}."
+      ],
+      [
+        "authorization.granted",
+        "Mission authorization 4c3ce135-7c91-4101-be57-93ec651905b0 granted by workstation: roots C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t13-3-e2e-1792001731311\\fixture-project; READ, EXECUTE; terminal [npm]; git []; browser off; computer off; expires 2026-10-14T18:45:36.488Z."
+      ],
+      [
+        "mission.started",
+        "Mission \"Gada worker: Run tests\" started."
+      ],
+      [
+        "mission.step.ready",
+        "Worker is ready. (step c751776a-9b02-4d8d-b8bc-5bf9a1e27d04)"
+      ],
+      [
+        "mission.step.started",
+        "Worker started (attempt 1, deterministic). (step c751776a-9b02-4d8d-b8bc-5bf9a1e27d04)"
+      ],
+      [
+        "capability.requested",
+        "terminal.exec requested by mission:2bc12d19-f1e7-4401-a972-509cfc94ac56 (step c751776a-9b02-4d8d-b8bc-5bf9a1e27d04)."
+      ],
+      [
+        "authorization.required",
+        "terminal.exec: Resolved executable for \"npm\" is not the approved executable identity; approve the new path explicitly."
+      ],
+      [
+        "mission.permission_required",
+        "Mission 2bc12d19-f1e7-4401-a972-509cfc94ac56 request 44e7e997-b1e8-46b7-8f0b-a80edd0d6089: Worker needs permission for terminal.exec (EXECUTE): Resolved executable for \"npm\" is not the approved executable identity; approve the new path explicitly. (step c751776a-9b02-4d8d-b8bc-5bf9a1e27d04)"
+      ],
+      [
+        "mission.waiting_for_user",
+        "Mission 2bc12d19-f1e7-4401-a972-509cfc94ac56 is waiting for 1 permission decision(s)."
+      ]
+    ]
+  },
+  "dispatchCounts": {
+    "session_ledger": 0,
+    "connection_usage": 0,
+    "jev_usage": 0,
+    "provider_tasks": 0
+  },
+  "checks": [
+    {
+      "id": "E01 packaged runtime and entry",
+      "ok": true,
+      "detail": "v24.18.0; Host imports the package's own source"
+    },
+    {
+      "id": "E02 defaults",
+      "ok": true,
+      "detail": {
+        "slots": [
+          "gada",
+          "spear",
+          "chakra",
+          "sword"
+        ],
+        "foreground": "bunny"
+      }
+    },
+    {
+      "id": "E03 local-only routing before any work",
+      "ok": true,
+      "detail": "No cloud provider may be chosen in this run"
+    },
+    {
+      "id": "E04 Gate B ownership and foreground",
+      "ok": true,
+      "detail": {
+        "parentState": "waiting_for_approval"
+      }
+    },
+    {
+      "id": "E05 Gate B reply from Host facts",
+      "ok": true,
+      "detail": "Fixture release: not started, 0 of 1 steps done, 0 verified by the Host."
+    },
+    {
+      "id": "E06 Gate C private memory, Project scope, credential refusal",
+      "ok": true,
+      "detail": {
+        "recall1": [
+          "Release codename: Kestrel (you told me)"
+        ],
+        "recall2": 0,
+        "credentialStatus": 400
+      }
+    },
+    {
+      "id": "E00 run completed",
+      "ok": false,
+      "detail": "Error: Timed out: worker close\n    at until (file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13-3/gate-i/e2e/t13-3-e2e.mjs:39:33)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///C:/Users/allam/Documents/new/bun-router/test-results/ma3/t13-3/gate-i/e2e/t13-3-e2e.mjs:132:18"
+    },
+    {
+      "id": "E17 no provider dispatch or chargeable use",
+      "ok": true,
+      "detail": {
+        "session_ledger": 0,
+        "connection_usage": 0,
+        "jev_usage": 0,
+        "provider_tasks": 0
+      }
+    },
+    {
+      "id": "E18 credential-shaped text stored nowhere",
+      "ok": true,
+      "detail": "4 state files and the Host log checked"
+    }
+  ],
+  "result": "FAIL",
+  "finishedAt": "2026-10-14T18:17:37.163Z",
+  "installed": false,
+  "published": false
+}

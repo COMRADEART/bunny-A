@@ -1,6 +1,6 @@
 # Bunny A MA3 T13.3: architecture and gate record
 
-Status: **in progress**. Gates A–H are implemented, each with its own source and evidence commits. Gate I has not started. No verdict is issued until Gate I.
+Status: **complete**. Gates A–I are done, each with its own source and evidence commits. The final executable source is `fd54c2b`, which includes the fixes from the independent review (`T13_3_INDEPENDENT_REVIEW.md`). The verdict and its limitations are in `MA3_T13_3_ACCEPTANCE.md`.
 
 ## Gate A: baseline
 
