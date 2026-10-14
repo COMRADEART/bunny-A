@@ -37,11 +37,15 @@ export type AdmissionInput = {
   waiting: WaitingAgent[];
   /** When this Agent's own step was first held, if it was. */
   since: number;
+  /** The Host clock, for aging. */
+  now: number;
   memoryUsedPercent: number;
 };
 
 const SLOTS: SlotId[] = [1, 2, 3, 4];
 const RANK: Record<AgentPriority, number> = { low: 0, normal: 1, high: 2 };
+/** A held step rises one priority rank per this much waiting (up to high), so no Agent waits forever behind higher priorities. */
+export const FAIRNESS_AGING_MS = 60_000;
 
 export const DEFAULT_FAIRNESS: FairnessSettings = {
   sharedCeiling: 4,
@@ -84,7 +88,7 @@ export function readFairness(stored: string | null | undefined): FairnessSetting
 
 /**
  * Decides whether `slot` may start one more step now. Order: its own cap, the shared ceiling, a fair turn for
- * Agents waiting ahead of it (higher priority, then fewer live steps, then longest wait), then memory pressure.
+ * Agents waiting ahead of it (higher aged priority, then fewer live steps, then longest wait), then memory pressure.
  */
 export function admitStep(input: AdmissionInput): Admission {
   const { slot, settings } = input;
@@ -95,7 +99,8 @@ export function admitStep(input: AdmissionInput): Admission {
     return { admit: false, code: "AGENT_CAP", reason: `This Agent already runs ${mine} of its ${settings.agents[slot].maxConcurrent} allowed steps.` };
   if (total >= settings.sharedCeiling)
     return { admit: false, code: "SHARED_CEILING", reason: `All ${settings.sharedCeiling} shared Agent step slots are in use.` };
-  const key = (s: SlotId, since: number) => [-RANK[settings.agents[s].priority], live(s), since] as const;
+  const aged = (s: SlotId, since: number) => Math.min(RANK.high, RANK[settings.agents[s].priority] + Math.floor(Math.max(0, input.now - since) / FAIRNESS_AGING_MS));
+  const key = (s: SlotId, since: number) => [-aged(s, since), live(s), since] as const;
   const before = (a: readonly number[], b: readonly number[]) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
   const own = key(slot, input.since);
   const ahead = new Set(input.waiting

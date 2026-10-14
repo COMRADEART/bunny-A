@@ -7,7 +7,7 @@ import { HostDatabase } from "../bunny-host/persistence.server.ts";
 import { ModelCapabilityRegistry } from "../bunny-host/model-capability.server.ts";
 import { TaskManager } from "../bunny-host/manager.server.ts";
 import { providerBase } from "../bunny-host/adapters.server.ts";
-import { DEFAULT_FAIRNESS, admitStep, readFairness, validateFairness, type FairnessSettings } from "../bunny-host/fairness.ts";
+import { DEFAULT_FAIRNESS, FAIRNESS_AGING_MS, admitStep, readFairness, validateFairness, type FairnessSettings } from "../bunny-host/fairness.ts";
 import type { AdapterHooks, AdapterResult, ProviderAdapter } from "../bunny-host/contracts.ts";
 import type { OrchTask, ProviderId, ProviderLive } from "../orch/types.ts";
 import { MissionManager } from "./manager.server.ts";
@@ -18,7 +18,7 @@ import { simulatedCodexProfile } from "../bunny-host/testing/codex.test.ts";
 /** M-A-3 T13.3 Gate F: Personal Agent fairness admission and quota-safe continuation of write steps. */
 
 const settings = (patch: Partial<FairnessSettings> = {}): FairnessSettings => ({ ...structuredClone(DEFAULT_FAIRNESS), ...patch });
-const base = { settings: settings(), live: {}, waiting: [], since: 100, memoryUsedPercent: 40 };
+const base = { settings: settings(), live: {}, waiting: [], since: 100, now: 200, memoryUsedPercent: 40 };
 
 test("T13.3 F fairness: per-Agent cap, shared ceiling, fair turn by priority and wait, memory pressure", () => {
   assert.deepEqual(admitStep({ ...base, slot: 1 }), { admit: true });
@@ -37,6 +37,19 @@ test("T13.3 F fairness: per-Agent cap, shared ceiling, fair turn by priority and
   assert.deepEqual(admitStep({ ...base, live: { 2: 2, 3: 1 }, slot: 1, waiting: [{ slot: 2, since: 10 }] }), { admit: true });
   assert.equal((admitStep({ ...base, slot: 1, live: { 2: 1 }, memoryUsedPercent: 97 }) as { code: string }).code, "MEMORY_PRESSURE");
   assert.deepEqual(admitStep({ ...base, slot: 1, memoryUsedPercent: 97 }), { admit: true }, "memory pressure never starves the only Agent");
+});
+
+test("T13.3 F11: aging; a low-priority Agent held long enough is no longer starved by a high-priority one", () => {
+  const ranked = settings({ agents: { ...DEFAULT_FAIRNESS.agents, 1: { maxConcurrent: 2, priority: "high" }, 2: { maxConcurrent: 2, priority: "low" } } });
+  const oneSeat = { ...base, settings: ranked, live: { 3: 2, 4: 1 } };
+  const t0 = 1_000_000;
+  // The exact reported case: Agent 2 (low) waits while Agent 1 (high) keeps arriving with fresh ready work.
+  assert.equal((admitStep({ ...oneSeat, slot: 2, since: t0, now: t0 + 1000, waiting: [{ slot: 1, since: t0 + 900 }] }) as { code: string }).code, "FAIR_TURN");
+  assert.deepEqual(admitStep({ ...oneSeat, slot: 1, since: t0 + 900, now: t0 + 1000, waiting: [{ slot: 2, since: t0 }] }), { admit: true });
+  // After two aging intervals the low-priority Agent ranks as high and its longer wait wins the seat.
+  const later = t0 + 2 * FAIRNESS_AGING_MS;
+  assert.deepEqual(admitStep({ ...oneSeat, slot: 2, since: t0, now: later, waiting: [{ slot: 1, since: later - 100 }] }), { admit: true });
+  assert.equal((admitStep({ ...oneSeat, slot: 1, since: later - 100, now: later, waiting: [{ slot: 2, since: t0 }] }) as { code: string }).code, "FAIR_TURN");
 });
 
 test("T13.3 F fairness settings validate bounds and fall back to defaults on corrupt storage", () => {

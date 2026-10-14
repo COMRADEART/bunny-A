@@ -448,7 +448,9 @@ export async function startHost(
         scope: `agent:${slot}` as LotusScope,
         layer: "bud" as const,
         key: turn.role === "user" ? "You" : name,
-        value: turn.text,
+        // The reply's "From memory" lines quote memories that keep their own trust in Lotus; folding them here at host
+        // trust would launder model notes and outside text, so only the Host-facts answer is folded.
+        value: turn.role === "user" ? turn.text : turn.text.split("\nFrom memory:\n")[0],
         trust: turn.role === "user" ? ("user" as const) : ("host" as const),
         provenance: "host:conversation",
         sources: [],
@@ -583,7 +585,7 @@ export async function startHost(
       const other = id === missionId ? null : slotForMission(id);
       return other === null ? [] : [{ slot: other, since: heldSince.get(id) ?? now }];
     });
-    const verdict = admitStep({ slot, settings: fairness, live: liveBySlot(), waiting, since: heldSince.get(missionId) ?? now, memoryUsedPercent: memoryUsedPercent() });
+    const verdict = admitStep({ slot, settings: fairness, live: liveBySlot(), waiting, since: heldSince.get(missionId) ?? now, now, memoryUsedPercent: memoryUsedPercent() });
     if (verdict.admit) { heldSince.delete(missionId); return null; }
     if (!heldSince.has(missionId)) heldSince.set(missionId, now);
     return `${verdict.code}: ${verdict.reason}`;
@@ -1103,6 +1105,8 @@ export async function startHost(
         } else {
           if(!local)throw new WorkstationRequiredError("AI accounts, credentials and provider permissions are managed on the Windows workstation.");
           await manager.connections.command(input.action,data,actor);
+          // T13.3 F7: the owner's own pause, resume or disconnect of a route supersedes a harness.disable record of it.
+          if(["connections.pause","connections.resume","connections.disconnect"].includes(input.action))harnessStore.forgetRoute(String(data.id ?? ""));
           if(["connections.check","connections.resume","connections.accept_account"].includes(input.action))await manager.discover();
         }
       } else if (typeof input.action === "string" && MISSION_ACTIONS.has(input.action)) {
@@ -1314,6 +1318,10 @@ export async function startHost(
             if (!agents.snapshot().agents.some((agent) => agent.id === agentId && isUserFacingAgent(agent)))
               throw new CommandRefusedError("A Personal Agent can only own one of your own Agents.");
             recordOwner(agentId, slot, actor);
+            // T13.3 F12: the Agent's open workers move with it, so fairness, worker limits and the Studio name the new owner.
+            // Closed workers keep the slot they ran under as history.
+            for (const worker of workerStore.open())
+              if (worker.slot !== slot && agents.coordinatorFor(worker.parentMissionId)?.id === agentId) workerStore.save({ ...worker, slot, updatedAt: Date.now() });
             // A slot keeps focus only on an Agent it owns.
             const config = manager.personalAgents;
             if (config.slots.some((row) => row.slot !== slot && row.agentId === agentId))

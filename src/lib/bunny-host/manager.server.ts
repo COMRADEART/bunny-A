@@ -2007,7 +2007,8 @@ export class TaskManager {
               exhaustNow(
                 `Manual model selection is fixed; the task failed instead of re-routing. ${action.reason}`,
               );
-            else if (taxonomy === "QUOTA_CONSTRAINED" && current.executionScope?.access === "write")
+            // T13.3 F4: an unscoped direct task may write files, so only declared read work reroutes on quota.
+            else if (taxonomy === "QUOTA_CONSTRAINED" && current.executionScope?.access !== "read")
               exhaustNow(QUOTA_WRITE_PAUSE);
             else if (action.action === "retry-same") {
               sameRetries += 1;

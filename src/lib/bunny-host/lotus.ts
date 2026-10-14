@@ -162,7 +162,9 @@ export function summarize(
   previous: Pick<LotusMemory, "value" | "sources" | "revision" | "trust"> | null,
 ): Pick<LotusInput, "scope" | "layer" | "key" | "value" | "trust" | "provenance"> & { sources: string[]; revision: number } {
   const order: LotusTrust[] = ["untrusted", "model", "host", "user"];
-  const trust = sources.reduce<LotusTrust>((low, m) => (order.indexOf(m.trust) < order.indexOf(low) ? m.trust : low), previous?.trust ?? "user");
+  // Folded text gets the same steering check as admit(): instruction-shaped text from anyone but the user is untrusted.
+  const trustOf = (m: LotusMemory): LotusTrust => (m.trust !== "user" && isSteering(`${m.key} ${m.value}`) ? "untrusted" : m.trust);
+  const trust = sources.reduce<LotusTrust>((low, m) => (order.indexOf(trustOf(m)) < order.indexOf(low) ? trustOf(m) : low), previous?.trust ?? "user");
   const lines = sources.map((m) => `${m.key}: ${m.value.slice(0, 80)}`);
   const prior = previous?.value ? [previous.value] : [];
   let value = [...prior, ...lines].join("; ");

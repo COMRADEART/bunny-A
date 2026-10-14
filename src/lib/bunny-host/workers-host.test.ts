@@ -282,10 +282,37 @@ test("T13.3 D a model worker's Project memory reaches only its model prompt; a d
       assert.equal(result.body.code, "WORKSTATION_REQUIRED", `${action}: ${JSON.stringify(result.body)}`);
     }
     assert.equal((await h.state()).body.missions.missions.find((m: Body) => m.id === child).state, "waiting_for_approval", "the device changed nothing");
+    // F2's fourth path: a device answering a request that belongs to the worker's child Mission (mapped through the request).
+    h.host.missions.store.saveRequest({ id: "worker-ask", missionId: child, stepId: view.mission.steps[0].id, action: "filesystem.read", risk: "READ", reason: "fixture ask", createdAt: Date.now(), resolvedAt: null, resolution: null, resolvedBy: null, batchOffer: null });
+    const answered = await h.command("mission.respond", { requestId: "worker-ask", decision: "allow_once" }, phone.token);
+    assert.equal(answered.body.code, "WORKSTATION_REQUIRED", JSON.stringify(answered.body));
+    assert.match(String(answered.body.error), /worker is approved on the workstation/);
+    assert.equal(h.host.missions.store.request("worker-ask").resolvedAt, null, "the device answered nothing");
 
     await approve(h, child);
     await until(async () => launched.length > 0, "the model launch");
     assert.match(launched[0].prompt, /Context from the Project's memory[\s\S]*Release codename: Kestrel/, "the model prompt carries the labelled memory");
     assert.doesNotMatch(JSON.stringify((await h.state(phone.token)).body), /Kestrel/, "device /state after the run");
   }, recording(launched));
+});
+
+test("T13.3 F12: reassigning a parent Agent moves its open workers to the new slot; closed workers keep their history", async () => {
+  await withHost(43885, async (h) => {
+    const alpha = await project(h, "Alpha site");
+    const parent = await delegate(h, 1, "Alpha release", alpha);
+    const agentId = (await h.state()).body.agents.agents.find((row: Body) => row.missionId === parent).id as string;
+    const propose = () => h.command("worker.propose", { slot: 1, parentMissionId: parent, ability: "test", objective: "Run the tests", projectId: alpha });
+    const open = ok(await propose()).data.worker as Body;
+    const done = ok(await propose()).data.worker as Body;
+    ok(await h.command("worker.cancel", { id: done.id }));
+    await closed(h, 1, done.id);
+
+    ok(await h.command("personal_agent.assign", { slot: 2, agentId }));
+    // The exact reported case: before the fix the open worker stayed under slot 1 after its parent moved to slot 2.
+    assert.ok((await workersOf(h, 2)).some((worker) => worker.id === open.id), "the open worker follows its parent Agent");
+    assert.ok(!(await workersOf(h, 1)).some((worker) => worker.id === open.id), "the old slot no longer names it");
+    assert.ok((await workersOf(h, 1)).some((worker) => worker.id === done.id && worker.state === "CLOSED"), "closed history keeps its slot");
+    // Slot 2 now owns the parent Mission, so it may add workers there; slot 1 no longer may.
+    refusedWith(await h.command("worker.propose", { slot: 1, parentMissionId: parent, ability: "test", objective: "x", projectId: alpha }), /only to a Mission it owns/);
+  });
 });
