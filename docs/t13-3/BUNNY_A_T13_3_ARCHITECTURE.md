@@ -1,6 +1,6 @@
 # Bunny A MA3 T13.3: architecture and gate record
 
-Status: **in progress**. Gates A–F are implemented, each with its own source and evidence commits. Gates G–I have not started. No verdict is issued until Gate I.
+Status: **in progress**. Gates A–G are implemented, each with its own source and evidence commits. Gates H–I have not started. No verdict is issued until Gate I.
 
 ## Gate A: baseline
 
@@ -50,7 +50,8 @@ T13 made the **slot** (1–4) the durable Personal Agent identity and the weapon
 | Dynamic bounded child workers with lifecycle | Fixed T11 role catalogue | Workers as child Missions with eligibility, budgets, Host-only verdicts, cancellation, catalogue and reviewed composed abilities (Gate D); model-backed abilities not run live; Part F planning additions not implemented |
 | Harness Manager (detect/install/test) | T13.2 detection and native dispatch for Codex/Claude/Ollama only | Harness views over the T13.2 registry, stepped `--version` test, disable/enable/remove through the dispatch gate, guided pinned install the owner runs (Gate E); still only Codex/Claude/Ollama route Tasks, and no live inference was run |
 | Active-session ledger, quota-aware failover | Provider usage windows, connection caps, reservations | Per-session ledger keyed by the T13.2 reservation, UNKNOWN cost and allowance, a write-step quota pause, owner routing priority and Personal Agent fair admission (Gate F, `SESSION_RESOURCE_SCHEDULER.md`); CPU/GPU are not measured and cloud cost stays UNKNOWN |
-| Evaluation-gated routing changes | Policy candidate/promote, verified-only learning weights | Shadow test and versioned rollback (Gate G) |
+| Evaluation-gated routing changes | Policy candidate/promote, verified-only learning weights | Bounded three-number policy, attributable replay, bounded proposal, shadow test beside live routing, owner accept/reject, versioned rollback (Gate G, `ADAPTIVE_FEEDBACK.md`); no candidate accepted on live evidence yet |
+| Voice personalization | T12 duplex voice, one instruction and voice | Per-speaker identity and installed voice, Bunny answer length, reply language, notification frequency, text-free ratings off by default (Gate G); pace and interruption preference not adjustable |
 | Five character styles | One art set, weapon-specific motion | Gate H |
 
 ## Gate plan (in order; a gate is complete only with executed evidence)
@@ -91,3 +92,12 @@ Full contract: `LOTUS_AGENT_MEMORY_CONTRACT.md`. Source: `lotus.ts` (pure rules)
 - Gate B's `appendTurn` now returns the turns it drops; the Host folds them into a versioned `Earlier conversation` summary (`host:summary`, sources = turn ids).
 - `personal_agent.converse` appends up to three rendered memories under "From memory:". Replies stay Host facts.
 - Workstation-only `lotus.remember / correct / promote / forget / export / share / recall`; devices are refused and the memory projection is stripped from device snapshots.
+
+## Gate G contract (implemented)
+
+Full contract: `ADAPTIVE_FEEDBACK.md`. Source: `routing-feedback.ts` (pure), `learning.server.ts` (`PolicyEngine`; additive tables `policy_lifecycle`, `policy_shadow`), `voice/voice-personalization.ts` and `.server.ts` (table `voice_feedback`: id, time, speaker, rating — no text), Host wiring in `http.server.ts`, UI `routing-improvement.tsx` and `voice-personalization.tsx`.
+
+- Live routing reads `PolicyEngine.liveWeights()`. Only an owner-accepted policy changes them; the base policy reproduces the pre-Gate-G score exactly. A shadow policy records its pick beside every live decision and never changes dispatch.
+- Only Host-verified outcomes count; user likes and dislikes are shown and never counted. Stopped and rerouted Tasks are excluded.
+- The voice session reads an optional `persona` port per turn (speaker, instruction, installed voice). With defaults and Bunny in the foreground the prompt and voice are unchanged; T12 turn-taking and interruption are untouched.
+- `routing.learning.*` and `personalization.*` are workstation-only; `routingLearning` and `voicePersonalization` are stripped from device snapshots.
