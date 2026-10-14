@@ -46,7 +46,7 @@ T13 made the **slot** (1–4) the durable Personal Agent identity and the weapon
 | Per-Agent personality, goals, preferences, conversation history | Name/description/purpose/interaction style only | Profile + bounded conversation store (Gate B) |
 | Direct conversation using the Agent's own state | Voice answers about *all* agents | Per-Agent factual answers scoped to owned Missions (Gate B: text, and voice status for the foreground Agent); spoken addressing by weapon name not implemented |
 | Foreground speaker vs ownership | Not modelled | Separate persisted foreground identity (Gate B) |
-| Lotus layered memory, Agent/Project scoping, poisoning protection | Mission-scoped memory only | Gate C |
+| Lotus layered memory, Agent/Project scoping, poisoning protection | Mission-scoped memory only | Lotus store, scoped recall, trust ceilings, correction, compaction, export/forget, scoped share (Gate C); no model prompt reads it yet |
 | Dynamic bounded child workers with lifecycle | Fixed T11 role catalogue | Gate D |
 | Harness Manager (detect/install/test) | T13.2 detection and native dispatch for Codex/Claude/Ollama only | Gate E |
 | Active-session ledger, quota-aware failover | Provider usage windows, connection caps, reservations | Session dimension + failover protocol (Gate F) |
@@ -80,3 +80,14 @@ Voice: when a Personal Agent is the foreground speaker, the voice "status" inten
 Surfaces: Studio "Talk to your Agents" (speaker choice, per-Agent history, message box; a working count only for PLANNING, RUNNING, VERIFYING or WAITING_FOR_DEPENDENCY). Recent Missions and the Studio "Other agents" list read the ownership ledger, so an owned Mission shows its Personal Agent even when it is not the slot's focused Agent; only the focused Agent's Mission borrows the slot's live presentation state.
 
 Limitation (explicit): Gate B replies are deterministic Host-fact answers, not model-generated persona dialogue. Personality text is stored and projected for later model-backed conversation (with Lotus retrieval, Gate C); it does not yet alter wording.
+
+## Gate C contract (implemented)
+
+Full contract: `LOTUS_AGENT_MEMORY_CONTRACT.md`. Source: `lotus.ts` (pure rules), `lotus.server.ts` (`LotusStore`; additive tables `lotus_memories`, `lotus_revisions`), Host wiring in `http.server.ts`, Studio panel `memory.tsx`.
+
+- Scopes come from the ownership ledger: an Agent reads `agent:<slot>` plus `project:<id>` for Projects where it owns a Mission. With a `projectId`, recall returns that Project only — the slice Gate D workers will receive.
+- Verified Mission facts and user decisions are read in place from the existing Mission memory as inner-petal sources; Lotus never copies or owns them.
+- Trust ceilings (user/host → central, model → outer, untrusted → bud), steering-text downgrade, user-only promotion of model or outside text, credential refusal, user-correction precedence in ranking.
+- Gate B's `appendTurn` now returns the turns it drops; the Host folds them into a versioned `Earlier conversation` summary (`host:summary`, sources = turn ids).
+- `personal_agent.converse` appends up to three rendered memories under "From memory:". Replies stay Host facts.
+- Workstation-only `lotus.remember / correct / promote / forget / export / share / recall`; devices are refused and the memory projection is stripped from device snapshots.
