@@ -40,8 +40,9 @@ export function ChatHome({ now }: { now: number }) {
     if (!store.prompt.trim()) store.setPrompt(CHIP_PREFIX[key]);
   };
 
+  const slots = store.personalAgents?.slots ?? [];
   return (
-    <>
+    <div className="ch-home">
       <section className="ch-hero" aria-labelledby="chat-greeting">
         <p className="eyebrow">{new Date(now || Date.now()).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</p>
         <h1 id="chat-greeting">{greetingFor(hour)}</h1>
@@ -72,7 +73,36 @@ export function ChatHome({ now }: { now: number }) {
           </button>
         ))}
       </section>
-      <section className="t8-section" aria-labelledby="recent-missions">
+      {slots.length > 0 && (
+        // The four Personal Agents as a dashboard module. Every state shown is the Host's presentation fact for that slot.
+        <section className="t8-section ch-agents" aria-labelledby="home-agents">
+          <div className="section-heading">
+            <h2 id="home-agents">Personal Agents</h2>
+            <button className="quiet-button" type="button" onClick={() => store.setSheet("agents")}>
+              Agent Studio
+            </button>
+          </div>
+          <div className="ch-agent-grid">
+            {slots.map((slot) => (
+              <button key={slot.slot} type="button" className="t8-surface ch-agent" onClick={() => store.setSheet("agents")} aria-label={`${slot.displayName}: ${slot.presentation.label}`}>
+                <WeaponCharacter
+                  weapon={slot.weapon}
+                  state={displayState(slot.presentation.state, live)}
+                  size="compact"
+                  reduced={systemReduced || store.appearance.motion !== "full"}
+                  displayName={slot.displayName}
+                  appearance={appearanceFor(store.characterAppearance, slot.slot)}
+                />
+                <span className="ch-copy">
+                  <strong>{slot.displayName}</strong>
+                  <small>{live ? slot.presentation.label : `Last known: ${slot.presentation.label}`}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      <section className="t8-section ch-missions" aria-labelledby="recent-missions">
         <div className="section-heading">
           <h2 id="recent-missions">Recent Missions</h2>
           <button className="quiet-button" type="button" onClick={() => store.setSheet("missions")}>
@@ -117,7 +147,7 @@ export function ChatHome({ now }: { now: number }) {
           {!missions.length && <Empty title={RECENT_MISSIONS_EMPTY.title} detail={RECENT_MISSIONS_EMPTY.detail} />}
         </div>
       </section>
-      <section className="t8-section">
+      <section className="t8-section ch-tasks">
         <h2>Recent ordinary Tasks</h2>
         <div className="task-list t8-surface">
           {store.tasks
@@ -131,6 +161,6 @@ export function ChatHome({ now }: { now: number }) {
           )}
         </div>
       </section>
-    </>
+    </div>
   );
 }

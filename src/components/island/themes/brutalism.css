@@ -1,0 +1,86 @@
+/* 03 Neo-Brutalism — signature: the slab. A thick-outlined hero block with a hard offset shadow, set off-axis, beside a
+   yellow navigation column. Hard shadows move into the control when it is pressed. */
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] {
+  --enter-name: ve-slam;
+  --press-transform: translate(4px, 4px);
+  background: var(--page);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] :is(.t8-surface, .cx-panel, .ch-quick button, .btn, .ch-agent, .ch-chip, input, textarea, select) {
+  border: var(--bw) solid var(--border);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] :is(.t8-surface, .cx-panel, .ch-quick button, .btn, .ch-agent) {
+  box-shadow: var(--shadow);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] :is(.btn, .ch-quick button):active:not(:disabled) {
+  box-shadow: none;
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .app-sidebar {
+  background: var(--decor);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .app-sidebar :is(nav button, .sidebar-bottom, .brand-button, .nav-group-label, .quiet-button) {
+  color: #0a0a0a;
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .app-sidebar nav button {
+  font-weight: 700;
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .app-sidebar nav button:hover {
+  background: #ffffff;
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: #0a0a0a;
+  color: #ffffff;
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .ch-hero {
+  margin: var(--s4) var(--s5) var(--s5) 0;
+  padding: var(--s6);
+  background: var(--action);
+  border: var(--bw) solid var(--border);
+  box-shadow: var(--raised-shadow);
+  transform: rotate(-1deg);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .ch-hero :is(.eyebrow, .caption, h1) {
+  color: var(--action-ink);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .ch-hero h1 {
+  font-size: clamp(2.2rem, 17cqi, 5.2rem);
+  line-height: 0.95;
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .ch-quick button {
+  font-weight: 700;
+  font-size: var(--text-title);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .ch-quick button:nth-child(odd) {
+  background: var(--working-soft);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] .ch-quick button:hover {
+  background: var(--decor);
+  color: #0a0a0a;
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material] :is(.cx-well, .st-card .st-well) {
+  border: var(--bw) solid var(--border);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--border);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material][data-hc="true"] .app-sidebar {
+  background: var(--glass-solid);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material][data-hc="true"] .app-sidebar :is(nav button, .sidebar-bottom, .brand-button, .nav-group-label, .quiet-button) {
+  color: var(--fg);
+}
+.bunny-app.t8-app[data-ui-theme="brutalism"][data-material][data-hc="true"] .ch-hero {
+  transform: none;
+}
+.pc-root[data-ui-theme="brutalism"][data-material] :is(.pc-card, .pc-tile, .pc-slot, .pc-row, .pc-btn, .pc-primary) {
+  border: var(--bw) solid var(--pc-line);
+  box-shadow: var(--shadow);
+}
+.pc-root[data-ui-theme="brutalism"][data-material] .pc-top {
+  background: var(--decor);
+  color: #0a0a0a;
+}
+@keyframes ve-slam {
+  0% { opacity: 0; transform: translate(-10px, -10px); }
+  100% { opacity: 1; }
+}

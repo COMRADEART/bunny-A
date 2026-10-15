@@ -1,0 +1,90 @@
+/* 15 Maximalism — signature: the patterned band. Bold pattern bands, jewel tiles, sticker labels and a headline set in a
+   high-contrast serif. Density is high but every primary control sits on a solid surface with plain text. */
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] {
+  --enter-name: ve-layers;
+  --page-texture:
+    radial-gradient(circle at 12px 12px, color-mix(in srgb, var(--decor) 35%, transparent) 0 3px, transparent 3.5px) 0 0 / 24px 24px;
+  --page-texture-opacity: 0.6;
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .app-sidebar {
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--decor) 22%, var(--panel)) 0 10px, var(--panel) 10px 20px);
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .app-sidebar nav button {
+  background: var(--panel);
+  font-weight: 650;
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: var(--action);
+  color: var(--action-ink);
+  border-radius: 999px;
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .ch-hero {
+  position: relative;
+  border-radius: var(--r-shell) !important;
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--action) 18%, var(--panel)), color-mix(in srgb, var(--decor) 28%, var(--panel))) !important;
+  border: var(--bw) solid var(--border) !important;
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .ch-hero h1 {
+  font-size: clamp(2.6rem, 9.2cqi, 4rem);
+  font-weight: 800;
+  font-style: italic;
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .ch-hero::after {
+  content: "";
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: conic-gradient(var(--decor), var(--action), var(--focus), var(--decor));
+  box-shadow: 4px 4px 0 var(--border);
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .ch-quick button {
+  font-weight: 700;
+  box-shadow: 4px 4px 0 var(--border);
+  border-radius: var(--r-lg);
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .ch-quick button:nth-child(4n+1) { background: color-mix(in srgb, var(--action) 18%, var(--panel)); }
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .ch-quick button:nth-child(4n+2) { background: color-mix(in srgb, var(--decor) 24%, var(--panel)); }
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .ch-quick button:nth-child(4n+3) { background: color-mix(in srgb, var(--focus) 18%, var(--panel)); }
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .ch-agent {
+  border-radius: var(--r-lg);
+  box-shadow: 4px 4px 0 var(--border);
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] .ch-agent small {
+  display: inline-block;
+  justify-self: start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--working-soft);
+  color: var(--working);
+  font-weight: 650;
+  transform: rotate(-2deg);
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] :is(.cx-well, .st-card .st-well) {
+  border-radius: 24px 6px 24px 6px;
+  box-shadow: 0 0 0 3px var(--decor), 6px 6px 0 var(--border);
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material] h2 {
+  font-style: italic;
+  font-size: 1.35rem;
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material][data-hc="true"] :is(.app-sidebar, .ch-hero) {
+  background: var(--glass-solid) !important;
+}
+.bunny-app.t8-app[data-ui-theme="maximal"][data-material][data-hc="true"] .ch-hero::after {
+  display: none;
+}
+.pc-root[data-ui-theme="maximal"][data-material] .pc-top {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--decor) 22%, var(--panel)) 0 10px, var(--panel) 10px 20px);
+}
+.pc-root[data-ui-theme="maximal"][data-material] :is(.pc-card, .pc-tile, .pc-slot) {
+  box-shadow: 4px 4px 0 var(--pc-line);
+}
+@keyframes ve-layers {
+  0% { opacity: 0; transform: translate(-8px, 8px) rotate(-1deg); }
+  70% { opacity: 1; transform: translate(1px, -1px) rotate(0.2deg); }
+}

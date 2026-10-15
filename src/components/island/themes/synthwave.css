@@ -1,0 +1,79 @@
+/* 08 Synthwave — signature: the sunset grid. A striped neon sun sinks behind a perspective grid at the foot of the page; the
+   masthead navigation glows like a tube, and headings are wide chrome capitals. Text never sits on the sun or the grid. */
+.bunny-app.t8-app[data-ui-theme="synthwave"][data-material] {
+  --enter-name: ve-neon;
+  --page-texture:
+    repeating-linear-gradient(180deg, transparent 0 9px, #0d0221 9px 13px) 50% calc(100% - 210px) / 340px 170px no-repeat,
+    radial-gradient(circle at 50% 100%, #ffd23f 0%, #ff4acd 55%, transparent 56%) 50% calc(100% - 210px) / 340px 170px no-repeat,
+    linear-gradient(180deg, transparent 0 calc(100% - 214px), rgba(255, 74, 205, 0.6) calc(100% - 214px) calc(100% - 212px), transparent calc(100% - 212px));
+  --page-texture-opacity: 0.55;
+}
+.bunny-app.t8-app[data-ui-theme="synthwave"][data-material]::after {
+  content: "";
+  position: fixed;
+  left: -20%;
+  right: -20%;
+  bottom: 0;
+  height: 212px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(46, 230, 255, 0.35) 1px, transparent 1px) 0 0 / 100% 26px,
+    linear-gradient(90deg, rgba(255, 74, 205, 0.35) 1px, transparent 1px) 0 0 / 56px 100%;
+  transform: perspective(240px) rotateX(58deg);
+  transform-origin: top;
+  opacity: 0.5;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bunny-app.t8-app[data-ui-theme="synthwave"][data-motion="full"][data-ambient="on"]::after {
+    animation: ve-grid 6s linear infinite;
+  }
+}
+.bunny-app.t8-app[data-ui-theme="synthwave"][data-material] :is(.ch-hero h1, .page-heading h1) {
+  background: linear-gradient(180deg, #ffffff 0%, #ffd0f4 46%, #ff4acd 50%, #2ee6ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 74, 205, 0.35));
+}
+.bunny-app.t8-app[data-ui-theme="synthwave"][data-material][data-hc="true"] :is(.ch-hero h1, .page-heading h1) {
+  background: none;
+  color: var(--fg);
+  filter: none;
+}
+.bunny-app.t8-app[data-ui-theme="synthwave"][data-material] .app-sidebar nav button[aria-current="page"] {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255, 74, 205, 0.9);
+  box-shadow: inset 0 -2px 0 #ff4acd, 0 6px 14px -8px #ff4acd;
+}
+.bunny-app.t8-app[data-ui-theme="synthwave"][data-material] .btn.primary {
+  box-shadow: 0 0 0 1px #ff9be6, 0 0 18px rgba(255, 74, 205, 0.55);
+}
+.bunny-app.t8-app[data-ui-theme="synthwave"][data-material] :is(.t8-surface, .cx-panel, .ch-agent, .ch-quick button) {
+  border-color: rgba(255, 74, 205, 0.45);
+}
+.bunny-app.t8-app[data-ui-theme="synthwave"][data-material] .ch-quick button:hover {
+  border-color: #2ee6ff;
+  box-shadow: 0 0 14px rgba(46, 230, 255, 0.35);
+}
+.bunny-app.t8-app[data-ui-theme="synthwave"][data-material] :is(.cx-well, .st-card .st-well) {
+  box-shadow: 0 0 0 1px #2ee6ff, 0 0 18px rgba(46, 230, 255, 0.35);
+}
+.pc-root[data-ui-theme="synthwave"][data-material] .pc-hero-well {
+  box-shadow: 0 0 0 2px #ff4acd, 0 0 30px rgba(255, 74, 205, 0.45);
+}
+.pc-root[data-ui-theme="synthwave"][data-material] .pc-title {
+  background: linear-gradient(180deg, #ffffff 0%, #ffd0f4 46%, #ff4acd 50%, #2ee6ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@keyframes ve-neon {
+  0% { opacity: 0; filter: brightness(2) saturate(0); }
+  30% { opacity: 1; }
+  45% { opacity: 0.4; }
+  60% { opacity: 1; filter: none; }
+}
+@keyframes ve-grid {
+  to { background-position: 0 26px, 0 0; }
+}

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { agentDetail, agentRows, stepActivity, batchButtonLabel, batchOfferLines, batchStatusLabel, focusMission, justFinished, permissionLabel, progressFraction, progressLabel, scopeSummary } from "./mission-model.ts";
+import { agentDetail, agentRows, stepActivity, batchButtonLabel, batchOfferLines, batchStatusLabel, focusMission, justFinished, permissionLabel, progressFraction, progressLabel, scopeSummary, stepDependencyLabel, stepResourceTrail } from "./mission-model.ts";
 import type { BatchView, MissionSnapshot, MissionStep, MissionView } from "../../lib/bunny-missions/types.ts";
 import type { OrchTask } from "../../lib/orch/types.ts";
 
@@ -131,4 +131,18 @@ test("T13.3 N-C: a step whose outcome is uncertain shows reconciliation required
   const failed = step("1", "Writer", "failed", { failure: { category: "host_restart", detail: "x" }, reconciliation: { required: true, reason: "OUTCOME_UNCERTAIN: x", at: 1 } });
   assert.equal(stepActivity(failed, null), "Outcome uncertain — reconciliation required");
   assert.equal(stepActivity({ ...failed, reconciliation: undefined }, null), "Interrupted · retry available");
+});
+
+test("Visual Experience 2.0: a step names what it waits on and shows each attempt's resource", () => {
+  const build = step("b", "build", "completed");
+  const review = step("r", "review", "running");
+  const ship = step("s", "ship", "pending", { dependsOn: ["b", "r"] });
+  assert.equal(stepDependencyLabel(build, [build, review, ship]), "No dependencies");
+  assert.equal(stepDependencyLabel(ship, [build, review, ship]), "After build, review (waiting for review)");
+  assert.equal(stepDependencyLabel(ship, [build, { ...review, state: "completed" }, ship]), "After build, review (done)");
+  assert.equal(stepDependencyLabel(step("x", "x", "pending", { dependsOn: ["gone"] }), []), "After step gone (waiting for an unknown step)");
+  const attempt = (n: number, provider: "claude" | "codex" | null, outcome: "failed" | "running") => ({ attempt: n, startedAt: n, finishedAt: null, taskId: null, capabilityRunId: null, provider, outcome, category: null } as MissionStep["attempts"][number]);
+  assert.equal(stepResourceTrail(step("a", "a", "running", { attempts: [attempt(1, "claude", "failed")] })), null);
+  assert.equal(stepResourceTrail(step("a", "a", "running", { attempts: [attempt(1, "claude", "failed"), attempt(2, "codex", "running")] })), "1: claude (failed) → 2: codex (running)");
+  assert.equal(stepResourceTrail(step("a", "a", "running", { attempts: [attempt(1, null, "failed"), attempt(2, null, "running")] })), "1: model (failed) → 2: model (running)");
 });

@@ -1,0 +1,66 @@
+/* 22 Wabi-sabi — signature: the single ink stroke. One uneven brush line under the greeting, rice-paper grain, stone and moss
+   neutrals, an asymmetric margin, and transitions that settle slowly into stillness. */
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] {
+  --enter-name: ve-settle;
+  --page-texture:
+    radial-gradient(color-mix(in srgb, var(--fg) 5%, transparent) 0.6px, transparent 0.9px) 0 0 / 5px 5px,
+    radial-gradient(color-mix(in srgb, var(--fg) 3%, transparent) 0.8px, transparent 1.2px) 2px 3px / 13px 13px;
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] :is(.t8-surface, .cx-panel, .ch-agent) {
+  border-radius: 6px 14px 8px 18px;
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] .app-sidebar {
+  background: transparent;
+  border-right: 1px solid var(--border);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] .ch-home {
+  padding-left: clamp(0px, 4vw, 64px);
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] .ch-hero h1 {
+  font-size: clamp(2.2rem, 7.6cqi, 3.2rem);
+  font-weight: 500;
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] .ch-hero h1::after {
+  content: "";
+  display: block;
+  width: 180px;
+  height: 7px;
+  margin-top: var(--s3);
+  border-radius: 60% 40% 70% 30% / 60% 50% 50% 40%;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--fg) 85%, transparent) 0%, var(--fg) 30%, color-mix(in srgb, var(--fg) 55%, transparent) 85%, transparent 100%);
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: transparent;
+  color: var(--fg);
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] .ch-quick button {
+  background: transparent;
+  border-color: var(--border);
+  border-radius: 4px 12px 6px 10px;
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] .ch-quick button:nth-child(odd) {
+  background: color-mix(in srgb, var(--working) 7%, transparent);
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] .btn.primary {
+  border-radius: 4px 12px 6px 10px;
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] :is(.cx-well, .st-card .st-well) {
+  border-radius: 46% 54% 50% 50% / 52% 48% 52% 48%;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.bunny-app.t8-app[data-ui-theme="wabisabi"][data-material] h2 {
+  font-weight: 500;
+  font-size: 1.25rem;
+}
+.pc-root[data-ui-theme="wabisabi"][data-material] :is(.pc-card, .pc-tile, .pc-slot) {
+  border-radius: 6px 14px 8px 18px;
+  box-shadow: none;
+}
+.pc-root[data-ui-theme="wabisabi"][data-material] .pc-hero-well {
+  border-radius: 46% 54% 50% 50% / 52% 48% 52% 48%;
+}
+@keyframes ve-settle {
+  from { opacity: 0; transform: translateY(4px); filter: blur(1px); }
+}

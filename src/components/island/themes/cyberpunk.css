@@ -1,0 +1,89 @@
+/* 21 Cyberpunk — signature: the hazard-clipped plate. Panels have one sheared corner and a hazard-yellow edge; magenta and
+   cyan hard shadows split behind them like a misregistered print. Glitch only touches decoration and stops under reduced motion.
+   Distinct from Cybercore: yellow/magenta not cyan, angular clipping not corner ticks, uppercase Chakra Petch not grotesk. */
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] {
+  --enter-name: ve-glitch;
+  --page-texture:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
+    linear-gradient(115deg, transparent 60%, rgba(255, 46, 136, 0.08) 60% 61%, transparent 61%);
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] :is(.t8-surface, .cx-panel, .ch-agent) {
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  border-left: 4px solid var(--border);
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] .app-sidebar {
+  border-right: 2px solid var(--border);
+  background:
+    repeating-linear-gradient(-45deg, var(--border) 0 10px, #07060b 10px 20px) left bottom / 100% 10px no-repeat,
+    var(--glass);
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: var(--action);
+  color: var(--action-ink);
+  box-shadow: 3px 3px 0 #ff2e88, -2px -2px 0 #38f6ff;
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] .btn.primary {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] .ch-hero h1 {
+  font-size: clamp(2.4rem, 9.2cqi, 4rem);
+  text-shadow: 3px 0 0 rgba(255, 46, 136, 0.75), -3px 0 0 rgba(56, 246, 255, 0.6);
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] .ch-hero .eyebrow {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--action);
+  color: var(--action-ink);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] .ch-quick button {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-left: 4px solid #ff2e88;
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] .ch-quick button:hover {
+  background: rgba(255, 46, 136, 0.12);
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material] :is(.cx-well, .st-card .st-well) {
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%);
+  box-shadow: inset 0 0 0 1px #38f6ff;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bunny-app.t8-app[data-ui-theme="cyberpunk"][data-motion="full"][data-ambient="on"] .ch-hero h1 {
+    animation: ve-jitter 7s steps(1, end) infinite;
+  }
+}
+.bunny-app.t8-app[data-ui-theme="cyberpunk"][data-material][data-hc="true"] .ch-hero h1 {
+  text-shadow: none;
+  animation: none;
+}
+.pc-root[data-ui-theme="cyberpunk"][data-material] :is(.pc-card, .pc-tile, .pc-slot, .pc-row) {
+  border-left: 4px solid var(--pc-line);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  border-radius: 0;
+}
+.pc-root[data-ui-theme="cyberpunk"][data-material] :is(.pc-title, .pc-tab) {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+@keyframes ve-glitch {
+  0% { opacity: 0; transform: translateX(-8px); clip-path: inset(10% 0 60% 0); }
+  20% { opacity: 1; transform: translateX(6px); clip-path: inset(50% 0 10% 0); }
+  40% { transform: translateX(-3px); clip-path: inset(0 0 0 0); }
+  100% { transform: none; }
+}
+@keyframes ve-jitter {
+  0%, 96%, 100% { transform: none; }
+  97% { transform: translateX(2px); }
+  98% { transform: translateX(-2px); }
+}

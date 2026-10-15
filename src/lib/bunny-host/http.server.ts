@@ -54,6 +54,8 @@ import { SPOKEN_CHAT_INSTRUCTION, VoiceSessionManager, type ListenSource, type I
 import { VoicePersonalizationStore } from "./voice/voice-personalization.server.ts";
 import { CharacterAppearanceStore } from "./character-style.server.ts";
 import { CHARACTER_STYLE_LABEL, resolvedStyle } from "./character-style.ts";
+import { UiThemeStore } from "./ui-theme.server.ts";
+import { UI_THEMES } from "./ui-theme.ts";
 import {
   FEEDBACK_RATINGS, SPEAKER_IDS, STYLE_VERBOSITY, personalizedInstruction, speakerFor, speakerId, voiceAdvice,
   type FeedbackRating, type Speaker, type SpeakerId, type VoicePersonalizationView,
@@ -701,6 +703,7 @@ export async function startHost(
       routingLearning: manager.policy.view(),
       voicePersonalization: personalizationView(),
       characterAppearance: appearanceStore.view(),
+      uiTheme: uiThemeStore.view(),
       personalAgentContext: (() => {
         const byId = new Map((canonical.agents?.agents ?? []).map((agent) => [agent.id, agent]));
         return {
@@ -739,6 +742,8 @@ export async function startHost(
   const voicePreferences = new VoicePersonalizationStore(db);
   // M-A-3 T13.3 Gate H (§25): presentation only. Paired devices draw it but cannot change it.
   const appearanceStore = new CharacterAppearanceStore(db);
+  // Visual Experience 2.0: the shared UI theme. Presentation only; paired devices read it and keep their own local look.
+  const uiThemeStore = new UiThemeStore(db);
   function personalizationView(): VoicePersonalizationView {
     const preferences = voicePreferences.preferences();
     const speakers = SPEAKER_IDS.map((id) => {
@@ -1385,6 +1390,22 @@ export async function startHost(
             const shown = weapon ? CHARACTER_STYLE_LABEL[resolvedStyle(weapon, next)] : "signature";
             manager.emit(db.event("personal_agent.appearance", null, `Personal Agent ${slot} appearance: ${shown}${next.style === null ? " (signature)" : ""}.`));
             extra = { data: { slot, appearance: next } };
+            break;
+          }
+          case "appearance.theme":
+          case "appearance.theme_reset": {
+            // Presentation only: it never touches a Mission, Task, Agent, profile, memory, routing, consent or approval,
+            // and the running Host keeps every Mission going while every window and the Notch restyle.
+            if (!local) throw new WorkstationRequiredError("The workstation theme is changed on the workstation (Windows Host). This device can choose its own look in its settings.");
+            const { expectRevision, ...preference } = data;
+            // Present means checked: a malformed revision is refused, never treated as "no check".
+            if (expectRevision !== undefined && !Number.isSafeInteger(expectRevision)) refused(() => { throw new Error("expectRevision must be an integer."); });
+            const expected = typeof expectRevision === "number" ? expectRevision : null;
+            const saved = input.action === "appearance.theme_reset"
+              ? refused(() => uiThemeStore.reset(Date.now(), expected))
+              : refused(() => uiThemeStore.set(preference, Date.now(), expected));
+            manager.emit(db.event("appearance.theme", null, `Workstation theme: ${UI_THEMES[saved.preference.theme].name} (revision ${saved.revision}).`));
+            extra = { data: uiThemeStore.view() };
             break;
           }
           case "personal_agent.converse": {

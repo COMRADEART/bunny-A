@@ -1,0 +1,352 @@
+/* Theme Gallery (Settings → Appearance). Cards inherit the shown theme; each miniature carries its own theme's tokens. */
+.tg {
+  display: grid;
+  gap: var(--s5);
+}
+.tg-status {
+  display: grid;
+  gap: 2px;
+}
+.tg-status strong {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+}
+.tg-status :is(span, small) {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.tg-preview-bar,
+.tg-global-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border: var(--bw-strong, 1px) solid var(--focus);
+  border-radius: var(--r-md);
+  background: var(--glass-solid);
+  color: var(--fg);
+}
+.tg-preview-bar > span,
+.tg-global-preview > span {
+  flex: 1;
+  min-width: 12ch;
+}
+.tg-global-preview {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  margin: var(--s2) var(--s4) 0;
+}
+.tg-tuning {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s2);
+}
+.tg-tuning legend {
+  font-weight: 650;
+  margin-bottom: var(--s2);
+}
+.tg-segment {
+  display: inline-flex;
+  border: var(--bw, 1px) solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+.tg-segment button {
+  min-height: 44px;
+  min-width: 64px;
+  padding: 0 var(--s3);
+  background: var(--field);
+  color: var(--fg);
+  border: 0;
+}
+.tg-segment button + button {
+  border-left: var(--bw, 1px) solid var(--border);
+}
+.tg-segment button[aria-checked="true"] {
+  background: var(--action);
+  color: var(--action-ink);
+  font-weight: 650;
+}
+.tg-segment button:disabled {
+  text-decoration: line-through;
+}
+.tg-accent {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+.tg-accent input[type="color"] {
+  width: 48px;
+  height: 44px;
+  padding: 2px;
+}
+.tg-reset {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.tg-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--s4);
+}
+.tg-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--s3);
+  padding: var(--s3);
+  border: var(--bw, 1px) solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--glass-solid);
+}
+.tg-card[data-current="true"] {
+  outline: 2px solid var(--working);
+  outline-offset: 2px;
+}
+.tg-card[data-previewing="true"] {
+  outline: 2px dashed var(--focus);
+  outline-offset: 2px;
+}
+.tg-copy h4 {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+}
+.tg-copy p {
+  margin: var(--s1) 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.tg-copy small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.tg-tag {
+  font-family: var(--font-bunny);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--working-soft);
+  color: var(--working);
+}
+.tg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+.tg-actions .btn {
+  flex: 1;
+  justify-content: center;
+}
+
+/* ---- the miniature: every value comes from its own theme's tokens (set inline by scopeFor) */
+.tg-mini {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 8px;
+  padding: 8px;
+  height: 150px;
+  border-radius: calc(var(--r-md) * 0.6);
+  background:
+    radial-gradient(120px 80px at 0% 0%, var(--page-wash-a), transparent 70%),
+    radial-gradient(120px 80px at 100% 0%, var(--page-wash-b), transparent 70%),
+    var(--page);
+  color: var(--fg);
+  font-family: var(--font-bunny);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.tg-desktop {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+.tg-mini[data-layout="topnav"] .tg-desktop {
+  grid-template-columns: 1fr;
+  grid-template-rows: 16px 1fr;
+}
+.tg-mini[data-layout="topnav"] .tg-nav {
+  flex-direction: row;
+  height: 16px;
+}
+.tg-mini[data-layout="rail"] .tg-desktop {
+  grid-template-columns: 16px minmax(0, 1fr);
+}
+.tg-mini[data-layout="floating"] .tg-nav,
+.tg-mini[data-layout="bento"] .tg-nav,
+.tg-mini[data-layout="window"] .tg-nav {
+  border-radius: calc(var(--r-shell) * 0.4);
+  box-shadow: var(--shadow);
+}
+.tg-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  background: var(--glass);
+  border: var(--bw) solid var(--border);
+  border-radius: calc(var(--r-sm) * 0.5);
+  min-width: 0;
+  overflow: hidden;
+}
+.tg-brand {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--fg);
+  flex-shrink: 0;
+}
+.tg-item {
+  height: 6px;
+  flex: 0 0 6px;
+  min-width: 10px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--muted) 40%, transparent);
+}
+.tg-mini[data-layout="topnav"] .tg-item {
+  flex: 0 0 18px;
+  height: 6px;
+  align-self: center;
+}
+.tg-item[data-current="true"] {
+  background: var(--working);
+}
+.tg-main {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+}
+.tg-eyebrow {
+  font-size: 7px;
+  color: var(--muted);
+  text-transform: var(--eyebrow-case);
+  letter-spacing: var(--eyebrow-tracking);
+}
+.tg-title {
+  font-family: var(--font-display);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+  text-transform: var(--heading-case);
+  font-size: calc(14px * var(--display-scale));
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+.tg-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-top: 3px;
+}
+.tg-mini[data-home="bento"] .tg-row,
+.tg-mini[data-home="grid"] .tg-row {
+  grid-template-columns: 1.3fr 1fr;
+}
+.tg-card {
+  min-width: 0;
+}
+.tg-mini .tg-tile {
+  display: grid;
+  gap: 4px;
+  padding: 5px;
+  height: 56px;
+  background: var(--glass);
+  border: var(--bw) solid var(--border);
+  border-radius: calc(var(--r-lg) * 0.45);
+  box-shadow: var(--shadow);
+}
+.tg-well {
+  width: 18px;
+  height: 18px;
+  border-radius: calc(var(--r-md) * 0.4);
+  background: radial-gradient(circle at 50% 35%, #2a2f44, #07080d);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--decor) 70%, transparent);
+}
+.tg-mini[data-agent-frame="circle"] .tg-well,
+.tg-mini[data-agent-frame="blob"] .tg-well {
+  border-radius: 50%;
+}
+.tg-lines {
+  height: 12px;
+  background:
+    linear-gradient(var(--muted), var(--muted)) 0 0 / 80% 2px no-repeat,
+    linear-gradient(var(--muted), var(--muted)) 0 5px / 60% 2px no-repeat,
+    linear-gradient(var(--muted), var(--muted)) 0 10px / 70% 2px no-repeat;
+  opacity: 0.55;
+}
+.tg-button {
+  justify-self: start;
+  padding: 1px 8px;
+  border-radius: var(--r-sm);
+  background: var(--action);
+  color: var(--action-ink);
+  font-size: 8px;
+  font-weight: 700;
+}
+.tg-side {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+}
+.tg-phone {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  gap: 4px;
+  padding: 4px;
+  border: 2px solid color-mix(in srgb, var(--fg) 70%, transparent);
+  border-radius: 10px;
+  background: var(--page);
+}
+.tg-phone-hero {
+  border-radius: calc(var(--r-shell) * 0.3);
+  background: radial-gradient(circle at 50% 40%, #2a2f44, #07080d);
+}
+.tg-phone-card {
+  height: 14px;
+  border-radius: calc(var(--r-md) * 0.4);
+  background: var(--glass);
+  border: 1px solid var(--border);
+}
+.tg-phone-tabs {
+  height: 8px;
+  border-radius: 3px;
+  background:
+    linear-gradient(90deg, var(--working) 0 22%, transparent 22%),
+    var(--glass-solid);
+}
+.tg-notch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 18px;
+  border-style: solid;
+  font-size: 8px;
+  font-weight: 600;
+}
+.tg-notch-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+@media (forced-colors: active) {
+  .tg-mini {
+    forced-color-adjust: none;
+  }
+}

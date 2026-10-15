@@ -196,6 +196,14 @@ function Set-BunnyTheme([bool]$Light) {
  $palette.BunnyViolet=if($Light){'#6554A4'}else{'#AB9DF5'};$palette.BunnyGlass=if($Light){'#F0FFFDF9'}else{'#ED0F1728'};$palette.BunnyClaude=if($Light){'#995831'}else{'#E4A27C'}
  # The notch itself is black glass in both themes (Set-BunnyGlassSurface). Only the expanded panel surface follows the theme.
  $palette.BunnyPanel=if($Light){'#F4FBFCFF'}else{'#00000000'}
+ # Visual Experience 2.0: a non-glass theme's validated colours replace the text, accent and panel roles. Status colours
+ # (positive/negative/warning) keep their tested values, and High Contrast below still overrides everything.
+ $theme=$script:bunnyUiTheme
+ if($null-ne$theme-and$theme.Theme-ne'glass'){
+  $tp=Get-BunnyNotchPalette $theme $Light 238
+  foreach($key in @('BunnyText','BunnyMuted','BunnyAccent','BunnyOnAccent','BunnyAccentSoft','BunnySep','BunnySegment','BunnyField','BunnyHover','BunnyPopup','BunnyPanel')){$palette[$key]=$tp[$key]}
+ }
+ $bunnyWindow.FontFamily=[Windows.Media.FontFamily]::new($(if($null-ne$theme-and$theme.Theme-ne'glass'){$theme.Font+', Segoe UI'}else{'Segoe UI'}))
  if([Windows.SystemParameters]::HighContrast){
   $palette.BunnyText=[Windows.SystemColors]::WindowTextColor.ToString();$palette.BunnyMuted=$palette.BunnyText
   $palette.BunnyGlass=[Windows.SystemColors]::WindowColor.ToString();$palette.BunnySep=$palette.BunnyText;$palette.BunnyViolet=$palette.BunnyText
@@ -203,6 +211,11 @@ function Set-BunnyTheme([bool]$Light) {
   # theme's transparent/near-black surface and the expanded panel cannot be read (High Contrast White on dark).
   $palette.BunnyPanel=[Windows.SystemColors]::WindowColor.ToString()
  }
+ # The header's local brushes were tuned for the always-black glass body and shadow the window palette. A themed body takes
+ # the theme's own ink there too; glass and Windows High Contrast keep the accepted T13 header brushes.
+ if($null-eq$script:bunnyHeaderDefaults){$script:bunnyHeaderDefaults=@{};foreach($key in @($bunnyControls.Header.Resources.Keys)){$script:bunnyHeaderDefaults[[string]$key]=$bunnyControls.Header.Resources[$key]}}
+ $themedHeader=($null-ne$theme)-and($theme.Theme-ne'glass')-and(-not[Windows.SystemParameters]::HighContrast)
+ foreach($key in @($script:bunnyHeaderDefaults.Keys)){$bunnyControls.Header.Resources[$key]=$(if($themedHeader-and$palette.ContainsKey($key)){New-BunnyBrush $palette[$key]}else{$script:bunnyHeaderDefaults[$key]})}
  foreach($key in $palette.Keys){$bunnyWindow.Resources[$key]=New-BunnyBrush $palette[$key]}
  $alpha=switch($bunnyPreferences.glass){'low'{250}'high'{218}default{238}};if([Windows.SystemParameters]::HighContrast){$alpha=255}
  $glass=$bunnyWindow.Resources['BunnyGlass'].Color;$glass.A=[byte]$alpha;$bunnyWindow.Resources['BunnyGlass']=[Windows.Media.SolidColorBrush]::new($glass)
@@ -414,21 +427,24 @@ function Set-BunnyLayout([bool]$Expanded) {
 function Set-BunnyJoin {
  $strip=$bunnyControls.StripCapsule;$glass=$bunnyControls.Glass
  $vertical=Test-BunnyVertical
- $glassRadius=$(if($vertical){29}else{28})
+ # Visual Experience 2.0: corners and stroke come from the validated theme (the glass theme keeps the T13 values exactly).
+ $r=Get-BunnyNotchRadius $script:bunnyUiTheme $vertical;$b=Get-BunnyNotchBorder $script:bunnyUiTheme ([Windows.SystemParameters]::HighContrast)
+ $sr=[Math]::Max($r.TopLeft,$r.BottomLeft)
+ if($null-eq$script:bunnyUiTheme-or$script:bunnyUiTheme.Theme-eq'glass'){$sr=29}
  if($strip.Visibility-ne'Visible'){
-  $strip.CornerRadius=[Windows.CornerRadius]::new(29);$strip.BorderThickness=[Windows.Thickness]::new(1)
-  $glass.CornerRadius=[Windows.CornerRadius]::new($glassRadius);$glass.BorderThickness=[Windows.Thickness]::new(1);return
+  $strip.CornerRadius=[Windows.CornerRadius]::new($sr);$strip.BorderThickness=[Windows.Thickness]::new($b)
+  $glass.CornerRadius=[Windows.CornerRadius]::new($r.TopLeft,$r.TopRight,$r.BottomRight,$r.BottomLeft);$glass.BorderThickness=[Windows.Thickness]::new($b);return
  }
  if($script:bunnyColumn){
   # Column: the strip sits above the body, so its bottom corners and the body's top corners are the shared edge. The body's
   # top stroke is dropped there, otherwise a light line would divide the two shapes.
-  $strip.CornerRadius=[Windows.CornerRadius]::new(29,29,0,0);$strip.BorderThickness=[Windows.Thickness]::new(1,1,1,0)
-  $glass.CornerRadius=[Windows.CornerRadius]::new(0,0,$glassRadius,$glassRadius);$glass.BorderThickness=[Windows.Thickness]::new(1,0,1,1)
+  $strip.CornerRadius=[Windows.CornerRadius]::new($sr,$sr,0,0);$strip.BorderThickness=[Windows.Thickness]::new($b,$b,$b,0)
+  $glass.CornerRadius=[Windows.CornerRadius]::new(0,0,$r.BottomRight,$r.BottomLeft);$glass.BorderThickness=[Windows.Thickness]::new($b,0,$b,$b)
  }else{
   # Row: the strip sits to the left of the body, so its right corners and the body's left corners are the shared edge. The
   # body's left stroke is dropped for the same reason.
-  $strip.CornerRadius=[Windows.CornerRadius]::new(29,0,0,29);$strip.BorderThickness=[Windows.Thickness]::new(1,1,0,1)
-  $glass.CornerRadius=[Windows.CornerRadius]::new(0,$glassRadius,$glassRadius,0);$glass.BorderThickness=[Windows.Thickness]::new(0,1,1,1)
+  $strip.CornerRadius=[Windows.CornerRadius]::new($sr,0,0,$sr);$strip.BorderThickness=[Windows.Thickness]::new($b,$b,0,$b)
+  $glass.CornerRadius=[Windows.CornerRadius]::new(0,$r.TopRight,$r.BottomRight,0);$glass.BorderThickness=[Windows.Thickness]::new(0,$b,$b,$b)
  }
 }
 # The Notch is black glossy glass in both themes (spec section 11): #0B0D14 at 92 % with a gradient from #1A1E2B to #07080D,
@@ -440,6 +456,20 @@ function Set-BunnyGlassSurface {
  if([Windows.SystemParameters]::HighContrast){
   $fill=[Windows.Media.SolidColorBrush]::new([Windows.SystemColors]::WindowColor);$fill.Freeze()
   $stroke=[Windows.Media.SolidColorBrush]::new([Windows.SystemColors]::WindowTextColor);$stroke.Freeze()
+  $bunnyControls.Glass.Background=$fill;$bunnyControls.Glass.BorderBrush=$stroke
+  $bunnyControls.StripCapsule.Background=$fill;$bunnyControls.StripCapsule.BorderBrush=$stroke
+  return
+ }
+ # Visual Experience 2.0: a non-glass theme draws its own material from validated #rrggbb tokens (no GPU effect either).
+ $theme=$script:bunnyUiTheme
+ if($null-ne$theme-and$theme.Theme-ne'glass'){
+  $alpha=switch($bunnyPreferences.glass){'low'{250}'high'{218}default{238}}
+  $p=Get-BunnyNotchPalette $theme ([bool]$script:bunnyLight) $alpha
+  $fill=[Windows.Media.LinearGradientBrush]::new();$fill.StartPoint=[Windows.Point]::new(0,0);$fill.EndPoint=[Windows.Point]::new(0,1)
+  [void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString($p.Fill),0))
+  [void]$fill.GradientStops.Add([Windows.Media.GradientStop]::new([Windows.Media.ColorConverter]::ConvertFromString($p.FillEnd),1))
+  $fill.Freeze()
+  $stroke=[Windows.Media.SolidColorBrush]::new([Windows.Media.ColorConverter]::ConvertFromString($(if($theme.Glow){$p.Glow}else{$p.Stroke})));$stroke.Freeze()
   $bunnyControls.Glass.Background=$fill;$bunnyControls.Glass.BorderBrush=$stroke
   $bunnyControls.StripCapsule.Background=$fill;$bunnyControls.StripCapsule.BorderBrush=$stroke
   return
@@ -699,7 +729,7 @@ function Show-BunnySystem {
 }
 function Update-BunnyRouteState {$bunnyControls.RouteButton.IsEnabled=$bunnyOnline-and-not$bunnyPending-and$bunnyControls.Prompt.Text.Trim().Length-gt0;$bunnyControls.CancelButton.IsEnabled=$bunnyOnline-and-not$bunnyPending;$bunnyControls.ChangeButton.IsEnabled=$bunnyOnline-and-not$bunnyPending;if($bunnyPending){$bunnyControls.ApproveButton.IsEnabled=$false;$bunnyControls.StopButton.IsEnabled=$false}}
 function Update-Bunny {
- try{$script:bunnySnapshot=Invoke-Bunny;$script:bunnyOnline=$true;$script:bunnyLastError=$null;$bunnyControls.Presence.Text='Host online '+$bunnyDot+' approval before launch';Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyPositive'
+ try{$script:bunnySnapshot=Invoke-Bunny;$script:bunnyOnline=$true;Update-BunnyUiTheme;$script:bunnyLastError=$null;$bunnyControls.Presence.Text='Host online '+$bunnyDot+' approval before launch';Set-BunnyRef $bunnyControls.PresenceDot ([Windows.Shapes.Shape]::FillProperty) 'BunnyPositive'
   # While the window is iconic, Host data is still polled but the UI rebuild/animation work waits (spec section 10:
   # invisible work is throttled). The next visible tick, at most 2 s after restore, replays this block. Update-BunnyMotion
   # still runs every tick so motion mode keeps tracking the real window state.
@@ -736,8 +766,18 @@ $bunnyCommandTimer=[Windows.Threading.DispatcherTimer]::new();$bunnyCommandTimer
  try{if($pending.task.IsFaulted){throw $pending.task.Exception.GetBaseException()};$result=$pending.task.Result|ConvertFrom-Json;$script:bunnySnapshot=$result.snapshot;if($result.task){$script:bunnySelectedId=$result.task.id};if($pending.action-eq'submit'){$bunnyControls.Prompt.Clear();$script:bunnyTaskExpanded=$false;Set-BunnyView 'approval'}elseif($pending.action-eq'approve'){Set-BunnyView 'task'};Update-Bunny}catch{$bunnyControls.Notice.Text=Get-BunnyError $_;if($bunnyView-eq'routing'){Set-BunnyView 'composer'}}finally{$pending.client.Dispose()}
 })
 function Add-BunnyChoice($Control,$Options,[string]$Key){foreach($pair in $Options){$item=[Windows.Controls.ComboBoxItem]::new();$item.Content=$pair[1];$item.Tag=$pair[0];[void]$Control.Items.Add($item);if([string]$pair[0]-eq[string]$bunnyPreferences[$Key]){$Control.SelectedItem=$item}};$Control.Tag=$Key;$Control.Add_SelectionChanged({if($bunnySettingsUpdating-or-not$this.SelectedItem){return};$bunnyPreferences[$this.Tag]=$this.SelectedItem.Tag;Save-BunnyPreferences;Apply-BunnyAppearance;Resize-Bunny})}
-function Apply-BunnyAppearance { $light=if($bunnyPreferences.theme-eq'system'){try{(Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize').AppsUseLightTheme-eq1}catch{$false}}else{$bunnyPreferences.theme-eq'light'};Set-BunnyTheme $light;Set-BunnyPosition;if(Get-Command Update-BunnyMotion -ErrorAction SilentlyContinue){$script:bunnyOrbState='';Update-BunnyMotion} }
+function Apply-BunnyAppearance { $windowsLight=try{(Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize').AppsUseLightTheme-eq1}catch{$false};$light=Get-BunnyThemeLight $script:bunnyUiTheme ([string]$bunnyPreferences.theme) $windowsLight;Set-BunnyTheme $light;Set-BunnyPosition;if(Get-Command Update-BunnyMotion -ErrorAction SilentlyContinue){$script:bunnyOrbState='';Update-BunnyMotion} }
 $bunnySettingsUpdating=$true
+. (Join-Path $PSScriptRoot 'Bunny-Island.Theme.ps1')
+$script:bunnyUiTheme=$null;$script:bunnyUiThemeKey='default'
+# Restyles the Notch only when the Host's theme actually changed. Offline, the last applied theme stays (never a flash).
+function Update-BunnyUiTheme {
+ if($null-eq$bunnySnapshot){return}
+ $theme=Get-BunnyNotchTheme $bunnySnapshot.uiTheme;$key=Get-BunnyNotchThemeKey $theme
+ if($key-eq$script:bunnyUiThemeKey){return}
+ $script:bunnyUiTheme=$theme;$script:bunnyUiThemeKey=$key
+ Apply-BunnyAppearance;Set-BunnyJoin
+}
 . (Join-Path $PSScriptRoot 'Bunny-Island.Voice.ps1')
 . (Join-Path $PSScriptRoot 'Bunny-Island.Motion.ps1')
 . (Join-Path $PSScriptRoot 'Bunny-Island.Presentation.ps1')

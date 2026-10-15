@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { ThemedDialogContent } from "./theme";
 import {
   ArrowLeft,
   ArrowRight,
@@ -34,6 +35,7 @@ import {
   returnFocusTo,
 } from "./workspace-model";
 import { ActivityTimeline } from "./activity";
+import { stepDependencyLabel, stepResourceTrail } from "./mission-model";
 import { Empty, NAMES } from "./ui";
 import { openTask } from "./task";
 import { artifactStatus } from "@/lib/bunny-host/presentation";
@@ -111,7 +113,7 @@ export function AgentControls({ agent }: { agent: AgentView }) {
         </Dialog.Trigger>
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog" data-theme={store.theme}>
+          <ThemedDialogContent className="t8-dialog">
             <Dialog.Title>Stop {agent.name}?</Dialog.Title>
             <Dialog.Description>
               Stop prevents new work. Completed work and artifacts stay. Effects already made are not
@@ -132,7 +134,7 @@ export function AgentControls({ agent }: { agent: AgentView }) {
                 Stop future work
               </button>
             </div>
-          </Dialog.Content>
+          </ThemedDialogContent>
         </Dialog.Portal>
       </Dialog.Root>
       {(caption ?? consentFirst) && (
@@ -240,7 +242,7 @@ export function PendingAsks({ agent, mission }: { agent: AgentView; mission?: Mi
       <Dialog.Root open={!!denying} onOpenChange={(open) => !open && setDenying(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog" data-theme={store.theme} onCloseAutoFocus={returnFocusTo(denyOpener)}>
+          <ThemedDialogContent className="t8-dialog" onCloseAutoFocus={returnFocusTo(denyOpener)}>
             <Dialog.Title>Deny {denying?.action}?</Dialog.Title>
             <Dialog.Description>
               The Host records your denial. This exact operation will not run, and the Mission step that
@@ -261,7 +263,7 @@ export function PendingAsks({ agent, mission }: { agent: AgentView; mission?: Mi
                 Deny this request
               </button>
             </div>
-          </Dialog.Content>
+          </ThemedDialogContent>
         </Dialog.Portal>
       </Dialog.Root>
     </section>
@@ -921,11 +923,8 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
                   <div>
                     <strong>{step.role}</strong>
                     <small>{step.state.replaceAll("_", " ")}</small>
-                    <small>
-                      {step.dependsOn.length
-                        ? `${step.dependsOn.length} dependencies`
-                        : "No dependencies"}
-                    </small>
+                    <small>{stepDependencyLabel(step, mission.steps)}</small>
+                    {stepResourceTrail(step) && <small>Attempts {stepResourceTrail(step)}</small>}
                     {step.failure && <small>{step.failure.category.replaceAll("_", " ")}</small>}
                     {step.reconciliation?.required && <small>{UNCERTAIN_LABEL}</small>}
                   </div>
@@ -1012,7 +1011,7 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
       >
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog artifact-dialog" data-theme={store.theme} onCloseAutoFocus={returnFocusTo(artifactOpener)}>
+          <ThemedDialogContent className="t8-dialog artifact-dialog" onCloseAutoFocus={returnFocusTo(artifactOpener)}>
             <Dialog.Title>{artifact?.title}</Dialog.Title>
             <Dialog.Description>
               Verified through the Project artifact authority. SHA-256: {artifact?.sha256}
@@ -1027,7 +1026,7 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
             ) : (
               <pre>{artifact?.body}</pre>
             )}
-          </Dialog.Content>
+          </ThemedDialogContent>
         </Dialog.Portal>
       </Dialog.Root>
     </>

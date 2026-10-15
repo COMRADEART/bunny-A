@@ -1,11 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { Bell, ChevronRight, ShieldCheck } from "lucide-react";
-import { liveProviders, useIsland, type Appearance } from "@/store/use-island";
+import { liveProviders, useIsland } from "@/store/use-island";
 import { NAMES, ProviderStatus } from "./ui";
 import { Pairing } from "./phone";
 import { MissionSettings } from "./mission";
 import { AiModelsSettings } from "./ai-models";
 import { NotificationFrequencySetting, VoicePersonalization } from "./voice-personalization";
+import { ThemeGallery } from "./theme-gallery";
 
 const GROUPS = [
   "General",
@@ -44,40 +45,6 @@ export function Settings() {
   const store = useIsland();
   const [group, setGroup] = useState<Group>(store.accountFocus ? "AI & Models" : "Appearance");
   const [notification, setNotification] = useState("");
-  const choice = <K extends keyof Appearance>(
-    key: K,
-    options: { value: Appearance[K]; label: string }[],
-  ) => (
-    <select
-      aria-label={
-        key === "size"
-          ? "Island size"
-          : key === "position"
-            ? "Island position"
-            : key === "idle"
-              ? "Idle content"
-              : key === "glass"
-                ? "Glass strength"
-                : key === "collapse"
-                  ? "Auto-collapse"
-                  : key === "motion"
-                    ? "Motion"
-                    : "Theme"
-      }
-      value={String(store.appearance[key])}
-      onChange={(e) =>
-        store.setAppearance({
-          [key]: key === "collapse" ? Number(e.target.value) : e.target.value,
-        } as Partial<Appearance>)
-      }
-    >
-      {options.map((o) => (
-        <option key={String(o.value)} value={String(o.value)}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  );
   return (
     <>
       <div className="page-heading">
@@ -115,25 +82,7 @@ export function Settings() {
         <section className="settings-panel glass" key={group}>
           <h2>{group}</h2>
           {group === "Appearance" ? (
-            <>
-              <p className="caption">
-                Preferences for this browser. Native Island preferences are available from its menu.
-              </p>
-              <Setting label="Motion" detail="OS reduced-motion preferences always take priority.">
-                {choice("motion", [
-                  { value: "full", label: "Full" },
-                  { value: "reduced", label: "Reduced" },
-                  { value: "off", label: "Off" },
-                ])}
-              </Setting>
-              <Setting label="Theme">
-                {choice("theme", [
-                  { value: "system", label: "System" },
-                  { value: "dark", label: "Dark" },
-                  { value: "light", label: "Light" },
-                ])}
-              </Setting>
-            </>
+            <ThemeGallery />
           ) : group === "General" ? (
             <>
               <Setting

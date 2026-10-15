@@ -1,0 +1,97 @@
+/* 17 Conceptual Sketch — signature: the dimensioned drawing. Grid paper, pencil outlines with a slight hand wobble, labels set
+   as annotations with leader ticks, and Agents shown as numbered study frames. Hit targets keep their full rectangle. */
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] {
+  --enter-name: ve-draw;
+  --page-texture:
+    linear-gradient(color-mix(in srgb, var(--decor) 22%, transparent) 1px, transparent 1px) 0 0 / 20px 20px,
+    linear-gradient(90deg, color-mix(in srgb, var(--decor) 22%, transparent) 1px, transparent 1px) 0 0 / 20px 20px,
+    linear-gradient(color-mix(in srgb, var(--decor) 34%, transparent) 1px, transparent 1px) 0 0 / 100px 100px,
+    linear-gradient(90deg, color-mix(in srgb, var(--decor) 34%, transparent) 1px, transparent 1px) 0 0 / 100px 100px;
+  background: var(--page);
+}
+/* The wobble: two offset outlines at slightly different radii read as a hand-drawn line. */
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] :is(.t8-surface, .cx-panel, .ch-agent, .ch-quick button, .btn) {
+  border: 1.5px solid var(--border);
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  box-shadow: 2px 3px 0 -1px color-mix(in srgb, var(--fg) 30%, transparent);
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] :is(.t8-surface, .cx-panel) {
+  border-radius: 8px 14px 10px 12px / 12px 8px 14px 10px;
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] :is(h1, h2) {
+  font-weight: 700;
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] h2 {
+  font-size: 1.5rem;
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] .ch-hero h1 {
+  font-size: clamp(2.8rem, 9.6cqi, 4rem);
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] .ch-hero h1::after {
+  content: "";
+  display: block;
+  width: min(320px, 70%);
+  height: 10px;
+  margin-top: 2px;
+  border-bottom: 2px solid var(--focus);
+  border-radius: 0 0 60% 40%;
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] :is(.eyebrow, .cx-section h3, .caption.annot) {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--working);
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] .eyebrow::before {
+  content: "\2014\2192\00a0";
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] .app-sidebar {
+  background: color-mix(in srgb, var(--page) 92%, var(--decor));
+  border-right: 2px solid var(--border);
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: transparent;
+  color: var(--fg);
+  outline: 1.5px solid var(--border);
+  outline-offset: -3px;
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] .st-grid {
+  counter-reset: study;
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] .st-card {
+  counter-increment: study;
+  position: relative;
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] .st-card::after {
+  content: "fig. " counter(study);
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--working);
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] :is(.cx-well, .st-card .st-well) {
+  border-radius: 6px;
+  outline: 1px dashed var(--border);
+  outline-offset: 4px;
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material] .btn.primary {
+  font-weight: 700;
+}
+.bunny-app.t8-app[data-ui-theme="sketch"][data-material][data-hc="true"] :is(.t8-surface, .cx-panel, .ch-agent, .ch-quick button, .btn) {
+  border-radius: var(--r-md);
+}
+.pc-root[data-ui-theme="sketch"][data-material] :is(.pc-card, .pc-tile, .pc-slot, .pc-row) {
+  border: 1.5px solid var(--pc-line);
+  border-radius: 8px 14px 10px 12px / 12px 8px 14px 10px;
+}
+.pc-root[data-ui-theme="sketch"][data-material] {
+  --pc-wash:
+    linear-gradient(color-mix(in srgb, var(--decor) 22%, transparent) 1px, transparent 1px) 0 0 / 20px 20px,
+    linear-gradient(90deg, color-mix(in srgb, var(--decor) 22%, transparent) 1px, transparent 1px) 0 0 / 20px 20px;
+}
+@keyframes ve-draw {
+  from { opacity: 0; clip-path: inset(0 100% 0 0); }
+  to { opacity: 1; clip-path: inset(0 -2% 0 0); }
+}

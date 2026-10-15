@@ -1,0 +1,57 @@
+/* 01 Claymorphism — signature: sculpted clay. Every surface is a soft pillow with an inner highlight; pressed controls squash. */
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] {
+  --enter-name: ve-squish;
+  --press-transform: scale(0.96, 0.92);
+}
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] :is(.t8-surface, .cx-panel, .app-sidebar, .ch-agent, .connection-banner) {
+  border: 0;
+}
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] .btn.primary {
+  box-shadow: 6px 8px 16px color-mix(in srgb, var(--action) 35%, transparent), inset 2px 2px 4px rgba(255, 255, 255, 0.35), inset -3px -4px 6px rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+}
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] :is(.btn.secondary, .ch-chip, input, textarea, select) {
+  border: 0;
+  background: var(--field);
+  box-shadow: inset 3px 3px 6px color-mix(in srgb, var(--fg) 10%, transparent), inset -3px -3px 6px var(--glass-edge);
+}
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] .ch-quick button {
+  border: 0;
+  background: var(--elevated);
+  box-shadow: var(--shadow);
+  font-weight: 700;
+  border-radius: var(--r-lg);
+}
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] .ch-quick button:nth-child(2n) { background: color-mix(in srgb, var(--decor) 22%, var(--elevated)); }
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] .ch-quick button:nth-child(3n) { background: color-mix(in srgb, var(--working) 14%, var(--elevated)); }
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: var(--elevated);
+  color: var(--working);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] :is(.cx-well, .st-card .st-well) {
+  border-radius: 42% 58% 55% 45% / 48% 42% 58% 52%;
+  box-shadow: inset 4px 6px 12px rgba(255, 255, 255, 0.12), inset -6px -8px 14px rgba(0, 0, 0, 0.45), 8px 10px 18px rgba(93, 72, 160, 0.25);
+}
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] .ch-hero h1 {
+  font-size: clamp(2.2rem, 7.6cqi, 3.2rem);
+}
+.bunny-app.t8-app[data-ui-theme="clay"][data-material] .ch-hero {
+  border-radius: var(--r-shell) !important;
+  background: linear-gradient(140deg, color-mix(in srgb, var(--decor) 34%, var(--elevated)), color-mix(in srgb, var(--working) 18%, var(--elevated))) !important;
+}
+.bunny-app.t8-app[data-ui-theme="clay"][data-material][data-hc="true"] .ch-hero {
+  background: var(--glass-solid) !important;
+}
+.pc-root[data-ui-theme="clay"][data-material] :is(.pc-card, .pc-tile, .pc-slot, .pc-row) {
+  border: 0;
+  box-shadow: var(--shadow);
+}
+.pc-root[data-ui-theme="clay"][data-material] .pc-hero-well {
+  border-radius: 42% 58% 55% 45% / 48% 42% 58% 52%;
+}
+@keyframes ve-squish {
+  0% { opacity: 0; transform: scale(0.94, 0.9) translateY(10px); }
+  60% { opacity: 1; transform: scale(1.015, 1.02); }
+}

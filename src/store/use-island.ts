@@ -36,6 +36,25 @@ import type { SchedulerView } from "@/lib/bunny-host/fairness";
 import type { RoutingLearningView } from "@/lib/bunny-host/routing-feedback";
 import { notificationAllowed, type VoicePersonalizationView } from "@/lib/bunny-host/voice/voice-personalization";
 import type { CharacterAppearanceView } from "@/lib/bunny-host/character-style";
+import {
+  resolveVariant,
+  themeManifest,
+  validateUiPreference,
+  type UiThemePreference,
+  type UiThemeView,
+} from "@/lib/bunny-host/ui-theme";
+import {
+  DEVICE_THEME_KEY,
+  THEME_CACHE_KEY,
+  effectivePreference,
+  hostView,
+  readStoredPreference,
+  storedPreference,
+  themeLinkFromSearch,
+  withLegacyVariant,
+  type ThemeInputs,
+  type ThemeOrigin,
+} from "@/components/island/theme-model";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import {
   parseAccountIntent,
@@ -104,7 +123,10 @@ export type Appearance = {
   collapse: 5 | 10 | 30 | 0;
   theme: "system" | "dark" | "light";
   primary: ProviderId[];
+  /** Visual Experience 2.0: this window's text size (a comfort setting, kept per device). */
+  fontScale: 0.9 | 1 | 1.1 | 1.25;
 };
+export const FONT_SCALES = [0.9, 1, 1.1, 1.25] as const;
 export const DEFAULT_APPEARANCE: Appearance = {
   size: "compact",
   position: "center",
@@ -114,6 +136,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   collapse: 10,
   theme: "light",
   primary: ["codex", "claude", "ollama"],
+  fontScale: 1,
 };
 type Preferences = {
   theme: "dark" | "light";
@@ -225,6 +248,25 @@ type Island = Preferences & {
   voicePersonalization: VoicePersonalizationView | null;
   /** M-A-3 T13.3 Gate H: per-slot character style. Presentation only; devices receive it too. */
   characterAppearance: CharacterAppearanceView | null;
+  /** Visual Experience 2.0: the workstation's theme from the Host (presentation only; null until a Host answers). */
+  uiTheme: UiThemeView | null;
+  /** A gallery preview: shown in this window only, never saved. */
+  themePreview: UiThemePreference | null;
+  /** A paired device's own look (kept on the device); null follows the workstation. */
+  deviceTheme: UiThemePreference | null;
+  /** The last theme this browser showed, so a reload or an offline start does not flash the default. */
+  themeCache: UiThemePreference | null;
+  themeLink: ThemeInputs["link"];
+  /** What this window shows now and where it came from. */
+  shownTheme: () => { preference: UiThemePreference; origin: ThemeOrigin };
+  /** Saves a theme change: on the Host from the workstation, on this device from a paired device. Returns success. */
+  setUiTheme: (patch: Partial<UiThemePreference>, onRefused?: (caption: string) => void) => Promise<boolean>;
+  resetUiTheme: (onRefused?: (caption: string) => void) => Promise<boolean>;
+  /** A device stops using its own look and follows the workstation again. */
+  followWorkstationTheme: () => void;
+  setThemePreview: (preview: UiThemePreference | null) => void;
+  /** Re-evaluates the shown theme (the OS light/dark preference changed). */
+  refreshTheme: () => void;
   /** One `personalization.*` command; the Host's answer or null when refused. */
   personalizationCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
@@ -282,6 +324,15 @@ type Island = Preferences & {
     },
   ) => Promise<void>;
   retryMission: (id: string) => Promise<void>;
+  /**
+   * Visual Experience 2.0 Gate I: the owner's decision on an uncertain outcome. Sends exactly the existing workstation-only
+   * Host command; anything else is refused locally. Returns whether the Host applied it.
+   */
+  reconcile: (
+    action: "task.reconcile" | "mission.reconcile",
+    data: { id: string; stepId?: string; resolution: "retry" | "close" | "stop" },
+    onRefused?: (caption: string) => void,
+  ) => Promise<boolean>;
   /** M-A-3 T9R-F02: workstation-only full view of a staged paired-device change (recorded by the Host as inspected). */
   inspectStaged: (
     stagingId: string,
@@ -515,6 +566,36 @@ export const useIsland = create<Island>((set, get) => {
     disconnected = false;
   let accessGeneration = 0;
   const reconciling = new Set<string>();
+  /** The workstation's own choice before any Host theme was saved: the legacy local light/dark setting. */
+  const themeInputs = (): ThemeInputs => {
+    const state = get();
+    return {
+      host: withLegacyVariant(state.uiTheme, state.appearance.theme),
+      viewer: state.viewer?.kind === "device" ? "device" : "workstation",
+      device: state.deviceTheme,
+      preview: state.themePreview,
+      link: state.themeLink,
+      cached: state.themeCache,
+    };
+  };
+  const systemDark = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+  /** Keeps `theme` (light/dark, read by existing components) and the browser cache in step with the theme shown. */
+  let cachedTheme: string | null = null;
+  const syncTheme = () => {
+    const { preference, origin } = effectivePreference(themeInputs());
+    const variant = resolveVariant(themeManifest(preference.theme), preference.variant, systemDark());
+    if (get().theme !== variant) set({ theme: variant });
+    const value = storedPreference(preference);
+    // Written only when it changes: syncTheme runs on every Host snapshot.
+    if ((origin === "host" || origin === "device") && value !== cachedTheme) {
+      try {
+        localStorage.setItem(THEME_CACHE_KEY, value);
+        cachedTheme = value;
+      } catch {
+        /* the cache is a convenience; the Host stays the source */
+      }
+    }
+  };
   // M-A-3 T10 voice slice. Polling runs only while a session is open; nothing here starts a session on its own.
   const VOICE_POLL_MS = 250;
   const VOICE_HIDDEN_STOP_MS = 30_000;
@@ -756,6 +837,7 @@ export const useIsland = create<Island>((set, get) => {
       routingLearning: snapshot.routingLearning ?? null,
       voicePersonalization: snapshot.voicePersonalization ?? null,
       characterAppearance: snapshot.characterAppearance ?? null,
+      uiTheme: hostView(snapshot.uiTheme) ?? state.uiTheme,
       intelligence: snapshot.intelligence ?? null,
       connections: snapshot.connections ?? null,
       deviceConnections: snapshot.deviceConnections ?? [],
@@ -770,6 +852,7 @@ export const useIsland = create<Island>((set, get) => {
         .reverse()
         .map((e) => ({ at: e.at, line: `${e.type}: ${e.detail}` })),
     });
+    syncTheme();
     disconnected = false;
     // M-A-3 T10: the dashboard carries the same voice truth, so a reconnected page restores it without a voice poll.
     acceptVoice(parseVoiceSnapshot((snapshot as { voice?: unknown }).voice));
@@ -1230,6 +1313,65 @@ export const useIsland = create<Island>((set, get) => {
     routingLearningCommand: (action, data, onRefused) => command(action, data, "routing-learning", onRefused),
     voicePersonalization: null,
     characterAppearance: null,
+    uiTheme: null,
+    themePreview: null,
+    deviceTheme: null,
+    themeCache: null,
+    themeLink: { theme: null, variant: null },
+    shownTheme: () => effectivePreference(themeInputs()),
+    setUiTheme: async (patch, onRefused) => {
+      const state = get();
+      if (state.viewer?.kind === "device") {
+        try {
+          // A device's own look starts from what it follows, never from a preview or a ?uitheme= link.
+          const followed = effectivePreference({ ...themeInputs(), preview: null, link: { theme: null, variant: null } }).preference;
+          const next = validateUiPreference(patch, state.deviceTheme ?? followed);
+          set({ deviceTheme: next });
+          try {
+            localStorage.setItem(DEVICE_THEME_KEY, storedPreference(next));
+          } catch {
+            /* kept for this session only */
+          }
+          syncTheme();
+          return true;
+        } catch (error) {
+          const caption = error instanceof Error ? error.message : "That look is not available.";
+          if (onRefused) onRefused(caption);
+          else state.note(caption);
+          return false;
+        }
+      }
+      const expectRevision = state.uiTheme?.revision;
+      // The first save carries the legacy light/dark choice, so applying a theme never flips the appearance.
+      const legacy = expectRevision === 0 && !("variant" in patch) ? { variant: state.appearance.theme } : {};
+      const answer = await command("appearance.theme", { ...legacy, ...patch, ...(typeof expectRevision === "number" ? { expectRevision } : {}) }, "ui-theme", onRefused);
+      syncTheme();
+      return answer !== null;
+    },
+    resetUiTheme: async (onRefused) => {
+      if (get().viewer?.kind === "device") {
+        get().followWorkstationTheme();
+        return true;
+      }
+      const expectRevision = get().uiTheme?.revision;
+      const answer = await command("appearance.theme_reset", typeof expectRevision === "number" ? { expectRevision } : {}, "ui-theme", onRefused);
+      syncTheme();
+      return answer !== null;
+    },
+    followWorkstationTheme: () => {
+      set({ deviceTheme: null });
+      try {
+        localStorage.removeItem(DEVICE_THEME_KEY);
+      } catch {
+        /* nothing stored */
+      }
+      syncTheme();
+    },
+    refreshTheme: () => syncTheme(),
+    setThemePreview: (themePreview) => {
+      set({ themePreview });
+      syncTheme();
+    },
     personalizationCommand: (action, data, onRefused) => command(action, data, "personalization", onRefused),
     intelligence: null,
     connections: null,
@@ -1298,6 +1440,16 @@ export const useIsland = create<Island>((set, get) => {
     },
     retryMission: async (id) => {
       await command("mission.retry", { id }, id);
+    },
+    reconcile: async (action, data, onRefused) => {
+      if (action !== "task.reconcile" && action !== "mission.reconcile") return false;
+      if (get().viewer?.kind === "device") {
+        const caption = "Only the workstation owner can reconcile an uncertain outcome.";
+        if (onRefused) onRefused(caption);
+        else get().note(caption);
+        return false;
+      }
+      return (await command(action, data, data.stepId ?? data.id, onRefused)) !== null;
     },
     inspectStaged: async (stagingId) => {
       const result = await command("mission.staging.inspect", { stagingId }, stagingId);
@@ -1369,6 +1521,7 @@ export const useIsland = create<Island>((set, get) => {
             )
             .slice(0, 3)
         : DEFAULT_APPEARANCE.primary;
+      if (!(FONT_SCALES as readonly number[]).includes(appearance.fontScale)) appearance.fontScale = 1;
       set({
         appearance,
         theme:
@@ -1385,10 +1538,19 @@ export const useIsland = create<Island>((set, get) => {
         gpuWarn: loaded.gpuWarn ?? 85,
         hydrated: true,
       });
+      const stored = (key: string) => {
+        try {
+          return readStoredPreference(localStorage.getItem(key));
+        } catch {
+          return null;
+        }
+      };
+      set({ themeCache: stored(THEME_CACHE_KEY), deviceTheme: stored(DEVICE_THEME_KEY), themeLink: themeLinkFromSearch(window.location.search) });
       // Deep links (view, companion, theme, task, mission, agent) are read by the shared nav model, so every entry point agrees.
       const link = deepLinkFromSearch(window.location.search);
       if (link.sheet) set({ sheet: link.sheet });
       if (link.theme) set({ theme: link.theme, appearance: { ...appearance, theme: link.theme } });
+      syncTheme();
       if (link.taskId) set({ decisionTaskId: link.taskId });
       if (link.missionId) set({ missionFocus: link.missionId });
       if (link.agentId) set({ agentFocus: link.agentId });
@@ -1430,12 +1592,21 @@ export const useIsland = create<Island>((set, get) => {
     },
     setSheet: (sheet) => set({ sheet }),
     setTheme: (theme) => {
-      set({ theme, appearance: { ...get().appearance, theme } });
+      const shown = themeManifest(effectivePreference(themeInputs()).preference.theme);
+      if (shown.variants.length < 2) {
+        get().note(`${shown.name} has one appearance. Choose another theme in Settings → Appearance for a ${theme} look.`);
+        return;
+      }
+      // The legacy local setting still records the choice; the theme engine saves it where this viewer's look lives.
+      set({ appearance: { ...get().appearance, theme }, themeLink: { ...get().themeLink, variant: null } });
       save(get());
+      void get().setUiTheme({ variant: theme });
+      syncTheme();
     },
     setAppearance: (value) => {
       const appearance = { ...get().appearance, ...value };
       appearance.primary = [...new Set(appearance.primary)].slice(0, 3);
+      if (!(FONT_SCALES as readonly number[]).includes(appearance.fontScale)) appearance.fontScale = 1;
       set({
         appearance,
         theme:
@@ -1446,6 +1617,7 @@ export const useIsland = create<Island>((set, get) => {
             : appearance.theme,
       });
       save(get());
+      syncTheme();
     },
     setPrompt: (prompt) => set({ prompt }),
     setMode: (mode) => set({ mode }),

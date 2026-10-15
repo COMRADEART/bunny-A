@@ -1,5 +1,6 @@
 import { Pause, Play, Square } from "lucide-react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { ThemedDialogContent } from "./theme";
 import { useIsland } from "@/store/use-island";
 import { agentPanelRows, CHECKPOINT_LABEL } from "./agent-model";
 import { teamAgentIds, teamPanels, type TeamPanel } from "./team-model";
@@ -197,7 +198,7 @@ export function AuthorizationCard({
       <Dialog.Root open={!!confirming} onOpenChange={(open) => !open && setConfirming(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog" data-theme={store.theme}>
+          <ThemedDialogContent className="t8-dialog">
             <Dialog.Title>{confirming === "deny" ? "Deny this Mission access?" : "Revoke this Mission access?"}</Dialog.Title>
             <Dialog.Description>
               {confirming === "deny"
@@ -219,7 +220,7 @@ export function AuthorizationCard({
                 {confirming === "deny" ? "Deny access" : "Revoke access"}
               </button>
             </div>
-          </Dialog.Content>
+          </ThemedDialogContent>
         </Dialog.Portal>
       </Dialog.Root>
     </div>

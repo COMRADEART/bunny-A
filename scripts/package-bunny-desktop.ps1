@@ -148,7 +148,7 @@ try {
     if(-not(Test-Path -LiteralPath $characterSource -PathType Container)) {throw 'Bunny character art is missing from the build.'}
     foreach($item in @(Get-ChildItem -LiteralPath $characterSource -Filter '*.png' -File)) {Add-PackageFile $item.FullName ('characters/'+$item.Name) 'source' ('public/bunny-a/characters/'+$item.Name)}
   }
-  foreach($name in @('Bunny-Island.Placement.ps1','Bunny-Island.Voice.ps1')) {if(Test-Path -LiteralPath (Join-Path $bunnyBuild ('install/'+$name))) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}}
+  foreach($name in @('Bunny-Island.Placement.ps1','Bunny-Island.Voice.ps1','Bunny-Island.Theme.ps1')) {if(Test-Path -LiteralPath (Join-Path $bunnyBuild ('install/'+$name))) {Add-PackageFile (Join-Path $bunnyBuild ('install/'+$name)) $name 'source' ('install/'+$name)}}
   # The tunnel worker runs from the release too, so remote access never starts code from a checkout.
   foreach($name in @('bunny-tunnel.mjs','bunny-tunnel-state.mjs','bunny-tunnel-paths.mjs','bunny-tunnel-worker.mjs')) {if(Test-Path -LiteralPath (Join-Path $bunnyBuild ('scripts/'+$name))) {Add-PackageFile (Join-Path $bunnyBuild ('scripts/'+$name)) ('scripts/'+$name) 'source' ('scripts/'+$name)}}
   foreach($relative in $toolingFiles) {$destination=if($relative.StartsWith('install/')) {Split-Path -Leaf $relative} else {$relative};Add-PackageFile (Join-Path $bunnyTooling $relative) $destination 'tooling' $relative}
