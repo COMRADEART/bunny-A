@@ -65,12 +65,12 @@ A priority never widens eligibility. A tool-requiring Task still cannot go to a 
 | Detect | `classifyFailure` maps the result to `QUOTA_CONSTRAINED`, and `classifyTaskFailure` maps it to `provider_rate_limited` |
 | Preserve checkpoint | Completed Mission steps are never re-run. Only the failed step changes state |
 | Mark accurately | The attempt is recorded with taxonomy `QUOTA_CONSTRAINED` and the ledger row settles as `failed` |
-| Unresolved side effects | For **write** work Bunny cannot prove what landed. The TaskManager refuses the reroute (`QUOTA_PAUSE`) and the step's retry verdict is `waitForUser`, so the Mission moves to `waiting_for_user`. Gate J (owner decision): a direct Chat or `/submit` task with no declared scope counts as write work, and a persistent transport failure pauses write work the same way (`WRITE_PAUSE`, Mission category `provider_write_paused`) |
+| Unresolved side effects | For **write** work Bunny cannot prove what landed. The TaskManager refuses the reroute (`QUOTA_PAUSE`) and the step's retry verdict is `waitForUser`, so the Mission moves to `waiting_for_user`. Gate J (owner decision): a direct Chat or `/submit` task with no declared scope counts as write work, and a persistent transport failure pauses write work the same way (`WRITE_PAUSE`, Mission category `provider_write_paused`). **N-C (owner decision 2026-10-14):** write work is not re-executed after **any** failure once an attempt may have started, not even on the same provider. The task or step records `reconciliation.required` and shows "Outcome uncertain — reconciliation required". See `T13_3_NC_RETRY_CLOSURE.md` |
 | Read work | Only work that **declares** read access keeps the bounded T3 reroute (two alternates at most), because it has no side effects |
 | Destination consent | Any reroute still passes the T13.2 cross-vendor switch rule (`CROSS_VENDOR_SWITCH`, `switchAllowlist`) and per-account consent |
 | Context | Bunny sends no context of its own. A reroute relaunches the same Task prompt only to a destination the owner already allowed |
 | Expired authority | Mission envelope expiry or revocation and stale connection authority refuse resumed cloud work (existing T9/T13.2 checks) |
-| Pause and ask | The write path pauses, and the owner retries or chooses another account |
+| Pause and ask | The write path pauses. The owner reconciles on the workstation (`task.reconcile` with retry or close; `mission.reconcile` with retry or stop) before any retry; plain `mission.retry` and `mission.replan` are refused until then |
 
 ## 4. Fairness (§19)
 

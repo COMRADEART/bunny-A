@@ -1,0 +1,39 @@
+[
+  {
+    "id": "NC-M9",
+    "what": "a spawn error after the process started is certified as pre-dispatch",
+    "file": "src/lib/bunny-host/adapters.server.ts",
+    "test": "src/lib/bunny-host/failure.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 6: the real adapter certifies dispatched:false only when no provider process started"
+    ]
+  },
+  {
+    "id": "NC-M15",
+    "what": "the bus does not mark a run that threw after starting as uncertain",
+    "file": "src/lib/bunny-missions/capabilities/bus.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  },
+  {
+    "id": "NC-M23",
+    "what": "review F9: the attempt loop records a stopped launched write as settled",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F2|N-C 10",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F2/F9: a Host fault or a stop during launched write work leaves it uncertain; read work stays settled"
+    ]
+  }
+]

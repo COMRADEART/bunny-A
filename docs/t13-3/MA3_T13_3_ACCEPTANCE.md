@@ -24,6 +24,49 @@ Both are listed under item 19.
 
 Evidence lives in `test-results/ma3/t13-3/` (one folder per gate). Gate I evidence is in `test-results/ma3/t13-3/gate-i/`, and Gate J evidence is in `test-results/ma3/t13-3/gate-j/`.
 
+## Addendum: N-C final safety patch (2026-10-15)
+
+**The owner's decision.** On 2026-10-14 the owner authorised a change to the original T3 retry contract: no automatic
+retry may duplicate a write. The policy is:
+
+- Read-only work retries within the existing limits.
+- Write-capable and unscoped work is never re-executed once an attempt may have started, on the same provider or
+  another.
+- A failure proven to come before dispatch earns one bounded retry.
+- Only Host-enforced idempotency may replay.
+- An uncertain outcome pauses with "Outcome uncertain — reconciliation required" until the owner reconciles.
+
+The full record is in `T13_3_NC_RETRY_CLOSURE.md`; the review is in `T13_3_NC_REVIEW.md`.
+
+| Item | Value |
+|---|---|
+| Starting source and evidence | `fc915a0`, `ca78d25` |
+| Source commits | `b682f6f`, `3a40957`, `b4ada18`, `e6240c2`, `4b6e919`, `6f7beb8`, `2e78bd9`, `2db90fc`, `72eab2b`, `23c8c85`, `8411305`, `3e75135`, `5376fdf`, `c43fad3` |
+| **Final source** | **`c43fad3`** |
+| Evidence | `test-results/ma3/t13-3/nc-retry/` and the evidence commit that adds it |
+| Independent review | Round 1 found that uncertain writes could still replay (F1–F15). Rounds 2–5 were NOT CONFIRMED; each finding was repaired with a test. Round 6 returned **"CONFIRMED: no automatic replay of an uncertain write found"**. Follow-up checks on stale Mission children ended with **CONFIRMED AT HEAD** at `5376fdf`, and again at `c43fad3`. |
+| Full regression at `c43fad3` (clean checkout) | scripts 448/448, library 1,602/1,602, Agent runtime 58/58, UI 380/380: **2,488 distinct (+28 over Gate J)**. Typecheck and build exit 0; lint 0 errors, 27 warnings. |
+| Mutation checks | 51 mutations; the final run at `c43fad3` killed 50 of 51. The survivor, NC-M15, is redundant with the generic rule (NC-M20, killed). |
+| Windows package | `0.0.0-ma3-t13.3.3` from `git archive` of `c43fad3`. 501/501 files, closure 145 files, 191 source files matched. Packaged end-to-end 18/18, repository end-to-end 18/18. Not installed or published. |
+| Production | Unchanged. See `nc-retry/production/PRODUCTION_PRESERVATION.md`. |
+| Changed baseline assertions | Nine, each documented with its reason in the closure document §3. No assertion was removed without a replacement proving at least the same safety property. |
+
+**N-C acceptance criteria:**
+
+- **Unsafe automatic write retry eliminated:** yes.
+- **Read-only retry contract kept:** yes (N-C 1/2, R22, R24 read).
+- **Same-source tests pass:** yes.
+- **Independent review:** confirmed.
+- **Production unchanged:** yes.
+
+None of the FAIL conditions holds:
+
+- No uncertain write can replay automatically.
+- A same-provider retry does not bypass the rule.
+- No checkpoint is falsely verified.
+- No authorization boundary is weakened. Reconcile is workstation-only, `mission.reconcile` is not in the device
+  REMOTE set, and `task.reconcile` requires `local`.
+
 ## Final delivery report
 
 ### 1. Exact starting source
@@ -281,7 +324,10 @@ The reviewer did not run the final gates; this document records them.
 - **L-LIVE: no live inference.** No provider model ran: no live local model, no cloud model and no model-backed worker against a real provider. Quota exhaustion, failover and routing improvement are proven with fixtures and real Hosts only.
 - **L-PKG-NPM: the package has no npm.** The packaged runtime ships `node.exe` without the npm CLI, as every earlier package did, T13.2 FINAL included. So in the packaged build, `terminal.exec npm …` cannot resolve, and the built-in `test`, `typecheck` and `lint` worker abilities wait for a permission that cannot be granted. They fail closed: never VERIFIED, closed as INDETERMINATE on cancel. They work from the repository source. Fixing this means either shipping npm in the package or changing `terminal.exec` executable identity, which is a packaging and security decision for a later milestone.
 - **~~L-QUOTA-DIRECT~~: closed in Gate J** (owner decision). Unscoped direct work counts as write and pauses on quota. This is a visible Chat and voice change: such a task now stops and asks instead of switching providers.
-- **L-RETRY-SAME (review N-C): the same-candidate retry re-runs write work.** The T3 §22 baseline allows one bounded same-candidate retry after a transport failure. For write work that re-runs the step on the same provider. Removing it is a T3 contract change for the owner to decide, as F4 was. Cross-provider switching of write work is closed (N5, N-B).
+- **~~L-RETRY-SAME~~ (review N-C): closed by the N-C final safety patch** (owner decision 2026-10-14). No automatic retry re-executes write work whose attempt may have started; see the addendum above.
+- **L-RECONCILE-UI (N-C, new): no reconcile control in the Island.** The UI shows "Outcome uncertain — reconciliation required"; the decision is a workstation Host command (`task.reconcile`, `mission.reconcile`). A control belongs to the next UI/UX milestone.
+- **L-PAUSE-COST (N-C, new, by design).** Every started write that fails (a non-zero test command, a crash after dispatch, a failed Bunny-A check of write work) now waits for the owner instead of retrying.
+- **L-TEAM-REWORK, L-SURVIVOR-LAUNCH, L-AUDIT-COUPLING, L-DEDUP-ATTRIBUTION (N-C, documented).** See `T13_3_NC_RETRY_CLOSURE.md` §6.
 - **L-RETRY-ACCESS (review N8): an undefined Mission access reroutes like read.** It is unreachable, because the Host refuses any Mission task without an execution scope. Changing it would rewrite a baseline Mission unit test.
 - **L-STEER (review N-F): the steering check is a pattern list.** Phrasings such as "Ignore whatever I said earlier" still pass. Recall labels every memory by trust regardless.
 - **L-VOICE: voice hardware not tested.** Microphone, speaker, human barge-in and live persona adherence were NOT TESTED. Speaking pace and interruption preference are not adjustable.

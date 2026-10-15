@@ -1,0 +1,680 @@
+[
+  {
+    "id": "NC-M1",
+    "what": "unscoped work is treated as read (only declared write is protected)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerouting (it may have written files)",
+      "T13.3 N-C 1/2: after a connection failure declared read work retries and reroutes; unscoped work pauses at once with reconciliation",
+      "T13.3 N-C 5: write work is not moved to another provider after any failure that may have started it",
+      "T13.3 N-C 6: a proven pre-dispatch failure earns exactly one bounded retry, and needs no reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M2",
+    "what": "every attempt counts as pre-dispatch (a connection failure taken as proof nothing landed)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F §18: a quota-constrained WRITE attempt pauses instead of rerouting, even with the switch allowed",
+      "T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerouting (it may have written files)",
+      "T13.3 N-C 1/2: after a connection failure declared read work retries and reroutes; unscoped work pauses at once with reconciliation",
+      "T13.3 N-C 4: a same-provider retry of write work is refused, even on a MANUAL pin"
+    ]
+  },
+  {
+    "id": "NC-M3",
+    "what": "write work with an uncertain outcome is retried (same candidate or rerouted)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F §18: a quota-constrained WRITE attempt pauses instead of rerouting, even with the switch allowed",
+      "T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerouting (it may have written files)",
+      "T13.3 N-C 1/2: after a connection failure declared read work retries and reroutes; unscoped work pauses at once with reconciliation",
+      "T13.3 N-C 4: a same-provider retry of write work is refused, even on a MANUAL pin"
+    ]
+  },
+  {
+    "id": "NC-M4",
+    "what": "pre-dispatch retries of write work are unbounded",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 6: a proven pre-dispatch failure earns exactly one bounded retry, and needs no reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M5",
+    "what": "the uncertain outcome is not recorded on the failed task",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 1/2: after a connection failure declared read work retries and reroutes; unscoped work pauses at once with reconciliation",
+      "T13.3 N-C 4: a same-provider retry of write work is refused, even on a MANUAL pin",
+      "T13.3 N-C review F4: write work that fails Bunny-A verification pauses for reconciliation instead of re-executing",
+      "T13.3 N-C 9: a restart preserves an uncertain outcome and turns an interrupted write attempt into one"
+    ]
+  },
+  {
+    "id": "NC-M6",
+    "what": "a Host restart does not mark an interrupted write task uncertain",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 9: a restart preserves an uncertain outcome and turns an interrupted write attempt into one"
+    ]
+  },
+  {
+    "id": "NC-M7",
+    "what": "the linked retry is not pinned to the original provider",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 10/11: reconciliation is explicit; a retry is a linked task pinned to the same destination that waits for a fresh approval and can be cancelled"
+    ]
+  },
+  {
+    "id": "NC-M8",
+    "what": "the adapter certifies dispatched:false on a refused authority check no more (fail-closed regression of the pre-dispatch path)",
+    "file": "src/lib/bunny-host/adapters.server.ts",
+    "test": "src/lib/bunny-host/failure.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 6: the real adapter certifies dispatched:false only when no provider process started"
+    ]
+  },
+  {
+    "id": "NC-M9",
+    "what": "a spawn error after the process started is certified as pre-dispatch",
+    "file": "src/lib/bunny-host/adapters.server.ts",
+    "test": "src/lib/bunny-host/failure.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 6: the real adapter certifies dispatched:false only when no provider process started"
+    ]
+  },
+  {
+    "id": "NC-M10",
+    "what": "the Mission ignores the child task's uncertain outcome",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 3/10: a Mission write step never replays after an uncertain failure; it waits for the owner's reconciliation",
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M11",
+    "what": "an uncertain step still gets the automatic retry verdict",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 3/10: a Mission write step never replays after an uncertain failure; it waits for the owner's reconciliation",
+      "T13.3 N-C 8: a claim of idempotency the Host does not enforce is ignored; the uncertain write waits for the owner",
+      "T13.3 N-C review F1/F3: a started write that returns an ordinary failure is uncertain; a refusal before any effect is not",
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M12",
+    "what": "mission.retry replays an unreconciled uncertain step",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 3/10: a Mission write step never replays after an uncertain failure; it waits for the owner's reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M13",
+    "what": "a paired device may reconcile (mission.reconcile added to REMOTE)",
+    "file": "src/lib/bunny-missions/commands.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 3/10: a Mission write step never replays after an uncertain failure; it waits for the owner's reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M14",
+    "what": "a claim of idempotency on the step is honoured",
+    "file": "src/lib/bunny-missions/machine.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 8: a claim of idempotency the Host does not enforce is ignored; the uncertain write waits for the owner"
+    ]
+  },
+  {
+    "id": "NC-M15",
+    "what": "the bus does not mark a run that threw after starting as uncertain",
+    "file": "src/lib/bunny-missions/capabilities/bus.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  },
+  {
+    "id": "NC-M16",
+    "what": "the guarded write writes again instead of detecting the landed write",
+    "file": "src/lib/bunny-missions/capabilities/local.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 7: a write with Host-enforced duplicate protection retries after an uncertain outcome and lands exactly once"
+    ]
+  },
+  {
+    "id": "NC-M17",
+    "what": "a Host restart does not mark an interrupted write-capable Mission step uncertain",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 12: an interrupted write-capable worker is uncertain after a restart; all four Personal Agents keep their Mission context"
+    ]
+  },
+  {
+    "id": "NC-M18",
+    "what": "the owner sees plain failure instead of the uncertain state",
+    "file": "src/lib/bunny-host/presentation.ts",
+    "test": "src/lib/bunny-host/presentation.test.ts",
+    "pattern": null,
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C: a task with an uncertain outcome says so instead of plain failure or retry available"
+    ]
+  },
+  {
+    "id": "NC-M19",
+    "what": "review F4: a direct write task that failed verification is re-executed again (carve-out restored)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F4",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F4: write work that fails Bunny-A verification pauses for reconciliation instead of re-executing"
+    ]
+  },
+  {
+    "id": "NC-M20",
+    "what": "review F1: a started capability that returns an ordinary failure is not marked uncertain",
+    "file": "src/lib/bunny-missions/capabilities/bus.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F1",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F1/F3: a started write that returns an ordinary failure is uncertain; a refusal before any effect is not"
+    ]
+  },
+  {
+    "id": "NC-M21",
+    "what": "review F3: an adapter's certified no-effect refusal is treated as uncertain",
+    "file": "src/lib/bunny-missions/capabilities/bus.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F1",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F1/F3: a started write that returns an ordinary failure is uncertain; a refusal before any effect is not"
+    ]
+  },
+  {
+    "id": "NC-M22",
+    "what": "review F2/F9: a Host fault or stop outside the attempt loop leaves launched write work settled",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F2",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F2/F9: a Host fault or a stop during launched write work leaves it uncertain; read work stays settled"
+    ]
+  },
+  {
+    "id": "NC-M23",
+    "what": "review F9: the attempt loop records a stopped launched write as settled",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F2|N-C 10",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F2/F9: a Host fault or a stop during launched write work leaves it uncertain; read work stays settled"
+    ]
+  },
+  {
+    "id": "NC-M24",
+    "what": "review F7: a reconcile retry starts beside a process of the original that may be alive",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F7",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F7: a reconcile retry waits while a process of the original attempt may still be alive"
+    ]
+  },
+  {
+    "id": "NC-M25",
+    "what": "review F11: a tool-free provider's failure is treated as an uncertain write",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F11",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F11: a tool-free provider cannot write, so its failed attempt is never uncertain and keeps the bounded retry"
+    ]
+  },
+  {
+    "id": "NC-M26",
+    "what": "review F4 (Mission): a write step that failed verification is repaired automatically",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/missions.test.ts",
+    "pattern": "bounded repair attempt",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "verification failure triggers a bounded repair attempt with the failure in context"
+    ]
+  },
+  {
+    "id": "NC-M27",
+    "what": "review F5: a write running under a one-time approval at restart is not marked uncertain",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/remote-authority.test.ts",
+    "pattern": "review F5",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F5: a step running under a one-time approval at restart is uncertain only when it could write"
+    ]
+  },
+  {
+    "id": "NC-M28",
+    "what": "review F6/F13: restart recovery resubmits an uncertain step",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/remote-authority.test.ts",
+    "pattern": "review F5",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F5: a step running under a one-time approval at restart is uncertain only when it could write"
+    ]
+  },
+  {
+    "id": "NC-M29",
+    "what": "replan discards an uncertain outcome",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F12",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M30",
+    "what": "review F12: a refused reconcile leaves the step marked as resolved",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F12",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M31",
+    "what": "a proven pre-dispatch failure of write work follows the normal planner (reroutes / retries unbounded)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "N-C 6",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 6: a proven pre-dispatch failure earns exactly one bounded retry, and needs no reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M32",
+    "what": "round 2 N1: a failed skill is judged by its last run only",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 2 N1",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N1: a failed skill that already wrote never repeats itself; it waits for the owner"
+    ]
+  },
+  {
+    "id": "NC-M33",
+    "what": "round 2 N1: a write that succeeded earlier in a failed skill is not counted",
+    "file": "src/lib/bunny-missions/machine.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 2 N1",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N1: a failed skill that already wrote never repeats itself; it waits for the owner"
+    ]
+  },
+  {
+    "id": "NC-M34",
+    "what": "round 2 N4: a synchronous launch failure is recorded as may-have-started",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "round 2 N4",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N4: a launch that throws before any process records not_started and needs no reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M35",
+    "what": "round 2 N6: a Mission model step on a tool-free provider counts as write-capable",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 2 N6",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N6: a Mission model step that ran on a tool-free provider is not write-capable"
+    ]
+  },
+  {
+    "id": "NC-M36",
+    "what": "round 2 N2/N3: a guarded team write counts as an unguarded write",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 2 N6",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N6: a Mission model step that ran on a tool-free provider is not write-capable"
+    ]
+  },
+  {
+    "id": "NC-M37",
+    "what": "round 2 N8: a failed Bunny-A check is labelled a verified terminal outcome",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F4",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F4: write work that fails Bunny-A verification pauses for reconciliation instead of re-executing"
+    ]
+  },
+  {
+    "id": "NC-M38",
+    "what": "round 2 F7: an unreadable provider-session record does not hold a reconcile retry",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F7",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F7: a reconcile retry waits while a process of the original attempt may still be alive"
+    ]
+  },
+  {
+    "id": "NC-M39",
+    "what": "round 3 P1: a skill runs its steps before settling a later step's permission",
+    "file": "src/lib/bunny-missions/skills.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 3",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 3 P1/P2: a skill asks before any step runs, and a cleanup that wrote counts as a landed write"
+    ]
+  },
+  {
+    "id": "NC-M40",
+    "what": "round 3 P2: a failing skill's cleanup runs are not counted",
+    "file": "src/lib/bunny-missions/skills.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 3",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 3 P1/P2: a skill asks before any step runs, and a cleanup that wrote counts as a landed write"
+    ]
+  },
+  {
+    "id": "NC-M41",
+    "what": "round 3 F7: a Mission reconcile retry ignores an unreadable provider-session record",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F12",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M42",
+    "what": "round 4: a Mission reconcile retry ignores a live process of the uncertain child task",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F12",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M43",
+    "what": "round 4 Q2: a throw after an earlier write landed is retried as an ordinary failure",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 4",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 4 Q2: a skill step that throws after an earlier write landed waits for the owner"
+    ]
+  },
+  {
+    "id": "NC-M44",
+    "what": "round 5: a delegated launch that threw after the child started is rerouted beside it",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 5",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 5: a delegated launch that throws after the child started waits for the owner, never reroutes beside it"
+    ]
+  },
+  {
+    "id": "NC-M45",
+    "what": "round 5: a Mission reconcile retry starts while a child task of the step is still running",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 5",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 5: a delegated launch that throws after the child started waits for the owner, never reroutes beside it"
+    ]
+  },
+  {
+    "id": "NC-M46",
+    "what": "post-confirmation narrowing: a child that never launched blocks the owner's reconcile retry",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F12",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M47",
+    "what": "final check: a stale child of an uncertain step launches on a direct approve",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F12",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M48",
+    "what": "final check: a child from an earlier attempt launches beside a later one",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "final check",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C final check: a displaced child (older than a sibling, never in attempts) never launches"
+    ]
+  },
+  {
+    "id": "NC-M49",
+    "what": "final check: re-arming a failed step leaves its never-launched children approvable",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "final check",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C final check: a child from an earlier attempt of a step can never be launched beside a later one",
+      "T13.3 N-C final check: Retry withdraws a step's never-launched child (the permission path), so it cannot run beside the retry"
+    ]
+  },
+  {
+    "id": "NC-M50",
+    "what": "final check: the newest child is judged by clock time (same-millisecond siblings both launch)",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "final check",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C final check: a displaced child (older than a sibling, never in attempts) never launches"
+    ]
+  },
+  {
+    "id": "NC-M51",
+    "what": "package e2e finding: a skill's preflight ask is not recorded as authorization.required",
+    "file": "src/lib/bunny-missions/capabilities/bus.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 3",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 3 P1/P2: a skill asks before any step runs, and a cleanup that wrote counts as a landed write"
+    ]
+  }
+]

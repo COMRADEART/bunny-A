@@ -1,0 +1,93 @@
+[
+  {
+    "id": "NC-M32",
+    "what": "round 2 N1: a failed skill is judged by its last run only",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 2 N1",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N1: a failed skill that already wrote never repeats itself; it waits for the owner"
+    ]
+  },
+  {
+    "id": "NC-M33",
+    "what": "round 2 N1: a write that succeeded earlier in a failed skill is not counted",
+    "file": "src/lib/bunny-missions/machine.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 2 N1",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N1: a failed skill that already wrote never repeats itself; it waits for the owner"
+    ]
+  },
+  {
+    "id": "NC-M34",
+    "what": "round 2 N4: a synchronous launch failure is recorded as may-have-started",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "round 2 N4",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N4: a launch that throws before any process records not_started and needs no reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M35",
+    "what": "round 2 N6: a Mission model step on a tool-free provider counts as write-capable",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 2 N6",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N6: a Mission model step that ran on a tool-free provider is not write-capable"
+    ]
+  },
+  {
+    "id": "NC-M36",
+    "what": "round 2 N2/N3: a guarded team write counts as an unguarded write",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 2 N6",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 2 N6: a Mission model step that ran on a tool-free provider is not write-capable"
+    ]
+  },
+  {
+    "id": "NC-M37",
+    "what": "round 2 N8: a failed Bunny-A check is labelled a verified terminal outcome",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F4",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F4: write work that fails Bunny-A verification pauses for reconciliation instead of re-executing"
+    ]
+  },
+  {
+    "id": "NC-M38",
+    "what": "round 2 F7: an unreadable provider-session record does not hold a reconcile retry",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "pattern": "review F7",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F7: a reconcile retry waits while a process of the original attempt may still be alive"
+    ]
+  }
+]
