@@ -1896,7 +1896,7 @@ export class MissionManager {
           timeoutMs: step.timeoutMs,
         });
         result = {
-          uncertain: run.ok || run.permission ? null : uncertainSkillRuns(run.runs),
+          uncertain: run.ok ? null : uncertainSkillRuns([...run.runs, ...(run.cleanupRuns ?? [])]),
           ok: run.ok,
           summary: run.ok
             ? `Skill ${run.skill} v${run.version} passed: ${run.runs.map((r) => r.summary).join(" · ").slice(0, 600)}`
@@ -1961,7 +1961,9 @@ export class MissionManager {
         this.askPromotion(this.store.mission(missionId), this.store.step(stepId), record);
         return;
       }
-      if (result.permission) {
+      // T13.3 N-C: an ask that arrives after a write already landed (a skill whose authority changed mid-run) would re-run
+      // that write once answered; the owner reconciles it instead.
+      if (result.permission && !result.uncertain) {
         this.workspace.release(stepId);
         this.askPermission(
           this.store.mission(missionId),
@@ -4688,6 +4690,9 @@ export class MissionManager {
       this.setStep(step, { reconciliation: resolved }, "mission.step.reconciled", recorded);
       return await this.stop(id, by);
     }
+    // An unreadable provider-session record names no Mission, so it could be this one's (fail closed, as for direct tasks).
+    if ([...this.tasks.lingering.keys()].some((key) => key.startsWith("unreadable:")))
+      throw new CommandRefusedError("A provider-session record from before the Host restarted cannot be read yet; Bunny starts no retry until it is reconciled. Try again shortly.");
     // The decision is recorded (and announced) only once the Retry it authorizes is accepted.
     this.setStep(step, { reconciliation: resolved });
     try {

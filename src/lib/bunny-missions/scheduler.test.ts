@@ -301,6 +301,10 @@ test("T13.3 N-C review F12/replan: a refused reconcile records nothing; replan w
     const [step] = env.missions.store.steps(view.id);
     await assert.rejects(env.missions.replan(view.id, "workstation"), /OUTCOME_UNCERTAIN/, "a replan cannot discard an uncertain outcome");
     await assert.rejects(env.missions.reconcile(view.id, step.id, "replay", "workstation"), /retry or stop/);
+    // An unreadable provider-session record could belong to this Mission: the retry waits (fail closed).
+    env.tasks.lingering.set("unreadable:op-9.json", "checking");
+    await assert.rejects(env.missions.reconcile(view.id, step.id, "retry", "workstation"), /cannot be read yet/);
+    env.tasks.lingering.delete("unreadable:op-9.json");
     // Revoke the authorization so the Retry the reconciliation would authorize is refused.
     const envelope = env.missions.store.authorization(env.missions.store.mission(view.id).authorizationId!)!;
     env.missions.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });
@@ -344,5 +348,41 @@ test("T13.3 N-C review round 2 N6: a Mission model step that ran on a tool-free 
     const cloud = env.tasks.submit({ prompt: "Draft text", mode: "fast", override: "claude", executionScope: { access: "write" } });
     assert.equal(env.missions.writeCapable({ ...step, taskId: cloud.id }), true);
     assert.equal(env.missions.writeCapable({ ...step, team: { kind: "write_file" } as never }), false, "a team write always runs under the Host's pre-image guard");
+  } finally { await env.cleanup(); }
+});
+
+test("T13.3 N-C review round 3 P1/P2: a skill asks before any step runs, and a cleanup that wrote counts as a landed write", async () => {
+  const env = await setup([]);
+  try {
+    const base = env.missions.skills.get("project.test");
+    const save = (id: string, steps: typeof base.steps, cleanup: typeof base.cleanup) =>
+      env.missions.store.saveSkill({ ...base, id, name: id, requirements: [...new Set([...steps, ...cleanup].map((step) => step.action))], preconditions: [], steps, validations: [{ kind: "status_succeeded", step: 0 }], cleanup }, true);
+    const writes = (missionId: string, path: string) => env.missions.store.runs({ missionId, limit: 50 }).filter((run) => run.action === "filesystem.write" && run.params.path === path).length;
+    // P1: the write would be allowed; the destructive delete after it needs the owner's answer.
+    writeFileSync(join(env.root, "old.txt"), "old");
+    save("nc.write-then-exec", [{ action: "filesystem.write", params: { path: "p1.txt", content: "x", overwrite: true }, label: "write" }, { action: "filesystem.delete", params: { path: "old.txt" }, label: "delete" }], []);
+    const asked = env.missions.create({ objective: "P1", mode: "fast", origin: "workstation", steps: [{ role: "Skill", objective: "P1", dependsOn: [], executor: { kind: "skill", skillId: "nc.write-then-exec", params: {} } }] });
+    env.missions.approve(asked.id, "workstation");
+    await until(() => env.missions.store.steps(asked.id)[0].pendingRequestId !== null || ["completed", "failed", "waiting_for_user"].includes(env.missions.mission(asked.id).state), "P1 ask or end", 20_000);
+    const [askedStep] = env.missions.store.steps(asked.id);
+    assert.ok(askedStep.pendingRequestId, `the delete asks: ${JSON.stringify(askedStep.failure)}`);
+    {
+      assert.equal(writes(asked.id, "p1.txt"), 0, "nothing ran before the owner answered");
+      await env.missions.respond(askedStep.pendingRequestId, "allow_once", "workstation");
+      await until(() => ["completed", "failed", "waiting_for_user"].includes(env.missions.mission(asked.id).state), "P1 end", 20_000);
+    }
+    assert.equal(env.missions.mission(asked.id).state, "completed", JSON.stringify(env.missions.store.steps(asked.id)[0].failure));
+    assert.equal(writes(asked.id, "p1.txt"), 1, "the write landed exactly once");
+    // P2: the step's own write is refused before any effect (noEffect), then its cleanup writes. The cleanup is the only
+    // landed write; repeating the step would repeat it.
+    writeFileSync(join(env.root, "exists.txt"), "kept");
+    save("nc.cleanup-writes", [{ action: "filesystem.write", params: { path: "exists.txt", content: "new" }, label: "write" }], [{ action: "filesystem.write", params: { path: "cleanup.txt", content: "c", overwrite: true }, label: "cleanup" }]);
+    const cleaned = env.missions.create({ objective: "P2", mode: "fast", origin: "workstation", steps: [{ role: "Skill", objective: "P2", dependsOn: [], maxRetries: 2, executor: { kind: "skill", skillId: "nc.cleanup-writes", params: {} } }] });
+    env.missions.approve(cleaned.id, "workstation");
+    await until(() => ["completed", "failed", "waiting_for_user"].includes(env.missions.mission(cleaned.id).state), "P2 end", 20_000);
+    await new Promise((r) => setTimeout(r, 80));
+    assert.equal(env.missions.mission(cleaned.id).state, "waiting_for_user");
+    assert.equal(writes(cleaned.id, "cleanup.txt"), 1, "the cleanup write ran once");
+    assert.equal(env.missions.store.steps(cleaned.id)[0].reconciliation?.required, true);
   } finally { await env.cleanup(); }
 });
