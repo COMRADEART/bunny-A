@@ -173,8 +173,12 @@ export class MissionManager {
       if (envelope.revokedAt) return "authorization revoked";
       // T13.3 N-C: no child of a step whose outcome is uncertain launches (an older child approved directly included)
       // until the owner reconciles it.
-      if (this.store.step(task.mission!.stepId).reconciliation?.required)
+      const owner = this.store.step(task.mission!.stepId);
+      if (owner.reconciliation?.required)
         return "OUTCOME_UNCERTAIN: this Mission step may already have taken effect; reconcile it (mission.reconcile) before anything for it runs.";
+      // A child from an earlier attempt never launches again: only the step's current child (or a new one) may run.
+      if (task.id !== owner.taskId && owner.attempts.some((attempt) => attempt.taskId === task.id))
+        return "STALE_CHILD: this task belongs to an earlier attempt of its Mission step and can no longer run.";
       const team = teamProviderViolation(this, task);
       if (team) return team;
       // M-A-3 T9R-F01: no shell-capable session starts while paired-device changes await workstation review.

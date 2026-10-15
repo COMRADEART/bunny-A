@@ -445,3 +445,25 @@ test("T13.3 N-C review round 5: a delegated launch that throws after the child s
     await env.cleanup();
   }
 });
+
+test("T13.3 N-C final check: a child from an earlier attempt of a step can never be launched beside a later one", async () => {
+  const env = await setup(["claude", "codex"]);
+  try {
+    const approve = env.tasks.approveDelegated.bind(env.tasks);
+    let stale: string | null = null;
+    // The first delegated launch fails before anything starts; the step retries with a fresh child.
+    env.tasks.approveDelegated = (...args: Parameters<typeof approve>) => { if (!stale) { stale = args[0]; throw new Error("authority check failed"); } return approve(...args); };
+    const view = env.missions.create({ objective: "Edit", mode: "balanced", origin: "workstation", steps: [model("Writer", "Edit file", [], { access: "write", maxRetries: 2 })] });
+    env.missions.approve(view.id, "workstation");
+    await until(() => env.launched.length === 1, "the fresh child");
+    assert.notEqual(env.launched[0].task.id, stale);
+    assert.equal(env.tasks.db.get(stale!).state, "waiting_for_approval");
+    assert.throws(() => env.tasks.approve(stale!), /STALE_CHILD/, "the earlier attempt's child cannot run beside the current one");
+    assert.equal(env.launched.length, 1);
+    env.launched[0].finish({ ok: true, output: "edited" });
+    await until(() => env.missions.mission(view.id).state === "completed", "completed");
+  } finally {
+    for (const row of env.launched) row.finish({ ok: false, output: "", stopped: true });
+    await env.cleanup();
+  }
+});
