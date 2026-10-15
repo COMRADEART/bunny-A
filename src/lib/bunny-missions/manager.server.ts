@@ -1673,12 +1673,7 @@ export class MissionManager {
           ),
       });
     } catch (error) {
-      this.stepFailed(
-        mission,
-        this.markRunning(step, task.id, task.provider, workspace),
-        "provider_unavailable",
-        error instanceof Error ? error.message : String(error),
-      );
+      this.delegatedLaunchFailed(mission, step, task, workspace, error);
       return false;
     }
     this.countModelCall(mission.id, local);
@@ -1750,12 +1745,23 @@ export class MissionManager {
         check: (child) => teamProviderViolation(this, child) ?? taskViolation(child, envelope, runsLocally(this.tasks.live().find((provider) => provider.id === child.provider), child.model), usedExternal, Date.now(), this.store.step(step.id), sessionsUsed),
       });
     } catch (error) {
-      this.stepFailed(mission, this.markRunning(step, task.id, task.provider, workspace), "provider_unavailable", error instanceof Error ? error.message : String(error));
+      this.delegatedLaunchFailed(mission, step, task, workspace, error);
       return false;
     }
     this.countModelCall(mission.id, local);
     this.markRunning(step, task.id, task.provider, workspace);
     return true;
+  }
+  /**
+   * T13.3 N-C: a delegated launch threw. If the child's provider session may already have started (a throw after the
+   * adapter launched), write work waits for the owner instead of being rerouted beside it.
+   */
+  delegatedLaunchFailed(mission: Mission, step: MissionStep, task: OrchTask, workspace: string, error: unknown) {
+    const child = this.tasks.db.get(task.id);
+    const started = this.tasks.sessions.has(task.id) || ["launching", "running", "verifying", "waiting_for_input", "waiting_for_agent_approval", "paused"].includes(child.state);
+    const running = this.markRunning(step, task.id, task.provider, workspace);
+    this.stepFailed(mission, running, "provider_unavailable", error instanceof Error ? error.message : String(error),
+      started && this.writeCapable(running) ? `OUTCOME_UNCERTAIN: the ${task.provider} session for ${step.role} may have started before the Host failed to record it, so it may already be changing files.` : null);
   }
   countModelCall(missionId: string, local: boolean) {
     const mission = this.store.mission(missionId);
@@ -2013,7 +2019,7 @@ export class MissionManager {
           safeError(error).message,
           // T13.3 N-C: a throw after this attempt already wrote (a later skill step, or the check after a write) must not
           // let the retry repeat what landed; judge by the runs this attempt recorded.
-          uncertainSkillRuns(this.store.runs({ missionId, limit: 500 }).filter((run) => run.stepId === stepId && run.startedAt >= (current.attempts.at(-1)?.startedAt ?? 0))),
+          uncertainSkillRuns(this.store.runs({ missionId, stepId, limit: 500 }).filter((run) => run.startedAt >= (current.attempts.at(-1)?.startedAt ?? 0))),
         );
     }
   }
@@ -4696,7 +4702,8 @@ export class MissionManager {
     // A retry never runs beside a process of an earlier attempt that may still be alive: this Host's watch of any child
     // task of the step, a restart survivor of this Mission, or an unreadable record, which names no owner (fail closed).
     const children = [step.taskId, ...step.attempts.map((attempt) => attempt.taskId)].filter((child): child is string => !!child);
-    if ([...this.tasks.lingering.keys()].some((key) => key.startsWith("unreadable:") || children.some((child) => key.startsWith(`${child}#`)) || this.tasks.restartSurvivorMission.get(key)?.missionId === id))
+    const unfinished = children.some((child) => { try { return !["completed", "failed", "stopped"].includes(this.tasks.db.get(child).state); } catch { return false; } });
+    if (unfinished || [...this.tasks.lingering.keys()].some((key) => key.startsWith("unreadable:") || children.some((child) => key.startsWith(`${child}#`)) || this.tasks.restartSurvivorMission.get(key)?.missionId === id))
       throw new CommandRefusedError("A provider process from an earlier attempt may still be running, or its record cannot be read yet; Bunny starts no retry until none is alive. Try again shortly.");
     // The decision is recorded (and announced) only once the Retry it authorizes is accepted.
     this.setStep(step, { reconciliation: resolved });

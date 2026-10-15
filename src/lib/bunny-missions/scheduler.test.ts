@@ -409,3 +409,30 @@ test("T13.3 N-C review round 4 Q2: a skill step that throws after an earlier wri
     assert.equal(step.reconciliation?.required, true);
   } finally { await env.cleanup(); }
 });
+
+test("T13.3 N-C review round 5: a delegated launch that throws after the child started waits for the owner, never reroutes beside it", async () => {
+  const env = await setup(["claude", "codex"]);
+  try {
+    const approve = env.tasks.approveDelegated.bind(env.tasks);
+    let fail = true;
+    env.tasks.approveDelegated = (...args: Parameters<typeof approve>) => { const launched = approve(...args); if (fail) { fail = false; throw new Error("the Host could not record the launch"); } return launched; };
+    const view = env.missions.create({ objective: "Edit", mode: "balanced", origin: "workstation", steps: [model("Writer", "Edit file", [], { access: "write", maxRetries: 2 })] });
+    env.missions.approve(view.id, "workstation");
+    await until(() => env.missions.mission(view.id).state === "waiting_for_user", "paused for the owner");
+    await new Promise((r) => setTimeout(r, 80));
+    assert.equal(env.launched.length, 1, "the started child is not rerouted or repeated");
+    const [step] = env.missions.store.steps(view.id);
+    assert.equal(step.reconciliation?.required, true);
+    // The first child is still running: a reconciled retry waits for it.
+    await assert.rejects(env.missions.reconcile(view.id, step.id, "retry", "workstation"), /may still be running/);
+    env.launched[0].finish({ ok: true, output: "late" });
+    await until(() => env.tasks.db.get(env.launched[0].task.id).state === "completed", "first child ended");
+    await env.missions.reconcile(view.id, step.id, "retry", "workstation");
+    await until(() => env.launched.length === 2, "the reconciled retry");
+    env.launched[1].finish({ ok: true, output: "edited" });
+    await until(() => env.missions.mission(view.id).state === "completed", "completed after reconciliation");
+  } finally {
+    for (const row of env.launched) row.finish({ ok: false, output: "", stopped: true }); // a failed assertion never leaves a session open
+    await env.cleanup();
+  }
+});
