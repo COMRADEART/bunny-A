@@ -178,7 +178,7 @@ export class MissionManager {
         return "OUTCOME_UNCERTAIN: this Mission step may already have taken effect; reconcile it (mission.reconcile) before anything for it runs.";
       // Only a step's newest child may launch: a child older than a sibling belongs to an earlier attempt, whether it was
       // launched, displaced or never recorded in the step's attempts.
-      if (this.tasks.db.tasks().some((other) => other.id !== task.id && other.mission?.stepId === owner.id && other.createdAt > task.createdAt))
+      if (this.tasks.db.tasks().some((other) => other.id !== task.id && other.mission?.stepId === owner.id && (other.createdAt > task.createdAt || (other.createdAt === task.createdAt && other.id > task.id))))
         return "STALE_CHILD: this task belongs to an earlier attempt of its Mission step and can no longer run.";
       const team = teamProviderViolation(this, task);
       if (team) return team;
@@ -576,6 +576,12 @@ export class MissionManager {
         : null;
     });
     if (event) this.tasks.emit(event);
+    // T13.3 N-C: a failed step re-armed by any path (Retry, an automatic retry, restart recovery) withdraws every child
+    // of it that never launched, so none can be approved beside the next attempt. Stop marks it stopping synchronously.
+    if (step.state === "failed" && next.state === "ready")
+      for (const child of this.tasks.db.tasks())
+        if (child.mission?.stepId === step.id && ["queued", "routing", "waiting_for_approval"].includes(child.state))
+          void this.tasks.stop(child.id, `Withdrawn: ${step.role} was re-armed for a fresh attempt.`).catch(() => {});
     if (this.admissionHolds.size && STEP_LIVE.includes(step.state) && !STEP_LIVE.includes(next.state))
       for (const held of [...this.admissionHolds.keys()]) if (held !== step.missionId) this.schedule(held);
     return next;
@@ -4774,9 +4780,6 @@ export class MissionManager {
     this.withdrawStaged(id, by, `Mission retried by ${by}; the step stages its change again.`);
     const failed = this.store.steps(id).filter((step) => step.state === "failed" && !step.team?.supersededBy);
     for (const step of failed) {
-      // T13.3 N-C: a child this step created that never launched is withdrawn, so it can never be approved beside the retry.
-      const child = (() => { try { return step.taskId ? this.tasks.db.get(step.taskId) : null; } catch { return null; } })();
-      if (child?.state === "waiting_for_approval") void this.tasks.stop(child.id, `Withdrawn: ${by} retried ${step.role} with a fresh child task.`).catch(() => {});
       this.setStep(
         step,
         { state: "ready", failure: null, taskId: null, approvedOnce: null },

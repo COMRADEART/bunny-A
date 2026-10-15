@@ -457,8 +457,9 @@ test("T13.3 N-C final check: a child from an earlier attempt of a step can never
     env.missions.approve(view.id, "workstation");
     await until(() => env.launched.length === 1, "the fresh child");
     assert.notEqual(env.launched[0].task.id, stale);
-    assert.equal(env.tasks.db.get(stale!).state, "waiting_for_approval");
-    assert.throws(() => env.tasks.approve(stale!), /STALE_CHILD/, "the earlier attempt's child cannot run beside the current one");
+    // The automatic retry re-armed the step, which withdrew the never-launched child; it can never run beside the new one.
+    await until(() => env.tasks.db.get(stale!).state === "stopped", "the earlier child withdrawn");
+    assert.throws(() => env.tasks.approve(stale!), /not awaiting approval/, "the earlier attempt's child cannot run beside the current one");
 
     assert.equal(env.launched.length, 1);
     env.launched[0].finish({ ok: true, output: "edited" });
@@ -477,10 +478,14 @@ test("T13.3 N-C final check: Retry withdraws a step's never-launched child (the 
     const [step] = env.missions.store.steps(view.id);
     // Persisted state of the permission path: the child waits for approval, recorded as the step's task but not in attempts.
     const pending = env.tasks.submit({ prompt: "Edit file", mode: "fast", override: "auto" }, { missionId: view.id, stepId: step.id, executionScope: { access: "write" } });
+    // A second waiting child the step never recorded at all (the newest one, not its taskId).
+    await new Promise((r) => setTimeout(r, 5));
+    const unrecorded = env.tasks.submit({ prompt: "Edit file", mode: "fast", override: "auto" }, { missionId: view.id, stepId: step.id, executionScope: { access: "write" } });
     env.missions.store.saveStep({ ...step, state: "failed", taskId: pending.id, failure: { category: "permission_denied", detail: "denied" } });
     env.missions.store.saveMission({ ...env.missions.mission(view.id), state: "failed" });
     env.missions.retry(view.id, "workstation");
-    await until(() => env.tasks.db.get(pending.id).state === "stopped", "the old child withdrawn");
+    await until(() => env.tasks.db.get(pending.id).state === "stopped" && env.tasks.db.get(unrecorded.id).state === "stopped", "every never-launched child withdrawn");
+    assert.throws(() => env.tasks.approve(unrecorded.id), /not awaiting approval/);
     assert.throws(() => env.tasks.approve(pending.id), /not awaiting approval/);
     await until(() => env.launched.length === 1, "the retry's fresh child");
     assert.notEqual(env.launched[0].task.id, pending.id);
@@ -503,6 +508,12 @@ test("T13.3 N-C final check: a displaced child (older than a sibling, never in a
     await new Promise((r) => setTimeout(r, 5)); // distinct creation times
     child();
     assert.throws(() => env.tasks.approve(older.id), /STALE_CHILD/);
+    assert.equal(env.launched.length, 0);
+    // Two children created in the same millisecond: exactly one is the newest (ties break by id).
+    const first = child(); const second = child();
+    env.tasks.db.write({ ...env.tasks.db.get(second.id), createdAt: env.tasks.db.get(first.id).createdAt }, "test.same_ms", "same creation time");
+    const [low] = [first.id, second.id].sort();
+    assert.throws(() => env.tasks.approve(low), /STALE_CHILD/);
     assert.equal(env.launched.length, 0);
   } finally {
     for (const row of env.launched) row.finish({ ok: false, output: "", stopped: true });
