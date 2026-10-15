@@ -144,6 +144,20 @@ export function uncertainRun(run: Pick<CapabilityRun, "uncertain" | "risk" | "ac
   return `OUTCOME_UNCERTAIN: ${run.action} started and then ${run.status === "timeout" ? "timed out" : "failed"} (${run.summary.slice(0, 200)}), so it may already have taken effect.`;
 }
 
+/**
+ * Why a failed skill run cannot be repeated automatically: any of its runs may have written. That covers an uncertain run,
+ * and a write that succeeded before a later step or the skill's validations failed (repeating the skill repeats it).
+ */
+export function uncertainSkillRuns(runs: (Pick<CapabilityRun, "uncertain" | "risk" | "action" | "params" | "status" | "summary"> | null)[]): string | null {
+  for (const run of runs) {
+    const uncertain = uncertainRun(run);
+    if (uncertain) return uncertain;
+    if (run?.status === "succeeded" && run.risk !== "READ" && !enforcedIdempotent(run.action, run.params))
+      return `OUTCOME_UNCERTAIN: ${run.action} already took effect earlier in this skill run, so repeating the skill would repeat it.`;
+  }
+  return null;
+}
+
 /** Classifies a finished child task's error text into a mission failure category. */
 export function classifyTaskFailure(error: string | null | undefined, state: string): FailureCategory {
   const text = (error ?? "").toLowerCase();

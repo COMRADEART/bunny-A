@@ -310,3 +310,39 @@ test("T13.3 N-C review F12/replan: a refused reconcile records nothing; replan w
     assert.equal(env.launched.length, 1);
   } finally { await env.cleanup(); }
 });
+
+test("T13.3 N-C review round 2 N1: a failed skill that already wrote never repeats itself; it waits for the owner", async () => {
+  const env = await setup([]);
+  try {
+    const base = env.missions.skills.get("project.test");
+    const skill = (id: string, steps: typeof base.steps, validations: typeof base.validations) =>
+      env.missions.store.saveSkill({ ...base, id, name: id, requirements: [...new Set(steps.map((step) => step.action))], preconditions: [], steps, validations, cleanup: [] }, true);
+    // 1. The write lands, then a later read fails. 2. The write lands and the skill's own validation fails.
+    skill("nc.write-then-read", [{ action: "filesystem.write", params: { path: "a.txt", content: "a", overwrite: true }, label: "write" }, { action: "filesystem.read", params: { path: "missing.txt" }, label: "read" }], [{ kind: "status_succeeded", step: 0 }]);
+    skill("nc.write-bad-check", [{ action: "filesystem.write", params: { path: "b.txt", content: "b", overwrite: true }, label: "write" }], [{ kind: "exit_code", step: 0, equals: 0 }]);
+    for (const id of ["nc.write-then-read", "nc.write-bad-check"]) {
+      const view = env.missions.create({ objective: id, mode: "fast", origin: "workstation", steps: [{ role: "Skill", objective: id, dependsOn: [], maxRetries: 2, executor: { kind: "skill", skillId: id, params: {} } }] });
+      env.missions.approve(view.id, "workstation");
+      await until(() => ["completed", "failed", "waiting_for_user"].includes(env.missions.mission(view.id).state), `${id} end`, 20_000);
+      await new Promise((r) => setTimeout(r, 80));
+      const [step] = env.missions.store.steps(view.id);
+      assert.equal(env.missions.mission(view.id).state, "waiting_for_user", `${id}: ${JSON.stringify(step.failure)}`);
+      assert.equal(env.missions.store.runs({ missionId: view.id, limit: 50 }).filter((run) => run.action === "filesystem.write").length, 1, `${id}: the landed write ran once`);
+      assert.match(step.reconciliation?.reason ?? "", /filesystem\.write already took effect/);
+    }
+  } finally { await env.cleanup(); }
+});
+
+test("T13.3 N-C review round 2 N6: a Mission model step that ran on a tool-free provider is not write-capable", async () => {
+  const env = await setup(["ollama", "claude"]);
+  try {
+    const view = env.missions.create({ objective: "Draft", mode: "fast", origin: "workstation", steps: [model("Writer", "Draft text", [], { access: "write" })] });
+    const [step] = env.missions.store.steps(view.id);
+    assert.equal(env.missions.writeCapable(step), true, "no task yet: fail closed");
+    const task = env.tasks.submit({ prompt: "Draft text", mode: "fast", override: "ollama", executionScope: { access: "write" } });
+    assert.equal(env.missions.writeCapable({ ...step, taskId: task.id }), false, "ollama cannot write");
+    const cloud = env.tasks.submit({ prompt: "Draft text", mode: "fast", override: "claude", executionScope: { access: "write" } });
+    assert.equal(env.missions.writeCapable({ ...step, taskId: cloud.id }), true);
+    assert.equal(env.missions.writeCapable({ ...step, team: { kind: "write_file" } as never }), false, "a team write always runs under the Host's pre-image guard");
+  } finally { await env.cleanup(); }
+});

@@ -29,7 +29,7 @@ import { FilesystemCapability, GitCapability, NotificationsCapability, TerminalC
 import { agentPrompt, type DependencyResult } from "./context.ts";
 import { Inbox } from "./inbox.server.ts";
 import {
-  assertMissionTransition, assertStepTransition, blockedBy, classifyTaskFailure, enforcedIdempotent, settled, uncertainRun, MISSION_ACTIVE, missionProgress, readySteps, retryVerdict, STEP_DONE, validateGraph,
+  assertMissionTransition, assertStepTransition, blockedBy, classifyTaskFailure, enforcedIdempotent, settled, uncertainRun, uncertainSkillRuns, MISSION_ACTIVE, missionProgress, readySteps, retryVerdict, STEP_DONE, validateGraph,
 } from "./machine.ts";
 import { MissionMemory } from "./memory.server.ts";
 import { scopedPath } from "./paths.server.ts";
@@ -37,6 +37,7 @@ import { operationContract, crossAppFailure } from "./cross-app.ts";
 import { sha256 } from "./artifacts.server.ts";
 import { calculatorOperation } from "./batches.server.ts";
 import { runsLocally } from "../bunny-host/router.ts";
+import { ADAPTER_TOOL_CONTRACTS } from "../bunny-host/routing.server.ts";
 import { planMission, PLANNER_ID } from "./planner.server.ts";
 import { SkillLibrary, fill } from "./skills.server.ts";
 import { MissionStore, redact } from "./store.server.ts";
@@ -1895,7 +1896,7 @@ export class MissionManager {
           timeoutMs: step.timeoutMs,
         });
         result = {
-          uncertain: run.ok ? null : uncertainRun(run.runs.at(-1) ?? null),
+          uncertain: run.ok || run.permission ? null : uncertainSkillRuns(run.runs),
           ok: run.ok,
           summary: run.ok
             ? `Skill ${run.skill} v${run.version} passed: ${run.runs.map((r) => r.summary).join(" · ").slice(0, 600)}`
@@ -3957,7 +3958,14 @@ export class MissionManager {
    * or skill that is not read-only, unless the Host itself enforces duplicate protection for it. Fails closed.
    */
   writeCapable(step: MissionStep): boolean {
-    if (step.executor.kind === "model") return step.scope?.access !== "read";
+    // A team write always runs under teamWrite's pre-image guard (Host-enforced dedup), whatever its stored params say.
+    if (step.team?.kind === "write_file") return false;
+    if (step.executor.kind === "model") {
+      if (step.scope?.access === "read") return false;
+      // Same rule as direct tasks: work that ran on a tool-free provider could not write.
+      try { if (step.taskId && ADAPTER_TOOL_CONTRACTS[this.tasks.db.get(step.taskId).provider] === false) return false; } catch { /* no task: fail closed */ }
+      return true;
+    }
     if (step.executor.kind === "capability")
       return (this.bus.riskOf(step.executor.action, step.executor.params) ?? "EXECUTE") !== "READ" && !enforcedIdempotent(step.executor.action, step.executor.params);
     return true;
@@ -3974,6 +3982,8 @@ export class MissionManager {
       return;
     step = owned;
     this.workspace.release(step.id);
+    // A failed team check activates the owner-reviewed rework chain. Its replica write runs under teamWrite's pre-image
+    // guard (FILE_CONFLICT unless the file holds this Mission's own last verified bytes), so nothing is replayed blindly.
     if (owned.team && mission.team && !uncertain && this.teamFailure(mission, owned, category, detail)) return;
     const attempts = step.attempts.length
       ? step.attempts.map((attempt, index) =>
@@ -4884,22 +4894,22 @@ export class MissionManager {
       if (step.team) {
         const mission = this.store.mission(missionId);
         if (ownerHold(this, step, false)) { results.push({ stepId: step.id, applied: false, reason: "The owning Agent was stopped; its work is not revived." }); continue; }
+        // T13.3 N-C: a step whose outcome is uncertain is never re-admitted or settled here; the owner reconciles it.
+        if (step.reconciliation?.required) { results.push({ stepId: step.id, applied: false, reason: "Outcome uncertain — reconciliation required (mission.reconcile)." }); continue; }
         if (step.team.kind === "write_file" && isTeam(mission)) {
           const write = teamWrite(this, mission, step, false);
           if ("already" in write) {
-            this.setStep(step, { state: "ready", finishedAt: null, failure: null, ...settled(step) }, "mission.step.recovered", `${step.role}: the verified bytes already landed before the restart; only Bunny's check is repeated.`);
+            this.setStep(step, { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role}: the verified bytes already landed before the restart; only Bunny's check is repeated.`);
             const running = this.markRunning(this.store.step(step.id), null, null);
             const live = this.setMission(this.store.mission(missionId), { state: "running", recovery: null }, "mission.recovered", "Team write reconciled from disk without writing again.");
             await this.verifyAndComplete(live, running, { summary: "Write reconciled from disk after a Host restart (not repeated).", artifactIds: [], output: null, task: null });
             results.push({ stepId: step.id, applied: true, replay: "verify_then_consume" });
           } else if ("params" in write) {
-            this.setStep(step, { state: "ready", finishedAt: null, failure: null, ...settled(step) }, "mission.step.recovered", `${step.role}: the destination still has its pre-image; the write is admitted once more under its guard.`);
+            this.setStep(step, { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role}: the destination still has its pre-image; the write is admitted once more under its guard.`);
             results.push({ stepId: step.id, applied: true, replay: "requeue_once" });
           } else results.push({ stepId: step.id, applied: false, reason: "conflict" in write ? write.conflict : write.refused });
           continue;
         }
-        // T13.3 N-C: a step whose outcome is uncertain is never re-admitted here; the owner reconciles it.
-        if (step.reconciliation?.required) { results.push({ stepId: step.id, applied: false, reason: "Outcome uncertain — reconciliation required (mission.reconcile)." }); continue; }
         if (step.state === "blocked") this.setStep(step, { state: "pending", finishedAt: null, failure: null });
         this.setStep(this.store.step(step.id), { state: "ready", finishedAt: null, failure: null }, "mission.step.recovered", `${step.role} re-admitted once after the Host restart (no side effect: ${step.executor.kind === "model" ? "tool-free generation" : "read-only observation"}).`);
         results.push({ stepId: step.id, applied: true, replay: "requeue_once" });

@@ -13,7 +13,7 @@ import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapt
 import { PolicyEngine, toRecorded } from "./learning.server.ts";
 import { classifyRequirements, effortRequirement, type TaskRequirements ,
 } from "../orch/router-requirements.ts";
-import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, STOP_WRITE_PAUSE, OUTCOME_UNCERTAIN_PAUSE, writePause, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
+import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, STOP_WRITE_PAUSE, OUTCOME_UNCERTAIN_PAUSE, writePause, RECOVERY_BOUNDS, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
 } from "./routing.server.ts";
 import { RoutingDecisionStore } from "./routing-store.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
@@ -1436,7 +1436,8 @@ export class TaskManager {
     if (!["failed", "stopped"].includes(task.state) || !task.reconciliation?.required) throw new CommandRefusedError("This task has no uncertain outcome waiting for reconciliation.");
     if (resolution !== "retry" && resolution !== "close") throw new CommandRefusedError("Resolution must be retry or close.");
     // A retry never runs beside a process of the original that may still be alive (this Host's or one from before a restart).
-    const survivor = [...this.lingering.keys()].some((key) => key.startsWith(`${task.id}#`) || this.restartSurvivorMission.get(key)?.taskId === task.id);
+    // An unreadable provider-session record names no task, so it could be this one's (fail closed, review N-C round 2).
+    const survivor = [...this.lingering.keys()].some((key) => key.startsWith(`${task.id}#`) || key.startsWith("unreadable:") || this.restartSurvivorMission.get(key)?.taskId === task.id);
     if (resolution === "retry" && survivor)
       throw new CommandRefusedError("A process from the original attempt may still be running; Bunny starts no retry until none is alive. Try again shortly.");
     // The exact model is pinned only when routing offered it as a selectable candidate; a provider default (or a model the
@@ -1876,6 +1877,9 @@ export class TaskManager {
           finishedAt: Date.now(),
           error: message,
           latestEvent: this.activity(launching, "agent.failed", message),
+          // T13.3 N-C: launch() threw synchronously; every adapter starts its provider inside the returned promise, so
+          // nothing was dispatched.
+          dispatch: "not_started",
         },
         "task.failed",
         message,
@@ -2063,7 +2067,8 @@ export class TaskManager {
             // candidate. A connection failure is never taken as proof that nothing landed.
             if (writeWork && mayHaveStarted) uncertain = writePause(taxonomy);
             if (writeWork && !mayHaveStarted)
-              action = preDispatchRetries++ >= 1
+              // Never beyond the T3 attempt bound either (review N5).
+              action = preDispatchRetries++ >= 1 || attempt >= RECOVERY_BOUNDS.maxAttempts
                 ? { action: "fail", reason: "The provider could not be started again; nothing was sent to it. Retry when it is available." }
                 : { action: "retry-same", reason: "No provider process was started; one bounded retry of the same candidate." };
             if (uncertain) exhaustNow(uncertain);
@@ -2142,7 +2147,8 @@ export class TaskManager {
               activity: activityLabel(`task.${state}`),
               verification,
               // T13.3 N-C: what is known about dispatch, and whether the owner must reconcile before anything replays it.
-              dispatch: result.dispatched === false ? "not_started" : verification ? "verified_terminal" : "may_have_started",
+              // Only a completed attempt has a verified terminal outcome (review N8); a failed Bunny-A check does not.
+              dispatch: result.dispatched === false ? "not_started" : state === "completed" ? "verified_terminal" : "may_have_started",
               ...(state !== "completed" && uncertain ? { reconciliation: { required: true, reason: uncertain, at: Date.now() } } : {}),
               usage: reportedUsage ?? latest.usage ?? null,
               latestEvent: this.activity(

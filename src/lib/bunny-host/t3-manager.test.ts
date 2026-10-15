@@ -538,6 +538,7 @@ test("T13.3 N-C review F4: write work that fails Bunny-A verification pauses for
     const paused = env.db.get(task.id);
     assert.deepEqual([paused.reconciliation?.required, paused.verification?.passed], [true, false], "the failed check is kept as evidence");
     assert.match(paused.reconciliation?.reason ?? "", /VERIFY/);
+    assert.equal(paused.dispatch, "may_have_started", "a failed check is not a verified terminal outcome (review round 2 N8)");
   } finally { env.cleanup(); }
 });
 
@@ -742,7 +743,7 @@ test("T13.3 N-C review F7: a reconcile retry waits while a process of the origin
     await until(() => env.parts.claude.launched.length === 1, "launch");
     env.parts.claude.launched[0].finish({ ok: false, output: "", error: "stream reset", exitCode: 1 });
     await until(() => env.db.get(task.id).reconciliation?.required === true, "uncertain");
-    for (const [key, owner] of [[`${task.id}#1`, null], ["restart:op-1", { missionId: null, taskId: task.id }]] as const) {
+    for (const [key, owner] of [[`${task.id}#1`, null], ["restart:op-1", { missionId: null, taskId: task.id }], ["unreadable:op-2.json", null]] as const) {
       env.tasks.lingering.set(key, "checking");
       if (owner) env.tasks.restartSurvivorMission.set(key, owner);
       assert.throws(() => env.tasks.reconcile(task.id, "retry", "workstation"), /may still be running/);
@@ -764,5 +765,16 @@ test("T13.3 N-C review F11: a tool-free provider cannot write, so its failed att
     env.parts.ollama.launched[1].finish({ ok: true, output: "done", exitCode: 0 });
     await until(() => env.db.get(task.id).state === "completed", "completion");
     assert.equal(env.db.get(task.id).reconciliation, undefined);
+  } finally { env.cleanup(); }
+});
+
+test("T13.3 N-C review round 2 N4: a launch that throws before any process records not_started and needs no reconciliation", async () => {
+  const env = await t3Fixture(["claude"]);
+  try {
+    env.parts.claude.adapter.launch = () => { throw new Error("adapter could not prepare the session"); };
+    const task = env.tasks.submit({ prompt: RESEARCH, mode: "balanced" });
+    env.tasks.approve(task.id);
+    await until(() => env.db.get(task.id).state === "failed", "launch failure");
+    assert.deepEqual([env.db.get(task.id).dispatch, env.db.get(task.id).reconciliation], ["not_started", undefined]);
   } finally { env.cleanup(); }
 });
