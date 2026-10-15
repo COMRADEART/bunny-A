@@ -509,11 +509,10 @@ test("T13.3 N-C final check: a displaced child (older than a sibling, never in a
     child();
     assert.throws(() => env.tasks.approve(older.id), /STALE_CHILD/);
     assert.equal(env.launched.length, 0);
-    // Two children created in the same millisecond: exactly one is the newest (ties break by id).
+    // Two children with the same creation time: creation order still decides, so the earlier one is refused.
     const first = child(); const second = child();
     env.tasks.db.write({ ...env.tasks.db.get(second.id), createdAt: env.tasks.db.get(first.id).createdAt }, "test.same_ms", "same creation time");
-    const [low] = [first.id, second.id].sort();
-    assert.throws(() => env.tasks.approve(low), /STALE_CHILD/);
+    assert.throws(() => env.tasks.approve(first.id), /STALE_CHILD/);
     assert.equal(env.launched.length, 0);
   } finally {
     for (const row of env.launched) row.finish({ ok: false, output: "", stopped: true });
