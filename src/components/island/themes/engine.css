@@ -249,12 +249,10 @@
   .bunny-app.t8-app[data-layout="topnav"][data-material] {
     display: block;
   }
-  /* The masthead is sticky: keep anything focused or scrolled-to clear of it (WCAG 2.4.11, focus not obscured). */
-  html:has(.bunny-app.t8-app[data-layout="topnav"][data-material]) {
-    scroll-padding-top: 144px;
-  }
+  /* The masthead scrolls away with the page: sticky, it covered the sticky context panel and preview bar and the controls
+     focused inside them (WCAG 2.4.11), and a masthead that may wrap to two rows has no fixed height to offset by. */
   .bunny-app.t8-app[data-layout="topnav"][data-material] .app-sidebar {
-    position: sticky;
+    position: relative;
     top: 0;
     height: auto;
     flex-direction: row;
