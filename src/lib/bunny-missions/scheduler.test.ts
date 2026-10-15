@@ -305,6 +305,10 @@ test("T13.3 N-C review F12/replan: a refused reconcile records nothing; replan w
     env.tasks.lingering.set("unreadable:op-9.json", "checking");
     await assert.rejects(env.missions.reconcile(view.id, step.id, "retry", "workstation"), /cannot be read yet/);
     env.tasks.lingering.delete("unreadable:op-9.json");
+    // A process of the uncertain child task may still be alive: the retry waits for it too.
+    env.tasks.lingering.set(`${step.taskId}#1`, "checking");
+    await assert.rejects(env.missions.reconcile(view.id, step.id, "retry", "workstation"), /may still be running/);
+    env.tasks.lingering.delete(`${step.taskId}#1`);
     // Revoke the authorization so the Retry the reconciliation would authorize is refused.
     const envelope = env.missions.store.authorization(env.missions.store.mission(view.id).authorizationId!)!;
     env.missions.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });
@@ -384,5 +388,24 @@ test("T13.3 N-C review round 3 P1/P2: a skill asks before any step runs, and a c
     assert.equal(env.missions.mission(cleaned.id).state, "waiting_for_user");
     assert.equal(writes(cleaned.id, "cleanup.txt"), 1, "the cleanup write ran once");
     assert.equal(env.missions.store.steps(cleaned.id)[0].reconciliation?.required, true);
+  } finally { await env.cleanup(); }
+});
+
+test("T13.3 N-C review round 4 Q2: a skill step that throws after an earlier write landed waits for the owner", async () => {
+  const env = await setup([]);
+  try {
+    const base = env.missions.skills.get("project.test");
+    env.missions.store.saveSkill({ ...base, id: "nc.write-then-throw", name: "nc.write-then-throw", requirements: ["filesystem.write", "filesystem.read"], preconditions: [], steps: [{ action: "filesystem.write", params: { path: "q2.txt", content: "q", overwrite: true }, label: "write" }, { action: "filesystem.read", params: { path: "q2.txt" }, label: "read" }], validations: [{ kind: "status_succeeded", step: 0 }], cleanup: [] }, true);
+    // The bus itself throws on the second step (as a containment refusal or an executable lookup can).
+    const request = env.missions.bus.request.bind(env.missions.bus);
+    env.missions.bus.request = async (input) => { if (input.action === "filesystem.read") throw new Error("capability intake closed"); return request(input); };
+    const view = env.missions.create({ objective: "Q2", mode: "fast", origin: "workstation", steps: [{ role: "Skill", objective: "Q2", dependsOn: [], maxRetries: 2, executor: { kind: "skill", skillId: "nc.write-then-throw", params: {} } }] });
+    env.missions.approve(view.id, "workstation");
+    await until(() => ["completed", "failed", "waiting_for_user"].includes(env.missions.mission(view.id).state), "Q2 end", 20_000);
+    await new Promise((r) => setTimeout(r, 80));
+    const [step] = env.missions.store.steps(view.id);
+    assert.equal(env.missions.mission(view.id).state, "waiting_for_user", JSON.stringify(step.failure));
+    assert.equal(env.missions.store.runs({ missionId: view.id, limit: 50 }).filter((run) => run.action === "filesystem.write").length, 1, "the landed write ran once");
+    assert.equal(step.reconciliation?.required, true);
   } finally { await env.cleanup(); }
 });

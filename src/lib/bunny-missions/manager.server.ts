@@ -2011,6 +2011,9 @@ export class MissionManager {
           current,
           "capability_failed",
           safeError(error).message,
+          // T13.3 N-C: a throw after this attempt already wrote (a later skill step, or the check after a write) must not
+          // let the retry repeat what landed; judge by the runs this attempt recorded.
+          uncertainSkillRuns(this.store.runs({ missionId, limit: 500 }).filter((run) => run.stepId === stepId && run.startedAt >= (current.attempts.at(-1)?.startedAt ?? 0))),
         );
     }
   }
@@ -4690,9 +4693,11 @@ export class MissionManager {
       this.setStep(step, { reconciliation: resolved }, "mission.step.reconciled", recorded);
       return await this.stop(id, by);
     }
-    // An unreadable provider-session record names no Mission, so it could be this one's (fail closed, as for direct tasks).
-    if ([...this.tasks.lingering.keys()].some((key) => key.startsWith("unreadable:")))
-      throw new CommandRefusedError("A provider-session record from before the Host restarted cannot be read yet; Bunny starts no retry until it is reconciled. Try again shortly.");
+    // A retry never runs beside a process of an earlier attempt that may still be alive: this Host's watch of any child
+    // task of the step, a restart survivor of this Mission, or an unreadable record, which names no owner (fail closed).
+    const children = [step.taskId, ...step.attempts.map((attempt) => attempt.taskId)].filter((child): child is string => !!child);
+    if ([...this.tasks.lingering.keys()].some((key) => key.startsWith("unreadable:") || children.some((child) => key.startsWith(`${child}#`)) || this.tasks.restartSurvivorMission.get(key)?.missionId === id))
+      throw new CommandRefusedError("A provider process from an earlier attempt may still be running, or its record cannot be read yet; Bunny starts no retry until none is alive. Try again shortly.");
     // The decision is recorded (and announced) only once the Retry it authorizes is accepted.
     this.setStep(step, { reconciliation: resolved });
     try {
