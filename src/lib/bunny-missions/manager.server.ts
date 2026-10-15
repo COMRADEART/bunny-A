@@ -171,6 +171,10 @@ export class MissionManager {
       const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
       if (!envelope) return "no approved mission envelope";
       if (envelope.revokedAt) return "authorization revoked";
+      // T13.3 N-C: no child of a step whose outcome is uncertain launches (an older child approved directly included)
+      // until the owner reconciles it.
+      if (this.store.step(task.mission!.stepId).reconciliation?.required)
+        return "OUTCOME_UNCERTAIN: this Mission step may already have taken effect; reconcile it (mission.reconcile) before anything for it runs.";
       const team = teamProviderViolation(this, task);
       if (team) return team;
       // M-A-3 T9R-F01: no shell-capable session starts while paired-device changes await workstation review.

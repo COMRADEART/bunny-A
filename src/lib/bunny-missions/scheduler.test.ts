@@ -309,6 +309,10 @@ test("T13.3 N-C review F12/replan: a refused reconcile records nothing; replan w
     env.tasks.lingering.set(`${step.taskId}#1`, "checking");
     await assert.rejects(env.missions.reconcile(view.id, step.id, "retry", "workstation"), /may still be running/);
     env.tasks.lingering.delete(`${step.taskId}#1`);
+    // A stale child of this uncertain step cannot be launched around the reconcile gate by approving it directly.
+    const stale = env.tasks.submit({ prompt: "stale child", mode: "fast", override: "auto" }, { missionId: view.id, stepId: step.id, executionScope: { access: "write" } });
+    assert.throws(() => env.tasks.approve(stale.id), /OUTCOME_UNCERTAIN/);
+    assert.equal(env.launched.length, 1);
     // A child that never launched holds no process, so it never blocks the owner (the refusal below is the revocation).
     const stuck = env.tasks.submit({ prompt: "never launched", mode: "fast" });
     assert.equal(stuck.state, "waiting_for_approval");
