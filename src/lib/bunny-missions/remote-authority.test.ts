@@ -241,8 +241,14 @@ test("F01-5: Retry never reuses a denied shell approval, and a spent grant never
     await env.missions.respond(ask.id, "allow_once", "workstation");
     await until(() => env.launched.length === 1, "single desktop-approved session");
     env.launched[0].finish({ ok: false, output: "", error: "provider crashed" });
+    // T13.3 N-C (owner decision 2026-10-14): a write session that crashed after dispatch is no longer retried
+    // automatically; it waits for reconciliation. The F01 property is kept on the reconciled retry instead.
+    await until(() => env.missions.store.steps(spent.id)[0].reconciliation?.required === true, "uncertain outcome recorded");
+    await settle();
+    assert.equal(env.launched.length, 1, "no automatic replay");
+    await env.missions.reconcile(spent.id, env.missions.store.steps(spent.id)[0].id, "retry", "workstation");
     const retry = await waitAsk(env, spent.id, "provider.execute");
-    assert.notEqual(retry.id, ask.id, "the automatic retry asks for fresh desktop authority");
+    assert.notEqual(retry.id, ask.id, "the reconciled retry asks for fresh desktop authority");
     await settle();
     assert.equal(env.launched.length, 1, "no second shell session from the spent grant");
   } finally { await env.cleanup(); }
@@ -1650,4 +1656,31 @@ test("F01-R57 (MEDIUM): every device response drops trusted-desktop grant, opera
   const seen = redactReviewListing(view);
   assert.deepEqual(Object.keys(seen.mission.requests[0]).sort(), ["desktopRequired", "id"]);
   assert.doesNotMatch(JSON.stringify(seen), /epoch e|"g"/);
+});
+
+test("T13.3 N-C review F5: a step running under a one-time approval at restart is uncertain only when it could write", async () => {
+  const env = await setup();
+  try {
+    const view = env.missions.create({ objective: "Mixed", mode: "fast", origin: "workstation", steps: [
+      capability("Writer", "filesystem.write", { path: "w.txt", content: "w" }),
+      capability("Reader", "filesystem.read", { path: "w.txt" }),
+      capability("Guarded", "filesystem.write", { path: "g.txt", content: "g", expectBeforeSha256: "absent" }),
+    ] });
+    env.missions.approve(view.id, "workstation", false);
+    // Synthesized persisted state: all three were running under a one-time allowance when the Host stopped.
+    for (const step of env.missions.store.steps(view.id))
+      env.missions.store.saveStep({ ...step, state: "running", approvedOnce: { requestId: `once-${step.role}`, action: step.executor.kind === "capability" ? step.executor.action : "x" } });
+    env.missions.store.saveMission({ ...env.missions.mission(view.id), state: "running" });
+    await env.restart();
+    const [writer, reader, guarded] = env.missions.store.steps(view.id);
+    assert.deepEqual([writer.state, writer.approvedOnce, writer.reconciliation?.required], ["failed", null, true], "a write under a one-time approval may have landed");
+    assert.match(writer.reconciliation?.reason ?? "", /one-time approval/);
+    assert.equal(reader.reconciliation, undefined, "a read needs a fresh decision, not reconciliation");
+    assert.equal(guarded.reconciliation, undefined, "a Host-guarded write can be replayed safely");
+    assert.throws(() => env.missions.retry(view.id, "workstation"), /OUTCOME_UNCERTAIN/);
+    // Review F6/F13: restart recovery cannot re-admit it either; only the owner's reconciliation can.
+    const [resubmit] = await env.missions.reconcileInterrupted(view.id, [{ stepId: writer.id, mode: "resubmit" }]);
+    assert.deepEqual([resubmit.applied, env.missions.store.step(writer.id).state], [false, "failed"]);
+    assert.match(String(resubmit.reason), /reconciliation required/);
+  } finally { await env.cleanup(); }
 });

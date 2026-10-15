@@ -61,6 +61,8 @@ test("T13.3 D verdict: a worker's words never verify it; only Host verification 
   assert.equal(verdict({ state: "completed", steps: [{ state: "completed", verified: null, summary: claim }] }).state, "INDETERMINATE");
   assert.equal(verdict({ state: "failed", steps: [{ state: "failed", verified: null, summary: claim }] }).state, "REJECTED");
   assert.equal(verdict({ state: "stopped", steps: [{ state: "stopped", verified: null, summary: claim }] }).state, "INDETERMINATE");
+  assert.equal(verdict({ state: "stopped", steps: [{ state: "failed", verified: null, summary: claim, failure: "capability_failed" }] }).state, "REJECTED", "a failed step stays a failure after a reconciliation stop");
+  assert.equal(verdict({ state: "stopped", steps: [{ state: "failed", verified: null, summary: claim, failure: "host_restart" }] }).state, "INDETERMINATE", "an interruption is not a verdict on the work");
   assert.equal(verdict({ state: "completed", steps: [] }).state, "INDETERMINATE");
   assert.equal(verdict({ state: "completed", steps: [{ state: "completed", verified: true, summary: null }, { state: "skipped", verified: null, summary: null }] }).state, "INDETERMINATE");
   assert.deepEqual(verdict({ state: "completed", steps: [{ state: "completed", verified: true, summary: "" }] }), { state: "VERIFIED", reason: "Every step passed the Host's verification." });

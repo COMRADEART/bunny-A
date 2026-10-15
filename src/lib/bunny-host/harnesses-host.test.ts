@@ -109,6 +109,14 @@ test("T13.3 E harness views, stepped tests, and disable/enable/remove enforced b
     assert.equal((gate(h, "claude") as Body).code, "CONNECTION_PAUSED", "harness.enable resumes only what harness.disable paused");
     ok(await h.command("connections.resume", { id: claudeRoute }));
     assert.notEqual((gate(h, "claude") as Body).code, "CONNECTION_PAUSED");
+    // F7 (review 2): the owner takes a harness-paused route back and pauses it themselves; enable must not undo that.
+    ok(await h.command("harness.disable", { id: "anthropic" }));
+    ok(await h.command("connections.resume", { id: claudeRoute }));
+    ok(await h.command("connections.pause", { id: claudeRoute }));
+    ok(await h.command("harness.enable", { id: "anthropic" }));
+    assert.equal((gate(h, "claude") as Body).code, "CONNECTION_PAUSED", "an owner pause made after harness.disable survives harness.enable");
+    ok(await h.command("connections.resume", { id: claudeRoute }));
+    assert.notEqual((gate(h, "claude") as Body).code, "CONNECTION_PAUSED");
 
     await h.host.close();
     h = await boot(directory, 43890);

@@ -508,6 +508,11 @@ test("T3 §21: every failure signature classifies into exactly one taxonomy; the
   assert.equal(classifyFailure({ policyDenied: true, error: "whatever else", exitCode: 1 }), "POLICY_DENIED");
   assert.equal(classifyFailure({ stopped: true, exitCode: null }), "EXECUTION_FAILED");
   assert.equal(classifyFailure({ exitCode: 0 }), "EXECUTION_FAILED", "no signal stays conservative");
+  // T13.3 N7: quota evidence wins over a co-occurring unavailable phrase, so write work keeps the quota pause.
+  assert.equal(classifyFailure({ error: "usage limit reached; model no longer available", exitCode: 1 }), "QUOTA_CONSTRAINED");
+  assert.equal(classifyFailure({ error: "rate limit: provider is offline", exitCode: 1 }), "QUOTA_CONSTRAINED");
+  // N-D: a port or address containing 429 is not quota evidence.
+  assert.equal(classifyFailure({ error: "connect ECONNREFUSED 127.0.0.1:14290", exitCode: 1 }), "PROVIDER_UNAVAILABLE");
   assert.equal(classifyFailure({ usageLimitStatus: "rejected", error: "provider said no", exitCode: 1 }), "QUOTA_CONSTRAINED");
 });
 // ── §22/§23/§24/§25 bounded recovery ─────────────────────────────────────────

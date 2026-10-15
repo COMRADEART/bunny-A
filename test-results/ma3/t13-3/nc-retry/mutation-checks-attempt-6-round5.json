@@ -1,0 +1,41 @@
+[
+  {
+    "id": "NC-M41",
+    "what": "round 3 F7: a Mission reconcile retry ignores an unreadable provider-session record",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F12",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M42",
+    "what": "round 4: a Mission reconcile retry ignores a live process of the uncertain child task",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "review F12",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review F12/replan: a refused reconcile records nothing; replan waits for reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M43",
+    "what": "round 4 Q2: a throw after an earlier write landed is retried as an ordinary failure",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "pattern": "round 4",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C review round 4 Q2: a skill step that throws after an earlier write landed waits for the owner"
+    ]
+  }
+]

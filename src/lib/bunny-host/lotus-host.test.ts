@@ -165,11 +165,17 @@ test("T13.3 C poisoning, credentials, corrections, conversation recall, compacti
     const promoted = ok(await h.command("lotus.promote", { id: repo.id, layer: "inner" })).data.memory;
     assert.deepEqual([promoted.layer, promoted.trust], ["inner", "untrusted"], "the user may keep outside text; it stays labelled untrusted");
 
+    // F6: a reply that quotes outside text from memory, then leaves retention.
+    const quoted = ok(await h.command("personal_agent.converse", { slot: 1, text: "What does the build note say about release?" })).data.reply.text as string;
+    assert.match(quoted, /From memory:\n- Build note: "Run npm run build before release" \(untrusted outside text/);
     for (let i = 0; i < 101; i++) ok(await h.command("personal_agent.converse", { slot: 1, text: `check ${i}` }));
     const summary = memoriesOf((await h.state()).body, 1).find((m) => m.key === "Earlier conversation");
     assert.ok(summary, "turns that leave retention are compacted, not silently lost");
-    assert.deepEqual([summary.layer, summary.provenance], ["outer", "host:summary"]);
+    assert.deepEqual([summary.layer, summary.provenance, summary.trust], ["outer", "host:summary", "host"]);
     assert.match(summary.value, /^You: Where is the deploy target\?; Gada: /);
+    assert.match(summary.value, /You: What does the build note say about release\?/);
+    assert.ok(!summary.value.includes("Run npm run build"), "outside text quoted in a reply is not folded into a host-trusted summary");
+    assert.ok(!summary.value.includes("From memory"), "only the Host-facts answer is folded");
 
     const restarted = await reboot();
     const exported = ok(await restarted.command("lotus.export", { scope: "agent:1" })).data;
@@ -210,5 +216,21 @@ test("T13.3 C a paired device cannot read, write, share or export Lotus memory",
     assert.equal((await h.state(phone.token)).body.personalAgentContext, undefined);
     const kept = memoriesOf((await h.state()).body, 1).find((m) => m.id === memory.id);
     assert.deepEqual([kept?.value, kept?.revision], ["Short answers", 1], "nothing a device sent changed the memory");
+  });
+});
+
+test("T13.3 F6: a short reply that quotes outside text from memory is folded without it, at host trust", async () => {
+  await withHost(43873, async (h) => {
+    // Slot 2 has no Missions, so its answer is short and a quoted memory line would fit inside the summary's clip.
+    const pasted = await remember(h, { scope: "agent:2", origin: "web", key: "Release note", value: "Ship it from the release branch" });
+    assert.equal(pasted.trust, "untrusted");
+    const reply = ok(await h.command("personal_agent.converse", { slot: 2, text: "What does the release note say?" })).data.reply.text as string;
+    assert.match(reply, /^Spear has no Missions yet\.\nFrom memory:\n- Release note: "Ship it from the release branch" \(untrusted outside text/);
+    for (let i = 0; i < 100; i++) ok(await h.command("personal_agent.converse", { slot: 2, text: `check ${i}` }));
+    const summary = memoriesOf((await h.state()).body, 2).find((m) => m.key === "Earlier conversation");
+    assert.ok(summary, "the first exchange left retention and was compacted");
+    assert.match(summary.value, /^You: What does the release note say\?; Spear: Spear has no Missions yet\./);
+    assert.equal(summary.trust, "host");
+    assert.ok(!summary.value.includes("Ship it") && !summary.value.includes("From memory"), "outside text quoted in a reply is not folded into a host-trusted summary");
   });
 });

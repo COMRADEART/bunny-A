@@ -1,4 +1,4 @@
-import type { FailureCategory, MissionLimits, MissionProgress, MissionState, MissionStep, StepState } from "./types.ts";
+import type { CapabilityRun, FailureCategory, MissionLimits, MissionProgress, MissionState, MissionStep, StepState } from "./types.ts";
 
 const MISSION_NEXT: Record<MissionState, MissionState[]> = {
   draft: ["planning", "stopped"],
@@ -104,6 +104,7 @@ export function retryVerdict(category: FailureCategory, attempts: number, maxRet
   // M-A-3 T13.3 Gate F (§18): a write step whose provider ran out of quota may have left side effects; never reroute it blindly.
   if (category === "provider_rate_limited" && access === "write") return no("The provider's quota ran out during write work. Paused at the last completed step; review the workspace before retrying or choosing another account.", true);
   switch (category) {
+    case "provider_write_paused": return no("The connection kept failing during write work, so the Host paused instead of switching providers. Review the workspace before retrying or choosing another account.", true);
     case "user_stopped": return no("Stopped by the user; never retried automatically.");
     case "permission_required": return no("Waiting for the user to allow or deny the action.", true);
     case "permission_denied": return no("The user denied the action.");
@@ -123,13 +124,49 @@ export function retryVerdict(category: FailureCategory, attempts: number, maxRet
   }
 }
 
+/**
+ * M-A-3 T13.3 N-C: duplicate protection the Host itself enforces. Only these may replay after an uncertain outcome; a
+ * plan's, step's or caller's claim of idempotency never counts. Today: filesystem.write under a pre-image guard (a
+ * landed write is detected and reported as applied, a changed file is refused).
+ */
+export function enforcedIdempotent(action: string, params: Record<string, unknown>): boolean {
+  return action === "filesystem.write" && typeof params.expectBeforeSha256 === "string";
+}
+
+/** A canonical result consumed after a restart settles an uncertain outcome without re-executing anything. */
+export function settled(step: Pick<MissionStep, "reconciliation">): Partial<Pick<MissionStep, "reconciliation">> {
+  return step.reconciliation?.required ? { reconciliation: { ...step.reconciliation, required: false, resolvedBy: "bunny-host-recovery", resolvedAt: Date.now() } } : {};
+}
+
+/** Why a failed capability run's outcome is unknown: it started, it was not read-only, and nothing enforces dedup. */
+export function uncertainRun(run: Pick<CapabilityRun, "uncertain" | "risk" | "action" | "params" | "status" | "summary"> | null): string | null {
+  if (!run?.uncertain || run.risk === "READ" || enforcedIdempotent(run.action, run.params)) return null;
+  return `OUTCOME_UNCERTAIN: ${run.action} started and then ${run.status === "timeout" ? "timed out" : "failed"} (${run.summary.slice(0, 200)}), so it may already have taken effect.`;
+}
+
+/**
+ * Why a failed skill run cannot be repeated automatically: any of its runs may have written. That covers an uncertain run,
+ * and a write that succeeded before a later step or the skill's validations failed (repeating the skill repeats it).
+ */
+export function uncertainSkillRuns(runs: (Pick<CapabilityRun, "uncertain" | "risk" | "action" | "params" | "status" | "summary"> | null)[]): string | null {
+  for (const run of runs) {
+    const uncertain = uncertainRun(run);
+    if (uncertain) return uncertain;
+    if (run?.status === "succeeded" && run.risk !== "READ" && !enforcedIdempotent(run.action, run.params))
+      return `OUTCOME_UNCERTAIN: ${run.action} already took effect earlier in this skill run, so repeating the skill would repeat it.`;
+  }
+  return null;
+}
+
 /** Classifies a finished child task's error text into a mission failure category. */
 export function classifyTaskFailure(error: string | null | undefined, state: string): FailureCategory {
   const text = (error ?? "").toLowerCase();
   if (state === "stopped") return /runtime limit/.test(text) ? "timeout" : "user_stopped";
   if (/host process restarted|cannot reattach/.test(text)) return "host_restart";
   if (/verification failed/.test(text)) return "verification_failed";
-  if (/rate.?limit|usage limit|quota|429/.test(text)) return "provider_rate_limited";
+  // T13.3 N-B: the Host's own write pause wins over the transport error text it wraps.
+  if (/\bwrite_pause\b/.test(text)) return "provider_write_paused";
+  if (/rate.?limit|usage limit|quota|\b429\b/.test(text)) return "provider_rate_limited";
   if (/no ready executor|not eligible|not installed|needs sign-in|not signed in|unavailable/.test(text)) return "provider_unavailable";
   return "provider_failed";
 }

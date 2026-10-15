@@ -42,6 +42,8 @@ export type SkillRunResult = {
   /** Set when the skill reached a step that needs the user's permission; nothing after it ran. */
   permission: ({ step: number; action: string; reason: string } & Partial<Pick<PermissionDecision, "risk" | "desktopRequired" | "desktopOperation" | "remoteReview">>) | null;
   repairNeeded: boolean;
+  /** T13.3 N-C: the cleanup actions a failing run executed; they count toward whether a retry could repeat a change. */
+  cleanupRuns?: CapabilityRun[];
 };
 
 /**
@@ -86,6 +88,12 @@ export class SkillLibrary {
     if (blocked) { this.emit("skill.failed", `${id} v${skill.version} precondition: ${blocked}`, request.missionId); return { ...base, failure: { step: -1, label: "preconditions", status: "failed", summary: blocked } }; }
     const params = this.params(skill, input);
     const runs: (CapabilityRun | null)[] = []; const outputs: unknown[] = []; const artifactIds: string[] = [];
+    // T13.3 N-C: every step's permission is settled before any step runs, so the re-run an approved ask causes never
+    // repeats a write that already landed.
+    for (const [index, step] of skill.steps.entries()) {
+      const ask = this.bus.preflight({ ...request, action: step.action, params: fill(step.params, params) as Record<string, unknown> });
+      if (ask) return { ...base, runs: [], outputs, artifactIds, permission: { step: index, action: step.action, reason: ask.reason, risk: ask.risk, desktopRequired: ask.desktopRequired, desktopOperation: ask.desktopOperation, remoteReview: ask.remoteReview } };
+    }
     for (const [index, step] of skill.steps.entries()) {
       const outcome = await this.bus.request({ ...request, action: step.action, params: fill(step.params, params) as Record<string, unknown> });
       if (outcome.decision.decision === "ask") return { ...base, runs: runs.filter(Boolean) as CapabilityRun[], outputs, artifactIds, permission: { step: index, action: step.action, reason: outcome.decision.reason, risk: outcome.decision.risk, desktopRequired: outcome.decision.desktopRequired, desktopOperation: outcome.decision.desktopOperation, remoteReview: outcome.decision.remoteReview } };
@@ -93,11 +101,12 @@ export class SkillLibrary {
       if (!outcome.run || outcome.run.status !== "succeeded") {
         // Unsafe continuation stops here: later steps assumed this one worked.
         const failure = { step: index, label: step.label, status: outcome.run?.status ?? "failed", summary: outcome.run?.summary ?? "No run recorded." };
-        for (const cleanup of skill.cleanup) await this.bus.request({ ...request, action: cleanup.action, params: fill(cleanup.params, params) as Record<string, unknown> }).catch(() => null);
+        const cleanupRuns: CapabilityRun[] = [];
+        for (const cleanup of skill.cleanup) { const done = await this.bus.request({ ...request, action: cleanup.action, params: fill(cleanup.params, params) as Record<string, unknown> }).catch(() => null); if (done?.run) cleanupRuns.push(done.run); }
         this.recordOutcome(skill, false);
         const environmental = ["denied", "unavailable", "unconfigured", "unsupported"].includes(failure.status);
         this.emit("skill.failed", `${id} v${skill.version} stopped at step ${index + 1} (${step.label}): ${failure.summary}${environmental ? "" : " Repair candidate needed; the last-known-good version is unchanged."}`, request.missionId);
-        return { ...base, runs: runs as CapabilityRun[], outputs, artifactIds, failure, repairNeeded: !environmental };
+        return { ...base, runs: runs as CapabilityRun[], outputs, artifactIds, failure, repairNeeded: !environmental, cleanupRuns };
       }
     }
     const passed = skill.validations.every((validation) => validationPassed(validation, runs, outputs));

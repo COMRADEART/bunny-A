@@ -36,7 +36,7 @@ import {
 } from "./motion";
 import { publicTaskLogs } from "./motion-model";
 import { ActivityTimeline } from "./activity";
-import { taskStatus } from "@/lib/bunny-host/presentation";
+import { taskStatus, UNCERTAIN_LABEL } from "@/lib/bunny-host/presentation";
 import { VoicePanel } from "./voice";
 
 export function openTask(id: string) {
@@ -591,7 +591,7 @@ export function TaskDetail({ now }: { now: number }) {
       {isActive(task) ? <TaskActivity task={task} expanded /> : null}
       {task.error ? (
         <div className="error-card" role="alert">
-          <strong>Task failed</strong>
+          <strong>{task.reconciliation?.required ? UNCERTAIN_LABEL : "Task failed"}</strong>
           <p>{task.error}</p>
         </div>
       ) : null}

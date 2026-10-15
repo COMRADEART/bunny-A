@@ -425,6 +425,46 @@ test("T3: computer UI action exception is failed with no fabricated output", asy
     await h.cleanup();
   }
 });
+test("T13.3 N-C 6: the real adapter certifies dispatched:false only when no provider process started", async () => {
+  const h = harness();
+  try {
+    await h.tasks.discover();
+    const task = h.tasks.submit({ prompt: "Fixture", mode: "fast" });
+    const node = { command: process.execPath, args: [] as string[], path: process.execPath, source: "fixture", kind: "native" as const };
+    const hooks = { event: () => {}, session: () => {}, output: () => {} };
+    // 1. The fresh authority check refuses before any process exists.
+    const refused = await spawnSession("claude", node, ["-e", "process.exit(0)"], { ...task, cwd: h.root }, { ...hooks, beforeDispatch: async () => { throw new Error("CONNECTION_PAUSED"); } }, "fixture").done;
+    assert.equal(refused.ok, false);
+    assert.equal(refused.dispatched, false);
+    // 2. The executable does not exist: nothing was ever started.
+    const missing = { ...node, command: join(h.root, "no-such-provider.exe"), path: join(h.root, "no-such-provider.exe") };
+    const absent = await spawnSession("claude", missing, [], { ...task, cwd: h.root }, hooks, "fixture").done;
+    assert.equal(absent.ok, false);
+    assert.equal(absent.dispatched, false, absent.error);
+    // 3. A process that started and then failed is never certified: its outcome may include side effects.
+    const started = await spawnSession("claude", node, ["-e", "process.stdin.resume();process.stdin.on('end',()=>process.exit(3))"], { ...task, cwd: h.root }, hooks, "fixture").done;
+    assert.equal(started.ok, false);
+    assert.equal(started.dispatched, undefined);
+    // 4. The unwrapped (non-job) spawn path follows the same rule: only an error before "spawn" certifies nothing started.
+    const injected = ((...args: Parameters<typeof spawn>) => spawn(...args)) as typeof spawn;
+    const unwrappedAbsent = await spawnSession("claude", missing, [], { ...task, cwd: h.root }, hooks, "fixture", undefined, injected).done;
+    assert.equal(unwrappedAbsent.dispatched, false, unwrappedAbsent.error);
+    const unwrappedStarted = await spawnSession("claude", node, ["-e", "process.stdin.resume();process.stdin.on('end',()=>process.exit(3))"], { ...task, cwd: h.root }, hooks, "fixture", undefined, injected).done;
+    assert.deepEqual([unwrappedStarted.ok, unwrappedStarted.dispatched], [false, undefined]);
+    // An "error" event AFTER "spawn" (a failed kill or pipe) is not proof that nothing started.
+    let late: ReturnType<typeof spawn> | null = null;
+    const lateError = ((...args: Parameters<typeof spawn>) => {
+      const child = (late = spawn(...args));
+      child.once("spawn", () => setImmediate(() => child.emit("error", new Error("pipe failed after start"))));
+      return child;
+    }) as typeof spawn;
+    const errored = await spawnSession("claude", node, ["-e", "setTimeout(()=>{},300)"], { ...task, cwd: h.root }, hooks, "fixture", undefined, lateError).done;
+    assert.deepEqual([errored.ok, errored.dispatched, errored.error], [false, undefined, "pipe failed after start"]);
+    if (late!.exitCode === null) await new Promise((resolve) => late!.once("exit", resolve)); // the real child still holds the folder
+  } finally {
+    await h.cleanup();
+  }
+});
 test("T3: a provider stdout hook throw ends the owned native process as a failed session", async () => {
   const h = harness();
   try {

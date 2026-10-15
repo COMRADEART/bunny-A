@@ -1,0 +1,16 @@
+F1-M1	KILLED	worker Project memory appended to the child Mission objective again	← T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker
+F1-M2	KILLED	worker Project memory never reaches the model prompt	← T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker
+F2-M1	KILLED	a paired device may approve, start, retry or answer a worker's child Mission	← T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker
+F2-M2	KILLED	mission.respond is not mapped to its worker Mission	← T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker
+F3-M1	SURVIVED	Studio save re-records every focused Agent's owner	← 
+F3-M2	KILLED	assign leaves the old slot focused on the moved Agent	← T13.3 B rebinding a slot in the Studio transfers ownership explicitly; assign accepts only user-facing Agents
+F4-M1	KILLED	an unscoped direct task reroutes on quota again (only declared write pauses)	← T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerouting (it may have written files)
+F4-M2	KILLED	quota never pauses (read work no longer distinguished)	← T3 §22/R22: a quota-constrained READ attempt reroutes to the next candidate within the bounded recovery
+F5-M1	KILLED	lotus.writeAll writes one by one (no admit-first, no transaction)	← T13.3 C store: writeAll stores every memory or none
+F6-M1	KILLED	compaction folds the reply's quoted memory lines at host trust	← T13.3 F6: a short reply that quotes outside text from memory is folded without it, at host trust
+F6-M2	KILLED	compaction skips the steering check	← T13.3 F6: compaction runs the steering check; instruction-shaped folded text from anyone but the user is untrusted
+F7-M1	KILLED	harness.enable resumes every paused route	← T13.3 E harness views, stepped tests, and disable/enable/remove enforced by the dispatch gate
+F7-M2	KILLED	an owner's own pause does not supersede the harness.disable record	← T13.3 E harness views, stepped tests, and disable/enable/remove enforced by the dispatch gate
+F11-M1	KILLED	no aging: priority alone orders held Agents	← T13.3 F11: aging; a low-priority Agent held long enough is no longer starved by a high-priority one
+F12-M1	KILLED	assign leaves open workers on the old slot	← T13.3 F12: reassigning a parent Agent moves its open workers to the new slot; closed workers keep their history
+F12-M2	KILLED	the worker store never persists a changed slot	← T13.3 F12: reassigning a parent Agent moves its open workers to the new slot; closed workers keep their history

@@ -25,7 +25,7 @@ export class WorkerStore {
 
   save(worker: AgentWorker): AgentWorker {
     this.db
-      .prepare("INSERT INTO agent_workers(id,slot,parent_mission_id,child_mission_id,state,record,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET child_mission_id=excluded.child_mission_id, state=excluded.state, record=excluded.record, updated_at=excluded.updated_at")
+      .prepare("INSERT INTO agent_workers(id,slot,parent_mission_id,child_mission_id,state,record,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET slot=excluded.slot, child_mission_id=excluded.child_mission_id, state=excluded.state, record=excluded.record, updated_at=excluded.updated_at")
       .run(worker.id, worker.slot, worker.parentMissionId, worker.childMissionId, worker.state, JSON.stringify(worker), worker.createdAt, worker.updatedAt);
     return worker;
   }

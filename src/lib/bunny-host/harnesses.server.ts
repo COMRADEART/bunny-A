@@ -38,6 +38,9 @@ export class HarnessStore {
   pausedRoutes(harness: HarnessId): string[] {
     return (this.db.db.prepare("SELECT route FROM harness_paused WHERE harness=?").all(harness) as { route: string }[]).map((row) => row.route);
   }
+  forgetRoute(route: string) {
+    this.db.db.prepare("DELETE FROM harness_paused WHERE route=?").run(route);
+  }
   clearPaused(harness: HarnessId) {
     this.db.db.prepare("DELETE FROM harness_paused WHERE harness=?").run(harness);
   }

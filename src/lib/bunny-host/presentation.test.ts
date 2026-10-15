@@ -11,6 +11,7 @@ import {
   projectHostActivity,
   publicEventDetail,
   taskStatus,
+  UNCERTAIN_LABEL,
 } from "./presentation.ts";
 import type { HostEvent, HostSnapshot } from "./contracts.ts";
 import type { OrchTask } from "../orch/types.ts";
@@ -63,6 +64,12 @@ test("T5: a provider turn ending never establishes task completion or independen
   assert.match(rows[0].detail, /separate Host decisions/);
   assert.doesNotMatch(rows[0].title, /Verified|Task completed/);
   assert.equal(taskStatus(task()).label, "Provider turn running");
+});
+test("T13.3 N-C: a task with an uncertain outcome says so instead of plain failure or retry available", () => {
+  const t = task({ state: "failed", reconciliation: { required: true, reason: "OUTCOME_UNCERTAIN: x", at: 1 } });
+  assert.equal(taskStatus(t).label, UNCERTAIN_LABEL);
+  assert.equal(UNCERTAIN_LABEL, "Outcome uncertain — reconciliation required");
+  assert.equal(taskStatus(task({ state: "failed", reconciliation: { required: false, reason: "x", at: 1, resolution: "close" } })).label, "Task failed", "a reconciled task is an ordinary failure");
 });
 test("T5: completed tasks without independent evidence remain unverified", () => {
   const t = task({ state: "completed" });

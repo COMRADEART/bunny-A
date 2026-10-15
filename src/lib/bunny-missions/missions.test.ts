@@ -662,6 +662,8 @@ test("a deterministic skill mission carries its own commands in the envelope and
     assert.throws(() => env.missions.create({ objective: "x", mode: "fast", origin: "workstation", steps: [{ role: "A", objective: "a", executor: { kind: "skill", skillId: "no.such.skill" } }] }).state === "failed" ? (() => { throw new Error("planning failed"); })() : null, /planning failed/);
   } finally { await env.cleanup(); }
 });
+// T13.3 N-C baseline change: a write step that failed verification may already have changed the workspace, so the
+// automatic repair became pause → owner reconciliation → repair (the repair still carries the failure in context).
 test("verification failure triggers a bounded repair attempt with the failure in context", async () => {
   const env = await setup();
   try {
@@ -670,6 +672,10 @@ test("verification failure triggers a bounded repair attempt with the failure in
     env.missions.approve(view.id, "workstation");
     await until(() => env.launched.length === 1, "first attempt");
     env.launched[0].finish({ ok: true, output: "I created done.txt and it works." });
+    await until(() => env.missions.mission(view.id).state === "waiting_for_user", "paused for reconciliation");
+    const paused = env.missions.store.steps(view.id)[0];
+    assert.deepEqual([paused.state, paused.reconciliation?.required, env.launched.length], ["failed", true, 1], "no automatic write replay");
+    await env.missions.reconcile(view.id, paused.id, "retry", "workstation");
     await until(() => env.launched.length === 2, "repair attempt");
     assert.match(env.launched[1].task.prompt, /did not pass Bunny's checks/);
     writeFileSync(join(env.root, "done.txt"), "ok");

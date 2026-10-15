@@ -1,0 +1,241 @@
+[
+  {
+    "id": "NC-M1",
+    "what": "unscoped work is treated as read (only declared write is protected)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerouting (it may have written files)",
+      "T13.3 N-C 1/2: after a connection failure declared read work retries and reroutes; unscoped work pauses at once with reconciliation",
+      "T13.3 N-C 5: write work is not moved to another provider after any failure that may have started it",
+      "T13.3 N-C 6: a proven pre-dispatch failure earns exactly one bounded retry, and needs no reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M2",
+    "what": "every attempt counts as pre-dispatch (a connection failure taken as proof nothing landed)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F §18: a quota-constrained WRITE attempt pauses instead of rerouting, even with the switch allowed",
+      "T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerouting (it may have written files)",
+      "T13.3 N-C 1/2: after a connection failure declared read work retries and reroutes; unscoped work pauses at once with reconciliation",
+      "T13.3 N-C 4: a same-provider retry of write work is refused, even on a MANUAL pin"
+    ]
+  },
+  {
+    "id": "NC-M3",
+    "what": "write work with an uncertain outcome is retried (same candidate or rerouted)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F §18: a quota-constrained WRITE attempt pauses instead of rerouting, even with the switch allowed",
+      "T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerouting (it may have written files)",
+      "T13.3 N-C 1/2: after a connection failure declared read work retries and reroutes; unscoped work pauses at once with reconciliation",
+      "T13.3 N-C 4: a same-provider retry of write work is refused, even on a MANUAL pin"
+    ]
+  },
+  {
+    "id": "NC-M4",
+    "what": "pre-dispatch retries of write work are unbounded",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 6: a proven pre-dispatch failure earns exactly one bounded retry, and needs no reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M5",
+    "what": "the uncertain outcome is not recorded on the failed task",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 1/2: after a connection failure declared read work retries and reroutes; unscoped work pauses at once with reconciliation",
+      "T13.3 N-C 4: a same-provider retry of write work is refused, even on a MANUAL pin",
+      "T13.3 N-C 9: a restart preserves an uncertain outcome and turns an interrupted write attempt into one",
+      "T13.3 N-C 10/11: reconciliation is explicit; a retry is a linked task pinned to the same destination that waits for a fresh approval and can be cancelled"
+    ]
+  },
+  {
+    "id": "NC-M6",
+    "what": "a Host restart does not mark an interrupted write task uncertain",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 9: a restart preserves an uncertain outcome and turns an interrupted write attempt into one"
+    ]
+  },
+  {
+    "id": "NC-M7",
+    "what": "the linked retry is not pinned to the original provider",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 10/11: reconciliation is explicit; a retry is a linked task pinned to the same destination that waits for a fresh approval and can be cancelled"
+    ]
+  },
+  {
+    "id": "NC-M8",
+    "what": "the adapter certifies dispatched:false on a refused authority check no more (fail-closed regression of the pre-dispatch path)",
+    "file": "src/lib/bunny-host/adapters.server.ts",
+    "test": "src/lib/bunny-host/failure.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 6: the real adapter certifies dispatched:false only when no provider process started"
+    ]
+  },
+  {
+    "id": "NC-M9",
+    "what": "a spawn error after the process started is certified as pre-dispatch",
+    "file": "src/lib/bunny-host/adapters.server.ts",
+    "test": "src/lib/bunny-host/failure.test.ts",
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  },
+  {
+    "id": "NC-M10",
+    "what": "the Mission ignores the child task's uncertain outcome",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": null,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 3/10: a Mission write step never replays after an uncertain failure; it waits for the owner's reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M11",
+    "what": "an uncertain step still gets the automatic retry verdict",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": null,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 3/10: a Mission write step never replays after an uncertain failure; it waits for the owner's reconciliation",
+      "T13.3 N-C 8: a claim of idempotency the Host does not enforce is ignored; the uncertain write waits for the owner"
+    ]
+  },
+  {
+    "id": "NC-M12",
+    "what": "mission.retry replays an unreconciled uncertain step",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 3/10: a Mission write step never replays after an uncertain failure; it waits for the owner's reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M13",
+    "what": "a paired device may reconcile (mission.reconcile added to REMOTE)",
+    "file": "src/lib/bunny-missions/commands.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 3/10: a Mission write step never replays after an uncertain failure; it waits for the owner's reconciliation"
+    ]
+  },
+  {
+    "id": "NC-M14",
+    "what": "a claim of idempotency on the step is honoured",
+    "file": "src/lib/bunny-missions/machine.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 8: a claim of idempotency the Host does not enforce is ignored; the uncertain write waits for the owner"
+    ]
+  },
+  {
+    "id": "NC-M15",
+    "what": "the bus does not mark a run that threw after starting as uncertain",
+    "file": "src/lib/bunny-missions/capabilities/bus.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 8: a claim of idempotency the Host does not enforce is ignored; the uncertain write waits for the owner"
+    ]
+  },
+  {
+    "id": "NC-M16",
+    "what": "the guarded write writes again instead of detecting the landed write",
+    "file": "src/lib/bunny-missions/capabilities/local.server.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 7: a write with Host-enforced duplicate protection retries after an uncertain outcome and lands exactly once"
+    ]
+  },
+  {
+    "id": "NC-M17",
+    "what": "a Host restart does not mark an interrupted write-capable Mission step uncertain",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C 12: an interrupted write-capable worker is uncertain after a restart; all four Personal Agents keep their Mission context"
+    ]
+  },
+  {
+    "id": "NC-M18",
+    "what": "the owner sees plain failure instead of the uncertain state",
+    "file": "src/lib/bunny-host/presentation.ts",
+    "test": "src/lib/bunny-host/presentation.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-C: a task with an uncertain outcome says so instead of plain failure or retry available"
+    ]
+  },
+  {
+    "id": "NC-M19",
+    "what": "the verified-terminal-outcome carve-out is removed (verification repair of write work refused)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T3 §24/R24: a failed Bunny-A verification escalates the effort once on the same candidate, then exhausts honestly"
+    ]
+  }
+]

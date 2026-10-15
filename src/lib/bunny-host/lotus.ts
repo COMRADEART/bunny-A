@@ -56,7 +56,7 @@ const RANK: Record<LotusLayer, number> = { bud: 0, outer: 1, inner: 2, central: 
 
 /** Text that tries to steer an agent is evidence about the source, never an instruction; it is held as untrusted. */
 const STEERING =
-  /\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|any)\b[^.\n]{0,20}\b(instructions?|rules?|prompts?|context)\b|\bsystem prompt\b|\byou are now\b|\bnew instructions?\b|\bact as\b[^.\n]{0,30}\b(admin|root|developer|system)\b|\b(grant|give) (yourself|me) (full |admin )?(access|permissions?)\b/i;
+  /\b(ignore|disregard|forget|override)\b[^.\n]{0,40}\b(previous|prior|above|earlier|all|any|your|my|the)\b[^.\n]{0,20}\b(instructions?|rules?|prompts?|context|guidance|guidelines?|directions?|directives?)\b|\bsystem prompt\b|\byou are now\b|\bnew instructions?\b|\bact as\b[^.\n]{0,30}\b(admin|root|developer|system)\b|\b(grant|give) (yourself|me) (full |admin )?(access|permissions?)\b/i;
 
 export const isSteering = (text: string) => STEERING.test(text);
 
@@ -162,7 +162,9 @@ export function summarize(
   previous: Pick<LotusMemory, "value" | "sources" | "revision" | "trust"> | null,
 ): Pick<LotusInput, "scope" | "layer" | "key" | "value" | "trust" | "provenance"> & { sources: string[]; revision: number } {
   const order: LotusTrust[] = ["untrusted", "model", "host", "user"];
-  const trust = sources.reduce<LotusTrust>((low, m) => (order.indexOf(m.trust) < order.indexOf(low) ? m.trust : low), previous?.trust ?? "user");
+  // Folded text gets the same steering check as admit(): instruction-shaped text from anyone but the user is untrusted.
+  const trustOf = (m: LotusMemory): LotusTrust => (m.trust !== "user" && isSteering(`${m.key} ${m.value}`) ? "untrusted" : m.trust);
+  const trust = sources.reduce<LotusTrust>((low, m) => (order.indexOf(trustOf(m)) < order.indexOf(low) ? trustOf(m) : low), previous?.trust ?? "user");
   const lines = sources.map((m) => `${m.key}: ${m.value.slice(0, 80)}`);
   const prior = previous?.value ? [previous.value] : [];
   let value = [...prior, ...lines].join("; ");

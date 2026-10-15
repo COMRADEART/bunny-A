@@ -29,7 +29,7 @@ import { FilesystemCapability, GitCapability, NotificationsCapability, TerminalC
 import { agentPrompt, type DependencyResult } from "./context.ts";
 import { Inbox } from "./inbox.server.ts";
 import {
-  assertMissionTransition, assertStepTransition, blockedBy, classifyTaskFailure, MISSION_ACTIVE, missionProgress, readySteps, retryVerdict, STEP_DONE, validateGraph,
+  assertMissionTransition, assertStepTransition, blockedBy, classifyTaskFailure, enforcedIdempotent, settled, uncertainRun, uncertainSkillRuns, MISSION_ACTIVE, missionProgress, readySteps, retryVerdict, STEP_DONE, validateGraph,
 } from "./machine.ts";
 import { MissionMemory } from "./memory.server.ts";
 import { scopedPath } from "./paths.server.ts";
@@ -37,6 +37,9 @@ import { operationContract, crossAppFailure } from "./cross-app.ts";
 import { sha256 } from "./artifacts.server.ts";
 import { calculatorOperation } from "./batches.server.ts";
 import { runsLocally } from "../bunny-host/router.ts";
+import { ADAPTER_TOOL_CONTRACTS } from "../bunny-host/routing.server.ts";
+/** Child task states in which its provider session may be alive (T13.3 N-C). */
+const CHILD_LAUNCHED: string[] = ["launching", "running", "verifying", "waiting_for_input", "waiting_for_agent_approval", "paused"];
 import { planMission, PLANNER_ID } from "./planner.server.ts";
 import { SkillLibrary, fill } from "./skills.server.ts";
 import { MissionStore, redact } from "./store.server.ts";
@@ -168,6 +171,16 @@ export class MissionManager {
       const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
       if (!envelope) return "no approved mission envelope";
       if (envelope.revokedAt) return "authorization revoked";
+      // T13.3 N-C: no child of a step whose outcome is uncertain launches (an older child approved directly included)
+      // until the owner reconciles it.
+      const owner = this.store.step(task.mission!.stepId);
+      if (owner.reconciliation?.required)
+        return "OUTCOME_UNCERTAIN: this Mission step may already have taken effect; reconcile it (mission.reconcile) before anything for it runs.";
+      // Only a step's newest child may launch: a child older than a sibling belongs to an earlier attempt, whether it was
+      // launched, displaced or never recorded in the step's attempts. Task rows are upserted in place, so rowid is the
+      // exact creation order (no clock ties).
+      if (this.tasks.db.db.prepare("SELECT 1 FROM tasks WHERE id<>? AND json_extract(record,'$.mission.stepId')=? AND rowid>(SELECT rowid FROM tasks WHERE id=?) LIMIT 1").get(task.id, owner.id, task.id))
+        return "STALE_CHILD: this task belongs to an earlier attempt of its Mission step and can no longer run.";
       const team = teamProviderViolation(this, task);
       if (team) return team;
       // M-A-3 T9R-F01: no shell-capable session starts while paired-device changes await workstation review.
@@ -564,6 +577,12 @@ export class MissionManager {
         : null;
     });
     if (event) this.tasks.emit(event);
+    // T13.3 N-C: a failed step re-armed by any path (Retry, an automatic retry, restart recovery) withdraws every child
+    // of it that never launched, so none can be approved beside the next attempt. Stop marks it stopping synchronously.
+    if (step.state === "failed" && next.state === "ready")
+      for (const child of this.tasks.db.tasks())
+        if (child.mission?.stepId === step.id && ["queued", "routing", "waiting_for_approval"].includes(child.state))
+          void this.tasks.stop(child.id, `Withdrawn: ${step.role} was re-armed for a fresh attempt.`).catch(() => {});
     if (this.admissionHolds.size && STEP_LIVE.includes(step.state) && !STEP_LIVE.includes(next.state))
       for (const held of [...this.admissionHolds.keys()]) if (held !== step.missionId) this.schedule(held);
     return next;
@@ -1483,7 +1502,6 @@ export class MissionManager {
         ? this.projectContext.resolve(mission.projectId, mission.id, step.id, delegation)
         : null;
     const facts = this.memory.context(mission.id);
-    facts.push(...(this.missionPromptFacts?.(mission.id) ?? []));
     if (context)
       facts.push(
         `Project context reference ${context.id}; version ${context.contextVersion}; references are task data and grant no authority. Repository files are not uploaded automatically.`,
@@ -1494,6 +1512,7 @@ export class MissionManager {
       cwd: workspace,
       dependencies: this.dependencyResults(step),
       facts,
+      notes: this.missionPromptFacts?.(mission.id) ?? [],
       repair,
     });
     const constraints: TaskConstraints = {
@@ -1672,12 +1691,7 @@ export class MissionManager {
           ),
       });
     } catch (error) {
-      this.stepFailed(
-        mission,
-        this.markRunning(step, task.id, task.provider, workspace),
-        "provider_unavailable",
-        error instanceof Error ? error.message : String(error),
-      );
+      this.delegatedLaunchFailed(mission, step, task, workspace, error);
       return false;
     }
     this.countModelCall(mission.id, local);
@@ -1749,12 +1763,23 @@ export class MissionManager {
         check: (child) => teamProviderViolation(this, child) ?? taskViolation(child, envelope, runsLocally(this.tasks.live().find((provider) => provider.id === child.provider), child.model), usedExternal, Date.now(), this.store.step(step.id), sessionsUsed),
       });
     } catch (error) {
-      this.stepFailed(mission, this.markRunning(step, task.id, task.provider, workspace), "provider_unavailable", error instanceof Error ? error.message : String(error));
+      this.delegatedLaunchFailed(mission, step, task, workspace, error);
       return false;
     }
     this.countModelCall(mission.id, local);
     this.markRunning(step, task.id, task.provider, workspace);
     return true;
+  }
+  /**
+   * T13.3 N-C: a delegated launch threw. If the child's provider session may already have started (a throw after the
+   * adapter launched), write work waits for the owner instead of being rerouted beside it.
+   */
+  delegatedLaunchFailed(mission: Mission, step: MissionStep, task: OrchTask, workspace: string, error: unknown) {
+    const child = this.tasks.db.get(task.id);
+    const started = this.tasks.sessions.has(task.id) || CHILD_LAUNCHED.includes(child.state);
+    const running = this.markRunning(step, task.id, task.provider, workspace);
+    this.stepFailed(mission, running, "provider_unavailable", error instanceof Error ? error.message : String(error),
+      started && this.writeCapable(running) ? `OUTCOME_UNCERTAIN: the ${task.provider} session for ${step.role} may have started before the Host failed to record it, so it may already be changing files.` : null);
   }
   countModelCall(missionId: string, local: boolean) {
     const mission = this.store.mission(missionId);
@@ -1820,6 +1845,8 @@ export class MissionManager {
         permission: ({ action: string; risk: string; reason: string } & Pick<PermissionDecision, "desktopRequired" | "desktopOperation" | "remoteReview">) | null;
         /** M-A-3 T9R-F02 (D2): the executor's write was staged, not applied; the step waits for workstation promotion. */
         staged?: string | null;
+        /** M-A-3 T13.3 N-C: why a failed non-read run's outcome is unknown (null when it is known or enforced-idempotent). */
+        uncertain?: string | null;
       };
       // M-A-3 T11: a team write takes its content from the producer's verified handoff and its pre-image guard from
       // what this Mission last wrote there; a destination already holding these exact bytes is not written again.
@@ -1854,6 +1881,7 @@ export class MissionManager {
         const stagedOutput = outcome.result?.output && typeof outcome.result.output === "object" ? (outcome.result.output as { staged?: boolean; stagingId?: string }) : null;
         result = {
           staged: status === "succeeded" && stagedOutput?.staged === true && typeof stagedOutput.stagingId === "string" ? stagedOutput.stagingId : null,
+          uncertain: uncertainRun(outcome.run),
           ok: status === "succeeded",
           summary: outcome.run?.summary ?? outcome.decision.reason,
           artifactIds: outcome.artifactIds,
@@ -1892,6 +1920,7 @@ export class MissionManager {
           timeoutMs: step.timeoutMs,
         });
         result = {
+          uncertain: run.ok ? null : uncertainSkillRuns([...run.runs, ...(run.cleanupRuns ?? [])]),
           ok: run.ok,
           summary: run.ok
             ? `Skill ${run.skill} v${run.version} passed: ${run.runs.map((r) => r.summary).join(" · ").slice(0, 600)}`
@@ -1956,7 +1985,9 @@ export class MissionManager {
         this.askPromotion(this.store.mission(missionId), this.store.step(stepId), record);
         return;
       }
-      if (result.permission) {
+      // T13.3 N-C: an ask that arrives after a write already landed (a skill whose authority changed mid-run) would re-run
+      // that write once answered; the owner reconciles it instead.
+      if (result.permission && !result.uncertain) {
         this.workspace.release(stepId);
         this.askPermission(
           this.store.mission(missionId),
@@ -1981,6 +2012,7 @@ export class MissionManager {
             ? "permission_required"
             : (result.category ?? "capability_failed"),
           result.summary,
+          result.uncertain ?? null,
         );
         return;
       }
@@ -2003,6 +2035,9 @@ export class MissionManager {
           current,
           "capability_failed",
           safeError(error).message,
+          // T13.3 N-C: a throw after this attempt already wrote (a later skill step, or the check after a write) must not
+          // let the retry repeat what landed; judge by the runs this attempt recorded.
+          uncertainSkillRuns(this.store.runs({ missionId, stepId, limit: 500 }).filter((run) => run.startedAt >= (current.attempts.at(-1)?.startedAt ?? 0))),
         );
     }
   }
@@ -3645,6 +3680,8 @@ export class MissionManager {
         current,
         classifyTaskFailure(task.error ?? task.stopReason, task.state),
         task.error ?? task.stopReason ?? `Child task ${task.state}.`,
+        // T13.3 N-C: the TaskManager's own record of an uncertain write outcome, never the error text.
+        task.reconciliation?.required ? task.reconciliation.reason : null,
       );
       return;
     }
@@ -3871,6 +3908,7 @@ export class MissionManager {
             (line) => !/passed|present|changes present/.test(line) || /failed|missing/.test(line),
           )
           .join("; ") || checks.join("; "),
+        this.writeCapable(step) ? "VERIFY_PAUSE: the step finished but did not pass Bunny's own check; re-running it could repeat the changes it already made." : null,
       );
       return;
     }
@@ -3944,7 +3982,25 @@ export class MissionManager {
     }
     this.schedule(mission.id);
   }
-  stepFailed(mission: Mission, step: MissionStep, category: FailureCategory, detail: string) {
+  /**
+   * M-A-3 T13.3 N-C: whether re-running this step could repeat a change: model work not declared read, any capability
+   * or skill that is not read-only, unless the Host itself enforces duplicate protection for it. Fails closed.
+   */
+  writeCapable(step: MissionStep): boolean {
+    // A team write always runs under teamWrite's pre-image guard (Host-enforced dedup), whatever its stored params say.
+    if (step.team?.kind === "write_file") return false;
+    if (step.executor.kind === "model") {
+      if (step.scope?.access === "read") return false;
+      // Same rule as direct tasks: work that ran on a tool-free provider could not write.
+      try { if (step.taskId && ADAPTER_TOOL_CONTRACTS[this.tasks.db.get(step.taskId).provider] === false) return false; } catch { /* no task: fail closed */ }
+      return true;
+    }
+    if (step.executor.kind === "capability")
+      return (this.bus.riskOf(step.executor.action, step.executor.params) ?? "EXECUTE") !== "READ" && !enforcedIdempotent(step.executor.action, step.executor.params);
+    return true;
+  }
+  /** `uncertain`: why the failed attempt may have changed something (T13.3 N-C); such a step never retries automatically. */
+  stepFailed(mission: Mission, step: MissionStep, category: FailureCategory, detail: string, uncertain: string | null = null) {
     const owned = this.store.step(step.id);
     if (
       this.closed ||
@@ -3955,7 +4011,9 @@ export class MissionManager {
       return;
     step = owned;
     this.workspace.release(step.id);
-    if (owned.team && mission.team && this.teamFailure(mission, owned, category, detail)) return;
+    // A failed team check activates the owner-reviewed rework chain. Its replica write runs under teamWrite's pre-image
+    // guard (FILE_CONFLICT unless the file holds this Mission's own last verified bytes), so nothing is replayed blindly.
+    if (owned.team && mission.team && !uncertain && this.teamFailure(mission, owned, category, detail)) return;
     const attempts = step.attempts.length
       ? step.attempts.map((attempt, index) =>
           index === step.attempts.length - 1
@@ -3973,14 +4031,16 @@ export class MissionManager {
             : attempt,
         )
       : step.attempts;
-    const verdict = retryVerdict(
-      category,
-      attempts.length,
-      step.maxRetries,
-      this.accounting(mission.id).retries,
-      mission.budget.maxRetries,
-      step.scope?.access,
-    );
+    const verdict = uncertain
+      ? { retry: false, reroute: false, waitForUser: true, reason: `Outcome uncertain — reconciliation required. ${uncertain}` }
+      : retryVerdict(
+          category,
+          attempts.length,
+          step.maxRetries,
+          this.accounting(mission.id).retries,
+          mission.budget.maxRetries,
+          step.scope?.access,
+        );
     if (verdict.retry) {
       // Reroute only when another provider could take the step; otherwise retry where it is.
       const failedProvider = step.accounting.provider ?? step.attempts.at(-1)?.provider ?? null;
@@ -4026,6 +4086,7 @@ export class MissionManager {
         finishedAt: Date.now(),
         attempts,
         failure: { category, detail: detail.slice(0, 2000) },
+        ...(uncertain ? { reconciliation: { required: true, reason: uncertain.slice(0, 1000), at: Date.now() } } : {}),
         approvedOnce: null,
       },
       "mission.step.failed",
@@ -4639,6 +4700,42 @@ export class MissionManager {
       this.stopping.delete(id);
     }
   }
+  /**
+   * M-A-3 T13.3 N-C: the owner's decision about a step whose outcome is uncertain. "retry" records the review and runs
+   * the normal bounded Retry (same Mission and step, a fresh child task, fresh approvals); "stop" stops the Mission. The
+   * workstation only: MISSION_ACTIONS admits it and the device REMOTE set does not.
+   */
+  async reconcile(id: string, stepId: string, resolution: unknown, by: string): Promise<MissionView> {
+    const step = this.store.step(stepId);
+    if (step.missionId !== id) throw new CommandRefusedError("That step is not part of this Mission.");
+    if (step.state !== "failed" || !step.reconciliation?.required) throw new CommandRefusedError("This step has no uncertain outcome waiting for reconciliation.");
+    if (resolution !== "retry" && resolution !== "stop") throw new CommandRefusedError("Resolution must be retry or stop.");
+    const before = step.reconciliation;
+    const resolved = { ...before, required: false, resolution: resolution as "retry" | "stop", resolvedBy: by, resolvedAt: Date.now() };
+    const recorded = `${by} reviewed the uncertain outcome of ${step.role} and chose ${resolution}.`;
+    if (resolution === "stop") {
+      this.setStep(step, { reconciliation: resolved }, "mission.step.reconciled", recorded);
+      return await this.stop(id, by);
+    }
+    // A retry never runs beside a process of an earlier attempt that may still be alive: this Host's watch of any child
+    // task of the step, a restart survivor of this Mission, or an unreadable record, which names no owner (fail closed).
+    const children = [step.taskId, ...step.attempts.map((attempt) => attempt.taskId)].filter((child): child is string => !!child);
+    // Only a child that was launched can hold a process; one that never launched (waiting_for_approval) cannot block.
+    const unfinished = children.some((child) => this.tasks.sessions.has(child) || (() => { try { return CHILD_LAUNCHED.includes(this.tasks.db.get(child).state); } catch { return false; } })());
+    if (unfinished || [...this.tasks.lingering.keys()].some((key) => key.startsWith("unreadable:") || children.some((child) => key.startsWith(`${child}#`)) || this.tasks.restartSurvivorMission.get(key)?.missionId === id))
+      throw new CommandRefusedError("A provider process from an earlier attempt may still be running, or its record cannot be read yet; Bunny starts no retry until none is alive. Try again shortly.");
+    // The decision is recorded (and announced) only once the Retry it authorizes is accepted.
+    this.setStep(step, { reconciliation: resolved });
+    try {
+      this.retry(id, by);
+    } catch (error) {
+      // A refused Retry leaves the step exactly as uncertain as it was, with no record of a decision.
+      this.setStep(this.store.step(stepId), { reconciliation: before });
+      throw error;
+    }
+    this.setStep(this.store.step(stepId), {}, "mission.step.reconciled", recorded);
+    return this.view(this.store.mission(id));
+  }
   retry(id: string, by: string): MissionView {
     this.requireEnabled();
     let mission = this.store.mission(id);
@@ -4659,6 +4756,10 @@ export class MissionManager {
     const retryable = [...before.filter((step) => step.state === "failed" && !step.team?.supersededBy), ...waitingPromotion];
     if (!retryable.length && !before.some((step) => step.state === "blocked"))
       throw new Error("No failed step to retry.");
+    // T13.3 N-C: a step whose last attempt may already have taken effect is never replayed before the owner reconciles it.
+    const unreconciled = retryable.filter((step) => step.reconciliation?.required);
+    if (unreconciled.length)
+      throw new CommandRefusedError(`OUTCOME_UNCERTAIN: ${unreconciled.map((step) => step.role).join(", ")} may already have taken effect. Review it, then reconcile (mission.reconcile) before retrying.`);
     for (const step of retryable)
       // Explicit retries are still bounded: at most twice the automatic per-step limit plus one.
       if (step.attempts.length > step.maxRetries * 2 + 1)
@@ -4726,6 +4827,10 @@ export class MissionManager {
       );
     if (this.store.steps(id).some((step) => STEP_LIVE.includes(step.state)))
       throw new Error("Steps are still running; stop them first.");
+    // T13.3 N-C: a new plan would re-do work that may already have taken effect; the owner reconciles it first.
+    const uncertain = this.store.steps(id).filter((step) => step.reconciliation?.required);
+    if (uncertain.length)
+      throw new CommandRefusedError(`OUTCOME_UNCERTAIN: ${uncertain.map((step) => step.role).join(", ")} may already have taken effect. Reconcile it (mission.reconcile) before replanning.`);
     if (mission.planning.replans >= this.cached.limits.maxReplans)
       throw new Error(`Replan limit (${this.cached.limits.maxReplans}) reached.`);
     // M-A-3 T11: a team Mission is replanned only by its Planner Agent, and only before any execution step completed.
@@ -4825,6 +4930,8 @@ export class MissionManager {
       if (step.team) {
         const mission = this.store.mission(missionId);
         if (ownerHold(this, step, false)) { results.push({ stepId: step.id, applied: false, reason: "The owning Agent was stopped; its work is not revived." }); continue; }
+        // T13.3 N-C: a step whose outcome is uncertain is never re-admitted or settled here; the owner reconciles it.
+        if (step.reconciliation?.required) { results.push({ stepId: step.id, applied: false, reason: "Outcome uncertain — reconciliation required (mission.reconcile)." }); continue; }
         if (step.team.kind === "write_file" && isTeam(mission)) {
           const write = teamWrite(this, mission, step, false);
           if ("already" in write) {
@@ -4845,6 +4952,8 @@ export class MissionManager {
         continue;
       }
       if (instruction.mode === "resubmit") {
+        // T13.3 N-C: only the owner's reconciliation replays a step whose outcome is uncertain.
+        if (step.reconciliation?.required) { results.push({ stepId: instruction.stepId, applied: false, reason: "Outcome uncertain — reconciliation required (mission.reconcile)." }); continue; }
         if (step.state === "blocked")
           this.setStep(
             step,
@@ -4882,7 +4991,8 @@ export class MissionManager {
           throw new Error("Canonical recovery output integrity failed.");
         this.setStep(
           step,
-          { state: "ready", finishedAt: null, failure: null },
+          // T13.3 N-C: the canonical result settles what happened, so nothing is left to reconcile.
+          { state: "ready", finishedAt: null, failure: null, ...settled(step) },
           "mission.step.recovered",
           "Consume a canonical capability result; repeat only independent postconditions.",
         );
@@ -4912,7 +5022,7 @@ export class MissionManager {
       }
       this.setStep(
         step,
-        { state: "ready", finishedAt: null, failure: null },
+        { state: "ready", finishedAt: null, failure: null, ...settled(step) },
         "mission.step.recovered",
         `${step.role} reconciliation: the child task's canonical result is consumed.`,
       );
@@ -5067,6 +5177,11 @@ export class MissionManager {
                 detail:
                   "Previous approval request was invalidated by Host restart; retry requires a fresh decision.",
               },
+              // T13.3 N-C: a one-time approval is held for the whole run, so a write-capable step that was already
+              // running when the Host stopped may have taken effect; a fresh decision is then not enough.
+              ...(["running", "verifying"].includes(step.state) && this.writeCapable(step)
+                ? { reconciliation: { required: true, reason: `OUTCOME_UNCERTAIN: the Host restarted while ${step.role} was running under a one-time approval, so it may already have changed files or external systems.`, at: now } }
+                : {}),
             },
             "mission.permission_invalidated",
             `${step.role} needs a fresh permission request after Host restart.`,
@@ -5098,6 +5213,9 @@ export class MissionManager {
               }
             : attempt,
         );
+        // T13.3 N-C: an interrupted step that could write may already have taken effect. Retry stays available, but only
+        // after the owner reconciles; read-only work and Host-enforced idempotent writes need no reconciliation.
+        const mayHaveWritten = this.writeCapable(step);
         this.setStep(
           step,
           {
@@ -5105,6 +5223,7 @@ export class MissionManager {
             finishedAt: now,
             attempts,
             failure: { category: "host_restart", detail },
+            ...(mayHaveWritten ? { reconciliation: { required: true, reason: `OUTCOME_UNCERTAIN: the Host restarted while ${step.role} was running, so it may already have changed files or external systems.`, at: now } } : {}),
           },
           "mission.step.failed",
           `${step.role} interrupted by Host restart: ${detail}`,

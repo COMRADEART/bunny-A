@@ -1,0 +1,312 @@
+[
+  {
+    "id": "F1-M1",
+    "what": "worker Project memory appended to the child Mission objective again",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker"
+    ]
+  },
+  {
+    "id": "F1-M2",
+    "what": "worker Project memory never reaches the model prompt",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker"
+    ]
+  },
+  {
+    "id": "F2-M1",
+    "what": "a paired device may approve, start, retry or answer a worker's child Mission",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker"
+    ]
+  },
+  {
+    "id": "F2-M2",
+    "what": "mission.respond is not mapped to its worker Mission",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker"
+    ]
+  },
+  {
+    "id": "F3-M1",
+    "what": "Studio save re-records every focused Agent's owner",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/personal-agent-context-host.test.ts",
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  },
+  {
+    "id": "F3-M2",
+    "what": "assign leaves the old slot focused on the moved Agent",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/personal-agent-context-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 B rebinding a slot in the Studio transfers ownership explicitly; assign accepts only user-facing Agents"
+    ]
+  },
+  {
+    "id": "F4-M1",
+    "what": "an unscoped direct task reroutes on quota again (only declared write pauses)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F4: an UNSCOPED direct task that hits quota pauses instead of rerouting (it may have written files)"
+    ]
+  },
+  {
+    "id": "F4-M2",
+    "what": "quota never pauses (read work no longer distinguished)",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T3 §22/R22: a quota-constrained READ attempt reroutes to the next candidate within the bounded recovery"
+    ]
+  },
+  {
+    "id": "F5-M1",
+    "what": "lotus.writeAll writes one by one (no admit-first, no transaction)",
+    "file": "src/lib/bunny-host/lotus.server.ts",
+    "test": "src/lib/bunny-host/lotus.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N9: writeAll rolls back copies already written when a later write fails inside the transaction",
+      "T13.3 C store: writeAll stores every memory or none"
+    ]
+  },
+  {
+    "id": "F6-M1",
+    "what": "compaction folds the reply's quoted memory lines at host trust",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/lotus-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F6: a short reply that quotes outside text from memory is folded without it, at host trust"
+    ]
+  },
+  {
+    "id": "F6-M2",
+    "what": "compaction skips the steering check",
+    "file": "src/lib/bunny-host/lotus.ts",
+    "test": "src/lib/bunny-host/lotus.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F6: compaction runs the steering check; instruction-shaped folded text from anyone but the user is untrusted"
+    ]
+  },
+  {
+    "id": "F7-M1",
+    "what": "harness.enable resumes every paused route",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/harnesses-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 E harness views, stepped tests, and disable/enable/remove enforced by the dispatch gate"
+    ]
+  },
+  {
+    "id": "F7-M2",
+    "what": "an owner's own pause does not supersede the harness.disable record",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/harnesses-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 E harness views, stepped tests, and disable/enable/remove enforced by the dispatch gate"
+    ]
+  },
+  {
+    "id": "F11-M1",
+    "what": "no aging: priority alone orders held Agents",
+    "file": "src/lib/bunny-host/fairness.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F11: aging; a low-priority Agent held long enough is no longer starved by a high-priority one"
+    ]
+  },
+  {
+    "id": "F12-M1",
+    "what": "an ownership change (assign or Studio rebinding) leaves open workers on the old slot",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F12: reassigning a parent Agent moves its open workers to the new slot; closed workers keep their history"
+    ]
+  },
+  {
+    "id": "F12-M2",
+    "what": "the worker store never persists a changed slot",
+    "file": "src/lib/bunny-host/workers.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F12: reassigning a parent Agent moves its open workers to the new slot; closed workers keep their history"
+    ]
+  },
+  {
+    "id": "N1-M1",
+    "what": "a worker's child Mission ignores its paused parent Agent",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N1: pausing a Personal Agent holds its workers' child Missions"
+    ]
+  },
+  {
+    "id": "N4-M1",
+    "what": "an ownership change may exceed the receiving slot's open-worker cap",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F12: reassigning a parent Agent moves its open workers to the new slot; closed workers keep their history"
+    ]
+  },
+  {
+    "id": "N5-M1",
+    "what": "write work reroutes after a persistent transport failure",
+    "file": "src/lib/bunny-host/manager.server.ts",
+    "test": "src/lib/bunny-host/t3-manager.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N5: an unscoped task whose transport keeps failing pauses instead of rerouting; a declared read task still reroutes"
+    ]
+  },
+  {
+    "id": "N6-M1",
+    "what": "steering check misses guidance/guidelines/directions phrasings",
+    "file": "src/lib/bunny-host/lotus.ts",
+    "test": "src/lib/bunny-host/lotus.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F6: compaction runs the steering check; instruction-shaped folded text from anyone but the user is untrusted"
+    ]
+  },
+  {
+    "id": "N7-M1",
+    "what": "an unavailable phrase outranks quota evidence",
+    "file": "src/lib/bunny-host/routing.server.ts",
+    "test": "src/lib/bunny-host/routing.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T3 §21: every failure signature classifies into exactly one taxonomy; the default stays EXECUTION_FAILED"
+    ]
+  },
+  {
+    "id": "N9-M1",
+    "what": "writeAll never rolls back a partial batch",
+    "file": "src/lib/bunny-host/lotus.server.ts",
+    "test": "src/lib/bunny-host/lotus.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N9: writeAll rolls back copies already written when a later write fails inside the transaction"
+    ]
+  },
+  {
+    "id": "F1R-M1",
+    "what": "worker Project memory listed under Verified facts",
+    "file": "src/lib/bunny-missions/manager.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 D a model worker's Project memory reaches only its model prompt; a device can neither read it nor release the worker"
+    ]
+  },
+  {
+    "id": "NB-M1",
+    "what": "a Mission treats the Host's write pause as a plain provider failure (reroutes)",
+    "file": "src/lib/bunny-missions/machine.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-B: a write step whose transport keeps failing pauses for the owner; the Mission never moves it to another provider",
+      "T13.3 N-D: an address or port containing 429 is not quota evidence"
+    ]
+  },
+  {
+    "id": "NA-M1",
+    "what": "the cap check counts workers leaving the slot in the same save",
+    "file": "src/lib/bunny-host/http.server.ts",
+    "test": "src/lib/bunny-host/workers-host.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 F12: reassigning a parent Agent moves its open workers to the new slot; closed workers keep their history"
+    ]
+  },
+  {
+    "id": "ND-M1",
+    "what": "429 matches inside an address or port",
+    "file": "src/lib/bunny-host/routing.server.ts",
+    "test": "src/lib/bunny-host/routing.test.ts",
+    "applied": true,
+    "exit": 0,
+    "killed": false,
+    "failing": []
+  }
+]

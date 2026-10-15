@@ -1,0 +1,27 @@
+[
+  {
+    "id": "NB-M1",
+    "what": "a Mission treats the Host's write pause as a plain provider failure (reroutes)",
+    "file": "src/lib/bunny-missions/machine.ts",
+    "test": "src/lib/bunny-missions/scheduler.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T13.3 N-B: a write step whose transport keeps failing pauses for the owner; the Mission never moves it to another provider",
+      "T13.3 N-D: an address or port containing 429 is not quota evidence"
+    ]
+  },
+  {
+    "id": "ND-M1",
+    "what": "429 matches inside an address or port",
+    "file": "src/lib/bunny-host/routing.server.ts",
+    "test": "src/lib/bunny-host/routing.test.ts",
+    "applied": true,
+    "exit": 1,
+    "killed": true,
+    "failing": [
+      "T3 §21: every failure signature classifies into exactly one taxonomy; the default stays EXECUTION_FAILED"
+    ]
+  }
+]

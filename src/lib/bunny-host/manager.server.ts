@@ -13,7 +13,7 @@ import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapt
 import { PolicyEngine, toRecorded } from "./learning.server.ts";
 import { classifyRequirements, effortRequirement, type TaskRequirements ,
 } from "../orch/router-requirements.ts";
-import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, QUOTA_WRITE_PAUSE, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
+import { ADAPTER_TOOL_CONTRACTS, ROUTING_POLICY_VERSION, PROVIDER_EFFORT_CONTRACTS, buildCandidates, selectRoutingCandidate, safeDecisionRecord, preLaunchRevalidate, codexCompatibilityFresh, classifyFailure, planRecovery, exhaustionNote, STOP_WRITE_PAUSE, OUTCOME_UNCERTAIN_PAUSE, writePause, RECOVERY_BOUNDS, ROUTING_PRIORITIES, type RoutingDecisionRecord, type RoutingFailureTaxonomy, type RoutingPriority,
 } from "./routing.server.ts";
 import { RoutingDecisionStore } from "./routing-store.server.ts";
 import { DEFAULT_TIMING, ProviderRegistry, type RegistryTiming } from "./registry.server.ts";
@@ -223,6 +223,11 @@ export class TaskManager {
             error:
               "Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.",
             finishedAt: Date.now(),
+            // T13.3 N-C: an interrupted attempt of work not declared read may already have changed things; a restart
+            // never clears that, and nothing replays it until the owner reconciles.
+            ...(task.executionScope?.access !== "read" && ADAPTER_TOOL_CONTRACTS[task.provider] !== false
+              ? { dispatch: "may_have_started" as const, reconciliation: { required: true, reason: "OUTCOME_UNCERTAIN: the Host restarted while this work was in progress, so it may have changed files or external systems. Outcome uncertain — reconciliation required.", at: Date.now() } }
+              : {}),
           },
           "task.failed",
           "Host restarted; session recovery unsupported.",
@@ -423,6 +428,16 @@ export class TaskManager {
       );
     if (patch.state && patch.state !== owned.state && !canTransition(owned.state, patch.state))
       throw new Error(`Invalid transition ${owned.state} → ${patch.state}`);
+    // T13.3 N-C: write work that leaves a launched state as stopped or failed by any path other than the attempt loop
+    // (which records dispatch itself) — a user stop, the runtime limit, a Host fault, containment — may already have
+    // changed things. Nothing replays it until the owner reconciles.
+    if (
+      (patch.state === "stopped" || patch.state === "failed") &&
+      ["launching", "running", "verifying", "waiting_for_input", "waiting_for_agent_approval", "paused"].includes(owned.state) &&
+      !Object.hasOwn(patch, "dispatch") && !Object.hasOwn(patch, "reconciliation") &&
+      owned.executionScope?.access !== "read" && ADAPTER_TOOL_CONTRACTS[owned.provider] !== false
+    )
+      patch = { ...patch, dispatch: "may_have_started", reconciliation: { required: true, reason: patch.state === "stopped" ? STOP_WRITE_PAUSE : OUTCOME_UNCERTAIN_PAUSE, at: Date.now() } };
     const next = {
       ...owned,
       ...patch,
@@ -1410,6 +1425,38 @@ export class TaskManager {
     return launched;
   }
   /**
+   * M-A-3 T13.3 N-C: the owner's reconciliation of an uncertain outcome (the Host route admits the workstation only).
+   * A terminal task never reopens, so "retry" submits a linked task pinned to the same provider and model, which waits
+   * for a fresh approval and passes the same connection consent at dispatch. "close" records the review and ends there.
+   * A Mission's own child is reconciled through its Mission.
+   */
+  reconcile(id: string, resolution: unknown, by: string): { task: OrchTask; retry: OrchTask | null } {
+    const task = this.db.get(id);
+    if (task.mission) throw new CommandRefusedError("A Mission's task is reconciled through its Mission.");
+    if (!["failed", "stopped"].includes(task.state) || !task.reconciliation?.required) throw new CommandRefusedError("This task has no uncertain outcome waiting for reconciliation.");
+    if (resolution !== "retry" && resolution !== "close") throw new CommandRefusedError("Resolution must be retry or close.");
+    // A retry never runs beside a process of the original that may still be alive (this Host's or one from before a restart).
+    // An unreadable provider-session record names no task, so it could be this one's (fail closed, review N-C round 2).
+    const survivor = [...this.lingering.keys()].some((key) => key.startsWith(`${task.id}#`) || key.startsWith("unreadable:") || this.restartSurvivorMission.get(key)?.taskId === task.id);
+    if (resolution === "retry" && survivor)
+      throw new CommandRefusedError("A process from the original attempt may still be running; Bunny starts no retry until none is alive. Try again shortly.");
+    // The exact model is pinned only when routing offered it as a selectable candidate; a provider default (or a model the
+    // provider merely reported) pins the provider alone, as a manual selection would.
+    const considered = task.routingDecisionId
+      ? this.routingStore.decision(task.routingDecisionId)?.candidates_considered.find((row) => row.provider_id === task.provider && row.model_id === task.model)
+      : undefined;
+    const retry = resolution === "retry"
+      ? this.submit({ prompt: task.prompt, mode: task.mode, projectId: task.projectId ?? null, override: task.provider, modelOverride: considered && considered.candidate_kind !== "PROVIDER_DEFAULT" ? task.model : null, constraints: task.constraints, verify: task.verify ?? null, ...(task.executionScope ? { executionScope: task.executionScope } : {}) })
+      : null;
+    const reconciled = this.update(
+      task,
+      { reconciliation: { ...task.reconciliation, required: false, resolution, resolvedBy: by, resolvedAt: Date.now(), ...(retry ? { retryTaskId: retry.id } : {}) } },
+      "task.reconciled",
+      retry ? `${by} reviewed the uncertain outcome and asked for a retry; task ${retry.id} on ${retry.provider} waits for a fresh approval.` : `${by} reviewed the uncertain outcome and closed the task.`,
+    );
+    return { task: reconciled, retry };
+  }
+  /**
    * Mission-delegated approval: the user approved the mission's authorization envelope, not this child.
    * `check` re-validates the child against that envelope at launch time; anything outside it is refused
    * so the mission stops and asks. Recorded as `approval.delegated`, never as a user click.
@@ -1830,6 +1877,9 @@ export class TaskManager {
           finishedAt: Date.now(),
           error: message,
           latestEvent: this.activity(launching, "agent.failed", message),
+          // T13.3 N-C: launch() threw synchronously; every adapter starts its provider inside the returned promise, so
+          // nothing was dispatched.
+          dispatch: "not_started",
         },
         "task.failed",
         message,
@@ -1866,6 +1916,7 @@ export class TaskManager {
         let sameRetries = 0;
         let alternates = 0;
         let escalations = 0;
+        let preDispatchRetries = 0;
         const attempted: {
           provider_id: ProviderId;
           model_id: string | null;
@@ -1894,6 +1945,13 @@ export class TaskManager {
             return;
           }
           let state: TaskState = result.stopped ? "stopped" : result.ok ? "completed" : "failed";
+          let uncertain: string | null = null;
+          // T13.3 N-C: write work is anything not declared read on a provider that can act on files or systems; an
+          // adapter without tools (Ollama today) cannot change anything, so its work is never write work.
+          const writeWork = current.executionScope?.access !== "read" && ADAPTER_TOOL_CONTRACTS[current.provider] !== false;
+          // Only the adapter's dispatched:false proves nothing was started; anything else may have started.
+          const mayHaveStarted = result.dispatched !== false;
+          if (state === "stopped" && writeWork && mayHaveStarted) uncertain = STOP_WRITE_PAUSE;
           let verification = current.verification ?? null;
           let error = result.error ?? null;
           if (state === "completed" && current.verify) {
@@ -1993,7 +2051,7 @@ export class TaskManager {
                 ),
               );
             };
-            const action = planRecovery({
+            let action = planRecovery({
               taxonomy,
               attemptIndex: attempt,
               sameRetriesUsed: sameRetries,
@@ -2002,13 +2060,23 @@ export class TaskManager {
               reroutesUsed: alternates,
               policyAllows: true,
             });
-            if (action.action === "fail") exhaustNow(action.reason);
+            // T13.3 N-C (owner decision 2026-10-14; supersedes the F4/N5 special cases): write work (see writeWork) is never
+            // re-executed automatically once its attempt may have started, on the same candidate or another, whatever
+            // the failure: a connection failure, a crash, a refusal or a failed Bunny-A check of a finished attempt. Only
+            // an adapter-certified pre-dispatch failure (dispatched:false) earns exactly one bounded retry on the same
+            // candidate. A connection failure is never taken as proof that nothing landed.
+            if (writeWork && mayHaveStarted) uncertain = writePause(taxonomy);
+            if (writeWork && !mayHaveStarted)
+              // Never beyond the T3 attempt bound either (review N5).
+              action = preDispatchRetries++ >= 1 || attempt >= RECOVERY_BOUNDS.maxAttempts
+                ? { action: "fail", reason: "The provider could not be started again; nothing was sent to it. Retry when it is available." }
+                : { action: "retry-same", reason: "No provider process was started; one bounded retry of the same candidate." };
+            if (uncertain) exhaustNow(uncertain);
+            else if (action.action === "fail") exhaustNow(action.reason);
             else if (current.routingMode === "manual" && action.action !== "retry-same")
               exhaustNow(
                 `Manual model selection is fixed; the task failed instead of re-routing. ${action.reason}`,
               );
-            else if (taxonomy === "QUOTA_CONSTRAINED" && current.executionScope?.access === "write")
-              exhaustNow(QUOTA_WRITE_PAUSE);
             else if (action.action === "retry-same") {
               sameRetries += 1;
               const label = `${current.provider}${current.model==="auto" ? " · provider default" : ` · ${current.model}`}`;
@@ -2078,6 +2146,10 @@ export class TaskManager {
               exitCode: result.exitCode ?? null,
               activity: activityLabel(`task.${state}`),
               verification,
+              // T13.3 N-C: what is known about dispatch, and whether the owner must reconcile before anything replays it.
+              // Only a completed attempt has a verified terminal outcome (review N8); a failed Bunny-A check does not.
+              dispatch: result.dispatched === false ? "not_started" : state === "completed" ? "verified_terminal" : "may_have_started",
+              ...(state !== "completed" && uncertain ? { reconciliation: { required: true, reason: uncertain, at: Date.now() } } : {}),
               usage: reportedUsage ?? latest.usage ?? null,
               latestEvent: this.activity(
                 latest,

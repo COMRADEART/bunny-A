@@ -271,9 +271,10 @@ export class MissionStore {
     if (!row) throw new Error("Unknown capability run.");
     return JSON.parse(row.record) as CapabilityRun;
   }
-  runs(filter: { missionId?: string; status?: string; limit?: number } = {}): CapabilityRun[] {
+  runs(filter: { missionId?: string; stepId?: string; status?: string; limit?: number } = {}): CapabilityRun[] {
     const where: string[] = []; const args: (string | number)[] = [];
     if (filter.missionId) { where.push("mission_id=?"); args.push(filter.missionId); }
+    if (filter.stepId) { where.push("step_id=?"); args.push(filter.stepId); }
     if (filter.status) { where.push("status=?"); args.push(filter.status); }
     return (this.db.prepare(`SELECT record FROM capability_runs ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY started_at DESC LIMIT ?`).all(...args, filter.limit ?? 200) as { record: string }[]).map((row) => JSON.parse(row.record) as CapabilityRun);
   }

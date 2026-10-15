@@ -56,6 +56,13 @@ Moves after ADMITTED are driven only by the child Mission's own state, observed 
   but has no Host verification closes as INDETERMINATE.
 - **Every proposal is recorded.** A refused proposal is saved as `PROPOSED → ELIGIBILITY_CHECK → REJECTED → CLOSED` with
   the reasons and returns 400 with the same text; no Mission is created.
+- **Ownership follows the Agent (Gate J).** When an Agent's owner changes (`personal_agent.assign` or a Studio
+  rebinding), its open workers move to the new slot; closed workers keep the slot they ran under as history. A move that
+  would push a slot over its open-worker cap is refused and changes nothing; the check uses the net effect of the save.
+- **Pause holds workers (Gate J).** While a Personal Agent is paused, its workers' child Missions admit no new step,
+  exactly like the Agent's own Missions.
+- **Memory is labelled in the prompt.** A model worker's Project memory reaches only its model prompt, under its own
+  "Context from the Project's memory" heading, never under "Verified facts" and never on a Mission field.
 - **Restart.** Workers persist. On boot an open worker without a child Mission closes as REJECTED; others are re-synced
   from their child Mission. An ADMITTED worker stays ADMITTED; nothing is marked complete by a restart.
 

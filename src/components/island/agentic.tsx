@@ -19,6 +19,7 @@ import {
 import { useIsland } from "@/store/use-island";
 import { WeaponCharacter, usePrefersReducedMotion } from "./characters";
 import { appearanceFor } from "./character-style-model";
+import { UNCERTAIN_LABEL } from "@/lib/bunny-host/presentation";
 import { displayState, hostLive } from "./character-model";
 import { AuthorizationCard, TeamsSection } from "./agent";
 import { parseRequirementLines, teamPanels } from "./team-model";
@@ -926,6 +927,7 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
                         : "No dependencies"}
                     </small>
                     {step.failure && <small>{step.failure.category.replaceAll("_", " ")}</small>}
+                    {step.reconciliation?.required && <small>{UNCERTAIN_LABEL}</small>}
                   </div>
                 </li>
               ))}

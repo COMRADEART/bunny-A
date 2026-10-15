@@ -34,6 +34,8 @@ export type StepState =
 export type FailureCategory =
   | "provider_unavailable"
   | "provider_rate_limited"
+  /** M-A-3 T13.3 N-B: the Host paused write work it could not safely move to another provider. */
+  | "provider_write_paused"
   | "provider_failed"
   | "capability_unavailable"
   | "capability_failed"
@@ -258,6 +260,8 @@ export type MissionStep = {
   result: { summary: string; artifactIds: string[]; verified: boolean | null; verification: string[]; outputRef?: string; verificationRunIds?: string[] } | null;
   evidence: string[];
   failure: { category: FailureCategory; detail: string } | null;
+  /** M-A-3 T13.3 N-C: the step's last attempt may have changed something and then failed; replay waits for the owner. */
+  reconciliation?: import("../orch/types.ts").Reconciliation;
   accounting: StepAccounting;
   pendingRequestId: string | null;
   /** Pending phase; one capability invocation or matching actions in one skill run (see approval UI). */
@@ -607,6 +611,10 @@ export type CapabilityResult = {
   after?: unknown;
   errorCategory?: FailureCategory;
   cleanup?: { attempted: boolean; ok: boolean; detail: string };
+  /** M-A-3 T13.3 N-C: set by the bus, never by an adapter: the action started and its outcome is unknown. */
+  uncertain?: true;
+  /** M-A-3 T13.3 N-C: the adapter certifies this failure changed nothing (a refusal before any effect). */
+  noEffect?: true;
 };
 
 export type CapabilityRun = {
@@ -622,6 +630,8 @@ export type CapabilityRun = {
   decisionReason: string;
   params: Record<string, unknown>;
   status: CapabilityRunStatus;
+  /** M-A-3 T13.3 N-C: the action started and its outcome is unknown (it threw, timed out, or a late success was discarded). */
+  uncertain?: true;
   summary: string;
   evidence: string[];
   artifactIds: string[];

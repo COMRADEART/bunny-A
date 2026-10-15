@@ -211,6 +211,9 @@ export function taskInterrupted(task: Pick<OrchTask, "state" | "stopReason" | "e
     )
   );
 }
+/** M-A-3 T13.3 N-C: the honest state of write work that may have taken effect before it failed. */
+export const UNCERTAIN_LABEL = "Outcome uncertain — reconciliation required";
+
 export function taskStatus(task: OrchTask): { label: string; verification: string } {
   const labels: Record<OrchTask["state"], string> = {
     queued: "Queued",
@@ -230,7 +233,7 @@ export function taskStatus(task: OrchTask): { label: string; verification: strin
     stopped: "Task stopped",
   };
   return {
-    label: taskInterrupted(task) ? "Interrupted · retry available" : labels[task.state],
+    label: task.reconciliation?.required ? UNCERTAIN_LABEL : taskInterrupted(task) ? "Interrupted · retry available" : labels[task.state],
     verification: task.verification
       ? task.verification.passed
         ? "Verified by Bunny"
