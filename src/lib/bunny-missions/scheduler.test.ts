@@ -459,7 +459,31 @@ test("T13.3 N-C final check: a child from an earlier attempt of a step can never
     assert.notEqual(env.launched[0].task.id, stale);
     assert.equal(env.tasks.db.get(stale!).state, "waiting_for_approval");
     assert.throws(() => env.tasks.approve(stale!), /STALE_CHILD/, "the earlier attempt's child cannot run beside the current one");
+
     assert.equal(env.launched.length, 1);
+    env.launched[0].finish({ ok: true, output: "edited" });
+    await until(() => env.missions.mission(view.id).state === "completed", "completed");
+  } finally {
+    for (const row of env.launched) row.finish({ ok: false, output: "", stopped: true });
+    await env.cleanup();
+  }
+});
+
+test("T13.3 N-C final check: Retry withdraws a step's never-launched child (the permission path), so it cannot run beside the retry", async () => {
+  const env = await setup(["claude"]);
+  try {
+    const view = env.missions.create({ objective: "Edit", mode: "fast", origin: "workstation", steps: [model("Writer", "Edit file", [], { access: "write" })] });
+    env.missions.approve(view.id, "workstation", false);
+    const [step] = env.missions.store.steps(view.id);
+    // Persisted state of the permission path: the child waits for approval, recorded as the step's task but not in attempts.
+    const pending = env.tasks.submit({ prompt: "Edit file", mode: "fast", override: "auto" }, { missionId: view.id, stepId: step.id, executionScope: { access: "write" } });
+    env.missions.store.saveStep({ ...step, state: "failed", taskId: pending.id, failure: { category: "permission_denied", detail: "denied" } });
+    env.missions.store.saveMission({ ...env.missions.mission(view.id), state: "failed" });
+    env.missions.retry(view.id, "workstation");
+    await until(() => env.tasks.db.get(pending.id).state === "stopped", "the old child withdrawn");
+    assert.throws(() => env.tasks.approve(pending.id), /not awaiting approval/);
+    await until(() => env.launched.length === 1, "the retry's fresh child");
+    assert.notEqual(env.launched[0].task.id, pending.id);
     env.launched[0].finish({ ok: true, output: "edited" });
     await until(() => env.missions.mission(view.id).state === "completed", "completed");
   } finally {

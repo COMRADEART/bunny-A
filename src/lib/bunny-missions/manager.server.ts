@@ -4773,6 +4773,9 @@ export class MissionManager {
     this.withdrawStaged(id, by, `Mission retried by ${by}; the step stages its change again.`);
     const failed = this.store.steps(id).filter((step) => step.state === "failed" && !step.team?.supersededBy);
     for (const step of failed) {
+      // T13.3 N-C: a child this step created that never launched is withdrawn, so it can never be approved beside the retry.
+      const child = (() => { try { return step.taskId ? this.tasks.db.get(step.taskId) : null; } catch { return null; } })();
+      if (child?.state === "waiting_for_approval") void this.tasks.stop(child.id, `Withdrawn: ${by} retried ${step.role} with a fresh child task.`).catch(() => {});
       this.setStep(
         step,
         { state: "ready", failure: null, taskId: null, approvedOnce: null },
