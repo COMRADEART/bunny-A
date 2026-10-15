@@ -235,12 +235,17 @@ export class CapabilityBus {
    * Decides, then (only when allowed) executes and records. An "ask" decision executes nothing and
    * returns no run; the caller turns it into a permission request.
    */
-  /** T13.3 N-C: the ask this request would get right now, computed exactly as request() would, with no side effect. */
+  /**
+   * T13.3 N-C: the ask this request would get right now, computed exactly as request() would. It executes and authorizes
+   * nothing; an ask is recorded as authorization.required, as request() records it.
+   */
   preflight(request: CapabilityRequest): PermissionDecision | null {
     let executable: Resolved | null | undefined;
     try { executable = request.action === "terminal.exec" ? resolveCommand(String(request.params.command ?? ""), request.cwd) : undefined; } catch { return null; } // request() reports it
     const decision = this.decision(request, executable);
-    return decision.decision === "ask" ? decision : null;
+    if (decision.decision !== "ask") return null;
+    this.emit("authorization.required", `${request.action}: ${decision.reason}`, request.missionId);
+    return decision;
   }
   async request(request: CapabilityRequest): Promise<CapabilityOutcome> {
     this.containment.assertAccepting(request.action.split(".")[0]);

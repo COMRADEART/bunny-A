@@ -381,6 +381,7 @@ test("T13.3 N-C review round 3 P1/P2: a skill asks before any step runs, and a c
     assert.ok(askedStep.pendingRequestId, `the delete asks: ${JSON.stringify(askedStep.failure)}`);
     {
       assert.equal(writes(asked.id, "p1.txt"), 0, "nothing ran before the owner answered");
+      assert.ok(env.missions.get(asked.id).events.some((event) => event.type === "authorization.required" && /filesystem\.delete/.test(event.detail)), "the ask is recorded as before");
       await env.missions.respond(askedStep.pendingRequestId, "allow_once", "workstation");
       await until(() => ["completed", "failed", "waiting_for_user"].includes(env.missions.mission(asked.id).state), "P1 end", 20_000);
     }
