@@ -309,6 +309,11 @@ test("T13.3 N-C review F12/replan: a refused reconcile records nothing; replan w
     env.tasks.lingering.set(`${step.taskId}#1`, "checking");
     await assert.rejects(env.missions.reconcile(view.id, step.id, "retry", "workstation"), /may still be running/);
     env.tasks.lingering.delete(`${step.taskId}#1`);
+    // A child that never launched holds no process, so it never blocks the owner (the refusal below is the revocation).
+    const stuck = env.tasks.submit({ prompt: "never launched", mode: "fast" });
+    assert.equal(stuck.state, "waiting_for_approval");
+    const withStuck = env.missions.store.step(step.id);
+    env.missions.store.saveStep({ ...withStuck, attempts: [...withStuck.attempts, { ...withStuck.attempts[0], taskId: stuck.id }] });
     // Revoke the authorization so the Retry the reconciliation would authorize is refused.
     const envelope = env.missions.store.authorization(env.missions.store.mission(view.id).authorizationId!)!;
     env.missions.store.saveAuthorization({ ...envelope, revokedAt: Date.now() });

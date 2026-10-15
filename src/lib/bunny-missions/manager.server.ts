@@ -38,6 +38,8 @@ import { sha256 } from "./artifacts.server.ts";
 import { calculatorOperation } from "./batches.server.ts";
 import { runsLocally } from "../bunny-host/router.ts";
 import { ADAPTER_TOOL_CONTRACTS } from "../bunny-host/routing.server.ts";
+/** Child task states in which its provider session may be alive (T13.3 N-C). */
+const CHILD_LAUNCHED: string[] = ["launching", "running", "verifying", "waiting_for_input", "waiting_for_agent_approval", "paused"];
 import { planMission, PLANNER_ID } from "./planner.server.ts";
 import { SkillLibrary, fill } from "./skills.server.ts";
 import { MissionStore, redact } from "./store.server.ts";
@@ -1758,7 +1760,7 @@ export class MissionManager {
    */
   delegatedLaunchFailed(mission: Mission, step: MissionStep, task: OrchTask, workspace: string, error: unknown) {
     const child = this.tasks.db.get(task.id);
-    const started = this.tasks.sessions.has(task.id) || ["launching", "running", "verifying", "waiting_for_input", "waiting_for_agent_approval", "paused"].includes(child.state);
+    const started = this.tasks.sessions.has(task.id) || CHILD_LAUNCHED.includes(child.state);
     const running = this.markRunning(step, task.id, task.provider, workspace);
     this.stepFailed(mission, running, "provider_unavailable", error instanceof Error ? error.message : String(error),
       started && this.writeCapable(running) ? `OUTCOME_UNCERTAIN: the ${task.provider} session for ${step.role} may have started before the Host failed to record it, so it may already be changing files.` : null);
@@ -4702,7 +4704,8 @@ export class MissionManager {
     // A retry never runs beside a process of an earlier attempt that may still be alive: this Host's watch of any child
     // task of the step, a restart survivor of this Mission, or an unreadable record, which names no owner (fail closed).
     const children = [step.taskId, ...step.attempts.map((attempt) => attempt.taskId)].filter((child): child is string => !!child);
-    const unfinished = children.some((child) => { try { return !["completed", "failed", "stopped"].includes(this.tasks.db.get(child).state); } catch { return false; } });
+    // Only a child that was launched can hold a process; one that never launched (waiting_for_approval) cannot block.
+    const unfinished = children.some((child) => this.tasks.sessions.has(child) || (() => { try { return CHILD_LAUNCHED.includes(this.tasks.db.get(child).state); } catch { return false; } })());
     if (unfinished || [...this.tasks.lingering.keys()].some((key) => key.startsWith("unreadable:") || children.some((child) => key.startsWith(`${child}#`)) || this.tasks.restartSurvivorMission.get(key)?.missionId === id))
       throw new CommandRefusedError("A provider process from an earlier attempt may still be running, or its record cannot be read yet; Bunny starts no retry until none is alive. Try again shortly.");
     // The decision is recorded (and announced) only once the Retry it authorizes is accepted.
