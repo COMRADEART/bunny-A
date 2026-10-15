@@ -518,7 +518,7 @@ export async function startHost(
     let next = worker;
     if (next.state === "ADMITTED" && ["running", "verifying", "waiting_for_user"].includes(view.state)) next = move(next, "RUNNING", `Child Mission is ${view.state}.`, now);
     if (!["completed", "failed", "stopped"].includes(view.state)) return next === worker ? worker : workerStore.save(next);
-    const steps = view.steps.map((step) => ({ state: step.state, verified: step.result?.verified ?? null, summary: step.result?.summary ?? null }));
+    const steps = view.steps.map((step) => ({ state: step.state, verified: step.result?.verified ?? null, summary: step.result?.summary ?? null, failure: step.failure?.category ?? null }));
     const summary = steps.map((step) => step.summary).filter(Boolean).join(" · ").slice(0, 600) || `Child Mission ${view.state}.`;
     const judged = verdict({ state: view.state, steps });
     next = move(next, "RESULT_REPORTED", summary, now);

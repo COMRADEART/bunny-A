@@ -147,7 +147,7 @@ export function eligibility(input: EligibilityInput): string[] {
 
 export type ChildOutcome = {
   state: string;
-  steps: { state: string; verified: boolean | null; summary: string | null }[];
+  steps: { state: string; verified: boolean | null; summary: string | null; failure?: string | null }[];
 };
 
 /**
@@ -158,6 +158,10 @@ export type ChildOutcome = {
 export function verdict(outcome: ChildOutcome): { state: "VERIFIED" | "REJECTED" | "INDETERMINATE"; reason: string } {
   if (outcome.steps.some((step) => step.verified === false)) return { state: "REJECTED", reason: "The Host's verification failed." };
   if (outcome.state === "failed") return { state: "REJECTED", reason: "The worker's Mission failed." };
+  // T13.3 N-C: a step whose own work reported failure stays a failure when the owner then stops the paused Mission. An
+  // interruption (restart, stop, timeout) is not a verdict on the work.
+  if (outcome.steps.some((step) => step.state === "failed" && (step.failure === "capability_failed" || step.failure === "verification_failed")))
+    return { state: "REJECTED", reason: "A step of the worker's Mission failed." };
   if (outcome.state === "stopped") return { state: "INDETERMINATE", reason: "The worker was stopped before a verified result." };
   if (outcome.state !== "completed") return { state: "INDETERMINATE", reason: `The worker's Mission ended as ${outcome.state}.` };
   if (!outcome.steps.length || outcome.steps.some((step) => step.state !== "completed")) return { state: "INDETERMINATE", reason: "Not every step completed." };

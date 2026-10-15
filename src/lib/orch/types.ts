@@ -268,6 +268,8 @@ export type OrchTask = {
   executionScope?: ProviderExecutionScope;
   /** M-A-3 T13.3 N-C: set when a failed write attempt may have started; blocks every replay until reconciled. */
   reconciliation?: Reconciliation;
+  /** M-A-3 T13.3 N-C: the last attempt's dispatch: certified not started, may have started, or finished and checked by Bunny-A. */
+  dispatch?: "not_started" | "may_have_started" | "verified_terminal";
   // M-A-3 T3 additions (additive): per-Task dynamic-model routing facts.
   /** The provider-native effort/reasoning level selected for THIS Task; null when the provider does not expose one. */
   effort?: string | null;

@@ -127,7 +127,18 @@ export type CandidateInput = {
 export const TRANSPORT_WRITE_PAUSE = "WRITE_PAUSE: the connection failed during work that may write files. Outcome uncertain — reconciliation required. Bunny paused instead of retrying on this or any other provider, because a connection failure does not prove that nothing landed. Review the workspace and any external effects, then retry or close.";
 /** T13.3 N-C: any other failure of write work after its attempt may have started. */
 export const OUTCOME_UNCERTAIN_PAUSE = "OUTCOME_UNCERTAIN: the attempt may have started changing files or external systems before it failed. Outcome uncertain — reconciliation required. Bunny paused instead of retrying on this or any other provider, because it cannot confirm what already landed. Review the workspace and any external effects, then retry or close.";
-export const QUOTA_WRITE_PAUSE = "QUOTA_PAUSE: the provider's quota ran out during write work. Bunny paused instead of switching providers, because it cannot confirm which changes already landed. Completed steps are kept; review the workspace, then retry or choose another account.";
+export const QUOTA_WRITE_PAUSE = "QUOTA_PAUSE: the provider's quota ran out during write work. Outcome uncertain — reconciliation required. Bunny paused instead of retrying or switching providers, because it cannot confirm which changes already landed. Completed steps are kept; review the workspace, then retry or choose another account.";
+/** T13.3 N-C: a finished write attempt that failed Bunny-A's own check; repeating it could repeat its changes. */
+export const VERIFY_WRITE_PAUSE = "VERIFY_PAUSE: the attempt finished but did not pass Bunny-A's own check. Outcome uncertain — reconciliation required. Bunny paused instead of re-running it on this or any other provider, because a re-run could repeat the changes it already made. Review the workspace, then retry or close.";
+/** T13.3 N-C: write work stopped after it may have started. A stop is never replayed; the owner reconciles first. */
+export const STOP_WRITE_PAUSE = "STOPPED: this work was stopped after it may have started changing files or external systems. Outcome uncertain — reconciliation required before any retry.";
+/** T13.3 N-C: why write work that may have started is paused instead of re-executed. */
+export function writePause(taxonomy: RoutingFailureTaxonomy): string {
+  return taxonomy === "QUOTA_CONSTRAINED" ? QUOTA_WRITE_PAUSE
+    : taxonomy === "TRANSIENT_TRANSPORT" ? TRANSPORT_WRITE_PAUSE
+    : taxonomy === "VERIFICATION_FAILED" ? VERIFY_WRITE_PAUSE
+    : OUTCOME_UNCERTAIN_PAUSE;
+}
 
 import type { RoutingPriority } from "./fairness.ts";
 export { ROUTING_PRIORITIES, type RoutingPriority } from "./fairness.ts";

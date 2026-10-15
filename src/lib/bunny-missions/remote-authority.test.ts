@@ -1657,3 +1657,30 @@ test("F01-R57 (MEDIUM): every device response drops trusted-desktop grant, opera
   assert.deepEqual(Object.keys(seen.mission.requests[0]).sort(), ["desktopRequired", "id"]);
   assert.doesNotMatch(JSON.stringify(seen), /epoch e|"g"/);
 });
+
+test("T13.3 N-C review F5: a step running under a one-time approval at restart is uncertain only when it could write", async () => {
+  const env = await setup();
+  try {
+    const view = env.missions.create({ objective: "Mixed", mode: "fast", origin: "workstation", steps: [
+      capability("Writer", "filesystem.write", { path: "w.txt", content: "w" }),
+      capability("Reader", "filesystem.read", { path: "w.txt" }),
+      capability("Guarded", "filesystem.write", { path: "g.txt", content: "g", expectBeforeSha256: "absent" }),
+    ] });
+    env.missions.approve(view.id, "workstation", false);
+    // Synthesized persisted state: all three were running under a one-time allowance when the Host stopped.
+    for (const step of env.missions.store.steps(view.id))
+      env.missions.store.saveStep({ ...step, state: "running", approvedOnce: { requestId: `once-${step.role}`, action: step.executor.kind === "capability" ? step.executor.action : "x" } });
+    env.missions.store.saveMission({ ...env.missions.mission(view.id), state: "running" });
+    await env.restart();
+    const [writer, reader, guarded] = env.missions.store.steps(view.id);
+    assert.deepEqual([writer.state, writer.approvedOnce, writer.reconciliation?.required], ["failed", null, true], "a write under a one-time approval may have landed");
+    assert.match(writer.reconciliation?.reason ?? "", /one-time approval/);
+    assert.equal(reader.reconciliation, undefined, "a read needs a fresh decision, not reconciliation");
+    assert.equal(guarded.reconciliation, undefined, "a Host-guarded write can be replayed safely");
+    assert.throws(() => env.missions.retry(view.id, "workstation"), /OUTCOME_UNCERTAIN/);
+    // Review F6/F13: restart recovery cannot re-admit it either; only the owner's reconciliation can.
+    const [resubmit] = await env.missions.reconcileInterrupted(view.id, [{ stepId: writer.id, mode: "resubmit" }]);
+    assert.deepEqual([resubmit.applied, env.missions.store.step(writer.id).state], [false, "failed"]);
+    assert.match(String(resubmit.reason), /reconciliation required/);
+  } finally { await env.cleanup(); }
+});

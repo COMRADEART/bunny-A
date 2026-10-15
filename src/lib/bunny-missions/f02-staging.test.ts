@@ -450,7 +450,12 @@ test("F02-ST2: a PROMOTED change plus Retry never writes or stages the same byte
     assert.equal(readFileSync(join(env.root, "note.md"), "utf8"), "from phone");
     assert.equal(stagedFor(env, view.id).length, 1);
     writeFileSync(join(env.root, "marker.txt"), "ok");
-    env.missions.retry(view.id, "workstation");
+    // T13.3 N-C baseline change: the failed step had already promoted a write, so plain Retry is refused until the owner
+    // reconciles; the reconciled retry still deduplicates against the PROMOTED record.
+    const failedStep = stepsOf(env, view.id).find((step) => step.state === "failed")!;
+    assert.equal(failedStep.reconciliation?.required, true);
+    assert.throws(() => env.missions.retry(view.id, "workstation"), /OUTCOME_UNCERTAIN/);
+    await env.missions.reconcile(view.id, failedStep.id, "retry", "workstation");
     await until(() => completed(env, view.id), "completed by dedupe retry");
     assert.equal(stagedFor(env, view.id).length, 1, "no second staging");
     assert.equal(openRequests(env, view.id).filter((request) => request.promotion).length, 0, "no second promotion ask");

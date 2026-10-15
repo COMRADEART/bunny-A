@@ -133,6 +133,11 @@ export function enforcedIdempotent(action: string, params: Record<string, unknow
   return action === "filesystem.write" && typeof params.expectBeforeSha256 === "string";
 }
 
+/** A canonical result consumed after a restart settles an uncertain outcome without re-executing anything. */
+export function settled(step: Pick<MissionStep, "reconciliation">): Partial<Pick<MissionStep, "reconciliation">> {
+  return step.reconciliation?.required ? { reconciliation: { ...step.reconciliation, required: false, resolvedBy: "bunny-host-recovery", resolvedAt: Date.now() } } : {};
+}
+
 /** Why a failed capability run's outcome is unknown: it started, it was not read-only, and nothing enforces dedup. */
 export function uncertainRun(run: Pick<CapabilityRun, "uncertain" | "risk" | "action" | "params" | "status" | "summary"> | null): string | null {
   if (!run?.uncertain || run.risk === "READ" || enforcedIdempotent(run.action, run.params)) return null;

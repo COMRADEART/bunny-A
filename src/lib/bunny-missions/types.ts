@@ -613,6 +613,8 @@ export type CapabilityResult = {
   cleanup?: { attempted: boolean; ok: boolean; detail: string };
   /** M-A-3 T13.3 N-C: set by the bus, never by an adapter: the action started and its outcome is unknown. */
   uncertain?: true;
+  /** M-A-3 T13.3 N-C: the adapter certifies this failure changed nothing (a refusal before any effect). */
+  noEffect?: true;
 };
 
 export type CapabilityRun = {

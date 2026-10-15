@@ -366,6 +366,9 @@ export class CapabilityBus {
     }
     if(controller.signal.aborted && result.ok) result={ok:false,status:"failed",summary:"Execution was cancelled; late success was discarded.",output:null,evidence:[],errorCategory:"user_stopped",cleanup:result.cleanup,uncertain:true};
     if(controller.signal.aborted && /timed out/i.test(String(controller.signal.reason))) result={...result,ok:false,status:"timeout",summary:`Execution timed out after ${timeoutMs} ms. ${result.cleanup?.detail??"Owned process group terminated."}`,errorCategory:"timeout",...(started ? { uncertain: true as const } : {})};
+    // M-A-3 T13.3 N-C: once the adapter was asked to act, any non-success (a non-zero exit after writing, the adapter's own
+    // timeout, a read-back mismatch) is uncertain unless the adapter certified that it changed nothing.
+    if (started && !result.ok && !result.noEffect && !["denied", "unavailable", "unconfigured", "unsupported"].includes(result.status)) result = { ...result, uncertain: true };
     const artifactIds: string[] = [];
     if (request.missionId && request.stepId && (() => { const step = this.store.step(request.stepId!); return !!(step.crossApp || step.team); })() && result.ok) {
       const artifact = await this.artifacts.create({ missionId: request.missionId, stepId: request.stepId, type: "structured_result", title: `${request.action} observation`, inline: JSON.stringify(semanticOutput(request.action, result.output)), mediaType: "application/json", provenance: `bunny:capability:${base.id}`, verification: "unverified" });

@@ -150,6 +150,14 @@ test("T13.3 D a worker runs as a real child Mission and is VERIFIED only by the 
 
     const failing = ok(await h.command("worker.propose", { slot: 1, parentMissionId: brokenParent, ability: "test", objective: "Run the broken tests", projectId: broken })).data.worker as Body;
     await approve(h, failing.childMissionId);
+    // T13.3 N-C baseline change: the failing test command started and exited non-zero, so it may have changed files. Its
+    // child Mission now waits for the owner's reconciliation instead of failing outright; the worker stays open until then.
+    const paused = await until(async () => {
+      const child = ok(await h.command("mission.get", { id: failing.childMissionId })).data.mission as Body;
+      return child.state === "waiting_for_user" && (child.steps as Body[]).find((step) => step.reconciliation?.required);
+    }, "the failing worker's Mission to wait for reconciliation");
+    assert.equal((await workersOf(h, 1)).find((row) => row.id === failing.id)!.state, "RUNNING", "no verdict before the owner decides");
+    ok(await h.command("mission.reconcile", { id: failing.childMissionId, stepId: paused.id, resolution: "stop" }));
     const rejected = await closed(h, 1, failing.id);
     assert.ok(rejected.history.some((row: Body) => row.state === "REJECTED"), JSON.stringify(rejected));
     assert.equal(rejected.result.verified, false);

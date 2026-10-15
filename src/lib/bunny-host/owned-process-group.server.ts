@@ -178,11 +178,14 @@ export class OwnedProcessGroup {
       if(this.record.containment){this.record.containment="refused";this.record.activeProcesses=0;}
       this.close("failed");throw error;
     }
-    if(this.record.action.startsWith("verification.")||this.record.action==="provider.probe") hostCodeRuns.set(this.record.operationId,this.record.action);
-    this.release=trackOwnedGroup(()=>{if(this.stopping)this.stopping();else this.close("stopped");});
-    // A failed post-launch inspection keeps the handle unless kernel accounting is already 0: the root ran, so the
-    // caller must settle the job by accounting (T9R-F04 review round 1, STOP-2) instead of reporting "refused".
-    try {this.inspect();persist(this.path,this.record);} catch(error){
+    // A failed post-launch step keeps the handle unless kernel accounting is already 0: the root ran, so the caller must
+    // settle the job by accounting (T9R-F04 review round 1, STOP-2) instead of reporting "refused". Every step after the
+    // handle exists is inside this guard, so no post-launch throw is ever reported as a launch that never happened (N-C).
+    try {
+      if(this.record.action.startsWith("verification.")||this.record.action==="provider.probe") hostCodeRuns.set(this.record.operationId,this.record.action);
+      this.release=trackOwnedGroup(()=>{if(this.stopping)this.stopping();else this.close("stopped");});
+      this.inspect();persist(this.path,this.record);
+    } catch(error){
       const launched=Object.assign(error instanceof Error ? error : new Error(String(error)),{launched:true});
       try {if(this.terminate()===0) this.close("failed");} catch { /* the caller settles the still-held job by accounting */ }
       throw launched;
