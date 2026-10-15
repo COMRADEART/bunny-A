@@ -249,6 +249,10 @@
   .bunny-app.t8-app[data-layout="topnav"][data-material] {
     display: block;
   }
+  /* The masthead is sticky: keep anything focused or scrolled-to clear of it (WCAG 2.4.11, focus not obscured). */
+  html:has(.bunny-app.t8-app[data-layout="topnav"][data-material]) {
+    scroll-padding-top: 144px;
+  }
   .bunny-app.t8-app[data-layout="topnav"][data-material] .app-sidebar {
     position: sticky;
     top: 0;
@@ -268,11 +272,11 @@
   .bunny-app.t8-app[data-layout="topnav"][data-material] .app-sidebar nav {
     flex-direction: row;
     align-items: center;
-    gap: var(--s1);
+    gap: 0 var(--s1);
     flex: 1;
     min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
+    /* Wraps to a second row rather than scrolling: a hidden horizontal scroll would hide destinations. */
+    flex-wrap: wrap;
   }
   .bunny-app.t8-app[data-layout="topnav"][data-material] .app-sidebar nav button {
     min-height: 44px;
