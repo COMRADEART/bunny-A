@@ -176,8 +176,9 @@ export class MissionManager {
       const owner = this.store.step(task.mission!.stepId);
       if (owner.reconciliation?.required)
         return "OUTCOME_UNCERTAIN: this Mission step may already have taken effect; reconcile it (mission.reconcile) before anything for it runs.";
-      // A child from an earlier attempt never launches again: only the step's current child (or a new one) may run.
-      if (task.id !== owner.taskId && owner.attempts.some((attempt) => attempt.taskId === task.id))
+      // Only a step's newest child may launch: a child older than a sibling belongs to an earlier attempt, whether it was
+      // launched, displaced or never recorded in the step's attempts.
+      if (this.tasks.db.tasks().some((other) => other.id !== task.id && other.mission?.stepId === owner.id && other.createdAt > task.createdAt))
         return "STALE_CHILD: this task belongs to an earlier attempt of its Mission step and can no longer run.";
       const team = teamProviderViolation(this, task);
       if (team) return team;

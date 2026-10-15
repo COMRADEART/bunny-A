@@ -491,3 +491,21 @@ test("T13.3 N-C final check: Retry withdraws a step's never-launched child (the 
     await env.cleanup();
   }
 });
+
+test("T13.3 N-C final check: a displaced child (older than a sibling, never in attempts) never launches", async () => {
+  const env = await setup(["claude"]);
+  try {
+    const view = env.missions.create({ objective: "Edit", mode: "fast", origin: "workstation", steps: [model("Writer", "Edit file", [], { access: "write" })] });
+    env.missions.approve(view.id, "workstation", false);
+    const [step] = env.missions.store.steps(view.id);
+    const child = () => env.tasks.submit({ prompt: "Edit file", mode: "fast", override: "auto" }, { missionId: view.id, stepId: step.id, executionScope: { access: "write" } });
+    const older = child();
+    await new Promise((r) => setTimeout(r, 5)); // distinct creation times
+    child();
+    assert.throws(() => env.tasks.approve(older.id), /STALE_CHILD/);
+    assert.equal(env.launched.length, 0);
+  } finally {
+    for (const row of env.launched) row.finish({ ok: false, output: "", stopped: true });
+    await env.cleanup();
+  }
+});
