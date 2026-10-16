@@ -27,7 +27,8 @@ export type AutonomyInput = {
   requests: { resolvedAt: number | null }[];
   result: { unverifiedSteps: number } | null;
 };
-export type DelegatedWork = { open: number; verified: number; unverified: number };
+/** `awaitingOwner`: open workers whose child Mission waits for the owner's approval. */
+export type DelegatedWork = { open: number; awaitingOwner?: number; verified: number; unverified: number };
 
 const RESOURCE = ["provider_unavailable", "provider_rate_limited", "provider_write_paused", "budget_exceeded", "timeout", "capability_unavailable", "workspace_conflict"];
 // A retry after a failed check, or a Team rework replica the Host activated with its failure evidence.
@@ -66,6 +67,9 @@ export function autonomyPhase(mission: AutonomyInput, delegated: DelegatedWork =
   if (ready.some((step) => step.attempts.at(-1)?.category === "verification_failed")) return at("REPAIR", "A failed check is queued for repair.");
   if (ready.some((step) => RESOURCE.includes(step.attempts.at(-1)?.category ?? ""))) return at("WAITING_RESOURCE", "Waiting for a provider or resource before retrying.");
   if (ready.length) return at("DELEGATE", "The next work is being handed out.");
-  if (delegated.open && steps.every((step) => ["completed", "skipped"].includes(step.state))) return at("WAITING_DEPENDENCY", `Waiting for ${delegated.open} worker(s).`);
+  if (delegated.open && steps.every((step) => ["completed", "skipped"].includes(step.state)))
+    return delegated.awaitingOwner
+      ? at("WAITING_AUTHORIZATION", `${delegated.awaitingOwner} worker(s) wait for your approval.`)
+      : at("WAITING_DEPENDENCY", `Waiting for ${delegated.open} worker(s).`);
   return at("WAITING_DEPENDENCY", "Waiting for earlier work to finish.");
 }

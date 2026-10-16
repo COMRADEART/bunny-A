@@ -537,8 +537,10 @@ export async function startHost(
     // M-A-3 T14: the result reaches the parent's later steps (and its Lotus recall) as a fact; only a Host-verified worker is a
     // verified fact, anything else stays an unverified conclusion. Then the parent may have been waiting for it to complete.
     try {
-      missions.memory.record(worker.parentMissionId, judged.state === "VERIFIED" ? "verified_fact" : "agent_conclusion", `Worker ${worker.abilityName} ${judged.state.toLowerCase()}`,
-        `${judged.reason} ${summary}`.slice(0, 1000), `bunny:verification:worker:${worker.id}`, judged.state === "VERIFIED");
+      // The verified fact carries Host-written text only; the steps' own summaries (model output) stay unverified.
+      if (judged.state === "VERIFIED")
+        missions.memory.record(worker.parentMissionId, "verified_fact", `Worker ${worker.abilityName} verified`, `${judged.reason} (${steps.length} step(s), child Mission ${worker.childMissionId}).`, `bunny:verification:worker:${worker.id}`, true);
+      missions.memory.record(worker.parentMissionId, "agent_conclusion", `Worker ${worker.abilityName} ${judged.state.toLowerCase()} — reported`, `${judged.reason} ${summary}`.slice(0, 1000), `worker:${worker.id}`, false);
     } catch {
       // A pruned parent keeps no memory.
     }
@@ -601,7 +603,9 @@ export async function startHost(
     const ran = workerStore.forParent(missionId).filter((worker) => worker.childMissionId);
     const closed = ran.filter((worker) => worker.state === "CLOSED");
     const verified = closed.filter((worker) => worker.result?.verified === true).length;
-    return { open: ran.filter((worker) => OPEN_STATES.includes(worker.state)).length, verified, unverified: closed.length - verified };
+    const open = ran.filter((worker) => OPEN_STATES.includes(worker.state));
+    const awaitingOwner = open.filter((worker) => { try { return missions.mission(worker.childMissionId!).state === "waiting_for_approval"; } catch { return false; } }).length;
+    return { open: open.length, awaitingOwner, verified, unverified: closed.length - verified };
   };
   // M-A-3 T13.3 Gate F: the Personal Agent that owns a Mission, directly or through one of its workers.
   const slotForMission = (missionId: string | null): SlotId | null => {
@@ -1640,7 +1644,15 @@ export async function startHost(
             }
             // M-A-3 T14: a worker whose needs are a strict subset of its parent's live authority runs on it at once; otherwise it
             // waits for the owner's approval exactly as before.
-            const derived = child.state === "waiting_for_approval" ? missions.deriveWorkerAuthorization(child.id, parentMissionId) : { view: null, reasons: ["the child Mission was not planned for approval"] };
+            // The worker record exists before any grant, so a child can never run unlinked to its worker.
+            workerStore.save({ ...worker, childMissionId: child.id });
+            let derived: { view: ReturnType<typeof missions.view> | null; reasons: string[] } = { view: null, reasons: ["the child Mission was not planned for approval"] };
+            if (child.state === "waiting_for_approval")
+              try {
+                derived = missions.deriveWorkerAuthorization(child.id, parentMissionId);
+              } catch (error) {
+                derived = { view: null, reasons: [error instanceof Error ? error.message : "the Host is not accepting work"] };
+              }
             worker = move({ ...worker, childMissionId: child.id }, "ADMITTED", derived.view
               ? "Child Mission created and authorized from its parent's approval (a strict subset of it)."
               : `Child Mission created; it waits for your approval: ${derived.reasons.join("; ")}.`, Date.now());

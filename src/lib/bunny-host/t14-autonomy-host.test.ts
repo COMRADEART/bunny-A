@@ -201,6 +201,11 @@ test("T14-B one Personal Agent runs three independent workers in parallel; its d
     provider.release();
     const finished = await until(async () => { const m = await mission(h, parent.missionId); return m?.state === "completed" && m; }, "parent completed");
     assert.match(finished.result.summary, /Workers: 3 verified by Bunny\./);
+    // Review F5: a verified worker fact carries Host-written text only; the reported summaries stay unverified.
+    const memory = (ok(await h.command("mission.get", { id: parent.missionId })).data ?? {}).memory ?? ok(await h.command("mission.get", { id: parent.missionId })).memory;
+    const workerFacts = (memory as Body[]).filter((entry) => /^Worker /.test(entry.key));
+    assert.ok(workerFacts.filter((entry) => entry.verified).every((entry) => entry.kind === "verified_fact" && entry.provenance.startsWith("bunny:verification:worker:") && /The Host's verification|Every step passed/.test(entry.value)), JSON.stringify(workerFacts));
+    assert.ok(workerFacts.filter((entry) => entry.kind === "agent_conclusion").every((entry) => entry.verified === false));
     assert.deepEqual([finished.autonomy.phase, finished.autonomy.verified], ["COMPLETE", true]);
   });
 });

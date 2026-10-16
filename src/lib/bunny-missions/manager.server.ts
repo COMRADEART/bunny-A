@@ -145,7 +145,7 @@ export class MissionManager {
    * parent never finishes, and takes its workers down with it, before their results are in; only Host-verified workers
    * count as verified in the Mission's result.
    */
-  missionDelegated: ((missionId: string) => { open: number; verified: number; unverified: number }) | null = null;
+  missionDelegated: ((missionId: string) => { open: number; awaitingOwner?: number; verified: number; unverified: number }) | null = null;
   readonly admissionHolds = new Map<string, string>();
   readonly completionHolds = new Set<string>();
   /** M-A-3 T11: AgentRuntime allocates (or reuses) one durable member identity per role; MissionManager records owners. */
@@ -975,14 +975,20 @@ export class MissionManager {
   private grant(mission: Mission, envelope: AuthorizationEnvelope, by: string, start: boolean): MissionView {
     const id = mission.id;
     this.store.saveAuthorization(envelope);
-    this.memory.record(
-      id,
-      "user_decision",
-      "Mission approved",
-      `${by} approved ${envelope.riskClasses.join("/")} in ${envelope.projectRoots.join(", ")} until ${new Date(envelope.expiresAt).toISOString()}.`,
-      `user:${by}`,
-      true,
-    );
+    // A derived grant is the Host's own bookkeeping, never a fresh owner decision (the owner decided the parent).
+    if (envelope.derivedFrom)
+      this.memory.record(id, "mission_state", "Mission authorized from its parent",
+        `Covered by parent authorization ${envelope.derivedFrom.authorizationId}: ${envelope.riskClasses.join("/")} in ${envelope.projectRoots.join(", ")} until ${new Date(envelope.expiresAt).toISOString()}.`,
+        `bunny:derived-authorization:${envelope.derivedFrom.authorizationId}`, true);
+    else
+      this.memory.record(
+        id,
+        "user_decision",
+        "Mission approved",
+        `${by} approved ${envelope.riskClasses.join("/")} in ${envelope.projectRoots.join(", ")} until ${new Date(envelope.expiresAt).toISOString()}.`,
+        `user:${by}`,
+        true,
+      );
     this.emit(
       "approval.mission_envelope",
       `Mission envelope ${envelope.id} by ${by}; provider sessions ${JSON.stringify(envelope.providers.sessions)}.`,
@@ -1017,7 +1023,9 @@ export class MissionManager {
     if (child.state !== "waiting_for_approval" || !child.requestedScope) reasons.push("the worker's Mission is not waiting for approval");
     if (child.team || this.agentic.forMission(childId)) reasons.push("the worker's Mission has its own consent flow");
     if (child.projectId !== parent.projectId || child.root !== parent.root) reasons.push("the worker's Project is not its parent's");
-    if (!["ready", "running", "waiting_for_user", "verifying"].includes(parent.state)) reasons.push(`the parent Mission is ${parent.state}`);
+    // Not while the parent waits for the owner (a decision, or an uncertain outcome to reconcile).
+    if (!["ready", "running", "verifying"].includes(parent.state)) reasons.push(`the parent Mission is ${parent.state}`);
+    if (this.store.steps(parentId).some((step) => step.reconciliation?.required)) reasons.push("the parent has an outcome waiting for reconciliation");
     const envelope = parent.authorizationId ? this.store.authorization(parent.authorizationId) : null;
     if (!envelope) reasons.push("the parent Mission has no authorization");
     if (envelope && child.requestedScope) reasons.push(...derivedScopeViolations(child.requestedScope, envelope));
@@ -1030,16 +1038,25 @@ export class MissionManager {
       this.emit("authorization.derived_refused", `Worker Mission ${childId} waits for the owner: ${reasons.join("; ")}.`, childId);
       return { view: null, reasons };
     }
-    // What the parent has left, after its own use and what live sibling workers were already handed.
-    const siblings = this.store.liveAuthorizations().filter((row) => row.derivedFrom?.authorizationId === envelope.id && MISSION_ACTIVE.includes(this.store.mission(row.missionId).state));
+    // What the parent has left: its own use, the actual spend of every worker derived from it that has ended, and the full
+    // allowance of every one still live (a live worker may still spend all of it).
+    const delegated = this.store.derivedAuthorizations(envelope.id).map((row) => {
+      const state = this.store.mission(row.missionId).state;
+      if (MISSION_ACTIVE.includes(state)) return { calls: row.budget.maxExternalModelCalls, retries: row.budget.maxRetries, tokens: row.budget.maxTokens ?? 0 };
+      const spent = this.accounting(row.missionId);
+      return { calls: spent.externalModelCalls, retries: spent.retries, tokens: spent.inputTokens + spent.outputTokens };
+    });
+    const sum = (key: "calls" | "retries" | "tokens") => delegated.reduce((total, row) => total + row[key], 0);
     const used = this.accounting(parentId);
     const now = Date.now();
     const remaining: Budget = {
-      maxExternalModelCalls: envelope.budget.maxExternalModelCalls - used.externalModelCalls - siblings.reduce((sum, row) => sum + row.budget.maxExternalModelCalls, 0),
-      maxRetries: envelope.budget.maxRetries - used.retries - siblings.reduce((sum, row) => sum + row.budget.maxRetries, 0),
+      maxExternalModelCalls: envelope.budget.maxExternalModelCalls - used.externalModelCalls - sum("calls"),
+      maxRetries: envelope.budget.maxRetries - used.retries - sum("retries"),
       maxRuntimeMs: envelope.expiresAt - now,
-      maxTokens: envelope.budget.maxTokens === null ? null : envelope.budget.maxTokens - used.inputTokens - used.outputTokens - siblings.reduce((sum, row) => sum + (row.budget.maxTokens ?? 0), 0),
+      maxTokens: envelope.budget.maxTokens === null ? null : envelope.budget.maxTokens - used.inputTokens - used.outputTokens - sum("tokens"),
     };
+    // start() refuses while the Host is not accepting work; check first so a grant never leaves a ready, unstarted child.
+    this.tasks.containment.assertAccepting("missions");
     const derived = derivedEnvelope(child.requestedScope, envelope, childId, remaining, this.cached.limits.maxMissionRuntimeMs, now);
     return { view: this.grant(child, derived, `${envelope.grantedBy} (covered by parent authorization ${envelope.id})`, true), reasons: [] };
   }

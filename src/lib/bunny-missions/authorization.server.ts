@@ -116,14 +116,12 @@ export function derivedScopeViolations(child: ScopeRequest, parent: Authorizatio
   if (p.allow && (!c.allow || c.allow.some((id) => !p.allow!.includes(id)))) out.push("providers beyond the parent's");
   if (p.localOnly && !c.localOnly) out.push("cloud providers while the parent is local-only");
   const sessions = c.sessions?.steps ?? [];
-  if (sessions.length) {
-    const parentWrite = !!p.sessions?.steps.some((step) => step.scope.access === "write");
-    if (!p.sessions || sessions.length > p.sessions.maxSessions) out.push("more provider sessions than the parent");
-    if (sessions.some((step) => step.scope.access === "write") && !parentWrite) out.push("write sessions the parent does not have");
-    if (c.sessions!.writeIncludesShell && !p.sessions?.writeIncludesShell) out.push("shell sessions the parent does not have");
-  }
+  if (sessions.length && !p.sessions?.steps.some((step) => step.scope.access === "write") && sessions.some((step) => step.scope.access === "write")) out.push("write sessions the parent does not have");
+  if (c.sessions && (sessions.length > (p.sessions?.maxSessions ?? 0) || c.sessions.maxSessions > (p.sessions?.maxSessions ?? 0))) out.push("more provider sessions than the parent");
+  if (c.sessions?.writeIncludesShell && !p.sessions?.writeIncludesShell) out.push("shell sessions the parent does not have");
   if (child.browser.enabled && !parent.browser.enabled) out.push("a browser the parent does not have");
   if (child.browser.enabled && parent.browser.domains !== "public" && (child.browser.domains === "public" || child.browser.domains.some((d) => !(parent.browser.domains as string[]).includes(d)))) out.push("browser domains beyond the parent's");
+  if (child.terminal.enabled && !parent.terminal.enabled) out.push("a terminal the parent does not have");
   subset(child.terminal.commands, parent.terminal.commands, "terminal commands");
   const key = (e: { file: string; prefix: string[] }) => JSON.stringify([e.file, e.prefix]);
   const parentExecutables = (parent.terminal.executables ?? []).map(key);
@@ -146,7 +144,7 @@ export function derivedEnvelope(child: ScopeRequest, parent: AuthorizationEnvelo
     maxExternalModelCalls: Math.max(0, Math.min(child.budget.maxExternalModelCalls, remaining.maxExternalModelCalls)),
     maxRuntimeMs: Math.max(0, Math.min(child.budget.maxRuntimeMs, remaining.maxRuntimeMs)),
     maxRetries: Math.max(0, Math.min(child.budget.maxRetries, remaining.maxRetries)),
-    maxTokens: remaining.maxTokens === null ? child.budget.maxTokens : Math.min(child.budget.maxTokens ?? remaining.maxTokens, remaining.maxTokens),
+    maxTokens: remaining.maxTokens === null ? child.budget.maxTokens : Math.max(0, Math.min(child.budget.maxTokens ?? remaining.maxTokens, remaining.maxTokens)),
   };
   return {
     ...structuredClone(child),

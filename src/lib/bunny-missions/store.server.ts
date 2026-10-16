@@ -192,6 +192,12 @@ export class MissionStore {
     const statement = this.db.prepare("UPDATE remote_changes SET acknowledged_at=?, acknowledged_by=? WHERE id=? AND acknowledged_at IS NULL");
     for (const id of ids) statement.run(Date.now(), by, id);
   }
+  /** M-A-3 T14: every envelope ever derived from `parentId` (live, revoked or finished), as stored. */
+  derivedAuthorizations(parentId: string): AuthorizationEnvelope[] {
+    return (this.db.prepare("SELECT record FROM mission_authorizations WHERE record LIKE ?").all(`%${parentId}%`) as { record: string }[])
+      .map((row) => JSON.parse(row.record) as AuthorizationEnvelope)
+      .filter((row) => row.derivedFrom?.authorizationId === parentId);
+  }
   /** Every unrevoked Mission authorization (M-A-3 T9R-F01 restart sweep). */
   liveAuthorizations(): AuthorizationEnvelope[] {
     return (this.db.prepare("SELECT record FROM mission_authorizations WHERE revoked_at IS NULL").all() as { record: string }[]).map((row) => JSON.parse(row.record) as AuthorizationEnvelope);

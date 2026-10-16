@@ -13,6 +13,7 @@ import type { TeamFaults } from "./team-coordination.server.ts";
 import { MissionManager } from "./manager.server.ts";
 import { FilesystemCapability, NotificationsCapability, TerminalCapability } from "./capabilities/local.server.ts";
 import { autonomyPhase, type AutonomyPhase } from "./autonomy.ts";
+import { derivedEnvelope, derivedScopeViolations, envelopeFrom, scopeFor } from "./authorization.server.ts";
 import { simulatedCodexProfile } from "../bunny-host/testing/codex.test.ts";
 import { teamSetup, createTeam, missionOf, reachReview, approvePlan, until as teamUntil } from "../bunny-host/agent-team.fixture.ts";
 
@@ -231,4 +232,69 @@ test("T14 autonomy projection: COMPLETE needs canonical completion, never a fina
   assert.equal(autonomyPhase({ state: "running", steps: [step("running", { reconciliation: { required: true } })], requests: [], result: null }).phase, "OUTCOME_UNCERTAIN");
   assert.equal(autonomyPhase({ state: "waiting_for_user", steps: [step("failed", { failure: { category: "dependency_failed" } })], requests: [], result: null }).phase, "WAITING_DEPENDENCY");
   assert.equal(autonomyPhase({ state: "stopped", steps: [], requests: [], result: null }).phase, "CANCELLED");
+});
+
+const read = (role = "Reader") => model(role, "Read the notes", [], { access: "read" });
+const worker = (env: { missions: MissionManager }, role = "Worker") => env.missions.create({ objective: "Worker task", mode: "fast", origin: "personal-agent:1:worker", steps: [read(role)] });
+
+test("T14 review F1: derived worker budgets are conserved across finished and live workers", async () => {
+  const env = await setup();
+  try {
+    env.missions.configure({ limits: { maxActiveMissions: 10 } }, "test");
+    // The fast parent may make 2 external calls; its own held step already used 1.
+    const parent = env.missions.create({ objective: "Parent", mode: "fast", origin: "workstation", steps: [read("Parent")] });
+    env.missions.approve(parent.id, "workstation");
+    await until(() => env.launched.length === 1, "parent step");
+    const first = worker(env);
+    const a = env.missions.deriveWorkerAuthorization(first.id, parent.id);
+    assert.equal(a.view?.budget.maxExternalModelCalls, 1, "only what the parent has left");
+    await until(() => env.launched.length === 2, "worker A step");
+    env.launched[1].finish({ ok: true, output: "notes" });
+    await until(() => env.missions.mission(first.id).state === "completed", "worker A done");
+    // Worker A really spent its call: nothing is left for worker B (before the fix B got the full allowance again).
+    const second = worker(env);
+    const b = env.missions.deriveWorkerAuthorization(second.id, parent.id);
+    assert.equal(b.view?.budget.maxExternalModelCalls, 0, "a finished worker's spend stays charged to the parent");
+    // F2: a derived grant is Host bookkeeping, never a recorded owner decision.
+    const kinds = env.missions.memory.entries(first.id).map((entry) => entry.kind);
+    assert.ok(!kinds.includes("user_decision"), kinds.join(","));
+    assert.ok(env.missions.memory.entries(first.id).some((entry) => entry.provenance.startsWith("bunny:derived-authorization:") && entry.verified));
+  } finally { env.launched.forEach((l) => l.finish({ ok: false, output: "", error: "cleanup" })); await env.cleanup(); }
+});
+
+test("T14 review F6: no worker is derived while the parent waits for reconciliation", async () => {
+  const env = await setup();
+  try {
+    const parent = env.missions.create({ objective: "Parent", mode: "balanced", origin: "workstation", steps: [model("Writer", "Edit", [], { access: "write" })] });
+    env.missions.approve(parent.id, "workstation");
+    await until(() => env.launched.length === 1, "writer");
+    env.launched[0].finish({ ok: false, output: "", error: "connection reset after the request was sent" });
+    await until(() => env.missions.mission(parent.id).state === "waiting_for_user", "paused");
+    const child = worker(env);
+    const result = env.missions.deriveWorkerAuthorization(child.id, parent.id);
+    assert.equal(result.view, null);
+    assert.ok(result.reasons.some((reason) => /waiting_for_user|reconciliation/.test(reason)), result.reasons.join("; "));
+    assert.equal(env.missions.mission(child.id).state, "waiting_for_approval");
+  } finally { await env.cleanup(); }
+});
+
+test("T14 review F3/F4/F7: every widening field is refused and a negative remainder is clamped", () => {
+  const root = mkdtempSync(join(tmpdir(), "bunny-t14-scope-"));
+  try {
+    const parentScope = scopeFor([{ executor: { kind: "model" }, requiredCapabilities: [], verification: [], scope: { root, access: "read", isolation: "shared" }, providerConstraints: {}, id: "p" } as never], root, "fast");
+    const parent = envelopeFrom({ ...parentScope, providers: { ...parentScope.providers, sessions: { ...parentScope.providers.sessions!, maxSessions: 1, writeIncludesShell: false } } }, "parent", "workstation", 60 * 60_000);
+    const child = structuredClone(parentScope);
+    child.providers.sessions = { steps: [], maxSessions: 999, writeIncludesShell: true };
+    child.terminal = { ...child.terminal, enabled: true };
+    const reasons = derivedScopeViolations(child, parent);
+    for (const pattern of [/more provider sessions/, /shell sessions/, /a terminal the parent does not have/]) assert.ok(reasons.some((r) => pattern.test(r)), `${pattern} in ${reasons.join("; ")}`);
+    const clamped = derivedEnvelope(parentScope, { ...parent, budget: { ...parent.budget, maxTokens: 100 } }, "child", { maxExternalModelCalls: -3, maxRetries: -1, maxRuntimeMs: 60_000, maxTokens: -40 }, 60 * 60_000);
+    assert.deepEqual([clamped.budget.maxExternalModelCalls, clamped.budget.maxRetries, clamped.budget.maxTokens], [0, 0, 0]);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("T14 review F9: a parent held by a worker that waits for the owner says so", () => {
+  const view = autonomyPhase({ state: "running", steps: [{ state: "completed", attempts: [], failure: null } as never], requests: [], result: null }, { open: 1, awaitingOwner: 1, verified: 0, unverified: 0 });
+  assert.equal(view.phase, "WAITING_AUTHORIZATION");
+  assert.match(view.basis, /1 worker\(s\) wait for your approval/);
 });
