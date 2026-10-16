@@ -56,6 +56,7 @@ import { CharacterAppearanceStore } from "./character-style.server.ts";
 import { CHARACTER_STYLE_LABEL, resolvedStyle } from "./character-style.ts";
 import { UiThemeStore } from "./ui-theme.server.ts";
 import { UI_THEMES } from "./ui-theme.ts";
+import { WidgetStore } from "./widgets.server.ts";
 import {
   FEEDBACK_RATINGS, SPEAKER_IDS, STYLE_VERBOSITY, personalizedInstruction, speakerFor, speakerId, voiceAdvice,
   type FeedbackRating, type Speaker, type SpeakerId, type VoicePersonalizationView,
@@ -704,6 +705,7 @@ export async function startHost(
       voicePersonalization: personalizationView(),
       characterAppearance: appearanceStore.view(),
       uiTheme: uiThemeStore.view(),
+      widgets: widgetStore.view(),
       personalAgentContext: (() => {
         const byId = new Map((canonical.agents?.agents ?? []).map((agent) => [agent.id, agent]));
         return {
@@ -744,6 +746,8 @@ export async function startHost(
   const appearanceStore = new CharacterAppearanceStore(db);
   // Visual Experience 2.0: the shared UI theme. Presentation only; paired devices read it and keep their own local look.
   const uiThemeStore = new UiThemeStore(db);
+  // Widget Design Studio: presentation only. Paired devices read the layout and cannot write it.
+  const widgetStore = new WidgetStore(db);
   function personalizationView(): VoicePersonalizationView {
     const preferences = voicePreferences.preferences();
     const speakers = SPEAKER_IDS.map((id) => {
@@ -1406,6 +1410,19 @@ export async function startHost(
               : refused(() => uiThemeStore.set(preference, Date.now(), expected));
             manager.emit(db.event("appearance.theme", null, `Workstation theme: ${UI_THEMES[saved.preference.theme].name} (revision ${saved.revision}).`));
             extra = { data: uiThemeStore.view() };
+            break;
+          }
+          case "widgets.layout":
+          case "widgets.reset": {
+            // Presentation only. A layout never authorizes a Mission, a voice session, a memory read or a reconciliation.
+            if (!local) throw new WorkstationRequiredError("The widget layout is changed on the workstation (Windows Host). This device shows the workstation layout.");
+            const { expectRevision, ...preference } = data;
+            if (expectRevision !== undefined && !Number.isSafeInteger(expectRevision)) refused(() => { throw new Error("expectRevision must be an integer."); });
+            const expected = typeof expectRevision === "number" ? expectRevision : null;
+            const saved = input.action === "widgets.reset"
+              ? refused(() => widgetStore.reset(Date.now(), expected))
+              : refused(() => widgetStore.set(preference, Date.now(), expected));
+            manager.emit(db.event("widgets.layout", null, `Widget layout: ${saved.preference.layout} (revision ${saved.revision}).`));
             break;
           }
           case "personal_agent.converse": {

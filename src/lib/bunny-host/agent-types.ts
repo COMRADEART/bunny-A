@@ -195,7 +195,7 @@ const MISSION_TO_AGENT: Partial<Record<string, AgentFailure>> = {
   budget_exceeded: "ROUTING_EXHAUSTED", timeout: "TASK_FAILED", invalid_plan: "TASK_FAILED",
 };
 /** Maps canonical mission step failure facts to the Agent's §10 taxonomy; detail strings are never forwarded. */
-export function mapFailure(category: string, detail: string): { category: AgentFailure; detail: string } {
+export function mapFailure(category: string, _detail: string): { category: AgentFailure; detail: string } {
   const mapped = MISSION_TO_AGENT[category] ?? "TASK_FAILED";
   const notes: Partial<Record<AgentFailure, string>> = { HOST_INTERRUPTED: "Host was restarted or failed; the previous execution was not resumed." };
   return { category: mapped, detail: notes[mapped] ?? "The mission recorded this failure category; full diagnostics stay on the Host." };

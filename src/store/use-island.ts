@@ -55,6 +55,18 @@ import {
   type ThemeInputs,
   type ThemeOrigin,
 } from "@/components/island/theme-model";
+import {
+  DEVICE_WIDGET_KEY,
+  readDeviceWidgets,
+  storedWidgets,
+  widgetHostView,
+} from "@/components/island/widget-model";
+import {
+  DEFAULT_WIDGET_PREFERENCE,
+  validateWidgetPreference,
+  type WidgetPreference,
+  type WidgetView,
+} from "@/lib/bunny-host/widgets";
 import type { IntelligenceSnapshot } from "@/lib/bunny-host/intelligence-snapshot";
 import {
   parseAccountIntent,
@@ -267,6 +279,15 @@ type Island = Preferences & {
   setThemePreview: (preview: UiThemePreference | null) => void;
   /** Re-evaluates the shown theme (the OS light/dark preference changed). */
   refreshTheme: () => void;
+  /** Widget Design Studio layout from the Host. Presentation only. */
+  widgets: WidgetView | null;
+  /** A paired device's own layout. Null follows the workstation. */
+  deviceWidgets: WidgetPreference | null;
+  /** The layout this window edits: the device's own, or the Host's. */
+  shownWidgets: () => WidgetPreference;
+  /** `baseRevision` is the Host revision the edit started from, so a draft opened before another window's change is refused. */
+  setWidgets: (patch: Partial<WidgetPreference>, onRefused?: (caption: string) => void, baseRevision?: number) => Promise<boolean>;
+  resetWidgets: (onRefused?: (caption: string) => void) => Promise<boolean>;
   /** One `personalization.*` command; the Host's answer or null when refused. */
   personalizationCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T10 voice truth from the Host (null until a Host with voice answers). Rendered only; never authority. */
@@ -838,6 +859,7 @@ export const useIsland = create<Island>((set, get) => {
       voicePersonalization: snapshot.voicePersonalization ?? null,
       characterAppearance: snapshot.characterAppearance ?? null,
       uiTheme: hostView(snapshot.uiTheme) ?? state.uiTheme,
+      widgets: widgetHostView(snapshot.widgets) ?? state.widgets,
       intelligence: snapshot.intelligence ?? null,
       connections: snapshot.connections ?? null,
       deviceConnections: snapshot.deviceConnections ?? [],
@@ -902,6 +924,7 @@ export const useIsland = create<Island>((set, get) => {
       harnesses: null,
       sessionLedger: null,
       scheduler: null,
+      widgets: null,
       routingLearning: null,
       voicePersonalization: null,
       characterAppearance: null,
@@ -1318,6 +1341,8 @@ export const useIsland = create<Island>((set, get) => {
     deviceTheme: null,
     themeCache: null,
     themeLink: { theme: null, variant: null },
+    widgets: null,
+    deviceWidgets: null,
     shownTheme: () => effectivePreference(themeInputs()),
     setUiTheme: async (patch, onRefused) => {
       const state = get();
@@ -1356,6 +1381,40 @@ export const useIsland = create<Island>((set, get) => {
       const expectRevision = get().uiTheme?.revision;
       const answer = await command("appearance.theme_reset", typeof expectRevision === "number" ? { expectRevision } : {}, "ui-theme", onRefused);
       syncTheme();
+      return answer !== null;
+    },
+    shownWidgets: () => {
+      const state = get();
+      if (state.viewer?.kind === "device" && state.deviceWidgets) return state.deviceWidgets;
+      return state.widgets?.preference ?? DEFAULT_WIDGET_PREFERENCE;
+    },
+    setWidgets: async (patch, onRefused, baseRevision) => {
+      const state = get();
+      if (state.viewer?.kind === "device") {
+        try {
+          const next = validateWidgetPreference(patch, state.deviceWidgets ?? state.widgets?.preference ?? DEFAULT_WIDGET_PREFERENCE);
+          set({ deviceWidgets: next });
+          try { localStorage.setItem(DEVICE_WIDGET_KEY, storedWidgets(next)); } catch { /* this visit only */ }
+          return true;
+        } catch (error) {
+          const caption = error instanceof Error ? error.message : "That widget layout is not available.";
+          if (onRefused) onRefused(caption);
+          else state.note(caption);
+          return false;
+        }
+      }
+      const expectRevision = baseRevision ?? state.widgets?.revision;
+      const answer = await command("widgets.layout", { ...patch, ...(typeof expectRevision === "number" ? { expectRevision } : {}) }, "widgets", onRefused);
+      return answer !== null;
+    },
+    resetWidgets: async (onRefused) => {
+      if (get().viewer?.kind === "device") {
+        set({ deviceWidgets: null });
+        try { localStorage.removeItem(DEVICE_WIDGET_KEY); } catch { /* already gone */ }
+        return true;
+      }
+      const expectRevision = get().widgets?.revision;
+      const answer = await command("widgets.reset", typeof expectRevision === "number" ? { expectRevision } : {}, "widgets", onRefused);
       return answer !== null;
     },
     followWorkstationTheme: () => {
@@ -1545,7 +1604,7 @@ export const useIsland = create<Island>((set, get) => {
           return null;
         }
       };
-      set({ themeCache: stored(THEME_CACHE_KEY), deviceTheme: stored(DEVICE_THEME_KEY), themeLink: themeLinkFromSearch(window.location.search) });
+      set({ themeCache: stored(THEME_CACHE_KEY), deviceTheme: stored(DEVICE_THEME_KEY), themeLink: themeLinkFromSearch(window.location.search), deviceWidgets: readDeviceWidgets((() => { try { return localStorage.getItem(DEVICE_WIDGET_KEY); } catch { return null; } })()) });
       // Deep links (view, companion, theme, task, mission, agent) are read by the shared nav model, so every entry point agrees.
       const link = deepLinkFromSearch(window.location.search);
       if (link.sheet) set({ sheet: link.sheet });

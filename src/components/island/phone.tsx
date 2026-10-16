@@ -26,6 +26,7 @@ import { WEAPON_LABEL, type PersonalAgentView, type SlotId } from "../../lib/bun
 import type { CompanionView } from "../../lib/bunny-host/voice/voice-companion.ts";
 import type { PermissionRequest } from "../../lib/bunny-missions/types.ts";
 import { basisText, characterLabel, displayState } from "./character-model.ts";
+import { PhoneWidgets } from "./widgets";
 import { BunnyCompanion, WeaponCharacter, usePrefersReducedMotion, useHappyWindow } from "./characters";
 import { appearanceFor } from "./character-style-model";
 import { CONNECTION_LABEL } from "./connection-model.ts";
@@ -274,6 +275,7 @@ function HomeView({ view }: { view: View }) {
           </p>
         )}
       </section>
+      <PhoneWidgets go={go} />
 
       <section className="pc-section" aria-labelledby="pc-slots-heading">
         <div className="pc-section-head">
@@ -1207,8 +1209,15 @@ function PhoneThemeChoice() {
   const device = store.viewer?.kind === "device";
   const [refusal, setRefusal] = useState<string | null>(null);
   const theme = UI_THEMES[preference.theme];
+  const previewing = store.themePreview !== null;
+  const canSave = device || (store.host === "online" && store.uiTheme !== null);
   const set = (patch: Partial<UiThemePreference>) => {
     setRefusal(null);
+    // Host offline: preview in this window (same as the desktop gallery) so the picker does not snap back.
+    if (!canSave) {
+      store.setThemePreview({ ...preference, ...patch });
+      return;
+    }
     void store.setUiTheme(patch, setRefusal);
   };
   return (
@@ -1224,11 +1233,13 @@ function PhoneThemeChoice() {
         ))}
       </select>
       <p className="pc-muted">
-        {device
-          ? origin === "device"
-            ? "Kept on this phone only."
-            : "Following your PC's theme."
-          : "Saved on your Host for every window and the Notch."}
+        {previewing
+          ? "Previewing in this window. Reconnect to the Host to save it."
+          : device
+            ? origin === "device"
+              ? "Kept on this phone only."
+              : "Following your PC's theme."
+            : "Saved on your Host for every window and the Notch."}
       </p>
       <p className="pc-label">Appearance</p>
       <div className="pc-segment" role="radiogroup" aria-label="Appearance">
@@ -1241,6 +1252,11 @@ function PhoneThemeChoice() {
           );
         })}
       </div>
+      {previewing ? (
+        <button type="button" className="pc-btn" onClick={() => store.setThemePreview(null)}>
+          Keep previous theme
+        </button>
+      ) : null}
       {device && store.deviceTheme ? (
         <button type="button" className="pc-btn" onClick={() => store.followWorkstationTheme()}>
           Follow my PC's theme

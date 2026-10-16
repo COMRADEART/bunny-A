@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ThemedDialogContent, useAmbient, useDocumentTheme, useThemeScope } from "./theme";
 import {
@@ -62,6 +63,7 @@ import { hostLive } from "./character-model";
 import { approvalCount, pendingApprovalItems } from "./approvals-model";
 import { COMPANION_LABEL, resolveCompanion } from "./companion-model";
 import { activeNavView, deepLinkFromSearch, NAV_MAIN, NAV_SYSTEM, type NavView } from "./nav-model";
+import { WidgetSurface, type WidgetOpeners } from "./widgets";
 
 import "./premium.css";
 import "./glass.css";
@@ -84,8 +86,22 @@ export function Island() {
   const store = useIsland();
   const [now, setNow] = useState(0);
   const [menu, setMenu] = useState(false);
-  const [companion, setCompanion] = useState(false);
+  // Router search is available on the first server and client paint — no post-hydrate flash of the desktop shell.
+  const companion = useRouterState({
+    select: (state) => deepLinkFromSearch(state.location.searchStr).companion,
+  });
   const hydrate = store.hydrate;
+  const widgetOpeners: WidgetOpeners = {
+    mission: (id) => { store.openMission(id); store.setSheet("missions"); },
+    agent: (slot) => {
+      void store.personalAgentCommand("personal_agent.foreground", { identity: slot as 1 | 2 | 3 | 4 });
+      store.setSheet("agents");
+    },
+    usage: () => store.setSheet("provider"),
+    memory: () => store.setSheet("agents"),
+    reconcile: () => store.setSheet("approvals"),
+  };
+  const widgetLayout = store.shownWidgets().layout;
   const scope = useThemeScope();
   const ambient = useAmbient();
   useDocumentTheme();
@@ -93,7 +109,6 @@ export function Island() {
   useEffect(() => {
     hydrate();
     setNow(Date.now());
-    setCompanion(deepLinkFromSearch(window.location.search).companion);
   }, [hydrate]);
   // The clock causes expiry renders; each incoming Host event is evaluated with that render's current time.
   useEffect(() => {
@@ -187,9 +202,7 @@ export function Island() {
         <div className="sidebar-brand">
           <button className="brand-button" onClick={() => navigate("chat")}>
             <BunnyMark />
-            <span>
-              Bunny<span className="brand-suffix">A</span>
-            </span>
+            <span>BunnyA</span>
           </button>
           <span className="mobile-header-actions">
             {attention > 0 && (
@@ -316,9 +329,12 @@ export function Island() {
             ) : (
               <ChatHome now={now} />
             )}
+            {widgetLayout === "board" && <WidgetSurface mode="board" page={page} openers={widgetOpeners} />}
           </main>
+          {widgetLayout === "sidebar" && <WidgetSurface mode="sidebar" page={page} openers={widgetOpeners} />}
           {page !== "design-preview" && <ContextPanel now={now} />}
         </div>
+        {widgetLayout === "drawer" && <WidgetSurface mode="drawer" page={page} openers={widgetOpeners} />}
         <footer className="workspace-footer">
           <span>Bunny-A</span>
           <span>Host authority · independently verified results</span>

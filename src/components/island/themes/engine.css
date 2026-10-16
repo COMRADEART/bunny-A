@@ -696,6 +696,20 @@
   border-width: var(--bw);
   border-radius: var(--r-sm);
 }
+/* ---- companion shell: phone owns the chrome; do not inherit desktop page padding or enter motion */
+.bunny-app.t8-app[data-surface="companion"] {
+  display: block;
+  min-height: 100dvh;
+}
+.bunny-app.t8-app[data-surface="companion"] .workspace-content {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.bunny-app.t8-app[data-surface="companion"][data-ui-theme][data-motion="full"] .workspace-content > * {
+  animation: none;
+}
+
 /* ---- the phone companion: same tokens, its own touch-first chrome */
 .pc-root[data-ui-theme][data-material] {
   font-family: var(--font-bunny);
