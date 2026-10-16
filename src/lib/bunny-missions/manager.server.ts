@@ -7,7 +7,7 @@ import type { HostEvent } from "../bunny-host/contracts.ts";
 import type { Mode, OrchTask, ProviderId, TaskConstraints, VerifySpec } from "../orch/types.ts";
 import { codexMissionExclusion } from "../orch/compatibility.ts";
 import { ArtifactStore } from "./artifacts.server.ts";
-import { agenticFingerprint, agenticOperationDigest, agenticScopeViolation, capabilityOperation, DESKTOP_GRANT_MAX_USES, DESKTOP_GRANT_TTL_MS, DESKTOP_REQUIRED, desktopGrantViolation, envelopeFrom, isRemoteEnvelope, isTrustedLocalActor, matches, MODE_BUDGET, classifyDeviceWrite, PHONE_SAFE_CLASSES, providerScopeViolation, providerSessionAuthority, REMOTE_SESSION_CEILING, remoteExecutionRefusal, redactReviewListing, DEVICE_REVIEW_REASON, remoteSessionViolation, runsCode, scopeFor, scopeViolation, sessionOperation, taskViolation, type DesktopGrantContext,
+import { agenticFingerprint, agenticOperationDigest, agenticScopeViolation, capabilityOperation, DESKTOP_GRANT_MAX_USES, DESKTOP_GRANT_TTL_MS, DESKTOP_REQUIRED, desktopGrantViolation, envelopeFrom, derivedEnvelope, derivedScopeViolations, isRemoteEnvelope, isTrustedLocalActor, matches, MODE_BUDGET, classifyDeviceWrite, PHONE_SAFE_CLASSES, providerScopeViolation, providerSessionAuthority, REMOTE_SESSION_CEILING, remoteExecutionRefusal, redactReviewListing, DEVICE_REVIEW_REASON, remoteSessionViolation, runsCode, scopeFor, scopeViolation, sessionOperation, taskViolation, type DesktopGrantContext,
 } from "./authorization.server.ts";
 import { AgenticStore, digest, fileDigest, rootIdentity } from "./agentic-store.server.ts";
 import { AGENTIC_POLICY_VERSION, type AgenticAdjustment, type AgenticAuthorizationEnvelope, type CommandBinding ,
@@ -27,6 +27,7 @@ import { communicationConnectors, GitHubCapability } from "./capabilities/connec
 import { FilesystemCapability, GitCapability, NotificationsCapability, TerminalCapability ,
 } from "./capabilities/local.server.ts";
 import { agentPrompt, type DependencyResult } from "./context.ts";
+import { autonomyPhase } from "./autonomy.ts";
 import { Inbox } from "./inbox.server.ts";
 import {
   assertMissionTransition, assertStepTransition, blockedBy, classifyTaskFailure, enforcedIdempotent, settled, uncertainRun, uncertainSkillRuns, MISSION_ACTIVE, missionProgress, readySteps, retryVerdict, STEP_DONE, validateGraph,
@@ -45,7 +46,7 @@ import { SkillLibrary, fill } from "./skills.server.ts";
 import { MissionStore, redact } from "./store.server.ts";
 import { TriggerEngine } from "./triggers.server.ts";
 import type {
-  ActionManifest, AuthorizationEnvelope, CapabilityResult, FailureCategory, Mission, MissionConfig, MissionSnapshot, MissionStep, MissionView,
+  ActionManifest, AuthorizationEnvelope, Budget, CapabilityResult, FailureCategory, Mission, MissionConfig, MissionSnapshot, MissionStep, MissionView,
   PermissionRequest, RemoteAnswer, StepState, Trigger, DesktopGrant, DesktopOperation, PermissionDecision,
 } from "./types.ts";
 import { APPROVAL_ON_HOST, deviceApprovalRefusal, deviceMayLaunch, ensureDeviceSchema, hostId, isDeviceActor, WorkstationRequiredError, WORKSTATION_ONLY_RISKS,
@@ -139,7 +140,14 @@ export class MissionManager {
    * steps or its tasks' routing prompt, so no projection of the Mission can carry them.
    */
   missionPromptFacts: ((missionId: string) => string[]) | null = null;
+  /**
+   * M-A-3 T14: delegated work (workers) a Mission waits for before it may complete. `open` > 0 holds completion, so a
+   * parent never finishes, and takes its workers down with it, before their results are in; only Host-verified workers
+   * count as verified in the Mission's result.
+   */
+  missionDelegated: ((missionId: string) => { open: number; verified: number; unverified: number }) | null = null;
   readonly admissionHolds = new Map<string, string>();
+  readonly completionHolds = new Set<string>();
   /** M-A-3 T11: AgentRuntime allocates (or reuses) one durable member identity per role; MissionManager records owners. */
   teamAllocator: ((missionId: string, roles: TeamRole[]) => Partial<Record<TeamRole, string>>) | null = null;
   teamFaults: TeamFaults | null = null;
@@ -622,6 +630,7 @@ export class MissionManager {
       requests,
       artifacts,
       batch: active ? batchView(active, Date.now()) : null,
+      autonomy: autonomyPhase({ state: mission.state, steps: mission.team ? liveTeamSteps(steps) : steps, requests, result: mission.result }, this.missionDelegated?.(mission.id)),
     };
   }
   get(id: string) {
@@ -891,7 +900,7 @@ export class MissionManager {
   }
   approve(id: string, by: string, start = true, agenticRevision?: number, planReference?: string, coordinatorId?: string): MissionView {
     this.requireEnabled();
-    let mission = this.store.mission(id);
+    const mission = this.store.mission(id);
     if (mission.state !== "waiting_for_approval" || !mission.requestedScope)
       throw new CommandRefusedError("Mission is not waiting for approval.");
     // M-A-3 T9: a client that reviewed a plan binds its approval to it; a replanned scope is never approved unseen.
@@ -960,6 +969,11 @@ export class MissionManager {
       envelope.agentic = { id: agentic.id, revision: agentic.revision };
       envelope.expiresAt = Math.min(envelope.expiresAt, agentic.expires_at);
     }
+    return this.grant(mission, envelope, by, start);
+  }
+  /** Persists an approved envelope and readies (and optionally starts) the Mission; owner approval and T14 derived worker authority share it. */
+  private grant(mission: Mission, envelope: AuthorizationEnvelope, by: string, start: boolean): MissionView {
+    const id = mission.id;
     this.store.saveAuthorization(envelope);
     this.memory.record(
       id,
@@ -982,13 +996,52 @@ export class MissionManager {
       );
     mission = this.setMission(
       mission,
-      { state: "ready", authorizationId: envelope.id },
+      { state: "ready", authorizationId: envelope.id, ...(envelope.derivedFrom ? { budget: envelope.budget } : {}) },
       "authorization.granted",
       `Mission authorization ${envelope.id} granted by ${by}: roots ${envelope.projectRoots.join(", ")}; ${envelope.riskClasses.join(", ")}; terminal [${envelope.terminal.commands.join(", ")}]; git [${envelope.git.actions.join(", ")}]; browser ${envelope.browser.enabled ? "on" : "off"}; computer ${envelope.computer.enabled ? "on" : "off"}; expires ${new Date(envelope.expiresAt).toISOString()}.`,
     );
     this.inbox.resolve(id, { kinds: ["requires_approval"] });
     if (start) mission = this.start(mission);
     return this.view(mission);
+  }
+  /**
+   * M-A-3 T14: a worker child Mission runs on a strict subset of its parent's live authority, so the owner's one approval
+   * of the parent covers it and nothing interrupts the owner. Anything wider, a parent that is not live, Agentic consent
+   * or a paired-device parent leaves the child waiting for the owner exactly as before (the reasons are returned).
+   */
+  deriveWorkerAuthorization(childId: string, parentId: string): { view: MissionView | null; reasons: string[] } {
+    this.requireEnabled();
+    const child = this.store.mission(childId);
+    const parent = this.store.mission(parentId);
+    const reasons: string[] = [];
+    if (child.state !== "waiting_for_approval" || !child.requestedScope) reasons.push("the worker's Mission is not waiting for approval");
+    if (child.team || this.agentic.forMission(childId)) reasons.push("the worker's Mission has its own consent flow");
+    if (child.projectId !== parent.projectId || child.root !== parent.root) reasons.push("the worker's Project is not its parent's");
+    if (!["ready", "running", "waiting_for_user", "verifying"].includes(parent.state)) reasons.push(`the parent Mission is ${parent.state}`);
+    const envelope = parent.authorizationId ? this.store.authorization(parent.authorizationId) : null;
+    if (!envelope) reasons.push("the parent Mission has no authorization");
+    if (envelope && child.requestedScope) reasons.push(...derivedScopeViolations(child.requestedScope, envelope));
+    const planned = this.store.steps(childId).filter((step) => step.executor.kind === "model").map((step) => ({ stepId: step.id, scope: { access: step.scope.access } }));
+    if (planned.length && JSON.stringify(child.requestedScope?.providers.sessions?.steps) !== JSON.stringify(planned)) reasons.push("the worker's provider scope does not match its plan");
+    if (this.store.steps(childId).some((step) => step.scope.isolation === "worktree")) reasons.push("the worker needs its own worktree");
+    const active = this.store.missionsIn(MISSION_ACTIVE).length;
+    if (active >= this.cached.limits.maxActiveMissions) reasons.push(`${active} missions are already active (limit ${this.cached.limits.maxActiveMissions})`);
+    if (reasons.length || !envelope || !child.requestedScope) {
+      this.emit("authorization.derived_refused", `Worker Mission ${childId} waits for the owner: ${reasons.join("; ")}.`, childId);
+      return { view: null, reasons };
+    }
+    // What the parent has left, after its own use and what live sibling workers were already handed.
+    const siblings = this.store.liveAuthorizations().filter((row) => row.derivedFrom?.authorizationId === envelope.id && MISSION_ACTIVE.includes(this.store.mission(row.missionId).state));
+    const used = this.accounting(parentId);
+    const now = Date.now();
+    const remaining: Budget = {
+      maxExternalModelCalls: envelope.budget.maxExternalModelCalls - used.externalModelCalls - siblings.reduce((sum, row) => sum + row.budget.maxExternalModelCalls, 0),
+      maxRetries: envelope.budget.maxRetries - used.retries - siblings.reduce((sum, row) => sum + row.budget.maxRetries, 0),
+      maxRuntimeMs: envelope.expiresAt - now,
+      maxTokens: envelope.budget.maxTokens === null ? null : envelope.budget.maxTokens - used.inputTokens - used.outputTokens - siblings.reduce((sum, row) => sum + (row.budget.maxTokens ?? 0), 0),
+    };
+    const derived = derivedEnvelope(child.requestedScope, envelope, childId, remaining, this.cached.limits.maxMissionRuntimeMs, now);
+    return { view: this.grant(child, derived, `${envelope.grantedBy} (covered by parent authorization ${envelope.id})`, true), reasons: [] };
   }
   start(mission: Mission): Mission {
     this.tasks.containment.assertAccepting("missions");
@@ -1119,7 +1172,7 @@ export class MissionManager {
     if (mission.team) { this.evaluateTeam(mission); return; }
     const steps = this.store.steps(mission.id);
     if (steps.every((step) => STEP_DONE.includes(step.state))) {
-      this.completeMission(mission, steps);
+      if (!this.holdForWorkers(mission)) this.completeMission(mission, steps);
       return;
     }
     // Pending steps can only be waiting on something; if nothing is running or ready, the mission cannot move by itself.
@@ -1162,6 +1215,7 @@ export class MissionManager {
     if (planningPhase(steps) && steps.every((step) => step.state === "completed")) return;
     const live = liveTeamSteps(steps);
     if (live.every((step) => STEP_DONE.includes(step.state))) {
+      if (this.holdForWorkers(mission)) return;
       for (const step of steps) if (step.team?.dormant && step.state === "pending")
         this.setStep(step, { state: "skipped" }, "mission.step.skipped", `${step.role}: reserved rework was not needed.`);
       this.completeMission(this.store.mission(mission.id), this.store.steps(mission.id));
@@ -1182,7 +1236,17 @@ export class MissionManager {
       (error) => this.containMission(mission.id, error),
     );
   }
+  /** M-A-3 T14: true while the Mission's own steps are done but its workers are still open (said once per hold). */
+  holdForWorkers(mission: Mission): boolean {
+    const open = this.missionDelegated?.(mission.id).open ?? 0;
+    if (!open) { this.completionHolds.delete(mission.id); return false; }
+    if (!this.completionHolds.has(mission.id))
+      this.emit("mission.waiting_workers", `All steps finished; waiting for ${open} worker(s) before checking mission-level evidence.`, mission.id);
+    this.completionHolds.add(mission.id);
+    return true;
+  }
   completeMission(mission: Mission, steps: MissionStep[]) {
+    this.completionHolds.delete(mission.id);
     if (mission.team) steps = liveTeamSteps(steps);
     const delegation = this.agentic.forMission(mission.id);
     if (delegation && !["REVOKED", "EXPIRED", "COMPLETED"].includes(delegation.current_state))
@@ -1198,7 +1262,9 @@ export class MissionManager {
       (step) => step.state === "completed" && step.result?.verified !== true,
     ).length;
     const artifactIds = this.store.artifacts(mission.id).map((artifact) => artifact.id);
-    const summary = `${steps.length}/${steps.length} steps completed. ${verified} independently verified by Bunny${unverified ? `; ${unverified} completed without independent verification (provider or capability output only)` : ""}.`;
+    const workers = this.missionDelegated?.(mission.id) ?? { verified: 0, unverified: 0 };
+    const delegated = workers.verified + workers.unverified ? ` Workers: ${workers.verified} verified by Bunny${workers.unverified ? `, ${workers.unverified} not verified` : ""}.` : "";
+    const summary = `${steps.length}/${steps.length} steps completed. ${verified} independently verified by Bunny${unverified ? `; ${unverified} completed without independent verification (provider or capability output only)` : ""}.${delegated}`;
     current = this.setMission(current, { state: "completed", finishedAt: Date.now(), result: { summary, verifiedSteps: verified, unverifiedSteps: unverified, artifactIds }, accounting: this.accounting(current.id) ,
       }, "mission.completed", `Mission "${current.title}": ${summary}`,
     );

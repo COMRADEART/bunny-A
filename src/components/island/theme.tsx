@@ -52,13 +52,16 @@ export function useThemeScope(): ThemeScope {
 export function useDocumentTheme() {
   const resolved = useResolvedTheme();
   const fontScale = useIsland((s) => s.appearance.fontScale);
+  const hydrated = useIsland((s) => s.hydrated);
   useEffect(() => {
     const root = document.documentElement;
     root.style.fontSize = fontScale === 1 ? "" : `${16 * fontScale}px`;
     root.dataset.uiTheme = resolved.manifest.id;
     root.style.colorScheme = resolved.variant;
     document.body.style.background = resolved.palette.page;
-  }, [resolved, fontScale]);
+    // M-A-3 T14: the cached theme is in the store once hydrated; only then may the shell show (see __root.tsx).
+    if (hydrated) root.removeAttribute("data-theme-restoring");
+  }, [resolved, fontScale, hydrated]);
 }
 
 /** A Radix dialog surface that carries the shown theme (it is portaled outside the shell, so it needs its own scope). */

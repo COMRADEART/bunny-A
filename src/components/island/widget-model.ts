@@ -183,6 +183,8 @@ export function lotusWidget(input: {
   viewer: WidgetViewer;
   agentName: string | null;
   projectName: string | null;
+  /** M-A-3 T14: with a Project in focus, other Projects' notes are left out (the Agent's own scope stays). */
+  projectId?: string | null;
   memories: readonly { id: string; scope: string; layer: string; trust: string; updatedAt: number; value?: string }[] | null;
 }): LotusWidgetModel {
   if (input.viewer === "device") {
@@ -191,13 +193,15 @@ export function lotusWidget(input: {
   if (!input.memories) {
     return { state: "unavailable", note: "Lotus memory has not been reported.", agent: input.agentName, project: input.projectName, count: null, recent: [] };
   }
-  const recent = input.memories.slice(0, 5).map(({ id, scope, layer, trust, updatedAt }) => ({ id, scope, layer, trust, updatedAt }));
+  const project = input.projectId ? `project:${input.projectId}` : null;
+  const memories = project ? input.memories.filter((memory) => !memory.scope.startsWith("project:") || memory.scope === project) : input.memories;
+  const recent = memories.slice(0, 5).map(({ id, scope, layer, trust, updatedAt }) => ({ id, scope, layer, trust, updatedAt }));
   return {
     state: recent.length ? "ready" : "empty",
     note: "Titles of recent changes only. Memory text is not shown here.",
     agent: input.agentName,
     project: input.projectName,
-    count: input.memories.length,
+    count: memories.length,
     recent,
   };
 }
