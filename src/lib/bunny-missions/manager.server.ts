@@ -148,6 +148,8 @@ export class MissionManager {
   missionDelegated: ((missionId: string) => { open: number; awaitingOwner?: number; verified: number; unverified: number }) | null = null;
   readonly admissionHolds = new Map<string, string>();
   readonly completionHolds = new Set<string>();
+  /** M-A-3 T14: Missions with a step waiting for another Mission's workspace lock; woken when any step leaves a live state. */
+  readonly workspaceWaits = new Set<string>();
   /** M-A-3 T11: AgentRuntime allocates (or reuses) one durable member identity per role; MissionManager records owners. */
   teamAllocator: ((missionId: string, roles: TeamRole[]) => Partial<Record<TeamRole, string>>) | null = null;
   teamFaults: TeamFaults | null = null;
@@ -591,8 +593,8 @@ export class MissionManager {
       for (const child of this.tasks.db.tasks())
         if (child.mission?.stepId === step.id && ["queued", "routing", "waiting_for_approval"].includes(child.state))
           void this.tasks.stop(child.id, `Withdrawn: ${step.role} was re-armed for a fresh attempt.`).catch(() => {});
-    if (this.admissionHolds.size && STEP_LIVE.includes(step.state) && !STEP_LIVE.includes(next.state))
-      for (const held of [...this.admissionHolds.keys()]) if (held !== step.missionId) this.schedule(held);
+    if ((this.admissionHolds.size || this.workspaceWaits.size) && STEP_LIVE.includes(step.state) && !STEP_LIVE.includes(next.state))
+      for (const held of new Set([...this.admissionHolds.keys(), ...this.workspaceWaits])) if (held !== step.missionId) this.schedule(held);
     return next;
   }
   view(mission: Mission): MissionView {
@@ -1095,6 +1097,8 @@ export class MissionManager {
     );
   }
   async tick(id: string) {
+    // Re-added by launch() if a step still waits for another Mission's workspace.
+    this.workspaceWaits.delete(id);
     if (this.ticking.has(id)) {
       this.again.add(id);
       return;
@@ -1497,6 +1501,7 @@ export class MissionManager {
       step.scope.access === "write" ? "exclusive" : "shared",
     );
     if (!lock.ok) {
+      if (lock.conflict.missionId !== mission.id) this.workspaceWaits.add(mission.id);
       if (!step.evidence.includes(`waiting for workspace ${lock.conflict.root}`))
         this.setStep(
           step,

@@ -453,3 +453,29 @@ test("T14-H a spoken goal becomes a reviewed draft; speech stops, interruptions 
     ok(await h.command("mission.stop", { id: draft.id }));
   }, { workerExtraArgs: ["--output", "null"] });
 });
+
+test("T14 review F6: a derived worker admits nothing new while its parent waits for reconciliation; it resumes after the owner decides", async () => {
+  const launched: OrchTask[] = [];
+  const provider = gated(launched);
+  await withHost(43968, provider.adapter, async (h) => {
+    const alpha = await project(h, "Reconcile app", 0, 300);
+    const parent = await delegateAndStart(h, 1, alpha, [{ ...softwarePlan[0], role: "Writer", access: "write" }]);
+    await until(async () => launched.length === 1, "parent write dispatched");
+    const worker = ok(await h.command("worker.propose", { slot: 1, parentMissionId: parent.missionId, ability: "test", objective: "Run tests", projectId: alpha })).data.worker as Body;
+    assert.match(worker.history.find((row: Body) => row.state === "ADMITTED").note, /authorized from its parent's approval/);
+    // The worker waits behind the parent's exclusive write lock; then the write loses its connection after dispatch.
+    provider.release(() => true, { ok: false, output: "", error: "connection reset after the request was sent" });
+    await until(async () => (await mission(h, parent.missionId)).autonomy.phase === "RECONCILIATION_REQUIRED", "parent reconciling");
+    await new Promise((r) => setTimeout(r, 1500));
+    const held = await mission(h, worker.childMissionId);
+    assert.ok(!["running", "completed"].includes(held.steps[0].state), `the worker admitted nothing during reconciliation (${held.steps[0].state})`);
+    assert.notEqual((await workersOf(h, 1)).find((w) => w.id === worker.id)!.state, "CLOSED");
+    // The owner reviews and retries; once the parent's write is done the worker runs and the parent completes.
+    ok(await h.command("mission.reconcile", { id: parent.missionId, stepId: (await mission(h, parent.missionId)).steps[0].id, resolution: "retry" }));
+    await until(async () => launched.length === 2, "owner-chosen retry dispatched");
+    provider.release();
+    const done = await closedWorker(h, 1, worker.id);
+    assert.equal(done.result.verified, true);
+    await until(async () => (await mission(h, parent.missionId)).state === "completed", "parent completed");
+  });
+});

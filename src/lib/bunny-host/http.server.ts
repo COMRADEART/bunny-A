@@ -581,7 +581,13 @@ export async function startHost(
       if (worker) syncWorker(worker);
       else if (workerStore.forParent(missionId).length) {
         if (["completed", "failed", "stopped"].includes(missions.mission(missionId).state)) void stopWorkersOf(missionId, "Its parent Mission ended.").catch(() => undefined);
-        else void stopWorkersOf(missionId, "Its parent Mission's authority ended (replanned).", true).catch(() => undefined);
+        else {
+          void stopWorkersOf(missionId, "Its parent Mission's authority ended (replanned).", true).catch(() => undefined);
+          // A worker held while its parent reconciled moves again once the owner has decided.
+          if (!parentReconciling(missionId))
+            for (const worker of workerStore.forParent(missionId))
+              if (worker.childMissionId && OPEN_STATES.includes(worker.state) && missions.mission(worker.childMissionId).state === "running") missions.schedule(worker.childMissionId);
+        }
       }
     } catch {
       // Worker bookkeeping never interrupts Mission events; the next event or boot reconciles it.
@@ -596,7 +602,18 @@ export async function startHost(
     } else syncWorker(worker);
   }
   // T13.3 N1: a worker's child Mission is held while its parent Agent is paused, like the Agent's own Missions.
-  missions.missionPauseGate = (missionId) => agents.blockedForMission(workerStore.byChild(missionId)?.parentMissionId ?? missionId);
+  // M-A-3 T14: a worker also holds new admissions while its parent waits for the owner to reconcile an uncertain outcome.
+  const parentReconciling = (parentMissionId: string) => {
+    try {
+      return missions.store.steps(parentMissionId).some((step) => step.reconciliation?.required);
+    } catch {
+      return false;
+    }
+  };
+  missions.missionPauseGate = (missionId) => {
+    const parent = workerStore.byChild(missionId)?.parentMissionId;
+    return agents.blockedForMission(parent ?? missionId) || (!!parent && parentReconciling(parent));
+  };
   missions.missionPromptFacts = (missionId) => workerStore.byChild(missionId)?.context ?? [];
   // M-A-3 T14: a parent completes only once its workers have reported; only Host-verified workers count as verified.
   missions.missionDelegated = (missionId) => {
@@ -1645,7 +1662,7 @@ export async function startHost(
             // M-A-3 T14: a worker whose needs are a strict subset of its parent's live authority runs on it at once; otherwise it
             // waits for the owner's approval exactly as before.
             // The worker record exists before any grant, so a child can never run unlinked to its worker.
-            workerStore.save({ ...worker, childMissionId: child.id });
+            worker = workerStore.save(move({ ...worker, childMissionId: child.id }, "ADMITTED", "Child Mission created; checking whether its parent's approval covers it.", Date.now()));
             let derived: { view: ReturnType<typeof missions.view> | null; reasons: string[] } = { view: null, reasons: ["the child Mission was not planned for approval"] };
             if (child.state === "waiting_for_approval")
               try {
@@ -1653,10 +1670,12 @@ export async function startHost(
               } catch (error) {
                 derived = { view: null, reasons: [error instanceof Error ? error.message : "the Host is not accepting work"] };
               }
-            worker = move({ ...worker, childMissionId: child.id }, "ADMITTED", derived.view
+            // The record may already have moved on (a child that ended at once); only the ADMITTED note is completed here.
+            const note = derived.view
               ? "Child Mission created and authorized from its parent's approval (a strict subset of it)."
-              : `Child Mission created; it waits for your approval: ${derived.reasons.join("; ")}.`, Date.now());
-            workerStore.save(worker);
+              : `Child Mission created; it waits for your approval: ${derived.reasons.join("; ")}.`;
+            const latest = workerStore.get(worker.id) ?? worker;
+            worker = workerStore.save({ ...latest, history: latest.history.map((row) => (row.state === "ADMITTED" ? { ...row, note: note.slice(0, 300) } : row)) });
             manager.emit(db.event("worker.admitted", null, `Personal Agent ${slot} added a ${worker.abilityName} worker to Mission ${parentMissionId}${derived.view ? " under its parent's authority" : ""}.`));
             extra = { data: { worker: syncWorker(worker) }, mission: derived.view ?? child };
             break;
