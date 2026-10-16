@@ -1,0 +1,30 @@
+Bunny-A Host ready on loopback (233e9a3d-968e-4316-8da6-2dda72d366fd).
+F6-DEBUG {"child":"completed","step":"completed","events":["mission.created: Mission \"Gada worker: Run tests\" created by personal-agent:1:worker (fast).","mission.planning: Planning with bunny-planner-deterministic-v1.","mission.planned: 1 step(s): Worker. User-supplied plan; validated and bounded by Bunny.","mission.approval_required: Mission 1fa55397-c0cf-40a3-982a-809ca5c8f9d3 \"Gada worker: Run tests\" needs approval: READ, EXECUTE; capabilities filesystem.exists, filesys","approval.mission_envelope: Mission envelope 7fb23a57-9092-4feb-8fc5-41216fda7d55 by workstation (covered by parent authorization f930783c-d5b3-46a9-876f-4b496825d398);","authorization.granted: Mission authorization 7fb23a57-9092-4feb-8fc5-41216fda7d55 granted by workstation (covered by parent authorization f930783c-d5b3-46a9-876f-4","mission.started: Mission \"Gada worker: Run tests\" started.","mission.step.ready: Worker is ready. (step 01d07442-0e5d-4b6b-98ab-88395e55080d)","mission.step.waiting_workspace: Worker waits: C:\\Users\\allam\\AppData\\Local\\Temp\\bunny-t14-bo2yCf\\Reconcile-app is held exclusive by step e44267ed-3555-4a20-8161-147fe81e3bc","mission.step.started: Worker started (attempt 1, deterministic). (step 01d07442-0e5d-4b6b-98ab-88395e55080d)","capability.requested: terminal.exec requested by mission:1fa55397-c0cf-40a3-982a-809ca5c8f9d3 (step 01d07442-0e5d-4b6b-98ab-88395e55080d).","authorization.granted: terminal.exec: Inside mission authorization 7fb23a57-9092-4feb-8fc5-41216fda7d55.","capability.started: terminal.exec started.","capability.completed: terminal.exec succeeded: npm test exited 0.","skill.executed: project.test v1 passed its validations.","mission.step.verifying: Bunny is checking Worker's result itself. (step 01d07442-0e5d-4b6b-98ab-88395e55080d)","capability.requested: terminal.exec requested by mission:1fa55397-c0cf-40a3-982a-809ca5c8f9d3 (step 01d07442-0e5d-4b6b-98ab-88395e55080d).","authorization.granted: terminal.exec: Inside mission authorization 7fb23a57-9092-4feb-8fc5-41216fda7d55.","capability.started: terminal.exec started.","capability.completed: terminal.exec succeeded: npm test exited 0.","mission.step.completed: Worker completed and verified by Bunny. (step 01d07442-0e5d-4b6b-98ab-88395e55080d)","mission.verifying: All steps finished; checking mission-level evidence.","mission.completed: Mission \"Gada worker: Run tests\": 1/1 steps completed. 1 independently verified by Bunny."]}
+✖ T14 review F6: a derived worker admits nothing new while its parent waits for reconciliation; it resumes after the owner decides (4574.2561ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4953.0307
+
+✖ failing tests:
+
+test at src\lib\bunny-host\t14-autonomy-host.test.ts:457:1
+✖ T14 review F6: a derived worker admits nothing new while its parent waits for reconciliation; it resumes after the owner decides (4574.2561ms)
+  AssertionError [ERR_ASSERTION]: the worker admitted nothing during reconciliation (completed)
+      at file:///C:/Users/allam/Documents/new/bun-router-t14/src/lib/bunny-host/t14-autonomy-host.test.ts:472:12
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async withHost (file:///C:/Users/allam/Documents/new/bun-router-t14/src/lib/bunny-host/t14-autonomy-host.test.ts:80:5)
+      at async TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-t14/src/lib/bunny-host/t14-autonomy-host.test.ts:460:3)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

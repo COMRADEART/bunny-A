@@ -1,0 +1,86 @@
+{
+  "packageRoot": "C:\\Users\\allam\\Documents\\new\\bun-router-t14\\test-results\\ma3-t14\\windows-package\\Bunny-A-Windows-MA3-T14-TEST",
+  "port": 43955,
+  "startedAt": "2026-10-16T06:37:07.586Z",
+  "runtime": "package runtime/node.exe",
+  "checks": [
+    {
+      "id": "P01 a Personal Agent's Mission starts after one approval",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "parentId": "3dfd6712-231b-44a6-8e1b-02af3224c07f"
+      }
+    },
+    {
+      "id": "P02 a worker inside the parent's approval runs with no owner request",
+      "ok": true,
+      "detail": {
+        "admitted": "Child Mission created and authorized from its parent's approval (a strict subset of it).",
+        "requests": 0
+      }
+    },
+    {
+      "id": "P03 a worker needing more waits for the owner, with the reason recorded",
+      "ok": true,
+      "detail": {
+        "wideNote": "Child Mission created; it waits for your approval: capabilities beyond the parent (browser.navigate, browser.read, browser.screenshot); a browser the parent does not have; network the parent does not ",
+        "wideState": "waiting_for_approval"
+      }
+    },
+    {
+      "id": "P04 the parent completes after its workers with their verdicts",
+      "ok": true,
+      "detail": {
+        "summary": "12/12 steps completed. 0 independently verified by Bunny; 12 completed without independent verification (provider or capability output only). Workers: 0 verified by Bunny, 2 not verified.",
+        "heldForWorkers": false
+      }
+    },
+    {
+      "id": "P05 COMPLETE is reported unverified (evidence-only worker), and the worker ran on authority derived from the parent",
+      "ok": true,
+      "detail": {
+        "autonomy": {
+          "phase": "COMPLETE",
+          "basis": "Finished, but some work was not independently verified.",
+          "verified": false
+        },
+        "derivedFrom": {
+          "authorizationId": "2c9e902f-a924-4259-bcf8-574367ddefcb",
+          "missionId": "3dfd6712-231b-44a6-8e1b-02af3224c07f"
+        }
+      }
+    },
+    {
+      "id": "P06 a paired device cannot propose a worker",
+      "ok": true,
+      "detail": {
+        "status": 400,
+        "code": "WORKSTATION_REQUIRED"
+      }
+    },
+    {
+      "id": "P07 the default active-Mission limit is 4",
+      "ok": true,
+      "detail": {
+        "maxConcurrentAgents": 3,
+        "maxSteps": 12,
+        "maxRetriesPerStep": 2,
+        "maxReplans": 2,
+        "maxMissionRuntimeMs": 7200000,
+        "maxActiveMissions": 4
+      }
+    },
+    {
+      "id": "P08 no provider task was created (skills only)",
+      "ok": true,
+      "detail": {
+        "tasks": 0
+      }
+    }
+  ],
+  "result": "PASS",
+  "finishedAt": "2026-10-16T06:37:17.268Z",
+  "installed": false,
+  "published": false
+}

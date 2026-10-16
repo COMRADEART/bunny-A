@@ -1,0 +1,235 @@
+{
+  "source": "ea6950c5aa1a0009c5d7a999ebd7f7dff798052f",
+  "from": "test-results/ma3-t14/regression/final-ea6950c/{library,ui}.log",
+  "scenarios": [
+    {
+      "id": "A",
+      "title": "Autonomous software task",
+      "mechanism": "SIMULATED model I/O; real Team Mission planning validation, scheduling, Host writes, Host verification and reviewed rework",
+      "tests": [
+        {
+          "name": "T14-A: one approval, then plan",
+          "ok": true,
+          "line": "T14-A: one approval, then plan → delegate → execute → verify → repair → complete with no owner prompt (7655.4173ms)"
+        },
+        {
+          "name": "T14-A: a raw write-capable provider session",
+          "ok": true,
+          "line": "T14-A: a raw write-capable provider session whose check fails is never auto-replayed (N-C kept) (730.4557ms)"
+        }
+      ],
+      "notes": "Zero owner prompts after the plan approval; repair via Team rework (N-C-compliant); raw write sessions still pause"
+    },
+    {
+      "id": "B",
+      "title": "Parallel workers",
+      "mechanism": "Real Host HTTP; deterministic skill workers; SIMULATED parent model step",
+      "tests": [
+        {
+          "name": "T14-B one Personal Agent runs three independent workers",
+          "ok": true,
+          "line": "T14-B one Personal Agent runs three independent workers in parallel; its dependent step waits and receives their verified results (10142.9665ms)"
+        }
+      ],
+      "notes": "Overlapping worker spans recorded in the log"
+    },
+    {
+      "id": "C",
+      "title": "Four-Agent concurrency",
+      "mechanism": "Real Host HTTP; SIMULATED model I/O",
+      "tests": [
+        {
+          "name": "T14-C four Personal Agents",
+          "ok": true,
+          "line": "T14-C four Personal Agents run four Missions at once, isolated; one paused for reconciliation never stops the others (4138.1246ms)"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "D",
+      "title": "Provider failure",
+      "mechanism": "Real MissionManager/TaskManager; SIMULATED providers",
+      "tests": [
+        {
+          "name": "T14-D: provider loss reroutes",
+          "ok": true,
+          "line": "T14-D: provider loss reroutes read work to an eligible fallback; retries are bounded (WAITING_RESOURCE); quota loss mid-write pauses for reconciliation (1460.1407ms)"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "E",
+      "title": "Uncertain write",
+      "mechanism": "Real MissionManager/TaskManager; SIMULATED providers",
+      "tests": [
+        {
+          "name": "T14-E: a write that may have started",
+          "ok": true,
+          "line": "T14-E: a write that may have started and then lost its connection is never replayed; only the owner's reconciliation moves it (929.9215ms)"
+        },
+        {
+          "name": "T14-C four Personal Agents",
+          "ok": true,
+          "line": "T14-C four Personal Agents run four Missions at once, isolated; one paused for reconciliation never stops the others (4138.1246ms)"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "F",
+      "title": "Host restart",
+      "mechanism": "Real Host reboot on the same data directory; database crash snapshot",
+      "tests": [
+        {
+          "name": "T14-F a Host restart mid-work",
+          "ok": true,
+          "line": "T14-F a Host restart mid-work dispatches nothing again: the parent and its worker wait for the owner (3002.5317ms)"
+        },
+        {
+          "name": "T14-L: an accelerated long Mission",
+          "ok": true,
+          "line": "T14-L: an accelerated long Mission survives a crash at a checkpoint without duplicate dispatch and stays within its limits (1966.493ms)"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "G",
+      "title": "Lotus Memory",
+      "mechanism": "Real Host HTTP and SQLite",
+      "tests": [
+        {
+          "name": "T14-G Lotus",
+          "ok": true,
+          "line": "T14-G Lotus: verified Mission facts and Project notes are recalled by their owner after a restart; private scopes never cross (2982.1033ms)"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "H",
+      "title": "Voice delegation",
+      "mechanism": "Real contained voice worker; typed (simulated) speech input, null audio output; no microphone or speaker",
+      "tests": [
+        {
+          "name": "T14-H a spoken goal becomes a reviewed draft",
+          "ok": true,
+          "line": "T14-H a spoken goal becomes a reviewed draft; speech stops, interruptions and closing voice never touch running Missions (36515.9468ms)"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "I",
+      "title": "Widget synchronization",
+      "mechanism": "Real Host HTTP; plus the built-app walk (test-results/ma3-t14/walk/results.json)",
+      "tests": [
+        {
+          "name": "T14-I switching all 22 themes",
+          "ok": true,
+          "line": "T14-I switching all 22 themes and every widget layout mid-Mission changes nothing about the work (3919.6326ms)"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "J",
+      "title": "Phone restrictions",
+      "mechanism": "Real Host HTTP with a real pairing",
+      "tests": [
+        {
+          "name": "T14-J a paired phone cannot delegate",
+          "ok": true,
+          "line": "T14-J a paired phone cannot delegate, add workers, reconcile, read memory or change the workstation: every attempt fails closed (1879.6028ms)"
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "id": "K",
+      "title": "Multi-Agent collaboration",
+      "mechanism": "Real Host HTTP",
+      "tests": [
+        {
+          "name": "T14-K two Personal Agents collaborate",
+          "ok": true,
+          "line": "T14-K two Personal Agents collaborate through one Project: explicit share, explicit ownership, no private leakage (3305.5387ms)"
+        }
+      ],
+      "notes": "Collaboration through a shared Project; a Mission is never co-owned"
+    },
+    {
+      "id": "L",
+      "title": "Long-running Mission",
+      "mechanism": "Deterministic durability fixture with an accelerated clock (start time moved back); NOT a multi-hour endurance run",
+      "tests": [
+        {
+          "name": "T14-L: an accelerated long Mission",
+          "ok": true,
+          "line": "T14-L: an accelerated long Mission survives a crash at a checkpoint without duplicate dispatch and stays within its limits (1966.493ms)"
+        }
+      ],
+      "notes": ""
+    }
+  ],
+  "additional": [
+    {
+      "name": "T14 a worker within its parent's approval",
+      "ok": true,
+      "line": "T14 a worker within its parent's approval runs at once under derived authority; the parent waits for it; a wider one waits for the owner (7141.5616ms)"
+    },
+    {
+      "name": "T14 derived authority ends with the parent's",
+      "ok": true,
+      "line": "T14 derived authority ends with the parent's: a replanned parent revokes its worker's envelope and stops it (1951.8351ms)"
+    },
+    {
+      "name": "T14 review F6: a derived worker admits nothing new",
+      "ok": true,
+      "line": "T14 review F6: a derived worker admits nothing new while its parent waits for reconciliation; it resumes after the owner decides (5896.6073ms)"
+    },
+    {
+      "name": "T14 autonomy projection",
+      "ok": true,
+      "line": "T14 autonomy projection: COMPLETE needs canonical completion, never a final message (0.8782ms)"
+    },
+    {
+      "name": "T14 review F1",
+      "ok": true,
+      "line": "T14 review F1: derived worker budgets are conserved across finished and live workers (791.1721ms)"
+    },
+    {
+      "name": "T14 review F6: no worker is derived",
+      "ok": true,
+      "line": "T14 review F6: no worker is derived while the parent waits for reconciliation (648.7942ms)"
+    },
+    {
+      "name": "T14 review F3/F4/F7",
+      "ok": true,
+      "line": "T14 review F3/F4/F7: every widening field is refused and a negative remainder is clamped (1.998ms)"
+    },
+    {
+      "name": "T14 review F9",
+      "ok": true,
+      "line": "T14 review F9: a parent held by a worker that waits for the owner says so (0.2723ms)"
+    },
+    {
+      "name": "M-A-3 T14: the autonomy caption",
+      "ok": true,
+      "line": "M-A-3 T14: the autonomy caption never calls unverified work verified (0.2103ms)"
+    },
+    {
+      "name": "M-A-3 T14: a Project in focus",
+      "ok": true,
+      "line": "M-A-3 T14: a Project in focus leaves other Projects' notes out of the Lotus widget (0.139ms)"
+    }
+  ],
+  "traces": [
+    "T14-B worker spans (ms from first start): [[0,3712],[379,4130],[427,4194]]",
+    "T14-F restart-to-reconciled-state 773 ms",
+    "T14-H spoken answer: I drafted a Mission: writing the changelog. It is waiting for review on the Windows Host screen. I can't approve or start it by voice. It uses the default workspace, because no project name matched.",
+    "T14-A trail: WAITING_AUTHORIZATION → DELEGATE → WAITING_DEPENDENCY → DELEGATE → EXECUTE → VERIFY → WAITING_DEPENDENCY → WAITING_AUTHORIZATION → PLAN → WAITING_AUTHORIZATION → DELEGATE → WAITING_DEPENDENCY → DELEGATE → EXECUTE → VERIFY → EXECUTE → VERIFY → EXECUTE → VERIFY → EXECUTE → VERIFY → EXECUTE → VERIFY → WAITING_DEPENDENCY → DELEGATE → EXECUTE → VERIFY → DELEGATE → EXECUTE → VERIFY → EXECUTE → VERIFY → WAITING_DEPENDENCY → DELEGATE → EXECUTE → VERIFY → WAITING_DEPENDENCY → DELEGATE → REPAIR → VERIFY → WAITING_DEPENDENCY → DELEGATE → EXECUTE → VERIFY → WAITING_DEPENDENCY → DELEGATE → EXECUTE → VERIFY → WAITING_DEPENDENCY → VERIFY → COMPLETE; verified=true; 10/10 steps completed. 10 independently verified by Bunny."
+  ]
+}
