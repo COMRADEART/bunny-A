@@ -108,7 +108,6 @@ const newAgent = (env: Env, before: Set<string>): { id: string; missionId: strin
   before.add(row.id);
   return { id: row.id, missionId: row.missionId!, row };
 };
-const snapshotWith = (env: Env): AgentSnapshot => env.agents.snapshot();
 const lifecycle = (env: Env, missionId: string) => env.db.events().filter((e) => e.type.startsWith("agent.") && e.missionId === missionId);
 const checkpoints = (env: Env) => (env.db.db.prepare("SELECT id, record FROM agent_checkpoints ORDER BY created_at ASC").all() as { id: string; record: string }[]);
 
@@ -276,7 +275,7 @@ test("A08: resume without restart reuses the same run and generation, then compl
         { role: "Implement", objective: "Write two.txt", access: "write", executor: { kind: "capability", action: "filesystem.write", params: { path: join(env.root, "two.txt"), content: "two" } }, dependsOn: [0], verification: [] },
       ],
     }, "test");
-    const { id, missionId } = newAgent(env, before);
+    const { id } = newAgent(env, before);
     env.agents.start(id, "workstation");
     const runId = await until(() => env.agents.snapshot().agents.find((a) => a.id === id)?.run?.id ?? undefined, "run opened at start");
     await until(() => env.launched.length === 1, "step 1 admitted");

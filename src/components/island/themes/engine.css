@@ -1,0 +1,830 @@
+/*
+ * Visual Experience 2.0 — the theme engine. One stylesheet for all 22 themes.
+ *
+ * Every value comes from the tokens that src/lib/bunny-host/ui-theme.ts writes as inline custom properties on the themed root
+ * (the shell, a portaled dialog, the phone). Structure is selected by data attributes, never by component code:
+ *   data-ui-theme  the theme id          data-layout  sidebar | rail | topnav | bento | floating | window
+ *   data-material  the surface material  data-home    stack | bento | editorial | focus | collage | console | grid | window
+ *   data-nav       navigation treatment  data-studio  cards | gallery | list | frames | polaroid | sprites | hud
+ *   data-hc        high contrast         data-motion  full | reduced | off (this window's comfort setting)
+ *
+ * Specificity: every rule starts from `.bunny-app.t8-app[data-ui-theme][data-material]` (0,4,0) so it outranks the T13 shell
+ * stylesheets (0,3,0) regardless of load order. Per-theme files use the same prefix and load after this one.
+ * The glass theme's tokens equal the accepted T13 values, so for glass these rules reproduce the existing workspace.
+ */
+
+/* ============================================================================================ root, page and text */
+.bunny-app.t8-app[data-ui-theme][data-material] {
+  font-family: var(--font-bunny);
+  background:
+    radial-gradient(900px 620px at 10% -12%, var(--page-wash-a) 0%, transparent 62%),
+    radial-gradient(820px 620px at 104% 0%, var(--page-wash-b) 0%, transparent 60%),
+    var(--page);
+  background-attachment: fixed;
+  color: var(--fg);
+  position: relative;
+  isolation: isolate;
+}
+/* A theme's page texture or atmosphere (paper grain, grid, horizon) lives on ::before, behind everything, never over text. */
+.bunny-app.t8-app[data-ui-theme][data-material]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--page-texture, none);
+  opacity: var(--page-texture-opacity, 1);
+}
+.bunny-app.t8-app[data-ui-theme][data-hc="true"]::before,
+.bunny-app.t8-app[data-ui-theme][data-hc="true"]::after {
+  display: none;
+}
+.bunny-app.t8-app[data-ui-theme][data-material] :is(h1, h2, h3, .brand-button) {
+  font-family: var(--font-display);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] h1 {
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+  text-transform: var(--heading-case);
+  font-size: var(--text-heading);
+  line-height: 1.12;
+}
+.bunny-app.t8-app[data-ui-theme][data-material] h2 {
+  text-transform: var(--heading-case);
+  letter-spacing: var(--heading-tracking);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] :is(.cx-section h3, .nav-group-label) {
+  text-transform: var(--eyebrow-case);
+  letter-spacing: var(--eyebrow-tracking);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] :is(code, pre, kbd, .mono) {
+  font-family: var(--font-mono);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] svg.lucide {
+  stroke-width: var(--icon-stroke);
+}
+
+/* ============================================================================================== surfaces */
+.bunny-app.t8-app[data-ui-theme][data-material] :is(.glass, .t8-surface, .cx-panel, .connection-banner, .offline-banner, .attention-banner) {
+  background: var(--glass);
+  border: var(--bw) solid var(--border);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-edge);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--blur)) saturate(var(--glass-saturate));
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .t8-surface {
+  border-radius: var(--r-lg);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .app-sidebar {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--blur)) saturate(var(--glass-saturate));
+  border-right: var(--bw) solid var(--border);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] :is(.app-topbar, .workspace-footer) {
+  border-color: var(--border);
+  border-width: 0;
+  border-style: solid;
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .app-topbar {
+  border-bottom-width: var(--bw);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .workspace-footer {
+  border-top-width: var(--bw);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] :is(.ch-mission-row, .ap-row, .fi-row, .agentic-row, .mission-link, .home-work-row) {
+  border-color: var(--border);
+}
+/* Wells that hold character art stay dark in every theme so the visors never vanish; each theme reshapes them. */
+.bunny-app.t8-app[data-ui-theme][data-material] :is(.cx-well, .st-card .st-well) {
+  border-radius: var(--r-md);
+}
+
+/* ============================================================================================== controls */
+.bunny-app.t8-app[data-ui-theme][data-material] .btn {
+  border-radius: var(--r-sm);
+  transition: transform var(--quick) var(--ease), box-shadow var(--quick) var(--ease), background-color var(--quick) var(--ease);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .btn.primary {
+  background: var(--action);
+  color: var(--action-ink);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] :is(.btn.secondary, .btn.danger, .ch-quick button, .ch-chip, .st-tag) {
+  border-width: var(--bw);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] :is(input, textarea, select, .search-field) {
+  border-width: var(--bw);
+  border-radius: var(--r-sm);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-quick button {
+  border-radius: var(--r-md);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] :is(.ch-chip, .st-tag, .cx-badge, .nav-count) {
+  border-radius: var(--r-pill);
+}
+/* Selected and focused states are never carried by depth or colour alone: an outline or a marker always appears. */
+.bunny-app.t8-app[data-ui-theme][data-material] :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.bunny-app.t8-app[data-ui-theme][data-hc="true"] :focus-visible {
+  outline-width: 3px;
+}
+.bunny-app.t8-app[data-ui-theme][data-hc="true"] .app-sidebar nav button[aria-current="page"] {
+  outline: 2px solid var(--fg);
+  outline-offset: -2px;
+}
+
+/* ============================================================================================== navigation */
+.bunny-app.t8-app[data-ui-theme][data-material] .app-sidebar nav button {
+  position: relative;
+  border-radius: var(--r-sm);
+  transition: background-color var(--quick) var(--ease), color var(--quick) var(--ease);
+}
+.bunny-app.t8-app[data-ui-theme][data-nav="underline"] .app-sidebar nav button[aria-current="page"] {
+  background: transparent;
+  color: var(--fg);
+  box-shadow: inset 0 -2px 0 var(--working);
+  border-radius: 0;
+}
+.bunny-app.t8-app[data-ui-theme][data-nav="block"] .app-sidebar nav button[aria-current="page"] {
+  background: var(--action);
+  color: var(--action-ink);
+  border-radius: 0;
+}
+.bunny-app.t8-app[data-ui-theme][data-nav="dot"] .app-sidebar nav button[aria-current="page"] {
+  background: transparent;
+  color: var(--fg);
+  font-weight: 600;
+}
+.bunny-app.t8-app[data-ui-theme][data-nav="dot"] .app-sidebar nav button[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--working);
+}
+.bunny-app.t8-app[data-ui-theme][data-nav="bracket"] .app-sidebar nav button[aria-current="page"] {
+  background: var(--working-soft);
+  color: var(--working);
+  border-radius: 0;
+  box-shadow: inset 2px 0 0 var(--working), inset -2px 0 0 var(--working);
+}
+.bunny-app.t8-app[data-ui-theme][data-nav="ink"] .app-sidebar nav button[aria-current="page"] {
+  background: transparent;
+  color: var(--fg);
+}
+.bunny-app.t8-app[data-ui-theme][data-nav="ink"] .app-sidebar nav button[aria-current="page"] > span:not(.nav-count) {
+  background-image: linear-gradient(transparent 62%, color-mix(in srgb, var(--working) 28%, transparent) 62%, color-mix(in srgb, var(--working) 28%, transparent) 92%, transparent 92%);
+}
+
+/* ============================================================================================== shell layouts */
+@media (min-width: 768px) {
+  /* ---- rail: a slim icon rail; labels stay in the accessibility tree and appear beside the icon on hover/focus */
+  .bunny-app.t8-app[data-layout="rail"][data-material] {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+  .bunny-app.t8-app[data-layout="rail"][data-material] .app-sidebar {
+    padding: var(--s4) var(--s2);
+    align-items: center;
+  }
+  .bunny-app.t8-app[data-layout="rail"][data-material] .sidebar-brand {
+    padding: 0 0 var(--s5);
+    justify-content: center;
+  }
+  .bunny-app.t8-app[data-layout="rail"][data-material] .brand-button > span,
+  .bunny-app.t8-app[data-layout="rail"][data-material] .nav-group-label,
+  .bunny-app.t8-app[data-layout="rail"][data-material] .sidebar-bottom :is(.caption, div > span:last-child, .quiet-button > span) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .bunny-app.t8-app[data-layout="rail"][data-material] .app-sidebar nav {
+    width: 100%;
+    align-items: stretch;
+  }
+  .bunny-app.t8-app[data-layout="rail"][data-material] .app-sidebar nav button {
+    justify-content: center;
+    padding: var(--s3) 0;
+  }
+  .bunny-app.t8-app[data-layout="rail"][data-material] .app-sidebar nav button > span:not(.nav-count) {
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translate(-4px, -50%);
+    padding: 4px 10px;
+    border-radius: var(--r-sm);
+    background: var(--fg);
+    color: var(--page);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--quick) var(--ease), transform var(--quick) var(--ease);
+    z-index: 30;
+  }
+  .bunny-app.t8-app[data-layout="rail"][data-material] .app-sidebar nav button:is(:hover, :focus-visible) > span:not(.nav-count) {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+  .bunny-app.t8-app[data-layout="rail"][data-material] .nav-count {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    margin: 0;
+  }
+  .bunny-app.t8-app[data-layout="rail"][data-material] .sidebar-bottom {
+    align-items: center;
+    padding-inline: 0;
+  }
+
+  /* ---- topnav: the navigation becomes a masthead bar; content runs in a centred measure below */
+  .bunny-app.t8-app[data-layout="topnav"][data-material] {
+    display: block;
+  }
+  /* The masthead scrolls away with the page: sticky, it covered the sticky context panel and preview bar and the controls
+     focused inside them (WCAG 2.4.11), and a masthead that may wrap to two rows has no fixed height to offset by. */
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .app-sidebar {
+    position: relative;
+    top: 0;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--s5);
+    padding: var(--s3) var(--s6);
+    border-right: 0;
+    border-bottom: var(--bw) solid var(--border);
+    z-index: 20;
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .sidebar-brand {
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .app-sidebar nav {
+    flex-direction: row;
+    align-items: center;
+    gap: 0 var(--s1);
+    flex: 1;
+    min-width: 0;
+    /* Wraps to a second row rather than scrolling: a hidden horizontal scroll would hide destinations. */
+    flex-wrap: wrap;
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .app-sidebar nav button {
+    min-height: 44px;
+    padding: var(--s2) var(--s3);
+    white-space: nowrap;
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .app-sidebar nav button > svg {
+    display: none;
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .nav-group-label {
+    margin: 0 0 0 var(--s3);
+    padding-left: var(--s3);
+    border-left: var(--bw) solid var(--border);
+    white-space: nowrap;
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .sidebar-bottom {
+    margin: 0;
+    padding: 0;
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .sidebar-bottom .caption {
+    display: none;
+  }
+  /* The masthead keeps the status dot and the appearance icon; their words stay for screen readers. */
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .sidebar-bottom :is(div > span:last-child, .quiet-button > span) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .sidebar-bottom .quiet-button {
+    min-width: 44px;
+    justify-content: center;
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .app-topbar {
+    padding-inline: var(--s6);
+  }
+  .bunny-app.t8-app[data-layout="topnav"][data-material] .workspace-content {
+    max-width: 1240px;
+  }
+
+  /* ---- floating: navigation is a detached card; panels hang in space with room around them */
+  .bunny-app.t8-app[data-layout="floating"][data-material] {
+    grid-template-columns: 248px minmax(0, 1fr);
+  }
+  .bunny-app.t8-app[data-layout="floating"][data-material] .app-sidebar {
+    margin: var(--s4) 0 var(--s4) var(--s4);
+    height: calc(100dvh - 2 * var(--s4));
+    top: var(--s4);
+    border: var(--bw) solid var(--border);
+    border-radius: var(--r-shell);
+    box-shadow: var(--raised-shadow);
+  }
+  .bunny-app.t8-app[data-layout="floating"][data-material] .app-topbar {
+    border-bottom: 0;
+    margin: var(--s4) var(--s4) 0;
+  }
+  .bunny-app.t8-app[data-layout="floating"][data-material] .workspace-footer {
+    border-top: 0;
+  }
+
+  /* ---- bento: the navigation is one tile of the grid, the context panel a column of tiles */
+  .bunny-app.t8-app[data-layout="bento"][data-material] {
+    grid-template-columns: 232px minmax(0, 1fr);
+    gap: var(--s3);
+    padding: var(--s3);
+  }
+  .bunny-app.t8-app[data-layout="bento"][data-material] .app-sidebar {
+    height: calc(100dvh - 2 * var(--s3));
+    top: var(--s3);
+    border: var(--bw) solid var(--border);
+    border-radius: var(--r-shell);
+    box-shadow: var(--shadow);
+    background: var(--glass);
+  }
+  .bunny-app.t8-app[data-layout="bento"][data-material] .app-topbar {
+    border: var(--bw) solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--glass);
+    box-shadow: var(--shadow);
+    min-height: 56px;
+  }
+  .bunny-app.t8-app[data-layout="bento"][data-material] .workspace-content {
+    padding: var(--s4) 0;
+  }
+  .bunny-app.t8-app[data-layout="bento"][data-material] .workspace-footer {
+    border: 0;
+  }
+  .bunny-app.t8-app[data-layout="bento"][data-material] .cx-panel {
+    margin-top: var(--s4);
+  }
+
+  /* ---- window: every major region is a framed window with a title bar */
+  .bunny-app.t8-app[data-layout="window"][data-material] {
+    grid-template-columns: 236px minmax(0, 1fr);
+    gap: var(--s3);
+    padding: var(--s3);
+  }
+  .bunny-app.t8-app[data-layout="window"][data-material] .app-sidebar {
+    height: calc(100dvh - 2 * var(--s3));
+    top: var(--s3);
+    border: var(--bw) solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--raised-shadow);
+    padding-top: calc(var(--s5) + 26px);
+  }
+  .bunny-app.t8-app[data-layout="window"][data-material] :is(.app-sidebar, .cx-panel)::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 28px;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    background: var(--window-bar, var(--action));
+    border-bottom: var(--bw) solid var(--border);
+  }
+  .bunny-app.t8-app[data-layout="window"][data-material] .cx-panel {
+    padding-top: calc(var(--s4) + 28px);
+  }
+  .bunny-app.t8-app[data-layout="window"][data-material] .app-topbar {
+    border: var(--bw) solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--glass);
+  }
+  .bunny-app.t8-app[data-layout="window"][data-material] .workspace-content {
+    padding: var(--s4) 0;
+  }
+  .bunny-app.t8-app[data-layout="window"][data-material] .workspace-footer {
+    border: 0;
+  }
+}
+.bunny-app.t8-app[data-layout="window"][data-material] .cx-panel {
+  position: sticky;
+}
+
+/* ============================================================================================== dashboard compositions */
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-home {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "hero" "compose" "quick" "missions" "tasks";
+  column-gap: var(--s4);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-home > * {
+  min-width: 0;
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-hero {
+  grid-area: hero;
+  /* Headlines size to their own column, so a large display face never overflows a narrow composition. */
+  container-type: inline-size;
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .chat-compose { grid-area: compose; }
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-quick { grid-area: quick; }
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-agents { grid-area: agents; display: none; }
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-missions { grid-area: missions; }
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-tasks { grid-area: tasks; }
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--s3);
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-agent {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3);
+  color: var(--fg);
+  text-align: left;
+  min-height: 72px;
+}
+.bunny-app.t8-app[data-ui-theme][data-material] .ch-agent small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+/* Compositions that surface the Agents module on the dashboard itself. */
+.bunny-app.t8-app[data-home="bento"][data-material] .ch-agents,
+.bunny-app.t8-app[data-home="console"][data-material] .ch-agents,
+.bunny-app.t8-app[data-home="collage"][data-material] .ch-agents,
+.bunny-app.t8-app[data-home="grid"][data-material] .ch-agents,
+.bunny-app.t8-app[data-home="window"][data-material] .ch-agents,
+.bunny-app.t8-app[data-home="editorial"][data-material] .ch-agents {
+  display: block;
+}
+@media (min-width: 1000px) {
+  /* bento: compartments of different sizes, read left to right, top to bottom */
+  .bunny-app.t8-app[data-home="bento"][data-material] .ch-home {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-areas:
+      "hero hero hero agents agents agents"
+      "compose compose compose compose quick quick"
+      "missions missions missions tasks tasks tasks";
+    gap: var(--s3);
+    align-items: stretch;
+  }
+  .bunny-app.t8-app[data-home="bento"][data-material] :is(.ch-hero, .ch-agents, .ch-missions, .ch-tasks, .ch-quick) {
+    margin: 0;
+    padding: var(--s5);
+    border: var(--bw) solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--glass);
+    box-shadow: var(--shadow);
+  }
+  .bunny-app.t8-app[data-home="bento"][data-material] .ch-quick {
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+  .bunny-app.t8-app[data-home="bento"][data-material] .ch-agent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .bunny-app.t8-app[data-home="bento"][data-material] :is(.ch-missions, .ch-tasks) > .t8-surface {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  /* editorial: a magazine spread, headline across, the story in a wide column, side notes in a narrow one */
+  .bunny-app.t8-app[data-home="editorial"][data-material] .ch-home {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-areas:
+      "hero hero"
+      "compose agents"
+      "missions agents"
+      "missions quick"
+      "tasks tasks";
+    column-gap: var(--s7);
+  }
+  .bunny-app.t8-app[data-home="editorial"][data-material] .ch-hero {
+    padding: var(--s7) 0 var(--s6);
+    border-bottom: var(--bw) solid var(--border);
+    margin-bottom: var(--s5);
+  }
+  .bunny-app.t8-app[data-home="editorial"][data-material] .ch-hero h1 {
+    font-size: calc(clamp(2.4rem, 8.8cqi, 4.2rem) * var(--display-scale) / 1.3);
+    max-width: 16ch;
+  }
+  .bunny-app.t8-app[data-home="editorial"][data-material] .ch-agent-grid,
+  .bunny-app.t8-app[data-home="editorial"][data-material] .ch-quick {
+    grid-template-columns: 1fr;
+  }
+  .bunny-app.t8-app[data-home="editorial"][data-material] .ch-agents {
+    border-left: var(--bw) solid var(--border);
+    padding-left: var(--s5);
+    margin-top: 0;
+  }
+
+  /* grid: a strict modular grid; hero and composer share a row, everything aligns to columns */
+  .bunny-app.t8-app[data-home="grid"][data-material] .ch-home {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-areas:
+      "hero hero hero hero hero compose compose compose compose compose compose compose"
+      "quick quick quick quick quick quick quick quick quick quick quick quick"
+      "agents agents agents agents agents agents agents agents agents agents agents agents"
+      "missions missions missions missions missions missions tasks tasks tasks tasks tasks tasks";
+    column-gap: var(--s5);
+    align-items: start;
+  }
+  .bunny-app.t8-app[data-home="grid"][data-material] .ch-agent-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .bunny-app.t8-app[data-home="grid"][data-material] .ch-quick {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* console: an operator's console — status modules first, the composer as a command line below */
+  .bunny-app.t8-app[data-home="console"][data-material] .ch-home {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    grid-template-areas:
+      "hero agents"
+      "missions agents"
+      "compose compose"
+      "quick quick"
+      "tasks tasks";
+    column-gap: var(--s4);
+  }
+  .bunny-app.t8-app[data-home="console"][data-material] .ch-agent-grid {
+    grid-template-columns: 1fr;
+    gap: var(--s2);
+  }
+
+  /* collage: pieces overlap slightly and sit at different heights, as if pinned by hand */
+  .bunny-app.t8-app[data-home="collage"][data-material] .ch-home {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-template-areas:
+      "hero hero hero hero hero hero hero agents agents agents agents agents"
+      "compose compose compose compose compose compose compose agents agents agents agents agents"
+      "quick quick quick quick quick quick quick quick quick quick quick quick"
+      "missions missions missions missions missions missions missions tasks tasks tasks tasks tasks";
+    column-gap: var(--s5);
+  }
+  .bunny-app.t8-app[data-home="collage"][data-material] .ch-agent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* window: the dashboard as a desktop of windows */
+  .bunny-app.t8-app[data-home="window"][data-material] .ch-home {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-areas:
+      "hero hero"
+      "compose agents"
+      "quick agents"
+      "missions tasks";
+    gap: var(--s4);
+  }
+  .bunny-app.t8-app[data-home="window"][data-material] .ch-agent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* focus: one quiet column; secondary lists stay one step away below */
+.bunny-app.t8-app[data-home="focus"][data-material] .ch-home {
+  max-width: 760px;
+  margin-inline: auto;
+}
+.bunny-app.t8-app[data-home="focus"][data-material] .ch-hero {
+  padding-top: var(--s8);
+  text-align: left;
+}
+
+/* ============================================================================================== Agent Studio frames */
+.bunny-app.t8-app[data-studio="gallery"][data-material] .st-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--s4);
+}
+.bunny-app.t8-app[data-studio="gallery"][data-material] .st-card .st-well {
+  height: 200px;
+}
+.bunny-app.t8-app[data-studio="list"][data-material] .st-grid {
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+.bunny-app.t8-app[data-studio="list"][data-material] .st-card {
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  grid-template-areas: "well name action" "well weapon action" "well badge action" "well purpose action";
+  align-items: center;
+  column-gap: var(--s5);
+  border-radius: 0;
+  border-width: 0 0 var(--bw);
+  box-shadow: none;
+  background: transparent;
+}
+.bunny-app.t8-app[data-studio="list"][data-material] .st-card .st-well {
+  grid-area: well;
+  height: 96px;
+  width: 96px;
+}
+.bunny-app.t8-app[data-studio="list"][data-material] .st-card > .btn {
+  grid-area: action;
+}
+.bunny-app.t8-app[data-studio="hud"][data-material] .st-grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.bunny-app.t8-app[data-studio="hud"][data-material] .st-card {
+  border-radius: 0;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+
+/* ---- Agent frames (data-agent-frame): the theme's frame is a ring AROUND the character. The well inside belongs to the
+   Agent's own skin (character-styles.css) and is never reshaped, so a theme and a per-Agent look stay independent.
+   Pixel frames are drawn by pixel.css. Under high contrast the ring is plain foreground. */
+[data-agent-frame][data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  --frame-ring: color-mix(in srgb, var(--decor) 70%, transparent);
+}
+[data-agent-frame="rounded"]:not([data-ui-theme="glass"])[data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  border-radius: 26%;
+  box-shadow: 0 0 0 2px var(--frame-ring);
+}
+[data-agent-frame="square"][data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  border-radius: var(--r-sm);
+  box-shadow: 0 0 0 var(--bw-strong, 2px) var(--border);
+}
+[data-agent-frame="circle"][data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--frame-ring), 0 0 0 5px color-mix(in srgb, var(--frame-ring) 35%, transparent);
+}
+[data-agent-frame="blob"][data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  border-radius: 46% 54% 42% 58% / 52% 44% 56% 48%;
+  box-shadow: 0 0 0 3px var(--frame-ring);
+}
+[data-agent-frame="hex"][data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  border-radius: 2px;
+  outline: 1px solid var(--frame-ring);
+  outline-offset: 3px;
+  box-shadow: -4px -4px 0 -2px var(--action), 4px 4px 0 -2px var(--action);
+}
+[data-agent-frame="polaroid"][data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  border-radius: 2px;
+  box-shadow: 0 0 0 4px #fdfbf5, 0 9px 0 4px #fdfbf5, 0 10px 12px 3px rgba(40, 30, 10, 0.22);
+}
+[data-agent-frame="ornate"][data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  border-radius: 50% 50% 10% 10% / 38% 38% 10% 10%;
+  box-shadow: 0 0 0 2px var(--decor), 0 0 0 4px var(--panel), 0 0 0 5px var(--decor);
+}
+[data-agent-frame="ticket"][data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  border-radius: 6px;
+  outline: 2px dashed var(--frame-ring);
+  outline-offset: 3px;
+}
+[data-agent-frame][data-hc="true"][data-material] :is(.ch-agent, .st-well) .wc-weapon {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--fg);
+}
+
+/* ============================================================================================== dialogs and phone */
+.t8-dialog[data-ui-theme][data-material] {
+  font-family: var(--font-bunny);
+  background: var(--glass-solid);
+  border: var(--bw-strong) solid var(--border);
+  border-radius: var(--r-shell);
+  box-shadow: var(--raised-shadow);
+  color: var(--fg);
+}
+.t8-dialog[data-ui-theme][data-material] h2 {
+  font-family: var(--font-display);
+  text-transform: var(--heading-case);
+}
+.t8-dialog[data-ui-theme][data-material] button {
+  border-width: var(--bw);
+  border-radius: var(--r-sm);
+}
+/* ---- companion shell: phone owns the chrome; do not inherit desktop page padding or enter motion */
+.bunny-app.t8-app[data-surface="companion"] {
+  display: block;
+  min-height: 100dvh;
+}
+.bunny-app.t8-app[data-surface="companion"] .workspace-content {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.bunny-app.t8-app[data-surface="companion"][data-ui-theme][data-motion="full"] .workspace-content > * {
+  animation: none;
+}
+
+/* ---- the phone companion: same tokens, its own touch-first chrome */
+.pc-root[data-ui-theme][data-material] {
+  font-family: var(--font-bunny);
+}
+.pc-root[data-ui-theme][data-material] :is(h1, h2, h3, .pc-title) {
+  font-family: var(--font-display);
+  text-transform: var(--heading-case);
+  letter-spacing: var(--heading-tracking);
+}
+.pc-root[data-ui-theme][data-material] :is(.pc-card, .pc-banner, .pairing) {
+  border: var(--bw) solid var(--pc-line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-edge);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--blur)) saturate(var(--glass-saturate));
+}
+.pc-root[data-ui-theme][data-material] :is(.pc-slot, .pc-tile, .pc-row, .pc-slot-empty) {
+  border-width: var(--bw);
+  border-radius: var(--r-md);
+}
+.pc-root[data-ui-theme][data-material] :is(.pc-icon, .pc-btn, .pc-input, .pc-segment, .pc-tab, .pairing .btn, .pairing .field input) {
+  border-radius: var(--r-sm);
+}
+.pc-root[data-ui-theme][data-material] :is(.pc-pill, .pc-primary) {
+  border-radius: var(--r-pill);
+}
+.pc-root[data-ui-theme][data-material] .pc-hero-well {
+  border-radius: var(--r-shell);
+}
+.pc-root[data-ui-theme][data-material] :is(.pc-btn.primary, .pc-primary) {
+  background: var(--pc-primary);
+  color: var(--pc-primary-ink);
+}
+.pc-root[data-ui-theme][data-material] .pc-top {
+  border-bottom: var(--bw) solid var(--pc-line);
+}
+.pc-root[data-ui-theme][data-material] .pc-tabs {
+  border-top: var(--bw) solid var(--pc-line);
+}
+.pc-root[data-ui-theme][data-material] .pc-tab[data-active="true"] {
+  color: var(--working);
+  background: var(--working-soft);
+}
+/* floating and pill tab bars detach from the edge; block bars take the theme's action colour for the current tab */
+.pc-root[data-phone-nav="floating"][data-material] .pc-tabs,
+.pc-root[data-phone-nav="pill"][data-material] .pc-tabs {
+  bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  width: min(calc(100% - 24px), 536px);
+  border: var(--bw) solid var(--pc-line);
+  border-radius: var(--r-shell);
+  box-shadow: var(--raised-shadow);
+  padding-bottom: 6px;
+}
+.pc-root[data-phone-nav="pill"][data-material] .pc-tabs {
+  border-radius: 999px;
+}
+.pc-root[data-phone-nav="pill"][data-material] .pc-tab {
+  border-radius: 999px;
+}
+.pc-root[data-phone-nav="block"][data-material] .pc-tabs {
+  border-top-width: calc(var(--bw) + 1px);
+}
+.pc-root[data-phone-nav="block"][data-material] .pc-tab[data-active="true"] {
+  background: var(--pc-primary);
+  color: var(--pc-primary-ink);
+  border-radius: 0;
+}
+.pc-root[data-phone-nav="window"][data-material] .pc-tabs {
+  border: var(--bw) solid var(--pc-line);
+  box-shadow: inset 0 0 0 2px var(--glass-edge);
+}
+
+/* ============================================================================================== motion */
+/* One orchestrated moment per navigation: the new page's content enters with the theme's own motion. Nothing else animates
+   on its own except real state (a working Agent, a live level), and every entrance stops under reduced or no motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .bunny-app.t8-app[data-ui-theme][data-motion="full"] .workspace-content > * {
+    animation: var(--enter-name, ve-rise) var(--motion) var(--ease) both;
+  }
+  .bunny-app.t8-app[data-ui-theme][data-motion="full"] .workspace-content > *:nth-child(2) { animation-delay: 40ms; }
+  .bunny-app.t8-app[data-ui-theme][data-motion="full"] .workspace-content > *:nth-child(3) { animation-delay: 80ms; }
+  .bunny-app.t8-app[data-ui-theme][data-motion="full"] .btn:active:not(:disabled) {
+    transform: var(--press-transform, translateY(1px));
+  }
+}
+@keyframes ve-rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes ve-fade {
+  from { opacity: 0; }
+}
+.bunny-app.t8-app[data-ui-theme][data-motion="off"] *,
+.bunny-app.t8-app[data-ui-theme][data-motion="off"] *::before,
+.bunny-app.t8-app[data-ui-theme][data-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+.bunny-app.t8-app[data-ui-theme][data-motion="reduced"] *,
+.bunny-app.t8-app[data-ui-theme][data-motion="reduced"] *::before,
+.bunny-app.t8-app[data-ui-theme][data-motion="reduced"] *::after {
+  animation-iteration-count: 1 !important;
+  animation-duration: 0.01ms !important;
+}
+
+/* ============================================================================================== forced colours */
+@media (forced-colors: active) {
+  .bunny-app.t8-app[data-ui-theme][data-material]::before,
+  .bunny-app.t8-app[data-ui-theme][data-material]::after {
+    display: none;
+  }
+  .bunny-app.t8-app[data-ui-theme][data-material] :is(.glass, .t8-surface, .app-sidebar, .cx-panel, .ch-agent) {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+    box-shadow: none;
+    clip-path: none;
+  }
+}

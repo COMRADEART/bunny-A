@@ -1,0 +1,49 @@
+/* 11 Bento Grid */
+/* Signature: the dashboard itself is compartments. The greeting tile is the one coloured compartment. */
+.bunny-app.t8-app[data-ui-theme="bento"][data-material] {
+  --enter-name: ve-tile;
+  background: var(--page);
+}
+.bunny-app.t8-app[data-ui-theme="bento"][data-material] .ch-hero {
+  background: var(--fg) !important;
+  color: var(--page);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 180px;
+}
+.bunny-app.t8-app[data-ui-theme="bento"][data-material] .ch-hero :is(.eyebrow, .caption) {
+  color: color-mix(in srgb, var(--page) 78%, var(--fg));
+}
+.bunny-app.t8-app[data-ui-theme="bento"][data-material] .ch-hero h1 {
+  color: var(--page);
+  font-size: clamp(2rem, 6.8cqi, 3rem);
+}
+.bunny-app.t8-app[data-ui-theme="bento"][data-material] .chat-compose {
+  border-radius: var(--r-lg);
+}
+.bunny-app.t8-app[data-ui-theme="bento"][data-material] .ch-quick button {
+  background: var(--elevated);
+  font-weight: 600;
+}
+.bunny-app.t8-app[data-ui-theme="bento"][data-material] .ch-quick button:nth-child(1) {
+  background: var(--decor);
+  color: #1a1400;
+  border-color: transparent;
+}
+.bunny-app.t8-app[data-ui-theme="bento"][data-material][data-hc="true"] .ch-quick button:nth-child(1) {
+  background: var(--glass-solid);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.bunny-app.t8-app[data-ui-theme="bento"][data-material] .ch-agent {
+  background: var(--elevated);
+  border-radius: var(--r-md);
+  box-shadow: none;
+}
+.bunny-app.t8-app[data-ui-theme="bento"][data-material] .st-card {
+  border-radius: var(--r-lg);
+}
+@keyframes ve-tile {
+  from { opacity: 0; transform: scale(0.985); }
+}

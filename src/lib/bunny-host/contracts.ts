@@ -65,6 +65,9 @@ export type HostSnapshot = {
   voicePersonalization?: import("./voice/voice-personalization.ts").VoicePersonalizationView;
   /** M-A-3 T13.3 Gate H: per-slot character style. Presentation only; paired devices receive it to draw the same look. */
   characterAppearance?: import("./character-style.ts").CharacterAppearanceView;
+  uiTheme?: import("./ui-theme.ts").UiThemeView;
+  /** Widget Design Studio layout. Presentation only; paired devices may read it and cannot write it. */
+  widgets?: import("./widgets.ts").WidgetView;
   /** M-A-3 T13.1 Laya/Jev intelligence state (no secrets; credential existence only). Absent for paired devices. */
   intelligence?: import("./intelligence-snapshot.ts").IntelligenceSnapshot;
   connections?: import("./connections.server.ts").ConnectionsSnapshot;

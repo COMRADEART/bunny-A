@@ -12,7 +12,6 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const install = join(root, 'install');
-const placementPath = join(install, 'Bunny-Island.Placement.ps1');
 const charactersPath = join(install, 'Bunny-Island.Characters.ps1');
 const weaponsPath = join(install, 'Bunny-Island.Weapons.ps1');
 const companionPath = join(install, 'Bunny-Island.Companion.ps1');

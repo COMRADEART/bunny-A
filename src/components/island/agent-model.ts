@@ -9,7 +9,6 @@ export const AGENT_STATE_LABEL: Record<AgentSnapshot["agents"][number]["state"],
   WAITING_FOR_DEPENDENCY: "Waiting on a step", PAUSED: "Paused", VERIFYING: "Verifying",
   COMPLETED: "Completed", FAILED: "Failed", STOPPED: "Stopped", INTERRUPTED: "Interrupted",
 };
-const NON_TERMINAL = ["CREATED", "PLANNING", "RUNNING", "WAITING_FOR_USER", "WAITING_FOR_DEPENDENCY", "PAUSED", "VERIFYING", "INTERRUPTED"];
 
 export type AgentPanelRow = {
   activity?: AgentSnapshot["agents"][number]["activity"];

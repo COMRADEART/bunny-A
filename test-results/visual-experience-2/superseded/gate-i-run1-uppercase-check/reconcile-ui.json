@@ -1,0 +1,110 @@
+{
+  "base": "http://127.0.0.1:8096",
+  "host": 43891,
+  "classification": "LIVE UI against a DISPOSABLE Host",
+  "steps": [
+    {
+      "name": "Host holds the uncertain task",
+      "pass": true,
+      "detail": {
+        "dispatch": "may_have_started",
+        "reason": "WRITE_PAUSE: the connection failed during work that may write files. Outcome uncertain — reconciliation required. Bunny paused instead of retrying on this or any other provider, because a connection failure does not prove that nothing landed. Review the workspace and any external effects, then retry or close."
+      }
+    },
+    {
+      "name": "glass: headline and Host facts shown",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "glass: only retry/close choices",
+      "pass": true,
+      "detail": [
+        "Retry as a new task",
+        "Close without retrying"
+      ]
+    },
+    {
+      "name": "cyberpunk: headline and Host facts shown",
+      "pass": false,
+      "detail": null
+    },
+    {
+      "name": "cyberpunk: only retry/close choices",
+      "pass": true,
+      "detail": [
+        "Retry as a new task",
+        "Close without retrying"
+      ]
+    },
+    {
+      "name": "editorial: headline and Host facts shown",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "editorial: only retry/close choices",
+      "pass": true,
+      "detail": [
+        "Retry as a new task",
+        "Close without retrying"
+      ]
+    },
+    {
+      "name": "Back sends no command",
+      "pass": true,
+      "detail": [
+        "task.reconcile"
+      ]
+    },
+    {
+      "name": "Host unchanged after Back",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "exactly one task.reconcile sent",
+      "pass": true,
+      "detail": [
+        "task.reconcile"
+      ]
+    },
+    {
+      "name": "Host cleared the reconciliation",
+      "pass": true,
+      "detail": {
+        "state": "failed",
+        "reconciliation": {
+          "required": false,
+          "reason": "WRITE_PAUSE: the connection failed during work that may write files. Outcome uncertain — reconciliation required. Bunny paused instead of retrying on this or any other provider, because a connection failure does not prove that nothing landed. Review the workspace and any external effects, then retry or close.",
+          "at": 1792079059318,
+          "resolution": "close",
+          "resolvedBy": "workstation",
+          "resolvedAt": 1792080996975
+        }
+      }
+    },
+    {
+      "name": "no replay: task count unchanged",
+      "pass": true,
+      "detail": {
+        "before": 1,
+        "after": 1
+      }
+    },
+    {
+      "name": "no new linked task",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "review gone from Approvals",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "ok": false,
+  "commandsSent": [
+    "task.reconcile"
+  ]
+}

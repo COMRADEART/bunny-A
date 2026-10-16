@@ -1,0 +1,58 @@
+/* 05 Surrealism — signature: the impossible horizon. A low sun and a far horizon line sit behind floating panels that cast
+   shadows onto nothing; Agents hang at different heights in circular portals. Navigation stays put and labelled. */
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material] {
+  --enter-name: ve-float;
+  --page-texture:
+    radial-gradient(circle at 78% 72%, color-mix(in srgb, var(--decor) 70%, transparent) 0 90px, transparent 91px),
+    radial-gradient(circle at 78% 72%, color-mix(in srgb, var(--decor) 22%, transparent) 0 220px, transparent 360px),
+    linear-gradient(180deg, transparent 0 71%, color-mix(in srgb, var(--fg) 18%, transparent) 71% calc(71% + 1px), transparent calc(71% + 1px)),
+    linear-gradient(180deg, transparent 72%, color-mix(in srgb, var(--working) 10%, transparent) 100%);
+}
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material] :is(.chat-compose, .ch-agent, .cx-panel) {
+  box-shadow: var(--shadow), 0 60px 50px -40px rgba(8, 4, 24, 0.45);
+}
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material] .ch-hero h1 {
+  font-size: clamp(2.6rem, 10.0cqi, 4.4rem);
+  font-style: italic;
+  font-weight: 400;
+}
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material] .ch-agent:nth-child(odd) { transform: translateY(-10px); }
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material] .ch-agent:nth-child(even) { transform: translateY(8px); }
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material] :is(.cx-well, .st-card .st-well) {
+  border-radius: 50%;
+}
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material] .st-card .st-well {
+  width: 168px;
+  height: 168px;
+  margin-inline: auto;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--decor) 30%, transparent), 0 30px 40px -20px rgba(8, 4, 24, 0.6);
+}
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material] .btn.primary {
+  border-radius: 999px;
+  background: linear-gradient(120deg, var(--action), color-mix(in srgb, var(--action) 70%, var(--decor)));
+}
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: color-mix(in srgb, var(--decor) 18%, transparent);
+  color: var(--fg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bunny-app.t8-app[data-ui-theme="surreal"][data-motion="full"][data-ambient="on"] .ch-agent {
+    animation: ve-drift 9s ease-in-out infinite alternate;
+  }
+  .bunny-app.t8-app[data-ui-theme="surreal"][data-motion="full"][data-ambient="on"] .ch-agent:nth-child(even) {
+    animation-delay: -4s;
+  }
+}
+.bunny-app.t8-app[data-ui-theme="surreal"][data-material][data-hc="true"] .ch-agent {
+  transform: none;
+}
+.pc-root[data-ui-theme="surreal"][data-material] .pc-hero-well {
+  border-radius: 50%;
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--decor) 30%, transparent), 0 40px 50px -24px rgba(8, 4, 24, 0.6);
+}
+@keyframes ve-float {
+  from { opacity: 0; transform: translateY(28px) scale(0.98); filter: blur(4px); }
+}
+@keyframes ve-drift {
+  to { translate: 0 -6px; }
+}

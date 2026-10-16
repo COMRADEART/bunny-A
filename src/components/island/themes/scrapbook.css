@@ -1,0 +1,99 @@
+/* 04 Scrapbook — signature: taped paper. Cards are pinned with washi tape, headings are handwritten, quick actions are sticky
+   notes, and Agents are polaroid prints. Tilts are small and vanish under high contrast. */
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] {
+  --enter-name: ve-paper;
+  --page-texture:
+    radial-gradient(rgba(80, 60, 30, 0.07) 1px, transparent 1.4px) 0 0 / 7px 7px,
+    radial-gradient(rgba(80, 60, 30, 0.05) 1px, transparent 1.2px) 3px 4px / 11px 11px;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] :is(.t8-surface, .cx-panel, .ch-agent) {
+  overflow: visible;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] :is(.chat-compose, .st-card, .ch-missions > .t8-surface) {
+  position: relative;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] :is(.chat-compose, .st-card, .ch-missions > .t8-surface)::before {
+  content: "";
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  width: 92px;
+  height: 22px;
+  transform: translateX(-50%) rotate(-2deg);
+  background: repeating-linear-gradient(45deg, rgba(242, 201, 76, 0.78) 0 6px, rgba(242, 201, 76, 0.58) 6px 12px);
+  box-shadow: 0 1px 2px rgba(80, 60, 30, 0.15);
+  z-index: 2;
+  pointer-events: none;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .st-card:nth-child(2n)::before {
+  background: repeating-linear-gradient(45deg, rgba(180, 71, 43, 0.45) 0 6px, rgba(180, 71, 43, 0.3) 6px 12px);
+  transform: translateX(-50%) rotate(3deg);
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .chat-compose { transform: rotate(-0.4deg); }
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .st-card:nth-child(odd) { transform: rotate(-1.2deg); }
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .st-card:nth-child(even) { transform: rotate(1deg); }
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] :is(h1, h2, .brand-button) {
+  font-weight: 700;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] h2 {
+  font-size: 1.5rem;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .ch-hero h1 {
+  font-size: clamp(3rem, 10.4cqi, 4.4rem);
+  transform: rotate(-1.5deg);
+  transform-origin: left;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .ch-quick button {
+  background: #fff6b8;
+  color: #2b241b;
+  border: 0;
+  border-radius: 2px;
+  box-shadow: 2px 3px 0 rgba(80, 60, 30, 0.14), 4px 8px 12px rgba(80, 60, 30, 0.12);
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .ch-quick button:nth-child(2) { background: #d9f0ff; transform: rotate(1deg); }
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .ch-quick button:nth-child(3) { background: #ffdcd2; transform: rotate(-1deg); }
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .ch-quick button:nth-child(4) { background: #dff3d4; }
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: #fff6b8;
+  color: #2b241b;
+  box-shadow: 2px 2px 0 rgba(80, 60, 30, 0.15);
+}
+/* Polaroids: the Agent's art sits in a white print frame with a caption strip. */
+.bunny-app.t8-app[data-studio="polaroid"][data-material] .st-card {
+  background: #ffffff;
+  padding: 12px 12px 18px;
+  border-radius: 2px;
+  box-shadow: 0 2px 0 rgba(80, 60, 30, 0.1), 0 12px 24px rgba(80, 60, 30, 0.18);
+}
+.bunny-app.t8-app[data-studio="polaroid"][data-material] .st-card .st-well {
+  border-radius: 0;
+  height: 190px;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material] .ch-agent {
+  background: #ffffff;
+  border-radius: 2px;
+  box-shadow: 0 6px 14px rgba(80, 60, 30, 0.16);
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material][data-hc="true"] :is(.chat-compose, .st-card, .ch-quick button, .ch-hero h1) {
+  transform: none;
+}
+.bunny-app.t8-app[data-ui-theme="scrapbook"][data-material][data-hc="true"] :is(.chat-compose, .st-card, .ch-missions > .t8-surface)::before {
+  display: none;
+}
+.pc-root[data-ui-theme="scrapbook"][data-material] .pc-card {
+  border-radius: 3px;
+  box-shadow: 2px 3px 0 rgba(80, 60, 30, 0.14), 6px 12px 18px rgba(80, 60, 30, 0.14);
+}
+.pc-root[data-ui-theme="scrapbook"][data-material] .pc-hero-well {
+  border-radius: 2px;
+  outline: 10px solid #ffffff;
+  box-shadow: 0 12px 24px rgba(80, 60, 30, 0.22);
+  transform: rotate(-2deg);
+}
+@keyframes ve-paper {
+  0% { opacity: 0; transform: translateY(-14px) rotate(-2deg); }
+  70% { opacity: 1; transform: translateY(2px) rotate(0.4deg); }
+}

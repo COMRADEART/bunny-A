@@ -1,0 +1,253 @@
+/* Widget studio surfaces. Tokens and materials come from the VE2 theme on the shell or the phone root. */
+
+[data-ui-theme][data-material] .wd-root,
+[data-ui-theme][data-material] .wd-drawer-anchor {
+  min-width: 0;
+  color: var(--fg);
+  font-family: var(--font-bunny);
+}
+[data-ui-theme][data-material] .wd-studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  gap: var(--wd-gap, var(--s3));
+  align-items: start;
+  min-width: 0;
+}
+[data-ui-theme][data-material] .wd-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--wd-gap, var(--s3));
+  align-items: start;
+  min-width: 0;
+}
+[data-ui-theme][data-material] .wd-root[data-widget-layout="sidebar"] .wd-studio,
+[data-ui-theme][data-material] .wd-root[data-widget-layout="drawer"] .wd-studio,
+[data-ui-theme][data-material] .wd-root[data-surface="phone"] .wd-studio,
+[data-ui-theme][data-material] .wd-drawer-anchor .wd-studio {
+  grid-template-columns: minmax(0, 1fr);
+}
+[data-ui-theme][data-material] .wd-root[data-widget-layout="sidebar"] .wd-grid,
+[data-ui-theme][data-material] .wd-root[data-widget-layout="drawer"] .wd-grid,
+[data-ui-theme][data-material] .wd-root[data-surface="phone"] .wd-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+[data-ui-theme][data-material] .wd-card[data-size="wide"] { grid-column: span 2; }
+[data-ui-theme][data-material] .wd-root[data-widget-layout="sidebar"] .wd-card,
+[data-ui-theme][data-material] .wd-root[data-widget-layout="drawer"] .wd-card,
+[data-ui-theme][data-material] .wd-root[data-surface="phone"] .wd-card { grid-column: auto; }
+[data-ui-theme][data-material] .wd-card[data-size="tall"] { min-height: 12rem; }
+[data-ui-theme][data-material] .wd-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+  background: var(--panel);
+  color: var(--fg);
+  border: var(--bw) solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+  transition: transform var(--quick) var(--ease), border-color var(--quick) var(--ease);
+}
+[data-ui-theme][data-material] .wd-root[data-widget-density="compact"] .wd-card { padding: var(--s2); }
+[data-ui-theme][data-material] .wd-card[data-selected="true"] { outline: 2px solid var(--focus); outline-offset: 2px; }
+[data-ui-theme][data-material] .wd-card:focus-visible,
+[data-ui-theme][data-material] .wd-text:focus-visible,
+[data-ui-theme][data-material] .wd-icon:focus-visible,
+[data-ui-theme][data-material] .wd-primary:focus-visible,
+[data-ui-theme][data-material] .wd-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+[data-ui-theme][data-material] .wd-titlebar,
+[data-ui-theme][data-material] .wd-actions,
+[data-ui-theme][data-material] .wd-row { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+[data-ui-theme][data-material] .wd-titlebar { justify-content: space-between; }
+[data-ui-theme][data-material] .wd-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: var(--eyebrow-case);
+}
+[data-ui-theme][data-material] .wd-title,
+[data-ui-theme][data-material] .wd-inspector h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+  text-transform: var(--heading-case);
+  font-size: var(--text-title);
+}
+[data-ui-theme][data-material] .wd-body,
+[data-ui-theme][data-material] .wd-inspector,
+[data-ui-theme][data-material] .wd-note { min-width: 0; overflow-wrap: anywhere; }
+[data-ui-theme][data-material] .wd-body p,
+[data-ui-theme][data-material] .wd-inspector p { margin: 0 0 var(--s2); color: var(--fg); }
+[data-ui-theme][data-material] .wd-link,
+[data-ui-theme][data-material] .wd-agent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s1);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--s2);
+  text-align: start;
+  color: inherit;
+  background: var(--field);
+  border: var(--bw) solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+[data-ui-theme][data-material] .wd-text,
+[data-ui-theme][data-material] .wd-icon,
+[data-ui-theme][data-material] .wd-resize,
+[data-ui-theme][data-material] .wd-primary,
+[data-ui-theme][data-material] .wd-drawer-toggle {
+  min-height: 44px;
+  padding: var(--s1) var(--s2);
+  color: var(--fg);
+  background: var(--field);
+  border: var(--bw) solid var(--border);
+  border-radius: var(--radius-workspace-control);
+  cursor: pointer;
+}
+[data-ui-theme][data-material] .wd-primary { background: var(--action); color: var(--action-ink); }
+[data-ui-theme][data-material] .wd-text[aria-pressed="true"],
+[data-ui-theme][data-material] .wd-icon[aria-pressed="true"] { background: var(--hover); }
+[data-ui-theme][data-material] .wd-text:disabled { opacity: 0.55; cursor: not-allowed; }
+[data-ui-theme][data-material] .wd-resize { align-self: flex-end; touch-action: none; }
+[data-ui-theme][data-material] .wd-agents { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+[data-ui-theme][data-material] .wd-agent { flex-direction: row; align-items: center; }
+/* Name, weapon/status, Mission and progress each on their own line; inline they ran together ("GadaGada · ..."). */
+[data-ui-theme][data-material] .wd-agent > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; text-align: start; }
+[data-ui-theme][data-material] .wd-agent > span > small { overflow-wrap: anywhere; }
+[data-ui-theme][data-material] .wd-bad { color: var(--negative); }
+[data-ui-theme][data-material] .wd-inspector label,
+[data-ui-theme][data-material] .wd-inspector fieldset { display: grid; gap: var(--s1); margin: 0 0 var(--s3); min-width: 0; }
+[data-ui-theme][data-material] .wd-inspector select,
+[data-ui-theme][data-material] .wd-inspector input[type="range"] { width: 100%; min-height: 44px; color: var(--fg); background: var(--field); border: var(--bw) solid var(--border); border-radius: var(--r-sm); }
+[data-ui-theme][data-material] .wd-inspector { background: var(--elevated); border: var(--bw) solid var(--border); border-radius: var(--r-md); padding: var(--s3); }
+[data-ui-theme][data-material] .wd-notch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s1); font-size: var(--text-xs); color: var(--muted); }
+[data-ui-theme][data-material] .wd-notch p { margin: 0; }
+[data-ui-theme][data-material] .wd-notch [data-current="true"] { color: var(--fg); }
+[data-ui-theme][data-material] .wd-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+[data-ui-theme][data-material] .wd-sheet {
+  position: fixed;
+  inset: auto 0 0 0;
+  max-height: min(80vh, 640px);
+  overflow: auto;
+  padding: var(--s4) var(--s3) calc(var(--s4) + env(safe-area-inset-bottom));
+  background: var(--glass-solid);
+  color: var(--fg);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+}
+/* Sidebar: its own fixed-width column between the page and the context panel. A percentage width in the split's `auto`
+   column let unwrapped card text size the track, which squeezed the page under the widgets and pushed the context panel
+   below the page. */
+.bunny-app.t8-app .workspace-split:has(> .wd-root[data-widget-layout="sidebar"]) { grid-template-columns: minmax(0, 1fr) auto auto; }
+[data-ui-theme][data-material] .wd-root[data-widget-layout="sidebar"] {
+  width: var(--wd-side, 320px);
+  position: sticky;
+  top: var(--s4);
+  max-height: calc(100dvh - 2 * var(--s4));
+  overflow: auto;
+}
+[data-ui-theme][data-material] .wd-root[data-widget-layout="sidebar"]:not(:has(.wd-studio)) { width: auto; }
+@media (max-width: 1180px) {
+  .bunny-app.t8-app .workspace-split:has(> .wd-root[data-widget-layout="sidebar"]) { grid-template-columns: minmax(0, 1fr); }
+  [data-ui-theme][data-material] .wd-root[data-widget-layout="sidebar"] { width: 100%; position: static; max-height: none; }
+}
+[data-ui-theme][data-material] .wd-drawer-anchor[data-open="true"] .wd-studio {
+  position: fixed;
+  z-index: 30;
+  inset: auto var(--s3) var(--s3) auto;
+  width: min(440px, calc(100vw - var(--s4)));
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  padding: var(--s3);
+  background: var(--glass-solid);
+  border: var(--bw) solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--raised-shadow);
+}
+[data-ui-theme][data-material] .wd-studio[data-edge="left"] { }
+[data-ui-theme][data-material] .wd-drawer-anchor[data-open="true"] .wd-studio[data-edge="left"] { inset: auto auto var(--s3) var(--s3); }
+[data-ui-theme][data-material] .wd-drawer-anchor[data-open="true"] .wd-studio[data-edge="top"] { inset: var(--s6) var(--s3) auto var(--s3); width: auto; }
+[data-ui-theme][data-material] .wd-drawer-anchor[data-open="true"] .wd-studio[data-edge="bottom"] { inset: auto var(--s3) var(--s3) var(--s3); width: auto; }
+
+/* Materials. Geometry follows the theme, not a recolour of one card. */
+[data-ui-theme][data-material="clay"] .wd-card { border: 0; border-radius: var(--r-lg); }
+[data-ui-theme][data-material="brutal"] .wd-card,
+[data-ui-theme][data-material="brutal"] .wd-text,
+[data-ui-theme][data-material="brutal"] .wd-primary { border: var(--bw-strong) solid var(--fg); box-shadow: 5px 5px 0 var(--fg); border-radius: var(--r-sm); }
+[data-ui-theme][data-material="pixel"] .wd-card,
+[data-ui-theme][data-material="pixel"] .wd-text { border-radius: 0; box-shadow: none; }
+[data-ui-theme][data-material="glass"] .wd-card { background: var(--panel); backdrop-filter: blur(var(--blur)); }
+[data-ui-theme][data-material="neu"] .wd-card { border-color: transparent; }
+[data-ui-theme][data-material="paper"] .wd-card { box-shadow: none; }
+[data-ui-theme][data-material="neon"] .wd-card { box-shadow: inset 0 0 0 1px var(--accent); }
+[data-ui-theme][data-material="ornate"] .wd-card { border-style: double; border-width: 4px; }
+[data-ui-theme][data-material="sketch"] .wd-card { border-style: dashed; }
+[data-ui-theme][data-material="mist"] .wd-card { box-shadow: none; }
+[data-ui-theme][data-material="chrome"] .wd-card { border-radius: var(--r-lg); }
+[data-ui-theme][data-material="linen"] .wd-card { border-radius: var(--r-lg) var(--r-sm); }
+
+[data-ui-theme="clay"] .wd-card { border: 0; }
+[data-ui-theme="brutalism"] .wd-resize { box-shadow: 3px 3px 0 var(--fg); }
+[data-ui-theme="pixel"] .wd-kicker { font-family: var(--font-display); }
+[data-ui-theme="glass"] .wd-inspector { backdrop-filter: blur(var(--blur)); }
+[data-ui-theme="editorial"] .wd-card { border-radius: 0; border-top: 3px solid var(--accent); box-shadow: none; }
+[data-ui-theme="swiss"] .wd-card { border-radius: 0; box-shadow: none; }
+[data-ui-theme="minimal"] .wd-card { box-shadow: none; background: transparent; }
+[data-ui-theme="bento"] .wd-root:not([data-surface="phone"]) .wd-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+[data-ui-theme="bento"] .wd-root:not([data-surface="phone"]) .wd-card[data-size="standard"] { grid-column: span 2; }
+[data-ui-theme="maximal"] .wd-card { border-width: 3px; }
+[data-ui-theme="luxury"] .wd-title { letter-spacing: 0.04em; }
+[data-ui-theme="cyberpunk"] .wd-card { box-shadow: 0 0 0 1px var(--accent), var(--shadow); }
+[data-ui-theme="wabisabi"] .wd-card { border-radius: 2px 18px 6px 14px; box-shadow: none; }
+[data-ui-theme="scrapbook"] .wd-card { transform: rotate(-0.3deg); }
+[data-ui-theme="surreal"] .wd-card { border-radius: 42% 58% 48% 52% / 46% 40% 60% 54%; }
+[data-ui-theme="victorian"] .wd-kicker { font-family: var(--font-display); }
+[data-ui-theme="cybercore"] .wd-kicker { font-family: var(--font-mono); }
+[data-ui-theme="synthwave"] .wd-card { border-color: var(--accent); }
+[data-ui-theme="y2k"] .wd-title { font-family: var(--font-display); }
+[data-ui-theme="bohemian"] .wd-card { border-bottom-width: 4px; }
+[data-ui-theme="ethereal"] .wd-card { box-shadow: none; }
+[data-ui-theme="neumorph"] .wd-card { background: var(--page); }
+
+[data-ui-theme][data-hc="true"] .wd-card,
+[data-ui-theme][data-material="glass"][data-hc="true"] .wd-card { background: var(--glass-solid); backdrop-filter: none; box-shadow: none; border-width: var(--bw-strong); }
+[data-ui-theme] .wd-root[data-widget-motion="reduced"] .wd-card,
+[data-ui-theme] .wd-root[data-widget-motion="off"] .wd-card,
+[data-ui-theme][data-motion="reduced"] .wd-card,
+[data-ui-theme][data-motion="off"] .wd-card { transition: none; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-ui-theme] .wd-card { transition: none; transform: none; }
+}
+@media (forced-colors: active) {
+  [data-ui-theme] .wd-card,
+  [data-ui-theme] .wd-text,
+  [data-ui-theme] .wd-primary { forced-color-adjust: auto; background: Canvas; color: CanvasText; border: 1px solid CanvasText; box-shadow: none; backdrop-filter: none; }
+}
+@media (max-width: 900px) {
+  [data-ui-theme][data-material] .wd-studio,
+  [data-ui-theme][data-material] .wd-grid,
+  [data-ui-theme="bento"] .wd-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-columns: minmax(0, 1fr);
+  }
+  /* Beats the wide/standard span rules, which otherwise open a 0px column on a phone. */
+  [data-ui-theme][data-material] .wd-card[data-size],
+  [data-ui-theme="bento"] .wd-card[data-size="standard"] {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+[data-ui-theme][data-material] .wd-root[data-surface="phone"] .wd-grid {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-columns: minmax(0, 1fr);
+}
+[data-ui-theme][data-material] .wd-root[data-surface="phone"] .wd-card[data-size] {
+  grid-column: 1 / -1;
+  width: 100%;
+}

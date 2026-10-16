@@ -245,10 +245,8 @@ test("sustained public failures reach the streak floor while a gateway fault bre
 
 test("a degradation-triggered child exit still counts against the bounded attempt budget", async () => {
   const controller = new AbortController();
-  let attempt = 0;
   const result = await superviseTunnel({
     start: () => {
-      attempt++;
       return fakeChild([registeredLine(0), registeredLine(1), unregisteredLine(1), registeredLine(1), unregisteredLine(1), registeredLine(1), unregisteredLine(1)]);
     },
     output: async () => {},

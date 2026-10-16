@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { HostDatabase } from "./persistence.server.ts";
 import { AGENT_RUNTIME_SCHEMA, AgentStore, MAX_CHECKPOINTS_PER_RUN } from "./agent-store.server.ts";
 import { assertCheckpointSafe, scanCheckpointJson } from "./agent-checkpoint.server.ts";
@@ -31,7 +30,7 @@ function setup() {
 }
 
 test("T4 store: the additive schema creates its key and four tables, and is idempotent on reopen", () => {
-  const { dir, host, store, cleanup } = setup();
+  const { dir, host, cleanup } = setup();
   const keys = (host.db.prepare("SELECT key FROM migrations").all() as { key: string }[]).map((r) => r.key);
   assert.ok(keys.includes(AGENT_RUNTIME_SCHEMA), "the runtime registers exactly one migrations key");
   const tables = (host.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as { name: string }[]).map((r) => r.name);
@@ -185,7 +184,7 @@ test("T4 countActive/snapshot: terminals no longer count active; the cursor foll
 });
 
 test("A20 runtime claim: exactly one recovery walk runs while a claim is held; released afterwards", async () => {
-  const { host, store, cleanup } = setup();
+  const { store, cleanup } = setup();
   store.saveAgent(profile("a"), "RUNNING", { paused: false, stopped: false });
   const holder = "host:1234";
   assert.equal(store.claimRecovery("a", "c1", 1, holder, Date.now()).ok, true);

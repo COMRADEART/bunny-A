@@ -1,0 +1,83 @@
+/* 02 Cybercore — signature: instrument corners. Every panel carries four cyan corner ticks on a hairline frame, labels read
+   like instrument readouts, and only the current destination scans. */
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] {
+  --enter-name: ve-scan;
+  --page-texture:
+    linear-gradient(rgba(76, 201, 255, 0.05) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(90deg, rgba(76, 201, 255, 0.05) 1px, transparent 1px) 0 0 / 32px 32px;
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] :is(.t8-surface, .cx-panel, .ch-agent) {
+  --tick: var(--working);
+  background:
+    linear-gradient(var(--tick), var(--tick)) top left / 14px 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top left / 1px 14px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / 14px 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / 1px 14px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / 14px 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / 1px 14px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / 14px 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / 1px 14px no-repeat,
+    var(--glass);
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] :is(.eyebrow, .caption, .cx-section h3, .nav-group-label, .stream-indicator, .cx-badge, small) {
+  font-family: var(--font-mono);
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] .ch-hero h1 {
+  font-size: clamp(1.8rem, 5.2cqi, 2.4rem);
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] .ch-hero .eyebrow::before {
+  content: "SYS ";
+  color: var(--working);
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] .app-sidebar nav button[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(95, 214, 255, 0.18) 50%, transparent 100%) 0 -100% / 100% 200% no-repeat;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bunny-app.t8-app[data-ui-theme="cybercore"][data-motion="full"][data-ambient="on"] .app-sidebar nav button[aria-current="page"]::after {
+    animation: ve-scanline 2.8s linear infinite;
+  }
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] .btn.primary {
+  box-shadow: 0 0 0 1px var(--action), 0 0 16px rgba(63, 208, 255, 0.35);
+  letter-spacing: 0.06em;
+  font-family: var(--font-mono);
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] .ch-agent small::before {
+  content: "> ";
+  color: var(--working);
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] :is(.cx-well, .st-card .st-well) {
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  border-radius: 0;
+  box-shadow: none;
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] .ch-quick button {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] .ch-quick button::before {
+  content: "[ ";
+  color: var(--working);
+}
+.bunny-app.t8-app[data-ui-theme="cybercore"][data-material] .ch-quick button::after {
+  content: " ]";
+  color: var(--working);
+}
+.pc-root[data-ui-theme="cybercore"][data-material] :is(.pc-pill, .pc-tab, small) {
+  font-family: var(--font-mono);
+}
+.pc-root[data-ui-theme="cybercore"][data-material] .pc-hero-well {
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  border-radius: 0;
+}
+@keyframes ve-scan {
+  from { opacity: 0; clip-path: inset(0 0 100% 0); }
+  to { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+@keyframes ve-scanline {
+  to { background-position: 0 200%; }
+}

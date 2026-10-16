@@ -1,0 +1,61 @@
+/* 18 Ethereal — signature: morning light. Soft luminous orbs drift high in a pale mist; cards condense out of it with a halo.
+   All text sits on firm, near-opaque surfaces: the light is decoration, never a background for words. */
+.bunny-app.t8-app[data-ui-theme="ethereal"][data-material] {
+  --enter-name: ve-mist;
+  --page-texture:
+    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.7) 0 2px, transparent 3px),
+    radial-gradient(circle at 64% 12%, rgba(255, 255, 255, 0.6) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 82% 40%, rgba(255, 255, 255, 0.55) 0 2px, transparent 3px),
+    radial-gradient(circle at 36% 64%, rgba(255, 255, 255, 0.5) 0 1.5px, transparent 2.5px),
+    radial-gradient(600px 400px at 70% 20%, color-mix(in srgb, var(--decor) 40%, transparent), transparent 70%),
+    radial-gradient(500px 360px at 20% 80%, color-mix(in srgb, var(--page-wash-b) 60%, transparent), transparent 70%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .bunny-app.t8-app[data-ui-theme="ethereal"][data-motion="full"][data-ambient="on"]::before {
+    animation: ve-breathe 14s ease-in-out infinite alternate;
+  }
+}
+.bunny-app.t8-app[data-ui-theme="ethereal"][data-material] :is(.t8-surface, .cx-panel, .ch-agent) {
+  box-shadow: var(--shadow);
+}
+.bunny-app.t8-app[data-ui-theme="ethereal"][data-material] .ch-hero {
+  text-align: center;
+}
+.bunny-app.t8-app[data-ui-theme="ethereal"][data-material] .ch-hero h1 {
+  font-size: clamp(2.4rem, 8.8cqi, 3.6rem);
+  font-weight: 500;
+}
+.bunny-app.t8-app[data-ui-theme="ethereal"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: var(--elevated);
+  color: var(--working);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--decor) 55%, transparent);
+  border-radius: 999px;
+}
+.bunny-app.t8-app[data-ui-theme="ethereal"][data-material] .btn.primary {
+  border-radius: 999px;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--action) 35%, transparent);
+}
+.bunny-app.t8-app[data-ui-theme="ethereal"][data-material] .ch-quick button {
+  border-radius: 999px;
+  text-align: center;
+  background: var(--elevated);
+}
+.bunny-app.t8-app[data-ui-theme="ethereal"][data-material] :is(.cx-well, .st-card .st-well) {
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5), 0 0 40px color-mix(in srgb, var(--decor) 55%, transparent);
+}
+.bunny-app.t8-app[data-ui-theme="ethereal"][data-material] .st-card .st-well {
+  width: 160px;
+  height: 160px;
+  margin-inline: auto;
+}
+.pc-root[data-ui-theme="ethereal"][data-material] .pc-hero-well {
+  border-radius: 50%;
+  box-shadow: 0 0 60px color-mix(in srgb, var(--decor) 60%, transparent);
+}
+@keyframes ve-mist {
+  from { opacity: 0; filter: blur(10px); transform: scale(1.01); }
+}
+@keyframes ve-breathe {
+  to { opacity: 0.75; transform: translateY(-12px); }
+}

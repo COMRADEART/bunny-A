@@ -13,7 +13,6 @@
  */
 import { createHash } from "node:crypto";
 import type { ObservedUsage, ProviderId, ProviderLive, UsageWindow } from "../orch/types.ts";
-import { safeError } from "./failure.server.ts";
 
 /** Enforced usage states (M-A-3 T2 §4). LOWERCASE; the UI maps them to labels. */
 export type UsageState = "current" | "stale" | "estimated" | "unknown" | "unavailable";

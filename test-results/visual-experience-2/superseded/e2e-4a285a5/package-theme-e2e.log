@@ -1,0 +1,8 @@
+PASS V01 snapshot carries uiTheme at revision 0: {"revision":0,"theme":"glass"}
+PASS V02 all 22 themes apply with revision checks and valid Notch tokens: {"revision":22,"bad":[]}
+PASS V03 stale, unknown, authority-shaped and malformed writes refused: {"refusals":[400,400,400,400],"revision":22}
+PASS V04 a paired device reads the theme but cannot change it: {"write":400,"read":"wabisabi"}
+PASS V05 the theme survives a real Host restart: {"theme":"wabisabi","revision":22}
+PASS V06 reset returns glass following the system: {"theme":"glass","variant":"system","accent":null,"density":"theme","transparency":"medium","highContrast":false}
+PASS V07 no Mission, Task or provider use from theme changes: {"missions":0,"tasks":0,"session_ledger":0}
+PASS: 7/7

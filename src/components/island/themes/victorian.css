@@ -1,0 +1,98 @@
+/* 20 Victorian — signature: the engraved frame. Every panel sits inside a brass double rule with corner rosettes; headings are
+   set in a classic display serif over a fleuron rule. Interactions stay modern: plain buttons, clear focus, no flourishes on text. */
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] {
+  --enter-name: ve-curtain;
+  --page-texture:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--decor) 12%, transparent) 0 1px, transparent 1.5px) 0 0 / 18px 18px;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] :is(.t8-surface, .cx-panel, .ch-agent) {
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  position: relative;
+}
+/* Corner rosettes: four small diamonds on the outer rule. */
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] :is(.chat-compose, .cx-panel, .st-card)::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  pointer-events: none;
+  background:
+    linear-gradient(45deg, transparent 40%, var(--decor) 40% 60%, transparent 60%) top left / 9px 9px no-repeat,
+    linear-gradient(45deg, transparent 40%, var(--decor) 40% 60%, transparent 60%) top right / 9px 9px no-repeat,
+    linear-gradient(45deg, transparent 40%, var(--decor) 40% 60%, transparent 60%) bottom left / 9px 9px no-repeat,
+    linear-gradient(45deg, transparent 40%, var(--decor) 40% 60%, transparent 60%) bottom right / 9px 9px no-repeat;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .app-sidebar {
+  border-bottom: 3px double var(--decor);
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .brand-button {
+  font-size: 1.5rem;
+  font-style: italic;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .ch-hero {
+  text-align: center;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .ch-hero h1 {
+  font-size: clamp(2.6rem, 10.0cqi, 4.4rem);
+  max-width: none !important;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .ch-hero h1::after,
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .page-heading h1::after {
+  content: "\2766";
+  display: block;
+  margin-top: var(--s2);
+  font-size: 1.1rem;
+  color: var(--decor);
+  font-style: normal;
+  background:
+    linear-gradient(var(--decor), var(--decor)) left 50% / calc(50% - 22px) 1px no-repeat,
+    linear-gradient(var(--decor), var(--decor)) right 50% / calc(50% - 22px) 1px no-repeat;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .page-heading h1::after {
+  max-width: 280px;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .app-sidebar nav button[aria-current="page"] {
+  background: transparent;
+  color: var(--action);
+  box-shadow: inset 0 -1px 0 var(--decor), inset 0 -4px 0 -2px var(--decor);
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .btn.primary {
+  border: 1px solid var(--decor);
+  box-shadow: inset 0 0 0 2px var(--action), inset 0 0 0 3px color-mix(in srgb, var(--action-ink) 40%, transparent);
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .ch-quick button {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  border-color: var(--border);
+  text-align: center;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] h2 {
+  font-style: italic;
+  font-size: 1.35rem;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] :is(.cx-well, .st-card .st-well) {
+  border-radius: 50% / 42%;
+  box-shadow: 0 0 0 2px var(--decor), 0 0 0 5px var(--panel), 0 0 0 6px var(--decor);
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material] .st-card .st-well {
+  width: 150px;
+  height: 180px;
+  margin-inline: auto;
+}
+.bunny-app.t8-app[data-ui-theme="victorian"][data-material][data-hc="true"] :is(.chat-compose, .cx-panel, .st-card)::after {
+  display: none;
+}
+.pc-root[data-ui-theme="victorian"][data-material] .pc-top {
+  border-bottom: 3px double var(--decor);
+}
+.pc-root[data-ui-theme="victorian"][data-material] .pc-title {
+  font-style: italic;
+}
+.pc-root[data-ui-theme="victorian"][data-material] .pc-hero-well {
+  border-radius: 50% / 42%;
+  box-shadow: 0 0 0 2px var(--decor), 0 0 0 6px var(--panel), 0 0 0 7px var(--decor);
+}
+@keyframes ve-curtain {
+  from { opacity: 0; clip-path: inset(0 50% 0 50%); }
+  to { opacity: 1; clip-path: inset(0 0 0 0); }
+}

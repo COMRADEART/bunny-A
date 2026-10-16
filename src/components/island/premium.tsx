@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import * as Dialog from "@radix-ui/react-dialog";
+import { ThemedDialogContent, useAmbient, useDocumentTheme, useThemeScope } from "./theme";
 import {
   Activity,
   Bot,
@@ -54,11 +56,14 @@ import { Approvals } from "./approvals";
 import { Files } from "./files";
 import { ContextPanel } from "./context-panel";
 import { DesignPreview } from "./design-preview";
+import { ThemePreviewBar } from "./theme-gallery";
+import { useReconcileItems } from "./reconciliation";
 import { BunnyCompanion, usePrefersReducedMotion, useHappyWindow } from "./characters";
 import { hostLive } from "./character-model";
 import { approvalCount, pendingApprovalItems } from "./approvals-model";
 import { COMPANION_LABEL, resolveCompanion } from "./companion-model";
 import { activeNavView, deepLinkFromSearch, NAV_MAIN, NAV_SYSTEM, type NavView } from "./nav-model";
+import { WidgetSurface, type WidgetOpeners } from "./widgets";
 
 import "./premium.css";
 import "./glass.css";
@@ -81,13 +86,29 @@ export function Island() {
   const store = useIsland();
   const [now, setNow] = useState(0);
   const [menu, setMenu] = useState(false);
-  const [companion, setCompanion] = useState(false);
+  // Router search is available on the first server and client paint — no post-hydrate flash of the desktop shell.
+  const companion = useRouterState({
+    select: (state) => deepLinkFromSearch(state.location.searchStr).companion,
+  });
   const hydrate = store.hydrate;
+  const widgetOpeners: WidgetOpeners = {
+    mission: (id) => { store.openMission(id); store.setSheet("missions"); },
+    agent: (slot) => {
+      void store.personalAgentCommand("personal_agent.foreground", { identity: slot as 1 | 2 | 3 | 4 });
+      store.setSheet("agents");
+    },
+    usage: () => store.setSheet("provider"),
+    memory: () => store.setSheet("agents"),
+    reconcile: () => store.setSheet("approvals"),
+  };
+  const widgetLayout = store.shownWidgets().layout;
+  const scope = useThemeScope();
+  const ambient = useAmbient();
+  useDocumentTheme();
   useHostStream();
   useEffect(() => {
     hydrate();
     setNow(Date.now());
-    setCompanion(deepLinkFromSearch(window.location.search).companion);
   }, [hydrate]);
   // The clock causes expiry renders; each incoming Host event is evaluated with that render's current time.
   useEffect(() => {
@@ -100,11 +121,9 @@ export function Island() {
     return () => clearTimeout(timer);
   }, [store.notice, store.dismissNotice]);
   useEffect(() => {
+    // A theme on "system" follows the OS light/dark choice; the theme engine re-resolves which variant to show.
     const query = window.matchMedia("(prefers-color-scheme: dark)");
-    const update = () => {
-      if (useIsland.getState().appearance.theme === "system")
-        useIsland.setState({ theme: query.matches ? "dark" : "light" });
-    };
+    const update = () => useIsland.getState().refreshTheme();
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);
@@ -138,6 +157,8 @@ export function Island() {
       viewer,
     }),
   );
+  // Uncertain outcomes waiting for the owner's review count as Approvals work too.
+  const paused = useReconcileItems().length;
   const attention = attentionCount(store.agents?.agents ?? [], store.missions?.missions ?? []);
   const connection = store.connection.state;
   const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -161,7 +182,7 @@ export function Island() {
   if (companion) {
     // `?companion=1` is the full-screen, touch-first companion (Phone), on every surface link.
     return (
-      <div className="bunny-app t8-app" data-theme={store.theme} data-motion={store.appearance.motion} data-surface="companion">
+      <div className="bunny-app t8-app" {...scope} data-ambient={ambient} data-surface="companion">
         <a href="#bunny-content" className="skip-link">
           Skip to content
         </a>
@@ -173,12 +194,7 @@ export function Island() {
     );
   }
   return (
-    <div
-      className="bunny-app t8-app"
-      data-theme={store.theme}
-      data-motion={store.appearance.motion}
-      data-menu={menu}
-    >
+    <div className="bunny-app t8-app" {...scope} data-ambient={ambient} data-menu={menu}>
       <a href="#bunny-content" className="skip-link">
         Skip to content
       </a>
@@ -186,9 +202,7 @@ export function Island() {
         <div className="sidebar-brand">
           <button className="brand-button" onClick={() => navigate("chat")}>
             <BunnyMark />
-            <span>
-              Bunny<span className="brand-suffix">A</span>
-            </span>
+            <span>BunnyA</span>
           </button>
           <span className="mobile-header-actions">
             {attention > 0 && (
@@ -215,7 +229,7 @@ export function Island() {
         <nav id="primary-navigation" aria-label="Primary navigation">
           {NAV_MAIN.map(({ view, sheet, label }) => {
             const Icon = NAV_ICONS[view];
-            const count = view === "approvals" ? approvals : view === "missions" ? attention : 0;
+            const count = view === "approvals" ? approvals + paused : view === "missions" ? attention : 0;
             return (
               <button key={view} aria-current={active === view ? "page" : undefined} onClick={() => navigate(sheet)}>
                 <Icon size={18} />
@@ -273,6 +287,7 @@ export function Island() {
           </div>
         </header>
         <HostHealthWarning />
+        <ThemePreviewBar />
         <ConnectionBanner freshness={freshness} />
         {store.syncStatus && (
           <p className="sync-message" role="status">
@@ -314,9 +329,12 @@ export function Island() {
             ) : (
               <ChatHome now={now} />
             )}
+            {widgetLayout === "board" && <WidgetSurface mode="board" page={page} openers={widgetOpeners} />}
           </main>
+          {widgetLayout === "sidebar" && <WidgetSurface mode="sidebar" page={page} openers={widgetOpeners} />}
           {page !== "design-preview" && <ContextPanel now={now} />}
         </div>
+        {widgetLayout === "drawer" && <WidgetSurface mode="drawer" page={page} openers={widgetOpeners} />}
         <footer className="workspace-footer">
           <span>Bunny-A</span>
           <span>Host authority · independently verified results</span>
@@ -747,7 +765,7 @@ function DevicesWorkspace() {
       <Dialog.Root open={signingOut} onOpenChange={setSigningOut}>
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog" data-theme={store.theme} onCloseAutoFocus={returnFocusTo(dialogOpener)}>
+          <ThemedDialogContent className="t8-dialog" onCloseAutoFocus={returnFocusTo(dialogOpener)}>
             <Dialog.Title>Sign out this phone?</Dialog.Title>
             <Dialog.Description>
               This phone revokes its own access on the Host and forgets its session. Agents keep running on
@@ -767,13 +785,13 @@ function DevicesWorkspace() {
                 Sign out
               </button>
             </div>
-          </Dialog.Content>
+          </ThemedDialogContent>
         </Dialog.Portal>
       </Dialog.Root>
       <Dialog.Root open={!!revoking} onOpenChange={(open) => !open && setRevoking(null)}>
         <Dialog.Portal>
           <Dialog.Overlay className="t8-overlay" />
-          <Dialog.Content className="t8-dialog" data-theme={store.theme} onCloseAutoFocus={returnFocusTo(dialogOpener)}>
+          <ThemedDialogContent className="t8-dialog" onCloseAutoFocus={returnFocusTo(dialogOpener)}>
             <Dialog.Title>Revoke {revoking?.name}?</Dialog.Title>
             <Dialog.Description>
               The device loses access immediately and its open activity streams close. Approval batches it
@@ -794,7 +812,7 @@ function DevicesWorkspace() {
                 Revoke access
               </button>
             </div>
-          </Dialog.Content>
+          </ThemedDialogContent>
         </Dialog.Portal>
       </Dialog.Root>
     </>

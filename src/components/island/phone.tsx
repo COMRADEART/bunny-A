@@ -26,6 +26,7 @@ import { WEAPON_LABEL, type PersonalAgentView, type SlotId } from "../../lib/bun
 import type { CompanionView } from "../../lib/bunny-host/voice/voice-companion.ts";
 import type { PermissionRequest } from "../../lib/bunny-missions/types.ts";
 import { basisText, characterLabel, displayState } from "./character-model.ts";
+import { PhoneWidgets } from "./widgets";
 import { BunnyCompanion, WeaponCharacter, usePrefersReducedMotion, useHappyWindow } from "./characters";
 import { appearanceFor } from "./character-style-model";
 import { CONNECTION_LABEL } from "./connection-model.ts";
@@ -67,6 +68,8 @@ import {
   type StepCounts,
 } from "./phone-model.ts";
 import "./phone.css";
+import { useShownTheme, useThemeScope } from "./theme";
+import { UI_THEMES, UI_THEME_IDS, type UiThemeId, type UiThemePreference } from "@/lib/bunny-host/ui-theme";
 
 /**
  * T13 touch-first phone companion. Every number and name on screen is the Host's; nothing here is sample data. The
@@ -145,7 +148,7 @@ export function Phone({ now: fixedNow }: PhoneProps = {}) {
     setRoute(next);
     if (typeof window !== "undefined") window.scrollTo?.({ top: 0 });
   }, []);
-  const theme = store.appearance.theme;
+  const scope = useThemeScope();
 
   // A route change the user made moves focus to the new screen's heading: the Back or tab button that had focus is gone.
   useEffect(() => {
@@ -156,7 +159,7 @@ export function Phone({ now: fixedNow }: PhoneProps = {}) {
 
   if (store.pairingRequired || status === "pairing") {
     return (
-      <div className="pc-root" data-theme={theme} data-status="pairing">
+      <div className="pc-root" {...scope} data-status="pairing">
         <header className="pc-top">
           <span aria-hidden="true" />
           <h1 className="pc-title">Bunny A</h1>
@@ -174,7 +177,7 @@ export function Phone({ now: fixedNow }: PhoneProps = {}) {
   const detail = route.kind !== "tab";
   const title = route.kind === "tab" ? TITLE[route.tab] : route.kind === "agent" ? "Agent details" : route.kind === "mission" ? "Mission" : "Projects";
   return (
-    <div className="pc-root" data-theme={theme} data-status={status} data-motion={reduced ? "reduced" : "full"}>
+    <div className="pc-root" {...scope} data-status={status} data-motion={reduced ? "reduced" : "full"}>
       <header className="pc-top">
         {detail ? (
           <button type="button" className="pc-icon" aria-label="Back" onClick={() => go(parentRoute(route))}>
@@ -272,6 +275,7 @@ function HomeView({ view }: { view: View }) {
           </p>
         )}
       </section>
+      <PhoneWidgets go={go} />
 
       <section className="pc-section" aria-labelledby="pc-slots-heading">
         <div className="pc-section-head">
@@ -1001,14 +1005,7 @@ function SettingsView({ view }: { view: View }) {
       </section>
       <section className="pc-card" aria-label="Appearance">
         <h2 className="pc-h3">Appearance</h2>
-        <p className="pc-label">Theme</p>
-        <div className="pc-segment" role="group" aria-label="Theme">
-          {(["system", "dark", "light"] as const).map((option) => (
-            <button key={option} type="button" aria-pressed={appearance.theme === option} onClick={() => store.setAppearance({ theme: option })}>
-              {option === "system" ? "System" : option === "dark" ? "Dark" : "Light"}
-            </button>
-          ))}
-        </div>
+        <PhoneThemeChoice />
         <p className="pc-label">Motion</p>
         <div className="pc-segment" role="group" aria-label="Motion">
           {(["full", "reduced"] as const).map((option) => (
@@ -1201,3 +1198,76 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
     </section>
   );
 }
+
+/**
+ * The phone's look. A paired device keeps its own choice on the device (or follows the workstation); the workstation's own
+ * companion window saves to the Host like the desktop gallery. Neither path can change what this device may do.
+ */
+function PhoneThemeChoice() {
+  const store = useIsland();
+  const { preference, origin } = useShownTheme();
+  const device = store.viewer?.kind === "device";
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const theme = UI_THEMES[preference.theme];
+  const previewing = store.themePreview !== null;
+  const canSave = device || (store.host === "online" && store.uiTheme !== null);
+  const set = (patch: Partial<UiThemePreference>) => {
+    setRefusal(null);
+    // Host offline: preview in this window (same as the desktop gallery) so the picker does not snap back.
+    if (!canSave) {
+      store.setThemePreview({ ...preference, ...patch });
+      return;
+    }
+    void store.setUiTheme(patch, setRefusal);
+  };
+  return (
+    <>
+      <label className="pc-label" htmlFor="pc-theme">
+        Theme
+      </label>
+      <select id="pc-theme" className="pc-input" value={preference.theme} onChange={(event) => set({ theme: event.target.value as UiThemeId })}>
+        {UI_THEME_IDS.map((id) => (
+          <option key={id} value={id}>
+            {UI_THEMES[id].name}
+          </option>
+        ))}
+      </select>
+      <p className="pc-muted">
+        {previewing
+          ? "Previewing in this window. Reconnect to the Host to save it."
+          : device
+            ? origin === "device"
+              ? "Kept on this phone only."
+              : "Following your PC's theme."
+            : "Saved on your Host for every window and the Notch."}
+      </p>
+      <p className="pc-label">Appearance</p>
+      <div className="pc-segment" role="radiogroup" aria-label="Appearance">
+        {(["system", "light", "dark"] as const).map((option) => {
+          const available = option === "system" || theme.variants.includes(option);
+          return (
+            <button key={option} type="button" role="radio" aria-checked={preference.variant === option} disabled={!available} onClick={() => set({ variant: option })}>
+              {option === "system" ? "System" : option === "dark" ? "Dark" : "Light"}
+            </button>
+          );
+        })}
+      </div>
+      {previewing ? (
+        <button type="button" className="pc-btn" onClick={() => store.setThemePreview(null)}>
+          Keep previous theme
+        </button>
+      ) : null}
+      {device && store.deviceTheme ? (
+        <button type="button" className="pc-btn" onClick={() => store.followWorkstationTheme()}>
+          Follow my PC's theme
+        </button>
+      ) : null}
+      {refusal ? (
+        <p className="pc-muted" role="alert">
+          {refusal}
+        </p>
+      ) : null}
+    </>
+  );
+}
+

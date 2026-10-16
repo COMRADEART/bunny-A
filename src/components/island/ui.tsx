@@ -16,8 +16,7 @@ import type { Availability, ProviderId, ProviderLive, TaskState, UsageWindow } f
 import { ringPlacement } from "@/lib/bunny-host/usage";
 import { useIsland } from "@/store/use-island";
 import { finitePlan } from "./ui-model";
-import { checkedLine, modelsDiscovered, resetIn, usageChipLabel, usageFor, usageStateLabel, usageWindowReset, usageWindowLine } from "./usage-model";
-import type { ProviderUsageSnapshot } from "@/lib/bunny-host/provider-usage.server";
+import { checkedLine, modelsDiscovered, usageChipLabel, usageFor, usageStateLabel, usageWindowReset, usageWindowLine } from "./usage-model";
 import type { OrchTask } from "@/lib/orch/types";
 import { activityDetail, isPrivateEvent } from "./motion-model";
 import { codexMissionExclusion, codexMissionStatus } from "@/lib/orch/compatibility";

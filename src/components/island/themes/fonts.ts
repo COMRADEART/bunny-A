@@ -1,0 +1,30 @@
+// Visual Experience 2.0: every theme font is bundled locally (SIL OFL 1.1 via @fontsource, Latin subset only), so the
+// Windows app never fetches a font at runtime. Provenance: FONT_PROVENANCE in src/lib/bunny-host/ui-theme.ts.
+import "@fontsource/nunito/latin-400.css";
+import "@fontsource/nunito/latin-700.css";
+import "@fontsource/nunito/latin-800.css";
+import "@fontsource/comfortaa/latin-400.css";
+import "@fontsource/comfortaa/latin-700.css";
+import "@fontsource/space-grotesk/latin-400.css";
+import "@fontsource/space-grotesk/latin-500.css";
+import "@fontsource/space-grotesk/latin-700.css";
+import "@fontsource/jetbrains-mono/latin-400.css";
+import "@fontsource/jetbrains-mono/latin-600.css";
+import "@fontsource/orbitron/latin-600.css";
+import "@fontsource/orbitron/latin-700.css";
+import "@fontsource/pixelify-sans/latin-400.css";
+import "@fontsource/pixelify-sans/latin-700.css";
+import "@fontsource/caveat/latin-600.css";
+import "@fontsource/caveat/latin-700.css";
+import "@fontsource/chakra-petch/latin-500.css";
+import "@fontsource/chakra-petch/latin-700.css";
+import "@fontsource/shippori-mincho/latin-500.css";
+import "@fontsource/shippori-mincho/latin-600.css";
+import "@fontsource/quicksand/latin-500.css";
+import "@fontsource/quicksand/latin-600.css";
+import "@fontsource/fraunces/latin-400.css";
+import "@fontsource/fraunces/latin-600.css";
+import "@fontsource/cormorant-garamond/latin-500.css";
+import "@fontsource/cormorant-garamond/latin-600.css";
+import "@fontsource/playfair-display/latin-600.css";
+import "@fontsource/playfair-display/latin-700.css";

@@ -2,6 +2,7 @@ import { ChevronRight, ShieldCheck } from "lucide-react";
 import { useIsland } from "@/store/use-island";
 import { Empty } from "./ui";
 import { answerableHere, approvalCount, pendingApprovalItems, type ApprovalItem } from "./approvals-model";
+import { ReconciliationReview, useReconcileItems } from "./reconciliation";
 
 /**
  * Approvals: every ask the Host is waiting on, in one list. Answers go only through the existing controls: a Task opens its
@@ -21,6 +22,7 @@ export function Approvals() {
   const here = answerableHere(items).length;
   // "Nothing needs you" is a claim about the Host's asks, so it is made only once both sources have arrived.
   const known = !!store.missions && !!store.agents;
+  const paused = useReconcileItems().length;
 
   return (
     <>
@@ -30,15 +32,18 @@ export function Approvals() {
           <h1>
             {items.length > 0
               ? `${approvalCount(items)} waiting for you`
-              : known
-                ? "Nothing needs you"
-                : "Approvals are loading"}
+              : paused > 0
+                ? "Review needed"
+                : known
+                  ? "Nothing needs you"
+                  : "Approvals are loading"}
           </h1>
           <p>
             Each ask is listed once. Closing this window does not stop a Mission. Asks wait on your Host until you answer them.
           </p>
         </div>
       </div>
+      <ReconciliationReview />
       {!known && (
         <Empty title="Approvals are loading." detail="The Host has not sent its asks yet. Nothing is approved while this is loading." />
       )}

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +21,6 @@ const contractPath = join(root, 'src', 'lib', 'bunny-host', 'voice', 'voice-prot
 const skip = process.platform === 'win32' ? false : 'Island is a Windows PowerShell surface';
 
 const read = (path) => readFileSync(path, 'utf8');
-const islandFiles = readdirSync(installDir).filter((name) => /^Bunny-Island.*\.ps1$/.test(name));
 
 test('every Bunny-Island PowerShell file parses with zero errors under the PowerShell 5.1 parser', { skip }, () => {
   const dir = mkdtempSync(join(tmpdir(), 'island-parse-'));

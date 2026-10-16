@@ -121,3 +121,19 @@ export function permissionLabel(mission: MissionView, stepId: string): string {
 
 /** Re-exports so the components keep one import surface for batch display truth. */
 export { batchButtonLabel, batchOfferLines, batchStatusLabel, targetLabelOf };
+
+/** Visual Experience 2.0: what a step waits on, by name, and which of those are still unfinished. Never a guessed order. */
+export function stepDependencyLabel(step: MissionStep, steps: MissionStep[]): string {
+  if (!step.dependsOn.length) return "No dependencies";
+  const named = step.dependsOn.map((id) => steps.find((row) => row.id === id));
+  const names = named.map((row, index) => row?.role ?? `step ${step.dependsOn[index]}`);
+  const open = named.filter((row) => !row || !["completed", "skipped"].includes(row.state)).map((row) => row?.role ?? "an unknown step");
+  return open.length ? `After ${names.join(", ")} (waiting for ${open.join(", ")})` : `After ${names.join(", ")} (done)`;
+}
+
+/** Visual Experience 2.0: which provider or capability each attempt used, so a switch of resource is visible. */
+export function stepResourceTrail(step: MissionStep): string | null {
+  if (step.attempts.length < 2) return null;
+  const label = (provider: string | null) => provider ?? (step.executor.kind === "capability" ? step.executor.action : step.executor.kind);
+  return step.attempts.map((attempt) => `${attempt.attempt}: ${label(attempt.provider)} (${attempt.outcome})`).join(" → ");
+}

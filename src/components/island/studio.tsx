@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, ChevronRight, Layers, ShieldCheck } from "lucide-react";
 import { useIsland } from "@/store/use-island";
+import { UI_THEMES } from "@/lib/bunny-host/ui-theme";
+import { useShownTheme } from "./theme";
 import {
   PERSONAL_AGENT_LIMITS,
   WEAPON_LABEL,
@@ -42,6 +44,7 @@ import {
  * shows the bound Agent's own authorization and links to the existing review controls.
  */
 export function Studio() {
+  const { preference: shownTheme } = useShownTheme();
   const systemReduced = usePrefersReducedMotion();
 
   const store = useIsland();
@@ -152,6 +155,10 @@ export function Studio() {
       <PageHeading />
       <p className="caption" role="note">
         {mode.caption}
+      </p>
+      <p className="caption st-theme-note">
+        The {UI_THEMES[shownTheme.theme].name} theme frames these characters. Each Agent's own character look is chosen below
+        and stays with that Agent whatever the theme. Neither changes what an Agent may do.
       </p>
       <section className="t8-section" aria-labelledby="studio-slots">
         <div className="section-heading">

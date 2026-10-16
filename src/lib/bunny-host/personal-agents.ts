@@ -88,7 +88,6 @@ export const clean = (value: unknown, max: number, field: string): string => {
   // Control characters (C0, DEL, C1) and bidi overrides or isolates never reach a label, so a name cannot spoof its
   // own text or break a layout; whitespace runs collapse so a name cannot be padded into a layout break.
   const text = value
-    // eslint-disable-next-line no-control-regex -- labels must exclude C0/C1 control characters.
     .replace(/[\p{Cc}\u200e\u200f\u202a-\u202e\u2066-\u2069\u061c]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();

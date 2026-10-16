@@ -16,12 +16,13 @@ function fixture(){
   writeFileSync(helper,`#!/bin/sh\nexec '${process.execPath.replaceAll("\\","/")}' '${child.replaceAll("\\","/")}' wait-child '${log.replaceAll("\\","/")}'\n`);
   const run=(args:string[],extra:NodeJS.ProcessEnv={})=>runCommand(git,args,{cwd:repo,env:{...env,...extra},signal:new AbortController().signal,timeoutMs:1200});
   const rows=()=>existsSync(log)?readFileSync(log,"utf8").trim().split(/\r?\n/).map(line=>JSON.parse(line)):[];
-  return{root,repo,log,helper,run,rows,cleanup:()=>rmSync(root,{recursive:true,force:true})};
+  // Windows releases a killed job's handles on the temp folder asynchronously; rmSync retries EPERM/EBUSY (cleanup only).
+  return{root,repo,log,helper,run,rows,cleanup:()=>rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100})};
 }
 const alive=(pid:number)=>{try{process.kill(pid,0);return true;}catch{return false;}};
 test("T4: argv reaches Windows executables intact without shell expansion",{skip:!windows},async()=>{
   const args=["space value","",'quoted"value',"tail\\","unicode-é🐇","&&"],root=mkdtempSync(join(tmpdir(),"bunny-t4-argv-"));
-  try{const r=await runCommand("node",["-e","console.log(JSON.stringify(process.argv.slice(1)))",...args],{cwd:root,signal:new AbortController().signal,timeoutMs:5000,owned:true});assert.equal(r.exitCode,0);assert.deepEqual(JSON.parse(r.stdout),args);}finally{rmSync(root,{recursive:true,force:true});}
+  try{const r=await runCommand("node",["-e","console.log(JSON.stringify(process.argv.slice(1)))",...args],{cwd:root,signal:new AbortController().signal,timeoutMs:5000,owned:true});assert.equal(r.exitCode,0);assert.deepEqual(JSON.parse(r.stdout),args);}finally{rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });
 test("T4: noninteractive Git refuses editor rather than starting a hidden prompt",{skip:!windows},async()=>{
   const f=fixture();try{const r=await f.run(["commit"],{GIT_EDITOR:f.helper});assert.notEqual(r.exitCode,0);assert.match(r.stderr,/editor 'false'/);assert.equal(f.rows().length,0);}finally{f.cleanup();}
