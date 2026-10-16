@@ -35,7 +35,7 @@ import {
   returnFocusTo,
 } from "./workspace-model";
 import { ActivityTimeline } from "./activity";
-import { stepDependencyLabel, stepResourceTrail } from "./mission-model";
+import { autonomyLabel, stepDependencyLabel, stepResourceTrail } from "./mission-model";
 import { Empty, NAMES } from "./ui";
 import { openTask } from "./task";
 import { artifactStatus } from "@/lib/bunny-host/presentation";
@@ -722,6 +722,11 @@ function AgentDetail({ agent, mission }: { agent: AgentView; mission?: MissionVi
           <h1 className="wrap-anywhere">{agent.name}</h1>
           <p className="wrap-anywhere">{mission?.objective ?? "Mission not retained in this snapshot."}</p>
           {agent.missionId && <p className="caption">Mission {agent.missionId.slice(0, 8)}</p>}
+          {mission?.autonomy && (
+            <p className="caption mission-autonomy" data-phase={mission.autonomy.phase} title={mission.autonomy.basis}>
+              {autonomyLabel(mission.autonomy)}
+            </p>
+          )}
         </div>
         <AgentState agent={agent} />
       </div>

@@ -646,3 +646,6 @@ html:has(.router-workspace[data-theme="light"]) body { background: #f2f2f7; }
   .filter-buttons button { flex: 1; padding: 0 6px; }
   .phone-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* M-A-3 T14: while a cached theme is being restored (set by the head script in __root.tsx), the shell is not shown in the default theme. */
+html[data-theme-restoring] .t8-app { visibility: hidden; }

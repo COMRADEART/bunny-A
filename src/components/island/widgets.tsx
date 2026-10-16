@@ -348,9 +348,10 @@ function WidgetBody({ id, preference, openers }: { id: CoreWidgetId; preference:
     const slotId = preference.focus.slot ?? (typeof store.personalAgentContext?.foreground === "number" ? store.personalAgentContext.foreground : null);
     const slot = slots.find((item) => item.slot === slotId) ?? slots[0];
     const context = store.personalAgentContext?.slots.find((item) => item.slot === slot?.slot);
-    const projectId = slot?.agent?.missionId ? store.missions?.missions.find((mission) => mission.id === slot.agent?.missionId)?.projectId ?? null : null;
+    const projectId = preference.focus.projectId ?? (slot?.agent?.missionId ? store.missions?.missions.find((mission) => mission.id === slot.agent?.missionId)?.projectId ?? null : null);
     const model = lotusWidget({
       viewer,
+      projectId,
       agentName: viewer === "device" ? null : slot?.displayName ?? null,
       projectName: viewer === "device" || !projectId ? null : store.projects.find((project) => project.id === projectId)?.name ?? null,
       memories: viewer === "device" ? null : context ? context.memories.map((memory) => ({ id: memory.id, scope: memory.scope, layer: memory.layer, trust: memory.trust, updatedAt: memory.updatedAt })) : null,

@@ -3,6 +3,7 @@ import type { MissionProgress, MissionSnapshot, MissionState, MissionStep, Missi
 import { batchButtonLabel, batchOfferLines, batchStatusLabel, targetLabelOf } from "../../lib/bunny-missions/batch-labels.ts";
 import { finitePlan } from "./ui-model.ts";
 import { publicEventLabel, UNCERTAIN_LABEL } from "../../lib/bunny-host/presentation.ts";
+import type { AutonomyPhase, AutonomyView } from "../../lib/bunny-missions/autonomy.ts";
 
 /** Missions the Bar treats as live: they get the expanded strip. */
 export const LIVE_MISSION: MissionState[] = ["planning", "waiting_for_approval", "ready", "running", "waiting_for_user", "verifying"];
@@ -13,6 +14,19 @@ export const MISSION_LABEL: Record<MissionState, string> = {
   draft: "Draft", planning: "Planning", waiting_for_approval: "Needs approval", ready: "Approved", running: "Running", waiting_for_user: "Needs you",
   verifying: "Verifying", completed: "Completed", failed: "Failed", stopped: "Stopped",
 };
+
+/** M-A-3 T14: the autonomous loop phase in owner words. "Done" says verified only when every step and worker was. */
+const AUTONOMY_LABEL: Record<AutonomyPhase, string> = {
+  PLAN: "Planning", DELEGATE: "Handing out work", EXECUTE: "Working", OBSERVE: "Collecting results", VERIFY: "Checking results",
+  REPAIR: "Repairing a failed check", COMPLETE: "Done", WAITING_RESOURCE: "Waiting for a provider or resource",
+  WAITING_DEPENDENCY: "Waiting for earlier work", WAITING_AUTHORIZATION: "Waiting for your approval",
+  OUTCOME_UNCERTAIN: "Outcome uncertain — reconciliation required", RECONCILIATION_REQUIRED: "Outcome uncertain — reconciliation required",
+  FAILED: "Failed", CANCELLED: "Stopped",
+};
+export function autonomyLabel(view: AutonomyView): string {
+  if (view.phase === "COMPLETE") return view.verified ? "Done — verified by Bunny" : "Done — not independently verified";
+  return AUTONOMY_LABEL[view.phase];
+}
 
 /** The mission the Bar should show: one that needs the user first, then a running one, then the newest live one. */
 export function focusMission(snapshot: MissionSnapshot | null | undefined): MissionView | null {

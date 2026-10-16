@@ -1,0 +1,15 @@
+
+> pretest
+> npm run build:ownership && npm run build:voice
+
+
+> build:ownership
+> node scripts/build-owned-process.mjs
+
+{"schema":"bunny-native-build/1","architecture":"windows-x64","nodeApi":8,"sourceSha256":"8ebba0e42fc0934fba6793a516c637c553292f27b48a0e49d3421025ff1864d8","binarySha256":"72c8807293ee12811e23ac30260a72e835f1f53135194cb30766269229f62e33","compilerSha256":"f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0","compilerVersion":"gcc.exe (Rev5, Built by MSYS2 project) 16.1.0","flags":["-std=c11","-O2","-Wall","-Wextra","-Werror","-shared","-s","-static-libgcc","-Wl,--no-insert-timestamp","-Wl,--image-base,0x180000000","-Wl,--nxcompat","-Wl,--dynamicbase"]}
+
+> build:voice
+> node scripts/build-voice-worker.mjs
+
+build:whisper-shim built
+{"schema":"bunny-voice-worker-build/1","protocol":"bunny-voice/1","source":"native/voice/BunnyVoiceWorker.cs","sourceSha256":"6f2ed33c79e77550ab38948a5ff9c0baa9d5930751a4b5bf474127052011c092","binary":"native/voice/bunny-voice-worker.exe","binarySha256":"a2fc98c2712650cc6d082e1136dacb372a34f8b3ca4b1f1fde0ddd4fdb6233a7","compiler":{"path":"C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe","sha256":"eca02e6b15cde93009a59a3d129d5a77fb5008f2e1cf62cf573b6737c747ecc3","version":"Microsoft (R) Visual C# Compiler version 14.8.10001.0"},"systemSpeech":{"path":"C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System.Speech\\v4.0_4.0.0.0__31bf3856ad364e35\\System.Speech.dll","sha256":"a5824a64a0e976fe257503c9c603e2bb04db47e42f99c2ea4ad8f44e3daefe38"},"architecture":"windows-x64","builtAt":"2026-10-16T04:21:19.326Z","whisperShim":{"source":"native/voice/whisper-shim.c","sourceSha256":"abad29ef84b4fd2d5f52798ccc6f076c8458c61942207a30098bff317a69b78a","binarySha256":"33852918c51a7fe83d90353a04bae4f3a72ae67e6edd0dc8c732bbf2423f3fae","linkedAgainst":{"whisper.dll":"b7bb4ba92bd36b8afe0c00059ca6a0f69c6767193bfb5f0761e9ed27b1087803","ggml.dll":"c6e88687d6aa0238f2e834a87958f38d2dc96075a6a7bf6fb8b9cd728a0faed2","ggml-base.dll":"a5241b52206f61c9dfd6f0f53a8ef19076f9528ead2db1e039a66d7e03817bfc"},"compiler":{"path":"C:\\msys64\\ucrt64\\bin\\gcc.exe","sha256":"f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0","version":"gcc.exe (Rev5, Built by MSYS2 project) 16.1.0"},"whisperVersion":"whisper.cpp v1.9.4 (927cfce)"}}

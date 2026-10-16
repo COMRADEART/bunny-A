@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { agentDetail, agentRows, stepActivity, batchButtonLabel, batchOfferLines, batchStatusLabel, focusMission, justFinished, permissionLabel, progressFraction, progressLabel, scopeSummary, stepDependencyLabel, stepResourceTrail } from "./mission-model.ts";
+import { agentDetail, agentRows, autonomyLabel, stepActivity, batchButtonLabel, batchOfferLines, batchStatusLabel, focusMission, justFinished, permissionLabel, progressFraction, progressLabel, scopeSummary, stepDependencyLabel, stepResourceTrail } from "./mission-model.ts";
 import type { BatchView, MissionSnapshot, MissionStep, MissionView } from "../../lib/bunny-missions/types.ts";
 import type { OrchTask } from "../../lib/orch/types.ts";
 
@@ -145,4 +145,11 @@ test("Visual Experience 2.0: a step names what it waits on and shows each attemp
   assert.equal(stepResourceTrail(step("a", "a", "running", { attempts: [attempt(1, "claude", "failed")] })), null);
   assert.equal(stepResourceTrail(step("a", "a", "running", { attempts: [attempt(1, "claude", "failed"), attempt(2, "codex", "running")] })), "1: claude (failed) → 2: codex (running)");
   assert.equal(stepResourceTrail(step("a", "a", "running", { attempts: [attempt(1, null, "failed"), attempt(2, null, "running")] })), "1: model (failed) → 2: model (running)");
+});
+
+test("M-A-3 T14: the autonomy caption never calls unverified work verified", () => {
+  assert.equal(autonomyLabel({ phase: "COMPLETE", basis: "", verified: true }), "Done — verified by Bunny");
+  assert.equal(autonomyLabel({ phase: "COMPLETE", basis: "", verified: false }), "Done — not independently verified");
+  assert.equal(autonomyLabel({ phase: "RECONCILIATION_REQUIRED", basis: "", verified: null }), "Outcome uncertain — reconciliation required");
+  assert.equal(autonomyLabel({ phase: "REPAIR", basis: "", verified: null }), "Repairing a failed check");
 });

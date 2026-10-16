@@ -91,6 +91,71 @@ export function scopeFor(steps: (Pick<MissionStep, "executor" | "requiredCapabil
   };
 }
 
+/**
+ * M-A-3 T14: every way a worker's requested scope exceeds its parent's live envelope. Empty means the child asks for a
+ * strict subset, so the owner's approval of the parent already covers it. Anything unknown counts as exceeding.
+ */
+export function derivedScopeViolations(child: ScopeRequest, parent: AuthorizationEnvelope, now = Date.now()): string[] {
+  const out: string[] = [];
+  const subset = <T,>(items: readonly T[], allowed: readonly T[], label: string) => {
+    const extra = items.filter((item) => !allowed.includes(item));
+    if (extra.length) out.push(`${label} beyond the parent (${extra.map(String).join(", ").slice(0, 200)})`);
+  };
+  if (parent.revokedAt) out.push("the parent authorization was revoked");
+  if (parent.expiresAt <= now) out.push("the parent authorization expired");
+  if (isRemoteEnvelope(parent)) out.push("the parent was approved by a paired device, which cannot delegate");
+  if (parent.agentic) out.push("the parent runs under finite Agentic consent, which a worker cannot share");
+  if (!child.projectRoots.every((root) => withinAny(parent.projectRoots, root))) out.push("a project root outside the parent's");
+  subset(child.riskClasses, parent.riskClasses, "risk classes");
+  const caps = child.capabilities.filter((action) => !matches(parent.capabilities, action));
+  if (caps.length) out.push(`capabilities beyond the parent (${caps.join(", ").slice(0, 200)})`);
+  if (!child.filesystem.read.every((path) => withinAny(parent.filesystem.read, path))) out.push("file reads outside the parent's");
+  if (!child.filesystem.write.every((path) => withinAny(parent.filesystem.write, path))) out.push("file writes outside the parent's");
+  const p = parent.providers, c = child.providers;
+  if (c.execution && !p.execution) out.push("model execution the parent does not have");
+  if (p.allow && (!c.allow || c.allow.some((id) => !p.allow!.includes(id)))) out.push("providers beyond the parent's");
+  if (p.localOnly && !c.localOnly) out.push("cloud providers while the parent is local-only");
+  const sessions = c.sessions?.steps ?? [];
+  if (sessions.length && !p.sessions?.steps.some((step) => step.scope.access === "write") && sessions.some((step) => step.scope.access === "write")) out.push("write sessions the parent does not have");
+  if (c.sessions && (sessions.length > (p.sessions?.maxSessions ?? 0) || c.sessions.maxSessions > (p.sessions?.maxSessions ?? 0))) out.push("more provider sessions than the parent");
+  if (c.sessions?.writeIncludesShell && !p.sessions?.writeIncludesShell) out.push("shell sessions the parent does not have");
+  if (child.browser.enabled && !parent.browser.enabled) out.push("a browser the parent does not have");
+  if (child.browser.enabled && parent.browser.domains !== "public" && (child.browser.domains === "public" || child.browser.domains.some((d) => !(parent.browser.domains as string[]).includes(d)))) out.push("browser domains beyond the parent's");
+  if (child.terminal.enabled && !parent.terminal.enabled) out.push("a terminal the parent does not have");
+  subset(child.terminal.commands, parent.terminal.commands, "terminal commands");
+  const key = (e: { file: string; prefix: string[] }) => JSON.stringify([e.file, e.prefix]);
+  const parentExecutables = (parent.terminal.executables ?? []).map(key);
+  if ((child.terminal.executables ?? []).some((e) => !parentExecutables.includes(key(e)))) out.push("executables beyond the parent's");
+  subset(child.git.actions, parent.git.actions, "git actions");
+  if (child.network.allowed && !parent.network.allowed) out.push("network the parent does not have");
+  if (child.computer.enabled && !parent.computer.enabled) out.push("computer control the parent does not have");
+  const missingAsk = parent.alwaysAsk.filter((risk) => !child.alwaysAsk.includes(risk));
+  if (missingAsk.length) out.push(`fewer always-ask checks than the parent (${missingAsk.join(", ")})`);
+  return out;
+}
+
+/**
+ * M-A-3 T14: the envelope a worker runs on. Built from the child's own request (never wider), with the parent's authority,
+ * an expiry no later than the parent's and a budget no larger than what the parent has left. The store reads it through
+ * its parent, so revoking or replanning the parent ends it too.
+ */
+export function derivedEnvelope(child: ScopeRequest, parent: AuthorizationEnvelope, missionId: string, remaining: Budget, maxRuntimeMs: number, now = Date.now()): AuthorizationEnvelope {
+  const budget: Budget = {
+    maxExternalModelCalls: Math.max(0, Math.min(child.budget.maxExternalModelCalls, remaining.maxExternalModelCalls)),
+    maxRuntimeMs: Math.max(0, Math.min(child.budget.maxRuntimeMs, remaining.maxRuntimeMs)),
+    maxRetries: Math.max(0, Math.min(child.budget.maxRetries, remaining.maxRetries)),
+    maxTokens: remaining.maxTokens === null ? child.budget.maxTokens : Math.max(0, Math.min(child.budget.maxTokens ?? remaining.maxTokens, remaining.maxTokens)),
+  };
+  return {
+    ...structuredClone(child),
+    providers: { ...structuredClone(child.providers), allow: child.providers.allow ?? parent.providers.allow, localOnly: child.providers.localOnly || parent.providers.localOnly },
+    budget,
+    id: crypto.randomUUID(), missionId, grantedAt: now, grantedBy: parent.grantedBy, authority: parent.authority ?? authorityFor(parent.grantedBy),
+    expiresAt: Math.min(parent.expiresAt, now + Math.min(maxRuntimeMs, budget.maxRuntimeMs)), revokedAt: null,
+    derivedFrom: { authorizationId: parent.id, missionId: parent.missionId },
+  };
+}
+
 export function envelopeFrom(request: ScopeRequest, missionId: string, grantedBy: string, maxRuntimeMs: number, extraRoots: string[] = []): AuthorizationEnvelope {
   const now = Date.now();
   const authority = authorityFor(grantedBy);

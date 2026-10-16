@@ -132,6 +132,8 @@ export type AuthorizationEnvelope = {
   /** Risk classes that ask even inside the envelope. */
   alwaysAsk: RiskClass[];
   revokedAt: number | null;
+  /** M-A-3 T14: a worker's envelope, a strict subset of this parent envelope; it ends whenever the parent's does. */
+  derivedFrom?: { authorizationId: string; missionId: string };
 };
 export type GitAction = "status" | "diff" | "log" | "commit" | "worktree" | "merge";
 /**
@@ -180,7 +182,7 @@ export type DesktopGrant = {
 };
 
 /** Requested scope shown before approval; becomes the envelope when approved. */
-export type ScopeRequest = Omit<AuthorizationEnvelope, "id" | "missionId" | "grantedAt" | "grantedBy" | "expiresAt" | "revokedAt" | "agentic">;
+export type ScopeRequest = Omit<AuthorizationEnvelope, "id" | "missionId" | "grantedAt" | "grantedBy" | "expiresAt" | "revokedAt" | "agentic" | "derivedFrom">;
 
 export type VerificationCriterion =
   | { kind: "capability"; action: string; params: Record<string, JsonValue>; expect: { field: string; equals?: JsonValue; contains?: string } }
@@ -438,6 +440,8 @@ export type MissionView = Mission & { steps: MissionStep[]; progress: MissionPro
   remote?: RemoteAnswer;
   /** M-A-3 T11: Team projection (members, handoffs, findings) from canonical rows. */
   teamView?: TeamView;
+  /** M-A-3 T14: where the autonomous loop is, derived from canonical facts (never an input to execution). */
+  autonomy?: import("./autonomy.ts").AutonomyView;
 };
 
 /**
