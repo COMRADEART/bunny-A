@@ -49,7 +49,7 @@ export function RoutingImprovement() {
             <strong id="routing-active">Routing in use</strong>
             <p>
               Bunny learns only from results it verified itself. Your likes and dislikes are shown below but never count as proof that a Task was
-              done correctly. Nothing changes until you accept a policy.
+              done correctly. {learning.autopilot ? "Autopilot is on: Bunny accepts a policy itself once it passes every gate below." : "Nothing changes until you accept a policy."}
             </p>
           </div>
         </header>
@@ -64,6 +64,24 @@ export function RoutingImprovement() {
               Roll back
             </button>
           ) : null}
+        </div>
+        <div className="setting-row">
+          <div style={{ minWidth: 0 }}>
+            <strong>Autopilot</strong>
+            <p>
+              After every {learning.minimumSamples} verified Tasks, Bunny proposes, shadow tests and accepts a policy on its own through the same gates, and
+              drops one that cannot pass. It calls no model and costs nothing. Roll back stays with you.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn secondary"
+            aria-pressed={learning.autopilot}
+            disabled={disabled}
+            onClick={() => void send("autopilot", { enabled: !learning.autopilot }, learning.autopilot ? "Autopilot off." : "Autopilot on.")}
+          >
+            {learning.autopilot ? "Turn off" : "Turn on"}
+          </button>
         </div>
       </section>
 

@@ -196,7 +196,11 @@ export function TasksHome({ now }: { now: number }) {
           <TaskRow key={task.id} task={task} now={now} />
         ))}
         {!store.tasks.length && (
-          <Empty title="No tasks yet." detail="Describe one on Home. Bunny shows the recommendation before it runs." />
+          <Empty
+            title="No tasks yet."
+            detail="Describe one on Home. Bunny shows the recommendation before it runs."
+            headingLevel={2}
+          />
         )}
       </div>
     </>

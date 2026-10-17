@@ -1203,6 +1203,8 @@ export class MissionManager {
       }, "mission.completed", `Mission "${current.title}": ${summary}`,
     );
     this.workspace.releaseMission(current.id);
+    // Self-evolving: a routine the owner keeps repeating becomes a candidate skill. Learning never fails a Mission.
+    try { this.skills.learnUseCases(); } catch (error) { this.emit("skill.learn_failed", error instanceof Error ? error.message : String(error), current.id); }
     for (const batch of this.store.endMissionBatches(current.id, "mission_ended", "bunny-mission"))
       this.emit("approval.batch_ended", `Small approval batch ended with the mission (${batch.usedCount} / ${batch.maxActions} actions used).`,
         current.id,

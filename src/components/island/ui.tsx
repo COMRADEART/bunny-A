@@ -396,15 +396,19 @@ export function Empty({
   title,
   detail,
   children,
+  headingLevel = 3,
 }: {
   title: string;
   detail?: string;
   children?: ReactNode;
+  /** Page-level empty states under an H1 pass 2 so the outline never skips a level. Defaults to 3 inside H2 sections. */
+  headingLevel?: 2 | 3;
 }) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <div className="empty">
       <BunnyMark />
-      <h3>{title}</h3>
+      <Heading>{title}</Heading>
       {detail ? <p>{detail}</p> : null}
       {children}
     </div>

@@ -374,6 +374,16 @@ export class TaskManager {
         );
       }
     }
+    if (/^task\.(completed|failed|stopped)$/.test(event.type)) this.learn();
+  }
+  /** Routing autopilot (owner opt-in, off by default). A failure here is reported and never reaches the run that ended. */
+  learn() {
+    try {
+      const step = this.policy.autopilotStep(this.live());
+      if (step) this.emit(this.db.event(step.changed ? "policy.changed" : "policy.evaluated", null, step.detail));
+    } catch (error) {
+      this.emit(this.db.event("policy.autopilot_failed", null, error instanceof Error ? error.message : String(error)));
+    }
   }
   /** For timers and thermal policy: a stop that fails (e.g. the task already ended) is reported, never an unhandled rejection. */
   stopInBackground(id: string, detail: string) {

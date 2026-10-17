@@ -195,4 +195,6 @@ export type RoutingLearningView = {
   }[];
   minimumSamples: number;
   shadowMinVerified: number;
+  /** Owner opt-in: Bunny runs propose → shadow → accept on its own, through the same gates. */
+  autopilot: boolean;
 };

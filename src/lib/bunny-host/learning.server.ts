@@ -15,6 +15,7 @@ export type ReplayCase={prompt:string;mode:Mode;constraints?:TaskConstraints;exp
 export const BASE_POLICY:RoutingPolicy={id:"bunny-router-v1",historyWeight:1,workloadWeight:0,latencyWeight:0};
 const BASE_WEIGHTS:LearningWeights={historyWeight:1,latencyWeight:0,perTaskType:false};
 const LIFECYCLE_MIGRATION="bunny-a.routing-learning.v1";
+const AUTOPILOT="learning_autopilot",AUTOPILOT_SEEN="learning_autopilot_verified";
 const PROVIDERS:ProviderId[]=["codex","claude","ollama","opencode","cline","cursor"];
 const median=(values:number[])=>{const sorted=[...values].sort((a,b)=>a-b);const middle=Math.floor(sorted.length/2);return sorted.length%2 ? sorted[middle] : (sorted[middle-1]+sorted[middle])/2;};
 export const ROUTING_BENCHMARK:ReplayCase[]=[
@@ -188,6 +189,38 @@ export class PolicyEngine {
     this.db.db.prepare("UPDATE policy_lifecycle SET state='accepted',decided_at=? WHERE policy_id=? AND state='superseded'").run(now,row.previous_id);
     this.db.event("policy.rolled_back",null,row.previous_id);return this.active();
   }
+  autopilot():boolean {return (this.db.db.prepare("SELECT value FROM settings WHERE key=?").get(AUTOPILOT) as {value:string}|undefined)?.value==="on";}
+  setAutopilot(on:boolean) {this.setting(AUTOPILOT,on?"on":"off");}
+  private setting(key:string,value:string) {this.db.db.prepare("INSERT INTO settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(key,value);}
+  private autoReject(id:string,reason:string) {this.db.db.prepare("UPDATE policy_lifecycle SET state='rejected',decided_at=?,reason=? WHERE policy_id=? AND state IN ('evaluated','shadow')").run(Date.now(),`Autopilot: ${reason}`,id);}
+  /**
+   * AUTOPILOT (owner opt-in): after a run ends, take the next lifecycle step the owner would, through the same gates.
+   * It proposes only after MINIMUM_SAMPLES new verified outcomes, shadows only a promotable candidate, accepts only what
+   * acceptGate passes, and drops a shadow that can no longer pass. No model is called. Rollback stays with the owner.
+   */
+  autopilotStep(providers:ProviderLive[]):{changed:boolean;detail:string}|null {
+    if(!this.autopilot()) return null;
+    const shadow=this.shadowPolicy();
+    if(shadow) {
+      try {this.accept(shadow.id,providers);return {changed:true,detail:`Autopilot accepted routing policy ${shadow.id} after a clean shadow test. Roll back from Routing improvement at any time.`};}
+      catch(error) {
+        const summary=shadowSummary(this.shadowRows(shadow.id));
+        if(summary.risks===0 && summary.verified<SHADOW_MIN_VERIFIED) return null;
+        const reason=error instanceof Error ? error.message : String(error);
+        this.autoReject(shadow.id,reason);
+        return {changed:false,detail:`Autopilot dropped routing policy ${shadow.id}: ${reason}`};
+      }
+    }
+    const verified=Number((this.db.db.prepare("SELECT COUNT(*) n FROM outcomes WHERE verification IN ('passed','failed')").get() as {n:number}).n);
+    const seen=Number((this.db.db.prepare("SELECT value FROM settings WHERE key=?").get(AUTOPILOT_SEEN) as {value:string}|undefined)?.value ?? 0);
+    if(verified-seen<MINIMUM_SAMPLES) return null;
+    this.setting(AUTOPILOT_SEEN,String(verified));
+    let result:ReturnType<PolicyEngine["proposeFromEvidence"]>;
+    try {result=this.proposeFromEvidence(providers);} catch {return null;}
+    if(!result.replay.promotable) {this.autoReject(result.policy.id,result.replay.gate && !result.replay.gate.ok ? result.replay.gate.reason : "it did not pass evaluation.");return null;}
+    this.startShadow(result.policy.id);
+    return {changed:false,detail:`Autopilot is shadow testing routing policy ${result.policy.id} (${result.replay.decisions.improvements} measured improvement(s)). It never changes which model runs until it passes.`};
+  }
   /** OBSERVE plus the lifecycle, for the workstation. Explicit feedback is shown beside verified results and never counted as one. */
   view():RoutingLearningView {
     const active=this.active();const activeRow=this.lifecycle(active.id);
@@ -207,7 +240,7 @@ export class PolicyEngine {
         failed:Number(row.failed ?? 0),medianMs:this.medianMs(provider,taskType),inputTokens:Number(row.input_tokens ?? 0),outputTokens:Number(row.output_tokens ?? 0),
         costUsd:provider==="ollama" ? 0 : null,feedback:{positive:Number(row.positive ?? 0),negative:Number(row.negative ?? 0)}};
     });
-    return {active:{id:active.id,weights:this.liveWeights(),since:activeRow?.decided_at ?? null,previousId:this.previousOf(active.id)},candidates,observations,minimumSamples:MINIMUM_SAMPLES,shadowMinVerified:SHADOW_MIN_VERIFIED};
+    return {active:{id:active.id,weights:this.liveWeights(),since:activeRow?.decided_at ?? null,previousId:this.previousOf(active.id)},candidates,autopilot:this.autopilot(),observations,minimumSamples:MINIMUM_SAMPLES,shadowMinVerified:SHADOW_MIN_VERIFIED};
   }
   private medianMs(provider:ProviderId,taskType:string):number|null {
     const values=(this.db.db.prepare("SELECT duration_ms d FROM outcomes WHERE provider=? AND task_type=? AND completed=1").all(provider,taskType) as {d:number}[]).map(row=>row.d);

@@ -1339,6 +1339,25 @@
     flex-wrap: wrap;
     gap: var(--s3);
   }
+  /* Narrow topbar: status on its own row, connection controls on the next. Nothing is hidden. */
+  .t8-app .app-topbar {
+    flex-wrap: wrap;
+    row-gap: var(--s1);
+  }
+  .t8-app .app-topbar > span.topbar-companion {
+    flex: 1 1 100%;
+  }
+  .t8-app .app-topbar > div {
+    width: 100%;
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+  .stream-indicator {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 /* Safe areas (viewport-fit=cover): nothing sits under a notch, rounded corner or home indicator. */
 @supports (padding: env(safe-area-inset-top)) {
@@ -1589,6 +1608,9 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
+  /* Long task titles ride in this line; wrap at word boundaries on narrow bars. */
+  overflow-wrap: break-word;
+  min-width: 0;
 }
 .island-status[data-island="approval"] strong,
 .island-status[data-island="failed"] strong {

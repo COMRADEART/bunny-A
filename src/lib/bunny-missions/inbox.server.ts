@@ -27,6 +27,7 @@ const RULES: Record<string, Rule> = {
   "capability.failed": { kind: "failure", source: sourceOf, title: (event) => `${event.detail.split(" ")[0]} failed` },
   "skill.failed": { kind: "requires_attention", source: "skill", title: () => "Skill failed; repair needed" },
   "skill.promoted": { kind: "informational", source: "skill", title: () => "Skill version promoted" },
+  "skill.learned": { kind: "requires_attention", source: "skill", title: () => "Bunny learned a routine; verify it to use it" },
   "thermal.warning": { kind: "requires_attention", source: "system", title: () => "Temperature warning" },
   "provider.status_changed": { kind: "informational", source: "provider", title: () => "Provider status changed" },
   "trigger.fired": { kind: "external_event", source: "trigger", title: () => "Trigger fired" },

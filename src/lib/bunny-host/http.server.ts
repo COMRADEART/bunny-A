@@ -1719,6 +1719,7 @@ export async function startHost(
               verification.detail,
             );
             db.outcome(task);
+            manager.learn();
             break;
           }
           case "policy.candidate": {
@@ -1741,6 +1742,7 @@ export async function startHost(
           case "routing.learning.shadow":
           case "routing.learning.accept":
           case "routing.learning.reject":
+          case "routing.learning.autopilot":
           case "routing.learning.rollback": {
             // T13.3 Gate G: OBSERVE → EVALUATE → PROPOSE → SHADOW → ACCEPT/REJECT → VERSION/ROLLBACK, owner-decided on the workstation.
             if (!local) throw new WorkstationRequiredError("Routing improvement is decided only on the workstation (Windows Host).");
@@ -1757,6 +1759,10 @@ export async function startHost(
                 detail = `Routing policy ${manager.policy.startShadow(id()).id} is being shadow tested; it never changes which model runs.`;
               } else if (input.action === "routing.learning.accept") {
                 detail = `Routing policy ${manager.policy.accept(id(), manager.live()).id} accepted.`;
+              } else if (input.action === "routing.learning.autopilot") {
+                if (typeof data.enabled !== "boolean") throw new Error("enabled must be true or false.");
+                manager.policy.setAutopilot(data.enabled);
+                detail = data.enabled ? "Routing autopilot on: Bunny proposes, shadow tests and accepts policies through the same gates." : "Routing autopilot off: every step waits for the owner.";
               } else if (input.action === "routing.learning.reject") {
                 manager.policy.reject(id());
                 detail = `Routing policy ${id()} rejected.`;
