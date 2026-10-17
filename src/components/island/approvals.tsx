@@ -45,7 +45,7 @@ export function Approvals() {
       </div>
       <ReconciliationReview />
       {!known && (
-        <Empty title="Approvals are loading." detail="The Host has not sent its asks yet. Nothing is approved while this is loading." />
+        <Empty title="Approvals are loading." detail="The Host has not sent its asks yet. Nothing is approved while this is loading." headingLevel={2} />
       )}
       {items.length > 0 && (
         <p className="caption" role="status">
@@ -57,7 +57,7 @@ export function Approvals() {
           <ApprovalRow key={item.id} item={item} canAct={canAct} />
         ))}
         {!items.length && known && (
-          <Empty title="No approvals waiting." detail="When a Task, Mission or Agent needs your decision, it appears here." />
+          <Empty title="No approvals waiting." detail="When a Task, Mission or Agent needs your decision, it appears here." headingLevel={2} />
         )}
       </section>
       <p className="caption">

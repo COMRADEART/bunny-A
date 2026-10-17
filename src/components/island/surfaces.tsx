@@ -226,7 +226,7 @@ export function AgentsHome({ now }: { now: number }) {
         </button>
       </div>
       {!store.personalAgents ? (
-        <Empty title="Agents are unavailable." detail="Personal Agents appear when the Host connects. Nothing here is a sample agent." />
+        <Empty title="Agents are unavailable." detail="Personal Agents appear when the Host connects. Nothing here is a sample agent." headingLevel={2} />
       ) : (
         <div className="ch-agent-grid">
           {slots.map((slot) => (
