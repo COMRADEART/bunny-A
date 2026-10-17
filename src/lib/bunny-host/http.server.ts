@@ -533,12 +533,37 @@ export async function startHost(
       result: { summary, verified: judged.state === "VERIFIED" ? true : judged.state === "REJECTED" ? false : null, reason: judged.reason },
     };
     manager.emit(db.event("worker.closed", null, `Personal Agent ${worker.slot}'s ${worker.abilityName} worker closed as ${judged.state}: ${judged.reason}`));
-    return workerStore.save(next);
+    const saved = workerStore.save(next);
+    // M-A-3 T14: the result reaches the parent's later steps (and its Lotus recall) as a fact; only a Host-verified worker is a
+    // verified fact, anything else stays an unverified conclusion. Then the parent may have been waiting for it to complete.
+    try {
+      // The verified fact carries Host-written text only; the steps' own summaries (model output) stay unverified.
+      if (judged.state === "VERIFIED")
+        missions.memory.record(worker.parentMissionId, "verified_fact", `Worker ${worker.abilityName} verified`, `${judged.reason} (${steps.length} step(s), child Mission ${worker.childMissionId}).`, `bunny:verification:worker:${worker.id}`, true);
+      missions.memory.record(worker.parentMissionId, "agent_conclusion", `Worker ${worker.abilityName} ${judged.state.toLowerCase()} — reported`, `${judged.reason} ${summary}`.slice(0, 1000), `worker:${worker.id}`, false);
+    } catch {
+      // A pruned parent keeps no memory.
+    }
+    try {
+      if (missions.mission(worker.parentMissionId).state === "running") missions.schedule(worker.parentMissionId);
+    } catch {
+      // A pruned parent has nothing left to complete.
+    }
+    return saved;
   };
-  /** Cancellation propagates down: a parent that ends takes its open workers with it. */
-  const stopWorkersOf = async (parentMissionId: string, reason: string) => {
+  /**
+   * Cancellation propagates down: a parent that ends takes its open workers with it. With `onlyStale`, only workers running
+   * on authority derived from an envelope the parent no longer holds (M-A-3 T14: a replanned parent) are stopped.
+   */
+  const stopWorkersOf = async (parentMissionId: string, reason: string, onlyStale = false) => {
+    const current = onlyStale ? missions.mission(parentMissionId).authorizationId : null;
     for (const worker of workerStore.forParent(parentMissionId)) {
       if (!worker.childMissionId || !OPEN_STATES.includes(worker.state)) continue;
+      if (onlyStale) {
+        const childAuth = missions.mission(worker.childMissionId).authorizationId;
+        const derived = childAuth ? missions.store.authorization(childAuth)?.derivedFrom : undefined;
+        if (!derived || derived.authorizationId === current) continue;
+      }
       try {
         const state = missions.mission(worker.childMissionId).state;
         if (!["completed", "failed", "stopped"].includes(state)) await missions.stop(worker.childMissionId, reason);
@@ -554,8 +579,16 @@ export async function startHost(
     try {
       const worker = workerStore.byChild(missionId);
       if (worker) syncWorker(worker);
-      else if (workerStore.forParent(missionId).length && ["completed", "failed", "stopped"].includes(missions.mission(missionId).state))
-        void stopWorkersOf(missionId, "Its parent Mission ended.").catch(() => undefined);
+      else if (workerStore.forParent(missionId).length) {
+        if (["completed", "failed", "stopped"].includes(missions.mission(missionId).state)) void stopWorkersOf(missionId, "Its parent Mission ended.").catch(() => undefined);
+        else {
+          void stopWorkersOf(missionId, "Its parent Mission's authority ended (replanned).", true).catch(() => undefined);
+          // A worker held while its parent reconciled moves again once the owner has decided.
+          if (!parentReconciling(missionId))
+            for (const worker of workerStore.forParent(missionId))
+              if (worker.childMissionId && OPEN_STATES.includes(worker.state) && missions.mission(worker.childMissionId).state === "running") missions.schedule(worker.childMissionId);
+        }
+      }
     } catch {
       // Worker bookkeeping never interrupts Mission events; the next event or boot reconciles it.
     }
@@ -569,8 +602,28 @@ export async function startHost(
     } else syncWorker(worker);
   }
   // T13.3 N1: a worker's child Mission is held while its parent Agent is paused, like the Agent's own Missions.
-  missions.missionPauseGate = (missionId) => agents.blockedForMission(workerStore.byChild(missionId)?.parentMissionId ?? missionId);
+  // M-A-3 T14: a worker also holds new admissions while its parent waits for the owner to reconcile an uncertain outcome.
+  const parentReconciling = (parentMissionId: string) => {
+    try {
+      return missions.store.steps(parentMissionId).some((step) => step.reconciliation?.required);
+    } catch {
+      return false;
+    }
+  };
+  missions.missionPauseGate = (missionId) => {
+    const parent = workerStore.byChild(missionId)?.parentMissionId;
+    return agents.blockedForMission(parent ?? missionId) || (!!parent && parentReconciling(parent));
+  };
   missions.missionPromptFacts = (missionId) => workerStore.byChild(missionId)?.context ?? [];
+  // M-A-3 T14: a parent completes only once its workers have reported; only Host-verified workers count as verified.
+  missions.missionDelegated = (missionId) => {
+    const ran = workerStore.forParent(missionId).filter((worker) => worker.childMissionId);
+    const closed = ran.filter((worker) => worker.state === "CLOSED");
+    const verified = closed.filter((worker) => worker.result?.verified === true).length;
+    const open = ran.filter((worker) => OPEN_STATES.includes(worker.state));
+    const awaitingOwner = open.filter((worker) => { try { return missions.mission(worker.childMissionId!).state === "waiting_for_approval"; } catch { return false; } }).length;
+    return { open: open.length, awaitingOwner, verified, unverified: closed.length - verified };
+  };
   // M-A-3 T13.3 Gate F: the Personal Agent that owns a Mission, directly or through one of its workers.
   const slotForMission = (missionId: string | null): SlotId | null => {
     if (!missionId) return null;
@@ -1606,10 +1659,25 @@ export async function startHost(
               manager.emit(db.event("worker.refused", null, `Personal Agent ${slot}'s worker was refused: ${problems.join(" ")}`));
               throw new CommandRefusedError(problems.join(" "));
             }
-            worker = move({ ...worker, childMissionId: child.id }, "ADMITTED", "Child Mission created; it waits for your approval like any other.", Date.now());
-            workerStore.save(worker);
-            manager.emit(db.event("worker.admitted", null, `Personal Agent ${slot} added a ${worker.abilityName} worker to Mission ${parentMissionId}.`));
-            extra = { data: { worker: syncWorker(worker) }, mission: child };
+            // M-A-3 T14: a worker whose needs are a strict subset of its parent's live authority runs on it at once; otherwise it
+            // waits for the owner's approval exactly as before.
+            // The worker record exists before any grant, so a child can never run unlinked to its worker.
+            worker = workerStore.save(move({ ...worker, childMissionId: child.id }, "ADMITTED", "Child Mission created; checking whether its parent's approval covers it.", Date.now()));
+            let derived: { view: ReturnType<typeof missions.view> | null; reasons: string[] } = { view: null, reasons: ["the child Mission was not planned for approval"] };
+            if (child.state === "waiting_for_approval")
+              try {
+                derived = missions.deriveWorkerAuthorization(child.id, parentMissionId);
+              } catch (error) {
+                derived = { view: null, reasons: [error instanceof Error ? error.message : "the Host is not accepting work"] };
+              }
+            // The record may already have moved on (a child that ended at once); only the ADMITTED note is completed here.
+            const note = derived.view
+              ? "Child Mission created and authorized from its parent's approval (a strict subset of it)."
+              : `Child Mission created; it waits for your approval: ${derived.reasons.join("; ")}.`;
+            const latest = workerStore.get(worker.id) ?? worker;
+            worker = workerStore.save({ ...latest, history: latest.history.map((row) => (row.state === "ADMITTED" ? { ...row, note: note.slice(0, 300) } : row)) });
+            manager.emit(db.event("worker.admitted", null, `Personal Agent ${slot} added a ${worker.abilityName} worker to Mission ${parentMissionId}${derived.view ? " under its parent's authority" : ""}.`));
+            extra = { data: { worker: syncWorker(worker) }, mission: derived.view ?? child };
             break;
           }
           case "worker.cancel": {

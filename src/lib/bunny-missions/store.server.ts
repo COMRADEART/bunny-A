@@ -11,7 +11,8 @@ export const APPROVAL_BATCHES_SCHEMA = "ma2.approval-batches.v1";
 export const TEAM_HANDOFFS_SCHEMA = "ma3.t11.team-handoffs.v1";
 export const DEFAULT_CONFIG: MissionConfig = {
   enabled: false,
-  limits: { maxConcurrentAgents: 3, maxSteps: 12, maxRetriesPerStep: 2, maxReplans: 2, maxMissionRuntimeMs: 2 * 60 * 60_000, maxActiveMissions: 3 },
+  // M-A-3 T14: four active Missions by default, so each of the four Personal Agents can run one at once (configurable 1-10).
+  limits: { maxConcurrentAgents: 3, maxSteps: 12, maxRetriesPerStep: 2, maxReplans: 2, maxMissionRuntimeMs: 2 * 60 * 60_000, maxActiveMissions: 4 },
   triggersEnabled: false,
   browserHeadless: true,
 };
@@ -154,7 +155,16 @@ export class MissionStore {
   }
   authorization(id: string): AuthorizationEnvelope | null {
     const row = this.db.prepare("SELECT record FROM mission_authorizations WHERE id=?").get(id) as { record: string } | undefined;
-    return row ? JSON.parse(row.record) as AuthorizationEnvelope : null;
+    if (!row) return null;
+    const envelope = JSON.parse(row.record) as AuthorizationEnvelope;
+    if (!envelope.derivedFrom || envelope.revokedAt) return envelope;
+    // M-A-3 T14: a worker's derived envelope lives only as long as its parent's (revoke, replan, stop, expiry).
+    const parent = this.authorization(envelope.derivedFrom.authorizationId);
+    return {
+      ...envelope,
+      expiresAt: Math.min(envelope.expiresAt, parent?.expiresAt ?? 0),
+      revokedAt: parent ? parent.revokedAt : envelope.grantedAt,
+    };
   }
 
   /**
@@ -181,6 +191,12 @@ export class MissionStore {
   acknowledgeRemoteChanges(ids: string[], by: string) {
     const statement = this.db.prepare("UPDATE remote_changes SET acknowledged_at=?, acknowledged_by=? WHERE id=? AND acknowledged_at IS NULL");
     for (const id of ids) statement.run(Date.now(), by, id);
+  }
+  /** M-A-3 T14: every envelope ever derived from `parentId` (live, revoked or finished), as stored. */
+  derivedAuthorizations(parentId: string): AuthorizationEnvelope[] {
+    return (this.db.prepare("SELECT record FROM mission_authorizations WHERE record LIKE ?").all(`%${parentId}%`) as { record: string }[])
+      .map((row) => JSON.parse(row.record) as AuthorizationEnvelope)
+      .filter((row) => row.derivedFrom?.authorizationId === parentId);
   }
   /** Every unrevoked Mission authorization (M-A-3 T9R-F01 restart sweep). */
   liveAuthorizations(): AuthorizationEnvelope[] {

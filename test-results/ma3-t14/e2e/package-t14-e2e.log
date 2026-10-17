@@ -1,0 +1,9 @@
+PASS P01 a Personal Agent's Mission starts after one approval: {"status":200,"parentId":"3dfd6712-231b-44a6-8e1b-02af3224c07f"}
+PASS P02 a worker inside the parent's approval runs with no owner request: {"admitted":"Child Mission created and authorized from its parent's approval (a strict subset of it).","requests":0}
+PASS P03 a worker needing more waits for the owner, with the reason recorded: {"wideNote":"Child Mission created; it waits for your approval: capabilities beyond the parent (browser.navigate, browser.read, browser.screenshot); a browser the parent does not have; network the parent does not ","wideState":"waiting_for_approval"}
+PASS P04 the parent completes after its workers with their verdicts: {"summary":"12/12 steps completed. 0 independently verified by Bunny; 12 completed without independent verification (provider or capability output only). Workers: 0 verified by Bunny, 2 not verified.","heldForWorkers":false}
+PASS P05 COMPLETE is reported unverified (evidence-only worker), and the worker ran on authority derived from the parent: {"autonomy":{"phase":"COMPLETE","basis":"Finished, but some work was not independently verified.","verified":false},"derivedFrom":{"authorizationId":"2c9e902f-a924-4259-bcf8-574367ddefcb","missionId":"3dfd6712-231b-44a6-8e1b-02af3224c07f"}}
+PASS P06 a paired device cannot propose a worker: {"status":400,"code":"WORKSTATION_REQUIRED"}
+PASS P07 the default active-Mission limit is 4: {"maxConcurrentAgents":3,"maxSteps":12,"maxRetriesPerStep":2,"maxReplans":2,"maxMissionRuntimeMs":7200000,"maxActiveMissions":4}
+PASS P08 no provider task was created (skills only): {"tasks":0}
+PASS: 8/8

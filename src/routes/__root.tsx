@@ -4,6 +4,8 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Bunny-A";
+// shortcut: the theme id is checked against the default only, without full validation; useDocumentTheme always clears it.
+const THEME_RESTORE_SCRIPT = `try{var p=JSON.parse(localStorage.getItem("bunny-a.ui-theme.v1")||"null");if(p&&typeof p.theme==="string"&&p.theme!=="glass"){var d=document.documentElement;d.setAttribute("data-theme-restoring","");setTimeout(function(){d.removeAttribute("data-theme-restoring")},1500)}}catch(e){}`;
 
 export const Route = createRootRoute({
   head: () => ({
@@ -32,6 +34,8 @@ export const Route = createRootRoute({
         {/* Rendered directly: the head manager de-duplicates <meta> by name and would drop one of the pair. */}
         <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)" />
         <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+        {/* M-A-3 T14: a cached non-default theme keeps the shell hidden until the client restores it, instead of flashing the default. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_RESTORE_SCRIPT }} />
       </head>
       <body>
         <PreviewHostBridge />

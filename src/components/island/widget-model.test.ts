@@ -91,6 +91,19 @@ test("lotus hides memory text, and a phone receives none of it", () => {
   assert.equal(JSON.stringify(phone).includes("private-memory-token"), false);
 });
 
+test("M-A-3 T14: a Project in focus leaves other Projects' notes out of the Lotus widget", () => {
+  const memories = [
+    { id: "a", scope: "agent:1", layer: "central", trust: "user", updatedAt: 3 },
+    { id: "b", scope: "project:alpha", layer: "inner", trust: "verified", updatedAt: 2 },
+    { id: "c", scope: "project:beta", layer: "inner", trust: "verified", updatedAt: 1 },
+  ];
+  const all = lotusWidget({ viewer: "workstation", agentName: "Gada", projectName: null, memories });
+  assert.deepEqual(all.recent.map((row) => row.id), ["a", "b", "c"]);
+  const alpha = lotusWidget({ viewer: "workstation", agentName: "Gada", projectName: "Alpha", projectId: "alpha", memories });
+  assert.deepEqual(alpha.recent.map((row) => row.id), ["a", "b"]);
+  assert.equal(alpha.count, 2);
+});
+
 test("voice uncertainty stays uncertainty, and reconciliation does not decide on a phone", () => {
   const missing = voiceWidget({ viewer: "workstation", speaker: "Bunny", voice: null });
   assert.equal(missing.state, "unreported");

@@ -8,6 +8,7 @@ import { allowVerdict, isDevice, missionApproveVerdict } from "./remote-view-mod
 import {
   agentDetail,
   agentRows,
+  autonomyLabel,
   batchButtonLabel,
   batchOfferLines,
   batchStatusLabel,
@@ -275,6 +276,11 @@ export function MissionPanel({ mission, now }: { mission: MissionView; now: numb
         </span>
       </div>
       <h2>{mission.title}</h2>
+      {mission.autonomy ? (
+        <p className="caption mission-autonomy" data-phase={mission.autonomy.phase} title={mission.autonomy.basis}>
+          {autonomyLabel(mission.autonomy)}
+        </p>
+      ) : null}
       <ProgressMeter mission={mission} />
       {mission.state === "waiting_for_approval" ? <ApprovalCard mission={mission} /> : null}
       <Requests mission={mission} />

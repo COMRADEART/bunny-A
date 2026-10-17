@@ -55,5 +55,9 @@ test("an uncertain Mission step names its owning Personal Agent, last verified c
 test("only the workstation may decide; a paired device sees the review without controls", () => {
   assert.equal(mayReconcile({ kind: "workstation" }), true);
   assert.equal(mayReconcile({ kind: "device" }), false);
+  // M-A-3 T14: no viewer yet (loading) or an unknown kind never shows the controls.
+  assert.equal(mayReconcile(null), false);
+  assert.equal(mayReconcile(undefined), false);
+  assert.equal(mayReconcile({ kind: "guest" }), false);
   assert.equal(RECONCILE_HEADLINE, "Outcome uncertain — reconciliation required");
 });
