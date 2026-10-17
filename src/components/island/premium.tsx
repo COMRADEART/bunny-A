@@ -8,15 +8,21 @@ import {
   Cpu,
   FileText,
   Folder,
+  Gauge,
   Layers,
+  LayoutGrid,
+  ListChecks,
   Menu,
   MessageSquare,
   Moon,
+  PenLine,
   RefreshCw,
   Settings2,
   ShieldCheck,
   Smartphone,
+  Sparkles,
   Sun,
+  Users,
   WifiOff,
   type LucideIcon,
 } from "lucide-react";
@@ -51,7 +57,6 @@ import {
   WORKSTATION_CAPTION,
 } from "./remote-view-model";
 import { ChatHome } from "./chat-home";
-import { Studio } from "./studio";
 import { Approvals } from "./approvals";
 import { Files } from "./files";
 import { ContextPanel } from "./context-panel";
@@ -62,20 +67,59 @@ import { BunnyCompanion, usePrefersReducedMotion, useHappyWindow } from "./chara
 import { hostLive } from "./character-model";
 import { approvalCount, pendingApprovalItems } from "./approvals-model";
 import { COMPANION_LABEL, resolveCompanion } from "./companion-model";
-import { activeNavView, deepLinkFromSearch, NAV_MAIN, NAV_SYSTEM, type NavView } from "./nav-model";
+import { activeNavView, deepLinkFromSearch, NAV_ADVANCED, NAV_PRIMARY, type NavView } from "./nav-model";
 import { WidgetSurface, type WidgetOpeners } from "./widgets";
+import {
+  AgentsHome,
+  CharactersHome,
+  IslandStatus,
+  Onboarding,
+  StudioHome,
+  TasksHome,
+  TeamsHome,
+  WidgetsPage,
+} from "./surfaces";
 
 import "./premium.css";
 import "./glass.css";
 
+const FOCUS_KEY = "bunny-a.focus.v1";
+
+/** Focus mode hides advanced navigation and the context panel. It does not stop Host work. */
+function useFocusMode(): [boolean, (next: boolean) => void] {
+  const [focus, setFocus] = useState(false);
+  useEffect(() => {
+    try {
+      setFocus(sessionStorage.getItem(FOCUS_KEY) === "1");
+    } catch {
+      /* Private mode can refuse storage. Focus still works for this visit. */
+    }
+  }, []);
+  const update = (next: boolean) => {
+    setFocus(next);
+    try {
+      sessionStorage.setItem(FOCUS_KEY, next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  };
+  return [focus, update];
+}
+
 const NAV_ICONS: Record<NavView, LucideIcon> = {
   chat: MessageSquare,
+  tasks: ListChecks,
   missions: Layers,
+  teams: Users,
   agents: Bot,
+  studio: PenLine,
+  widgets: LayoutGrid,
+  characters: Sparkles,
   projects: Folder,
   files: FileText,
   approvals: ShieldCheck,
   activity: Activity,
+  telemetry: Gauge,
   settings: Settings2,
   models: Cpu,
   devices: Smartphone,
@@ -86,6 +130,8 @@ export function Island() {
   const store = useIsland();
   const [now, setNow] = useState(0);
   const [menu, setMenu] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [focus, setFocus] = useFocusMode();
   // Router search is available on the first server and client paint — no post-hydrate flash of the desktop shell.
   const companion = useRouterState({
     select: (state) => deepLinkFromSearch(state.location.searchStr).companion,
@@ -130,6 +176,7 @@ export function Island() {
   useEffect(() => {
     window.scrollTo({ top: 0 });
     setMenu(false);
+    if (NAV_ADVANCED.some((item) => item.view === activeNavView(store.sheet))) setAdvancedOpen(true);
   }, [store.sheet]);
   const page = store.sheet ?? "chat";
   const active = activeNavView(page);
@@ -194,7 +241,7 @@ export function Island() {
     );
   }
   return (
-    <div className="bunny-app t8-app" {...scope} data-ambient={ambient} data-menu={menu}>
+    <div className="bunny-app t8-app" {...scope} data-ambient={ambient} data-menu={menu} data-focus={focus ? "true" : "false"}>
       <a href="#bunny-content" className="skip-link">
         Skip to content
       </a>
@@ -227,19 +274,7 @@ export function Island() {
           </span>
         </div>
         <nav id="primary-navigation" aria-label="Primary navigation">
-          {NAV_MAIN.map(({ view, sheet, label }) => {
-            const Icon = NAV_ICONS[view];
-            const count = view === "approvals" ? approvals + paused : view === "missions" ? attention : 0;
-            return (
-              <button key={view} aria-current={active === view ? "page" : undefined} onClick={() => navigate(sheet)}>
-                <Icon size={18} />
-                <span>{label}</span>
-                {count > 0 && <span className="nav-count">{count}</span>}
-              </button>
-            );
-          })}
-          <p className="nav-group-label">System</p>
-          {NAV_SYSTEM.map(({ view, sheet, label }) => {
+          {NAV_PRIMARY.map(({ view, sheet, label }) => {
             const Icon = NAV_ICONS[view];
             return (
               <button key={view} aria-current={active === view ? "page" : undefined} onClick={() => navigate(sheet)}>
@@ -248,6 +283,30 @@ export function Island() {
               </button>
             );
           })}
+          <button
+            type="button"
+            className="nav-group-label"
+            aria-expanded={advancedOpen}
+            aria-controls="advanced-navigation"
+            onClick={() => setAdvancedOpen((open) => !open)}
+          >
+            Advanced
+          </button>
+          {advancedOpen && (
+            <div id="advanced-navigation" className="nav-advanced">
+              {NAV_ADVANCED.map(({ view, sheet, label }) => {
+                const Icon = NAV_ICONS[view];
+                const count = view === "approvals" ? approvals + paused : view === "missions" ? attention : 0;
+                return (
+                  <button key={view} aria-current={active === view ? "page" : undefined} onClick={() => navigate(sheet)}>
+                    <Icon size={18} />
+                    <span>{label}</span>
+                    {count > 0 && <span className="nav-count">{count}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </nav>
         <div className="sidebar-bottom">
           <p className="caption">Work stays with your Host.</p>
@@ -269,7 +328,7 @@ export function Island() {
         <header className="app-topbar">
           <span className="topbar-companion">
             <BunnyCompanion state={bunny.state} level={bunny.level} size="compact" reduced={reduced} label={`Bunny is ${COMPANION_LABEL[bunny.state]}`} />
-            <span>Your personal workspace</span>
+            <IslandStatus now={now} />
           </span>
           <div>
             <span className="stream-indicator" role="status" data-connection={connection}>
@@ -277,6 +336,9 @@ export function Island() {
                 ? `${CONNECTION_LABEL[connection]} · ${freshness}`
                 : CONNECTION_LABEL[connection]}
             </span>
+            <button type="button" className="quiet-button" aria-pressed={focus} onClick={() => setFocus(!focus)}>
+              {focus ? "Show navigation" : "Focus"}
+            </button>
             <button
               className="icon-button"
               aria-label="Refresh Host state"
@@ -298,8 +360,18 @@ export function Island() {
           <main id="bunny-content" className="workspace-content" tabIndex={-1}>
             {page === "missions" || page === "agentic" ? (
               <AgenticWorkspace />
+            ) : page === "teams" ? (
+              <TeamsHome />
             ) : page === "agents" ? (
-              <Studio />
+              <AgentsHome now={now} />
+            ) : page === "studio" ? (
+              <StudioHome />
+            ) : page === "characters" ? (
+              <CharactersHome now={now} />
+            ) : page === "widgets" ? (
+              <WidgetsPage openers={widgetOpeners} />
+            ) : page === "tasks" ? (
+              <TasksHome now={now} />
             ) : page === "project" ? (
               <Projects />
             ) : page === "files" ? (
@@ -308,7 +380,7 @@ export function Island() {
               <Approvals />
             ) : page === "provider" ? (
               <ModelsWorkspace />
-            ) : page === "activity" || page === "tasks" ? (
+            ) : page === "activity" ? (
               <ActivityWorkspace now={now} />
             ) : page === "settings" ? (
               <Settings />
@@ -327,9 +399,12 @@ export function Island() {
                 <Approval task={task} />
               </div>
             ) : (
-              <ChatHome now={now} />
+              <>
+                <Onboarding onOpenDevices={() => store.setSheet("devices")} />
+                <ChatHome now={now} />
+              </>
             )}
-            {widgetLayout === "board" && <WidgetSurface mode="board" page={page} openers={widgetOpeners} />}
+            {widgetLayout === "board" && page !== "widgets" && <WidgetSurface mode="board" page={page} openers={widgetOpeners} />}
           </main>
           {widgetLayout === "sidebar" && <WidgetSurface mode="sidebar" page={page} openers={widgetOpeners} />}
           {page !== "design-preview" && <ContextPanel now={now} />}

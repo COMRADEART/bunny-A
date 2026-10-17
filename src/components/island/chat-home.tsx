@@ -78,7 +78,7 @@ export function ChatHome({ now }: { now: number }) {
         <section className="t8-section ch-agents" aria-labelledby="home-agents">
           <div className="section-heading">
             <h2 id="home-agents">Personal Agents</h2>
-            <button className="quiet-button" type="button" onClick={() => store.setSheet("agents")}>
+            <button className="quiet-button" type="button" onClick={() => store.setSheet("studio")}>
               Agent Studio
             </button>
           </div>

@@ -67,6 +67,7 @@ import {
   type StatusCopy,
   type StepCounts,
 } from "./phone-model.ts";
+import { pairingCodeFromLocation } from "./journey-model";
 import "./phone.css";
 import { useShownTheme, useThemeScope } from "./theme";
 import { UI_THEMES, UI_THEME_IDS, type UiThemeId, type UiThemePreference } from "@/lib/bunny-host/ui-theme";
@@ -1070,7 +1071,9 @@ function ProjectsView({ view }: { view: View }) {
 
 export function Pairing({ compact = false }: { compact?: boolean }) {
   const store = useIsland();
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(() =>
+    typeof window === "undefined" ? "" : pairingCodeFromLocation(window.location.search, window.location.hash) ?? "",
+  );
   const [name, setName] = useState("Phone companion");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1131,7 +1134,14 @@ export function Pairing({ compact = false }: { compact?: boolean }) {
             {store.pairCode ? (
               <div className="pairing-code-display">
                 <code>{store.pairCode}</code>
-                <small>Single use · expires in 10 minutes</small>
+                <small>Single use · expires in 10 minutes. The phone still confirms this code with the Host.</small>
+                {store.remoteUrl ? (
+                  <a href={`${store.remoteUrl}/?companion=1#pair=${encodeURIComponent(store.pairCode)}`}>
+                    Open the companion with this code filled in
+                  </a>
+                ) : (
+                  <small>Secure companion address unavailable, so there is no link to open.</small>
+                )}
               </div>
             ) : null}
           </div>

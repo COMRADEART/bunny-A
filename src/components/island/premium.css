@@ -1547,3 +1547,77 @@
 .t8-app.bunny-app[data-motion="off"] .voice-talk {
   transition: none;
 }
+
+.nav-group-label {
+  margin: 12px 8px 4px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.nav-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.t8-app[data-focus="true"] .nav-advanced,
+.t8-app[data-focus="true"] .nav-group-label,
+.t8-app[data-focus="true"] .cx-panel {
+  display: none;
+}
+.topbar-companion {
+  min-width: 0;
+}
+.island-status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+}
+.island-status strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+.island-status span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.island-status[data-island="approval"] strong,
+.island-status[data-island="failed"] strong {
+  color: var(--danger, #9a3412);
+}
+.island-status[data-island="offline"] strong {
+  color: var(--muted);
+}
+.onboarding {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 20px;
+}
+.onboarding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pairing-code-display a {
+  display: block;
+  margin-top: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .island-status,
+  .onboarding {
+    animation: none;
+    transition: none;
+  }
+}
+
