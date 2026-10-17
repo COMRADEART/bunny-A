@@ -1,0 +1,51 @@
+{
+  "command": "node --experimental-strip-types test-results/ma3/t13-gate-closure/check-pairing-security.mjs",
+  "checkedAt": "2026-10-17T21:56:02.879Z",
+  "sourceSha": "b23005136c48036968036475e841dcf67a38a794",
+  "classification": "LIVE disposable Host HTTP; software client; expiry clock explicitly simulated",
+  "physicalAndroid": false,
+  "results": [
+    {
+      "check": "anonymous Host state rejected",
+      "status": 401,
+      "passed": true
+    },
+    {
+      "check": "workstation issues cryptographically shaped pairing code",
+      "status": 200,
+      "passed": true,
+      "codeRetained": false
+    },
+    {
+      "check": "new paired software credential authenticates",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "workstation lists paired software principal",
+      "passed": true
+    },
+    {
+      "check": "reused pairing code rejected",
+      "status": 403,
+      "passed": true
+    },
+    {
+      "check": "paired device cannot issue codes by forging owner headers",
+      "status": 400,
+      "passed": true
+    },
+    {
+      "check": "expired pairing code rejected",
+      "status": 403,
+      "passed": true,
+      "clock": "SIMULATED +600001 ms in this disposable process; actual Host HTTP path"
+    },
+    {
+      "check": "revoked credential cannot read Host state",
+      "status": 401,
+      "passed": true
+    }
+  ],
+  "passed": true
+}

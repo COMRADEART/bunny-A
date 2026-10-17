@@ -1,0 +1,77 @@
+# T13 gate-closure evidence index
+
+Source: b23005136c48036968036475e841dcf67a38a794. Disposition: CONDITIONAL PASS; physical Android gate BLOCKED.
+
+Only these files plus this index and INDEX.sha256 are intended for the evidence commit. The source-isolated validation checkout and compiled Android classes are excluded.
+
+| File | Bytes |
+|---|---:|
+| .gitattributes | 96 |
+| ANDROID_ENVIRONMENT.md | 4005 |
+| FINAL_ACCEPTANCE.md | 4723 |
+| FULL_SUITE_REPORT.md | 4854 |
+| PHONE_PAIRING_MATRIX.md | 6078 |
+| SECURITY_VALIDATION.md | 3339 |
+| android-checks.json | 1240 |
+| android-checks/address-policy.log | 46 |
+| android-checks/apk-manifest.log | 888 |
+| android-checks/compile-address-policy.log | 272 |
+| android-checks/compile-apk-verifier.log | 164 |
+| android-checks/verify-existing-apk.log | 223 |
+| android-environment.json | 9091 |
+| assemble-evidence.mjs | 33498 |
+| auth-final-result.json | 456 |
+| auth-final.log | 105 |
+| auth-result.json | 451 |
+| auth.log | 131 |
+| browser/t13-gate-closure-built-mobile.png | 92436 |
+| browser/t13-gate-closure-built.json | 1357 |
+| browser/t13-gate-closure-built.png | 176958 |
+| browser/t13-gate-closure-dev-mobile.png | 86619 |
+| browser/t13-gate-closure-dev.json | 1293 |
+| browser/t13-gate-closure-dev.png | 162288 |
+| build-result.json | 472 |
+| build.log | 42628 |
+| check-android.ps1 | 2359 |
+| check-pairing-security.mjs | 5442 |
+| command-results.json | 3392 |
+| cross-surface-regression.json | 2040 |
+| discover-android.ps1 | 7296 |
+| environment-correction.json | 729 |
+| installed-release-observation.json | 355 |
+| pairing-security.json | 1396 |
+| preserved-processes-after.json | 1317 |
+| probe-transport.mjs | 2224 |
+| receipt-investigation.json | 1757 |
+| receipt-provenance.json | 2916 |
+| receipts/client-only-disconnect.json | 354 |
+| receipts/concurrent-four-way.json | 325 |
+| receipts/concurrent-resolution.json | 211 |
+| receipts/cross-agentId.json | 447 |
+| receipts/cross-missionId.json | 447 |
+| receipts/cross-project-artifact.json | 255 |
+| receipts/cross-projectId.json | 447 |
+| receipts/dev01-reroute.json | 1187 |
+| receipts/f02-revocation-ends-approvals.json | 494 |
+| receipts/f03-plan-binding.json | 346 |
+| receipts/host-replacement.json | 534 |
+| receipts/host-restart-continuity.json | 572 |
+| receipts/lost-ack-reconciliation.json | 741 |
+| receipts/offline-replay.json | 333 |
+| retained-evidence.json | 1077 |
+| run-gates.mjs | 6517 |
+| seal-evidence.mjs | 3298 |
+| secret-scan.json | 457 |
+| suite-summary.json | 729 |
+| test-final-result.json | 2207 |
+| test-final.log | 237898 |
+| test-result.json | 443 |
+| test.log | 48445 |
+| transport-probe.json | 1193 |
+| typecheck-result.json | 456 |
+| typecheck.log | 29 |
+| ui-result.json | 446 |
+| ui.log | 40766 |
+| validation-source.json | 386 |
+| workspace-before.json | 11787 |
+| workspace-preservation.json | 123 |

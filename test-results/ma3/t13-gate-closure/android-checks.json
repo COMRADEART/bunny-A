@@ -1,0 +1,32 @@
+[
+  {
+    "command": "javac -encoding UTF-8 -classpath test-results/android-tools/apksig.jar -d <evidence>/android-checks android/tools/SignApk.java",
+    "exitCode": 0,
+    "name": "compile-apk-verifier",
+    "log": "android-checks/compile-apk-verifier.log"
+  },
+  {
+    "command": "java -cp <evidence>/android-checks;test-results/android-tools/apksig.jar SignApk verify releases/Bunny-A-Android-v2.apk",
+    "exitCode": 0,
+    "name": "verify-existing-apk",
+    "log": "android-checks/verify-existing-apk.log"
+  },
+  {
+    "command": "javac --release 8 -d <evidence>/android-checks android/app/src/main/java/com/routeragent/jev/ServerAddress.java android/tests/ServerAddressTest.java",
+    "exitCode": 0,
+    "name": "compile-address-policy",
+    "log": "android-checks/compile-address-policy.log"
+  },
+  {
+    "command": "java -cp <evidence>/android-checks com.routeragent.jev.ServerAddressTest",
+    "exitCode": 0,
+    "name": "address-policy",
+    "log": "android-checks/address-policy.log"
+  },
+  {
+    "command": "test-results/android-tools/aapt2/aapt2.exe dump badging releases/Bunny-A-Android-v2.apk",
+    "exitCode": 0,
+    "name": "apk-manifest",
+    "log": "android-checks/apk-manifest.log"
+  }
+]

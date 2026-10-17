@@ -1,0 +1,115 @@
+[
+  {
+    "command": "node test-results/ma3/t13-gate-closure/run-gates.mjs prepare",
+    "exitCode": 0
+  },
+  {
+    "command": "node test-results/ma3/t13-gate-closure/run-gates.mjs test",
+    "nestedCommand": "npm test",
+    "exitCode": 1,
+    "log": "test.log"
+  },
+  {
+    "command": "node test-results/ma3/t13-gate-closure/run-gates.mjs test test-final",
+    "nestedCommand": "npm test",
+    "exitCode": 0,
+    "log": "test-final.log"
+  },
+  {
+    "command": "npm run test:ui",
+    "exitCode": 0,
+    "log": "ui.log"
+  },
+  {
+    "command": "npm run typecheck",
+    "exitCode": 0,
+    "log": "typecheck.log"
+  },
+  {
+    "command": "npm run build",
+    "exitCode": 0,
+    "log": "build.log"
+  },
+  {
+    "command": "npm run check:auth",
+    "exitCode": 0,
+    "log": "auth-final.log"
+  },
+  {
+    "command": "node test-results/ma3/t13-gate-closure/run-gates.mjs auth",
+    "nestedCommand": "npm run check:auth",
+    "exitCode": 2,
+    "log": "auth.log",
+    "limitation": "sandbox could not reach local server; escalated rerun passed"
+  },
+  {
+    "command": "./test-results/ma3/t13-gate-closure/discover-android.ps1",
+    "exitCode": 0
+  },
+  {
+    "command": "./test-results/ma3/t13-gate-closure/check-android.ps1",
+    "exitCode": 0
+  },
+  {
+    "command": "javac -encoding UTF-8 -classpath test-results/android-tools/apksig.jar -d <evidence>/android-checks android/tools/SignApk.java",
+    "exitCode": 0,
+    "name": "compile-apk-verifier",
+    "log": "android-checks/compile-apk-verifier.log"
+  },
+  {
+    "command": "java -cp <evidence>/android-checks;test-results/android-tools/apksig.jar SignApk verify releases/Bunny-A-Android-v2.apk",
+    "exitCode": 0,
+    "name": "verify-existing-apk",
+    "log": "android-checks/verify-existing-apk.log"
+  },
+  {
+    "command": "javac --release 8 -d <evidence>/android-checks android/app/src/main/java/com/routeragent/jev/ServerAddress.java android/tests/ServerAddressTest.java",
+    "exitCode": 0,
+    "name": "compile-address-policy",
+    "log": "android-checks/compile-address-policy.log"
+  },
+  {
+    "command": "java -cp <evidence>/android-checks com.routeragent.jev.ServerAddressTest",
+    "exitCode": 0,
+    "name": "address-policy",
+    "log": "android-checks/address-policy.log"
+  },
+  {
+    "command": "test-results/android-tools/aapt2/aapt2.exe dump badging releases/Bunny-A-Android-v2.apk",
+    "exitCode": 0,
+    "name": "apk-manifest",
+    "log": "android-checks/apk-manifest.log"
+  },
+  {
+    "command": "node test-results/ma3/t13-gate-closure/probe-transport.mjs",
+    "exitCode": 0
+  },
+  {
+    "command": "node --experimental-strip-types test-results/ma3/t13-gate-closure/check-pairing-security.mjs",
+    "exitCode": 0
+  },
+  {
+    "command": "node scripts/browser-smoke.mjs http://127.0.0.1:8080/ screenshots/t13-gate-closure-dev.png",
+    "cwd": "original workspace",
+    "exitCode": 0
+  },
+  {
+    "command": "npm run preview:restart",
+    "cwd": "validation-checkout",
+    "exitCode": 0
+  },
+  {
+    "command": "node scripts/browser-smoke.mjs http://127.0.0.1:8081/ screenshots/t13-gate-closure-built.png --baseline screenshots/t13-gate-closure-dev.json",
+    "cwd": "original workspace",
+    "exitCode": 0
+  },
+  {
+    "command": "npm run preview:stop",
+    "cwd": "validation-checkout",
+    "exitCode": 0
+  },
+  {
+    "command": "node test-results/ma3/t13-gate-closure/run-gates.mjs preserve",
+    "exitCode": 0
+  }
+]
