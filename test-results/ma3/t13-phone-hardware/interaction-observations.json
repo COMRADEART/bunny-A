@@ -1,0 +1,134 @@
+{
+  "recordedAt": "2026-10-18T01:52:47.4791495Z",
+  "launchVisuallyVerified": true,
+  "checks": [
+    {
+      "check": "Native connection form and tap response",
+      "pass": true
+    },
+    {
+      "check": "Keyboard opens from observed input",
+      "pass": true
+    },
+    {
+      "check": "Android Back dismisses keyboard",
+      "pass": true,
+      "imeFlagOnlyResult": false,
+      "evidence": "Real Back key followed by a full native screenshot visually identical to before keyboard; hashes match. Unscoped IME flags remained true and are not reliable per-window visibility evidence."
+    },
+    {
+      "check": "Connection help opens from actual tap",
+      "pass": true
+    },
+    {
+      "check": "Landscape native surface remains available",
+      "pass": true
+    },
+    {
+      "check": "Background/foreground restores native app",
+      "pass": true
+    },
+    {
+      "check": "Landscape controls reachable after actual swipe",
+      "pass": true,
+      "evidence": "landscape-scrolled-surface.json and visually inspected screenshots/landscape-scrolled.png; Connect and Connection help visible within app viewport."
+    }
+  ],
+  "commands": [
+    {
+      "exitCode": 0,
+      "command": "adb shell wm user-rotation (save mode)",
+      "recordedAt": "2026-10-18T01:52:47.4733908Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed Change connection center>",
+      "recordedAt": "2026-10-18T01:52:47.6074604Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed HTTPS address field center>",
+      "recordedAt": "2026-10-18T01:52:50.5689806Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell dumpsys input_method (visibility booleans only)",
+      "recordedAt": "2026-10-18T01:52:51.7246614Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input keyevent BACK (dismiss keyboard)",
+      "recordedAt": "2026-10-18T01:52:54.7424568Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell dumpsys input_method (visibility after Back)",
+      "recordedAt": "2026-10-18T01:52:55.2256325Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed Connection help center>",
+      "recordedAt": "2026-10-18T01:52:58.2316327Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed Got it center>",
+      "recordedAt": "2026-10-18T01:53:00.7924715Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell wm user-rotation lock landscape (temporary)",
+      "recordedAt": "2026-10-18T01:53:00.8640339Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed Change connection center>",
+      "recordedAt": "2026-10-18T01:53:04.4148440Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell wm user-rotation lock portrait (temporary)",
+      "recordedAt": "2026-10-18T01:53:07.2881502Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input keyevent HOME (background Bunny-A; no screenshot)",
+      "recordedAt": "2026-10-18T01:53:07.9644110Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell am start -W Bunny-A (foreground restore)",
+      "recordedAt": "2026-10-18T01:53:08.3686799Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell wm density",
+      "recordedAt": "2026-10-18T01:53:11.2222401Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell wm user-rotation lock <original> (restore original)",
+      "recordedAt": "2026-10-18T01:53:11.2916807Z"
+    }
+  ],
+  "rotationBefore": "lock 0",
+  "rotationRestored": true,
+  "summary": "Verified native portrait/landscape connection and error screens, observed taps, address keyboard and Back dismissal, help open/dismiss, landscape scrolling, and background/foreground recovery. Earlier foreground loss resolved when the user left the phone untouched. Saved connection reports unreachable computer; no candidate workstation pairing or authenticated streaming was tested. Original rotation lock 0 restored.",
+  "density": "Physical density: 600",
+  "visualReviewAt": "2026-10-18T01:55:43.981Z",
+  "targetSize": {
+    "densityDpi": 600,
+    "buttonHeightPixels": 180,
+    "buttonHeightDp": 48,
+    "scope": "Observed native connection/error/help controls; no authenticated dashboard claim."
+  },
+  "insets": {
+    "portraitViewport": "[0,149][1440,3064]",
+    "landscapeViewport": "[139,113][3120,1384]",
+    "primaryControlsInsideViewport": true,
+    "landscapeRequiresVerticalScroll": true
+  },
+  "screenReaderTested": false,
+  "finalCrashEvidence": "final-native-check.json: process alive, 0 AndroidRuntime crash markers",
+  "savedOriginChanged": false
+}

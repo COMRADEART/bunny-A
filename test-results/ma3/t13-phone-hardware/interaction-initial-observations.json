@@ -1,0 +1,111 @@
+{
+  "recordedAt": "2026-10-18T01:52:47.4791495Z",
+  "launchVisuallyVerified": false,
+  "checks": [
+    {
+      "check": "Native connection form and tap response",
+      "pass": true
+    },
+    {
+      "check": "Keyboard opens from observed input",
+      "pass": true
+    },
+    {
+      "check": "Android Back dismisses keyboard",
+      "pass": false
+    },
+    {
+      "check": "Connection help opens from actual tap",
+      "pass": true
+    },
+    {
+      "check": "Landscape native surface remains available",
+      "pass": true
+    },
+    {
+      "check": "Background/foreground restores native app",
+      "pass": true
+    }
+  ],
+  "commands": [
+    {
+      "exitCode": 0,
+      "command": "adb shell wm user-rotation (save mode)",
+      "recordedAt": "2026-10-18T01:52:47.4733908Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed Change connection center>",
+      "recordedAt": "2026-10-18T01:52:47.6074604Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed HTTPS address field center>",
+      "recordedAt": "2026-10-18T01:52:50.5689806Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell dumpsys input_method (visibility booleans only)",
+      "recordedAt": "2026-10-18T01:52:51.7246614Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input keyevent BACK (dismiss keyboard)",
+      "recordedAt": "2026-10-18T01:52:54.7424568Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell dumpsys input_method (visibility after Back)",
+      "recordedAt": "2026-10-18T01:52:55.2256325Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed Connection help center>",
+      "recordedAt": "2026-10-18T01:52:58.2316327Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed Got it center>",
+      "recordedAt": "2026-10-18T01:53:00.7924715Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell wm user-rotation lock landscape (temporary)",
+      "recordedAt": "2026-10-18T01:53:00.8640339Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input tap <observed Change connection center>",
+      "recordedAt": "2026-10-18T01:53:04.4148440Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell wm user-rotation lock portrait (temporary)",
+      "recordedAt": "2026-10-18T01:53:07.2881502Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell input keyevent HOME (background Bunny-A; no screenshot)",
+      "recordedAt": "2026-10-18T01:53:07.9644110Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell am start -W Bunny-A (foreground restore)",
+      "recordedAt": "2026-10-18T01:53:08.3686799Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell wm density",
+      "recordedAt": "2026-10-18T01:53:11.2222401Z"
+    },
+    {
+      "exitCode": 0,
+      "command": "adb shell wm user-rotation lock <original> (restore original)",
+      "recordedAt": "2026-10-18T01:53:11.2916807Z"
+    }
+  ],
+  "rotationBefore": "lock 0",
+  "rotationRestored": true,
+  "summary": "Real native connection/error/help screens and touch interactions executed; screenshots require final visual review. No workstation pairing, authenticated streaming or approval claim.",
+  "density": "Physical density: 600"
+}
