@@ -144,7 +144,10 @@ public final class MainActivity extends Activity {
                 .setTitle("Remote connection")
                 .setMessage("In Bunny Island, choose Phone to find your HTTPS address and one-time pairing code.\n\nConnect to that address here, then enter the code on the pairing page. Codes expire after 10 minutes. You can revoke this device from the workstation dashboard.\n\nThe workstation must be awake. Task execution and agent credentials stay on the workstation. This APK supports any configured HTTPS gateway; it does not embed a temporary tunnel address.")
                 .setPositiveButton("Got it", null).show()), 12);
-        add(content, text("Bunny-A · router_agent\nAndroid 8 or newer · version 2.0", 12, MUTED), 32);
+        String version;
+        try { version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
+        catch (android.content.pm.PackageManager.NameNotFoundException ex) { version = "unknown"; }
+        add(content, text("Bunny-A · router_agent\nAndroid 8 or newer · version " + version, 12, MUTED), 32);
         scroll.addView(content);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, -1));
     }

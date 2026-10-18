@@ -62,7 +62,10 @@ if (-not (Test-Path -LiteralPath $keyPath)) {
   Run-Checked $keytool @('-genkeypair','-keystore',$keyPath,'-storetype','PKCS12','-alias','jev','-storepass:file',$passwordPath,'-keypass:file',$passwordPath,'-keyalg','RSA','-keysize','3072','-validity','10000','-dname','CN=JEV Local Build')
 }
 New-Item -ItemType Directory -Path (Join-Path $workspace 'releases') -Force | Out-Null
-$signed = Join-Path $workspace 'releases/Bunny-A-Android-v2.apk'
+[xml]$manifest = Get-Content -LiteralPath (Join-Path $sourceDirectory 'AndroidManifest.xml') -Raw
+$apkVersionCode = $manifest.manifest.GetAttribute('versionCode', 'http://schemas.android.com/apk/res/android')
+if ($apkVersionCode -notmatch '^[1-9][0-9]*$') { throw 'Android manifest needs a positive integer versionCode.' }
+$signed = Join-Path $workspace ("releases/Bunny-A-Android-v$apkVersionCode.apk")
 Run-Checked 'java' @('-cp',($helpers+';'+$apksig),'SignApk','sign',$keyPath,$passwordPath,$unsigned,$signed)
 Run-Checked $aapt @('dump','badging',$signed)
 Get-FileHash -LiteralPath $signed -Algorithm SHA256 | Format-List
