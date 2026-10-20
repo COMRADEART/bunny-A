@@ -1210,7 +1210,7 @@ export class TaskManager {
       // exist, registry absence is UNKNOWN, not an empty world (§8): the legacy BunnyRouter
       // provider decision stands byte-for-byte — also for a manual PROVIDER override (pre-T3
       // parity; MA0R2 reaches launch-time refusal tests through it) — no effort knob (§11).
-      if (this.modelSnapshotHasFacts(pipeline.modelSnapshot)) {
+      if (this.modelSnapshotHasFacts(pipeline.modelSnapshot) || input.modelOverride || constraints.modelExact || constraints.modelAllowlist?.length || constraints.language || constraints.requiresAudio || constraints.responseFormat || constraints.maxCostUsd !== undefined) {
         const reason = `No eligible model candidate for this Task. ${this.pipelineFailure(pipeline)}`;
         if (manual) {
           this.emit(this.db.event("model.approval_required", null, "Exact model pin could not be honored; no fallback selected."));
@@ -1391,11 +1391,11 @@ export class TaskManager {
       decision.reroutes = decision.reroutes ?? 0;
       decision.selection_reason = pipeline.selection.reason;
       decision.candidates = this.pipelineCandidates(pipeline);
-    } else if (!this.modelSnapshotHasFacts(pipeline.modelSnapshot)) {
+    } else if (!this.modelSnapshotHasFacts(pipeline.modelSnapshot) && !modelOverride && !task.constraints?.modelExact && !task.constraints?.modelAllowlist?.length && !task.constraints?.language && !task.constraints?.requiresAudio && !task.constraints?.responseFormat && task.constraints?.maxCostUsd === undefined) {
       // Fact-less Host: the explicit provider stands with the legacy model surface (UNKNOWN, not emptiness).
       routed = { model: decision.recommended_model, effort: null };
     } else {
-      throw new Error(
+      throw new ModelApprovalRequired(
         `No eligible model candidate on ${provider}.${modelOverride ? ` The exact model ${modelOverride} could not be honored.` : ""} ${this.pipelineFailure(pipeline)}`,
       );
     }

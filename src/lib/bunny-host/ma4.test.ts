@@ -334,3 +334,18 @@ test("MA4 MA3 integration: mission pins persist across planning/restart; depende
     assert.equal(single.steps.length, 1);
   } finally { await missions.close(); tasks.dispose(); db.close(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("MA4 exact-model constraints never escape through the legacy Host path when discovery has no facts", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "bunny-ma4-no-facts-")); const db = new HostDatabase(":memory:");
+  let launches = 0;
+  const manager = new TaskManager(db, dir, [{ id: "claude", detect: async () => ({ ...providerBase("claude"), installed: true, authenticated: true, availability: "ready", current_model: "configured-default", capabilities: ["text"] }),
+    launch: () => { launches++; throw new Error("Must not launch"); } }], { modelRegistry: new ModelCapabilityRegistry(db, { availableProviders: () => [] }) });
+  try {
+    await manager.discover();
+    assert.throws(() => manager.submit({ prompt: "hello", mode: "fast", override: "claude", modelOverride: "exact-unavailable" }), /Approve a different model/);
+    assert.throws(() => manager.submit({ prompt: "hello", mode: "fast", constraints: { modelExact: "exact-unavailable" } }), /Approve a different model/);
+    const pending = manager.submit({ prompt: "hello", mode: "fast", override: "claude" });
+    assert.throws(() => manager.retarget(pending.id, "claude", "exact-unavailable"), /No eligible/);
+    assert.equal(launches, 0);
+  } finally { manager.dispose(); db.close(); rmSync(dir, { recursive: true, force: true }); }
+});
