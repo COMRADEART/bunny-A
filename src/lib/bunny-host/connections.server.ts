@@ -320,6 +320,20 @@ export class ConnectionRegistry {
     }
     return evaluateDispatch({ ...request, remoteModels }, this.views(), this.selectedPolicy, usage);
   }
+  /** Host-only inference credential access. Reuse DPAPI; never export to child tools or shared snapshots. */
+  async inferenceKey(id: string): Promise<string> {
+    const row = this.records.get(id);
+    if (this.closed || !row || row.catalog !== "openrouter" || row.mode !== "api_key" || row.lifecycle !== "active" || row.session !== "signed_in" || !row.consent.allowTasks || !row.consent.billingOptIn) throw new Error("Inference connection is not approved.");
+    const keyRow = this.options.db.db.prepare("SELECT ciphertext,protector FROM connection_credentials WHERE connection_id=?").get(id) as { ciphertext: Uint8Array; protector: string } | undefined;
+    if (!keyRow) throw new Error("No inference credential.");
+    const protector = this.options.protector ?? new DpapiProtector(`Bunny-A/Connections/${row.catalog}/${row.mode}/v1`);
+    if (protector.kind !== keyRow.protector) throw new Error("Credential protection mismatch.");
+    const key = await protector.unprotect(Buffer.from(keyRow.ciphertext));
+    registerDiagnosticSecret(key);
+    const current = this.records.get(id);
+    if (this.closed || !current || current.epoch !== row.epoch || current.consent.revision !== row.consent.revision) throw new Error("Connection changed during credential access.");
+    return key;
+  }
   bind(
     provider: ProviderId,
     model: string | null,
@@ -380,6 +394,8 @@ export class ConnectionRegistry {
       this.live.set(provider.id, provider);
       const family = defaultModeFor(provider.id, null);
       if (!family) continue;
+      // API-key authentication is established by the explicit metadata check, never a native CLI/fixture identity.
+      if (provider.id === "openrouter") continue;
       const id = connectionId(family.catalog, family.mode);
       const row = this.records.get(id);
       if (!row) continue;
@@ -845,6 +861,7 @@ export class ConnectionRegistry {
       ...row,
       lastCheckedAt: this.clock(),
       authVerifiedAt: status >= 200 && status < 300 ? this.clock() : null,
+      ...(row.catalog === "openrouter" ? { tool: "not_applicable" as const } : {}),
       session:
         status >= 200 && status < 300
           ? "signed_in"

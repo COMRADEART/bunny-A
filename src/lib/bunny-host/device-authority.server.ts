@@ -414,6 +414,7 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
       : snapshot.agents,
     // M-A-3 T13.1: credential state, provider limits and usage are workstation-owner settings.
     intelligence: undefined,
+    modelIntelligence: undefined,
     connections: undefined,
     deviceConnections: snapshot.connections?.accounts.map(connectionDeviceView),
   };

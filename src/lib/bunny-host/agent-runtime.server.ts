@@ -112,6 +112,7 @@ export class AgentRuntime {
 
   // ── commands (§7/§11/§12) ─────────────────────────────────────────────────
   create(input: { objective?: unknown; name?: unknown; title?: unknown; mode?: unknown; projectId?: unknown; steps?: unknown; localOnly?: unknown; providers?: unknown ;
+      modelSelection?: import("./ma4/selection.ts").ModelSelection;
     }, actor: string,
   ): AgentSnapshot {
     this.missions.requireEnabled();
@@ -131,6 +132,7 @@ export class AgentRuntime {
       mode: "balanced",
       projectId: input.projectId == null ? null : String(input.projectId),
       steps: input.steps,
+      modelSelection: input.modelSelection,
       localOnly: input.localOnly === true,
       providers: Array.isArray(input.providers)
         ? (input.providers as CreateMission["providers"])

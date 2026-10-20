@@ -23,6 +23,7 @@ import { codexMissionExclusion, codexMissionStatus } from "@/lib/orch/compatibil
 import { hostHealthMessage, publicEventLabel, taskStatus } from "@/lib/bunny-host/presentation";
 
 export const NAMES: Record<ProviderId, string> = {
+  openrouter: "OpenRouter",
   codex: "Codex",
   claude: "Claude",
   ollama: "Ollama",

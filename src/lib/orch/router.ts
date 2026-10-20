@@ -13,6 +13,7 @@ type Cap = {
 };
 
 const CAP: Record<ProviderId, Cap> = {
+  openrouter: { coding: 0.5, debug: 0.5, research: 0.5, writing: 0.5, ops: 0.5, general: 0.5, context: 0.5, speed: 0.5, local: false },
   opencode: { coding: 0.8, debug: 0.8, research: 0.7, writing: 0.6, ops: 0.7, general: 0.7, context: 0.75, speed: 0.5, local: false },
   codex: { coding: 0.95, debug: 0.92, research: 0.72, writing: 0.6, ops: 0.7, general: 0.74, context: 0.9, speed: 0.42, local: false },
   claude: { coding: 0.86, debug: 0.84, research: 0.95, writing: 0.9, ops: 0.66, general: 0.88, context: 0.92, speed: 0.4, local: false },

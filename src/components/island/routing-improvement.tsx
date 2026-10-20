@@ -3,7 +3,7 @@ import { useIsland } from "@/store/use-island";
 import { LEARNING_GRID, type LearningWeights, type RoutingLearningView } from "@/lib/bunny-host/routing-feedback";
 import type { ProviderId } from "@/lib/orch/types";
 
-const PROVIDER: Record<ProviderId, string> = { codex: "Codex", claude: "Claude Code", ollama: "Ollama", opencode: "OpenCode", cline: "Cline", cursor: "Cursor Agent" };
+const PROVIDER: Record<ProviderId, string> = { codex: "Codex", claude: "Claude Code", ollama: "Ollama", opencode: "OpenCode", cline: "Cline", cursor: "Cursor Agent", openrouter: "OpenRouter" };
 const STATE_LABEL = { evaluated: "Evaluated", shadow: "Shadow testing", accepted: "Accepted", rejected: "Rejected", superseded: "Replaced" } as const;
 type Candidate = RoutingLearningView["candidates"][number];
 

@@ -27,6 +27,9 @@ export type CodexCatalogLike = { model: string | null; models: string[]; limited
 
 /** One normalized model fact set. Null/absent capability fields are UNKNOWN — never defaulted. */
 export type ModelCapabilityRecord = {
+  structuredOutput?: boolean | null;
+  outputTokens?: number | null;
+  languages?: string[];
   provider: ProviderId;
   /** The model tag/catalog id exactly as the provider reported it. */
   model: string;
@@ -59,11 +62,11 @@ export type ModelCapabilityProviderSnapshot = {
 export type ModelCapabilitySnapshot = { version: 1; providers: ModelCapabilityProviderSnapshot[] };
 
 /** Providers whose real probe contracts can list models today. Claude Code reports its model only inside sessions; the detect-only providers (OpenCode/Cline/Cursor) are never routed. Absence of rows for those is UNKNOWN, not evidence of emptiness. (Exported for the T3 router: one source of truth for which providers surface model catalogues.) */
-export const MODEL_SOURCE_PROVIDERS: ProviderId[] = ["ollama", "codex"];
+export const MODEL_SOURCE_PROVIDERS: ProviderId[] = ["ollama", "codex", "openrouter"];
 /** The known provider set, in registry display order. */
-export const MODEL_CAPABILITY_PROVIDERS: ProviderId[] = ["ollama", "codex", "claude", "opencode", "cline", "cursor"];
+export const MODEL_CAPABILITY_PROVIDERS: ProviderId[] = ["ollama", "codex", "claude", "opencode", "cline", "cursor", "openrouter"];
 
-const display = (id: ProviderId): string => (id === "codex" ? "Codex" : id === "claude" ? "Claude Code" : id === "ollama" ? "Ollama" : id === "opencode" ? "OpenCode" : id === "cline" ? "Cline" : "Cursor Agent");
+const display = (id: ProviderId): string => (id === "openrouter" ? "OpenRouter" : id === "codex" ? "Codex" : id === "claude" ? "Claude Code" : id === "ollama" ? "Ollama" : id === "opencode" ? "OpenCode" : id === "cline" ? "Cline" : "Cursor Agent");
 
 /** Real HTTP probes, in the exact failure discipline of probeOllama: a miss is null, never a guess. */
 async function ollamaShowViaHttp(model: string): Promise<OllamaShowRecord | null> {
@@ -82,6 +85,7 @@ async function ollamaPsViaHttp(): Promise<OllamaPsRecord | null> {
 }
 
 export type ModelCapabilityOptions = {
+  inferenceModels?: () => ModelCapabilityRecord[];
   /** Min age before a provider's model listing is re-probed. Model catalogues change rarely. */
   intervalMs?: number;
   /** User-configured provider executable paths (settings key provider_paths). */
@@ -111,7 +115,7 @@ function recordSignature(record: ModelCapabilityRecord): string {
 export class ModelCapabilityRegistry {
   private readonly db: HostDatabase;
   private readonly intervalMs: number;
-  private readonly opts: Required<Pick<ModelCapabilityOptions, "ollamaProbe" | "ollamaShow" | "ollamaPs" | "codexLaunch" | "codexCatalog" | "now" | "availableProviders">> & Pick<ModelCapabilityOptions, "providerPaths">;
+  private readonly opts: Required<Pick<ModelCapabilityOptions, "ollamaProbe" | "ollamaShow" | "ollamaPs" | "codexLaunch" | "codexCatalog" | "now" | "availableProviders">> & Pick<ModelCapabilityOptions, "providerPaths" | "inferenceModels">;
   private readonly records = new Map<ProviderId, Map<string, ModelCapabilityRecord>>();
   private readonly probeAt = new Map<ProviderId, number>();
   private readonly signatures = new Map<ProviderId, string>();
@@ -121,6 +125,7 @@ export class ModelCapabilityRegistry {
     this.db = db;
     this.intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
     this.opts = {
+      inferenceModels: options.inferenceModels,
       providerPaths: options.providerPaths,
       availableProviders: options.availableProviders ?? (() => MODEL_CAPABILITY_PROVIDERS),
       ollamaProbe: options.ollamaProbe ?? probeOllama,
@@ -173,9 +178,10 @@ export class ModelCapabilityRegistry {
     if (!MODEL_SOURCE_PROVIDERS.includes(id) || !this.opts.availableProviders().includes(id)) return [];
     const due = force || !this.probeAt.has(id) || now - (this.probeAt.get(id) ?? 0) >= this.intervalMs;
     if (!due) return [];
-    const records = id === "ollama" ? await this.probeOllamaModels(now) : await this.probeCodexModels(now);
+    const records = id === "openrouter" ? (this.opts.inferenceModels?.() ?? []) : id === "ollama" ? await this.probeOllamaModels(now) : await this.probeCodexModels(now);
     this.probeAt.set(id, now);
     if (records === null) return []; // The probe produced no facts (service down, CLI missing, catalogue unreadable): say nothing; persisted rows keep their original probed age.
+    if (id === "openrouter") this.records.set(id, new Map());
     this.persist(id, records);
     return this.describe(id, records);
   }

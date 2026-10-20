@@ -132,6 +132,7 @@ export function newestVersionFolder(names: string[]): string | null {
 }
 
 export function locate(ctx: DiscoveryContext, id: ProviderId): Located {
+  if (id === "openrouter") return { launch: null, checked: [], note: "HTTP inference; no executable discovery." };
   const npm = join(ctx, appData(ctx), "npm");
   const local = localAppData(ctx);
   switch (id) {

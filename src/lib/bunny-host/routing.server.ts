@@ -19,7 +19,7 @@ import type { ProviderUsageSnapshot, UsageState } from "./provider-usage.server.
 import { CODEX_COMPATIBILITY_MAX_AGE_MS, CODEX_SECURITY_POLICY_VERSION } from "../orch/compatibility.ts";
 import { eligibility } from "./router.ts";
 
-export const ROUTING_POLICY_VERSION = "routing-policy-v1";
+export const ROUTING_POLICY_VERSION = "routing-policy-ma4-s1-v1";
 
 /** T3 §10 candidate kinds. */
 export type CandidateKind = "DISCOVERED_MODEL" | "PROVIDER_DEFAULT";
@@ -76,9 +76,9 @@ export type RoutingCandidate = {
  * - The Ollama adapter performs single-shot text generation only — it cannot
  *   drive tool calls regardless of what a model's metadata claims.
  */
-export const ADAPTER_TOOL_CONTRACTS: Partial<Record<ProviderId, boolean>> = { codex: true, claude: true, ollama: false };
+export const ADAPTER_TOOL_CONTRACTS: Partial<Record<ProviderId, boolean>> = { codex: true, claude: true, ollama: false, openrouter: false };
 
-const DISPLAY_ORDER: ProviderId[] = ["codex", "claude", "ollama", "opencode", "cline", "cursor"];
+const DISPLAY_ORDER: ProviderId[] = ["codex", "claude", "ollama", "opencode", "cline", "cursor", "openrouter"];
 
 /**
  * Versioned candidate scoring policy (T3 §12). Weights are points out of 100,
@@ -95,6 +95,7 @@ export const ROUTING_POLICY = {
 /** T3 §11 provider-native effort vocabulary, verified against the installed product surface. */
 export type ProviderEffortContract = { supported: boolean; native: Partial<Record<NormalizedEffort, string>> | null; note?: string };
 export const PROVIDER_EFFORT_CONTRACTS: Record<ProviderId, ProviderEffortContract> = {
+  openrouter: { supported: false, native: null, note: "No inference effort override is asserted by this adapter." },
   codex: { supported: true, native: { LOW: "low", MEDIUM: "medium", HIGH: "high", MAX: "xhigh" } },
   claude: { supported: false, native: null, note: "The verified claude adapter passes no effort or model override (PROVIDER_DEFAULT only)." },
   ollama: { supported: false, native: null, note: "Ollama generate exposes no reasoning-effort knob." },
@@ -113,6 +114,7 @@ export type CandidateInput = {
   modelOverride?: string | null;
   mode: Mode;
   empirical?: (provider: ProviderId, model: string | null) => number | null;
+  evaluated?: (provider: ProviderId, model: string | null) => number | null;
   /** M-A-3 T13.1: Laya benchmark gate; returns an exclusion reason for an unbenchmarked Laya model. */
   layaGate?: (model: string, taskClass: string) => string | null;
   connectionGate?: (provider: ProviderId, model: string | null) => string | null;
@@ -179,6 +181,7 @@ export function routingProfileFor(provider: ProviderId, record: ModelCapabilityR
     if (preferred) tags.push("catalogue-default");
     return { provider_id: provider, model_id: record!.model, candidate_kind: candidateKind, provenance: "POLICY_DEFAULT", coding_rank: preferred ? 91 : 86, reasoning_rank: preferred ? 88 : 84, latency_rank: 48, quality_rank: preferred ? 90 : 86, specialization_tags: tags, note: record?.isDefault === true ? "Codex catalogue-preferred model." : undefined };
   }
+  if (provider === "openrouter") return { provider_id: provider, model_id: record!.model, candidate_kind: candidateKind, provenance: "POLICY_DEFAULT", coding_rank: 50, reasoning_rank: 50, latency_rank: 50, quality_rank: 50, specialization_tags: tags, note: "Neutral policy prior; no measured capability is inferred from a model name." };
   // Ollama local models: modest priors, adjusted only by verified probe facts.
   const context = typeof record?.contextWindow === "number" ? record.contextWindow : null;
   if (context && context >= 100_000) tags.push("large-context");
@@ -212,6 +215,12 @@ export function resolveCapability(provider: ProviderId, record: ModelCapabilityR
 export function hardExclusions(input: { provider: ProviderLive; record: ModelCapabilityRecord | null; candidateKind: CandidateKind; requirements: TaskRequirements; constraints: TaskConstraints; modelOverride?: string | null }): string[] {
   const { provider, record, candidateKind, requirements, constraints } = input;
   const reasons: string[] = [];
+  if (constraints.maxCostUsd !== undefined && provider.id !== "openrouter" && record?.local !== true) reasons.push("A strict monetary budget requires known per-request pricing; unavailable for this candidate.");
+  if (constraints.sensitive && !record?.local) reasons.push("Sensitive data requires local inference.");
+  if (constraints.requiresAudio) reasons.push("No installed execution adapter has a verified audio input contract.");
+  if (constraints.language && !record?.languages?.includes(constraints.language)) reasons.push("Required language support is unverified.");
+  if (constraints.responseFormat && record?.structuredOutput !== true && provider.id !== "ollama") reasons.push("Structured output capability is unknown or unavailable.");
+  if (constraints.outputTokens && (record?.outputTokens == null || record.outputTokens < constraints.outputTokens) && provider.id !== "ollama") reasons.push("Output-token capacity is unknown or insufficient.");
   const features = provider.features ?? null;
   if (!features?.launch?.supported) reasons.push("No execution adapter for this provider.");
   const providerBlock = eligibility(provider, constraints);
@@ -307,6 +316,8 @@ export function scoreCandidate(candidate: RoutingCandidate, requirements: TaskRe
 
   const empirical = input.empirical ? safeEmpirical(input.empirical, candidate) : 0;
   components.push({ name: "empirical", points: round(empirical * w.empirical), detail: "Bounded verified-success history (EMPIRICAL_HISTORY), zero below the minimum sample count." });
+  const measured = input.evaluated?.(candidate.provider_id, candidate.model_id);
+  if (measured !== undefined && measured !== null && Number.isFinite(measured)) components.push({ name: "benchmark", points: round(Math.max(-1, Math.min(1, measured)) * 6), detail: "Versioned synthetic benchmark evidence; limited scope, not a general capability guarantee." });
 
   const priority = priorityComponent(candidate, requirements, input.priority);
   if (priority) components.push(priority);

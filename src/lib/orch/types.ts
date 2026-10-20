@@ -2,7 +2,7 @@ import type { CodexCompatibilityProfile } from "./compatibility.ts";
 
 export type Mode = "fast" | "balanced" | "deep";
 
-export type ProviderId = "codex" | "claude" | "ollama" | "opencode" | "cline" | "cursor";
+export type ProviderId = "codex" | "claude" | "ollama" | "opencode" | "cline" | "cursor" | "openrouter";
 
 export type TaskType = "coding" | "debug" | "research" | "writing" | "ops" | "general";
 
@@ -215,6 +215,8 @@ export type Reconciliation = {
 };
 
 export type OrchTask = {
+  /** Host policy binding: changing approved MA4 downstream hosts invalidates queued inference. */
+  inferencePolicy?: string;
   connectionRoute?: import("../bunny-host/connections.ts").ApprovedRoute | null;
   proposedRoute?: import("../bunny-host/connections.ts").ApprovedRoute | null;
   id: string;
@@ -294,6 +296,11 @@ export type VerifySpec =
   | { kind: "python"; name: string; expected: string };
 
 export type TaskConstraints = {
+  /** MA4 hard routing constraints, scoped to this task only. */
+  sensitive?: boolean;
+  language?: string;
+  requiresAudio?: boolean;
+  maxCostUsd?: number;
   /** Host-owned Mission authority. Not accepted as a user-supplied HTTP constraint. */
   missionAccess?: ProviderExecutionScope["access"];
   localOnly?: boolean;

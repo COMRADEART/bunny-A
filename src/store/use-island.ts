@@ -497,6 +497,7 @@ export function liveProviders(state: {
     (id) => ({
       id,
       name: {
+        openrouter: "OpenRouter",
         codex: "Codex",
         claude: "Claude Code",
         ollama: "Ollama",
