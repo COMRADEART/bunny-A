@@ -1,0 +1,44 @@
+✔ candidates are documentation data only: disabled, not routable, sensitive data refused (4.9273ms)
+✔ rate limit: 429 with Retry-After surfaces as rate_limited and the backoff never shortens it (42.1096ms)
+✔ quota exhaustion (402) and outage (503/network) fail closed without a result (6.7265ms)
+✔ streaming: complete streams succeed; interrupted, malformed or mismatched streams fail (8.6365ms)
+✔ OpenAI-format tool calls: ids map back, malformed arguments and unknown tools never execute (10.8238ms)
+✔ B3 routing modes only add restrictions; MODEL_PINNED never chooses a model itself (13.7311ms)
+✔ H1 reliability-aware ranking: measured category correctness outranks valid-JSON-only evidence; UNPROVEN earns nothing (2.0414ms)
+✔ B4 approvals are scoped to provider, exact model, purpose, data category, expiry and spend (1.9413ms)
+✔ B4 only the workstation issues approvals; imported or agent-written records stay pending (11.2875ms)
+✔ H2 reliability evidence: benchmark import replaces only its source; runtime outcomes accumulate (4.5215ms)
+✔ request validation refuses traversal names, non-allowlisted programs and out-of-range limits (6.5592ms)
+✔ fails closed: an unproven backend blocks execution and a malformed result is a failure (8.3891ms)
+✔ F4.1 reading files outside the workspace fails (host files, Windows drives, home, the launcher) (514.5662ms)
+✔ F4.2 environment secrets do not reach the program (752.2499ms)
+✔ F4.3/F4.10 no external network, no DNS and no host services (Ollama/loopback) (701.2663ms)
+✔ F4.4 process spawning is capped and Windows interop executables cannot launch (521.2091ms)
+✔ F4.5 writes outside the private workspace fail and the workspace is discarded (488.5405ms)
+✔ F4.6 memory limit is enforced by the cgroup (550.7034ms)
+✔ F4.7 runtime limit kills a busy loop (1887.0016ms)
+✔ F4.8 excessive output is truncated and the program is stopped (411.2013ms)
+✔ F4.9 detached descendants do not outlive the run (1098.0759ms)
+✔ F4.11 cancellation kills the whole tree and cleans up (1721.4784ms)
+✔ valid call executes through the broker, output returns as a tool message, final answer completes (16.738ms)
+✔ invalid schema, malformed JSON arguments and non-object calls are refused without execution (4.1941ms)
+✔ unknown tool names and permission denials never execute; ask is not treated as allow (2.0375ms)
+✔ missing capability is classified from Ollama facts, not model self-description (0.5935ms)
+✔ per-tool timeout, call-count limit and multiple calls in one round (110.9429ms)
+✔ cancellation stops the running tool and the loop (37.7779ms)
+✔ prompt injection in tool output stays data: sanitized, and follow-up calls remain gated (3.1362ms)
+✔ served-model mismatch and round exhaustion fail closed (1.5673ms)
+✔ E2/E4 happy path: typed artifacts, Worker ∥ Tester, sandboxed checks, deterministic pass (2730.5428ms)
+✔ E2/G8 the Reviewer cannot override failing deterministic tests (2345.1265ms)
+✔ E5 repair loop: bounded, receives contract + failing validated tests + previous code, never hidden tests (9121.22ms)
+✔ E4 static validation: import-time code, disallowed imports and undeclared files fail closed (2856.0768ms)
+✔ E3/H3 malformed or authority-seeking artifacts fail closed before any execution (82.624ms)
+✔ pins: a served-model mismatch is a violation, never a substitution; cancellation stops the workflow (30.689ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21060.042

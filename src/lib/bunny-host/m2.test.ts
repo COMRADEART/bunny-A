@@ -352,6 +352,9 @@ test("real task lifecycle: running → Bunny-A verifying → completed only when
     fake.launched[1].finish({ ok: true, output: "done", exitCode: 0 }); await tick(50);
     const failed = db.get(bad.id);
     assert.equal(failed.state, "failed"); assert.match(failed.error!, /Bunny-A verification failed/);
+    // MA4-S1R2 H2: both independently verified outcomes (one pass, one fail) are runtime reliability evidence.
+    assert.equal(passed.model, failed.model);
+    assert.deepEqual(host.ma4.reliability(passed.provider, passed.model, "tool-call"), { passes: 1, samples: 2 });
     const evidence = db.db.prepare("SELECT state,verification,input_tokens AS inputTokens,manual,mode FROM outcomes WHERE task_id=?").get(good.id) as Record<string, unknown>;
     assert.deepEqual({ ...evidence }, { state: "completed", verification: "passed", inputTokens: 12, manual: 0, mode: "balanced" });
     assert.equal(host.live().find((provider) => provider.id === "claude")!.observed!.tasks, 2);

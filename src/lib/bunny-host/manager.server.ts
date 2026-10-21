@@ -1,4 +1,4 @@
-import { applyRoutingMode, approvalExclusion } from "./ma4/hybrid.ts";
+import { applyRoutingMode, approvalExclusion, reliabilityCategory } from "./ma4/hybrid.ts";
 import { EventEmitter } from "node:events";
 import { appendFileSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
@@ -2089,6 +2089,10 @@ export class TaskManager {
               "verification.completed",
               verification.detail,
             );
+            // MA4-S1R2 H2: an independently verified outcome becomes runtime reliability evidence for this model and category.
+            const verified = this.db.get(id);
+            const category = held || !verified.model ? null : reliabilityCategory(analyzeModelTask({ prompt: verified.routingPrompt ?? verified.prompt, mode: verified.mode, constraints: verified.constraints }).analysis);
+            if (category) try { this.ma4.recordOutcome(verified.provider, verified.model, category, verification.passed); } catch { /* evidence is advisory; never blocks the task */ }
             if (!verification.passed) {
               state = "failed";
               error = `Bunny-A verification failed: ${verification.detail}`;

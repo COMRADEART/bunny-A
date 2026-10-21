@@ -1,0 +1,89 @@
+# Deterministic checks only. Live-model, hardware (GPU/NPU), WSL2-sandbox adversarial, installed-release and
+# physical-device qualification run locally and are reported separately; they never gate or fake a CI pass.
+# No provider API keys are used or required.
+name: ci
+
+on:
+  push:
+    branches: [main, "ma4-**", "ma3-**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: typecheck, MA4/routing/sandbox-contract tests, UI tests, builds
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # MA4 suite: routing modes, approvals, reliability, tool calling, workflow gate, offline cloud adapters.
+      # Without WSL2 user namespaces the adversarial sandbox fixtures report SKIPPED (never passed).
+      - run: npm run test:ma4
+      - name: Routing policy tests
+        run: node --experimental-strip-types --test --test-concurrency=1 src/lib/bunny-host/routing.test.ts src/lib/bunny-host/routing-matrix.test.ts src/lib/bunny-host/routing-learning.test.ts
+      - run: npm run test:ui
+      - name: Shared mobile-web build
+        run: npm run build
+      - name: Desktop build
+        run: npm run build
+        env:
+          JEV_DESKTOP_BUILD: "1"
+
+  regression:
+    name: full MA3/MA4 regression (npm test)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # The Windows process-ownership module is compiled from reviewed source with MinGW; nothing prebuilt is downloaded.
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc
+          location: C:\msys64-ci
+      - run: npm ci
+      - run: npm test
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+
+  security:
+    name: static security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Dependency audit (production, high+)
+        run: npm audit --omit=dev --audit-level=high
+      - name: No committed secrets or env files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)\.env($|\.)' ; then echo "committed .env file"; exit 1; fi
+          if git grep -nE '(sk-[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' -- ':!*.test.*' ':!docs/**' ; then echo "possible secret"; exit 1; fi
+      - name: External inference stays disabled by default
+        shell: bash
+        run: |
+          grep -q 'enabled: false, models: \[\]' src/lib/bunny-host/ma4/registry.ts
+          ! grep -nE 'enabled: true' src/lib/bunny-host/ma4/cloud-candidates.ts
