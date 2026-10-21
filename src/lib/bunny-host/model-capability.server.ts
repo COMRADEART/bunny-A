@@ -20,7 +20,14 @@ import type { HostDatabase } from "./persistence.server.ts";
 /** Probe source for tags as used by OllamaAdapter (same shape, injected for tests). */
 export type OllamaTags = { up: boolean; models: string[]; remote?: string[] };
 /** What `POST /api/show` returns for a model. Every capability field may be absent. */
-export type OllamaShowRecord = { name?: string; family?: string; parameter_size?: string; capabilities?: string[]; context_length?: number };
+export type OllamaShowRecord = { name?: string; family?: string; parameter_size?: string; capabilities?: string[]; context_length?: number; model_info?: Record<string, unknown> };
+
+/** Current Ollama exposes the training context under the reported architecture, not /api/ps's loaded context. */
+function ollamaContext(show: OllamaShowRecord | null): number | null {
+  const architecture = show?.model_info?.["general.architecture"];
+  const value = show?.context_length ?? (typeof architecture === "string" ? show?.model_info?.[`${architecture}.context_length`] : null);
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
 /** What `GET /api/ps` returns: the models currently held in memory. */
 export type OllamaPsRecord = { models?: { name?: string; context_length?: number; size_vram?: number }[] };
 export type CodexCatalogLike = { model: string | null; models: string[]; limited: boolean; usageRead: boolean };
@@ -205,7 +212,7 @@ export class ModelCapabilityRegistry {
         model: tag,
         local: !remote.has(tag),
         toolCalling: capabilities === null ? null : capabilities.includes("tools"), vision: capabilities === null ? null : capabilities.includes("vision"), embedding: capabilities === null ? null : capabilities.includes("embedding"),
-        contextWindow: typeof show?.context_length === "number" && Number.isFinite(show.context_length) ? show.context_length : null,
+        contextWindow: ollamaContext(show),
         loaded: psRead ? loaded.has(tag) : null,
         isDefault: null,
         source: ["ollama /api/tags", show ? "ollama /api/show" : null, ...(psRead ? ["ollama /api/ps"] : [])].filter(Boolean).join(" + "),
