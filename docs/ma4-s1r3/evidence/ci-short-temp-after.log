@@ -1,0 +1,66 @@
+✔ M-A-1D: the production release pin is the reviewed M-A-1 code candidate (47.4229ms)
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (10454.0717ms)
+✔ M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release (7882.0023ms)
+✔ M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release (13110.9409ms)
+✔ MA2 T1: the read-only SQLite snapshot includes committed WAL rows (232.1856ms)
+✔ MA2 T1: all 23 tables and non-database files survive migration (283.2397ms)
+✔ MA2 T1: an unexpected changed task field fails preservation (298.2303ms)
+✔ MA2 T1: new telemetry is allowed, but missing historical events fail (310.9398ms)
+✔ MA2 T1: active tasks refuse migration before copy (203.5853ms)
+✔ MA2 T1: active missions refuse migration before copy (210.3905ms)
+✔ MA2 T1: unknown schema refuses migration (208.0852ms)
+✔ MA2 T1: an occupied stage is never overwritten (197.7874ms)
+✔ MA2 T1: state cannot be installed inside a Git checkout (195.4479ms)
+✔ MA2 T1: a source directory junction fails preflight (190.5213ms)
+✔ MA2 T1: a target junction cannot hide a repository dependency (188.1239ms)
+✔ MA2 T1: copied hard-linked files become independent files (283.9002ms)
+✔ MA2 T1: git clean in a disposable checkout cannot delete migrated state (344.2249ms)
+✔ MA2 T1: a named-tunnel configuration needs an explicit credential inventory (191.8001ms)
+✔ MA2 T1: the installed tunnel uses application state and rejects a missing or changed client (285.6931ms)
+✔ MA2 T1: installed Host state fails closed without an explicit path or database (186.3859ms)
+✔ MA2 T1: installed Host resolves flat canonical state and moved credentials (289.2964ms)
+✔ MA2 T1: a truncated database and unknown layout fail closed without creating state (276.4155ms)
+✔ MA2 T1: a retired production source cannot become development state (190.1133ms)
+✔ MA2 T1 Windows controller: complete cutover and idempotent retry (18479.7591ms)
+✔ MA2 T1 Windows controller: after-copy (17498.1303ms)
+✔ MA2 T1 Windows controller: after-config (19222.6134ms)
+✔ MA2 T1 Windows controller: after-host (20706.1665ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 26
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 117099.4004
+
+✖ failing tests:
+
+test at scripts\bunny-release.test.mjs:46:1
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (10454.0717ms)
+  AssertionError [ERR_ASSERTION]: Node runtime license unavailable; package must not ship without it.
+  At <home>\Documents\new\bun-router-s1r3\scripts\package-bunny-desktop.ps1:179 char:9
+  +   else {throw 'Node runtime license unavailable; package must not shi ...
+  +         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      + CategoryInfo          : OperationStopped: (Node runtime li...hip without it.:String) [], RuntimeException
+      + FullyQualifiedErrorId : Node runtime license unavailable; package must not ship without it.
+   
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///<home>/Documents/new/bun-router-s1r3/scripts/bunny-release.test.mjs:61:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+exit=1

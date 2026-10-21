@@ -1,0 +1,2510 @@
+{
+  "suite": "bunny-ma4-s1r2-bench-v1",
+  "split": "dev",
+  "startedAt": "2026-10-21T21:44:04.923Z",
+  "ollamaVersion": "0.40.6",
+  "options": {
+    "temperature": 0.2,
+    "num_ctx": 4096,
+    "num_predict": 900
+  },
+  "samplesPerTask": 3,
+  "host": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 185H",
+    "logicalCpus": 22,
+    "totalMemGiB": 31.6
+  },
+  "sandbox": {
+    "available": true,
+    "backend": "wsl2-userns-pivot_root-cgroupv2",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2"
+  },
+  "taskHash": "219381cc391227a09f5496495a17a98ed22667b1fff0bca3b5529f793dfca9f7",
+  "models": [
+    {
+      "model": "qwen2.5-coder:7b",
+      "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+      "sizeBytes": 4683087561,
+      "parameterSize": "7.6B",
+      "quantization": "Q4_K_M",
+      "capabilities": [
+        "completion",
+        "tools",
+        "insert"
+      ],
+      "toolCapability": {
+        "modelSupports": true,
+        "apiSupports": true,
+        "adapterSupports": true
+      },
+      "freeMemBeforeGiB": 11.21,
+      "gpuBefore": {
+        "vramUsedMiB": 0,
+        "gpuUtilPercent": 0
+      },
+      "loaded": {
+        "sizeBytes": 5152041860,
+        "sizeVramBytes": 4199263764,
+        "vramFraction": 0.815,
+        "contextLength": 4096
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "digest": "103482475c9b4d4032999dd5d7383478cad8b966ae6ae984d525daf7352c2219",
+      "sizeBytes": 4683087428,
+      "parameterSize": "7.6B",
+      "quantization": "Q4_K_M",
+      "capabilities": [
+        "completion",
+        "tools"
+      ],
+      "toolCapability": {
+        "modelSupports": true,
+        "apiSupports": true,
+        "adapterSupports": true
+      },
+      "freeMemBeforeGiB": 10.9,
+      "gpuBefore": {
+        "vramUsedMiB": 0,
+        "gpuUtilPercent": 64
+      },
+      "loaded": {
+        "sizeBytes": 5152041860,
+        "sizeVramBytes": 4199263764,
+        "vramFraction": 0.815,
+        "contextLength": 4096
+      }
+    }
+  ],
+  "samples": [
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "prog-rle",
+      "category": "programming",
+      "sample": 0,
+      "latencyMs": 7542,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 43,
+      "tokensPerSecond": 28.8,
+      "loadMs": 5848,
+      "output": "```python\nfrom itertools import groupby\n\ndef rle_encode(s):\n    return ''.join(f'{char}{sum(1 for _ in group)}' for char, group in groupby(s))\n```",
+      "outputSha256": "e0a8e94741fc2034c473993190103e3a2317fcb91f84796a1683387477251958",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 164,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.84,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 27
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "prog-rle",
+      "category": "programming",
+      "sample": 1,
+      "latencyMs": 1552,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 43,
+      "tokensPerSecond": 28.9,
+      "loadMs": 12,
+      "output": "```python\nfrom itertools import groupby\n\ndef rle_encode(s):\n    return ''.join(f'{char}{sum(1 for _ in group)}' for char, group in groupby(s))\n```",
+      "outputSha256": "e0a8e94741fc2034c473993190103e3a2317fcb91f84796a1683387477251958",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 116,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.84,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 38
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "prog-rle",
+      "category": "programming",
+      "sample": 2,
+      "latencyMs": 1521,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 43,
+      "tokensPerSecond": 29.5,
+      "loadMs": 10,
+      "output": "```python\nfrom itertools import groupby\n\ndef rle_encode(s):\n    return ''.join(f'{char}{sum(1 for _ in group)}' for char, group in groupby(s))\n```",
+      "outputSha256": "e0a8e94741fc2034c473993190103e3a2317fcb91f84796a1683387477251958",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 123,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.86,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 0
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "prog-ipv4",
+      "category": "programming",
+      "sample": 0,
+      "latencyMs": 3218,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 90,
+      "tokensPerSecond": 29.14,
+      "loadMs": 12,
+      "output": "```python\nimport re\n\ndef is_valid_ipv4(s):\n    return bool(re.match(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$', s))\n```",
+      "outputSha256": "6dfd1c135c9a12d2cb0feecd11d26e21ee31951a89a251386631da495dff99c3",
+      "correct": false,
+      "reason": "tests 1 failures 1 errors 0",
+      "sandbox": {
+        "exitCode": 1,
+        "durationMs": 109,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.84,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 0
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "prog-ipv4",
+      "category": "programming",
+      "sample": 1,
+      "latencyMs": 3163,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 90,
+      "tokensPerSecond": 29.02,
+      "loadMs": 12,
+      "output": "```python\nimport re\n\ndef is_valid_ipv4(s):\n    return bool(re.match(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$', s))\n```",
+      "outputSha256": "6dfd1c135c9a12d2cb0feecd11d26e21ee31951a89a251386631da495dff99c3",
+      "correct": false,
+      "reason": "tests 1 failures 1 errors 0",
+      "sandbox": {
+        "exitCode": 1,
+        "durationMs": 113,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.86,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 2
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "prog-ipv4",
+      "category": "programming",
+      "sample": 2,
+      "latencyMs": 3173,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 90,
+      "tokensPerSecond": 28.94,
+      "loadMs": 12,
+      "output": "```python\nimport re\n\ndef is_valid_ipv4(s):\n    return bool(re.match(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$', s))\n```",
+      "outputSha256": "6dfd1c135c9a12d2cb0feecd11d26e21ee31951a89a251386631da495dff99c3",
+      "correct": false,
+      "reason": "tests 1 failures 1 errors 0",
+      "sandbox": {
+        "exitCode": 1,
+        "durationMs": 109,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.85,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 19
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "debug-bsearch",
+      "category": "debugging",
+      "sample": 0,
+      "latencyMs": 3099,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 85,
+      "tokensPerSecond": 29.12,
+      "loadMs": 11,
+      "output": "```python\ndef find_index(items, target):\n    lo, hi = 0, len(items)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if items[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo if lo < len(items) and items[lo] == target else -1\n```",
+      "outputSha256": "895b909a72d90abe3d3c84746138e9f1467d02fe5bafa82bba977263900c4cf4",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 115,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.85,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 0
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "debug-bsearch",
+      "category": "debugging",
+      "sample": 1,
+      "latencyMs": 2987,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 85,
+      "tokensPerSecond": 29.09,
+      "loadMs": 10,
+      "output": "```python\ndef find_index(items, target):\n    lo, hi = 0, len(items)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if items[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo if lo < len(items) and items[lo] == target else -1\n```",
+      "outputSha256": "895b909a72d90abe3d3c84746138e9f1467d02fe5bafa82bba977263900c4cf4",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 114,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.88,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "debug-bsearch",
+      "category": "debugging",
+      "sample": 2,
+      "latencyMs": 2983,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 85,
+      "tokensPerSecond": 29.13,
+      "loadMs": 12,
+      "output": "```python\ndef find_index(items, target):\n    lo, hi = 0, len(items)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if items[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo if lo < len(items) and items[lo] == target else -1\n```",
+      "outputSha256": "895b909a72d90abe3d3c84746138e9f1467d02fe5bafa82bba977263900c4cf4",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 118,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.9,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "debug-default",
+      "category": "debugging",
+      "sample": 0,
+      "latencyMs": 1222,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 32,
+      "tokensPerSecond": 29.52,
+      "loadMs": 11,
+      "output": "```python\ndef append_item(item, bucket=None):\n    if bucket is None:\n        bucket = []\n    bucket.append(item)\n    return bucket\n```",
+      "outputSha256": "e06eb084b40a9a448aee728b011c47cb81bcfa3a9a4d0c909b2db5a1c8b20ea9",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 122,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.88,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "debug-default",
+      "category": "debugging",
+      "sample": 1,
+      "latencyMs": 1140,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 32,
+      "tokensPerSecond": 29.75,
+      "loadMs": 12,
+      "output": "```python\ndef append_item(item, bucket=None):\n    if bucket is None:\n        bucket = []\n    bucket.append(item)\n    return bucket\n```",
+      "outputSha256": "e06eb084b40a9a448aee728b011c47cb81bcfa3a9a4d0c909b2db5a1c8b20ea9",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 106,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.88,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "debug-default",
+      "category": "debugging",
+      "sample": 2,
+      "latencyMs": 1136,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 32,
+      "tokensPerSecond": 29.76,
+      "loadMs": 7,
+      "output": "```python\ndef append_item(item, bucket=None):\n    if bucket is None:\n        bucket = []\n    bucket.append(item)\n    return bucket\n```",
+      "outputSha256": "e06eb084b40a9a448aee728b011c47cb81bcfa3a9a4d0c909b2db5a1c8b20ea9",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 122,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.88,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "plan-deploy",
+      "category": "planning",
+      "sample": 0,
+      "latencyMs": 1474,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 39,
+      "tokensPerSecond": 29.45,
+      "loadMs": 8,
+      "output": "{\n  \"order\": [\n    \"fetch\",\n    \"backup\",\n    \"build\",\n    \"test\",\n    \"migrate\",\n    \"deploy\",\n    \"announce\"\n  ]\n}",
+      "outputSha256": "79ef07c28d76d6dbe70a406cd434bc18c1bbc1276866c373231d09bd9e13ea27",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.87,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 59
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "plan-deploy",
+      "category": "planning",
+      "sample": 1,
+      "latencyMs": 1391,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 39,
+      "tokensPerSecond": 29.56,
+      "loadMs": 6,
+      "output": "{\n  \"order\": [\n    \"fetch\",\n    \"backup\",\n    \"build\",\n    \"test\",\n    \"migrate\",\n    \"deploy\",\n    \"announce\"\n  ]\n}",
+      "outputSha256": "79ef07c28d76d6dbe70a406cd434bc18c1bbc1276866c373231d09bd9e13ea27",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.12,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "plan-deploy",
+      "category": "planning",
+      "sample": 2,
+      "latencyMs": 1400,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 39,
+      "tokensPerSecond": 29.36,
+      "loadMs": 7,
+      "output": "{\n  \"order\": [\n    \"fetch\",\n    \"backup\",\n    \"build\",\n    \"test\",\n    \"migrate\",\n    \"deploy\",\n    \"announce\"\n  ]\n}",
+      "outputSha256": "79ef07c28d76d6dbe70a406cd434bc18c1bbc1276866c373231d09bd9e13ea27",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.11,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "plan-docs",
+      "category": "planning",
+      "sample": 0,
+      "latencyMs": 976,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 25,
+      "tokensPerSecond": 29.73,
+      "loadMs": 8,
+      "output": "{\n  \"order\": [\"outline\", \"research\", \"draft\", \"figures\", \"review\", \"publish\"]\n}",
+      "outputSha256": "2129f9db26a6e3c271add9c193fb15cc9ffd56b1dc72531fa8e274512f76e606",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.42,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 58
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "plan-docs",
+      "category": "planning",
+      "sample": 1,
+      "latencyMs": 910,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 25,
+      "tokensPerSecond": 29.86,
+      "loadMs": 7,
+      "output": "{\n  \"order\": [\"outline\", \"research\", \"draft\", \"figures\", \"review\", \"publish\"]\n}",
+      "outputSha256": "2129f9db26a6e3c271add9c193fb15cc9ffd56b1dc72531fa8e274512f76e606",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.45,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "plan-docs",
+      "category": "planning",
+      "sample": 2,
+      "latencyMs": 933,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 25,
+      "tokensPerSecond": 29.11,
+      "loadMs": 7,
+      "output": "{\n  \"order\": [\"outline\", \"research\", \"draft\", \"figures\", \"review\", \"publish\"]\n}",
+      "outputSha256": "2129f9db26a6e3c271add9c193fb15cc9ffd56b1dc72531fa8e274512f76e606",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.45,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "json-task",
+      "category": "json-schema",
+      "sample": 0,
+      "latencyMs": 1804,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 48,
+      "tokensPerSecond": 29.03,
+      "loadMs": 7,
+      "output": "{\n  \"name\": \"renew passport\",\n  \"tags\": [\"urgent\", \"travel\", \"personal\"],\n  \"priority\": 5,\n  \"due\": \"2026-12-01\"\n}",
+      "outputSha256": "8dc7e12938aeede9c8847b585ae73d4c11f7d05a7ba6f2f6d2d608b42552f407",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.47,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 63
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "json-task",
+      "category": "json-schema",
+      "sample": 1,
+      "latencyMs": 1718,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 48,
+      "tokensPerSecond": 29.1,
+      "loadMs": 7,
+      "output": "{\n  \"name\": \"renew passport\",\n  \"tags\": [\"travel\", \"important\", \"legal\"],\n  \"priority\": 5,\n  \"due\": \"2026-12-01\"\n}",
+      "outputSha256": "de4d50bc190db95bc26f1d8630543b0712ba76881573a339d8a4e192ce5fe096",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.48,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "json-task",
+      "category": "json-schema",
+      "sample": 2,
+      "latencyMs": 1726,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 48,
+      "tokensPerSecond": 29.1,
+      "loadMs": 7,
+      "output": "{\n  \"name\": \"renew passport\",\n  \"tags\": [\"urgent\", \"travel\", \"personal\"],\n  \"priority\": 5,\n  \"due\": \"2026-12-01\"\n}",
+      "outputSha256": "8dc7e12938aeede9c8847b585ae73d4c11f7d05a7ba6f2f6d2d608b42552f407",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.57,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "json-user",
+      "category": "json-schema",
+      "sample": 0,
+      "latencyMs": 1424,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 38,
+      "tokensPerSecond": 29.62,
+      "loadMs": 8,
+      "output": "{\n  \"user\": {\n    \"id\": 42,\n    \"email\": \"alice@example.com\"\n  },\n  \"roles\": [\n    \"viewer\"\n  ]\n}",
+      "outputSha256": "19bd3cd65b3c9b2aee72c73701725c086e7c6fb92679c75cf4662696c45a8f32",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.6,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "json-user",
+      "category": "json-schema",
+      "sample": 1,
+      "latencyMs": 1247,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 34,
+      "tokensPerSecond": 29.12,
+      "loadMs": 5,
+      "output": "{\n  \"user\": {\n    \"id\": 42,\n    \"email\": \"alice@example.com\"\n  },\n  \"roles\": [\"viewer\"]\n}",
+      "outputSha256": "284f04ee68e6ad7e77762d0aa8101229b1e62823d675d1b944988621ffd3f0a1",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.82,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 58
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "json-user",
+      "category": "json-schema",
+      "sample": 2,
+      "latencyMs": 1388,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 38,
+      "tokensPerSecond": 29.28,
+      "loadMs": 10,
+      "output": "{\n  \"user\": {\n    \"id\": 42,\n    \"email\": \"alice@example.com\"\n  },\n  \"roles\": [\n    \"viewer\"\n  ]\n}",
+      "outputSha256": "19bd3cd65b3c9b2aee72c73701725c086e7c6fb92679c75cf4662696c45a8f32",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.97,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "math-pens",
+      "category": "math",
+      "sample": 0,
+      "latencyMs": 188,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 3,
+      "tokensPerSecond": 42.52,
+      "loadMs": 8,
+      "output": "31",
+      "outputSha256": "eb1e33e8a81b697b75855af6bfcdbcbf7cbbde9f94962ceaec1ed8af21f5a50f",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.97,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 52
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "math-pens",
+      "category": "math",
+      "sample": 1,
+      "latencyMs": 131,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 3,
+      "tokensPerSecond": 42.23,
+      "loadMs": 9,
+      "output": "31",
+      "outputSha256": "eb1e33e8a81b697b75855af6bfcdbcbf7cbbde9f94962ceaec1ed8af21f5a50f",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.96,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 52
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "math-pens",
+      "category": "math",
+      "sample": 2,
+      "latencyMs": 125,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 3,
+      "tokensPerSecond": 41.56,
+      "loadMs": 7,
+      "output": "31",
+      "outputSha256": "eb1e33e8a81b697b75855af6bfcdbcbf7cbbde9f94962ceaec1ed8af21f5a50f",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.9,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 21
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "math-multiples",
+      "category": "math",
+      "sample": 0,
+      "latencyMs": 253,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 5,
+      "tokensPerSecond": 35.52,
+      "loadMs": 9,
+      "output": "9850",
+      "outputSha256": "ba258b5a7eb00f1bb2da1943f42c46d45ae030163ba9fdfad4eefad0d9cb2319",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.84,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 21
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "math-multiples",
+      "category": "math",
+      "sample": 1,
+      "latencyMs": 196,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 5,
+      "tokensPerSecond": 35.54,
+      "loadMs": 7,
+      "output": "9850",
+      "outputSha256": "ba258b5a7eb00f1bb2da1943f42c46d45ae030163ba9fdfad4eefad0d9cb2319",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.84,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 38
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "math-multiples",
+      "category": "math",
+      "sample": 2,
+      "latencyMs": 198,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 5,
+      "tokensPerSecond": 35.87,
+      "loadMs": 9,
+      "output": "9850",
+      "outputSha256": "ba258b5a7eb00f1bb2da1943f42c46d45ae030163ba9fdfad4eefad0d9cb2319",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.86,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 38
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "tool-arith",
+      "category": "tool-call",
+      "sample": 0,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 324,
+      "output": "132",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.87,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 54
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "tool-arith",
+      "category": "tool-call",
+      "sample": 1,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 162,
+      "output": "120",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.87,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 19
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "tool-arith",
+      "category": "tool-call",
+      "sample": 2,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 160,
+      "output": "120",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.87,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 19
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "tool-convert",
+      "category": "tool-call",
+      "sample": 0,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 259,
+      "output": "86",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.87,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 68
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "tool-convert",
+      "category": "tool-call",
+      "sample": 1,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 127,
+      "output": "86",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.84,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 68
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "tool-convert",
+      "category": "tool-call",
+      "sample": 2,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 128,
+      "output": "86",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.86,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 26
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "instr-lines",
+      "category": "instruction-following",
+      "sample": 0,
+      "latencyMs": 1265,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 34,
+      "tokensPerSecond": 29.6,
+      "loadMs": 8,
+      "output": "- the harbor whispers secrets to the moon,\n- lanterns flicker, guiding the night's soft tide,\n- shadows dance on the water's glassy surface.",
+      "outputSha256": "b971ad3dc2fd56babee9f7c2f5d337bae6860165168cb364c8d8d3bb32042456",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.88,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "instr-lines",
+      "category": "instruction-following",
+      "sample": 1,
+      "latencyMs": 1035,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 29,
+      "tokensPerSecond": 29.72,
+      "loadMs": 9,
+      "output": "- the harbor whispers secrets of old\n- lanterns flicker, guiding the way\n- mist hugs the water, cloaking the shore",
+      "outputSha256": "d696830fba8a70cad3250a15eaaa14e1be35235176ad90d2ea3de4c267021998",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.88,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 65
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "instr-lines",
+      "category": "instruction-following",
+      "sample": 2,
+      "latencyMs": 1028,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 29,
+      "tokensPerSecond": 29.87,
+      "loadMs": 8,
+      "output": "- the harbor whispers secrets of old\n- lanterns flicker, guiding the night\n- shadows dance on the water's glassy surface",
+      "outputSha256": "0d928b99973ffbd9ced485fc7a2ebd22134593b66830680b6bd31075aefa7855",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.87,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "instr-primes",
+      "category": "instruction-following",
+      "sample": 0,
+      "latencyMs": 550,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 12,
+      "tokensPerSecond": 31.25,
+      "loadMs": 8,
+      "output": "[5,3,2,1,2]",
+      "outputSha256": "564bebac5d759fdadde7d2d86e7c841ea420096045c570a3f216adb757c243f2",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.92,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "instr-primes",
+      "category": "instruction-following",
+      "sample": 1,
+      "latencyMs": 437,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 12,
+      "tokensPerSecond": 31.55,
+      "loadMs": 8,
+      "output": "[5,3,2,1,2]",
+      "outputSha256": "564bebac5d759fdadde7d2d86e7c841ea420096045c570a3f216adb757c243f2",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.92,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "instr-primes",
+      "category": "instruction-following",
+      "sample": 2,
+      "latencyMs": 434,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 12,
+      "tokensPerSecond": 31.67,
+      "loadMs": 7,
+      "output": "[5,3,2,1,2]",
+      "outputSha256": "564bebac5d759fdadde7d2d86e7c841ea420096045c570a3f216adb757c243f2",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.92,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "review-lastn",
+      "category": "code-review",
+      "sample": 0,
+      "latencyMs": 356,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 7,
+      "tokensPerSecond": 33.27,
+      "loadMs": 4,
+      "output": "{\"function\": \"average\"}",
+      "outputSha256": "f40a1f1b72a2f020e703c75c3f25af35d8aa8cdfebf687e20300e466a7533bb8",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.92,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "review-lastn",
+      "category": "code-review",
+      "sample": 1,
+      "latencyMs": 287,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 7,
+      "tokensPerSecond": 33.22,
+      "loadMs": 7,
+      "output": "{\"function\": \"average\"}",
+      "outputSha256": "f40a1f1b72a2f020e703c75c3f25af35d8aa8cdfebf687e20300e466a7533bb8",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.93,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "review-lastn",
+      "category": "code-review",
+      "sample": 2,
+      "latencyMs": 285,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 7,
+      "tokensPerSecond": 33.38,
+      "loadMs": 7,
+      "output": "{\"function\": \"average\"}",
+      "outputSha256": "f40a1f1b72a2f020e703c75c3f25af35d8aa8cdfebf687e20300e466a7533bb8",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.91,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 39
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "review-weekend",
+      "category": "code-review",
+      "sample": 0,
+      "latencyMs": 469,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 9,
+      "tokensPerSecond": 32.22,
+      "loadMs": 9,
+      "output": "{\"function\": \"is_weekend\"}",
+      "outputSha256": "36c974ee3c2aa536da8ed323d21731ab7bd23aa914c347fa3fe3e8c04894f93f",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.93,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 92
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "review-weekend",
+      "category": "code-review",
+      "sample": 1,
+      "latencyMs": 360,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 9,
+      "tokensPerSecond": 32.23,
+      "loadMs": 6,
+      "output": "{\"function\": \"is_weekend\"}",
+      "outputSha256": "36c974ee3c2aa536da8ed323d21731ab7bd23aa914c347fa3fe3e8c04894f93f",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.93,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 21
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "review-weekend",
+      "category": "code-review",
+      "sample": 2,
+      "latencyMs": 356,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 9,
+      "tokensPerSecond": 32.69,
+      "loadMs": 10,
+      "output": "{\"function\": \"is_weekend\"}",
+      "outputSha256": "36c974ee3c2aa536da8ed323d21731ab7bd23aa914c347fa3fe3e8c04894f93f",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.92,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 55
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "comm-handoff",
+      "category": "multi-agent",
+      "sample": 0,
+      "latencyMs": 1897,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 51,
+      "tokensPerSecond": 29.25,
+      "loadMs": 7,
+      "output": "{\n  \"Tester\": \"T-17\",\n  \"files\": [\"slugify.py\"],\n  \"acceptance\": [\"A1\", \"A2\", \"A3\"],\n  \"notes\": \"Module changed to slugify.py\"\n}",
+      "outputSha256": "a00cce7e8abc5dbeb7577d3e8ba08761da905acdba5180ea5cd12626e2756219",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.93,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "comm-handoff",
+      "category": "multi-agent",
+      "sample": 1,
+      "latencyMs": 1830,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 51,
+      "tokensPerSecond": 29.12,
+      "loadMs": 8,
+      "output": "{\n  \"Tester\": \"T-17\",\n  \"files\": [\"slugify.py\"],\n  \"acceptance\": [\"A1\", \"A2\", \"A3\"],\n  \"notes\": \"Module changed to slugify.py\"\n}",
+      "outputSha256": "a00cce7e8abc5dbeb7577d3e8ba08761da905acdba5180ea5cd12626e2756219",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.92,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 59
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "comm-handoff",
+      "category": "multi-agent",
+      "sample": 2,
+      "latencyMs": 1816,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 51,
+      "tokensPerSecond": 29.31,
+      "loadMs": 8,
+      "output": "{\n  \"Tester\": \"T-17\",\n  \"files\": [\"slugify.py\"],\n  \"acceptance\": [\"A1\", \"A2\", \"A3\"],\n  \"notes\": \"Module changed to slugify.py\"\n}",
+      "outputSha256": "a00cce7e8abc5dbeb7577d3e8ba08761da905acdba5180ea5cd12626e2756219",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.92,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "comm-review",
+      "category": "multi-agent",
+      "sample": 0,
+      "latencyMs": 1130,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 29,
+      "tokensPerSecond": 29.79,
+      "loadMs": 7,
+      "output": "{\n  \"task_id\": \"T-9\",\n  \"verdict\": \"reject\",\n  \"blocking\": [\"A2\"]\n}",
+      "outputSha256": "fdd927d5709e1d7d69fe51cd4ed969c698d40689323e91c9bc5c89ca49718d9d",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.91,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "comm-review",
+      "category": "multi-agent",
+      "sample": 1,
+      "latencyMs": 1057,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 29,
+      "tokensPerSecond": 29.88,
+      "loadMs": 17,
+      "output": "{\n  \"task_id\": \"T-9\",\n  \"verdict\": \"reject\",\n  \"blocking\": [\"A2\"]\n}",
+      "outputSha256": "fdd927d5709e1d7d69fe51cd4ed969c698d40689323e91c9bc5c89ca49718d9d",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.91,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "task": "comm-review",
+      "category": "multi-agent",
+      "sample": 2,
+      "latencyMs": 1043,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 29,
+      "tokensPerSecond": 29.85,
+      "loadMs": 9,
+      "output": "{\n  \"task_id\": \"T-9\",\n  \"verdict\": \"reject\",\n  \"blocking\": [\"A2\"]\n}",
+      "outputSha256": "fdd927d5709e1d7d69fe51cd4ed969c698d40689323e91c9bc5c89ca49718d9d",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.92,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "prog-rle",
+      "category": "programming",
+      "sample": 0,
+      "latencyMs": 8231,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 104,
+      "tokensPerSecond": 28.91,
+      "loadMs": 4466,
+      "output": "def rle_encode(s):\n    \"\"\"Run-length encodes a string as character followed by count.\"\"\"\n    if not s:\n        return \"\"\n    prev = s[0]\n    count = 1\n    encoded = []\n    for c in s[1:]:\n        if c == prev:\n            count += 1\n        else:\n            encoded.append(f\"{prev}{count}\")\n            prev = c\n            count = 1\n    encoded.append(f\"{prev}{count}\")\n    return \"\".join(encoded)",
+      "outputSha256": "4302b04b8d6f49371673610366bc7f3a6f733529846886e9bd02c1d17b830a04",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 145,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 10.01,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 0
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "prog-rle",
+      "category": "programming",
+      "sample": 1,
+      "latencyMs": 4003,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 104,
+      "tokensPerSecond": 28.73,
+      "loadMs": 12,
+      "output": "def rle_encode(s):\n    \"\"\"Run-length encodes a string as character followed by count.\"\"\"\n    if not s:\n        return \"\"\n    prev = s[0]\n    count = 1\n    encoded = []\n    for c in s[1:]:\n        if c == prev:\n            count += 1\n        else:\n            encoded.append(f\"{prev}{count}\")\n            prev = c\n            count = 1\n    encoded.append(f\"{prev}{count}\")\n    return \"\".join(encoded)",
+      "outputSha256": "4302b04b8d6f49371673610366bc7f3a6f733529846886e9bd02c1d17b830a04",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 120,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.88,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 0
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "prog-rle",
+      "category": "programming",
+      "sample": 2,
+      "latencyMs": 3590,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 104,
+      "tokensPerSecond": 29.43,
+      "loadMs": 11,
+      "output": "def rle_encode(s):\n    \"\"\"Run-length encodes a string as character followed by count.\"\"\"\n    if not s:\n        return \"\"\n    prev = s[0]\n    count = 1\n    encoded = []\n    for c in s[1:]:\n        if c == prev:\n            count += 1\n        else:\n            encoded.append(f\"{prev}{count}\")\n            prev = c\n            count = 1\n    encoded.append(f\"{prev}{count}\")\n    return \"\".join(encoded)",
+      "outputSha256": "4302b04b8d6f49371673610366bc7f3a6f733529846886e9bd02c1d17b830a04",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 117,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.89,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 0
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "prog-ipv4",
+      "category": "programming",
+      "sample": 0,
+      "latencyMs": 3322,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 94,
+      "tokensPerSecond": 29.45,
+      "loadMs": 10,
+      "output": "def is_valid_ipv4(s):\n    \"\"\"Return True if the string is a valid IPv4 address.\"\"\"\n    parts = s.split('.')\n    if len(parts) != 4:\n        return False\n    for part in parts:\n        if not part.isdigit():\n            return False\n        if part == '0' or (part[0] != '0' and part[0].isdigit()):\n            continue\n        else:\n            return False\n    return True",
+      "outputSha256": "0f6b6a39f3d3a186151f7cbb1f01963b915e922b730b90bb0e58e0fc9656c716",
+      "correct": false,
+      "reason": "tests 1 failures 1 errors 0",
+      "sandbox": {
+        "exitCode": 1,
+        "durationMs": 115,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.92,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 30
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "prog-ipv4",
+      "category": "programming",
+      "sample": 1,
+      "latencyMs": 3242,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 94,
+      "tokensPerSecond": 29.56,
+      "loadMs": 8,
+      "output": "def is_valid_ipv4(s):\n    \"\"\"Return True if the string is a valid IPv4 address.\"\"\"\n    parts = s.split('.')\n    if len(parts) != 4:\n        return False\n    for part in parts:\n        if not part.isdigit():\n            return False\n        if part == '0' or (part[0] != '0' and part[0].isdigit()):\n            continue\n        else:\n            return False\n    return True",
+      "outputSha256": "0f6b6a39f3d3a186151f7cbb1f01963b915e922b730b90bb0e58e0fc9656c716",
+      "correct": false,
+      "reason": "tests 1 failures 1 errors 0",
+      "sandbox": {
+        "exitCode": 1,
+        "durationMs": 107,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.91,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "prog-ipv4",
+      "category": "programming",
+      "sample": 2,
+      "latencyMs": 2771,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 80,
+      "tokensPerSecond": 29.53,
+      "loadMs": 11,
+      "output": "def is_valid_ipv4(s):\n    parts = s.split('.')\n    if len(parts) != 4:\n        return False\n    for part in parts:\n        if not part.isdigit():\n            return False\n        if part == \"0\" or (part[0] != \"0\" and int(part) <= 255):\n            continue\n        return False\n    return True",
+      "outputSha256": "bedb69fd2c136946555749a8fd8575e8f0ad9d947f62c554a641afe6715e40f1",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 107,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.92,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 63
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "debug-bsearch",
+      "category": "debugging",
+      "sample": 0,
+      "latencyMs": 2902,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 80,
+      "tokensPerSecond": 29.42,
+      "loadMs": 11,
+      "output": "def find_index(items, target):\n    lo, hi = 0, len(items)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if items[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo if lo < len(items) and items[lo] == target else -1",
+      "outputSha256": "df256608a8255c478f4505e1c9dc401825390b711c094a4c5ffd62c21601c938",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 114,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.92,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 0
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "debug-bsearch",
+      "category": "debugging",
+      "sample": 1,
+      "latencyMs": 2780,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 80,
+      "tokensPerSecond": 29.42,
+      "loadMs": 11,
+      "output": "def find_index(items, target):\n    lo, hi = 0, len(items)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if items[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo if lo < len(items) and items[lo] == target else -1",
+      "outputSha256": "df256608a8255c478f4505e1c9dc401825390b711c094a4c5ffd62c21601c938",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 115,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.9,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 8
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "debug-bsearch",
+      "category": "debugging",
+      "sample": 2,
+      "latencyMs": 2778,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 80,
+      "tokensPerSecond": 29.45,
+      "loadMs": 11,
+      "output": "def find_index(items, target):\n    lo, hi = 0, len(items)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if items[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo if lo < len(items) and items[lo] == target else -1",
+      "outputSha256": "df256608a8255c478f4505e1c9dc401825390b711c094a4c5ffd62c21601c938",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 115,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.89,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "debug-default",
+      "category": "debugging",
+      "sample": 0,
+      "latencyMs": 1040,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 27,
+      "tokensPerSecond": 30.21,
+      "loadMs": 10,
+      "output": "def append_item(item, bucket=None):\n    if bucket is None:\n        bucket = []\n    bucket.append(item)\n    return bucket",
+      "outputSha256": "d0ababf1648683f458c1c42c5ce97de0e8bb55b73fc6c5e65090873942f75b17",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 110,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.86,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 0
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "debug-default",
+      "category": "debugging",
+      "sample": 1,
+      "latencyMs": 962,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 27,
+      "tokensPerSecond": 30.08,
+      "loadMs": 9,
+      "output": "def append_item(item, bucket=None):\n    if bucket is None:\n        bucket = []\n    bucket.append(item)\n    return bucket",
+      "outputSha256": "d0ababf1648683f458c1c42c5ce97de0e8bb55b73fc6c5e65090873942f75b17",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 108,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.78,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "debug-default",
+      "category": "debugging",
+      "sample": 2,
+      "latencyMs": 952,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 27,
+      "tokensPerSecond": 30.23,
+      "loadMs": 11,
+      "output": "def append_item(item, bucket=None):\n    if bucket is None:\n        bucket = []\n    bucket.append(item)\n    return bucket",
+      "outputSha256": "d0ababf1648683f458c1c42c5ce97de0e8bb55b73fc6c5e65090873942f75b17",
+      "correct": true,
+      "reason": null,
+      "sandbox": {
+        "exitCode": 0,
+        "durationMs": 122,
+        "remainingProcesses": 0
+      },
+      "freeMemGiB": 9.82,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 43
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "plan-deploy",
+      "category": "planning",
+      "sample": 0,
+      "latencyMs": 960,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 25,
+      "tokensPerSecond": 30.36,
+      "loadMs": 12,
+      "output": "{\"order\":[\"fetch\", \"build\", \"test\", \"backup\", \"migrate\", \"deploy\", \"announce\"]}",
+      "outputSha256": "9179876ae26de557488ac7ebe4610db90502489a0727d843d2a2bccd7fc36b10",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.82,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "plan-deploy",
+      "category": "planning",
+      "sample": 1,
+      "latencyMs": 872,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 25,
+      "tokensPerSecond": 30.47,
+      "loadMs": 8,
+      "output": "{\"order\":[\"fetch\", \"build\", \"test\", \"backup\", \"migrate\", \"deploy\", \"announce\"]}",
+      "outputSha256": "9179876ae26de557488ac7ebe4610db90502489a0727d843d2a2bccd7fc36b10",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.84,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "plan-deploy",
+      "category": "planning",
+      "sample": 2,
+      "latencyMs": 882,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 25,
+      "tokensPerSecond": 30.21,
+      "loadMs": 6,
+      "output": "{\"order\":[\"fetch\", \"build\", \"test\", \"backup\", \"migrate\", \"deploy\", \"announce\"]}",
+      "outputSha256": "9179876ae26de557488ac7ebe4610db90502489a0727d843d2a2bccd7fc36b10",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.84,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 63
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "plan-docs",
+      "category": "planning",
+      "sample": 0,
+      "latencyMs": 842,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 22,
+      "tokensPerSecond": 30.58,
+      "loadMs": 6,
+      "output": "{\"order\":[\"outline\", \"research\", \"draft\", \"figures\", \"review\", \"publish\"]}",
+      "outputSha256": "a8b7a688ac2c9485587a09ac283c36b326f2bc61a4cbf5decd6bd3424c108903",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.84,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "plan-docs",
+      "category": "planning",
+      "sample": 1,
+      "latencyMs": 775,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 22,
+      "tokensPerSecond": 30.65,
+      "loadMs": 7,
+      "output": "{\"order\":[\"outline\", \"research\", \"draft\", \"figures\", \"review\", \"publish\"]}",
+      "outputSha256": "a8b7a688ac2c9485587a09ac283c36b326f2bc61a4cbf5decd6bd3424c108903",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.88,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "plan-docs",
+      "category": "planning",
+      "sample": 2,
+      "latencyMs": 769,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 22,
+      "tokensPerSecond": 30.6,
+      "loadMs": 7,
+      "output": "{\"order\":[\"outline\", \"research\", \"draft\", \"figures\", \"review\", \"publish\"]}",
+      "outputSha256": "a8b7a688ac2c9485587a09ac283c36b326f2bc61a4cbf5decd6bd3424c108903",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.88,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "json-task",
+      "category": "json-schema",
+      "sample": 0,
+      "latencyMs": 1572,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 43,
+      "tokensPerSecond": 29.79,
+      "loadMs": 8,
+      "output": "{\"name\": \"renew the passport\", \"tags\": [\"urgent\", \"pass\", \"document\"], \"priority\": 5, \"due\": \"2026-12-01\"}",
+      "outputSha256": "19190fb1842f795d0089379d12f8e1485fba1c560a218f098835e9a09b63f190",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.87,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "json-task",
+      "category": "json-schema",
+      "sample": 1,
+      "latencyMs": 1570,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 45,
+      "tokensPerSecond": 29.75,
+      "loadMs": 8,
+      "output": "{\"name\": \"renew the passport\", \"tags\": [\"urgent\", \"passport\", \"renewal\"], \"priority\": 5, \"due\": \"2026-12-01\"}",
+      "outputSha256": "51da6a4f4f835f928523af265276166618340415911ab290cd7e9bdd64dc852d",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.87,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 43
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "json-task",
+      "category": "json-schema",
+      "sample": 2,
+      "latencyMs": 1508,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 43,
+      "tokensPerSecond": 29.61,
+      "loadMs": 6,
+      "output": "{\"name\": \"renew the passport\", \"tags\": [\"urgent\", \"pass\", \"document\"], \"priority\": 5, \"due\": \"2026-12-01\"}",
+      "outputSha256": "19190fb1842f795d0089379d12f8e1485fba1c560a218f098835e9a09b63f190",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.87,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "json-user",
+      "category": "json-schema",
+      "sample": 0,
+      "latencyMs": 1418,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 38,
+      "tokensPerSecond": 29.75,
+      "loadMs": 17,
+      "output": "{\n  \"user\": {\n    \"id\": 42,\n    \"email\": \"alice@example.com\"\n  },\n  \"roles\": [\n    \"viewer\"\n  ]\n}",
+      "outputSha256": "19bd3cd65b3c9b2aee72c73701725c086e7c6fb92679c75cf4662696c45a8f32",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.87,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "json-user",
+      "category": "json-schema",
+      "sample": 1,
+      "latencyMs": 1334,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 38,
+      "tokensPerSecond": 29.68,
+      "loadMs": 6,
+      "output": "{\n  \"user\": {\n    \"id\": 42,\n    \"email\": \"alice@example.com\"\n  },\n  \"roles\": [\n    \"viewer\"\n  ]\n}",
+      "outputSha256": "19bd3cd65b3c9b2aee72c73701725c086e7c6fb92679c75cf4662696c45a8f32",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 9.87,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 65
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "json-user",
+      "category": "json-schema",
+      "sample": 2,
+      "latencyMs": 1338,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 38,
+      "tokensPerSecond": 29.71,
+      "loadMs": 11,
+      "output": "{\n  \"user\": {\n    \"id\": 42,\n    \"email\": \"alice@example.com\"\n  },\n  \"roles\": [\n    \"viewer\"\n  ]\n}",
+      "outputSha256": "19bd3cd65b3c9b2aee72c73701725c086e7c6fb92679c75cf4662696c45a8f32",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.14,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "math-pens",
+      "category": "math",
+      "sample": 0,
+      "latencyMs": 180,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 3,
+      "tokensPerSecond": 42.91,
+      "loadMs": 6,
+      "output": "11",
+      "outputSha256": "4fc82b26aecb47d2868c4efbe3581732a3e7cbcc6c2efb32062c08170a05eeb8",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.12,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 65
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "math-pens",
+      "category": "math",
+      "sample": 1,
+      "latencyMs": 118,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 3,
+      "tokensPerSecond": 44.03,
+      "loadMs": 8,
+      "output": "11",
+      "outputSha256": "4fc82b26aecb47d2868c4efbe3581732a3e7cbcc6c2efb32062c08170a05eeb8",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.12,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 65
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "math-pens",
+      "category": "math",
+      "sample": 2,
+      "latencyMs": 123,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 3,
+      "tokensPerSecond": 42.98,
+      "loadMs": 10,
+      "output": "11",
+      "outputSha256": "4fc82b26aecb47d2868c4efbe3581732a3e7cbcc6c2efb32062c08170a05eeb8",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.12,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 65
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "math-multiples",
+      "category": "math",
+      "sample": 0,
+      "latencyMs": 251,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 5,
+      "tokensPerSecond": 35.8,
+      "loadMs": 8,
+      "output": "1332",
+      "outputSha256": "24fd7e2735af185459f293eb8704789722c8e46ef86c880322577fe019bb829c",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.13,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 43
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "math-multiples",
+      "category": "math",
+      "sample": 1,
+      "latencyMs": 195,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 5,
+      "tokensPerSecond": 35.97,
+      "loadMs": 8,
+      "output": "1332",
+      "outputSha256": "24fd7e2735af185459f293eb8704789722c8e46ef86c880322577fe019bb829c",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.17,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "math-multiples",
+      "category": "math",
+      "sample": 2,
+      "latencyMs": 196,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 5,
+      "tokensPerSecond": 35.65,
+      "loadMs": 6,
+      "output": "1332",
+      "outputSha256": "24fd7e2735af185459f293eb8704789722c8e46ef86c880322577fe019bb829c",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.27,
+      "gpu": {
+        "vramUsedMiB": 4099,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "tool-arith",
+      "category": "tool-call",
+      "sample": 0,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 291,
+      "output": "126",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.38,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 96
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "tool-arith",
+      "category": "tool-call",
+      "sample": 1,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 171,
+      "output": "126",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.47,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 96
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "tool-arith",
+      "category": "tool-call",
+      "sample": 2,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 154,
+      "output": "126",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.51,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 0
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "tool-convert",
+      "category": "tool-call",
+      "sample": 0,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 310,
+      "output": "86.0",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.5,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "tool-convert",
+      "category": "tool-call",
+      "sample": 1,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 191,
+      "output": "86.0",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.51,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "tool-convert",
+      "category": "tool-call",
+      "sample": 2,
+      "correct": false,
+      "reason": null,
+      "latencyMs": 190,
+      "output": "86.0",
+      "receipts": [],
+      "servedModelMatches": true,
+      "freeMemGiB": 10.51,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 60
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "instr-lines",
+      "category": "instruction-following",
+      "sample": 0,
+      "latencyMs": 1334,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 36,
+      "tokensPerSecond": 29.77,
+      "loadMs": 8,
+      "output": "- a quiet harbor cradles the evening's peace. - lanterns float, softening the night's embrace. - the water mirrors the stars, still and deep.",
+      "outputSha256": "3b241676a0354b2de68d5cfd79dc6ef4a4beef9cf4e5dbc49ae98634fc802042",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.58,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 63
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "instr-lines",
+      "category": "instruction-following",
+      "sample": 1,
+      "latencyMs": 1233,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 35,
+      "tokensPerSecond": 29.79,
+      "loadMs": 9,
+      "output": "- a quiet harbor cradles the evening's dreams. - lanterns dangle, whispering to the stars. - the water mirrors the soft, glowing lights.",
+      "outputSha256": "0caf62ac41edc205bedbcfff88257b6ad47cfc542425540cdfd04212d10ea805",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.61,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "instr-lines",
+      "category": "instruction-following",
+      "sample": 2,
+      "latencyMs": 1154,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 33,
+      "tokensPerSecond": 30.07,
+      "loadMs": 10,
+      "output": "- a quiet harbor cradles the evening's dreams. - lanterns float, mirroring the soft glow. - the water whispers secrets to the shore.",
+      "outputSha256": "9cc3bad2a2698e0a4f501dfed6d210d5df8e3041582f7efff74230f1c816fc7c",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.61,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "instr-primes",
+      "category": "instruction-following",
+      "sample": 0,
+      "latencyMs": 547,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 12,
+      "tokensPerSecond": 31.31,
+      "loadMs": 7,
+      "output": "[7,5,3,2,1]",
+      "outputSha256": "4e1e0c05c87d8d777dbb5cb77dbc06b293045254d0a079108fbfd62bdfaed6c7",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.6,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 61
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "instr-primes",
+      "category": "instruction-following",
+      "sample": 1,
+      "latencyMs": 434,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 12,
+      "tokensPerSecond": 31.83,
+      "loadMs": 6,
+      "output": "[7,5,3,2,1]",
+      "outputSha256": "4e1e0c05c87d8d777dbb5cb77dbc06b293045254d0a079108fbfd62bdfaed6c7",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.59,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "instr-primes",
+      "category": "instruction-following",
+      "sample": 2,
+      "latencyMs": 425,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 12,
+      "tokensPerSecond": 32.07,
+      "loadMs": 7,
+      "output": "[7,5,3,2,7]",
+      "outputSha256": "cdf6f3227e1fe8b7ca900be25f3cb1050a0a8e320267be3be84534c24f7b8be9",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.59,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "review-lastn",
+      "category": "code-review",
+      "sample": 0,
+      "latencyMs": 345,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 7,
+      "tokensPerSecond": 33.33,
+      "loadMs": 5,
+      "output": "{\"function\": \"average\"}",
+      "outputSha256": "f40a1f1b72a2f020e703c75c3f25af35d8aa8cdfebf687e20300e466a7533bb8",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.59,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 64
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "review-lastn",
+      "category": "code-review",
+      "sample": 1,
+      "latencyMs": 265,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 7,
+      "tokensPerSecond": 34.13,
+      "loadMs": 9,
+      "output": "{\"function\": \"average\"}",
+      "outputSha256": "f40a1f1b72a2f020e703c75c3f25af35d8aa8cdfebf687e20300e466a7533bb8",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.59,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 21
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "review-lastn",
+      "category": "code-review",
+      "sample": 2,
+      "latencyMs": 265,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 7,
+      "tokensPerSecond": 33.53,
+      "loadMs": 7,
+      "output": "{\"function\": \"average\"}",
+      "outputSha256": "f40a1f1b72a2f020e703c75c3f25af35d8aa8cdfebf687e20300e466a7533bb8",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.65,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 59
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "review-weekend",
+      "category": "code-review",
+      "sample": 0,
+      "latencyMs": 443,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 9,
+      "tokensPerSecond": 32.86,
+      "loadMs": 6,
+      "output": "{\"function\": \"is_weekend\"}",
+      "outputSha256": "36c974ee3c2aa536da8ed323d21731ab7bd23aa914c347fa3fe3e8c04894f93f",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.71,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "review-weekend",
+      "category": "code-review",
+      "sample": 1,
+      "latencyMs": 328,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 9,
+      "tokensPerSecond": 32.58,
+      "loadMs": 6,
+      "output": "{\"function\": \"is_weekend\"}",
+      "outputSha256": "36c974ee3c2aa536da8ed323d21731ab7bd23aa914c347fa3fe3e8c04894f93f",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.71,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "review-weekend",
+      "category": "code-review",
+      "sample": 2,
+      "latencyMs": 326,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 9,
+      "tokensPerSecond": 32.55,
+      "loadMs": 6,
+      "output": "{\"function\": \"is_weekend\"}",
+      "outputSha256": "36c974ee3c2aa536da8ed323d21731ab7bd23aa914c347fa3fe3e8c04894f93f",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 10.72,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "comm-handoff",
+      "category": "multi-agent",
+      "sample": 0,
+      "latencyMs": 2207,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 61,
+      "tokensPerSecond": 29.57,
+      "loadMs": 7,
+      "output": "{\n  \"Tester\": \"Tester\",\n  \"task_id\": \"T-17\",\n  \"files\": [\"slugify.py\"],\n  \"acceptance\": [\"A1\", \"A2\", \"A3\"],\n  \"notes\": \"Module changed from slugify to slugify.\"\n}",
+      "outputSha256": "13c3b28fdad25f8f29342c5a5abd8eb5e95fe0693a8922958390492fab94c746",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 10.72,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 62
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "comm-handoff",
+      "category": "multi-agent",
+      "sample": 1,
+      "latencyMs": 2126,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 61,
+      "tokensPerSecond": 29.5,
+      "loadMs": 8,
+      "output": "{\n  \"Tester\": \"Tester\",\n  \"task_id\": \"T-17\",\n  \"files\": [\"slugify.py\"],\n  \"acceptance\": [\"A1\", \"A2\", \"A3\"],\n  \"notes\": \"Module changed from slugify to slugify.\"\n}",
+      "outputSha256": "13c3b28fdad25f8f29342c5a5abd8eb5e95fe0693a8922958390492fab94c746",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 11.03,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 65
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "comm-handoff",
+      "category": "multi-agent",
+      "sample": 2,
+      "latencyMs": 1945,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 56,
+      "tokensPerSecond": 29.61,
+      "loadMs": 8,
+      "output": "{\n  \"Tester\": \"Tester\",\n  \"task_id\": \"T-17\",\n  \"files\": [\"slugify.py\"],\n  \"acceptance\": [\"A1\", \"A2\", \"A3\"],\n  \"notes\": \"Module information updated.\"\n}",
+      "outputSha256": "94358a811e42ba9f2f55402e8a4f76f8b91d7307dd80fced08b3d53321219cee",
+      "correct": false,
+      "reason": "check failed",
+      "freeMemGiB": 11.05,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 65
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "comm-review",
+      "category": "multi-agent",
+      "sample": 0,
+      "latencyMs": 941,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 24,
+      "tokensPerSecond": 30.13,
+      "loadMs": 9,
+      "output": "{\"task_id\": \"T-9\", \"verdict\": \"reject\", \"blocking\": [\"A2\"]}",
+      "outputSha256": "11432311e321bc0dd368502035a3b4e61fa6dfea71bf893d6690735e665ed81b",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 11.05,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 59
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "comm-review",
+      "category": "multi-agent",
+      "sample": 1,
+      "latencyMs": 842,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 24,
+      "tokensPerSecond": 30.45,
+      "loadMs": 8,
+      "output": "{\"task_id\": \"T-9\", \"verdict\": \"reject\", \"blocking\": [\"A2\"]}",
+      "outputSha256": "11432311e321bc0dd368502035a3b4e61fa6dfea71bf893d6690735e665ed81b",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 11.05,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 63
+      }
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "task": "comm-review",
+      "category": "multi-agent",
+      "sample": 2,
+      "latencyMs": 844,
+      "servedModelMatches": true,
+      "doneReason": "stop",
+      "evalCount": 24,
+      "tokensPerSecond": 30.51,
+      "loadMs": 7,
+      "output": "{\"task_id\": \"T-9\", \"verdict\": \"reject\", \"blocking\": [\"A2\"]}",
+      "outputSha256": "11432311e321bc0dd368502035a3b4e61fa6dfea71bf893d6690735e665ed81b",
+      "correct": true,
+      "reason": null,
+      "freeMemGiB": 11.05,
+      "gpu": {
+        "vramUsedMiB": 4103,
+        "gpuUtilPercent": 61
+      }
+    }
+  ],
+  "summary": {
+    "qwen2.5-coder:7b": {
+      "programming": {
+        "passes": 3,
+        "samples": 6
+      },
+      "debugging": {
+        "passes": 6,
+        "samples": 6
+      },
+      "planning": {
+        "passes": 6,
+        "samples": 6
+      },
+      "json-schema": {
+        "passes": 6,
+        "samples": 6
+      },
+      "math": {
+        "passes": 0,
+        "samples": 6
+      },
+      "tool-call": {
+        "passes": 0,
+        "samples": 6
+      },
+      "instruction-following": {
+        "passes": 0,
+        "samples": 6
+      },
+      "code-review": {
+        "passes": 3,
+        "samples": 6
+      },
+      "multi-agent": {
+        "passes": 3,
+        "samples": 6
+      },
+      "total": {
+        "passes": 27,
+        "samples": 54
+      }
+    },
+    "huihui_ai/qwen2.5-abliterate:7b": {
+      "programming": {
+        "passes": 4,
+        "samples": 6
+      },
+      "debugging": {
+        "passes": 6,
+        "samples": 6
+      },
+      "planning": {
+        "passes": 6,
+        "samples": 6
+      },
+      "json-schema": {
+        "passes": 6,
+        "samples": 6
+      },
+      "math": {
+        "passes": 0,
+        "samples": 6
+      },
+      "tool-call": {
+        "passes": 0,
+        "samples": 6
+      },
+      "instruction-following": {
+        "passes": 0,
+        "samples": 6
+      },
+      "code-review": {
+        "passes": 3,
+        "samples": 6
+      },
+      "multi-agent": {
+        "passes": 3,
+        "samples": 6
+      },
+      "total": {
+        "passes": 28,
+        "samples": 54
+      }
+    }
+  },
+  "finishedAt": "2026-10-21T21:46:37.483Z",
+  "externalRequestsRefused": 0
+}

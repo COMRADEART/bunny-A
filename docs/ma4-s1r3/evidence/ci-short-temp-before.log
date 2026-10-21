@@ -1,0 +1,174 @@
+✔ M-A-1D: the production release pin is the reviewed M-A-1 code candidate (83.4357ms)
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (15092.7553ms)
+✖ M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release (1307.4022ms)
+✖ M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release (5413.9652ms)
+✔ MA2 T1: the read-only SQLite snapshot includes committed WAL rows (294.8639ms)
+✔ MA2 T1: all 23 tables and non-database files survive migration (397.1752ms)
+✔ MA2 T1: an unexpected changed task field fails preservation (398.4198ms)
+✔ MA2 T1: new telemetry is allowed, but missing historical events fail (431.4597ms)
+✔ MA2 T1: active tasks refuse migration before copy (243.2245ms)
+✔ MA2 T1: active missions refuse migration before copy (244.7583ms)
+✔ MA2 T1: unknown schema refuses migration (247.1655ms)
+✔ MA2 T1: an occupied stage is never overwritten (237.7148ms)
+✔ MA2 T1: state cannot be installed inside a Git checkout (213.3946ms)
+✔ MA2 T1: a source directory junction fails preflight (221.575ms)
+✔ MA2 T1: a target junction cannot hide a repository dependency (221.0233ms)
+✔ MA2 T1: copied hard-linked files become independent files (336.3178ms)
+✔ MA2 T1: git clean in a disposable checkout cannot delete migrated state (426.4123ms)
+✔ MA2 T1: a named-tunnel configuration needs an explicit credential inventory (232.4408ms)
+✔ MA2 T1: the installed tunnel uses application state and rejects a missing or changed client (342.5612ms)
+✔ MA2 T1: installed Host state fails closed without an explicit path or database (206.0286ms)
+✔ MA2 T1: installed Host resolves flat canonical state and moved credentials (391.3799ms)
+✔ MA2 T1: a truncated database and unknown layout fail closed without creating state (322.4459ms)
+✔ MA2 T1: a retired production source cannot become development state (196.271ms)
+✖ MA2 T1 Windows controller: complete cutover and idempotent retry (10072.5751ms)
+✖ MA2 T1 Windows controller: after-copy (10043.3413ms)
+✖ MA2 T1 Windows controller: after-config (9844.6517ms)
+✖ MA2 T1 Windows controller: after-host (9824.2502ms)
+ℹ tests 27
+ℹ suites 0
+ℹ pass 20
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 69535.5124
+
+✖ failing tests:
+
+test at scripts\bunny-release.test.mjs:44:1
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (15092.7553ms)
+  AssertionError [ERR_ASSERTION]: Node runtime license unavailable; package must not ship without it.
+  At <home>\Documents\new\bun-router-s1r3\scripts\package-bunny-desktop.ps1:179 char:9
+  +   else {throw 'Node runtime license unavailable; package must not shi ...
+  +         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      + CategoryInfo          : OperationStopped: (Node runtime li...hip without it.:String) [], RuntimeException
+      + FullyQualifiedErrorId : Node runtime license unavailable; package must not ship without it.
+   
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///<home>/Documents/new/bun-router-s1r3/scripts/bunny-release.test.mjs:59:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\bunny-release.test.mjs:112:1
+✖ M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release (1307.4022ms)
+  AssertionError [ERR_ASSERTION]: Installed Bunny state layout does not match install.json.
+  At <home>\AppData\Local\Temp\bunnyshortpathci\bunny-release-launch-OzBO1E\releases\Bunny-A-Windows-v99\Start-Bu
+  nny-Release.ps1:23 char:74
+  + ... ne $state) {throw 'Installed Bunny state layout does not match instal ...
+  +                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      + CategoryInfo          : OperationStopped: (Installed Bunny...h install.json.:String) [], RuntimeException
+      + FullyQualifiedErrorId : Installed Bunny state layout does not match install.json.
+   
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///<home>/Documents/new/bun-router-s1r3/scripts/bunny-release.test.mjs:126:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\bunny-release.test.mjs:155:1
+✖ M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release (5413.9652ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /inside a Git checkout/. Input:
+  
+  'Migrate Bunny state to the real <InstallRoot>\\state directory before activation. Use -StageOnly to install the \r\n' +
+    'candidate first.\r\n' +
+    'At C:\\Users\\<user>\\Documents\\new\\bun-router-s1r3\\scripts\\install-bunny-release.ps1:106 char:184\r\n' +
+    "+ ... sqlite'))) {throw 'Migrate Bunny state to the real <InstallRoot>\\stat ...\r\n" +
+    '+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n' +
+    '    + CategoryInfo          : OperationStopped: (Migrate Bunny s...andidate first.:String) [], RuntimeException\r\n' +
+    '    + FullyQualifiedErrorId : Migrate Bunny state to the real <InstallRoot>\\state directory before activation. Use -St \r\n' +
+    '   ageOnly to install the candidate first.\r\n' +
+    ' \r\n'
+  
+      at TestContext.<anonymous> (file:///<home>/Documents/new/bun-router-s1r3/scripts/bunny-release.test.mjs:185:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "Migrate Bunny state to the real <InstallRoot>\\state directory before activation. Use -StageOnly to install the \r\ncandidate first.\r\nAt C:\\Users\\<user>\\Documents\\new\\bun-router-s1r3\\scripts\\install-bunny-release.ps1:106 char:184\r\n+ ... sqlite'))) {throw 'Migrate Bunny state to the real <InstallRoot>\\stat ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : OperationStopped: (Migrate Bunny s...andidate first.:String) [], RuntimeException\r\n    + FullyQualifiedErrorId : Migrate Bunny state to the real <InstallRoot>\\state directory before activation. Use -St \r\n   ageOnly to install the candidate first.\r\n \r\n",
+    expected: /inside a Git checkout/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:245:73
+✖ MA2 T1 Windows controller: complete cutover and idempotent retry (10072.5751ms)
+  Error: EPERM, Permission denied: \\?\<home>\AppData\Local\Temp\BUNNYS~1\bunny-state-test-kJW4q6 '\\?\<home>\AppData\Local\Temp\BUNNYS~1\bunny-state-test-kJW4q6'
+      at rmSync (node:fs:1222:18)
+      at TestContext.<anonymous> (file:///<home>/Documents/new/bun-router-s1r3/scripts/bunny-state-migration.test.mjs:290:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\<user>\\AppData\\Local\\Temp\\BUNNYS~1\\bunny-state-test-kJW4q6',
+    syscall: 'rm'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:245:73
+✖ MA2 T1 Windows controller: after-copy (10043.3413ms)
+  Error: EPERM, Permission denied: \\?\<home>\AppData\Local\Temp\BUNNYS~1\bunny-state-test-BRQRyX '\\?\<home>\AppData\Local\Temp\BUNNYS~1\bunny-state-test-BRQRyX'
+      at rmSync (node:fs:1222:18)
+      at TestContext.<anonymous> (file:///<home>/Documents/new/bun-router-s1r3/scripts/bunny-state-migration.test.mjs:290:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\<user>\\AppData\\Local\\Temp\\BUNNYS~1\\bunny-state-test-BRQRyX',
+    syscall: 'rm'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:245:73
+✖ MA2 T1 Windows controller: after-config (9844.6517ms)
+  Error: EPERM, Permission denied: \\?\<home>\AppData\Local\Temp\BUNNYS~1\bunny-state-test-Rs4MsX '\\?\<home>\AppData\Local\Temp\BUNNYS~1\bunny-state-test-Rs4MsX'
+      at rmSync (node:fs:1222:18)
+      at TestContext.<anonymous> (file:///<home>/Documents/new/bun-router-s1r3/scripts/bunny-state-migration.test.mjs:290:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\<user>\\AppData\\Local\\Temp\\BUNNYS~1\\bunny-state-test-Rs4MsX',
+    syscall: 'rm'
+  }
+
+test at scripts\bunny-state-migration.test.mjs:245:73
+✖ MA2 T1 Windows controller: after-host (9824.2502ms)
+  Error: EPERM, Permission denied: \\?\<home>\AppData\Local\Temp\BUNNYS~1\bunny-state-test-huId44 '\\?\<home>\AppData\Local\Temp\BUNNYS~1\bunny-state-test-huId44'
+      at rmSync (node:fs:1222:18)
+      at TestContext.<anonymous> (file:///<home>/Documents/new/bun-router-s1r3/scripts/bunny-state-migration.test.mjs:290:5)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    errno: 1,
+    code: 'EPERM',
+    path: '\\\\?\\C:\\Users\\<user>\\AppData\\Local\\Temp\\BUNNYS~1\\bunny-state-test-huId44',
+    syscall: 'rm'
+  }
+exit=1
