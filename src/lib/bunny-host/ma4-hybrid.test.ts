@@ -40,7 +40,7 @@ test("H1 reliability-aware ranking: measured category correctness outranks valid
     "coder:7b": { programming: { passes: 0, samples: 6 }, "json-schema": { passes: 6, samples: 6 } },
     "general:7b": { programming: { passes: 5, samples: 6 } },
   };
-  const reliability = (_p: ProviderId, m: string | null, c: string) => (m && evidence[m]?.[c]) ?? null;
+  const reliability = (_p: ProviderId, m: string | null, c: string) => (m ? evidence[m]?.[c] : null) ?? null;
   const i = input(CODING, { routingMode: "AUTO_LOCAL" }, { reliability });
   const pick = selectRoutingCandidate({ candidates: buildCandidates(i), requirements: i.requirements });
   assert.equal(pick.selected?.model_id, "general:7b");
