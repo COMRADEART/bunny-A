@@ -10,9 +10,22 @@ Before this phase the repository had no CI. The workflow runs on `push` to `main
 | `regression` | windows-latest | full git history (release-pin tests resolve historical commits) · MSYS2 UCRT64 GCC (compiles the reviewed ownership module from source; nothing prebuilt is downloaded) · `npm ci` · `npm run pretest` · the exact `npm test` command with only `scripts/voice-worker.test.mjs` removed (generated from `package.json`, so the list cannot drift) |
 | `security` | ubuntu-latest | `npm audit --omit=dev --audit-level=high` · no committed `.env` or key-shaped secrets · external inference disabled by default (registry default and disabled cloud candidates) |
 
-Excluded from CI (hardware, live or installation dependent; reported separately): `scripts/voice-worker.test.mjs`, which needs the operator-staged, hash-pinned whisper runtime (`stage-whisper.mjs` never downloads) and a working Windows speech recognizer. On the first CI run it failed 8 whisper tests and V07–V09 for exactly these reasons. It passes locally (see the engineering report). Also excluded: live Ollama benchmarks and G7 (`scripts/ma4-s1r2/*.mjs`), `test:ma4:local`, live WSL2 adversarial sandbox fixtures (they report **SKIPPED (not passed)** without WSL2 user namespaces), installed-release switching, physical devices, NPU.
+Excluded from CI (hardware, live or installation dependent; reported separately): `scripts/voice-worker.test.mjs`, which needs the operator-staged, hash-pinned whisper runtime (`stage-whisper.mjs` never downloads) and a working Windows speech recognizer. On the first CI run it failed 8 voice tests (7 whisper, 1 V07–V09 streaming) for exactly these reasons; the other 8 failures were shallow-clone release-pin lookups, fixed by full history. It passes locally (see the engineering report). Also excluded: live Ollama benchmarks and G7 (`scripts/ma4-s1r2/*.mjs`), `test:ma4:local`, live WSL2 adversarial sandbox fixtures (they report **SKIPPED (not passed)** without WSL2 user namespaces), installed-release switching, physical devices, NPU.
 
-CI run results are recorded in the [engineering report](ENGINEERING_REPORT.md) after the branch is published.
+## Observed CI results (inspected)
+
+| Run (commit) | checks | regression | security |
+|---|---|---|---|
+| 39657189466 (`a3937da`) | FAIL: S1 transport test expected the old "unsupported stream" contract → fixed in `bb182b1` | FAIL: 16 environment failures (shallow clone, whisper not staged, runner speech) | FAIL: npm audit |
+| 39657625178 (`bb182b1`) | **PASS** | FAIL: same 16 | FAIL: npm audit |
+| 39658679375 (`a8d74c0`) | **PASS** | FAIL: scripts stage 367/374. The 7 failures are Windows install/release-packaging tests (M-A-1D release builder/launcher/installer state layout, MA2 T1 controller temp-dir `EPERM` after ~437 s). They depend on the installed-release environment and pass locally. Later stages were not reached (`&&`). | FAIL: npm audit (pre-existing, 5 critical / 2 high; semver-compatible fixes) |
+
+Local authoritative regression on this branch: `npm test` 2,204 passed, 0 failed, 1 skipped (`evidence/regression.log`).
+
+Next CI steps (not done here):
+1. Run each `npm test` stage as its own CI step, so one environment failure does not hide the rest.
+2. Move the install/release-environment tests to a self-hosted Windows runner with the release layout, or make their temp paths runner-safe.
+3. Apply the lockfile-only `npm audit fix` in an isolated checkout.
 
 ## MA4 → main conflict (I2) — strategy only, not executed
 
