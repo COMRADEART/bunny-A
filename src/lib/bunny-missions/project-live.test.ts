@@ -4,12 +4,13 @@ import { fork, execFileSync } from "node:child_process";
 import { createServer } from "node:net";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { evidenceDir } from "../bunny-host/test-evidence.ts";
 import { tmpdir } from "node:os";
 import type { AgentSnapshot } from "../bunny-host/agent-types.ts";
 import type { ProjectDetail, RegisteredProject, ProjectPage } from "../bunny-host/project-types.ts";
 import { contained } from "../bunny-host/project-paths.server.ts";
 import { DatabaseSync } from "node:sqlite";
-const evidence = resolve("test-results/ma3/t7");
+const evidence = evidenceDir("ma3/t7");
 const save = (name: string, value: unknown) => {
   mkdirSync(evidence, { recursive: true });
   writeFileSync(join(evidence, name), JSON.stringify(value, null, 2) + "\n");

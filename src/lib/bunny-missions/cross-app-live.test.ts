@@ -4,13 +4,14 @@ import { fork, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { createServer as allocate } from "node:net";
 import { join, resolve } from "node:path";
+import { evidenceDir } from "../bunny-host/test-evidence.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { canonical, within } from "./paths.server.ts";
 import type { AgentSnapshot } from "../bunny-host/agent-types.ts";
 import { sha256 } from "./artifacts.server.ts";
-const evidence = resolve("test-results/ma3/t6");
+const evidence = evidenceDir("ma3/t6");
 const save = (name: string, value: unknown) => { mkdirSync(evidence, { recursive: true }); writeFileSync(join(evidence, name), JSON.stringify(value, null, 2)); };
 async function until<T>(fn: () => Promise<T | null>, detail: string): Promise<T> { const end = Date.now() + 100_000; while (Date.now() < end) { const value = await fn(); if (value) return value; await new Promise(r => setTimeout(r, 50)); } throw new Error(`Timeout: ${detail}`); }
 async function start(dir: string, root: string) {

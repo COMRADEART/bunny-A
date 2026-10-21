@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
+import { evidenceDir } from "../bunny-host/test-evidence.ts";
 import { HostDatabase } from "../bunny-host/persistence.server.ts";
 import { TaskManager } from "../bunny-host/manager.server.ts";
 import { AgentRuntime } from "../bunny-host/agent-runtime.server.ts";
@@ -15,7 +16,7 @@ import { safeUrl, approvedOrigin, resolvePublic, checkingProxy } from "./capabil
 import { operationContract, semanticOutput, safeSemanticText } from "./cross-app.ts";
 import { classifyReplay, type ReplayFacts } from "../bunny-host/agent-replay.ts";
 import { spawnSync } from "node:child_process";
-const evidence = resolve("test-results/ma3/t6/security");
+const evidence = evidenceDir("ma3/t6/security");
 function record(id: string, value: unknown) { mkdirSync(evidence, { recursive: true }); writeFileSync(join(evidence, `${id}.json`), JSON.stringify(value, null, 2)); }
 const post = (action: string, params: Record<string, unknown>, field: string, equals: unknown) => ({ kind: "capability", action, params, expect: { field, equals } });
 const step = (action: string, params: Record<string, unknown>, verification: unknown[] = [post("filesystem.exists", { path: "seed.txt" }, "exists", true)]) => ({ role: "Probe", objective: "Bounded cross-app probe", crossApp: true, access: action === "filesystem.write" ? "write" : "read", executor: { kind: "capability", action, params }, verification });
