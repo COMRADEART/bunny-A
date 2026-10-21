@@ -1,0 +1,307 @@
+{
+  "version": "bunny-ma4-s1r-python-workflow-v2",
+  "model": "qwen2.5-coder:7b",
+  "modelDigest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+  "trials": 3,
+  "gate": ">=2 of 3 trials pass hidden and generated tests",
+  "hiddenTestsSha256": "b09129d2711b8046354f10066d68f755b1825bd3dd485b56a1a1660f897fda46",
+  "astGateSha256": "139714bc7d19b11c4ed77a63e7f3367ab468434e5aa26d967f7b61edb7bb354b",
+  "runs": [
+    {
+      "trial": 1,
+      "at": "2026-10-21T14:53:51.107Z",
+      "mission": {
+        "state": "waiting_for_user",
+        "steps": [
+          {
+            "role": "Planner",
+            "state": "failed",
+            "startedAt": 1792594431127,
+            "finishedAt": 1792594431128,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          },
+          {
+            "role": "Worker",
+            "state": "pending",
+            "startedAt": null,
+            "finishedAt": null,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          },
+          {
+            "role": "Tester",
+            "state": "pending",
+            "startedAt": null,
+            "finishedAt": null,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          },
+          {
+            "role": "Reviewer",
+            "state": "pending",
+            "startedAt": null,
+            "finishedAt": null,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          }
+        ],
+        "events": [
+          "mission.created",
+          "mission.planning",
+          "mission.planned",
+          "mission.approval_required",
+          "approval.mission_envelope",
+          "authorization.granted",
+          "mission.started",
+          "mission.step.ready",
+          "mission.step.started",
+          "mission.step.failed",
+          "mission.waiting_for_user"
+        ]
+      },
+      "checks": {
+        "missionCompleted": false,
+        "allPinned": false,
+        "dependenciesRespected": false,
+        "workerTesterOverlapped": false,
+        "extracted": true,
+        "astGate": true,
+        "hiddenTestsPass": false,
+        "generatedTestsPass": false
+      },
+      "reviewerFirstLine": "",
+      "artifacts": {
+        "workerSource": "\n",
+        "testerSource": "\n"
+      },
+      "astGate": {
+        "exitCode": 0,
+        "timedOut": false,
+        "stdout": "AST_OK\r\n",
+        "stderr": ""
+      },
+      "hidden": {
+        "exitCode": 1,
+        "timedOut": false,
+        "stdout": "======================================================================\r\nERROR: test_hidden_duration (unittest.loader._FailedTest.test_hidden_duration)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_hidden_duration\r\nTraceback (most recent call last):\r\n  File \"<user-path>\", line 396, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"<user-path>\", line 339, in _get_module_from_name\r\n    __import__(name)\r\n  File \"<temp>\\trial-1\\test_hidden_duration.py\", line 2, in <module>\r\n    from duration import parse_duration\r\nImportError: cannot import name 'parse_duration' from 'duration' (<temp>\\trial-1\\duration.py)\r\n\r\n\r\n----------------------------------------------------------------------\r\nRan 1 test in 0.000s\r\n\r\nFAILED (errors=1)\r\nRESULT 1 0 1\r\n",
+        "stderr": ""
+      },
+      "generated": {
+        "exitCode": 1,
+        "timedOut": false,
+        "stdout": "----------------------------------------------------------------------\r\nRan 0 tests in 0.000s\r\n\r\nNO TESTS RAN\r\nRESULT 0 0 0\r\n",
+        "stderr": ""
+      },
+      "pass": false
+    },
+    {
+      "trial": 2,
+      "at": "2026-10-21T14:53:51.988Z",
+      "mission": {
+        "state": "waiting_for_user",
+        "steps": [
+          {
+            "role": "Planner",
+            "state": "failed",
+            "startedAt": 1792594431995,
+            "finishedAt": 1792594431995,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          },
+          {
+            "role": "Worker",
+            "state": "pending",
+            "startedAt": null,
+            "finishedAt": null,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          },
+          {
+            "role": "Tester",
+            "state": "pending",
+            "startedAt": null,
+            "finishedAt": null,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          },
+          {
+            "role": "Reviewer",
+            "state": "pending",
+            "startedAt": null,
+            "finishedAt": null,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          }
+        ],
+        "events": [
+          "mission.created",
+          "mission.planning",
+          "mission.planned",
+          "mission.approval_required",
+          "approval.mission_envelope",
+          "authorization.granted",
+          "mission.started",
+          "mission.step.ready",
+          "mission.step.started",
+          "mission.step.failed",
+          "mission.waiting_for_user"
+        ]
+      },
+      "checks": {
+        "missionCompleted": false,
+        "allPinned": false,
+        "dependenciesRespected": false,
+        "workerTesterOverlapped": false,
+        "extracted": true,
+        "astGate": true,
+        "hiddenTestsPass": false,
+        "generatedTestsPass": false
+      },
+      "reviewerFirstLine": "",
+      "artifacts": {
+        "workerSource": "\n",
+        "testerSource": "\n"
+      },
+      "astGate": {
+        "exitCode": 0,
+        "timedOut": false,
+        "stdout": "AST_OK\r\n",
+        "stderr": ""
+      },
+      "hidden": {
+        "exitCode": 1,
+        "timedOut": false,
+        "stdout": "======================================================================\r\nERROR: test_hidden_duration (unittest.loader._FailedTest.test_hidden_duration)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_hidden_duration\r\nTraceback (most recent call last):\r\n  File \"<user-path>\", line 396, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"<user-path>\", line 339, in _get_module_from_name\r\n    __import__(name)\r\n  File \"<temp>\\trial-2\\test_hidden_duration.py\", line 2, in <module>\r\n    from duration import parse_duration\r\nImportError: cannot import name 'parse_duration' from 'duration' (<temp>\\trial-2\\duration.py)\r\n\r\n\r\n----------------------------------------------------------------------\r\nRan 1 test in 0.000s\r\n\r\nFAILED (errors=1)\r\nRESULT 1 0 1\r\n",
+        "stderr": ""
+      },
+      "generated": {
+        "exitCode": 1,
+        "timedOut": false,
+        "stdout": "----------------------------------------------------------------------\r\nRan 0 tests in 0.000s\r\n\r\nNO TESTS RAN\r\nRESULT 0 0 0\r\n",
+        "stderr": ""
+      },
+      "pass": false
+    },
+    {
+      "trial": 3,
+      "at": "2026-10-21T14:53:52.938Z",
+      "mission": {
+        "state": "waiting_for_user",
+        "steps": [
+          {
+            "role": "Planner",
+            "state": "failed",
+            "startedAt": 1792594432947,
+            "finishedAt": 1792594432948,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          },
+          {
+            "role": "Worker",
+            "state": "pending",
+            "startedAt": null,
+            "finishedAt": null,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          },
+          {
+            "role": "Tester",
+            "state": "pending",
+            "startedAt": null,
+            "finishedAt": null,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          },
+          {
+            "role": "Reviewer",
+            "state": "pending",
+            "startedAt": null,
+            "finishedAt": null,
+            "model": null,
+            "provider": null,
+            "outputTokens": null,
+            "outputSha256": null
+          }
+        ],
+        "events": [
+          "mission.created",
+          "mission.planning",
+          "mission.planned",
+          "mission.approval_required",
+          "approval.mission_envelope",
+          "authorization.granted",
+          "mission.started",
+          "mission.step.ready",
+          "mission.step.started",
+          "mission.step.failed",
+          "mission.waiting_for_user"
+        ]
+      },
+      "checks": {
+        "missionCompleted": false,
+        "allPinned": false,
+        "dependenciesRespected": false,
+        "workerTesterOverlapped": false,
+        "extracted": true,
+        "astGate": true,
+        "hiddenTestsPass": false,
+        "generatedTestsPass": false
+      },
+      "reviewerFirstLine": "",
+      "artifacts": {
+        "workerSource": "\n",
+        "testerSource": "\n"
+      },
+      "astGate": {
+        "exitCode": 0,
+        "timedOut": false,
+        "stdout": "AST_OK\r\n",
+        "stderr": ""
+      },
+      "hidden": {
+        "exitCode": 1,
+        "timedOut": false,
+        "stdout": "======================================================================\r\nERROR: test_hidden_duration (unittest.loader._FailedTest.test_hidden_duration)\r\n----------------------------------------------------------------------\r\nImportError: Failed to import test module: test_hidden_duration\r\nTraceback (most recent call last):\r\n  File \"<user-path>\", line 396, in _find_test_path\r\n    module = self._get_module_from_name(name)\r\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"<user-path>\", line 339, in _get_module_from_name\r\n    __import__(name)\r\n  File \"<temp>\\trial-3\\test_hidden_duration.py\", line 2, in <module>\r\n    from duration import parse_duration\r\nImportError: cannot import name 'parse_duration' from 'duration' (<temp>\\trial-3\\duration.py)\r\n\r\n\r\n----------------------------------------------------------------------\r\nRan 1 test in 0.000s\r\n\r\nFAILED (errors=1)\r\nRESULT 1 0 1\r\n",
+        "stderr": ""
+      },
+      "generated": {
+        "exitCode": 1,
+        "timedOut": false,
+        "stdout": "----------------------------------------------------------------------\r\nRan 0 tests in 0.000s\r\n\r\nNO TESTS RAN\r\nRESULT 0 0 0\r\n",
+        "stderr": ""
+      },
+      "pass": false
+    }
+  ],
+  "startedAt": "2026-10-21T14:53:50.840Z",
+  "sessionsRemaining": 0,
+  "finishedAt": "2026-10-21T14:53:53.649Z",
+  "generationRequests": 0,
+  "networkDenied": 0,
+  "externalInference": false,
+  "passed": 0,
+  "g7": "FAIL"
+}
