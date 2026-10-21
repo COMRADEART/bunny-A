@@ -18,6 +18,15 @@ Command:
 G7_OUT=docs/ma4-s1r3/evidence/g7-qwen2.5-coder-7b.json node --experimental-strip-types scripts/ma4-s1r2/g7.mjs
 ```
 
+## Addendum (written while run 1 was in progress, after its 3 regression trials were observed)
+
+Run 1 exposed two workflow gaps. Both follow from the policy already stated in the mission, and neither is specific to any task:
+
+1. Under the all-pass rule, an invalid Tester test (one that fails on the frozen reference) that happens to *pass* on a buggy Worker is only flagged after the Worker is fixed, when the budget is already spent (v2 t2).
+2. The execution layer reports a malformed structured reply as an error ("invalid structured JSON"), so it bypassed producer repair and ended the trial as `model_error` (v2 t3).
+
+Rule fixed now, before any further generation: run 1 is reported in full as the result of workflow v1 (`611c37f`). At most **one** further S1R3 run (run 2) is made, with the fixes, under exactly the same tasks, trials, rules, threshold and pin, using a new evidence file. R3-G7/R3-G8 are decided by **run 2**; run 1 stays reported next to it. No further reruns in S1R3, whatever run 2 shows.
+
 ## Results
 
 Pending (filled in after the decisive run completes).
