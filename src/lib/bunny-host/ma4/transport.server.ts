@@ -104,6 +104,49 @@ export class CompatibleProvider implements ModelProvider {
       throw new InferenceError(503);
     } finally { this.active.delete(request.requestId); }
   }
-  async *stream(_request: GenerationRequest): AsyncIterable<string> { throw new Error("Streaming unsupported by this adapter contract; use bounded generate."); }
+  /** Bounded SSE stream. A stream that ends without a finish_reason and [DONE] is an interruption, never a success. */
+  async *stream(request: GenerationRequest): AsyncIterable<string> {
+    if (this.active.has(request.requestId)) throw new Error("Duplicate active request id.");
+    const controller = new AbortController(); this.active.set(request.requestId, controller);
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(Math.min(300000, Math.max(1, request.timeoutMs))), ...(request.signal ? [request.signal] : [])]);
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+    try {
+      const key = await this.key();
+      if (key) registerDiagnosticSecret(key);
+      let response: Response;
+      try {
+        response = await this.fetcher(`${this.endpoint}/chat/completions`, { method: "POST", signal, redirect: "error", headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
+          body: JSON.stringify({ model: request.model, messages: [{ role: "user", content: request.prompt }], max_tokens: request.maxTokens, stream: true, ...(request.providerOptions ? { provider: request.providerOptions } : {}) }) });
+      } catch { throw new InferenceError(signal.aborted ? 408 : 503); }
+      if (!response.ok) { await response.body?.cancel(); throw new InferenceError(response.status, retryAfter(response.headers.get("retry-after"))); }
+      reader = response.body?.getReader();
+      if (!reader) throw new InferenceError(502);
+      const decoder = new TextDecoder(); let buffer = "", size = 0, finished = false, done = false;
+      while (!done) {
+        let part: ReadableStreamReadResult<Uint8Array>;
+        try { part = await reader.read(); } catch { throw new InferenceError(signal.aborted ? 408 : 502); }
+        if (part.done) break;
+        size += part.value.byteLength;
+        if (size > 4 * 1024 * 1024) throw new InferenceError(502);
+        buffer += decoder.decode(part.value, { stream: true });
+        let index: number;
+        while ((index = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.slice(0, index).trim(); buffer = buffer.slice(index + 1);
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (data === "[DONE]") { done = true; break; }
+          let chunk: unknown;
+          try { chunk = JSON.parse(data); } catch { throw new InferenceError(502); }
+          if (!record(chunk) || chunk.error || (typeof chunk.model === "string" && chunk.model !== request.model) || !Array.isArray(chunk.choices)) throw new InferenceError(502);
+          const choice = chunk.choices[0];
+          if (!record(choice)) continue;
+          const delta = record(choice.delta) && typeof choice.delta.content === "string" ? choice.delta.content : "";
+          if (delta) yield redactOutput(delta, key ? [key] : []);
+          if (choice.finish_reason != null) { if (!["stop", "eos"].includes(String(choice.finish_reason))) throw new InferenceError(502); finished = true; }
+        }
+      }
+      if (!finished || !done) throw new InferenceError(signal.aborted ? 408 : 502);
+    } finally { this.active.delete(request.requestId); await reader?.cancel().catch(() => undefined); }
+  }
   cancel(requestId: string) { this.active.get(requestId)?.abort(); }
 }
