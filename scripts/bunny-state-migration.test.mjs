@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { execFileSync, spawnSync } from "node:child_process";
-import { closeSync, copyFileSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
@@ -13,8 +13,10 @@ import { hostStatePaths } from "../src/lib/bunny-host/state-paths.server.ts";
 import { walkFiles, writeManifest } from "./bunny-release.mjs";
 
 const TABLES = ["tasks", "outcomes", "events", "projects", "devices", "settings", "missions", "mission_steps", "mission_authorizations", "capability_grants", "capability_runs", "skills", "skill_versions", "inbox_events", "mission_memory", "mission_artifacts", "mission_dependencies", "permission_requests", "policies", "triggers", "workspace_locks", "providers", "migrations"];
+// Hosted Windows runners set TEMP to an 8.3 short path (C:\Users\RUNNER~1\...); the scripts under test compare long paths.
+const TEMP = realpathSync.native(tmpdir());
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "bunny-state-test-"));
+  const root = mkdtempSync(join(TEMP, "bunny-state-test-"));
   const source = join(root, "checkout", ".bunny-a"); const install = join(root, "install");
   mkdirSync(join(source, "validation"), { recursive: true }); mkdirSync(install);
   writeFileSync(join(source, "validation", "evidence.txt"), "retained validation evidence");
