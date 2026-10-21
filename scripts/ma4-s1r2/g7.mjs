@@ -9,8 +9,11 @@
 //     Reviewer runs last; acceptance equals the deterministic gate (reviewer never overrides); statuses match the gate;
 //     one controlled cancellation trial ends "cancelled" with no sandbox run and no live request left.
 //   * No retries of whole trials, no cherry-picking; every trial is recorded.
+// MA4-S1R3 harness-only changes (tasks, trials, rules, threshold and invariants unchanged): G7_OUT selects the evidence
+// file so historical S1R2 evidence is never overwritten; each run also records the S1R3 failure attributions and repairs.
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { freemem } from 'node:os';
 import { G7_TASKS, G7_VERSION } from './g7-tasks.mjs';
 import { runCodingWorkflow } from '../../src/lib/bunny-host/ma4/coding-workflow.server.ts';
@@ -19,7 +22,7 @@ import { execute } from '../../src/lib/orch/exec.server.ts';
 
 const PIN = process.env.G7_PIN ?? 'qwen2.5-coder:7b';
 const TRIALS = { regression: 3, heldout: 2 };
-const OUT = `docs/ma4-s1r2/evidence/g7${process.env.G7_PIN ? '-' + PIN.replace(/[^a-z0-9]+/gi, '_') : ''}.json`;
+const OUT = process.env.G7_OUT ?? `docs/ma4-s1r2/evidence/g7${process.env.G7_PIN ? '-' + PIN.replace(/[^a-z0-9]+/gi, '_') : ''}.json`;
 const ORIGIN = 'http://127.0.0.1:11434';
 const realFetch = globalThis.fetch; let refused = 0, live = 0;
 globalThis.fetch = async (input, init) => {
@@ -41,7 +44,7 @@ const call = async ({ model, prompt, schema, signal }) => {
 const sandbox = await sandboxAvailability();
 if (!sandbox.available) throw new Error('Sandbox unavailable: dynamic execution BLOCKED; G7 not run.');
 const evidence = { version: G7_VERSION, pin: PIN, trials: TRIALS, startedAt: new Date().toISOString(), sandbox, taskHash: sha(JSON.stringify(G7_TASKS)), preflight: [], runs: [] };
-const save = () => { mkdirSync('docs/ma4-s1r2/evidence', { recursive: true }); writeFileSync(OUT, JSON.stringify(evidence, null, 2) + '\n'); };
+const save = () => { mkdirSync(dirname(OUT), { recursive: true }); writeFileSync(OUT, JSON.stringify(evidence, null, 2) + '\n'); };
 
 // Pre-flight: each frozen reference passes its hidden tests, so a failure is never the harness's fault.
 for (const t of G7_TASKS) {
@@ -62,7 +65,7 @@ for (const task of G7_TASKS) {
     const r = await runCodingWorkflow(task, { call, sandbox: runSandboxed, pins, maxRepairs: 2, onEvent: e => console.log(`  ${task.id}#${trial} ${e}`) });
     const final = r.attempts.at(-1);
     evidence.runs.push({ task: task.id, kind: task.kind, trial, status: r.status, reason: r.reason, repairsUsed: r.repairsUsed, durationMs: Date.now() - started,
-      attempts: r.attempts, reviewer: r.reviewer, reviewerFalseApproval: r.reviewerFalseApproval, reviewerFalseRejection: r.reviewerFalseRejection, workerTesterConcurrent: r.workerTesterConcurrent,
+      attempts: r.attempts, repairs: r.repairs, failures: r.failures, contractVersion: r.contractVersion, reviewer: r.reviewer, reviewerFalseApproval: r.reviewerFalseApproval, reviewerFalseRejection: r.reviewerFalseRejection, workerTesterConcurrent: r.workerTesterConcurrent,
       calls: r.calls.map(({ role, model, attempt, ok, durationMs, servedModel, startedAt, endedAt }) => ({ role, model, attempt, ok, durationMs, servedModel, startedAt, endedAt })),
       invariants: { pinsHeld: r.calls.every(c => c.model === pins[c.role] && (!c.ok || c.servedModel === pins[c.role])), ordering: r.status === 'passed' || r.status === 'failed' ? order(r.calls) : null,
         gateIsAuthority: (r.status === 'passed') === !!final?.accepted || !['passed', 'failed'].includes(r.status) },
@@ -89,7 +92,8 @@ evidence.summary = {
   regression: { passed: reg.filter(r => r.status === 'passed').length, trials: reg.length },
   byKind: Object.fromEntries(['simple', 'intermediate', 'debugging', 'planning'].map(k => [k, `${held.filter(r => r.kind === k && r.status === 'passed').length}/${held.filter(r => r.kind === k).length}`])),
   statuses: evidence.runs.reduce((a, r) => ({ ...a, [r.status]: (a[r.status] ?? 0) + 1 }), {}),
-  repairsUsed: evidence.runs.reduce((a, r) => a + r.repairsUsed, 0), passedAfterRepair: evidence.runs.filter(r => r.status === 'passed' && r.repairsUsed > 0).length,
+  repairsUsed: evidence.runs.reduce((a, r) => a + r.repairsUsed, 0),
+  repairsByTarget: evidence.runs.flatMap(r => r.repairs ?? []).reduce((a, x) => ({ ...a, [`${x.target}:${x.outcome}`]: (a[`${x.target}:${x.outcome}`] ?? 0) + 1 }), {}), passedAfterRepair: evidence.runs.filter(r => r.status === 'passed' && r.repairsUsed > 0).length,
   reviewerFalseApprovals: evidence.runs.filter(r => r.reviewerFalseApproval).length, reviewerFalseRejections: evidence.runs.filter(r => r.reviewerFalseRejection).length,
   invariants: { pinsHeld: inv.every(i => i.pinsHeld), ordering: inv.every(i => i.ordering !== false), gateIsAuthority: inv.every(i => i.gateIsAuthority), cancellation: evidence.cancellation.status === 'cancelled' && evidence.cancellation.sandboxRuns === 0 && evidence.cancellation.liveRequestsAfter === 0 },
   externalRequestsRefused: refused,
