@@ -1,0 +1,2889 @@
+{
+  "version": "bunny-ma4-s1r2-g7-v1",
+  "pin": "qwen2.5-coder:7b",
+  "trials": {
+    "regression": 3,
+    "heldout": 2
+  },
+  "startedAt": "2026-10-21T16:09:49.469Z",
+  "sandbox": {
+    "available": true,
+    "backend": "wsl2-userns-pivot_root-cgroupv2",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2"
+  },
+  "taskHash": "aa5d5c19d80e611ebee8ab37f2a3bf9f86d0553aedeccf7cda5f346fa09b4cb8",
+  "preflight": [
+    {
+      "task": "g7-v2-duration",
+      "referencePasses": true
+    },
+    {
+      "task": "s1-anagram",
+      "referencePasses": true
+    },
+    {
+      "task": "s2-chunk",
+      "referencePasses": true
+    },
+    {
+      "task": "s3-title",
+      "referencePasses": true
+    },
+    {
+      "task": "i1-roman",
+      "referencePasses": true
+    },
+    {
+      "task": "i2-kv",
+      "referencePasses": true
+    },
+    {
+      "task": "i3-lru",
+      "referencePasses": true
+    },
+    {
+      "task": "d1-flatten",
+      "referencePasses": true
+    },
+    {
+      "task": "d2-moving",
+      "referencePasses": true
+    },
+    {
+      "task": "p1-inventory",
+      "referencePasses": true
+    },
+    {
+      "task": "p2-bucket",
+      "referencePasses": true
+    }
+  ],
+  "runs": [
+    {
+      "task": "g7-v2-duration",
+      "kind": "regression",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 173841,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": false,
+            "errors": [
+              "declared dependency 're (regular expression module)' is not allowed",
+              "declared dependency 'typing (for type hints)' is not allowed"
+            ]
+          },
+          "hidden": {
+            "ran": false,
+            "passed": false,
+            "total": 0,
+            "failed": 0
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3282
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 2,
+            "valid": 2,
+            "failedValid": [
+              "test_generated.TestDuration.test_edge_cases"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3346,
+          "feedback": "test_generated.TestDuration.test_edge_cases: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 24, in test_edge_cases\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n"
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 2,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 2,
+            "valid": 2,
+            "failedValid": [
+              "test_generated.TestDuration.test_edge_cases",
+              "test_generated.TestDuration.test_normal_cases"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3742,
+          "feedback": "test_generated.TestDuration.test_edge_cases: ^^^^^^^\n  File \"/usr/lib/python3.12/re/__init__.py\", line 167, in match\n    return _compile(pattern, flags).match(string)\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/re/__init__.py\", line 307, in _compile\n    p = _compiler.compile(pattern, flags)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/re/_compiler.py\", line 745, in compile\n    p = _parser.parse(p, flags)\n        ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/re/_parser.py\", line 984, in parse\n    raise source.error(\"unbalanced parenthesis\")\nre.error: unbalanced parenthesis at position 51\n\ntest_generated.TestDuration.test_normal_cases: ^^^^^^^\n  File \"/usr/lib/python3.12/re/__init__.py\", line 167, in match\n    return _compile(pattern, flags).match(string)\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/re/__init__.py\", line 307, in _compile\n    p = _compiler.compile(pattern, flags)\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/re/_compiler.py\", line 745, in compile\n    p = _parser.parse(p, flags)\n        ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/re/_parser.py\", line 984, in parse\n    raise source.error(\"unbalanced parenthesis\")\nre.error: unbalanced parenthesis at position 51\n"
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 31549,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792598992681,
+          "endedAt": 1792599024232
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 26896,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599024234,
+          "endedAt": 1792599051130
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 73814,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599024235,
+          "endedAt": 1792599098049
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 23139,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599101332,
+          "endedAt": 1792599124471
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 19456,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599127817,
+          "endedAt": 1792599147273
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 15504,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599151015,
+          "endedAt": 1792599166520
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "9dc0996a7e0669eef535dd75aba3f909b7e4b6e9c7f47494e43fd82533fb9506",
+      "finalSource": "import re\n\ndef parse_duration(text: str) -> int:\n    if not text or not re.match(r'^\b(\b[1-9]\b|\\b0\\b)\b\\d*[hms](\\b[1-9]\\b|\\b0\\b)\\d*[hms])*$', text):\n        raise ValueError\n\n    total_seconds = 0\n    parts = re.findall(r'\\d+[hms]', text)\n\n    for part in parts:\n        number, unit = int(part[:-1]), part[-1]\n        if unit not in {'h': 3600, 'm': 60, 's': 1}:\n            raise ValueError\n        total_seconds += number * {'h': 3600, 'm': 60, 's': 1}[unit]\n\n    return total_seconds\n"
+    },
+    {
+      "task": "g7-v2-duration",
+      "kind": "regression",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): tester tests.",
+      "repairsUsed": 2,
+      "durationMs": 169149,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": false,
+            "errors": [
+              "declared dependency 're module for regular expression operations' is not allowed",
+              "declared dependency 'typing module for type hinting' is not allowed"
+            ]
+          },
+          "hidden": {
+            "ran": false,
+            "passed": false,
+            "total": 0,
+            "failed": 0
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3880
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 2,
+            "valid": 2,
+            "failedValid": [
+              "test_generated.TestParseDuration.test_parse_duration_normal_cases"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 5438,
+          "feedback": "test_generated.TestParseDuration.test_parse_duration_normal_cases: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 6, in test_parse_duration_normal_cases\n    self.assertEqual(parse_duration('1h30m'), 5400)\n                     ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/work/duration.py\", line 12, in parse_duration\n    raise ValueError\nValueError\n"
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 2,
+            "valid": 2,
+            "failedValid": [
+              "test_generated.TestParseDuration.test_parse_duration_edge_cases"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3222,
+          "feedback": "test_generated.TestParseDuration.test_parse_duration_edge_cases: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 19, in test_parse_duration_edge_cases\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n"
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.9,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 36253,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599166523,
+          "endedAt": 1792599202776
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 29137,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599202776,
+          "endedAt": 1792599231913
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 64219,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599202777,
+          "endedAt": 1792599266996
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 25144,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599270877,
+          "endedAt": 1792599296021
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 21708,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599301461,
+          "endedAt": 1792599323169
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 9280,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599326391,
+          "endedAt": 1792599335671
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "bc618c63b0614c00a62096b46410c9e868b6e1996b6c9ab8fb26173a3511dbd0",
+      "finalSource": "import re\n\nUNIT_TO_SECONDS = {'h': 3600, 'm': 60, 's': 1}\n\ndef parse_duration(text: str) -> int:\n    if not text:\n        raise ValueError\n\n    pattern = r'^([0-9]+h)?([0-9]+m)?([0-9]+s)?$'\n    match = re.match(pattern, text)\n    if not match:\n        raise ValueError\n\n    total_seconds = 0\n    for i, unit in enumerate(('h', 'm', 's')):\n        if match.group(i + 1):\n            total_seconds += int(match.group(i + 1)[:-1]) * UNIT_TO_SECONDS[unit]\n\n    return total_seconds\n"
+    },
+    {
+      "task": "g7-v2-duration",
+      "kind": "regression",
+      "trial": 3,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 234120,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": false,
+            "errors": [
+              "source: syntax error line 2: invalid syntax"
+            ]
+          },
+          "hidden": {
+            "ran": false,
+            "passed": false,
+            "total": 0,
+            "failed": 0
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3303
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 2,
+            "valid": 2,
+            "failedValid": [
+              "test_generated.TestDuration.test_valid_duration"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 4068,
+          "feedback": "test_generated.TestDuration.test_valid_duration: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 6, in test_valid_duration\n    self.assertEqual(parse_duration('1h30m'), 5400)\n                     ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/work/duration.py\", line 8, in parse_duration\n    raise ValueError('Invalid format')\nValueError: Invalid format\n"
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 2,
+            "valid": 2,
+            "failedValid": [
+              "test_generated.TestDuration.test_valid_duration"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1304,
+          "feedback": "test_generated.TestDuration.test_valid_duration: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 6, in test_valid_duration\n    self.assertEqual(parse_duration('1h30m'), 5400)\n                     ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/work/duration.py\", line 9, in parse_duration\n    raise ValueError('Invalid format')\nValueError: Invalid format\n"
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 65467,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599335673,
+          "endedAt": 1792599401140
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 85626,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599401141,
+          "endedAt": 1792599486768
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 106001,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599401141,
+          "endedAt": 1792599507142
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 23668,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599510446,
+          "endedAt": 1792599534114
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 14001,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599538182,
+          "endedAt": 1792599552183
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 16304,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599553489,
+          "endedAt": 1792599569793
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "71ec9111d5cdc2856bc8ff30b982f95b90c44855752f7a85a637cbdfd3bead70",
+      "finalSource": "import re\n\ndef parse_duration(text):\n    if not text:\n        raise ValueError('Empty input')\n    pattern = r'^([0-9]+)h([0-9]+)m([0-9]+)s$'\n    match = re.match(pattern, text)\n    if not match:\n        raise ValueError('Invalid format')\n    hours, minutes, seconds = map(int, match.groups())\n    return hours * 3600 + minutes * 60 + seconds\n"
+    },
+    {
+      "task": "s1-anagram",
+      "kind": "simple",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 118976,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 3,
+            "valid": 2,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 3903,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 40982,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599569794,
+          "endedAt": 1792599610777
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 16544,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599610777,
+          "endedAt": 1792599627322
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 56337,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599610778,
+          "endedAt": 1792599667115
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 17751,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599671018,
+          "endedAt": 1792599688769
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "aae8c013ca165e84de0c920b78f9541563aada78244d2ddce3c9109baf0b4226",
+      "finalSource": "def is_anagram(a, b):\n    if not isinstance(a, str) or not isinstance(b, str):\n        raise TypeError('Both arguments must be of type str')\n    normalized_a = a.replace(' ', '').lower()\n    normalized_b = b.replace(' ', '').lower()\n    return sorted(normalized_a) == sorted(normalized_b)\n"
+    },
+    {
+      "task": "s1-anagram",
+      "kind": "simple",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 141875,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 10,
+            "valid": 8,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4074,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 54094,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599688771,
+          "endedAt": 1792599742866
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 65462,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599742867,
+          "endedAt": 1792599808329
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 81482,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599742867,
+          "endedAt": 1792599824349
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2222,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599828424,
+          "endedAt": 1792599830646
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "17e7bf4dc4dc1a6444fb250bb97fff1d54916ad16eac2e3c11e2195a64906da3",
+      "finalSource": "def is_anagram(a, b):\n    if not isinstance(a, str) or not isinstance(b, str):\n        raise TypeError('Both arguments must be strings')\n    normalized_a = ''.join(sorted(a.lower().replace(' ', '')))\n    normalized_b = ''.join(sorted(b.lower().replace(' ', '')))\n    return normalized_a == normalized_b\n"
+    },
+    {
+      "task": "s2-chunk",
+      "kind": "simple",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): tester tests.",
+      "repairsUsed": 2,
+      "durationMs": 149603,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 1,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 4022,
+          "feedback": ""
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 1,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3416,
+          "feedback": ""
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 1,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1380,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.8,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 24104,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599830648,
+          "endedAt": 1792599854753
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 58290,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599854754,
+          "endedAt": 1792599913044
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 73739,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599854753,
+          "endedAt": 1792599928493
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 15906,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599932515,
+          "endedAt": 1792599948421
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 9515,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599951837,
+          "endedAt": 1792599961352
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 17519,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599962732,
+          "endedAt": 1792599980251
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "b3fb1021ce027db85c097f1b4832ecfb046bac5586bc71d8f2544e2d8a1eabc3",
+      "finalSource": "def chunk(xs, n):\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError('n must be a positive integer')\n\n    chunks = []\n    for i in range(0, len(xs), n):\n        chunks.append(xs[i:i+n])\n\n    return chunks\n"
+    },
+    {
+      "task": "s2-chunk",
+      "kind": "simple",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 96589,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 3854,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 32663,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792599980253,
+          "endedAt": 1792600012916
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 15517,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600012916,
+          "endedAt": 1792600028433
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 57807,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600012917,
+          "endedAt": 1792600070724
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2264,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600074578,
+          "endedAt": 1792600076842
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "4cd54bb86b3f816ccfe10fe1baba606e4378cb591d59b598751b6adbb300b797",
+      "finalSource": "def chunk(xs, n):\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError('n must be a positive integer')\n    result = []\n    for i in range(0, len(xs), n):\n        result.append(xs[i:i + n])\n    return result\n"
+    },
+    {
+      "task": "s3-title",
+      "kind": "simple",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "durationMs": 145958,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": false,
+            "errors": [
+              "source: line 15: top-level Assert runs on import; only imports, definitions, constants and a __main__ guard are allowed",
+              "source: line 16: top-level Assert runs on import; only imports, definitions, constants and a __main__ guard are allowed",
+              "source: line 17: top-level Assert runs on import; only imports, definitions, constants and a __main__ guard are allowed",
+              "source: line 18: top-level Assert runs on import; only imports, definitions, constants and a __main__ guard are allowed",
+              "source: line 19: top-level Assert runs on import; only imports, definitions, constants and a __main__ guard are allowed"
+            ]
+          },
+          "hidden": {
+            "ran": false,
+            "passed": false,
+            "total": 0,
+            "failed": 0
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 2778
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 6,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 3966,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 21175,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600076843,
+          "endedAt": 1792600098019
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 26813,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600098019,
+          "endedAt": 1792600124833
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 68128,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600098020,
+          "endedAt": 1792600166148
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 29974,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600168926,
+          "endedAt": 1792600198900
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 19933,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600202867,
+          "endedAt": 1792600222801
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "abd9a00b92edb93599084a81176bf20a00a4171d5f0338ef6703bd3656ee1ec3",
+      "finalSource": "def title_case(s):\n    small_words = {'a', 'an', 'the', 'of', 'in'}\n    words = s.split()\n    titlecased_words = []\n\n    for i, word in enumerate(words):\n        if word.islower() and word in small_words and i != 0:\n            titlecased_words.append(word.lower())\n        else:\n            titlecased_words.append(word.capitalize())\n\n    return ' '.join(titlecased_words)\n\n# Test cases\ndef check_title_case():\n    assert title_case('the quick brown fox') == 'The Quick Brown Fox'\n    assert title_case('jump over the lazy dog') == 'Jump Over the Lazy Dog'\n    assert title_case('a an the of in') == 'A An The Of In'\n    assert title_case('') == ''\n    assert title_case('single') == 'Single'\n\nif __name__ == '__main__':\n    check_title_case()\n"
+    },
+    {
+      "task": "s3-title",
+      "kind": "simple",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 111195,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 6,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4046,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 24533,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600222803,
+          "endedAt": 1792600247336
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 19634,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600247337,
+          "endedAt": 1792600266971
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 68008,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600247337,
+          "endedAt": 1792600315345
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 14605,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600319391,
+          "endedAt": 1792600333997
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "2d23adeec869ca8a6734ff1ab6b5b5774bbdfc38fea2e479d05cc788fbb90847",
+      "finalSource": "def title_case(s):\n    small_words = {'a', 'an', 'the', 'of', 'in'}\n    words = s.split()\n    for i, word in enumerate(words):\n        if word.lower() in small_words and i != 0:\n            words[i] = word.lower()\n        else:\n            words[i] = word.capitalize()\n    return ' '.join(words)\n\n__all__ = ['title_case']\n"
+    },
+    {
+      "task": "i1-roman",
+      "kind": "intermediate",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "durationMs": 239287,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": false,
+            "errors": [
+              "source: line 34: top-level Expr runs on import; only imports, definitions, constants and a __main__ guard are allowed",
+              "source: line 35: top-level Expr runs on import; only imports, definitions, constants and a __main__ guard are allowed",
+              "source: line 36: top-level Expr runs on import; only imports, definitions, constants and a __main__ guard are allowed",
+              "source: line 37: top-level Expr runs on import; only imports, definitions, constants and a __main__ guard are allowed",
+              "source: line 38: top-level Expr runs on import; only imports, definitions, constants and a __main__ guard are allowed"
+            ]
+          },
+          "hidden": {
+            "ran": false,
+            "passed": false,
+            "total": 0,
+            "failed": 0
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3023
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 6,
+            "valid": 6,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4089,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 44047,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600333999,
+          "endedAt": 1792600378046
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 47508,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600378046,
+          "endedAt": 1792600425554
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 145682,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600378047,
+          "endedAt": 1792600523729
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 36095,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600526752,
+          "endedAt": 1792600562847
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 6349,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600566937,
+          "endedAt": 1792600573286
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "b2eada40c7c8cc4f643fb46950ad79b15025b13bf688e1930df3084492a04fe1",
+      "finalSource": "import re\n\nROMAN_NUMERALS = {\n    'I': 1,\n    'V': 5,\n    'X': 10,\n    'L': 50,\n    'C': 100,\n    'D': 500,\n    'M': 1000\n}\n\ndef roman_to_int(s):\n    if not s:\n        raise ValueError('Input string is empty')\n    if not s.isupper():\n        raise ValueError('Input string is not uppercase')\n    if not re.match(r'^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$', s):\n        raise ValueError('Input string is not a valid Roman numeral')\n\n    total = 0\n    prev_value = 0\n    for char in s[::-1]:\n        value = ROMAN_NUMERALS[char]\n        if value < prev_value:\n            total -= value\n        else:\n            total += value\n        prev_value = value\n\n    return total\n"
+    },
+    {
+      "task": "i1-roman",
+      "kind": "intermediate",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 245040,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 3,
+            "valid": 1,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4284,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 32562,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600573287,
+          "endedAt": 1792600605850
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 49791,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600605850,
+          "endedAt": 1792600655641
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 200131,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600605851,
+          "endedAt": 1792600805982
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 8060,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600810267,
+          "endedAt": 1792600818327
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "b2b672e34d4982b37c89428da94871dfe963a0c76102a2ead52e67baabed7167",
+      "finalSource": "import re\n\n# Define the mapping of Roman numeral characters to their integer values\nroman_map = {\n    'I': 1, 'V': 5, 'X': 10, 'L': 50,\n    'C': 100, 'D': 500, 'M': 1000,\n    'IV': 4, 'IX': 9, 'XL': 40,\n    'XC': 90, 'CD': 400, 'CM': 900\n}\n\n# Define the function to convert a Roman numeral to an integer\ndef roman_to_int(s):\n    if not isinstance(s, str) or not s:\n        raise ValueError(\"Input must be a non-empty string\")\n    if not s.isupper():\n        raise ValueError(\"Input must be in uppercase\")\n    if not re.fullmatch(r'^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$', s):\n        raise ValueError(\"Invalid Roman numeral format\")\n\n    result = 0\n    i = 0\n    while i < len(s):\n        if i + 1 < len(s) and s[i:i+2] in roman_map:\n            result += roman_map[s[i:i+2]]\n            i += 2\n        else:\n            result += roman_map[s[i]]\n            i += 1\n    return result\n\n# Example usage\n# print(roman_to_int('III'))\n# print(roman_to_int('IV'))\n# print(roman_to_int('IX'))\n# print(roman_to_int('LVIII'))\n# print(roman_to_int('MCMXCIV'))\n"
+    },
+    {
+      "task": "i2-kv",
+      "kind": "intermediate",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 218397,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 9,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4296,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.8,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": true,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 82465,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600818329,
+          "endedAt": 1792600900794
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 35881,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600900794,
+          "endedAt": 1792600936675
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 119015,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792600900795,
+          "endedAt": 1792601019810
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 12619,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601024106,
+          "endedAt": 1792601036726
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "eec1d2704f3fe50fec7476686e0c313f749e5c30ecaa23c8b323be20863920f9",
+      "finalSource": "import re\ndef parse_kv(text):\n    # Regular expression to match valid keys\n    key_pattern = re.compile(r'^[a-z_]+$')\n    # Dictionary to store the parsed key-value pairs\n    result = {}\n    # Split the input text by semicolons and iterate over the pairs\n    pairs = text.split(';')\n    for pair in pairs:\n        # Strip whitespace from the pair\n        pair = pair.strip()\n        if not pair:\n            continue\n        # Split the pair into key and value\n        key, value = pair.split('=', 1)\n        key = key.strip()\n        value = value.strip()\n        # Check if the pair has a '='\n        if '=' not in pair:\n            raise ValueError('Invalid pair: {}'.format(pair))\n        # Check if the key matches the regular expression\n        if not key_pattern.match(key):\n            raise ValueError('Invalid key: {}'.format(key))\n        # Check for duplicate keys\n        if key in result:\n            raise ValueError('Duplicate key: {}'.format(key))\n        # Add the key-value pair to the dictionary\n        result[key] = value\n    return result\n"
+    },
+    {
+      "task": "i2-kv",
+      "kind": "intermediate",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 152751,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 8042,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 40525,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601036728,
+          "endedAt": 1792601077253
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 25129,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601077254,
+          "endedAt": 1792601102383
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 87385,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601077254,
+          "endedAt": 1792601164639
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 16797,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601172681,
+          "endedAt": 1792601189478
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "2dfc08d2bae5be192367e934d848e3cc538a8d6ec41613921310741207d62f02",
+      "finalSource": "import re\n\ndef parse_kv(text):\n    pattern = r'^\\s*([a-z_]+)\\s*=\\s*(.*)\\s*$'\n    result = {}\n    seen_keys = set()\n\n    for pair in text.split(';'):\n        pair = pair.strip()\n        if pair:\n            match = re.match(pattern, pair)\n            if not match:\n                raise ValueError(f'Invalid pair: {pair}')\n            key, value = match.groups()\n            if key in seen_keys:\n                raise ValueError(f'Duplicate key: {key}')\n            seen_keys.add(key)\n            result[key] = value\n\n    return result\n"
+    },
+    {
+      "task": "i3-lru",
+      "kind": "intermediate",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 163596,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 7,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4150,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 49902,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601189480,
+          "endedAt": 1792601239382
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 27006,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601239383,
+          "endedAt": 1792601266389
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 106810,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601239383,
+          "endedAt": 1792601346193
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2732,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601350344,
+          "endedAt": 1792601353076
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "85e3a5eca140b0611c7e7ff71ae7ff3516fcef779e02cac40e8b991be23ce974",
+      "finalSource": "from collections import OrderedDict\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity < 1:\n            raise ValueError('Capacity must be at least 1')\n        self.cache = OrderedDict()\n        self.capacity = capacity\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n"
+    },
+    {
+      "task": "i3-lru",
+      "kind": "intermediate",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 133695,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 6,
+            "valid": 1,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4608,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 29371,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601353077,
+          "endedAt": 1792601382448
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 72457,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601382449,
+          "endedAt": 1792601454906
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 97499,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601382449,
+          "endedAt": 1792601479948
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2215,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601484557,
+          "endedAt": 1792601486772
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "7e602f185727ad0919b97dd237c14d2c3d58260a8863dd6b4049b95430bf5415",
+      "finalSource": "from collections import OrderedDict\nclass LRUCache:\n    def __init__(self, capacity):\n        if capacity < 1:\n            raise ValueError(\"Capacity must be greater than 0\")\n        self.cache = OrderedDict()\n        self.capacity = capacity\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n"
+    },
+    {
+      "task": "d1-flatten",
+      "kind": "debugging",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 215858,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 18,
+            "valid": 17,
+            "failedValid": [
+              "test_generated.TestFlatten.test_flatten_mixed_depth_nested_single_empty_list",
+              "test_generated.TestFlatten.test_flatten_nested_single_empty_list"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 4143,
+          "feedback": "test_generated.TestFlatten.test_flatten_mixed_depth_nested_single_empty_list: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 95, in test_flatten_mixed_depth_nested_single_empty_list\n    self.assertEqual(flatten(nested_list), expected_output)\nAssertionError: Lists differ: [[]] != []\n\nFirst list contains 1 additional elements.\nFirst extra element 0:\n[]\n\n- [[]]\n+ []\n\ntest_generated.TestFlatten.test_flatten_nested_single_empty_list: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 55, in test_flatten_nested_single_empty_list\n    self.assertEqual(flatten(nested_list), expected_output)\nAssertionError: Lists differ: [[]] != []\n\nFirst list contains 1 additional elements.\nFirst extra element 0:\n[]\n\n- [[]]\n+ []\n"
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 18,
+            "valid": 17,
+            "failedValid": [
+              "test_generated.TestFlatten.test_flatten_mixed_depth_nested_single_empty_list",
+              "test_generated.TestFlatten.test_flatten_nested_single_empty_list"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1110,
+          "feedback": "test_generated.TestFlatten.test_flatten_mixed_depth_nested_single_empty_list: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 95, in test_flatten_mixed_depth_nested_single_empty_list\n    self.assertEqual(flatten(nested_list), expected_output)\nAssertionError: Lists differ: [[]] != []\n\nFirst list contains 1 additional elements.\nFirst extra element 0:\n[]\n\n- [[]]\n+ []\n\ntest_generated.TestFlatten.test_flatten_nested_single_empty_list: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 55, in test_flatten_nested_single_empty_list\n    self.assertEqual(flatten(nested_list), expected_output)\nAssertionError: Lists differ: [[]] != []\n\nFirst list contains 1 additional elements.\nFirst extra element 0:\n[]\n\n- [[]]\n+ []\n"
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 18,
+            "valid": 17,
+            "failedValid": [
+              "test_generated.TestFlatten.test_flatten_mixed_depth_nested_single_empty_list",
+              "test_generated.TestFlatten.test_flatten_nested_single_empty_list"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1093,
+          "feedback": "test_generated.TestFlatten.test_flatten_mixed_depth_nested_single_empty_list: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 95, in test_flatten_mixed_depth_nested_single_empty_list\n    self.assertEqual(flatten(nested_list), expected_output)\nAssertionError: Lists differ: [[]] != []\n\nFirst list contains 1 additional elements.\nFirst extra element 0:\n[]\n\n- [[]]\n+ []\n\ntest_generated.TestFlatten.test_flatten_nested_single_empty_list: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 55, in test_flatten_nested_single_empty_list\n    self.assertEqual(flatten(nested_list), expected_output)\nAssertionError: Lists differ: [[]] != []\n\nFirst list contains 1 additional elements.\nFirst extra element 0:\n[]\n\n- [[]]\n+ []\n"
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 5656,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601486774,
+          "endedAt": 1792601492430
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 158966,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601492431,
+          "endedAt": 1792601651397
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 174772,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601492430,
+          "endedAt": 1792601667202
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 6808,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601671345,
+          "endedAt": 1792601678153
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 10391,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601679263,
+          "endedAt": 1792601689654
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 11884,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601690747,
+          "endedAt": 1792601702632
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "f499e2574b445588be55a1173a47f6a74728519a993aa3d83fcca6a6ecbe216b",
+      "finalSource": "def flatten(nested):\n    out = []\n    for item in nested:\n        if isinstance(item, list):\n            out.extend(item)\n        else:\n            out.append(item)\n    return out\n"
+    },
+    {
+      "task": "d1-flatten",
+      "kind": "debugging",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 165835,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": false,
+            "errors": [
+              "source: import of 'typing' is not allowed"
+            ]
+          },
+          "hidden": {
+            "ran": false,
+            "passed": false,
+            "total": 0,
+            "failed": 0
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 2852
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 9,
+            "valid": 9,
+            "failedValid": [
+              "test_generated.TestFlatten.test_flatten_with_deeply_nested_lists",
+              "test_generated.TestFlatten.test_flatten_with_nested_empty_lists",
+              "test_generated.TestFlatten.test_flatten_with_nested_lists_of_lists"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1377,
+          "feedback": "test_generated.TestFlatten.test_flatten_with_deeply_nested_lists: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 27, in test_flatten_with_deeply_nested_lists\n    self.assertEqual(flatten([[1, [2, [3, [4, [5]]]]]]), [1, 2, 3, 4, 5])\nAssertionError: Lists differ: [1, [2, [3, [4, [5]]]]] != [1, 2, 3, 4, 5]\n\nFirst differing element 1:\n[2, [3, [4, [5]]]]\n2\n\nSecond list contains 3 additional elements.\nFirst extra element 2:\n3\n\n- [1, [2, [3, [4, [5]]]]]\n?     -   -   -   -  ----\n\n+ [1, 2, 3, 4, 5]\n\ntest_generated.TestFlatten.test_flatten_with_nested_empty_lists: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 21, in test_flatten_with_nested_empty_lists\n    self.assertEqual(flatten([[], [1, [], 2], []]), [1, 2])\nAssertionError: Lists differ: [1, [], 2] != [1, 2]\n\nFirst differing element 1:\n[]\n2\n\nFirst list contains 1 additional elements.\nFirst extra element 2:\n2\n\n- [1, [], 2]\n?     ----\n\n+ [1, 2]\n\ntest_generated.TestFlatten.test_flatten_with_nested_lists_of_lists: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 24, in test_flatten_with_nested_lists_of_lists\n    self.assertEqual(flatten([[1, [2, 3]], [[4, 5], 6]]), [1, 2, 3, 4, 5, 6])\nAssertionError: Lists differ: [1, [2, 3], [4, 5], 6] != [1, 2, 3, 4, 5, 6]\n\nFirst differing element 1:\n[2, 3]\n2\n\nSecond list contains 2 additional elements.\nFirst extra element 4:\n5\n\n- [1, [2, 3], [4, 5], 6]\n?     -    -  -    -\n\n+ [1, 2, 3, 4, 5, 6]\n"
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 9,
+            "valid": 9,
+            "failedValid": [
+              "test_generated.TestFlatten.test_flatten_with_deeply_nested_lists",
+              "test_generated.TestFlatten.test_flatten_with_nested_empty_lists",
+              "test_generated.TestFlatten.test_flatten_with_nested_lists_of_lists"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1097,
+          "feedback": "test_generated.TestFlatten.test_flatten_with_deeply_nested_lists: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 27, in test_flatten_with_deeply_nested_lists\n    self.assertEqual(flatten([[1, [2, [3, [4, [5]]]]]]), [1, 2, 3, 4, 5])\nAssertionError: Lists differ: [1, [2, [3, [4, [5]]]]] != [1, 2, 3, 4, 5]\n\nFirst differing element 1:\n[2, [3, [4, [5]]]]\n2\n\nSecond list contains 3 additional elements.\nFirst extra element 2:\n3\n\n- [1, [2, [3, [4, [5]]]]]\n?     -   -   -   -  ----\n\n+ [1, 2, 3, 4, 5]\n\ntest_generated.TestFlatten.test_flatten_with_nested_empty_lists: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 21, in test_flatten_with_nested_empty_lists\n    self.assertEqual(flatten([[], [1, [], 2], []]), [1, 2])\nAssertionError: Lists differ: [1, [], 2] != [1, 2]\n\nFirst differing element 1:\n[]\n2\n\nFirst list contains 1 additional elements.\nFirst extra element 2:\n2\n\n- [1, [], 2]\n?     ----\n\n+ [1, 2]\n\ntest_generated.TestFlatten.test_flatten_with_nested_lists_of_lists: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 24, in test_flatten_with_nested_lists_of_lists\n    self.assertEqual(flatten([[1, [2, 3]], [[4, 5], 6]]), [1, 2, 3, 4, 5, 6])\nAssertionError: Lists differ: [1, [2, 3], [4, 5], 6] != [1, 2, 3, 4, 5, 6]\n\nFirst differing element 1:\n[2, 3]\n2\n\nSecond list contains 2 additional elements.\nFirst extra element 4:\n5\n\n- [1, [2, 3], [4, 5], 6]\n?     -    -  -    -\n\n+ [1, 2, 3, 4, 5, 6]\n"
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 22070,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601702633,
+          "endedAt": 1792601724703
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 81273,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601724704,
+          "endedAt": 1792601805977
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 97566,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601724704,
+          "endedAt": 1792601822270
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 10960,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601825122,
+          "endedAt": 1792601836083
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 14769,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601837460,
+          "endedAt": 1792601852229
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 15142,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601853326,
+          "endedAt": 1792601868468
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "1b9f0e3659d40b1eb9c71946d60f80aedda333361b1b4c4353381c24556c8045",
+      "finalSource": "def flatten(nested):\n    out = []\n    for item in nested:\n        if isinstance(item, list):\n            for subitem in item:\n                out.append(subitem)\n        else:\n            out.append(item)\n    return out\n"
+    },
+    {
+      "task": "d2-moving",
+      "kind": "debugging",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 93715,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 3,
+            "valid": 2,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4180,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 24920,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601868469,
+          "endedAt": 1792601893390
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 14419,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601893390,
+          "endedAt": 1792601907809
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 62182,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601893390,
+          "endedAt": 1792601955572
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2431,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601959753,
+          "endedAt": 1792601962184
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "b62ea2e878551d71e7e934885d003f484f90f4ae34132237779c2b7a396f7983",
+      "finalSource": "def moving_average(xs, k):\n    if k < 1:\n        raise ValueError('k must be at least 1')\n    return [sum(xs[i:i + k]) / k for i in range(len(xs) - k + 1)]\n"
+    },
+    {
+      "task": "d2-moving",
+      "kind": "debugging",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 94091,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4246,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 18879,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601962185,
+          "endedAt": 1792601981064
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 16164,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601981064,
+          "endedAt": 1792601997228
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 64404,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792601981065,
+          "endedAt": 1792602045469
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 6559,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602049715,
+          "endedAt": 1792602056275
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "27f796558b8ac17aa30501c8346a6f006d2d554fcaa834d42e3395892db6ec95",
+      "finalSource": "def moving_average(xs, k):\n    if k < 1:\n        raise ValueError('k must be greater than 0')\n    if k > len(xs):\n        return []\n    return [sum(xs[i:i + k]) / k for i in range(len(xs) - k + 1)]\n"
+    },
+    {
+      "task": "p1-inventory",
+      "kind": "planning",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "durationMs": 276523,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": false,
+            "errors": [
+              "source: import of 'unittest' is not allowed"
+            ]
+          },
+          "hidden": {
+            "ran": false,
+            "passed": false,
+            "total": 0,
+            "failed": 0
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3005
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 10,
+            "valid": 9,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 3698,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 62869,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602056277,
+          "endedAt": 1792602119146
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 65315,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602119146,
+          "endedAt": 1792602184461
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 159868,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602119146,
+          "endedAt": 1792602279014
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 31342,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602282020,
+          "endedAt": 1792602313363
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 15739,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602317061,
+          "endedAt": 1792602332800
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "38976b697493503b481b640c47ae4f1b8253bd8fd6e5a20600363a824d229483",
+      "finalSource": "class Inventory:\n    def __init__(self):\n        self.items = {}\n\n    def add(self, name, qty, unit_price):\n        if qty <= 0 or unit_price < 0:\n            raise ValueError('Invalid quantity or unit price')\n        if name in self.items:\n            self.items[name]['qty'] += qty\n            self.items[name]['unit_price'] = unit_price\n        else:\n            self.items[name] = {'qty': qty, 'unit_price': unit_price}\n\n    def remove(self, name, qty):\n        if name not in self.items:\n            raise KeyError('Item not found')\n        if qty <= 0 or qty > self.items[name]['qty']:\n            raise ValueError('Invalid quantity')\n        self.items[name]['qty'] -= qty\n        if self.items[name]['qty'] == 0:\n            del self.items[name]\n\n    def quantity(self, name):\n        return self.items.get(name, {}).get('qty', 0)\n\n    def total_value(self):\n        return sum(item['qty'] * item['unit_price'] for item in self.items.values())\n"
+    },
+    {
+      "task": "p1-inventory",
+      "kind": "planning",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 158664,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 6,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4306,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 37545,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602332801,
+          "endedAt": 1792602370347
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 78239,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602370348,
+          "endedAt": 1792602448587
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 111312,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602370347,
+          "endedAt": 1792602481660
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 5497,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602485966,
+          "endedAt": 1792602491464
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "afc8ea83ea7c7c0ad74f7dbafccab096b105e3c4e6ad5a0362274087dde61231",
+      "finalSource": "class Inventory:\n    def __init__(self):\n        self.items = {}\n\n    def add(self, name, qty, unit_price):\n        if qty <= 0 or unit_price < 0:\n            raise ValueError('Invalid quantity or unit price')\n        if name in self.items:\n            self.items[name]['qty'] += qty\n            self.items[name]['unit_price'] = unit_price\n        else:\n            self.items[name] = {'qty': qty, 'unit_price': unit_price}\n\n    def remove(self, name, qty):\n        if name not in self.items:\n            raise KeyError('Item not found')\n        if qty < 1 or qty > self.items[name]['qty']:\n            raise ValueError('Invalid quantity')\n        self.items[name]['qty'] -= qty\n        if self.items[name]['qty'] == 0:\n            del self.items[name]\n\n    def quantity(self, name):\n        return self.items.get(name, {'qty': 0})['qty']\n\n    def total_value(self):\n        return sum(item['qty'] * item['unit_price'] for item in self.items.values())\n"
+    },
+    {
+      "task": "p2-bucket",
+      "kind": "planning",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 226659,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": false,
+            "errors": [
+              "source: import of 'collections' is not allowed"
+            ]
+          },
+          "hidden": {
+            "ran": false,
+            "passed": false,
+            "total": 0,
+            "failed": 0
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 2983
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 7,
+            "valid": 3,
+            "failedValid": [
+              "test_generated.TestTokenBucket.test_exceed_capacity"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3471,
+          "feedback": "test_generated.TestTokenBucket.test_exceed_capacity: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 35, in test_exceed_capacity\n    self.assertTrue(bucket.allow())\nAssertionError: False is not true\n"
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 7,
+            "valid": 3,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false,
+          "durationMs": 3495,
+          "feedback": ""
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 47237,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602491466,
+          "endedAt": 1792602538704
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 31115,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602538704,
+          "endedAt": 1792602569819
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 98379,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602538704,
+          "endedAt": 1792602637083
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 24224,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602640066,
+          "endedAt": 1792602664290
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 18709,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602667761,
+          "endedAt": 1792602686470
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 28159,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602689965,
+          "endedAt": 1792602718125
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "b19b0e4db5f4669ba315debbe40586a29cc86a1f012992fcafb565454c52a156",
+      "finalSource": "class TokenBucket:\n    def __init__(self, capacity, refill_per_second, clock):\n        if capacity < 1 or refill_per_second < 0:\n            raise ValueError('Invalid capacity or refill rate')\n        self.capacity = capacity\n        self.refill_per_second = refill_per_second\n        self.clock = clock\n        self.tokens = capacity\n        self.last_refill_time = clock()\n\n    def allow(self):\n        current_time = self.clock()\n        elapsed_time = current_time - self.last_refill_time\n        self.tokens += elapsed_time * self.refill_per_second\n        if self.tokens > self.capacity:\n            self.tokens = self.capacity\n        self.tokens -= 1\n        self.last_refill_time = current_time\n        return self.tokens >= 0\n"
+    },
+    {
+      "task": "p2-bucket",
+      "kind": "planning",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): static validation.",
+      "repairsUsed": 2,
+      "durationMs": 231127,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": false,
+            "errors": [
+              "source: import of 'typing' is not allowed",
+              "tests: import of 'time' is not allowed"
+            ]
+          },
+          "hidden": {
+            "ran": false,
+            "passed": false,
+            "total": 0,
+            "failed": 0
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 2743
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": false,
+            "errors": [
+              "tests: import of 'time' is not allowed"
+            ]
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 2979
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": false,
+            "errors": [
+              "tests: import of 'time' is not allowed"
+            ]
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3370
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 47917,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602718127,
+          "endedAt": 1792602766044
+        },
+        {
+          "role": "Tester",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 74097,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602766045,
+          "endedAt": 1792602840142
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 107279,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602766044,
+          "endedAt": 1792602873324
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 21925,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602876068,
+          "endedAt": 1792602897993
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 31649,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602900972,
+          "endedAt": 1792602932621
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 13262,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792602935991,
+          "endedAt": 1792602949254
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "a6a9442e6436ce00aa88010956c5886b66ef06662a7e4cc9f3228619871c229f",
+      "finalSource": "class TokenBucket:\n    def __init__(self, capacity, refill_per_second, clock):\n        if capacity < 1 or refill_per_second < 0:\n            raise ValueError(\"Capacity must be greater than 0 and refill rate must be non-negative\")\n        self.capacity = capacity\n        self.refill_per_second = refill_per_second\n        self.tokens = capacity\n        self.last_refill_time = clock()\n\n    def allow(self):\n        current_time = clock()\n        time_elapsed = current_time - self.last_refill_time\n        self.tokens += time_elapsed * self.refill_per_second\n        self.tokens = min(self.tokens, self.capacity)\n        self.last_refill_time = current_time\n        if self.tokens >= 1:\n            self.tokens -= 1\n            return True\n        return False\n\n    def clock(self):\n        # This is a placeholder for the actual clock function\n        # In a real-world scenario, this would call a real clock function\n        pass\n"
+    }
+  ],
+  "cancellation": {
+    "status": "cancelled",
+    "sandboxRuns": 0,
+    "liveRequestsAfter": 0,
+    "calls": [
+      {
+        "role": "Planner",
+        "ok": true
+      },
+      {
+        "role": "Tester",
+        "ok": false
+      },
+      {
+        "role": "Worker",
+        "ok": false
+      }
+    ]
+  },
+  "summary": {
+    "heldout": {
+      "passed": 15,
+      "trials": 20
+    },
+    "regression": {
+      "passed": 0,
+      "trials": 3
+    },
+    "byKind": {
+      "simple": "5/6",
+      "intermediate": "6/6",
+      "debugging": "2/4",
+      "planning": "2/4"
+    },
+    "statuses": {
+      "failed": 8,
+      "passed": 15
+    },
+    "repairsUsed": 19,
+    "passedAfterRepair": 3,
+    "reviewerFalseApprovals": 1,
+    "reviewerFalseRejections": 1,
+    "invariants": {
+      "pinsHeld": true,
+      "ordering": true,
+      "gateIsAuthority": true,
+      "cancellation": true
+    },
+    "externalRequestsRefused": 0
+  },
+  "g7": "FAIL",
+  "finishedAt": "2026-10-21T17:16:22.076Z"
+}
