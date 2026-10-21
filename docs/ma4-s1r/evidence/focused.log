@@ -1,0 +1,31 @@
+✔ S1R: incomplete streams and served-model substitutions cannot certify success (30.3536ms)
+✔ S1R: nonstream substitutions, missing completion and malformed JSON fail validation (1.8389ms)
+✔ S1R: actual architecture-qualified Ollama context metadata is discovered (4.5825ms)
+✔ S1R: read-only agent formatting is not contradicted by a mandatory prose summary (0.4355ms)
+✔ ollama model facts are normalized from the real probe shape, with UNKNOWN where the probe returned nothing (5.6288ms)
+✔ vision false comes from a returned capability list; only a missing list stays UNKNOWN (2.1699ms)
+✔ codex catalogue models normalize with the preferred default and no invented capability facts (2.1911ms)
+✔ providers without a real model-listing probe produce no rows and no claims (2.6649ms)
+✔ a downed Ollama service yields no fresh facts, no rows, and no events; persisted rows keep their probed age (3.4098ms)
+✔ rows persist across a reopen, but persisted state alone never satisfies probedThisRun (133.5891ms)
+✔ corrupt persisted rows are skipped without crashing and are re-probed (3.4109ms)
+✔ interval gating: identical facts within the interval produce no re-probe and no changes; a change produces a change string (4.89ms)
+✔ a probe failure path never emits change strings or overwrites rows (Codex catalogue errors caught) (3.8383ms)
+✔ model discovery probes only providers present in the Host's adapter set (3.3123ms)
+✔ user_version stays 3 and the table creation is idempotent; migration keeps older rows (111.6792ms)
+✔ unconfigured cloud providers refuse launch without a network request (2.5334ms)
+✔ offline or malformed Ollama discovery fails cleanly (28.4768ms)
+✔ MA1: Ollama discovery marks cloud-hosted tags as remote, never as local models (0.7159ms)
+✔ a missing requested model is refused instead of silently switching (0.5882ms)
+✔ execution delivers model output and releases its task controller (0.932ms)
+✔ duplicate launch is refused and cancellation aborts only its task (1.7959ms)
+✔ Host streaming preserves genuine Ollama output and cancellation during discovery prevents generation (1.204ms)
+✔ V16 T10: a local-only task (every voice turn) is refused at launch when the fresh probe reports its tag hosted (0.7307ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 500.0077

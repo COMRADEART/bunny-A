@@ -71,6 +71,11 @@ test("T13.3 N-C: a task with an uncertain outcome says so instead of plain failu
   assert.equal(UNCERTAIN_LABEL, "Outcome uncertain — reconciliation required");
   assert.equal(taskStatus(task({ state: "failed", reconciliation: { required: false, reason: "x", at: 1, resolution: "close" } })).label, "Task failed", "a reconciled task is an ordinary failure");
 });
+test("MA4-S1R: a Host runtime deadline is shown as such, not as a generic user Stop", () => {
+  assert.equal(taskStatus(task({ state: "stopped", stopReason: "Runtime limit reached." })).label, "Stopped · runtime limit reached");
+  assert.equal(taskStatus(task({ state: "stopped", stopReason: "Stopped by user." })).label, "Task stopped");
+  assert.equal(taskStatus(task({ state: "failed", stopReason: "Runtime limit reached." })).label, "Task failed", "only a stopped task carries the deadline label");
+});
 test("T5: completed tasks without independent evidence remain unverified", () => {
   const t = task({ state: "completed" });
   assert.equal(taskStatus(t).verification, "Not independently verified");

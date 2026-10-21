@@ -116,8 +116,15 @@ export async function teamSetup(label: string, options: { faults?: TeamFaults; r
   const db = new HostDatabase(join(dir, "host.sqlite"));
   const launched: Launch[] = [];
   const control = { responder: options.responder ?? scripted, attempts: new Map<string, number>(), hold: false, unknown: options.startUnknown === true, ...(options.startOffline ? { availability: "offline" as const } : {}) } as TeamEnv["control"];
-  const factLess = new ModelCapabilityRegistry(db, { availableProviders: () => [] });
-  const tasks = new TaskManager(db, root, [localModel(launched, control), ...(options.providers ?? [])], { modelRegistry: factLess });
+  // MA4 schema-bound team requests require current model facts. These are simulated facts for this
+  // scripted adapter, never a live Ollama probe; unknown/offline starts still have no ready catalogue.
+  const modelRegistry = new ModelCapabilityRegistry(db, {
+    availableProviders: () => ["ollama"],
+    ollamaProbe: async () => ({ up: !control.unknown && control.availability !== "offline", models: !control.unknown && control.availability !== "offline" ? ["test-local:7b"] : [], remote: [] }),
+    ollamaShow: async () => ({ capabilities: ["completion"], context_length: 32768 }),
+    ollamaPs: async () => ({ models: [] }),
+  });
+  const tasks = new TaskManager(db, root, [localModel(launched, control), ...(options.providers ?? [])], { modelRegistry });
   await tasks.discover();
   const adapters = [new FilesystemCapability(), new TerminalCapability(), new NotificationsCapability(() => undefined)];
   const missions = new MissionManager(tasks, { dataDirectory: dir, adapters, ...(options.faults ? { teamFaults: options.faults } : {}) });

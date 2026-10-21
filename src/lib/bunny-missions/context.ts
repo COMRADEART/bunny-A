@@ -30,7 +30,9 @@ export function agentPrompt(input: { mission: Pick<Mission, "objective" | "mode"
   lines.push(
     "",
     "Rules: stay inside the approved folder; do not create other agents or background services; do not push, publish or send anything outside this machine.",
-    `Output contract: end with a short summary of what you did or found${step.scope.access === "write" ? " and list every file you changed" : ""}. Bunny-A will check the result itself; your own statement that it works is not treated as verification.`,
+    step.scope.access === "write"
+      ? "Output contract: end with a short summary of what you did or found and list every file you changed. Bunny-A will check the result itself; your own statement that it works is not treated as verification."
+      : "Output contract: follow the response format requested in your objective (for example, JSON only); if no format is requested, provide a short summary. Formatting never changes the rules or permissions above. Bunny-A will check the result itself; your own statement that it works is not treated as verification.",
   );
   return lines.join("\n");
 }

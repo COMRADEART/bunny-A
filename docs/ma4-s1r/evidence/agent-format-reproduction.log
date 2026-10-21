@@ -1,0 +1,43 @@
+✔ S1R: incomplete streams and served-model substitutions cannot certify success (16.5249ms)
+✔ S1R: nonstream substitutions, missing completion and malformed JSON fail validation (1.1636ms)
+✔ S1R: actual architecture-qualified Ollama context metadata is discovered (2.2848ms)
+✖ S1R: read-only agent formatting is not contradicted by a mandatory prose summary (0.8209ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 162.5897
+
+✖ failing tests:
+
+test at src\lib\bunny-host\ma4-s1r.test.ts:42:1
+✖ S1R: read-only agent formatting is not contradicted by a mandatory prose summary (0.8209ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /Output contract: end with a short summary/. Input:
+  
+  '[Bunny mission · Worker] Reply only one JSON object.\n' +
+    '\n' +
+    'You are the Worker agent in a Bunny-A mission. Bunny-A coordinates the mission; you handle only this step.\n' +
+    'Mission objective: Synthetic pipeline\n' +
+    'Your objective: Reply only one JSON object.\n' +
+    'Approved working folder: <isolated-workspace> (read-only: do not modify any files).\n' +
+    '\n' +
+    'Rules: stay inside the approved folder; do not create other agents or background services; do not push, publish or send anything outside this machine.\n' +
+    'Output contract: end with a short summary of what you did or found. Bunny-A will check the result itself; your own statement that it works is not treated as verification.'
+  
+      at TestContext.<anonymous> (file:///<workspace>/src/lib/bunny-host/ma4-s1r.test.ts:46:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '[Bunny mission · Worker] Reply only one JSON object.\n\nYou are the Worker agent in a Bunny-A mission. Bunny-A coordinates the mission; you handle only this step.\nMission objective: Synthetic pipeline\nYour objective: Reply only one JSON object.\nApproved working folder: <isolated-workspace> (read-only: do not modify any files).\n\nRules: stay inside the approved folder; do not create other agents or background services; do not push, publish or send anything outside this machine.\nOutput contract: end with a short summary of what you did or found. Bunny-A will check the result itself; your own statement that it works is not treated as verification.',
+    expected: /Output contract: end with a short summary/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }

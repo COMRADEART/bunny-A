@@ -1,0 +1,142 @@
+{
+  "version": "bunny-ma4-s1r-local-v2",
+  "externalInference": false,
+  "networkDeniedAttempts": 0,
+  "scenarios": [
+    {
+      "name": "basic-streaming-pin",
+      "status": "PASS",
+      "at": 1792533911200,
+      "durationMs": 5015,
+      "ok": true,
+      "servedModel": "qwen2.5-coder:7b",
+      "latencyMs": 5015,
+      "outputHash": "c2e3ac47f4a325469c1a2d5f117e463ec943c721986d5d9f09ac4540b7d80526",
+      "syntheticOutput": "READY",
+      "chunkCount": 1,
+      "receipt": {
+        "model": "qwen2.5-coder:7b",
+        "doneReason": "stop",
+        "promptEvalCount": 33,
+        "evalCount": 2,
+        "totalDurationNs": 4931501400,
+        "loadDurationNs": 4769375000,
+        "promptEvalDurationNs": 114739000,
+        "evalDurationNs": 42619000,
+        "requestedAt": 1792533911263,
+        "firstTokenAt": 1792533916170,
+        "finishedAt": 1792533916215
+      },
+      "error": null
+    },
+    {
+      "name": "invalid-pin",
+      "status": "PASS",
+      "at": 1792533916217,
+      "durationMs": 53,
+      "ok": false,
+      "servedModel": null,
+      "latencyMs": 53,
+      "outputHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "syntheticOutput": "",
+      "chunkCount": 0,
+      "receipt": null,
+      "error": "Model bunny-qualification-nonexistent:missing is no longer available. Route the task again."
+    },
+    {
+      "name": "structured-output",
+      "status": "PASS",
+      "at": 1792533916271,
+      "durationMs": 506,
+      "ok": true,
+      "servedModel": "qwen2.5-coder:7b",
+      "latencyMs": 505,
+      "outputHash": "723c39a9c415af7d8d03c521245bd91fedc9c8a5398c737494fc29a70334f138",
+      "syntheticOutput": "{\"ok\":true,\"count\":3}",
+      "chunkCount": 9,
+      "receipt": {
+        "model": "qwen2.5-coder:7b",
+        "doneReason": "stop",
+        "promptEvalCount": 41,
+        "evalCount": 10,
+        "totalDurationNs": 443802600,
+        "loadDurationNs": 7310900,
+        "promptEvalDurationNs": 132844000,
+        "evalDurationNs": 299335000,
+        "requestedAt": 1792533916321,
+        "firstTokenAt": 1792533916475,
+        "finishedAt": 1792533916776
+      },
+      "error": null
+    },
+    {
+      "name": "cancellation",
+      "status": "PASS",
+      "at": 1792533916778,
+      "durationMs": 207,
+      "boundMs": 4,
+      "controllerReleased": true
+    },
+    {
+      "name": "model-timeout",
+      "status": "PASS",
+      "at": 1792533916986,
+      "durationMs": 67,
+      "boundMs": 66
+    },
+    {
+      "name": "native-tool-proposal-harness-only",
+      "status": "FAIL",
+      "at": 1792533917054,
+      "durationMs": 984,
+      "error": "Expected values to be strictly equal:\n\nundefined !== 1\n"
+    },
+    {
+      "name": "automatic-routing-host",
+      "status": "PASS",
+      "at": 1792533937736,
+      "durationMs": 5639,
+      "state": "completed",
+      "selectedModel": "huihui_ai/qwen2.5-abliterate:7b",
+      "provider": "ollama"
+    },
+    {
+      "name": "sensitive-host-and-pin",
+      "status": "PASS",
+      "at": 1792533943376,
+      "durationMs": 5934,
+      "model": "qwen2.5-coder:7b",
+      "state": "completed"
+    },
+    {
+      "name": "unapproved-external-before-network",
+      "status": "PASS",
+      "at": 1792533949311,
+      "durationMs": 4,
+      "deniedAtHostBeforeFetch": true
+    },
+    {
+      "name": "planner-worker-reviewer",
+      "status": "FAIL",
+      "at": 1792534059975,
+      "durationMs": 8564,
+      "error": "Unexpected token '`', \"```json\n{\n\"... is not valid JSON"
+    },
+    {
+      "name": "controlled-agent-failure",
+      "status": "PASS",
+      "at": 1792534068540,
+      "durationMs": 49,
+      "state": "waiting_for_user",
+      "substitutedCalls": 0
+    },
+    {
+      "name": "mission-cancellation-resource-release",
+      "status": "PASS",
+      "at": 1792534068590,
+      "durationMs": 1220,
+      "boundMs": 8,
+      "sessionsRemaining": 0
+    }
+  ]
+}

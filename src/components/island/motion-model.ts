@@ -1,7 +1,14 @@
 import type { HostEvent } from "../../lib/bunny-host/contracts.ts";
-import type { HostPresence, OrchTask, RouteDecision, TaskState } from "../../lib/orch/types.ts";
+import type { HostPresence, OrchTask, ProviderId, ProviderLive, RouteDecision, TaskState } from "../../lib/orch/types.ts";
 import { TERMINAL } from "./ui-model.ts";
 import { publicEventDetail, publicEventLabel, taskStatus } from "../../lib/bunny-host/presentation.ts";
+
+/** Partial Host snapshots must not fabricate provider facts or hand undefined to a provider mark. */
+export function routingGraphIds(providers: Pick<ProviderLive, "id">[], decision?: RouteDecision | null): ProviderId[] {
+  const primary: ProviderId[] = ["codex", "claude", "ollama"];
+  return [...new Set([...primary, ...routeStrengths(decision).map(s => s.provider)])]
+    .filter(id => providers.some(p => p.id === id)).slice(0, 6);
+}
 
 export type OrbState =
   "idle" | "listening" | "routing" | "working" | "waiting" | "completed" | "failed" | "offline";

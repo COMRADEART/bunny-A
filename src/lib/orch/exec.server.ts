@@ -35,6 +35,11 @@ export async function probeOllama(): Promise<{ up: boolean; models: string[]; re
 /** The final `done` message of /api/generate: Ollama's own counts and durations. */
 type DonePart = { done?: boolean; model?: string; done_reason?: string; prompt_eval_count?: number; eval_count?: number; total_duration?: number; load_duration?: number; prompt_eval_duration?: number; eval_duration?: number };
 const count = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+function validateCompletion(part: DonePart | null, model: string, output: string, format: ExecRequest["format"]) {
+  if (!part || part.done !== true) throw new Error("Local model stream ended without a completion receipt.");
+  if (part.model !== model) throw new Error("Local model receipt does not match the requested model.");
+  if (format) { try { JSON.parse(output); } catch { throw new Error("Local model returned invalid structured JSON."); } }
+}
 /** M-A-3 T11: a provider receipt taken from the provider's own final message; nothing here is estimated. */
 function receiptOf(part: DonePart, requested: string, requestedAt: number, firstTokenAt: number | null): OllamaReceipt {
   return {
@@ -102,13 +107,15 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
     if (options.stream && response.body) {
       const reader=response.body.getReader();const decoder=new TextDecoder();let buffer="",output="";
       let firstTokenAt:number|null=null;let done:DonePart|null=null;
-      const consume=(line:string)=>{if(!line.trim()) return;const part=JSON.parse(line) as {response?:string;error?:string}&DonePart;if(part.error) throw new Error(part.error);if(part.response) {firstTokenAt??=Date.now();output+=part.response;options.stream!(part.response);if(output.length>2_000_000) throw new Error("Model output exceeds the log limit.");}if(part.done===true) done=part;};
+      const consume=(line:string)=>{if(!line.trim()) return;const part=JSON.parse(line) as {response?:string;error?:string}&DonePart;if(part.error) throw new Error("Local model reported a generation error.");if(part.model !== model) throw new Error("Local model response does not match the requested model.");if(done) throw new Error("Local model sent data after its completion receipt.");if(part.response) {firstTokenAt??=Date.now();output+=part.response;options.stream!(part.response);if(output.length>2_000_000) throw new Error("Model output exceeds the log limit.");}if(part.done===true) done=part;};
       try {while(true) {const chunk=await reader.read();if(chunk.done) break;buffer+=decoder.decode(chunk.value,{stream:true});let index:number;while((index=buffer.indexOf("\n"))>=0) {consume(buffer.slice(0,index));buffer=buffer.slice(index+1);}}buffer+=decoder.decode();consume(buffer);}
       finally {await reader.cancel().catch(()=>{});}
+      validateCompletion(done, model, output, request.format);
       const receipt=done?receiptOf(done,model,requestedAt,firstTokenAt):null;
       return {ok:true,output,log:`Ollama ${model} finished.`,...(receipt?{receipt}:{})};
     }
     const body = (await response.json()) as { response?: string } & DonePart;
+    validateCompletion(body, model, body.response ?? "", request.format);
     return { ok: true, output: body.response ?? "", log: `Ollama ${model} finished.`, ...(body.done === true ? { receipt: receiptOf(body, model, requestedAt, null) } : {}) };
   } catch (error) {
     if (controller.signal.reason === "interrupted") return { ok: false, error: "The local model stream was interrupted before it finished.", log: "Stream interrupted." };

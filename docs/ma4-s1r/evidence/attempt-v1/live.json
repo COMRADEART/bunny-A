@@ -1,0 +1,138 @@
+{
+  "version": "bunny-ma4-s1r-local-v1",
+  "externalInference": false,
+  "networkDeniedAttempts": 0,
+  "scenarios": [
+    {
+      "name": "basic-streaming-pin",
+      "status": "PASS",
+      "at": 1792533670915,
+      "durationMs": 5630,
+      "ok": true,
+      "servedModel": "qwen2.5-coder:7b",
+      "latencyMs": 5630,
+      "outputHash": "c2e3ac47f4a325469c1a2d5f117e463ec943c721986d5d9f09ac4540b7d80526",
+      "chunkCount": 1,
+      "receipt": {
+        "model": "qwen2.5-coder:7b",
+        "doneReason": "stop",
+        "promptEvalCount": 33,
+        "evalCount": 2,
+        "totalDurationNs": 5558321500,
+        "loadDurationNs": 5374760600,
+        "promptEvalDurationNs": 133054000,
+        "evalDurationNs": 44701000,
+        "requestedAt": 1792533670988,
+        "firstTokenAt": 1792533676498,
+        "finishedAt": 1792533676545
+      },
+      "error": null
+    },
+    {
+      "name": "invalid-pin",
+      "status": "PASS",
+      "at": 1792533676547,
+      "durationMs": 67,
+      "ok": false,
+      "servedModel": null,
+      "latencyMs": 67,
+      "outputHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "chunkCount": 0,
+      "receipt": null,
+      "error": "Model bunny-qualification-nonexistent:missing is no longer available. Route the task again."
+    },
+    {
+      "name": "structured-output",
+      "status": "PASS",
+      "at": 1792533676615,
+      "durationMs": 553,
+      "ok": true,
+      "servedModel": "qwen2.5-coder:7b",
+      "latencyMs": 551,
+      "outputHash": "723c39a9c415af7d8d03c521245bd91fedc9c8a5398c737494fc29a70334f138",
+      "chunkCount": 9,
+      "receipt": {
+        "model": "qwen2.5-coder:7b",
+        "doneReason": "stop",
+        "promptEvalCount": 41,
+        "evalCount": 10,
+        "totalDurationNs": 489125600,
+        "loadDurationNs": 8603700,
+        "promptEvalDurationNs": 154194000,
+        "evalDurationNs": 316822000,
+        "requestedAt": 1792533676670,
+        "firstTokenAt": 1792533676848,
+        "finishedAt": 1792533677166
+      },
+      "error": null
+    },
+    {
+      "name": "cancellation",
+      "status": "PASS",
+      "at": 1792533677169,
+      "durationMs": 225,
+      "boundMs": 4,
+      "controllerReleased": true
+    },
+    {
+      "name": "model-timeout",
+      "status": "PASS",
+      "at": 1792533677395,
+      "durationMs": 85,
+      "boundMs": 84
+    },
+    {
+      "name": "native-tool-proposal-harness-only",
+      "status": "FAIL",
+      "at": 1792533677481,
+      "durationMs": 1128,
+      "error": "Expected values to be strictly equal:\n\nundefined !== 1\n"
+    },
+    {
+      "name": "automatic-routing-host",
+      "status": "PASS",
+      "at": 1792533702476,
+      "durationMs": 6840,
+      "state": "completed",
+      "selectedModel": "huihui_ai/qwen2.5-abliterate:7b",
+      "provider": "ollama"
+    },
+    {
+      "name": "sensitive-host-and-pin",
+      "status": "PASS",
+      "at": 1792533709317,
+      "durationMs": 12271,
+      "model": "qwen2.5-coder:7b",
+      "state": "completed"
+    },
+    {
+      "name": "unapproved-external-before-network",
+      "status": "PASS",
+      "at": 1792533721589,
+      "durationMs": 5,
+      "deniedAtHostBeforeFetch": true
+    },
+    {
+      "name": "planner-worker-reviewer",
+      "status": "FAIL",
+      "at": 1792533835389,
+      "durationMs": 14001,
+      "error": "Expected values to be strictly equal:\n+ actual - expected\n\n+ 'sort,sum\\n' +\n+   '\\n' +\n+   'Summary: The order proposed for the input [9,1,5] is to first sort the numbers in ascending order, which results in [1, 5, 9], and then sum them up, resulting in 15.'\n- 'sort,sum'\n"
+    },
+    {
+      "name": "controlled-agent-failure",
+      "status": "FAIL",
+      "at": 1792533849391,
+      "durationMs": 30,
+      "error": "Expected values to be strictly equal:\n\nundefined !== 0\n"
+    },
+    {
+      "name": "mission-cancellation-resource-release",
+      "status": "PASS",
+      "at": 1792533849422,
+      "durationMs": 134,
+      "boundMs": 105,
+      "sessionsRemaining": 0
+    }
+  ]
+}
