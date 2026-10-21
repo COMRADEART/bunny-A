@@ -27,7 +27,7 @@ All local results come from the isolated worktree `bun-router-s1r3`: its own `np
 |---|---|
 | static security checks | **success** |
 | typecheck, MA4/routing/sandbox-contract tests, UI tests, builds | **success** |
-| full MA3/MA4 regression (`npm test`) | see ENGINEERING_REPORT.md (final hosted status recorded there) |
+| full MA3/MA4 regression (`npm test`) | PR run 39684601550: stage 1 374/374; stage 2 one hosted-only failure (T13.3 H appearance), then a hang to the 90-min limit (see ENGINEERING_REPORT.md) |
 
 Hosted runners have no WSL2 user namespaces, so the live sandbox/workflow fixtures report `SKIPPED (not passed)` there. Local success is not counted as hosted success.
 

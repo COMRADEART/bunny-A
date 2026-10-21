@@ -71,8 +71,8 @@ RELEASE
   Mobile build:        pass (shared mobile-web)
   Windows installed app: NOT TESTED (no approval to touch the installed app; fixture-level release tests pass)
   Physical mobile devices: NOT TESTED
-  Hosted CI:           security SUCCESS; checks SUCCESS; regression — see "Hosted CI" below. The 7 Windows failures
-                       are root-caused (8.3 short TEMP on runners) and fixed (7/7 reproduced locally, 0 after the fix)
+  Hosted CI:           security SUCCESS; checks SUCCESS; regression stage 1 374/374 (7 Windows failures fixed, confirmed
+                       on hosted runners); stage 2: 1 hosted-only failure + hang → job hit its 90-min limit (see below)
   Dependency vulnerabilities: 0 (npm audit, prod and all); lockfile unchanged from 5d92fea
 
 CLOUD
@@ -84,7 +84,8 @@ GATES
   Passed:  R3-G1, G2, G3, G4, G5, G6, G9, G10, G12, G13, G14, G15
   Failed:  R3-G7 (v2 0/3), R3-G8 (held-out 13/20)
   Blocked: none as a gate; 27B/30B model trials BLOCKED_RESOURCE_LIMIT
-  Partial: R3-G11 (hosted CI) until the hosted regression job is green on the final head
+  Partial: R3-G11 (hosted CI): security + checks green; regression stage 1 374/374 green; stage 2 has one hosted-only
+           failure (T13.3 H appearance) followed by a hang to the 90-min limit
 
 FINAL STATUS: PARTIAL
 
@@ -122,6 +123,14 @@ New in S1R3: everything under `docs/ma4-s1r3/evidence/` (two G7 runs, tool probe
 
 `b07d6aa` CI temp canonicalization · `611c37f` fault-aware repair · `31f9919` G7 pre-registration + output path · `56553a1` MA3 evidence isolation · `dfaba3e` demonstrated tool-call capability · `eb84796` run-2 rule · `3724349` latent invalid tests / rejected structured replies · `9548eac` seccomp · `5d223d5` runner resume + unload · docs/evidence commit.
 
-## Hosted CI
+## Hosted CI (PR #12, run 39684601550 at `0b8c84e`)
 
-Recorded at PR creation. See the PR description for the final job conclusions.
+| Job | Result |
+|---|---|
+| static security checks | **success** |
+| typecheck, MA4/routing/sandbox-contract tests, UI tests, builds | **success** |
+| full MA3/MA4 regression | **cancelled at the 90-minute job limit (hang)**: stage 1 `scripts/*.test.mjs` **374/374 passed in 2 min** (S1R2: 367/374, with ~30 min of 437 s timeouts), so the 7 Windows fixes are confirmed on hosted runners. Stage 2 reported **one failure**, `T13.3 H every weapon wears every style … survives a restart` (`character-appearance-host.test.ts`, 5.2 s), then printed nothing for 86 min until the job limit |
+
+Stage 2 had never run on hosted CI before, because earlier runs stopped at stage 1. The failure detail was not captured: Node prints failure details only when the run ends, and the run never ended. Locally the same file passes 3/3 under an 8.3 short `TEMP` and with no git identity (`evidence/appearance-*.log`), so neither of those runner differences is the cause. Stage 2 runs without `--test-force-exit`, so a handle left open after a failure can keep the run alive. Log: `evidence/ci-hosted-regression-39684601550.log`.
+
+**R3-G11 remains PARTIAL.** Exact remaining gate: a green hosted `npm test` stage 2+. Next diagnostic step (not done, because each cycle costs 90 min): run stage 2 on the hosted runner with `--test-reporter=tap`, which streams failure details inline, and with a per-test `--test-timeout`, so a hang becomes a named failure. Then fix the cause. Do not add `--test-force-exit` alone, since that would hide the hang.
