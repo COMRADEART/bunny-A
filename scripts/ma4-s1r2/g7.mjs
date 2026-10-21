@@ -11,8 +11,10 @@
 //   * No retries of whole trials, no cherry-picking; every trial is recorded.
 // MA4-S1R3 harness-only changes (tasks, trials, rules, threshold and invariants unchanged): G7_OUT selects the evidence
 // file so historical S1R2 evidence is never overwritten; each run also records the S1R3 failure attributions and repairs.
+// G7_RESUME=1 continues an interrupted run in the same G7_OUT (same task hash and pin required): recorded trials are kept
+// unchanged and only missing ones run. The model is unloaded after every trial so Ollama's runner memory cannot accumulate.
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { freemem } from 'node:os';
 import { G7_TASKS, G7_VERSION } from './g7-tasks.mjs';
@@ -43,13 +45,20 @@ const call = async ({ model, prompt, schema, signal }) => {
 
 const sandbox = await sandboxAvailability();
 if (!sandbox.available) throw new Error('Sandbox unavailable: dynamic execution BLOCKED; G7 not run.');
-const evidence = { version: G7_VERSION, pin: PIN, trials: TRIALS, startedAt: new Date().toISOString(), sandbox, taskHash: sha(JSON.stringify(G7_TASKS)), preflight: [], runs: [] };
+const fresh = { version: G7_VERSION, pin: PIN, trials: TRIALS, startedAt: new Date().toISOString(), sandbox, taskHash: sha(JSON.stringify(G7_TASKS)), preflight: [], runs: [] };
+const evidence = process.env.G7_RESUME === '1' && existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : fresh;
+if (evidence !== fresh) {
+  if (evidence.taskHash !== fresh.taskHash || evidence.pin !== PIN || evidence.g7) throw new Error('Resume refused: different task set or pin, or the run is already complete.');
+  (evidence.resumes ??= []).push({ at: fresh.startedAt, keptTrials: evidence.runs.length, sandbox });
+}
+const preflight = evidence === fresh ? evidence.preflight : (evidence.resumes.at(-1).preflight = []);
+const unload = () => fetch(ORIGIN + '/api/generate', { method: 'POST', body: JSON.stringify({ model: PIN, keep_alive: 0 }) }).then(r => r.text()).catch(() => {});
 const save = () => { mkdirSync(dirname(OUT), { recursive: true }); writeFileSync(OUT, JSON.stringify(evidence, null, 2) + '\n'); };
 
 // Pre-flight: each frozen reference passes its hidden tests, so a failure is never the harness's fault.
 for (const t of G7_TASKS) {
   const r = await runSandboxed({ files: { [`${t.module}.py`]: t.reference, 'test_hidden.py': t.hiddenTests, 'run.py': 'import sys,unittest\nsys.path.insert(0,".")\nr=unittest.TextTestRunner(verbosity=0).run(unittest.defaultTestLoader.loadTestsFromName("test_hidden"))\nsys.exit(0 if r.wasSuccessful() and r.testsRun else 1)\n' }, argv: ['python3', '-I', '-S', 'run.py'], timeoutMs: 15000 });
-  evidence.preflight.push({ task: t.id, referencePasses: r.exitCode === 0 });
+  preflight.push({ task: t.id, referencePasses: r.exitCode === 0 });
   if (r.exitCode !== 0) { save(); throw new Error(`Reference for ${t.id} fails its hidden tests: ${r.stderr.slice(-300)}`); }
 }
 save();
@@ -61,6 +70,7 @@ const order = (calls) => {
 for (const task of G7_TASKS) {
   const n = task.kind === 'regression' ? TRIALS.regression : TRIALS.heldout;
   for (let trial = 1; trial <= n; trial++) {
+    if (evidence.runs.some(r => r.task === task.id && r.trial === trial)) continue;
     const started = Date.now();
     const r = await runCodingWorkflow(task, { call, sandbox: runSandboxed, pins, maxRepairs: 2, onEvent: e => console.log(`  ${task.id}#${trial} ${e}`) });
     const final = r.attempts.at(-1);
@@ -72,6 +82,7 @@ for (const task of G7_TASKS) {
       finalSourceSha256: r.finalSource ? sha(r.finalSource) : null, finalSource: r.finalSource?.slice(0, 2500) ?? null });
     console.log(`${task.id}#${trial}: ${r.status} (${r.reason})`);
     save();
+    await unload();
   }
 }
 
