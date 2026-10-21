@@ -7,10 +7,10 @@ Before this phase the repository had no CI. The workflow runs on `push` to `main
 | Job | Runner | Steps |
 |---|---|---|
 | `checks` | windows-latest | `npm ci` · `npm run typecheck` · `npm run test:ma4` (MA4, routing modes, approvals, reliability, tool loop, workflow gate, offline cloud adapters, sandbox contract tests) · routing policy tests · `npm run test:ui` · shared mobile-web build · desktop build (`JEV_DESKTOP_BUILD=1`) |
-| `regression` | windows-latest | MSYS2 UCRT64 GCC (compiles the reviewed ownership module from source; nothing prebuilt is downloaded) · `npm ci` · `npm test` (full MA3/MA4 regression incl. `pretest`) |
+| `regression` | windows-latest | full git history (release-pin tests resolve historical commits) · MSYS2 UCRT64 GCC (compiles the reviewed ownership module from source; nothing prebuilt is downloaded) · `npm ci` · `npm run pretest` · the exact `npm test` command with only `scripts/voice-worker.test.mjs` removed (generated from `package.json`, so the list cannot drift) |
 | `security` | ubuntu-latest | `npm audit --omit=dev --audit-level=high` · no committed `.env` or key-shaped secrets · external inference disabled by default (registry default and disabled cloud candidates) |
 
-Excluded from CI (hardware, live or installation dependent; reported separately): live Ollama benchmarks and G7 (`scripts/ma4-s1r2/*.mjs`), `test:ma4:local`, live WSL2 adversarial sandbox fixtures (they report **SKIPPED (not passed)** without WSL2 user namespaces), installed-release switching, physical devices, NPU.
+Excluded from CI (hardware, live or installation dependent; reported separately): `scripts/voice-worker.test.mjs`, which needs the operator-staged, hash-pinned whisper runtime (`stage-whisper.mjs` never downloads) and a working Windows speech recognizer. On the first CI run it failed 8 whisper tests and V07–V09 for exactly these reasons. It passes locally (see the engineering report). Also excluded: live Ollama benchmarks and G7 (`scripts/ma4-s1r2/*.mjs`), `test:ma4:local`, live WSL2 adversarial sandbox fixtures (they report **SKIPPED (not passed)** without WSL2 user namespaces), installed-release switching, physical devices, NPU.
 
 CI run results are recorded in the [engineering report](ENGINEERING_REPORT.md) after the branch is published.
 

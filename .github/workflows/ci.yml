@@ -48,6 +48,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # release-pin tests resolve historical commits
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -59,7 +61,17 @@ jobs:
           install: mingw-w64-ucrt-x86_64-gcc
           location: C:\msys64-ci
       - run: npm ci
-      - run: npm test
+      - run: npm run pretest
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+      # The exact `npm test` command minus scripts/voice-worker.test.mjs: those tests need the operator-staged,
+      # hash-pinned whisper runtime and a working Windows speech recognizer, which hosted runners lack.
+      # They remain a LOCAL gate (docs/ma4-s1r2/CI_VALIDATION.md); excluded here, never counted as passed.
+      - name: npm test (without hardware voice tests)
+        shell: bash
+        run: |
+          cmd=$(node -e 'const s=require("./package.json").scripts.test;const f=require("fs").readdirSync("scripts").filter(n=>n.endsWith(".test.mjs")&&n!=="voice-worker.test.mjs").map(n=>"scripts/"+n).join(" ");if(!s.includes("scripts/*.test.mjs"))process.exit(1);console.log(s.replace("scripts/*.test.mjs",f))')
+          eval "$cmd"
         env:
           BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
 
