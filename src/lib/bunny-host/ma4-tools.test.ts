@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { z } from "zod";
 import { decide, type GrantRow } from "../bunny-missions/authorization.server.ts";
 import type { ActionManifest } from "../bunny-missions/types.ts";
-import { ollamaToolCapability, runToolLoop, sanitizeToolOutput, type Chat, type ToolDefinition } from "./ma4/ollama-tools.server.ts";
+import { demonstratedToolCalling, ollamaToolCapability, runToolLoop, sanitizeToolOutput, type Chat, type ToolDefinition } from "./ma4/ollama-tools.server.ts";
 
 const manifest = (id: string, risk: ActionManifest["risk"] = "READ", timeoutMs = 2000): ActionManifest => ({ id, description: `${id} tool`, risk, inputs: [], outputs: "json", evidence: "receipt", timeoutMs, implemented: true });
 const add: ToolDefinition<{ a: number; b: number }> = { manifest: manifest("math.add"), schema: z.object({ a: z.number(), b: z.number() }).strict(), run: async ({ a, b }) => ({ sum: a + b }) };
@@ -52,6 +52,14 @@ test("missing capability is classified from Ollama facts, not model self-descrip
   assert.deepEqual(ollamaToolCapability(["completion"], "0.40.6"), { modelSupports: false, apiSupports: true, adapterSupports: true });
   assert.deepEqual(ollamaToolCapability(["completion", "tools"], "0.2.8"), { modelSupports: true, apiSupports: false, adapterSupports: true });
   assert.deepEqual(ollamaToolCapability(undefined, null), { modelSupports: null, apiSupports: null, adapterSupports: true });
+});
+
+test("S1R3 demonstrated tool calling is measured from receipts: prose, unknown names and invalid arguments never count", () => {
+  const r = (status: string) => ({ receipts: status ? [{ index: 0, round: 1, name: "math.add", status, reason: "", durationMs: 0, outputChars: 0 }] : [] }) as Parameters<typeof demonstratedToolCalling>[0][number];
+  assert.equal(demonstratedToolCalling(Array(6).fill(r(""))), false, "answers in prose: claimed capability, none demonstrated");
+  assert.equal(demonstratedToolCalling([...Array(5).fill(r("executed")), r("unknown_tool")]), true);
+  assert.equal(demonstratedToolCalling([...Array(4).fill(r("denied")), r("invalid_arguments"), r("")]), false, "4/6 < 0.8");
+  assert.equal(demonstratedToolCalling(Array(5).fill(r("executed"))), null, "too few probes to decide");
 });
 
 test("per-tool timeout, call-count limit and multiple calls in one round", async () => {
