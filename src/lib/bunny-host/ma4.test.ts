@@ -1,3 +1,4 @@
+import { PURPOSES } from "./ma4/hybrid.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
@@ -282,6 +283,9 @@ test("MA4 Host integration: existing consent, exact-model dispatch, status/outpu
     const consent = manager.connections.views().find(r => r.id === id)!.consent;
     await manager.connections.command("connections.consent.set", { id, consent: { ...consent, allowTasks: true, billingOptIn: true, maxRequestsPerDay: 20, strictBudget: true } }, "workstation");
     await manager.discover();
+    // MA4-S1R2 B4: configuration plus consent is no longer enough; the owner must also approve this exact model's scope.
+    assert.throws(() => manager.submit({ prompt: "hello", mode: "fast", override: "openrouter", modelOverride: MODEL }), /owner-issued approval/);
+    manager.ma4.issueApproval({ provider_id: "openrouter", model_id: MODEL, approval_status: "approved", approved_purpose: [...PURPOSES], data_categories: ["unclassified"], spending_limit_usd: 1, expiry: new Date(Date.now() + 3_600_000).toISOString() }, "workstation");
     const submitted = manager.submit({ prompt: "hello", mode: "fast", override: "openrouter", modelOverride: MODEL, executionScope: { access: "read" } });
     assert.equal(submitted.provider, "openrouter"); assert.equal(submitted.model, MODEL);
     manager.approve(submitted.id); await until(() => ["completed", "failed"].includes(db.get(submitted.id).state));

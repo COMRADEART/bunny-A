@@ -1,4 +1,5 @@
 import { redactReviewListing } from "../bunny-missions/authorization.server.ts";
+import { DATA_CATEGORIES, ROUTING_MODES } from "./ma4/hybrid.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomBytes, createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -106,6 +107,8 @@ export function validateConstraints(value: unknown): TaskConstraints {
   for(const key of ["localOnly","offlineOnly","requiresFilesystem","requiresTerminal","requiresGit","requiresGPU","cloudOnly","privacyLocal","sensitive","requiresAudio",
   ] as const) if(input[key]!==undefined) {if(typeof input[key]!=="boolean") throw new Error("Invalid constraint.");output[key]=input[key];}
   if(input.workingDirectory!==undefined) output.workingDirectory=text(input.workingDirectory,2000);
+  if(input.routingMode!==undefined) {if(!ROUTING_MODES.includes(input.routingMode as never)) throw new Error("Unknown routing mode.");output.routingMode=input.routingMode as TaskConstraints["routingMode"];}
+  if(input.dataCategory!==undefined) {if(!DATA_CATEGORIES.includes(input.dataCategory as never)) throw new Error("Unknown data category.");output.dataCategory=input.dataCategory as TaskConstraints["dataCategory"];}
   if(input.language!==undefined) output.language=text(input.language,40);
   if (input.maxCostUsd !== undefined) { if (typeof input.maxCostUsd !== "number" || !Number.isFinite(input.maxCostUsd) || input.maxCostUsd < 0 || input.maxCostUsd > 10) throw new Error("Invalid task cost budget."); output.maxCostUsd = input.maxCostUsd; }
   for (const key of ["contextTokens", "outputTokens"] as const) if (input[key] !== undefined) { if (!Number.isSafeInteger(input[key]) || Number(input[key]) < 1 || Number(input[key]) > 1000000) throw new Error("Invalid token budget."); output[key] = Number(input[key]); }

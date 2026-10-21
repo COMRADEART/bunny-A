@@ -1,6 +1,8 @@
 import type { HostDatabase } from "../persistence.server.ts";
 import { createHash } from "node:crypto";
 import { DEFAULT_CONFIGURATION, ModelMetadataSchema, loadConfiguration, type Configuration, type ModelMetadata } from "./registry.ts";
+import { isTrustedLocalActor } from "../../bunny-missions/authorization.server.ts";
+import { ApprovalSchema, type IssuedApproval, type ReliabilityCategory, type ReliabilityEvidence } from "./hybrid.ts";
 
 /** Additive host-owned tables. No prompts, outputs, credentials or benchmark answers. */
 export class IntelligenceStore {
@@ -11,7 +13,9 @@ export class IntelligenceStore {
       CREATE TABLE IF NOT EXISTS ma4_models(id TEXT PRIMARY KEY,record TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS ma4_usage(id INTEGER PRIMARY KEY,at INTEGER NOT NULL,model TEXT NOT NULL,tokens INTEGER NOT NULL,reserved_usd REAL NOT NULL,input_tokens INTEGER,output_tokens INTEGER);
       CREATE INDEX IF NOT EXISTS ma4_usage_at ON ma4_usage(at);
-      CREATE TABLE IF NOT EXISTS ma4_evaluations(id INTEGER PRIMARY KEY,model TEXT NOT NULL,record TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS ma4_evaluations(id INTEGER PRIMARY KEY,model TEXT NOT NULL,record TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS ma4_approvals(provider TEXT NOT NULL,model TEXT NOT NULL,record TEXT NOT NULL,PRIMARY KEY(provider,model));
+      CREATE TABLE IF NOT EXISTS ma4_reliability(provider TEXT NOT NULL,model TEXT NOT NULL,category TEXT NOT NULL,passes INTEGER NOT NULL,samples INTEGER NOT NULL,source TEXT NOT NULL,PRIMARY KEY(provider,model,category,source));`);
   }
   configuration(): Configuration {
     try {
@@ -75,5 +79,46 @@ export class IntelligenceStore {
   }
   recordUsage(id: number, input: number | null, output: number | null) {
     this.db.db.prepare("UPDATE ma4_usage SET input_tokens=?,output_tokens=? WHERE id=?").run(input, output, id);
+  }
+  /** MA4-S1R2 B4: only the trusted workstation actor issues approvals; the Host stamps issuer and time. */
+  issueApproval(raw: unknown, actor: unknown, now = Date.now()): IssuedApproval {
+    if (!isTrustedLocalActor(actor)) throw new Error("Only the workstation owner can issue external model approvals.");
+    const approval = ApprovalSchema.parse(raw);
+    if (approval.approval_status === "approved" && (!approval.expiry || Date.parse(approval.expiry) <= now || !approval.approved_purpose)) throw new Error("An approval needs a purpose and a future expiry.");
+    const issued: IssuedApproval = { ...approval, issued_by: "workstation", issued_at: new Date(now).toISOString() };
+    this.db.db.prepare("INSERT INTO ma4_approvals(provider,model,record) VALUES(?,?,?) ON CONFLICT(provider,model) DO UPDATE SET record=excluded.record").run(issued.provider_id, issued.model_id, JSON.stringify(issued));
+    return issued;
+  }
+  approvals(): IssuedApproval[] {
+    return (this.db.db.prepare("SELECT record FROM ma4_approvals").all() as { record: string }[]).flatMap(row => {
+      try { const r = JSON.parse(row.record); const a = ApprovalSchema.parse({ provider_id: r.provider_id, model_id: r.model_id, approval_status: r.approval_status, approved_purpose: r.approved_purpose, data_categories: r.data_categories, spending_limit_usd: r.spending_limit_usd, expiry: r.expiry });
+        return r.issued_by === "workstation" && typeof r.issued_at === "string" ? [{ ...a, issued_by: "workstation" as const, issued_at: r.issued_at }] : []; } catch { return []; }
+    });
+  }
+  /** Reserved spend since the approval was issued (unknown billing stays reserved). */
+  spentUsd(model: string, sinceIso: string): number {
+    const row = this.db.db.prepare("SELECT COALESCE(SUM(reserved_usd),0) AS usd FROM ma4_usage WHERE model=? AND at>=?").get(model, Date.parse(sinceIso) || 0) as { usd: number };
+    return row.usd;
+  }
+  /** Replaces one source's measured evidence (e.g. a benchmark suite version); other sources are kept. */
+  importReliability(rows: ReliabilityEvidence[], source: string) {
+    this.db.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.db.prepare("DELETE FROM ma4_reliability WHERE source=?").run(source);
+      for (const r of rows) {
+        if (!Number.isInteger(r.passes) || !Number.isInteger(r.samples) || r.passes < 0 || r.samples < 1 || r.passes > r.samples) throw new Error("Invalid reliability evidence.");
+        this.db.db.prepare("INSERT INTO ma4_reliability VALUES(?,?,?,?,?,?)").run(r.provider, r.model, r.category, r.passes, r.samples, source);
+      }
+      this.db.db.exec("COMMIT");
+    } catch (e) { this.db.db.exec("ROLLBACK"); throw e; }
+  }
+  /** H2: a verified runtime outcome (pass or fail) adds one sample under the "runtime" source. */
+  recordOutcome(provider: string, model: string, category: ReliabilityCategory, passed: boolean) {
+    this.db.db.prepare("INSERT INTO ma4_reliability VALUES(?,?,?,?,1,'runtime') ON CONFLICT(provider,model,category,source) DO UPDATE SET passes=passes+excluded.passes,samples=samples+1").run(provider, model, category, passed ? 1 : 0);
+  }
+  reliability(provider: string, model: string | null, category: ReliabilityCategory): { passes: number; samples: number } | null {
+    if (!model) return null;
+    const row = this.db.db.prepare("SELECT COALESCE(SUM(passes),0) AS passes,COALESCE(SUM(samples),0) AS samples FROM ma4_reliability WHERE provider=? AND model=? AND category=?").get(provider, model, category) as { passes: number; samples: number };
+    return row.samples > 0 ? { passes: row.passes, samples: row.samples } : null;
   }
 }

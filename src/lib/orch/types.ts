@@ -305,6 +305,10 @@ export type TaskConstraints = {
   missionAccess?: ProviderExecutionScope["access"];
   localOnly?: boolean;
   offlineOnly?: boolean;
+  /** MA4-S1R2 routing mode; modes only add restrictions (see bunny-host/ma4/hybrid.ts). */
+  routingMode?: import("../bunny-host/ma4/hybrid.ts").RoutingMode;
+  /** MA4-S1R2 data category an external approval must explicitly cover; absent means "unclassified". */
+  dataCategory?: import("../bunny-host/ma4/hybrid.ts").DataCategory;
   /** M-A-3 T3 user routing constraints (§27). Hard filters, never silent overrides. */
   /** Run only on this exact model id; no substitution when it is unavailable. */
   modelExact?: string;

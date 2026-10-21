@@ -11,6 +11,7 @@
  * grant authority — the Router chooses INTELLIGENCE, the Host chooses
  * AUTHORITY (§28).
  */
+import { reliabilityCategory, reliabilityPoints, type ReliabilityCategory } from "./ma4/hybrid.ts";
 import type { Mode, ProviderId, ProviderLive, TaskConstraints } from "../orch/types.ts";
 import type { TaskRequirements } from "../orch/router-requirements.ts";
 import { effortRequirement } from "../orch/router-requirements.ts";
@@ -115,6 +116,8 @@ export type CandidateInput = {
   mode: Mode;
   empirical?: (provider: ProviderId, model: string | null) => number | null;
   evaluated?: (provider: ProviderId, model: string | null) => number | null;
+  /** MA4-S1R2: measured task-category correctness for a model; null is UNPROVEN (never a bonus). */
+  reliability?: (provider: ProviderId, model: string | null, category: ReliabilityCategory) => { passes: number; samples: number } | null;
   /** M-A-3 T13.1: Laya benchmark gate; returns an exclusion reason for an unbenchmarked Laya model. */
   layaGate?: (model: string, taskClass: string) => string | null;
   connectionGate?: (provider: ProviderId, model: string | null) => string | null;
@@ -318,6 +321,15 @@ export function scoreCandidate(candidate: RoutingCandidate, requirements: TaskRe
   components.push({ name: "empirical", points: round(empirical * w.empirical), detail: "Bounded verified-success history (EMPIRICAL_HISTORY), zero below the minimum sample count." });
   const measured = input.evaluated?.(candidate.provider_id, candidate.model_id);
   if (measured !== undefined && measured !== null && Number.isFinite(measured)) components.push({ name: "benchmark", points: round(Math.max(-1, Math.min(1, measured)) * 6), detail: "Versioned synthetic benchmark evidence; limited scope, not a general capability guarantee." });
+
+  // MA4-S1R2 H1: correctness evidence per task category is separate from capability flags; valid JSON is not correct code.
+  const category = reliabilityCategory(requirements.model_intelligence);
+  if (category && input.reliability) {
+    let evidence: { passes: number; samples: number } | null = null;
+    try { evidence = input.reliability(candidate.provider_id, candidate.model_id, category); } catch { evidence = null; }
+    const r = reliabilityPoints(evidence);
+    components.push({ name: "reliability", points: r.points, detail: `${category}: ${r.detail}` });
+  }
 
   const priority = priorityComponent(candidate, requirements, input.priority);
   if (priority) components.push(priority);

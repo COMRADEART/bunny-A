@@ -1,3 +1,4 @@
+import { applyRoutingMode, approvalExclusion } from "./ma4/hybrid.ts";
 import { EventEmitter } from "node:events";
 import { appendFileSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
@@ -814,6 +815,8 @@ export class TaskManager {
     taskType?: string;
     projectId?: string | null;
   }) {
+    // MA4-S1R2: a routing mode only adds hard restrictions; MODEL_PINNED without a model refuses here.
+    input = { ...input, constraints: applyRoutingMode(input.constraints) };
     const analyzed = analyzeModelTask({
       prompt: input.routingText,
       mode: input.mode,
@@ -835,6 +838,7 @@ export class TaskManager {
       mode: input.mode,
       empirical: (provider) => learning.signal(provider, learning.taskType, learning.mode, learning.weights),
       evaluated: (provider, model) => provider === "openrouter" && model ? this.evaluations.score(model) : null,
+      reliability: (provider, model, category) => this.ma4.reliability(provider, model, category),
       layaGate: (model, taskClass) => (!isLayaModel(model) ? null : !this.laya.enabled ? `Laya routing is turned off in Settings; ${model} is not eligible.` : layaExclusion(model, taskClass, this.laya.benchmarks(model))),
       connectionGate: (provider,model)=>{
         if (provider === "openrouter" && model) {
@@ -842,6 +846,11 @@ export class TaskManager {
             structured: !!input.constraints.responseFormat, tools: requirements.needs_tools, input: requirements.needs_vision ? ["image"] : ["text"], language: input.constraints.language ?? null,
             sensitive: !!input.constraints.sensitive || requirements.privacy_requirement === "local_only" }, input.constraints.maxCostUsd);
           if (reason) return reason;
+          // MA4-S1R2 B4: a scoped, owner-issued approval for this exact model, purpose and data category.
+          const approval = this.ma4.approvals().find(a => a.provider_id === provider && a.model_id === model);
+          const blocked = approvalExclusion(this.ma4.approvals(), { provider, model, purpose: analyzed.analysis.category, dataCategory: input.constraints.dataCategory ?? "unclassified",
+            estimatedUsd: 0, spentUsd: approval ? this.ma4.spentUsd(model, approval.issued_at) : 0 });
+          if (blocked) return blocked;
         }
         const gate=this.connections.evaluate({kind:"advice",provider,model,projectId:input.projectId??null,origin:"workstation",route:null});return gate.ok?null:gate.reason;
       },
