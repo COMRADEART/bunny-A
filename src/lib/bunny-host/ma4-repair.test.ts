@@ -24,6 +24,10 @@ test("A2 attribution: a failing generated test is the Tester's fault only when t
   // Both at once: each component gets only its own failure.
   assert.deepEqual(who(obs({ hidden: { ran: true, passed: false }, generated: { loadError: null, results: [bad("t.a"), bad("t.b")] }, oracle: { loadError: null, results: [ok("t.a"), bad("t.b")] } })),
     ["implementation_defect:worker:verified", "implementation_defect:worker:verified", "test_invalid:tester:verified"]);
+  // Latent invalid test: passes on today's buggy code but fails on the reference; repaired now while the attempt fails anyway.
+  assert.deepEqual(who(obs({ hidden: { ran: true, passed: false }, generated: { loadError: null, results: [ok("t.a"), ok("t.b")] }, oracle: { loadError: null, results: [ok("t.a"), bad("t.b")] } })),
+    ["implementation_defect:worker:verified", "test_invalid:tester:verified"]);
+  assert.deepEqual(who(obs({ generated: { loadError: null, results: [ok("t.a"), ok("t.b")] }, oracle: { loadError: null, results: [ok("t.a"), bad("t.b")] } })), [], "an accepted attempt is never sent for repair");
   // Reference-validated rule: invalid tests are not counted, so they block nothing — unless no test is valid.
   assert.deepEqual(who(obs({ testerRule: "reference-validated", generated: { loadError: null, results: [ok("t.a"), bad("t.b")] }, oracle: { loadError: null, results: [ok("t.a"), bad("t.b")] } })), []);
   assert.deepEqual(who(obs({ testerRule: "reference-validated", generated: { loadError: null, results: [ok("t.b")] }, oracle: { loadError: null, results: [bad("t.b")] } })), ["test_invalid:tester:verified"]);
@@ -44,6 +48,14 @@ test("B2/A1 decode-time module-name constraint replaces prose dependencies", () 
     assert.equal(json.properties.dependencies.items.pattern, "^[A-Za-z_][A-Za-z0-9_.]{0,59}$");
   }
   assert.equal(WorkerArtifactSchema.safeParse({ source: "x", notes: "", dependencies: ["re (regular expression module)"], files: ["a.py"] }).success, false);
+});
+
+test("A3 a structured reply the execution layer rejects is a malformed artifact for its producer, not a model failure", async () => {
+  let calls = 0;
+  const call: ModelCall = async () => { calls++; return { ok: false, error: "Local model returned invalid structured JSON.", durationMs: 1 }; };
+  const r = await runCodingWorkflow({ id: "x", spec: "s", module: "m", allowedImports: [], hiddenTests: "", testerRule: "all-pass" }, { call, sandbox: async () => { throw new Error("never"); }, pins: { Planner: "p", Worker: "w", Tester: "t", Reviewer: "r" } });
+  assert.equal(r.status, "malformed_artifact"); assert.equal(calls, 3); assert.equal(r.repairsUsed, 2);
+  assert.ok(r.failures.every(f => f.failureCategory === "schema_error" && f.suspectedComponent === "planner"));
 });
 
 // ---- live-sandbox routing -------------------------------------------------------------------------------------------

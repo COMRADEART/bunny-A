@@ -116,9 +116,12 @@ export function attributeAttempt(o: AttemptObservation): Attribution[] {
     else if (failing.length) out.push({ failingStage: "sandbox_tests", failureCategory: "implementation_defect", suspectedComponent: "worker", evidence: failing.map(x => x.id), confidence: "supported", testIds: failing.map(x => x.id) });
     return out;
   }
-  const exposing = failing.filter(x => oraclePass.has(x.id)), wrong = failing.filter(x => !oraclePass.has(x.id));
+  const exposing = failing.filter(x => oraclePass.has(x.id));
   if (exposing.length) out.push({ failingStage: "sandbox_tests", failureCategory: "implementation_defect", suspectedComponent: "worker", evidence: exposing.map(x => `${x.id} passes on the frozen reference`), confidence: "verified", testIds: exposing.map(x => x.id) });
-  if (o.testerRule === "all-pass" && wrong.length) out.push({ failingStage: "sandbox_tests", failureCategory: "test_invalid", suspectedComponent: "tester", evidence: wrong.map(x => `${x.id} also fails on the frozen reference`), confidence: "verified", testIds: wrong.map(x => x.id) });
+  // All-pass rule: a test the reference fails blocks every contract-correct implementation, even if it passes buggy code
+  // today, so while the attempt fails anyway it is repaired now rather than after the Worker is fixed.
+  const wrong = g.results.filter(x => !oraclePass.has(x.id) && (!x.passed || out.length > 0 || failing.length > 0));
+  if (o.testerRule === "all-pass" && wrong.length) out.push({ failingStage: "sandbox_tests", failureCategory: "test_invalid", suspectedComponent: "tester", evidence: wrong.map(x => `${x.id} fails on the frozen reference`), confidence: "verified", testIds: wrong.map(x => x.id) });
   if (o.testerRule === "reference-validated" && !g.results.some(x => oraclePass.has(x.id))) out.push({ failingStage: "sandbox_tests", failureCategory: "test_invalid", suspectedComponent: "tester", evidence: ["no generated test is consistent with the frozen reference"], confidence: "verified", testIds: g.results.map(x => x.id) });
   return out;
 }
@@ -212,6 +215,11 @@ export async function runCodingWorkflow(task: CodingTask, deps: {
     if (!r.ok) {
       if (signal.aborted || r.stopped) return done("cancelled", "Cancelled.");
       const error = `${role}: ${sanitize(r.error, 300)}`;
+      // The execution layer rejects unparseable structured output itself; that is a malformed artifact, not a model failure.
+      if (/invalid structured JSON/i.test(r.error)) {
+        result.artifacts.push({ taskId: task.id, producer: role, model: pins[role], contractVersion, attempt, sha256: sha256(""), bytes: 0, validation: "malformed", createdAt: new Date().toISOString() });
+        return { ok: false, issue: `${role} artifact is not JSON.` };
+      }
       if (/did not finish within|timed out|timeout/i.test(r.error)) return terminal(attempt, "generation", "timeout", "infrastructure", "model_error", error);
       if (/does not support|unsupported|no longer available|not found|not installed/i.test(r.error)) return terminal(attempt, "generation", "unsupported_capability", "router", "model_error", error);
       return terminal(attempt, "generation", "model_error", "router", "model_error", error);
@@ -334,7 +342,7 @@ export async function runCodingWorkflow(task: CodingTask, deps: {
           ...(generated?.loadError && forWorker.some(a => a.evidence[0]?.startsWith("tests load")) ? [`Generated tests could not load against your module: ${generated.loadError}`] : []),
           record.hidden.ran && !record.hidden.passed ? "An independent acceptance suite also failed (details withheld)." : ""].filter(Boolean).join("\n"), 2000);
         (record as AttemptRecord & { testerFeedback?: string }).testerFeedback = sanitize([...testErrors,
-          ...forTester.filter(a => a.failureCategory === "test_invalid" && a.testIds && a.evidence[0]?.includes("also fails")).flatMap(a => a.testIds!).map(id => `${id} contradicts the frozen task contract at ${ownLine(tests ?? "", oracleById.get(id) ?? "")}`),
+          ...forTester.filter(a => a.failureCategory === "test_invalid" && a.testIds && a.evidence[0]?.includes("fails on the frozen reference")).flatMap(a => a.testIds!).map(id => `${id} contradicts the frozen task contract at ${ownLine(tests ?? "", oracleById.get(id) ?? "")}`),
           ...forTester.filter(a => a.evidence[0]?.startsWith("no generated test")).map(() => "None of your tests is consistent with the frozen task contract; re-derive every expected value and error from the contract text."),
           ...forTester.filter(a => a.evidence[0]?.startsWith("tests do not load") || a.evidence[0]?.startsWith("the test module")).map(a => a.evidence[0])].join("\n"), 2000);
         record.feedback = (record as AttemptRecord & { workerFeedback?: string }).workerFeedback;
