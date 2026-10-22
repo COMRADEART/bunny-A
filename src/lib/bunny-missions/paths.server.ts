@@ -3,7 +3,8 @@ import { dirname, isAbsolute, relative, resolve, basename, join } from "node:pat
 
 /**
  * Resolves a path the way the OS will see it: symlinks/junctions in the existing part are followed, so
- * a link inside an approved folder cannot point the operation outside it. Missing tails are appended.
+ * a link inside an approved folder cannot point the operation outside it. Missing tails are appended. `.native` also
+ * expands Windows 8.3 short names, so a short and a long spelling of one folder compare equal (MA4-S1R3-CI2).
  */
 export function canonical(path: string): string {
   let current = resolve(path); const tail: string[] = [];
@@ -12,7 +13,7 @@ export function canonical(path: string): string {
     if (parent === current) return resolve(path);
     tail.unshift(basename(current)); current = parent;
   }
-  return join(realpathSync(current), ...tail);
+  return join(realpathSync.native(current), ...tail);
 }
 
 /** True when `path` is `root` or inside it after canonicalization. */

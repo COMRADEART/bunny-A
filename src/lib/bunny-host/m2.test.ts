@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CodexAdapter, ClaudeAdapter, DetectOnlyAdapter, OllamaAdapter, providerBase } from "./adapters.server.ts";
@@ -10,6 +11,7 @@ import { bunnyRoute, eligibility, structuredDecision } from "./router.ts";
 import { HostDatabase } from "./persistence.server.ts";
 import { ModelCapabilityRegistry } from "./model-capability.server.ts";
 import { TaskManager } from "./manager.server.ts";
+import { canonical } from "../bunny-missions/paths.server.ts";
 import { ProviderRegistry, applyUsage } from "./registry.server.ts";
 import { codexUsageWindows } from "./codex-probe.server.ts";
 import { descendants, survivors } from "./process-tree.server.ts";
@@ -372,6 +374,20 @@ test("a required working directory must be an approved project folder", async ()
     assert.throws(() => host.submit({ prompt: "Edit a file", mode: "balanced", constraints: { workingDirectory: folder } }), /not an approved project/);
     const project = host.registerProject("Approved", folder);
     const task = host.submit({ prompt: "Edit a file", mode: "balanced", constraints: { workingDirectory: folder } });
+    assert.equal(task.projectId, project.id); assert.equal(task.cwd, project.path);
+  } finally { db.close(); rmSync(folder, { recursive: true, force: true }); }
+});
+
+test("MA4-S1R3-CI2: the 8.3 short spelling of an approved project folder is that folder", { skip: process.platform !== "win32" && "Windows 8.3 names only" }, async (t) => {
+  const folder = mkdtempSync(join(tmpdir(), "bunny-ci2-long-project-name-"));
+  const db = new HostDatabase(":memory:"); const fake = scriptedAdapter();
+  try {
+    const short = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "(New-Object -ComObject Scripting.FileSystemObject).GetFolder($env:BUNNY_FOLDER).ShortPath"], { env: { ...process.env, BUNNY_FOLDER: folder }, encoding: "utf8", windowsHide: true }).trim();
+    if (!short || short.toLowerCase() === realpathSync.native(folder).toLowerCase()) return t.skip("8.3 names are disabled on this volume");
+    assert.equal(canonical(short), canonical(folder), "both spellings canonicalize to the long form");
+    const host = new TaskManager(db, process.cwd(), [fake.adapter]); await host.discover();
+    const project = host.registerProject("Approved", folder);
+    const task = host.submit({ prompt: "Edit a file", mode: "balanced", constraints: { workingDirectory: short } });
     assert.equal(task.projectId, project.id); assert.equal(task.cwd, project.path);
   } finally { db.close(); rmSync(folder, { recursive: true, force: true }); }
 });
