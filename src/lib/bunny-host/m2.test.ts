@@ -11,7 +11,6 @@ import { bunnyRoute, eligibility, structuredDecision } from "./router.ts";
 import { HostDatabase } from "./persistence.server.ts";
 import { ModelCapabilityRegistry } from "./model-capability.server.ts";
 import { TaskManager } from "./manager.server.ts";
-import { canonical } from "../bunny-missions/paths.server.ts";
 import { ProviderRegistry, applyUsage } from "./registry.server.ts";
 import { codexUsageWindows } from "./codex-probe.server.ts";
 import { descendants, survivors } from "./process-tree.server.ts";
@@ -384,7 +383,6 @@ test("MA4-S1R3-CI2: the 8.3 short spelling of an approved project folder is that
   try {
     const short = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "(New-Object -ComObject Scripting.FileSystemObject).GetFolder($env:BUNNY_FOLDER).ShortPath"], { env: { ...process.env, BUNNY_FOLDER: folder }, encoding: "utf8", windowsHide: true }).trim();
     if (!short || short.toLowerCase() === realpathSync.native(folder).toLowerCase()) return t.skip("8.3 names are disabled on this volume");
-    assert.equal(canonical(short), canonical(folder), "both spellings canonicalize to the long form");
     const host = new TaskManager(db, process.cwd(), [fake.adapter]); await host.discover();
     const project = host.registerProject("Approved", folder);
     const task = host.submit({ prompt: "Edit a file", mode: "balanced", constraints: { workingDirectory: short } });

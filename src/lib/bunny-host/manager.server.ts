@@ -173,7 +173,7 @@ export class TaskManager {
     options: ManagerOptions = {},
   ) {
     this.db = db;
-    this.defaultRoot = realpathSync.native(defaultRoot);
+    this.defaultRoot = realpathSync(defaultRoot);
     this.workspaceRootConfigured = !!options.workspaceRoot;
     this.projects = new ProjectRegistry(db, options.workspaceRoot ?? this.defaultRoot);
     this.containment =
@@ -562,7 +562,7 @@ export class TaskManager {
   async configureProviderPath(id: ProviderId, path: string | null) {
     const paths = this.providerPaths();
     if (path) {
-      const real = realpathSync.native(resolve(path));
+      const real = realpathSync(resolve(path));
       if (!statSync(real).isFile()) throw new Error("Executable path must be a file.");
       paths[id] = real;
     } else delete paths[id];
@@ -1117,14 +1117,18 @@ export class TaskManager {
       // A required folder must be an approved project root (or the Host's default root); it is never created or guessed.
       let folder: string;
       try {
-        folder = realpathSync.native(resolve(constraints.workingDirectory));
+        folder = realpathSync(resolve(constraints.workingDirectory));
       } catch {
         throw new Error("The required working directory does not exist.");
       }
-      const owner = this.db.projects().find((p) => p.path === folder) ?? null;
+      // Project roots are registered in native long form (project-paths inspectRoot), while realpathSync keeps 8.3 short
+      // names; the same folder spelled short must still match its registration (MA4-S1R3-CI2).
+      const identity = realpathSync.native(folder);
+      const isFolder = (path: string) => path === folder || path === identity;
+      const owner = this.db.projects().find((p) => isFolder(p.path)) ?? null;
       if (!owner && folder !== this.defaultRoot)
         throw new Error("The required working directory is not an approved project folder.");
-      if (project && project.path !== folder)
+      if (project && !isFolder(project.path))
         throw new Error("The required working directory differs from the selected project.");
       project = owner ? this.projects.forExecution(owner.id) : null;
       constraints.workingDirectory = folder;
@@ -1133,14 +1137,14 @@ export class TaskManager {
     if (delegated?.cwd) {
       let folder: string;
       try {
-        folder = realpathSync.native(resolve(delegated.cwd));
+        folder = realpathSync(resolve(delegated.cwd));
       } catch {
         throw new Error("The mission workspace does not exist.");
       }
       const inside = (root: string) => {
         let real: string;
         try {
-          real = realpathSync.native(root);
+          real = realpathSync(root);
         } catch {
           return false;
         }
@@ -1715,7 +1719,7 @@ export class TaskManager {
     }
     const provider=this.live().find((p) =>p.id===this.db.get(id).provider);if(!provider) throw new Error("Executor is no longer eligible. Route again.");
     const adapter=this.adapters.find((a) =>a.id===provider.id);if(!adapter) throw new Error("Adapter unsupported.");
-    if(!task.cwd || realpathSync.native(task.cwd)!==task.cwd || !statSync(task.cwd).isDirectory()) throw new Error("Execution root changed or is unavailable.");
+    if(!task.cwd || realpathSync(task.cwd)!==task.cwd || !statSync(task.cwd).isDirectory()) throw new Error("Execution root changed or is unavailable.");
     // M-A-3 T9R-F01: a launch-time reroute may have changed provider or model; the session that actually starts
     // passes the Mission scope check again (this also spends a trusted-desktop grant exactly once).
     const final = this.db.get(id);
@@ -2647,7 +2651,7 @@ export class TaskManager {
     const known = new Set(this.db.tasks().map((task) => task.id));
     for (const project of projects) {
       try {
-        const root = realpathSync.native(project.path);
+        const root = realpathSync(project.path);
         if (statSync(root).isDirectory() && !this.db.projects().some((p) => p.id === project.id))
           this.db.project({ ...project, path: root });
       } catch {
