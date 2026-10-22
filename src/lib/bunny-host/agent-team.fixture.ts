@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HostDatabase } from "./persistence.server.ts";
@@ -106,7 +106,9 @@ export type TeamEnv = {
 };
 
 export async function teamSetup(label: string, options: { faults?: TeamFaults; responder?: Responder; dir?: string; providers?: ProviderAdapter[]; startUnknown?: boolean; startOffline?: boolean } = {}): Promise<TeamEnv> {
-  const dir = options.dir ?? mkdtempSync(join(tmpdir(), `bunny-t11-${label}-`));
+  // The long form of the temp root: Host snapshots carry native project paths, and hosted runners set an 8.3 TEMP;
+  // a short fixture path would make the device-masking positive controls look for a string the Host never writes.
+  const dir = options.dir ?? mkdtempSync(join(realpathSync.native(tmpdir()), `bunny-t11-${label}-`));
   const root = join(dir, "project");
   if (!options.dir) {
     mkdirSync(join(root, "data"), { recursive: true });
