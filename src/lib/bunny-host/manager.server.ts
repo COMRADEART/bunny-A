@@ -91,6 +91,12 @@ export class TaskManager {
     this.db.db.prepare("INSERT INTO settings(key,value) VALUES('routing_priority',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(priority);
     this.routingPriority = priority;
   }
+  /** A Task's constraints with the owner's routing priority applied, so every route (legacy fallback included) and the
+   *  hosted-advice gate see local-only (MA4-S1R3-CI2: a fact-less Host used to route a local-only Task to the cloud). */
+  private taskConstraints(routingText: string, constraints: TaskConstraints | undefined): TaskConstraints {
+    const inferred = inferredConstraints(routingText, constraints);
+    return this.routingPriority === "local_only" ? { ...inferred, localOnly: true } : inferred;
+  }
   projects: ProjectRegistry;
   workspaceRootConfigured: boolean;
   db: HostDatabase;
@@ -788,7 +794,7 @@ export class TaskManager {
     if ((input.override && input.override !== "auto") || input.modelOverride || input.constraints?.modelExact || ownerDirective(input.prompt)) return null;
     try {
       const routingText = input.routingPrompt ?? input.prompt;
-      const constraints = inferredConstraints(routingText, input.constraints);
+      const constraints = this.taskConstraints(routingText, input.constraints);
       if (constraints.localOnly || constraints.offlineOnly || constraints.privacyLocal || constraints.sensitive) return null;
       const pipeline = this.routingPipeline({ projectId:input.projectId??null, routingText, mode: input.mode, providers: this.live(), constraints, override: input.override, modelOverride: input.modelOverride });
       const eligibleKeys = pipeline.selection.order.map((candidate) => candidateKey(candidate.provider_id, candidate.model_id));
@@ -1101,7 +1107,7 @@ export class TaskManager {
     const executionScope = scope ? { access: scope.access } : undefined;
     // A mission child is routed on its step objective; Bunny's own agent-prompt wording must not add requirements.
     const routingText = input.routingPrompt ?? input.prompt;
-    const constraints = inferredConstraints(routingText, input.constraints);
+    const constraints = this.taskConstraints(routingText, input.constraints);
     let project = input.projectId ? this.projects.forExecution(input.projectId) : null;
     if (input.projectId && !project) throw new Error("Project is not registered on this Host.");
     if (constraints.workingDirectory) {

@@ -54,6 +54,14 @@ jobs:
             fs.writeFileSync("ci-diag/env.json",JSON.stringify(env,null,2));console.log(env)'
           { which -a git; git --version; ls -d "/c/Program Files/Git"/*/ "/c/Program Files/Git"/*/bin/git.exe; } > ci-diag/git-layout.txt 2>&1 || true
           cat ci-diag/git-layout.txt
+          # DPAPI through the Host's own protector, as the TypeSafe key store uses it (no real key: a fixed test string).
+          node --experimental-strip-types -e '
+            import("./src/lib/bunny-host/jev-secrets.server.ts").then(async ({ DpapiProtector }) => {
+              const p = new DpapiProtector(); const t0 = Date.now();
+              try { const c = await p.protect("ci-dpapi-probe"); console.log("dpapi", (await p.unprotect(c)) === "ci-dpapi-probe" ? "ROUND-TRIP OK" : "MISMATCH", Date.now() - t0, "ms"); }
+              catch (e) { console.log("dpapi FAILED", Date.now() - t0, "ms", e.message); }
+            })' 2>&1 | tee ci-diag/dpapi-probe.txt
+          powershell.exe -NoProfile -NonInteractive -Command "Add-Type -AssemblyName System.Security; [Security.Cryptography.ProtectedData]::Protect([byte[]](1,2,3), \$null, 'CurrentUser').Length" 2>&1 | tee -a ci-diag/dpapi-probe.txt || true
       - name: Keep-alive restart probe (no Host code)
         if: matrix.lane == 'isolated'
         shell: bash
@@ -67,6 +75,7 @@ jobs:
           BUNNY_CI_HANDLE_DIR: ${{ github.workspace }}\ci-diag\handles
           FILES: ${{ inputs.files }}
           LANE: ${{ matrix.lane }}
+          BUNNY_TEST_EVIDENCE_DIR: ${{ github.workspace }}\ci-diag\evidence
         run: |
           url() { node -p "require('url').pathToFileURL(require('path').resolve('$1')).href"; }
           export NODE_OPTIONS="--import $(url scripts/ci/handle-report.mjs)"

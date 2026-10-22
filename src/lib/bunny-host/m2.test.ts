@@ -392,6 +392,26 @@ test("MA4-S1R3-CI2: the 8.3 short spelling of an approved project folder is that
   } finally { db.close(); rmSync(folder, { recursive: true, force: true }); }
 });
 
+test("MA4-S1R3-CI2: the local-only routing priority holds on a Host with no model facts (legacy fallback)", async () => {
+  const boot = async (ids: ProviderId[]) => {
+    const db = new HostDatabase(":memory:");
+    const host = new TaskManager(db, process.cwd(), ids.map((id) => scriptedAdapter(id).adapter), { modelRegistry: new ModelCapabilityRegistry(db, { availableProviders: () => [] }) });
+    await host.discover(); host.setRoutingPriority("local_only");
+    return { db, host };
+  };
+  const both = await boot(["claude", "ollama"]);
+  try {
+    const task = both.host.submit({ prompt: "Summarize the tradeoffs of two approaches", mode: "balanced" });
+    assert.equal(task.provider, "ollama", "a ready cloud provider is never chosen under local-only");
+    assert.equal(task.constraints?.localOnly, true, "the Task records the constraint it was admitted under");
+  } finally { both.db.close(); }
+  const cloud = await boot(["claude"]);
+  try {
+    assert.throws(() => cloud.host.submit({ prompt: "Summarize the tradeoffs of two approaches", mode: "balanced" }), "no local provider: refused, not sent to the cloud");
+    assert.equal(cloud.host.db.tasks().length, 0);
+  } finally { cloud.db.close(); }
+});
+
 test("process tree: descendants follow parent links and reject reused PIDs; survivors need the same start time", () => {
   const rows = [
     { pid: 10, ppid: 1, name: "codex.exe", createdAt: 1000 },
