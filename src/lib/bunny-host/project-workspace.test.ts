@@ -11,9 +11,13 @@ import {
   symlinkSync,
   linkSync,
   writeFileSync,
+  realpathSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
+
+// The long form of the temp root: hosted runners set an 8.3 TEMP, and the fixtures compare paths as strings.
+const TEMP = realpathSync.native(tmpdir());
 import { HostDatabase } from "./persistence.server.ts";
 import { ProjectRegistry } from "./project-registry.server.ts";
 import { AgentWorkspaceStore } from "./agent-workspace.server.ts";
@@ -30,7 +34,7 @@ import { dashboardCommand } from "./presentation.ts";
 import type { HostSnapshot } from "./contracts.ts";
 
 function fixture() {
-  const parent = mkdtempSync(join(tmpdir(), "bunny-t7-unit-"));
+  const parent = mkdtempSync(join(TEMP, "bunny-t7-unit-"));
   const workspace = join(parent, "workspace"),
     a = join(parent, "a"),
     b = join(parent, "b"),
@@ -94,7 +98,7 @@ function fixture() {
   };
   const cleanup = () => {
     host.close();
-    assert.ok(contained(resolve(tmpdir()), parent) && parent.includes("bunny-t7-unit-"));
+    assert.ok(contained(TEMP, parent) && parent.includes("bunny-t7-unit-"));
     rmSync(parent, { recursive: true, force: true });
   };
   return {

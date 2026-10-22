@@ -67,13 +67,40 @@ jobs:
       # The exact `npm test` command minus scripts/voice-worker.test.mjs: those tests need the operator-staged,
       # hash-pinned whisper runtime and a working Windows speech recognizer, which hosted runners lack.
       # They remain a LOCAL gate (docs/ma4-s1r2/CI_VALIDATION.md); excluded here, never counted as passed.
-      - name: npm test (without hardware voice tests)
+      # Each `npm test` stage runs unchanged (files, order, concurrency) except for the TAP reporter, which streams a
+      # failure as it happens, and a per-test timeout. A watchdog bounds each stage: on overrun it records the process
+      # tree and listening ports, stops the tree and fails with the stage named, instead of hanging to the job limit.
+      - name: npm test stage 1 (scripts, without hardware voice tests)
         shell: bash
         run: |
-          cmd=$(node -e 'const s=require("./package.json").scripts.test;const f=require("fs").readdirSync("scripts").filter(n=>n.endsWith(".test.mjs")&&n!=="voice-worker.test.mjs").map(n=>"scripts/"+n).join(" ");if(!s.includes("scripts/*.test.mjs"))process.exit(1);console.log(s.replace("scripts/*.test.mjs",f))')
-          eval "$cmd"
+          [ "$(node scripts/ci/test-stage.mjs count)" = 4 ] || { echo "::error::npm test no longer has 4 stages; update ci.yml"; exit 1; }
+          node scripts/ci/watchdog.mjs --label stage1 --budget-s 900 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 0 $TEST_FLAGS)"
         env:
           BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+          TEST_FLAGS: --test-reporter=tap --test-timeout=300000
+      - name: npm test stage 2 (MA3 Host and Mission suites)
+        shell: bash
+        run: node scripts/ci/watchdog.mjs --label stage2 --budget-s 2400 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 1 $TEST_FLAGS)"
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+          TEST_FLAGS: --test-reporter=tap --test-timeout=300000
+      - name: npm test stage 3 (agent runtime and teams)
+        shell: bash
+        run: node scripts/ci/watchdog.mjs --label stage3 --budget-s 900 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 2 $TEST_FLAGS)"
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+          TEST_FLAGS: --test-reporter=tap --test-timeout=300000
+      - name: npm test stage 4 (npm run test:ma4)
+        shell: bash
+        run: node scripts/ci/watchdog.mjs --label stage4 --budget-s 600 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 3)"
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regression-diagnostics
+          path: ci-diag
+          retention-days: 14
 
   security:
     name: static security checks

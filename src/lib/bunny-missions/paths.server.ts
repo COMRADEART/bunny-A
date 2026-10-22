@@ -5,19 +5,23 @@ import { dirname, isAbsolute, relative, resolve, basename, join } from "node:pat
  * Resolves a path the way the OS will see it: symlinks/junctions in the existing part are followed, so
  * a link inside an approved folder cannot point the operation outside it. Missing tails are appended.
  */
-export function canonical(path: string): string {
+export function canonical(path: string, real: (path: string) => string = realpathSync): string {
   let current = resolve(path); const tail: string[] = [];
   while (!existsSync(current)) {
     const parent = dirname(current);
     if (parent === current) return resolve(path);
     tail.unshift(basename(current)); current = parent;
   }
-  return join(realpathSync(current), ...tail);
+  return join(real(current), ...tail);
 }
 
 /** True when `path` is `root` or inside it after canonicalization. */
 export function within(root: string, path: string): boolean {
-  const base = canonical(root); const target = canonical(path);
+  // Also compare the OS's final paths: both forms follow links, but only .native expands 8.3 short names, so a short
+  // and a long spelling of one folder (an approved root vs. a path Git reports) still nest (MA4-S1R3-CI2).
+  return nested(canonical(root), canonical(path)) || nested(canonical(root, realpathSync.native), canonical(path, realpathSync.native));
+}
+function nested(base: string, target: string): boolean {
   const rel = relative(base, target);
   if (process.platform === "win32" && base.slice(0, 2).toLowerCase() !== target.slice(0, 2).toLowerCase()) return false;
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));

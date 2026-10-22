@@ -329,6 +329,10 @@ test("MA1: git resolves past the Git for Windows cmd launcher so a Host crash ca
     assert.equal(realGit(real, "win32"), real, "the real binary is kept");
     const lone = join(root, "Other", "cmd", "git.exe"); mkdirSync(join(root, "Other", "cmd"), { recursive: true }); writeFileSync(lone, "");
     assert.equal(realGit(lone, "win32"), lone, "no sibling binary: unchanged");
+    const current = join(root, "Ucrt", "cmd", "git.exe"); const ucrt = join(root, "Ucrt", "ucrt64", "bin", "git.exe");
+    mkdirSync(join(root, "Ucrt", "cmd"), { recursive: true }); mkdirSync(join(root, "Ucrt", "ucrt64", "bin"), { recursive: true });
+    writeFileSync(current, ""); writeFileSync(ucrt, "");
+    assert.equal(realGit(current, "win32"), ucrt, "the UCRT64 layout of current Git for Windows resolves too");
     if (process.platform === "win32") {
       const saved = process.env.PATH;
       try { process.env.PATH = join(root, "Git", "cmd"); assert.equal(resolveCommand("git")?.file.toLowerCase(), real.toLowerCase()); }

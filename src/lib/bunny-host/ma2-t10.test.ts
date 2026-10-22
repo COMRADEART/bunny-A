@@ -16,17 +16,20 @@ async function fixture() {
   };
   const host = await startHost({ dataDirectory: directory, root: directory, port: 45139, adapters: [unapprovedFixture] });
   const base = "http://127.0.0.1:45139";
-  const command = (action: string, data: unknown = {}, token = host.token) => fetch(base + "/command", { method: "POST", headers: { authorization: "Bearer " + token, "content-type": "application/json" }, body: JSON.stringify({ action, data }) });
+  // One connection per request: a socket pooled by an earlier Host on this port (every test boots one) is reset when that Host's deferred
+  // socket close lands (hosted Windows, MA4-S1R3-CI2), so it must never carry a later Host's first request.
+  const fresh = { connection: "close" };
+  const command = (action: string, data: unknown = {}, token = host.token) => fetch(base + "/command", { method: "POST", headers: { ...fresh, authorization: "Bearer " + token, "content-type": "application/json" }, body: JSON.stringify({ action, data }) });
   const pair = async () => {
     const code = (await (await command("pairing.create")).json()).pairCode;
-    const response = await fetch(base + "/pair", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, name: "T10 disposable client" }) });
+    const response = await fetch(base + "/pair", { method: "POST", headers: { ...fresh, "content-type": "application/json" }, body: JSON.stringify({ code, name: "T10 disposable client" }) });
     assert.equal(response.status, 200);
     return await response.json() as { token: string; deviceId: string };
   };
   const controllers: AbortController[] = [];
   const stream = async (token: string, path = "/events") => {
     const abort = new AbortController(); controllers.push(abort);
-    const response = await fetch(base + path, { headers: { authorization: "Bearer " + token }, signal: abort.signal });
+    const response = await fetch(base + path, { headers: { ...fresh, authorization: "Bearer " + token }, signal: abort.signal });
     assert.equal(response.status, 200);
     const reader = response.body!.getReader();
     await reader.read();
@@ -67,8 +70,8 @@ for (const taskScoped of [false, true]) test(`T10-T6-04: revocation ends an alre
       // Destroyed HTTP streams report termination as a fetch TypeError on Node.
       assert.ok(error instanceof TypeError, String(error));
     }
-    assert.equal((await fetch(f.base + "/events", { headers: { authorization: "Bearer " + device.token } })).status, 401);
-    assert.equal((await fetch(f.base + "/state", { headers: { authorization: "Bearer " + device.token } })).status, 401);
+    assert.equal((await fetch(f.base + "/events", { headers: { connection: "close", authorization: "Bearer " + device.token } })).status, 401);
+    assert.equal((await fetch(f.base + "/state", { headers: { connection: "close", authorization: "Bearer " + device.token } })).status, 401);
     assert.equal((await f.command("stop", { id: "unknown" }, device.token)).status, 401);
   } finally { await f.close(); }
 });
@@ -85,6 +88,6 @@ test("T10-T6-04: revoking one device preserves workstation and independently pai
     assert.ok(ownerEvent.text.includes("UNRELATED_AUTHORITY_SURVIVES"), "workstation detail is unchanged");
     assert.equal(deviceEvent.closed, false, "the other device still receives the exact canonical event");
     assert.ok(!deviceEvent.text.includes("UNRELATED_AUTHORITY_SURVIVES"), "the other device retains only the safe projection");
-    assert.equal((await fetch(f.base + "/state", { headers: { authorization: "Bearer " + b.token } })).status, 200);
+    assert.equal((await fetch(f.base + "/state", { headers: { connection: "close", authorization: "Bearer " + b.token } })).status, 200);
   } finally { await f.close(); }
 });

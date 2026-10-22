@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mergeTransaction, runGitProcess, type GitRunner } from "./capabilities/git-merge.server.ts";
@@ -13,7 +13,8 @@ import { GitCapability } from "./capabilities/local.server.ts";
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, windowsHide: true, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 function repository(conflict = false) {
-  const directory = mkdtempSync(join(tmpdir(), "bunny-ma0r-merge-")); const root = join(directory, "repo"); mkdirSync(root);
+  // The long form of the temp root: Git reports long paths, and hosted runners set an 8.3 TEMP.
+  const directory = mkdtempSync(join(realpathSync.native(tmpdir()), "bunny-ma0r-merge-")); const root = join(directory, "repo"); mkdirSync(root);
   git(root, "init", "-q", "-b", "main"); git(root, "config", "user.name", "Bunny Fixture"); git(root, "config", "user.email", "bunny@fixture");
   writeFileSync(join(root, "a.txt"), "base\n"); git(root, "add", "."); git(root, "commit", "-qm", "base");
   git(root, "checkout", "-qb", "bunny/test");

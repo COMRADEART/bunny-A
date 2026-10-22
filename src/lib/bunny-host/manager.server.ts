@@ -6,7 +6,7 @@ import { canTransition } from "../orch/machine.ts";
 import type { Mode, OrchTask, Project, ProviderId, ProviderLive, TaskState, HostSample, TaskProgress, TokenUsage, ProcessInfo, ProviderExecutionScope, TaskConstraints, RouteDecision ,
 } from "../orch/types.ts";
 import { HostDatabase } from "./persistence.server.ts";
-import { MODEL_SOURCE_PROVIDERS, ModelCapabilityRegistry } from "./model-capability.server.ts";
+import { MODEL_SOURCE_PROVIDERS, ModelCapabilityRegistry, type ModelCapabilityOptions } from "./model-capability.server.ts";
 import { bunnyRoute, eligibility, inferredConstraints, runsLocally } from "./router.ts";
 import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask ,
@@ -76,6 +76,8 @@ export type ManagerOptions = {
   containment?: HostContainment;
   /** M-A-3 T3: test/fixture injection point for the T1 model registry; production builds the real one. */
   modelRegistry?: ModelCapabilityRegistry;
+  /** MA4-S1R3-CI2 test-only model probes for the Host-built registry, so a Host test does not read the PC's own Ollama/Codex. */
+  modelProbes?: Pick<ModelCapabilityOptions, "ollamaProbe" | "ollamaShow" | "ollamaPs" | "codexLaunch" | "codexCatalog">;
   /** M-A-3 T9R-F04: Host state folder; provider-session job records live in runtime/provider-sessions. */
   dataDirectory?: string | null;
   /** M-A-3 T13.1 test seams for intelligence services; production uses Ollama, real fetch and Windows DPAPI. */
@@ -90,6 +92,12 @@ export class TaskManager {
   setRoutingPriority(priority: RoutingPriority) {
     this.db.db.prepare("INSERT INTO settings(key,value) VALUES('routing_priority',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(priority);
     this.routingPriority = priority;
+  }
+  /** A Task's constraints with the owner's routing priority applied, so every route (legacy fallback included) and the
+   *  hosted-advice gate see local-only (MA4-S1R3-CI2: a fact-less Host used to route a local-only Task to the cloud). */
+  private taskConstraints(routingText: string, constraints: TaskConstraints | undefined): TaskConstraints {
+    const inferred = inferredConstraints(routingText, constraints);
+    return this.routingPriority === "local_only" ? { ...inferred, localOnly: true } : inferred;
   }
   projects: ProjectRegistry;
   workspaceRootConfigured: boolean;
@@ -190,6 +198,7 @@ export class TaskManager {
         inferenceModels: () => this.ma4Adapter.modelRecords(),
         providerPaths: () => this.providerPaths(),
         availableProviders: () => this.adapters.map((adapter) => adapter.id),
+        ...options.modelProbes,
       });
     this.providerUsage = new ProviderUsageService({
       providers: () => this.registry.list(),
@@ -788,7 +797,7 @@ export class TaskManager {
     if ((input.override && input.override !== "auto") || input.modelOverride || input.constraints?.modelExact || ownerDirective(input.prompt)) return null;
     try {
       const routingText = input.routingPrompt ?? input.prompt;
-      const constraints = inferredConstraints(routingText, input.constraints);
+      const constraints = this.taskConstraints(routingText, input.constraints);
       if (constraints.localOnly || constraints.offlineOnly || constraints.privacyLocal || constraints.sensitive) return null;
       const pipeline = this.routingPipeline({ projectId:input.projectId??null, routingText, mode: input.mode, providers: this.live(), constraints, override: input.override, modelOverride: input.modelOverride });
       const eligibleKeys = pipeline.selection.order.map((candidate) => candidateKey(candidate.provider_id, candidate.model_id));
@@ -1101,7 +1110,7 @@ export class TaskManager {
     const executionScope = scope ? { access: scope.access } : undefined;
     // A mission child is routed on its step objective; Bunny's own agent-prompt wording must not add requirements.
     const routingText = input.routingPrompt ?? input.prompt;
-    const constraints = inferredConstraints(routingText, input.constraints);
+    const constraints = this.taskConstraints(routingText, input.constraints);
     let project = input.projectId ? this.projects.forExecution(input.projectId) : null;
     if (input.projectId && !project) throw new Error("Project is not registered on this Host.");
     if (constraints.workingDirectory) {
@@ -1112,10 +1121,14 @@ export class TaskManager {
       } catch {
         throw new Error("The required working directory does not exist.");
       }
-      const owner = this.db.projects().find((p) => p.path === folder) ?? null;
+      // Project roots are registered in native long form (project-paths inspectRoot), while realpathSync keeps 8.3 short
+      // names; the same folder spelled short must still match its registration (MA4-S1R3-CI2).
+      const identity = realpathSync.native(folder);
+      const isFolder = (path: string) => path === folder || path === identity;
+      const owner = this.db.projects().find((p) => isFolder(p.path)) ?? null;
       if (!owner && folder !== this.defaultRoot)
         throw new Error("The required working directory is not an approved project folder.");
-      if (project && project.path !== folder)
+      if (project && !isFolder(project.path))
         throw new Error("The required working directory differs from the selected project.");
       project = owner ? this.projects.forExecution(owner.id) : null;
       constraints.workingDirectory = folder;

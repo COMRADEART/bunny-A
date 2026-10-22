@@ -10,6 +10,14 @@ import { TestProtector } from "./jev-secrets.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
 import type { ConnectionView } from "./connections.ts";
 import type { OrchTask } from "../orch/types.ts";
+import type { Launchable } from "./discovery.server.ts";
+
+// Model facts are fixtures: the Host never reads this PC's own Ollama or Codex install (hosted runners have neither).
+const modelProbes = {
+  ollamaProbe: async () => ({ up: false, models: [] }),
+  codexLaunch: () => ({ command: "fixture-codex", args: [], kind: "native" }) as unknown as Launchable,
+  codexCatalog: async () => ({ model: "gpt-5.3", models: ["gpt-5.3", "gpt-5.3-codex"], limited: false, usageRead: false }),
+};
 
 test("T13.2 R07 [SIMULATED] Jev enabled through actual Host cannot move Claude data to Codex without destination approval", async () => {
   const calls: string[] = [];
@@ -144,6 +152,7 @@ async function boot(jevFetch?: import("./typesafe-jev.server.ts").FetchLike) {
     root,
     port: await freePort(),
     adapters,
+    modelProbes,
     ...(jevFetch ? { intelligence: { jevFetch, jevProtector: new TestProtector() } } : {}),
     connections: {
       protector: new TestProtector(),

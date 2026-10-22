@@ -46,14 +46,17 @@ async function boot(directory: string, port: number) {
     },
   });
   const base = `http://127.0.0.1:${port}`;
+  // One connection per request: a socket pooled by an earlier Host on this port is reset when that Host's deferred
+  // socket close lands (hosted Windows, MA4-S1R3-CI2), so it must never carry a later Host's first request.
+  const fresh = { connection: "close" };
   const command = async (action: string, data: unknown = {}, token = host.token) => {
-    const response = await fetch(`${base}/command`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, data }) });
+    const response = await fetch(`${base}/command`, { method: "POST", headers: { ...fresh, authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, data }) });
     return { status: response.status, body: (await response.json()) as Body };
   };
-  const state = async (token = host.token) => (await (await fetch(`${base}/state`, { headers: { authorization: `Bearer ${token}` } })).json()) as Body;
+  const state = async (token = host.token) => (await (await fetch(`${base}/state`, { headers: { ...fresh, authorization: `Bearer ${token}` } })).json()) as Body;
   const pair = async () => {
     const code = (await command("pairing.create")).body.pairCode;
-    return (await (await fetch(`${base}/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, name: "Phone" }) })).json()) as { token: string };
+    return (await (await fetch(`${base}/pair`, { method: "POST", headers: { ...fresh, "content-type": "application/json" }, body: JSON.stringify({ code, name: "Phone" }) })).json()) as { token: string };
   };
   return { host, command, state, pair, probed };
 }

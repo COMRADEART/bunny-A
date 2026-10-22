@@ -315,6 +315,8 @@ export async function startHost(
     /** M-A-3 T13.1 test-only intelligence seams (fake transport/protector). Never reachable from HTTP. */
     intelligence?: ManagerOptions["intelligence"];
     connections?: ManagerOptions["connections"];
+    /** MA4-S1R3-CI2 test-only model probes (fixture Ollama/Codex catalogs). Never reachable from HTTP. */
+    modelProbes?: ManagerOptions["modelProbes"];
     ma4Fetch?: typeof fetch;
     /** M-A-3 T13.3 Gate E test-only harness `--version` probe. Never reachable from HTTP. */
     harnessProbe?: typeof probeHarness;
@@ -364,6 +366,7 @@ export async function startHost(
     workspaceRoot,
     ...(options.intelligence ? { intelligence: options.intelligence } : {}),
     ...(options.connections ? { connections:options.connections } : {}),
+    ...(options.modelProbes ? { modelProbes: options.modelProbes } : {}),
     ...(options.ma4Fetch ? { ma4Fetch: options.ma4Fetch } : {}),
   });
   containment.options.persist = (type, detail, owner) =>

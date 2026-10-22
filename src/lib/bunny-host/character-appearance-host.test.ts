@@ -39,26 +39,36 @@ async function boot(directory: string, port: number) {
     missions: { adapters: [new FilesystemCapability(), new TerminalCapability(), new GitCapability(directory)] },
   });
   const base = `http://127.0.0.1:${port}`;
+  // One connection per request: a socket pooled by an earlier Host on this port is reset when that Host's deferred
+  // socket close lands (hosted Windows, MA4-S1R3-CI2), so it must never carry the restarted Host's first request.
+  const fresh = { connection: "close" };
   const command = async (action: string, data: unknown = {}, token = host.token) => {
     const response = await fetch(`${base}/command`, {
       method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      headers: { ...fresh, authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify({ action, data }),
     });
     return { status: response.status, body: (await response.json()) as Body };
   };
   const state = async (token = host.token) => {
-    const response = await fetch(`${base}/state`, { headers: { authorization: `Bearer ${token}` } });
+    const response = await fetch(`${base}/state`, { headers: { ...fresh, authorization: `Bearer ${token}` } });
     return { status: response.status, body: (await response.json()) as Body };
   };
   const pair = async (name: string) => {
     const code = (await command("pairing.create")).body.pairCode;
-    const response = await fetch(`${base}/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, name }) });
+    const response = await fetch(`${base}/pair`, { method: "POST", headers: { ...fresh, "content-type": "application/json" }, body: JSON.stringify({ code, name }) });
     assert.equal(response.status, 200);
     return (await response.json()) as { token: string; deviceId: string };
   };
-  const enabled = await command("mission.configure", { enabled: true });
-  assert.equal(enabled.status, 200, JSON.stringify(enabled.body));
+  try {
+    const enabled = await command("mission.configure", { enabled: true });
+    assert.equal(enabled.status, 200, JSON.stringify(enabled.body));
+  } catch (error) {
+    // The caller never receives this Host, so close it here: a leaked Host keeps its port, state files and the test
+    // process alive (the MA4-S1R3 stage 2 hang).
+    await host.close();
+    throw error;
+  }
   return { host, command, state, pair, close: () => host.close() };
 }
 

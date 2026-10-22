@@ -8,6 +8,14 @@ import { providerBase } from "./adapters.server.ts";
 import { TestProtector } from "./jev-secrets.server.ts";
 import type { FetchLike } from "./typesafe-jev.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
+import type { Launchable } from "./discovery.server.ts";
+
+// Model facts are fixtures: the Host never reads this PC's own Ollama or Codex install (hosted runners have neither).
+const modelProbes = {
+  ollamaProbe: async () => ({ up: false, models: [] }),
+  codexLaunch: () => ({ command: "fixture-codex", args: [], kind: "native" }) as unknown as Launchable,
+  codexCatalog: async () => ({ model: "gpt-5.3", models: ["gpt-5.3", "gpt-5.3-codex"], limited: false, usageRead: false }),
+};
 
 /**
  * M-A-3 T13.1 at the real Host HTTP surface: workstation-only credential authority, paired-device
@@ -51,7 +59,7 @@ async function boot(port: number, adapters: ProviderAdapter[] = [neverLaunches()
     calls.push(url);
     return { status: 200, headers: { get: () => null }, text: async () => JSON.stringify(jevReply(url, init.body)) };
   };
-  const host = await startHost({ dataDirectory: directory, root, port, adapters, intelligence: { jevFetch, jevProtector: new TestProtector() } });
+  const host = await startHost({ dataDirectory: directory, root, port, adapters, modelProbes, intelligence: { jevFetch, jevProtector: new TestProtector() } });
   const base = `http://127.0.0.1:${port}`;
   const command = async (action: string, data: unknown = {}, token = host.token) => {
     const response = await fetch(`${base}/command`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, data }) });

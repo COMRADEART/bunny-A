@@ -134,3 +134,45 @@ New in S1R3: everything under `docs/ma4-s1r3/evidence/` (two G7 runs, tool probe
 Stage 2 had never run on hosted CI before, because earlier runs stopped at stage 1. The failure detail was not captured: Node prints failure details only when the run ends, and the run never ended. Locally the same file passes 3/3 under an 8.3 short `TEMP` and with no git identity (`evidence/appearance-*.log`), so neither of those runner differences is the cause. Stage 2 runs without `--test-force-exit`, so a handle left open after a failure can keep the run alive. Log: `evidence/ci-hosted-regression-39684601550.log`.
 
 **R3-G11 remains PARTIAL.** Exact remaining gate: a green hosted `npm test` stage 2+. Next diagnostic step (not done, because each cycle costs 90 min): run stage 2 on the hosted runner with `--test-reporter=tap`, which streams failure details inline, and with a per-test `--test-timeout`, so a hang becomes a named failure. Then fix the cause. Do not add `--test-force-exit` alone, since that would hide the hang.
+
+## MA4-S1R3-CI2 — hosted CI recovery (follow-up, branch `ma4-s1r3-ci2`)
+
+The S1R3 results above stay as recorded. This section adds what CI2 found and fixed. Details are in
+[CI_STAGE2_DIAGNOSIS](CI_STAGE2_DIAGNOSIS.md), [CI_HOST_LIFECYCLE](CI_HOST_LIFECYCLE.md) and
+[CI_RECOVERY_EVIDENCE](CI_RECOVERY_EVIDENCE.md).
+
+**Original failure (T13.3 H appearance), test defect.** The test restarts a Host in-process on the same port. The
+restarted Host's first request reused a keep-alive socket that `fetch` pooled while talking to the first Host. On
+hosted Windows that socket was still open, because the first Host's socket close is deferred, and it was reset (`read
+ECONNRESET`). This is proven by a per-socket trace on the runner (run 39702421167).
+
+**Hang, test defect.** That failure happened inside `boot()`, after `startHost()`, so nothing owned the new Host. Its
+listener (`127.0.0.1:43910`, recorded by the handle report) kept the test-file process alive, and its state files
+raised the cleanup `EPERM` that replaced the original error. `boot()` now closes a Host whose setup fails, and the Host
+harnesses use one connection per request (9 files).
+
+**Failures the hang had hidden** (37 on the first complete hosted stage 2), all fixed:
+
+* **Product:** 8.3 short paths were refused as working directories, and `within()` rejected long spellings Git reports.
+  Git for Windows' UCRT64 layout was not found by `realGit()`. The local-only routing priority was ignored on a Host
+  without model facts, and hosted decision assistance was not suppressed under it; this is a **privacy defect**. Calculator acquisition
+  launched `calc.exe` before verifying the package and left an unverified app running. Each has a regression test.
+* **Test:** three fixtures with string path comparisons, hard-coded `mingw64` Git paths, two Host tests that read the
+  PC's own Codex/Ollama (now fixture probes through a test-only `startHost({ modelProbes })` seam), and one stage 3
+  fixture whose device-masking positive control could not be met on an 8.3 temp root.
+* **Live-only:** X53 needs a real Microsoft Calculator package. It is `SKIPPED (NOT TESTED)` on hosted runners and
+  still runs locally.
+
+**Overreach corrected.** The first 8.3 fix made `canonical()` native everywhere. That broke 63 staging and
+remote-authority tests on hosted runners (the staging alias check). It was reverted and confined to the two comparison
+points.
+
+**CI hardening.** Each `npm test` stage runs under `scripts/ci/watchdog.mjs` with a budget, the TAP reporter,
+per-test timeouts and an always-uploaded diagnostics artifact. A manual diagnostic workflow
+(`ci-stage2-diagnostic.yml`) adds handle reports and HTTP socket traces. `--test-force-exit` was not added to stage 2.
+
+**Hosted CI (run 39721263206 at `b49bb7c`): all three jobs green.** Stage 1 378/378; stage 2 1,639 pass / 0 fail / 2
+skipped; stage 3 58/58; stage 4 50 pass / 0 fail / 21 skipped (WSL2 sandbox, opt-in live); security audit 0
+advisories. **R3-G11: PASS** (hosted). G7 is unchanged: **FAIL** (v2 0/3, held-out 13/20). Cloud inference is DISABLED.
+Physical devices, installed release, WSL2 adversarial sandbox and live Calculator UIA remain **NOT TESTED** on hosted
+CI.

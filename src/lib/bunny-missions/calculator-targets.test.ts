@@ -144,3 +144,11 @@ test("target disappearance after batch admission cannot cause a replacement laun
   await assert.rejects(adapter.execute("computer.open_app", { app: "calculator" }, context), /fresh approval/);
   assert.equal(launchCalls, 0);
 });
+
+test("MA4-S1R3-CI2: Calculator acquisition verifies the installed package before it launches anything", () => {
+  // Without the package, calc.exe starts a different app (win32calc on Windows Server) that a late check would leave running.
+  const script = CALCULATOR_SCRIPTS.acquire;
+  const verify = script.indexOf("Calculator-Packages"), launch = script.indexOf("Start-Process");
+  assert.ok(verify > 0 && launch > 0, "the acquire script both verifies and launches");
+  assert.ok(verify < launch, "the package is verified before Start-Process");
+});
