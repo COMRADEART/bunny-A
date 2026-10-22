@@ -24,6 +24,7 @@ function scripted(replies: Partial<Record<Role, unknown[]>>) {
   const seen: { role: Role; schema: unknown; options?: Sampling; prompt: string }[] = [];
   const call: ModelCall = async ({ role, prompt, model, schema, options }) => {
     seen.push({ role, schema, options, prompt });
+    await new Promise(r => setTimeout(r, 5));
     const next = replies[role]?.shift();
     if (next === undefined) throw new Error(`unexpected ${role} call`);
     return { ok: true, text: typeof next === "string" ? next : JSON.stringify(next), servedModel: model, durationMs: 1 };
@@ -87,7 +88,8 @@ test("R4-G3 verified sampling: Worker samples are ranked by the Tester's own tes
   assert.ok(runs.filter(x => x.startsWith("before")).every(x => !x.includes("test_hidden")), "selection never runs the hidden tests");
   assert.equal(r.finalSource, GOOD);
   // Sampling is per role; code-bearing roles use free text (no JSON schema), Planner/Reviewer keep schema decoding.
-  assert.deepEqual(m.seen.map(x => [x.role, x.schema === null, x.options?.temperature]), [["Planner", false, 0.2], ["Worker", true, 0.2], ["Worker", true, 0.8], ["Worker", true, 0.8], ["Tester", true, 0.2], ["Reviewer", false, 0.2]]);
+  assert.deepEqual(m.seen.map(x => [x.role, x.schema === null, x.options?.temperature]), [["Planner", false, 0.2], ["Worker", true, 0.2], ["Tester", true, 0.2], ["Worker", true, 0.8], ["Worker", true, 0.8], ["Reviewer", false, 0.2]]);
+  assert.equal(r.workerTesterConcurrent, true, "the first Worker and the Tester still run in parallel");
   assert.ok(r.toolReceipts.length > 0 && r.toolReceipts.every(x => x.invoker === "orchestrator" && x.decision === "allow" && x.ok));
 });
 
