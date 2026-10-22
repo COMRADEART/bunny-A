@@ -88,3 +88,36 @@ export function reliabilityPoints(evidence: Pick<ReliabilityEvidence, "passes" |
   const lower = wilsonLower(evidence.passes, evidence.samples);
   return { points: Math.round((lower - 0.5) * RELIABILITY_WEIGHT * 10) / 10, detail: `Measured ${evidence.passes}/${evidence.samples} correct in this task category (95% lower bound ${(lower * 100).toFixed(0)}%).` };
 }
+
+/** MA4-S1R4 role-level evidence: verified outcomes of one model in one agent role, from a versioned evaluator. */
+export type AgentRole = "Planner" | "Worker" | "Tester" | "Reviewer";
+export type RoleEvidence = { model: string; role: AgentRole; passes: number; samples: number; evaluator: string };
+/** Eligibility is decided upstream (pins, privacy, provider approval, mandatory capability, resources); null = eligible. */
+export type RoleCandidate = { model: string; exclusion: string | null };
+export type RoleAssignment = { role: AgentRole; model: string | null; decision: "pinned" | "measured" | "unproven" | "abstain"; lowerBound: number | null; reasons: string[] };
+
+/**
+ * Assign one role. Order: an explicit pin (never substituted) → eligibility (hard) → measured correctness in this role
+ * (Wilson lower bound, soft) → caller order (local-first) on ties. A score never makes an ineligible model eligible.
+ * For high-risk work, abstain unless some eligible model has DEMONSTRATED the role (lower bound ≥ minLowerBound).
+ */
+export function assignRole(role: AgentRole, candidates: readonly RoleCandidate[], evidence: readonly RoleEvidence[], options: { pin?: string | null; highRisk?: boolean; minLowerBound?: number } = {}): RoleAssignment {
+  const min = options.minLowerBound ?? 0.5;
+  const bound = (model: string) => {
+    const rows = evidence.filter(e => e.model === model && e.role === role);
+    const passes = rows.reduce((a, e) => a + e.passes, 0), samples = rows.reduce((a, e) => a + e.samples, 0);
+    return { samples, lower: samples >= 3 ? wilsonLower(passes, samples) : null, passes };
+  };
+  if (options.pin) {
+    const c = candidates.find(x => x.model === options.pin);
+    if (!c || c.exclusion) return { role, model: null, decision: "abstain", lowerBound: null, reasons: [`The pinned model ${options.pin} is not eligible${c?.exclusion ? `: ${c.exclusion}` : ""}; no substitute is chosen.`] };
+    return { role, model: c.model, decision: "pinned", lowerBound: bound(c.model).lower, reasons: ["Explicit pin; measured evidence is reported, never used to override it."] };
+  }
+  const eligible = candidates.filter(c => !c.exclusion);
+  if (!eligible.length) return { role, model: null, decision: "abstain", lowerBound: null, reasons: ["No eligible model.", ...candidates.map(c => `${c.model}: ${c.exclusion}`)] };
+  const ranked = eligible.map((c, i) => ({ c, i, b: bound(c.model) })).sort((x, y) => (y.b.lower ?? -1) - (x.b.lower ?? -1) || x.i - y.i);
+  const best = ranked[0];
+  const reasons = ranked.map(r => `${r.c.model}: ${r.b.lower === null ? `UNPROVEN in ${role} (${r.b.samples} samples)` : `${r.b.passes}/${r.b.samples} verified in ${role}, 95% lower bound ${(r.b.lower * 100).toFixed(0)}%`}`);
+  if (options.highRisk && (best.b.lower ?? 0) < min) return { role, model: null, decision: "abstain", lowerBound: best.b.lower, reasons: [`No eligible model has demonstrated the ${role} role for high-risk work (needs a ${(min * 100).toFixed(0)}% lower bound).`, ...reasons] };
+  return { role, model: best.c.model, decision: best.b.lower === null ? "unproven" : "measured", lowerBound: best.b.lower, reasons };
+}
