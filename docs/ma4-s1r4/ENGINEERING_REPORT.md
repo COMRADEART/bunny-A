@@ -5,10 +5,10 @@ BUNNY A — MA4-S1R4 INTELLIGENCE REPORT
 
 Repository:   https://github.com/COMRADEART/bunny-A
 Starting SHA: e93f5ae (merge of PR #13; tree identical to the #13 head 19bbdec, whose hosted CI run 39724249720 passed)
-Final SHA:    see the draft PR head (branch below)
+Final SHA:    65a1b3a (last code+evidence commit, hosted CI green); later commits are docs only
 Branch:       ma4-s1r4-intelligence-leap (worktree ../bun-router-s1r4, own node_modules)
-PR:           draft, base ma4-s1r3-agent-reliability (PR #13 is merged, so S1R4 stacks on its merge commit)
-CI:           see "Hosted CI" below
+PR:           #14 (draft), base ma4-s1r3-agent-reliability (PR #13 is merged, so S1R4 stacks on its merge commit); MERGEABLE
+CI:           run 39860603646 (pull_request, 65a1b3a): all three jobs SUCCESS
 
 INTELLIGENCE
   Adaptive decomposition:   deterministic task profile → typed, validated task graph (≤ 4 agents, acyclic, ≤ 12 nodes);
@@ -73,16 +73,16 @@ RELEASE
   Typecheck:                 pass
   Builds:                    desktop pass; mobile-web pass
   Dependency audit:          0 vulnerabilities (prod and all); lockfile unchanged
-  Hosted CI:                 see below
+  Hosted CI:                 SUCCESS — security; typecheck/MA4/UI/builds; regression stage 1 378/378, stage 2
+                             1,639/0 fail/2 skip, stage 3 58/58, stage 4 55/0 fail/23 skip (WSL2 sandbox live tests)
   Installed Windows release: NOT TESTED
   Physical mobile testing:   NOT TESTED
 
 GATES
-  Passed:  R4-G1, G2, G3, G4, G5, G6, G8, G9, G10, G11, G13, G14
+  Passed:  R4-G1, G2, G3, G4, G5, G6, G8, G9, G10, G11, G12, G13, G14, G15
   Failed:  R4-G7 (G7 v2 0/3)
   Partial: none
   Blocked: none as a gate (27B/30B trials BLOCKED_RESOURCE_LIMIT; NPU NOT TESTED)
-  Pending at writing: R4-G12 (hosted CI), R4-G15 (draft PR) — see below
 
 FINAL STATUS: PARTIAL
 
@@ -108,10 +108,10 @@ NEXT RECOMMENDED ACTION: the owner chooses one of two ways to a stronger Worker,
 | R4-G9 pins and privacy | PASS | [SECURITY_REGRESSION](SECURITY_REGRESSION.md) |
 | R4-G10 sandbox adversarial | PASS (13/13) | [SANDBOX_VALIDATION](SANDBOX_VALIDATION.md) |
 | R4-G11 performance/resources documented | PASS | [HARDWARE_RESOURCE_REPORT](HARDWARE_RESOURCE_REPORT.md), [ROUTING_BENCHMARKS](ROUTING_BENCHMARKS.md) |
-| R4-G12 hosted CI green | see below | |
+| R4-G12 hosted CI green | PASS | run 39860603646 at `65a1b3a` (WSL2 adversarial and live Calculator UIA NOT TESTED on hosted runners) |
 | R4-G13 builds and UI | PASS | `evidence/build-*.log`, `evidence/ui.log` |
 | R4-G14 external inference disabled | PASS | [SECURITY_REGRESSION](SECURITY_REGRESSION.md) |
-| R4-G15 draft PR and evidence | see below | |
+| R4-G15 draft PR and evidence | PASS | PR #14 (draft, mergeable), `docs/ma4-s1r4/` |
 
 ## Phase notes
 
