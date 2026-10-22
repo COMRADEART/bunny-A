@@ -52,6 +52,8 @@ jobs:
               cwd:process.cwd(),tmpdir:os.tmpdir(),tmpdirReal:fs.realpathSync.native(os.tmpdir()),TEMP:process.env.TEMP,TMP:process.env.TMP,
               gitIdentity:!!require("child_process").spawnSync("git",["config","user.email"]).stdout.toString().trim()};
             fs.writeFileSync("ci-diag/env.json",JSON.stringify(env,null,2));console.log(env)'
+          { which -a git; git --version; ls -d "/c/Program Files/Git"/*/ "/c/Program Files/Git"/*/bin/git.exe; } > ci-diag/git-layout.txt 2>&1 || true
+          cat ci-diag/git-layout.txt
       - name: Keep-alive restart probe (no Host code)
         if: matrix.lane == 'isolated'
         shell: bash
