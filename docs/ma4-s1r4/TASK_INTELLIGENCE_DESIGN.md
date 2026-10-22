@@ -61,7 +61,24 @@ plan (Planner)
 
 No change touches the G7 tasks, hidden tests, references, scoring, trial counts or threshold.
 
-## Measurement
+## Measurement (identical frozen development tasks, coder 7B, same sandbox and runner)
 
-See the *Results* section appended after the development comparison (S1R3 vs S1R4 k=adaptive vs S1R4 k=1, identical
-frozen development tasks, same pin, same sandbox, same runner).
+| Strategy | Final | First attempt | Strict (all-pass) | Model calls | Output tokens | Median / P95 call | schema errors |
+|---|---|---|---|---|---|---|---|
+| S1R3 workflow (baseline) | 11/20 | 10 | 0/4 | 106 | 38,081 | 19.8 s / 64.6 s | 5 |
+| S1R4 v3 (adaptive samples) | 11/20 | 8 | 1/4 | 114 | 41,640 | 18.4 s / 77.6 s | 0 |
+| S1R4 v3b | 11/20 | 9 | 0/4 | 118 | 46,948 | 18.3 s / 61.0 s | 0 |
+| S1R4 v3c (decisive G7 strategy) | 11/20 | **11** | 1/4 | 107 | 40,908 | 17.0 s / 69.4 s | 0 |
+
+**On the development set, decomposition + verified sampling did not raise final correctness** (11/20 in every
+configuration; n = 20, sd ≈ 2.2). What it measurably did: removed the malformed-artifact failure class (5 → 0), and
+raised first-attempt passes in v3c. Extra cost: +1 to +12 model calls and +7 to +23 % output tokens per 20 trials.
+The planned single-sample ablation (k = 1) was stopped (it had started on mixed code) and not re-run for time, so the
+contribution of sampling alone is **not separately measured**.
+
+On frozen G7 (one pre-registered run, automatic routing), the same design scored held-out **17/20** vs S1R3 13/20, with
+first-attempt passes 16 vs 9 and the same number of model calls (G7_FROZEN_RESULTS). The dev set's strict tasks were
+harder than G7's held-out tasks, which is where most of the G7 gain came from (planning 2/4 → 4/4, intermediate 3/6 → 4/6).
+
+**Decision:** keep `STRATEGY_S1R3` as the default and `STRATEGY_S1R4` opt-in. The simpler path is preserved; S1R4 is
+selected explicitly where the evidence supports it.
