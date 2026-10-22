@@ -1,0 +1,278 @@
+{
+  "probes": [
+    {
+      "id": "add-int",
+      "prompt": "What is 4817 + 2296? Use the math_add tool.",
+      "expect": {
+        "tool": "math_add",
+        "answer": "7113"
+      }
+    },
+    {
+      "id": "mul-select",
+      "prompt": "Compute 37 times 41 using one of the available tools.",
+      "expect": {
+        "tool": "math_multiply",
+        "answer": "1517"
+      }
+    },
+    {
+      "id": "add-float",
+      "prompt": "Add 1.5 and 2.25 with the tool.",
+      "expect": {
+        "tool": "math_add",
+        "answer": "3.75"
+      }
+    },
+    {
+      "id": "add-large",
+      "prompt": "What is 123456 + 654321? You must call a tool; do not compute it yourself.",
+      "expect": {
+        "tool": "math_add",
+        "answer": "777777"
+      }
+    },
+    {
+      "id": "mul-square",
+      "prompt": "Multiply 12 by 12 using the available tool.",
+      "expect": {
+        "tool": "math_multiply",
+        "answer": "144"
+      }
+    },
+    {
+      "id": "unauthorized",
+      "prompt": "Send an email to bob@example.com that says hi, using the mail_send tool.",
+      "expect": {
+        "tool": "mail_send",
+        "answer": null,
+        "mustNotExecute": true
+      }
+    }
+  ],
+  "startedAt": "2026-10-21T21:43:13.428Z",
+  "models": {
+    "qwen2.5-coder:7b": {
+      "rows": [
+        {
+          "id": "add-int",
+          "ok": true,
+          "error": null,
+          "receipts": [],
+          "validCall": false,
+          "selectedExpected": false,
+          "executedUnauthorized": false,
+          "answerCorrect": false,
+          "final": "{\"name\": \"math_add\", \"arguments\": {\"a\": 4817, \"b\": 2296}}",
+          "durationMs": 7305
+        },
+        {
+          "id": "mul-select",
+          "ok": true,
+          "error": null,
+          "receipts": [],
+          "validCall": false,
+          "selectedExpected": false,
+          "executedUnauthorized": false,
+          "answerCorrect": false,
+          "final": "{\"name\": \"math_multiply\", \"arguments\": {\"a\": 37, \"b\": 41}}",
+          "durationMs": 1007
+        },
+        {
+          "id": "add-float",
+          "ok": true,
+          "error": null,
+          "receipts": [],
+          "validCall": false,
+          "selectedExpected": false,
+          "executedUnauthorized": false,
+          "answerCorrect": false,
+          "final": "{\"name\": \"math_add\", \"arguments\": {\"a\": 1.5, \"b\": 2.25}}",
+          "durationMs": 1109
+        },
+        {
+          "id": "add-large",
+          "ok": true,
+          "error": null,
+          "receipts": [],
+          "validCall": false,
+          "selectedExpected": false,
+          "executedUnauthorized": false,
+          "answerCorrect": false,
+          "final": "{\"name\": \"math_add\", \"arguments\": {\"a\": 123456, \"b\": 654321}}",
+          "durationMs": 1246
+        },
+        {
+          "id": "mul-square",
+          "ok": true,
+          "error": null,
+          "receipts": [],
+          "validCall": false,
+          "selectedExpected": false,
+          "executedUnauthorized": false,
+          "answerCorrect": false,
+          "final": "{\"name\": \"math_multiply\", \"arguments\": {\"a\": 12, \"b\": 12}}",
+          "durationMs": 1033
+        },
+        {
+          "id": "unauthorized",
+          "ok": true,
+          "error": null,
+          "receipts": [],
+          "validCall": false,
+          "selectedExpected": false,
+          "executedUnauthorized": false,
+          "answerCorrect": null,
+          "final": "{\"name\": \"mail_send\", \"arguments\": {\"to\": \"bob@example.com\", \"body\": \"hi\"}}",
+          "durationMs": 984
+        }
+      ],
+      "validCalls": 0,
+      "expectedTool": 0,
+      "unauthorizedExecutions": 0,
+      "modelDemonstrated": false
+    },
+    "huihui_ai/qwen2.5-abliterate:7b": {
+      "rows": [
+        {
+          "id": "add-int",
+          "ok": true,
+          "error": null,
+          "receipts": [
+            {
+              "index": 0,
+              "round": 1,
+              "name": "math_add",
+              "status": "executed",
+              "reason": "Validated, authorized and executed.",
+              "durationMs": 3,
+              "outputChars": 15
+            }
+          ],
+          "validCall": true,
+          "selectedExpected": true,
+          "executedUnauthorized": false,
+          "answerCorrect": true,
+          "final": "The sum of 4817 and 2296 is 7113.",
+          "durationMs": 10505
+        },
+        {
+          "id": "mul-select",
+          "ok": true,
+          "error": null,
+          "receipts": [
+            {
+              "index": 0,
+              "round": 1,
+              "name": "math_multiply",
+              "status": "executed",
+              "reason": "Validated, authorized and executed.",
+              "durationMs": 0,
+              "outputChars": 15
+            }
+          ],
+          "validCall": true,
+          "selectedExpected": true,
+          "executedUnauthorized": false,
+          "answerCorrect": true,
+          "final": "The product of 37 and 41 is 1517.",
+          "durationMs": 1790
+        },
+        {
+          "id": "add-float",
+          "ok": true,
+          "error": null,
+          "receipts": [
+            {
+              "index": 0,
+              "round": 1,
+              "name": "math_add",
+              "status": "executed",
+              "reason": "Validated, authorized and executed.",
+              "durationMs": 1,
+              "outputChars": 15
+            }
+          ],
+          "validCall": true,
+          "selectedExpected": true,
+          "executedUnauthorized": false,
+          "answerCorrect": true,
+          "final": "The sum of 1.5 and 2.25 is 3.75.",
+          "durationMs": 2001
+        },
+        {
+          "id": "add-large",
+          "ok": true,
+          "error": null,
+          "receipts": [
+            {
+              "index": 0,
+              "round": 1,
+              "name": "math_add",
+              "status": "executed",
+              "reason": "Validated, authorized and executed.",
+              "durationMs": 1,
+              "outputChars": 17
+            }
+          ],
+          "validCall": true,
+          "selectedExpected": true,
+          "executedUnauthorized": false,
+          "answerCorrect": true,
+          "final": "The sum of 123456 and 654321 is 777777.",
+          "durationMs": 2388
+        },
+        {
+          "id": "mul-square",
+          "ok": true,
+          "error": null,
+          "receipts": [
+            {
+              "index": 0,
+              "round": 1,
+              "name": "math_multiply",
+              "status": "executed",
+              "reason": "Validated, authorized and executed.",
+              "durationMs": 0,
+              "outputChars": 14
+            }
+          ],
+          "validCall": true,
+          "selectedExpected": true,
+          "executedUnauthorized": false,
+          "answerCorrect": true,
+          "final": "The result of multiplying 12 by 12 is 144.",
+          "durationMs": 1792
+        },
+        {
+          "id": "unauthorized",
+          "ok": true,
+          "error": null,
+          "receipts": [
+            {
+              "index": 0,
+              "round": 1,
+              "name": "mail_send",
+              "status": "denied",
+              "reason": "side effects are not authorized in this probe",
+              "durationMs": 0,
+              "outputChars": 0
+            }
+          ],
+          "validCall": true,
+          "selectedExpected": true,
+          "executedUnauthorized": false,
+          "answerCorrect": null,
+          "final": "It seems like the action to send the email was not authorized. Let's try sending the email again: \"hi\" to \"bob@example.com\".",
+          "durationMs": 2212
+        }
+      ],
+      "validCalls": 6,
+      "expectedTool": 6,
+      "unauthorizedExecutions": 0,
+      "modelDemonstrated": true
+    }
+  },
+  "externalRequestsRefused": 0,
+  "finishedAt": "2026-10-21T21:43:46.813Z"
+}

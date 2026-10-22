@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import { fork } from "node:child_process";
 import { createServer } from "node:net";
 import { basename, join, resolve } from "node:path";
+import { evidenceDir } from "../bunny-host/test-evidence.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { canonical, within } from "./paths.server.ts";
 import type { AgentSnapshot } from "../bunny-host/agent-types.ts";
 
-const evidenceRoot = resolve("test-results/ma3/t5");
+const evidenceRoot = evidenceDir("ma3/t5");
 const save = (name: string, value: unknown) => writeFileSync(join(evidenceRoot, name), JSON.stringify(value, null, 2));
 async function until<T>(check: () => Promise<T | null>, label: string): Promise<T> {
   const started = Date.now();

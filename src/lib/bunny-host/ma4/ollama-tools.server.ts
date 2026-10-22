@@ -23,8 +23,9 @@ type ChatMessage = { role: "system" | "user" | "assistant" | "tool"; content: st
 export type ChatResponse = { model?: string; done?: boolean; message?: { role?: string; content?: string; tool_calls?: unknown } };
 export type Chat = (body: Record<string, unknown>, signal: AbortSignal) => Promise<ChatResponse>;
 
-/** The five independent conditions; a tool runs only when all are true. A model's self-description counts for none. */
-export type ToolCapability = { modelSupports: boolean | null; apiSupports: boolean | null; adapterSupports: boolean; permissionGranted: boolean | null; executionSucceeded: boolean | null };
+/** Independent conditions; a tool runs only when all are true. A model's self-description counts for none:
+ * `modelSupports` is Ollama's metadata claim, `modelDemonstrated` is measured from live probe receipts (S1R3). */
+export type ToolCapability = { modelSupports: boolean | null; modelDemonstrated: boolean | null; apiSupports: boolean | null; adapterSupports: boolean; permissionGranted: boolean | null; executionSucceeded: boolean | null };
 
 const NAME = /^[a-z][a-z0-9_.]{0,63}$/;
 const CallSchema = z.object({ function: z.object({ name: z.string(), arguments: z.unknown() }) }).passthrough();
@@ -122,4 +123,12 @@ export function ollamaToolCapability(showCapabilities: unknown, version: string 
     apiSupports: Number.isFinite(major) && Number.isFinite(minor) ? major > 0 || minor >= 3 : null,
     adapterSupports: true,
   };
+}
+
+/** A probe counts as a demonstrated call only if the model named a registered tool with schema-valid arguments
+ * (executed, denied or held for approval); prose, unknown names and invalid arguments never count. */
+export const VALID_CALL: ReadonlySet<ToolReceipt["status"]> = new Set(["executed", "denied", "approval_required", "timeout", "cancelled", "failed"]);
+export function demonstratedToolCalling(probes: { receipts: ToolReceipt[] }[], minProbes = 6, minRate = 0.8): boolean | null {
+  if (probes.length < minProbes) return null;
+  return probes.filter(p => p.receipts.some(r => VALID_CALL.has(r.status))).length / probes.length >= minRate;
 }

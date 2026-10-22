@@ -198,3 +198,26 @@ time.sleep(120)`, { timeoutMs: 60_000 }, controller.signal);
   assert.equal(hostSees(tag), "");
   assert.equal(r.workspaceRemoved, true);
 });
+
+test("F5 seccomp (S1R3): namespace, mount, tracing, keyring, BPF and io_uring syscalls fail with EPERM; ordinary work still runs", { skip }, async () => {
+  const r = await py(`import ctypes, json, os, subprocess, sys
+libc = ctypes.CDLL(None, use_errno=True)
+def sc(nr, *a):
+    rv = libc.syscall(nr, *a)
+    if rv == 0 and nr == 56: os._exit(0)  # a clone that was not blocked: the child leaves at once
+    return "EPERM" if rv == -1 and ctypes.get_errno() == 1 else f"rv={rv} errno={ctypes.get_errno()}"
+out = {"status": [l.split()[1] for l in open("/proc/self/status") if l.startswith("Seccomp:")][0]}
+try: os.unshare(os.CLONE_NEWUSER); out["unshare"] = "allowed"
+except PermissionError: out["unshare"] = "EPERM"
+out.update(clone_newuser=sc(56, 0x10000000 | 17, 0, 0, 0, 0), ptrace=sc(101, 0, 0, 0, 0), mount=sc(165, b"x", b"/tmp", b"tmpfs", 0, 0),
+           keyctl=sc(250, 0, 0, 0, 0), bpf=sc(321, 0, 0, 0), io_uring=sc(425, 1, 0), setns=sc(308, 0, 0), perf=sc(298, 0, 0, 0, 0, 0))
+pid = os.fork()
+if pid == 0: os._exit(7)
+out["fork"] = os.waitpid(pid, 0)[1] >> 8
+out["spawn"] = subprocess.run([sys.executable, "-I", "-S", "-c", "print(6*7)"], capture_output=True, text=True).stdout.strip()
+print(json.dumps(out))`);
+  const o = json(r.stdout);
+  assert.equal(o.status, "2", "seccomp filter mode is active for the untrusted program");
+  for (const k of ["unshare", "clone_newuser", "ptrace", "mount", "keyctl", "bpf", "io_uring", "setns", "perf"]) assert.equal(o[k], "EPERM", `${k}: ${o[k]}`);
+  assert.equal(o.fork, 7); assert.equal(o.spawn, "42");
+});

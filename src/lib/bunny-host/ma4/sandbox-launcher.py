@@ -7,16 +7,56 @@ Isolation is enforced by the Linux kernel, not by this script's checks:
     a private /proc, and size-capped noexec tmpfs /work and /tmp; the host filesystem,
     /mnt/c, /run (WSL interop socket) and /home are never mounted
   * all capabilities dropped, no_new_privs, rlimits (CPU, file size, open files, core)
+  * seccomp-BPF (MA4-S1R3): namespace creation, mount, ptrace, keyrings, BPF, io_uring, module/kexec/clock control → EPERM;
+    foreign syscall ABIs killed. Installed unprivileged (no_new_privs) and inherited by the program.
   * empty environment, wall-clock SIGKILL, bounded output; killing pid 1 kills the namespace
 
 Protocol: one JSON request line on stdin, then optional "cancel" line (or EOF) to stop.
 One JSON result line on stdout. Never prints untrusted output outside that JSON.
 """
-import ctypes, json, os, re, select, shutil, signal, subprocess, sys, tempfile, threading, time, uuid
+import ctypes, json, os, re, select, shutil, signal, struct, subprocess, sys, tempfile, threading, time, uuid
 
 NAME = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$")
 LIMITS = {"timeoutMs": (100, 120_000), "memoryMb": (32, 1024), "pids": (1, 64), "outputBytes": (1024, 1_048_576), "diskMb": (1, 256)}
 PROGRAMS = {"python3": "/usr/bin/python3"}
+
+
+# x86_64 syscalls an untrusted test program never needs; each returns EPERM. Defense in depth on top of the namespaces:
+# nested namespaces, mounts, tracing, kernel keyrings, BPF, io_uring, module/kexec/clock/swap/reboot control.
+DENY = {101: "ptrace", 103: "syslog", 135: "personality", 153: "vhangup", 155: "pivot_root", 159: "adjtimex", 161: "chroot", 163: "acct", 164: "settimeofday",
+        165: "mount", 166: "umount2", 167: "swapon", 168: "swapoff", 169: "reboot", 170: "sethostname", 171: "setdomainname", 172: "iopl", 173: "ioperm",
+        175: "init_module", 176: "delete_module", 179: "quotactl", 212: "lookup_dcookie", 227: "clock_settime", 246: "kexec_load", 248: "add_key",
+        249: "request_key", 250: "keyctl", 272: "unshare", 298: "perf_event_open", 303: "name_to_handle_at", 304: "open_by_handle_at", 305: "clock_adjtime",
+        308: "setns", 310: "process_vm_readv", 311: "process_vm_writev", 312: "kcmp", 313: "finit_module", 320: "kexec_file_load", 321: "bpf",
+        323: "userfaultfd", 425: "io_uring_setup", 426: "io_uring_enter", 427: "io_uring_register", 428: "open_tree", 429: "move_mount", 430: "fsopen",
+        431: "fsconfig", 432: "fsmount", 433: "fspick", 442: "mount_setattr"}
+CLONE_NS_FLAGS = 0x7E020000  # CLONE_NEWNS|NEWCGROUP|NEWUTS|NEWIPC|NEWUSER|NEWPID|NEWNET
+
+
+def install_seccomp():
+    """Installs a seccomp-BPF filter on this process (inherited across execve). Needs only no_new_privs, no privilege."""
+    ld_abs, jeq, jge, jset, ret = 0x20, 0x15, 0x35, 0x45, 0x06
+    allow, kill, eperm, enosys = 0x7FFF0000, 0x80000000, 0x00050000 | 1, 0x00050000 | 38
+    prog = [(ld_abs, 0, 0, 4), (jeq, 1, 0, 0xC000003E), (ret, 0, 0, kill),  # foreign ABI (i386) → kill
+            (ld_abs, 0, 0, 0), (jge, 0, 1, 0x40000000), (ret, 0, 0, eperm)]  # x32 ABI → EPERM
+    for nr in sorted(DENY):
+        prog += [(jeq, 0, 1, nr), (ret, 0, 0, eperm)]
+    # clone3 hides its flags in memory: ENOSYS makes libc fall back to clone, whose flags are checked below.
+    prog += [(jeq, 0, 1, 435), (ret, 0, 0, enosys),
+             (jeq, 0, 3, 56), (ld_abs, 0, 0, 16), (jset, 0, 1, CLONE_NS_FLAGS), (ret, 0, 0, eperm),
+             (ret, 0, 0, allow)]
+    filters = (ctypes.c_ubyte * (8 * len(prog)))()
+    for i, (code, jt, jf, k) in enumerate(prog):
+        ctypes.memmove(ctypes.byref(filters, 8 * i), struct.pack("=HBBI", code, jt, jf, k), 8)
+
+    class Fprog(ctypes.Structure):
+        _fields_ = [("len", ctypes.c_ushort), ("filter", ctypes.c_void_p)]
+    fprog = Fprog(len(prog), ctypes.addressof(filters))
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(38, 1, 0, 0, 0) != 0:  # PR_SET_NO_NEW_PRIVS
+        raise OSError(ctypes.get_errno(), "no_new_privs failed")
+    if libc.prctl(22, 2, ctypes.byref(fprog), 0, 0) != 0:  # PR_SET_SECCOMP, SECCOMP_MODE_FILTER
+        raise OSError(ctypes.get_errno(), "seccomp filter install failed")
 
 
 def fail(message):
@@ -92,6 +132,7 @@ def stage2(base, config_path):
     os.chdir("/work")
     seconds = max(1, -(-cfg["timeoutMs"] // 1000))
     argv = [PROGRAMS[cfg["argv"][0]], *cfg["argv"][1:]]
+    install_seccomp()  # last step: fails closed (raises) before anything untrusted runs
     os.execve("/usr/bin/setpriv", [
         "setpriv", "--no-new-privs", "--inh-caps=-all", "--ambient-caps=-all", "--bounding-set=-all", "--",
         "/usr/bin/prlimit", "--cpu=%d" % seconds, "--fsize=%d" % (cfg["diskMb"] * 1024 * 1024), "--nofile=64", "--core=0",
@@ -229,6 +270,11 @@ def probe():
     except Exception:
         checks["cgroupLimits"] = False
     checks["arch"] = os.uname().machine == "x86_64"
+    try:
+        r = subprocess.run([sys.executable, "-I", os.path.abspath(__file__), "--seccomp-selftest"], capture_output=True, text=True, timeout=10)
+        checks["seccomp"] = r.stdout.strip() == "seccomp-ok"
+    except Exception:
+        checks["seccomp"] = False
     print(json.dumps({"ok": all(checks.values()), "checks": checks, "kernel": os.uname().release}), flush=True)
 
 
@@ -237,5 +283,11 @@ if __name__ == "__main__":
         stage2(sys.argv[2], sys.argv[3])
     elif sys.argv[1:] == ["--probe"]:
         probe()
+    elif sys.argv[1:] == ["--seccomp-selftest"]:
+        install_seccomp()
+        try:
+            os.unshare(os.CLONE_NEWUSER)
+        except PermissionError:
+            print("seccomp-ok")
     else:
         stage1()

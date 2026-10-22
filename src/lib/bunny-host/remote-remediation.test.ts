@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { evidenceDir } from "./test-evidence.ts";
 import { startHost } from "./http.server.ts";
 import { FilesystemCapability } from "../bunny-missions/capabilities/local.server.ts";
 import type { AgentSnapshot } from "./agent-types.ts";
@@ -18,7 +19,7 @@ import type { ProviderId, ProviderLive } from "../orch/types.ts";
 type Agent = AgentSnapshot["agents"][number];
 
 function record(name: string, value: unknown) {
-  const directory = resolve("test-results/ma3/t9r/remote-canonical");
+  const directory = evidenceDir("ma3/t9r/remote-canonical");
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, `${name}.json`), JSON.stringify(value, null, 2) + "\n");
 }

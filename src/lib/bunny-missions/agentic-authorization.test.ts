@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { evidenceDir } from "../bunny-host/test-evidence.ts";
 import { HostDatabase } from "../bunny-host/persistence.server.ts";
 import { TaskManager } from "../bunny-host/manager.server.ts";
 import { AgentRuntime, agentCommand } from "../bunny-host/agent-runtime.server.ts";
@@ -94,7 +95,7 @@ probe("A41 no content or credential material in envelope/admission/public author
 probe("A42 legacy direct Task/capability authority stays additive", async f => { const outcome = await f.missions.bus.request({ ...f.request(), missionId: null, stepId: null, envelope: null, direct: { confirmed: true } }); assert.equal(outcome.run?.status, "succeeded"); assert.equal(f.missions.agentic.rows(f.e.id).length, 0); });
 probe("A43 T4 checkpoint continuity survives T5 consent and Pause", f => { f.agents.pause(f.agentId, "workstation"); assert.ok(f.agents.store.latestRun(f.agentId)); assert.ok(f.agents.snapshot().agents[0].checkpoints > 0); });
 probe("A44 routing/provider selection never edits authorization revision or roots", async f => { const before = f.missions.agentic.get(f.e.id); await blocked(f, "provider.execute", { provider: "ollama", access: "write", filesystem: true, effort: "high" }); assert.deepEqual(f.missions.agentic.get(f.e.id), before); });
-probe("A45 revocation committed before admission wins the race", async f => { const attempt = Promise.resolve().then(() => f.missions.bus.request(f.request())); f.missions.syncAgentic(f.missions.agentic.state(f.e.id, "REVOKED")); const out = await attempt; assert.notEqual(out.decision.decision, "allow"); assert.equal(f.missions.agentic.rows(f.e.id).length, 0); writeFileSync(resolve("test-results/ma3/t5/revocation-race.json"), JSON.stringify({ classification: "DISPOSABLE LIVE VERIFIED", pendingMicrotask: true, revocationCommittedFirst: true, realHostDatabaseAndBus: true, decision: out.decision, admitted: 0, alreadyAdmittedEffects: "separate A46 probe preserves completed file" }, null, 2)); });
+probe("A45 revocation committed before admission wins the race", async f => { const attempt = Promise.resolve().then(() => f.missions.bus.request(f.request())); f.missions.syncAgentic(f.missions.agentic.state(f.e.id, "REVOKED")); const out = await attempt; assert.notEqual(out.decision.decision, "allow"); assert.equal(f.missions.agentic.rows(f.e.id).length, 0); writeFileSync(join(evidenceDir("ma3/t5"), "revocation-race.json"), JSON.stringify({ classification: "DISPOSABLE LIVE VERIFIED", pendingMicrotask: true, revocationCommittedFirst: true, realHostDatabaseAndBus: true, decision: out.decision, admitted: 0, alreadyAdmittedEffects: "separate A46 probe preserves completed file" }, null, 2)); });
 probe("A46 already-completed effects remain after Stop and revocation", async f => { await covered(f, "filesystem.write", { path: "written.txt", content: "done", overwrite: true }); await f.agents.stop(f.agentId, "workstation"); assert.equal(readFileSync(join(f.root, "written.txt"), "utf8"), "done"); assert.equal(f.missions.agentic.rows(f.e.id)[0].outcome, "COMPLETED"); });
 probe("A47 no second authority: canonical deny still wins over Agentic scope", async f => { f.missions.store.setGrant("filesystem.read", "global", "never_allow", "workstation"); const out = await blocked(f); assert.equal(out.decision.decision, "deny"); });
 probe("A48 unknown quota still has finite action and provider-attempt ceilings", f => { assert.equal(f.e.budget_constraints.usage_unknown, "finite-action-budget"); assert.ok(Number.isSafeInteger(f.e.maximum_actions)); assert.ok(Number.isSafeInteger(f.e.budget_constraints.maximum_provider_attempts)); assert.ok(!("modelQuota" in f.e)); });
@@ -161,7 +162,7 @@ test("T5 A07/A23/A39/A44: actual retarget and launch cannot enlarge Mission auth
     assert.throws(() => f.tasks.approve(task.id), /scope|review|authority/i); assert.equal(models.launches.length, 0); assert.deepEqual(f.missions.agentic.get(f.e.id), before);
     f.tasks.retarget(task.id, "ollama"); f.tasks.approve(task.id); assert.equal(models.launches.length, 1); assert.deepEqual(f.missions.agentic.get(f.e.id), before);
     models.launches[0].finish({ ok: true, output: "fixture" }); await waitFor(() => f.missions.agentic.rows(f.e.id)[0].outcome === "COMPLETED");
-    writeFileSync(resolve("test-results/ma3/t5/routing-authority-proof.json"), JSON.stringify({ classification: "SIMULATED", hostPath: "Real TaskManager submit/retarget/approve, MissionManager canonical check and SQLite admission", providerIO: "scripted, no live model service", before: { revision: before!.revision, capabilities: before!.permitted_capabilities, resourceScopes: before!.permitted_resource_scopes }, retargetToClaude: "rejected before launch; cannot enforce tool-free bounds", retargetBackToOllama: "one admission under unchanged consent", scopeEqual: true, projectModelBinding: false }, null, 2));
+    writeFileSync(join(evidenceDir("ma3/t5"), "routing-authority-proof.json"), JSON.stringify({ classification: "SIMULATED", hostPath: "Real TaskManager submit/retarget/approve, MissionManager canonical check and SQLite admission", providerIO: "scripted, no live model service", before: { revision: before!.revision, capabilities: before!.permitted_capabilities, resourceScopes: before!.permitted_resource_scopes }, retargetToClaude: "rejected before launch; cannot enforce tool-free bounds", retargetBackToOllama: "one admission under unchanged consent", scopeEqual: true, projectModelBinding: false }, null, 2));
   } finally { await f.cleanup(); }
 });
 
@@ -185,7 +186,7 @@ test("T5 A22 actual TaskManager retry spends fresh authority and refuses an exha
       evidence.push({ maximumActions: max, launches: models.launches.length, attempts: rows.map(row => ({ kind: row.attempt_kind, outcome: row.outcome })), taskState: f.db.get(task.id).state });
     } finally { await f.cleanup(); }
   }
-  writeFileSync(resolve("test-results/ma3/t5/retry-accounting-proof.json"), JSON.stringify({ classification: "SIMULATED", hostPath: "Actual TaskManager transient-failure recovery and canonical Mission admission", providerIO: "scripted, no live model service", runs: evidence }, null, 2));
+  writeFileSync(join(evidenceDir("ma3/t5"), "retry-accounting-proof.json"), JSON.stringify({ classification: "SIMULATED", hostPath: "Actual TaskManager transient-failure recovery and canonical Mission admission", providerIO: "scripted, no live model service", runs: evidence }, null, 2));
 });
 
 probe("T5 Git read cannot execute repository fsmonitor configuration", async f => {
