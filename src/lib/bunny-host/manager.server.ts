@@ -6,7 +6,7 @@ import { canTransition } from "../orch/machine.ts";
 import type { Mode, OrchTask, Project, ProviderId, ProviderLive, TaskState, HostSample, TaskProgress, TokenUsage, ProcessInfo, ProviderExecutionScope, TaskConstraints, RouteDecision ,
 } from "../orch/types.ts";
 import { HostDatabase } from "./persistence.server.ts";
-import { MODEL_SOURCE_PROVIDERS, ModelCapabilityRegistry } from "./model-capability.server.ts";
+import { MODEL_SOURCE_PROVIDERS, ModelCapabilityRegistry, type ModelCapabilityOptions } from "./model-capability.server.ts";
 import { bunnyRoute, eligibility, inferredConstraints, runsLocally } from "./router.ts";
 import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask ,
@@ -76,6 +76,8 @@ export type ManagerOptions = {
   containment?: HostContainment;
   /** M-A-3 T3: test/fixture injection point for the T1 model registry; production builds the real one. */
   modelRegistry?: ModelCapabilityRegistry;
+  /** MA4-S1R3-CI2 test-only model probes for the Host-built registry, so a Host test does not read the PC's own Ollama/Codex. */
+  modelProbes?: Pick<ModelCapabilityOptions, "ollamaProbe" | "ollamaShow" | "ollamaPs" | "codexLaunch" | "codexCatalog">;
   /** M-A-3 T9R-F04: Host state folder; provider-session job records live in runtime/provider-sessions. */
   dataDirectory?: string | null;
   /** M-A-3 T13.1 test seams for intelligence services; production uses Ollama, real fetch and Windows DPAPI. */
@@ -196,6 +198,7 @@ export class TaskManager {
         inferenceModels: () => this.ma4Adapter.modelRecords(),
         providerPaths: () => this.providerPaths(),
         availableProviders: () => this.adapters.map((adapter) => adapter.id),
+        ...options.modelProbes,
       });
     this.providerUsage = new ProviderUsageService({
       providers: () => this.registry.list(),

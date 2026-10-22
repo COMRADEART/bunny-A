@@ -283,6 +283,8 @@ if ($windows.Count -eq 1) {
   @{ decision = 'reuse_existing'; identity = $prepared.identity; readiness = $prepared.readiness; newWindows = 0 } | ConvertTo-Json -Depth 5 -Compress
 } else {
   Assert-BatchClock
+  # Verify the package before launching: without it calc.exe starts a different, unverified app that would be left running.
+  [void](Calculator-Packages)
   $proc = Start-Process -FilePath ([string]$p.file) -PassThru
   $deadline = [Math]::Min([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() + 8000, [long]$batch.expiresAt)
   do {
