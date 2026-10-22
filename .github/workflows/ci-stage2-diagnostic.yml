@@ -52,6 +52,12 @@ jobs:
               cwd:process.cwd(),tmpdir:os.tmpdir(),tmpdirReal:fs.realpathSync.native(os.tmpdir()),TEMP:process.env.TEMP,TMP:process.env.TMP,
               gitIdentity:!!require("child_process").spawnSync("git",["config","user.email"]).stdout.toString().trim()};
             fs.writeFileSync("ci-diag/env.json",JSON.stringify(env,null,2));console.log(env)'
+      - name: Keep-alive restart probe (no Host code)
+        if: matrix.lane == 'isolated'
+        shell: bash
+        run: |
+          node scripts/ci/keepalive-probe.mjs 0 200 | tee ci-diag/keepalive-probe.log
+          node scripts/ci/keepalive-probe.mjs 300 40 | tee -a ci-diag/keepalive-probe.log
       - name: Stage 2 under the watchdog (${{ matrix.lane }})
         shell: bash
         env:
