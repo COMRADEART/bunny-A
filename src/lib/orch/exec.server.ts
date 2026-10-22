@@ -98,7 +98,7 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
     const response = await fetch("http://127.0.0.1:11434/api/generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model, prompt: request.prompt, stream: !!options.stream, ...(request.format ? { format: request.format } : {}), ...(request.numCtx || request.numPredict ? { options: { ...(request.numCtx ? { num_ctx: request.numCtx } : {}), ...(request.numPredict ? { num_predict: request.numPredict } : {}) } } : {}) }),
+      body: JSON.stringify({ model, prompt: request.prompt, stream: !!options.stream, ...(request.format ? { format: request.format } : {}), ...(request.numCtx || request.numPredict || request.temperature !== undefined ? { options: { ...(request.numCtx ? { num_ctx: request.numCtx } : {}), ...(request.numPredict ? { num_predict: request.numPredict } : {}), ...(request.temperature !== undefined ? { temperature: request.temperature } : {}) } } : {}) }),
       signal: controller.signal,
     });
     if (!response.ok) {
