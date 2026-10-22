@@ -1,0 +1,106 @@
+{
+  "sources": [
+    "docs/ma4-s1r4/evidence/dev-s1r4-v3b-coder.json",
+    "docs/ma4-s1r4/evidence/dev-s1r4-v3b-abliterate.json"
+  ],
+  "evidence": [
+    {
+      "model": "qwen2.5-coder:7b",
+      "role": "Worker",
+      "passes": 13,
+      "samples": 20,
+      "evaluator": "bunny-ma4-s1r4-dev-v1/s1r4-v3b"
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "role": "Tester",
+      "passes": 15,
+      "samples": 19,
+      "evaluator": "bunny-ma4-s1r4-dev-v1/s1r4-v3b"
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "role": "Planner",
+      "passes": 20,
+      "samples": 20,
+      "evaluator": "bunny-ma4-s1r4-dev-v1/s1r4-v3b"
+    },
+    {
+      "model": "qwen2.5-coder:7b",
+      "role": "Reviewer",
+      "passes": 18,
+      "samples": 20,
+      "evaluator": "bunny-ma4-s1r4-dev-v1/s1r4-v3b"
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "role": "Worker",
+      "passes": 13,
+      "samples": 20,
+      "evaluator": "bunny-ma4-s1r4-dev-v1/s1r4-v3b"
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "role": "Tester",
+      "passes": 16,
+      "samples": 20,
+      "evaluator": "bunny-ma4-s1r4-dev-v1/s1r4-v3b"
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "role": "Planner",
+      "passes": 20,
+      "samples": 20,
+      "evaluator": "bunny-ma4-s1r4-dev-v1/s1r4-v3b"
+    },
+    {
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "role": "Reviewer",
+      "passes": 14,
+      "samples": 20,
+      "evaluator": "bunny-ma4-s1r4-dev-v1/s1r4-v3b"
+    }
+  ],
+  "assignments": [
+    {
+      "role": "Planner",
+      "model": "qwen2.5-coder:7b",
+      "decision": "measured",
+      "lowerBound": 0.8388698745050667,
+      "reasons": [
+        "qwen2.5-coder:7b: 20/20 verified in Planner, 95% lower bound 84%",
+        "huihui_ai/qwen2.5-abliterate:7b: 20/20 verified in Planner, 95% lower bound 84%"
+      ]
+    },
+    {
+      "role": "Worker",
+      "model": "qwen2.5-coder:7b",
+      "decision": "measured",
+      "lowerBound": 0.43285051021946475,
+      "reasons": [
+        "qwen2.5-coder:7b: 13/20 verified in Worker, 95% lower bound 43%",
+        "huihui_ai/qwen2.5-abliterate:7b: 13/20 verified in Worker, 95% lower bound 43%"
+      ]
+    },
+    {
+      "role": "Tester",
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "decision": "measured",
+      "lowerBound": 0.5839782779742402,
+      "reasons": [
+        "huihui_ai/qwen2.5-abliterate:7b: 16/20 verified in Tester, 95% lower bound 58%",
+        "qwen2.5-coder:7b: 15/19 verified in Tester, 95% lower bound 57%"
+      ]
+    },
+    {
+      "role": "Reviewer",
+      "model": "qwen2.5-coder:7b",
+      "decision": "measured",
+      "lowerBound": 0.6989617935882066,
+      "reasons": [
+        "qwen2.5-coder:7b: 18/20 verified in Reviewer, 95% lower bound 70%",
+        "huihui_ai/qwen2.5-abliterate:7b: 14/20 verified in Reviewer, 95% lower bound 48%"
+      ]
+    }
+  ]
+}

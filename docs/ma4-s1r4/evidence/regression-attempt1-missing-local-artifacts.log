@@ -1,0 +1,678 @@
+
+> pretest
+> npm run build:ownership && npm run build:voice
+
+
+> build:ownership
+> node scripts/build-owned-process.mjs
+
+{"schema":"bunny-native-build/1","architecture":"windows-x64","nodeApi":8,"sourceSha256":"8ebba0e42fc0934fba6793a516c637c553292f27b48a0e49d3421025ff1864d8","binarySha256":"72c8807293ee12811e23ac30260a72e835f1f53135194cb30766269229f62e33","compilerSha256":"f96a3bdb1d3a3967b309d75c7413399391e857b5be4cb17162572ed66f6772a0","compilerVersion":"gcc.exe (Rev5, Built by MSYS2 project) 16.1.0","flags":["-std=c11","-O2","-Wall","-Wextra","-Werror","-shared","-s","-static-libgcc","-Wl,--no-insert-timestamp","-Wl,--image-base,0x180000000","-Wl,--nxcompat","-Wl,--dynamicbase"]}
+
+> build:voice
+> node scripts/build-voice-worker.mjs
+
+build:whisper-shim skipped: whisper runtime not staged (missing whisper.dll, ggml.dll, ggml-base.dll, ggml-base.en.bin); run node scripts/stage-whisper.mjs
+{"schema":"bunny-voice-worker-build/1","protocol":"bunny-voice/1","source":"native/voice/BunnyVoiceWorker.cs","sourceSha256":"6f2ed33c79e77550ab38948a5ff9c0baa9d5930751a4b5bf474127052011c092","binary":"native/voice/bunny-voice-worker.exe","binarySha256":"786c38aabe1a85cdb421cdb96ebf26393f8f9e335122b27bc85a2eada876cc6d","compiler":{"path":"C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe","sha256":"eca02e6b15cde93009a59a3d129d5a77fb5008f2e1cf62cf573b6737c747ecc3","version":"Microsoft (R) Visual C# Compiler version 14.8.10001.0"},"systemSpeech":{"path":"C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System.Speech\\v4.0_4.0.0.0__31bf3856ad364e35\\System.Speech.dll","sha256":"a5824a64a0e976fe257503c9c603e2bb04db47e42f99c2ea4ad8f44e3daefe38"},"architecture":"windows-x64","builtAt":"2026-10-22T19:02:32.984Z"}
+
+> test
+> node --test --test-concurrency=1 scripts/*.test.mjs && node --experimental-strip-types --test --test-concurrency=1 src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts src/lib/orch/*.test.ts src/lib/bunny-host/agent-machine.test.ts src/lib/bunny-host/agent-replay.test.ts src/lib/bunny-host/agent-store.test.ts src/lib/bunny-host/codex-compatibility.test.ts src/lib/bunny-host/codex-probe.test.ts src/lib/bunny-host/execution-scope.test.ts src/lib/bunny-host/failure.test.ts src/lib/bunny-host/git-helpers-ownership.test.ts src/lib/bunny-host/host.test.ts src/lib/bunny-host/learning.test.ts src/lib/bunny-host/m2.test.ts src/lib/bunny-host/ma2-t10.test.ts src/lib/bunny-host/model-capability.test.ts src/lib/bunny-host/oauth-pkce.test.ts src/lib/bunny-host/owned-process-group.test.ts src/lib/bunny-host/provider-containment.test.ts src/lib/bunny-host/presentation.test.ts src/lib/bunny-host/provider-usage.test.ts src/lib/bunny-host/release-identity.test.ts src/lib/bunny-host/routing-matrix.test.ts src/lib/bunny-host/routing-store.test.ts src/lib/bunny-host/routing.test.ts src/lib/bunny-host/state-marker.test.ts src/lib/bunny-host/stop-ownership.test.ts src/lib/bunny-host/t3-manager.test.ts src/lib/bunny-host/personal-agents.test.ts src/lib/bunny-host/personal-agents-host.test.ts src/lib/bunny-host/personal-agent-context.test.ts src/lib/bunny-host/personal-agent-context-host.test.ts src/lib/bunny-host/lotus.test.ts src/lib/bunny-host/lotus-host.test.ts src/lib/bunny-host/workers.test.ts src/lib/bunny-host/workers-host.test.ts src/lib/bunny-host/harnesses.test.ts src/lib/bunny-host/harnesses-host.test.ts src/lib/bunny-host/session-ledger-host.test.ts src/lib/bunny-host/routing-learning.test.ts src/lib/bunny-host/character-appearance-host.test.ts src/lib/bunny-host/ui-theme.test.ts src/lib/bunny-host/ui-theme-host.test.ts src/lib/bunny-host/widgets.test.ts src/lib/bunny-host/widgets-host.test.ts src/lib/bunny-missions/scheduler.test.ts src/lib/bunny-host/intelligence.test.ts src/lib/bunny-host/intelligence-host.test.ts src/lib/bunny-host/connections.test.ts src/lib/bunny-host/connections-host.test.ts src/lib/bunny-host/project-workspace.test.ts src/lib/bunny-host/remote-device.test.ts src/lib/bunny-host/remote-remediation.test.ts src/lib/bunny-host/voice/*.test.ts src/lib/bunny-missions/*.test.ts && node --experimental-strip-types --test --test-force-exit --test-concurrency=1 src/lib/bunny-host/agent-runtime.test.ts src/lib/bunny-host/agent-recovery.test.ts src/lib/bunny-host/agent-team.test.ts src/lib/bunny-host/agent-team-matrix.test.ts src/lib/bunny-host/agent-team-lifecycle.test.ts src/lib/bunny-host/agent-team-handoff.test.ts src/lib/bunny-host/agent-team-surfaces.test.ts src/lib/bunny-host/personal-agents-team.test.ts && npm run test:ma4
+
+✔ non-canvas app with no custom card gets a soft BRAND NOTE (utility exception) (9.3009ms)
+✔ non-canvas app with a compliant card is silent (9.209ms)
+✔ card file without site.json card=custom warns (7.0457ms)
+✔ card file with missing site.json warns for card=custom (4.345ms)
+✔ card file with invalid site.json warns for card=custom (6.3677ms)
+✔ oversized card warns for non-canvas apps too (8.7313ms)
+✔ canvas app with no card warns 'missing' and missing og:type (7.8269ms)
+✔ canvas card without type still warns for og:type (7.3287ms)
+✔ oversized card warns on the scraper budget (jpg and legacy png) (14.2145ms)
+✔ compliant game (custom card + site.json type + x-banner) is silent (9.0956ms)
+✔ __root.tsx og:type no longer satisfies the canvas gate (10.4487ms)
+✔ oversized x-banner warns on the same scraper budget as og.jpg (8.7956ms)
+✔ legacy png + site.json type still needs the X feed card (7.0629ms)
+✔ siteDeclaresOgTypeGame reads the site contract (0.3267ms)
+✔ a fresh og-pending marker silences the whole gate view (4.888ms)
+✔ a stale og-pending marker is ignored and the warnings return (5.0051ms)
+✔ the marker goes stale on the clock, not on the file (7.831ms)
+✔ no marker means nothing is in flight (4.1201ms)
+✔ parseBrandCheckArgs takes --game, --placeholder-ok and --root, and rejects the rest (0.76ms)
+✔ cli: a game missing its card reports JSON and exits 1 (120.6648ms)
+✔ cli: a compliant game passes (126.0733ms)
+✔ cli: the task's own marker is reported, not honoured (114.9773ms)
+✔ cli: a bad argument fails with JSON on stderr (113.5877ms)
+✔ cli: a non-game with no card fails too — the pass exists to produce one (110.7606ms)
+✔ cli: --placeholder-ok is how a plain-utility pass reports no card as expected (220.8222ms)
+✔ cli: a non-game with a compliant card passes (111.1971ms)
+✔ SKILL.md and AGENTS.md name the marker path and bound this script uses (16.2365ms)
+✔ the sections that own the brand-task prohibition never affirm a wait (3.7205ms)
+✔ SKILL.md tells the pass to self-check with the flag this CLI accepts (1.3474ms)
+✔ normalizes whitespace before hashing (3.4437ms)
+✔ nullish and blank body text normalize to the empty string (0.3127ms)
+✔ body text prefix is normalized and capped (0.2716ms)
+✔ identical runs do not diverge (1.394ms)
+✔ status change diverges (0.5524ms)
+✔ title change diverges (0.3759ms)
+✔ title comparison is skipped when either side lacks one (0.275ms)
+✔ canvas disappearing diverges; canvas appearing does not (0.3696ms)
+✔ horizontal overflow appearing diverges; clearing does not (0.3455ms)
+✔ new console errors diverge (0.4583ms)
+✔ errors already present in the baseline do not re-diverge (0.3768ms)
+✔ body text collapse diverges (0.2751ms)
+✔ body text dropping to zero reports collapse (0.2161ms)
+✔ zero-length baseline reports growth via the hash branch, not collapse (0.2098ms)
+✔ hash mismatch with a trivial length delta and same page start is tolerated (0.1386ms)
+✔ hash mismatch with a trivial length delta but changed page start diverges (0.1472ms)
+✔ prefix check is skipped when either side lacks a prefix (0.2843ms)
+✔ length-delta tolerance boundary: 50 tolerated, 51 diverges (500-char baseline) (0.1816ms)
+✔ length-delta floor dominates small baselines: 20 tolerated, 21 diverges (100-char baseline) (0.1363ms)
+✔ collapse boundary: exactly half is 'changed', one below is 'collapsed' (0.1459ms)
+✔ missing baseline viewport diverges (0.1389ms)
+✔ empty or null baseline diverges for every viewport (0.1825ms)
+✔ degenerate current verdict fails closed (0.3355ms)
+✔ multiple signals across viewports all accumulate (0.1648ms)
+✔ baselineComparison round-trips a valid baseline (0.2491ms)
+✔ baselineComparison fails closed on malformed or wrong-shape baselines (0.4445ms)
+✔ parseSmokeArgs defaults (0.3737ms)
+✔ parseSmokeArgs consumes --baseline without shifting positionals (0.1557ms)
+✔ parseSmokeArgs rejects a trailing --baseline flag (0.1277ms)
+✔ parseSmokeArgs supports the --baseline= form (0.1364ms)
+✔ parseSmokeArgs rejects unknown flags instead of treating them as positionals (0.1389ms)
+✔ parseSmokeArgs env fallback and flag precedence (0.1504ms)
+✔ derivedPaths handles .png, .PNG, and extensionless inputs (0.4129ms)
+✔ exitCodeFor: clean run exits 0 (0.2261ms)
+✔ exitCodeFor: errors in any single viewport exit 2 (0.1477ms)
+✔ exitCodeFor: navigation failure in any viewport exits 1, beating errors (0.1925ms)
+✔ exitCodeFor: 4xx boundary and missing status (0.2189ms)
+✔ exitCodeFor: no viewport data is a failure (0.1369ms)
+✔ browser-smoke wires the guard and verdict helpers (3.3368ms)
+✔ browser-smoke file I/O only touches guarded paths (2.7537ms)
+✔ defaultScreenshotPath stays inside the allowed output root on each platform (0.3041ms)
+✔ M-A-1D: the production release pin is the reviewed M-A-1 code candidate (102.3251ms)
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (29920.1428ms)
+✔ M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release (12812.9659ms)
+✔ M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release (21042.9192ms)
+✔ T10-XG-06: rollback refuses a paused Mission with a live desktop grant, even outside the snapshot page (155.216ms)
+✔ T10 rollback preflight preserves the idle positive control, and refuses enabled scheduling (95.8621ms)
+✔ T10 rollback preflight refuses orphan grant and interrupted or waiting work independently (131.9698ms)
+✔ MA2 T1: the read-only SQLite snapshot includes committed WAL rows (214.18ms)
+✔ MA2 T1: all 23 tables and non-database files survive migration (347.0164ms)
+✔ MA2 T1: an unexpected changed task field fails preservation (345.1156ms)
+✔ MA2 T1: new telemetry is allowed, but missing historical events fail (361.7045ms)
+✔ MA2 T1: active tasks refuse migration before copy (181.3292ms)
+✔ MA2 T1: active missions refuse migration before copy (195.4197ms)
+✔ MA2 T1: unknown schema refuses migration (183.3015ms)
+✔ MA2 T1: an occupied stage is never overwritten (176.1245ms)
+✔ MA2 T1: state cannot be installed inside a Git checkout (154.061ms)
+✔ MA2 T1: a source directory junction fails preflight (155.9087ms)
+✔ MA2 T1: a target junction cannot hide a repository dependency (157.0498ms)
+✔ MA2 T1: copied hard-linked files become independent files (321.7806ms)
+✔ MA2 T1: git clean in a disposable checkout cannot delete migrated state (470.7404ms)
+✔ MA2 T1: a named-tunnel configuration needs an explicit credential inventory (167.289ms)
+✔ MA2 T1: the installed tunnel uses application state and rejects a missing or changed client (355.5981ms)
+✔ MA2 T1: installed Host state fails closed without an explicit path or database (153.1963ms)
+✔ MA2 T1: installed Host resolves flat canonical state and moved credentials (344.6574ms)
+✔ MA2 T1: a truncated database and unknown layout fail closed without creating state (325.4309ms)
+✔ MA2 T1: a retired production source cannot become development state (166.7283ms)
+✔ MA2 T1 Windows controller: complete cutover and idempotent retry (24316.4909ms)
+✔ MA2 T1 Windows controller: after-copy (26310.6861ms)
+✔ MA2 T1 Windows controller: after-config (25696.3683ms)
+✔ MA2 T1 Windows controller: after-host (26490.2607ms)
+✔ T3: disposable tunnel worker crash has three bounded attempts and no Host failure (373.8ms)
+{"type":"host.degraded","at":1792695932675,"failureClass":"HOST_DEGRADED","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+{"type":"host.subsystem_failed","at":1792695932674,"failureClass":"SUBSYSTEM_FAILURE","action":"DEGRADE","error":"Failure evidence unavailable locally."}
+✔ T3: tunnel output callback rejection is contained and marks transport unavailable (121.7857ms)
+✔ T3: cancelling tunnel backoff never revives stopped work (112.7618ms)
+✔ T3: tunnel development state has no retired checkout fallback (3.1322ms)
+✔ T3: installed entry uses actual global policy and launcher has no crash retry loop (6.4261ms)
+✔ T3: every retired credential launcher refuses before starting a process or creating state (14.3942ms)
+✔ Cloudflare API errors and documentation are never public companion URLs (1.8808ms)
+✔ quick tunnel publishing requires both actual announcement and registered connection (0.4819ms)
+✔ chunked cloudflared output stays unavailable until the full hostname and connection arrive (0.3069ms)
+✔ an announced API service address is rejected even after connection text (0.213ms)
+✔ named tunnels retain their configured origin and wait for registration (0.2542ms)
+✔ candidate tunnel target is loopback-only without changing the installed default (0.6799ms)
+✔ the child's registration ledger parses register and unregister events with connIndex (1.5436ms)
+✔ startup decisions reconcile a dead worker's stale publication and refuse a live duplicate (0.5449ms)
+✔ a healthy child keeps the supervisor quiet; abort ends the single attempt (411.5471ms)
+✔ zero active edge connections sustained beyond the window stop the owned child and retry (906.5716ms)
+✔ edge-connection churn with a sub-floor active count stops the child exactly as the T6 diagnostic recorded (506.132ms)
+✔ sustained public failures reach the streak floor while a gateway fault breaks the streak without counting (1007.9266ms)
+✔ a degradation-triggered child exit still counts against the bounded attempt budget (256.1654ms)
+✔ T10-whisper a release with the pin is closed only when every pinned runtime file, the shim and the model are present (34.5544ms)
+✔ the flag predicate matches src/lib/auth (1.7166ms)
+✔ reads the value a live dev server resolved (0.4861ms)
+✔ a server started without the flag reads as sign-in on (0.2504ms)
+✔ agreement passes (0.3228ms)
+✔ divergence fails in either direction (0.3809ms)
+✔ an unobservable dev server is indeterminate, not agreement (0.1895ms)
+✔ a dev server that cannot be reached probes as null (0.3074ms)
+✔ a server without the endpoint probes as null, not as agreement (0.4119ms)
+✔ only a divergence warns the smoke verdict (1.1859ms)
+✔ the build side resolves the template's shipped app-env (4.3814ms)
+✔ the CLI reports rather than silently passing when run via a symlink (158.6071ms)
+✔ CI test-stage: flags go after --test; stage 1 drops only the hardware voice tests (3.6327ms)
+✔ CI watchdog: arguments are validated (1.7062ms)
+started
+
+::error title=WATCHDOG TIMEOUT::hang exceeded 3s; still running: (no test file in the tree); 3 processes, see hang.watchdog.json
+✔ CI watchdog: a hung command and its child become a named timeout, and nothing it started survives (17216.6792ms)
+✔ CI watchdog: a command that exits keeps its exit code (2456.5956ms)
+✔ T6 release closure refuses a cross-app package without its browser API and licenses (11.4649ms)
+✔ T6 browser dependency export refuses an installed version outside the source lockfile (21.959ms)
+✔ desktop runtime refuses unknown hosts and cross-site writes (1.225ms)
+✔ remote runtime accepts only an explicitly configured HTTPS origin (1.599ms)
+✔ Android manifest supplies standalone display and both required icon sizes (1.0137ms)
+✔ MA1: the desktop package copies every source folder the native Host imports (300.5975ms)
+✔ injects before </head> (6.49ms)
+✔ injects the extensions script without a project id (1.1487ms)
+✔ injects project id on the script and meta when provided (1.0344ms)
+✔ does not duplicate grok:app_id (1.8428ms)
+✔ omits x:creator tags without both creator values (1.8982ms)
+✔ injects x:creator tags when both creator values are set (0.9304ms)
+✔ escapes x:creator values (0.2282ms)
+✔ does not duplicate x:creator tags (1.4483ms)
+✔ platform chrome overwrites share-card metas and always sets og:title (0.8075ms)
+✔ does not duplicate twitter:card or og:title (1.1181ms)
+✔ a baked site.image is treated as a custom card (1.6688ms)
+✔ baked identity does not need a workspace filesystem (1.3362ms)
+✔ a public card file wins over a baked site without card=custom (2.751ms)
+✔ public/og.png wins when jpg is absent (3.7283ms)
+✔ resolveOgCardAsset: disk file, then bake, then empty (placeholder) (3.2014ms)
+✔ snapshotOgIdentity stamps card=custom from a public card file (1.9281ms)
+✔ snapshotOgIdentity stamps banner from public/x-banner.jpg (1.8478ms)
+✔ emits x:game:image for a public host when site.banner is set (0.6066ms)
+✔ does not emit x:game:image without a public host or banner (0.8007ms)
+✔ site title Grok App is a real name, not a sentinel (0.6985ms)
+✔ published grok.me slug is still a title fallback (0.8623ms)
+✔ rejects Vercel system hosts as og:image origins (0.1436ms)
+✔ published VITE_PUBLIC_HOSTNAME wins over request Host for og:image (0.9473ms)
+✔ vercel Host without a public hostname emits no og:image (0.4727ms)
+✔ emits og:image for a public host and prefers a custom card (1.1467ms)
+✔ placeholder og:image appends site.color when it is 6-digit hex (1.1871ms)
+✔ document title entities are not double-escaped on og:title (0.5116ms)
+✔ site.json title wins over the host slug (0.8306ms)
+✔ injects into documents with no head element (0.701ms)
+✔ streaming injector matches </HEAD> case-insensitively (1.8523ms)
+✔ does not duplicate the extensions script (1.0374ms)
+✔ is idempotent (1.657ms)
+✔ uses the app name in the injected title tag (0.5686ms)
+✔ streaming injector handles </head> split across chunks (1.0448ms)
+✔ streaming injector passes post-head chunks through untouched (0.6899ms)
+✔ streaming injector falls back when no </head> is seen (0.7066ms)
+✔ detects install query (0.2855ms)
+✔ filters non-document paths (0.3938ms)
+✔ strips install params from the app link (0.2086ms)
+✔ names the install page from host slug (0.1411ms)
+✔ rejects hosts that are not plain slugs (0.099ms)
+✔ renders install page markup (3.4058ms)
+✔ escapes host-derived values in the install page (1.2127ms)
+✔ renders the manifest with the per-app name (0.2809ms)
+✔ vite config keeps the nitro serverDir wiring (2.1278ms)
+✔ nitro middleware and its bundled assets exist (7.371ms)
+✔ vite plugin bakes og identity as a virtual module (2.0287ms)
+✔ DPI: device work areas convert to DIPs at 125% and 150%, and a secondary monitor left of primary keeps negative DIPs (2075.4135ms)
+✔ work-area fingerprint rounds to whole DIPs so a saved monitor matches again only when its geometry is unchanged (0.3506ms)
+✔ drag-to-dock: the release point picks the nearest edge of the monitor under the pointer, for all four edges (0.3306ms)
+✔ drag-to-dock: a secondary monitor left of primary (negative coordinates) snaps to its own edges (0.3102ms)
+✔ drag-to-dock: the taskbar on the left or the top moves the usable edge, and the snap follows the work area (0.2745ms)
+✔ drag-to-dock: a corner resolves to a single edge by the fixed tie order (top, bottom, left, right) (0.1993ms)
+✔ drag-to-dock: the offset is clamped to 0..1 when the pointer is past either end of the edge (0.4051ms)
+✔ placement after a drag stays wholly inside its work area for every edge, monitor and DPI (0.5367ms)
+✔ expansion direction is anchored to the dock edge: TOP down, BOTTOM up, LEFT right, RIGHT left (0.2848ms)
+✔ the on-screen check accepts a rect inside a secondary monitor and rejects one that leaves it (0.4245ms)
+✔ restore: a saved monitor is used only when it still exists with the same geometry; otherwise the primary monitor (0.28ms)
+✔ companion mirror: the voice snapshot maps to the same expression as companionState() in voice-companion.ts (0.2309ms)
+✔ companion display: Host offline or a stale voice poll shows DISCONNECTED; a fresh verified agent shows HAPPY; the Host state is used when sent (0.2232ms)
+✔ weapon motion: planning loops, waiting slows, needs-you pulses amber and stops, verified and failed are one-shots (0.1338ms)
+✔ Personal Agent strip: bound active slots in slot order, at most four; unbound and inactive slots draw nothing (1.227ms)
+✔ verified transitions: the first observation seeds and never celebrates; an observed move into VERIFIED fires once per slot (0.3794ms)
+✔ native real-level ring stops in reduced motion and rejects future or non-listening samples (4.5133ms)
+✔ character art: the gada compact PNG is read at its real width from the header (0.1566ms)
+✔ every character id the Island draws exists as a runtime PNG under public/bunny-a/characters (4.1157ms)
+✔ the package lists every character PNG under characters\ unconditionally, and the new Island modules (0.4386ms)
+✔ the Island resolves art from the release folder first, then the development public folder (0.3505ms)
+✔ motion in the strip and the companion uses transforms and opacity only: no layout property is animated (2.3066ms)
+✔ one-shots and loops only start on a state change: the strip keys each loop and never restarts it on a plain poll (2.4302ms)
+✔ animations stop when motion is off or reduced, when the system disables animation, and when the strip is hidden (4.2195ms)
+✔ the Ctrl+Alt+Arrow keyboard move and the drag share one edge rule, and the settings combo stays in sync (1.2788ms)
+✔ accessibility: every weapon, the companion and the detail actions carry a name; the card is reachable by keyboard (2.5041ms)
+✔ weapon chips never draw letters, provider marks or internal team members (1.5947ms)
+✔ Ctrl+Alt docking and drag keep the four locked dock behaviours: the strip side and the expansion follow the edge (1.9989ms)
+✔ no function is defined twice in the Visual module (the slot-row opener had a duplicate) (1.7514ms)
+✔ offline data is labelled last known wherever a retained Agent state is shown: slot rows, the weapon card and chip names (2.9593ms)
+✔ the Notch carries no "--" placeholder text and the header controls and weapon chips meet the 44 DIP target (3.1043ms)
+✔ weapon chips show keyboard focus, and the expanded slot rows do the same (3.065ms)
+✔ a weapon command is never reported as sent while another command is still in flight (1.5392ms)
+✔ the harness evidence receipts, when present, record every notch check as passing (5.5938ms)
+✔ T13.3 H native chips: all four weapons wear all five styles; pixel art is nearest-neighbour, the others keep the art smooth (0.5108ms)
+✔ T13.3 H native pixel art fits the longest side to 24 px like the web pixelSprite, never upscaled (2.0359ms)
+✔ T13.3 H native chips: no style falls back to the signature; unknown values never pass through (0.3676ms)
+✔ T13.3 H native chips: intensity, the Island animation switch and high contrast (per Agent or system) control the skin (0.2142ms)
+✔ T13.3 H the Notch marks the active speaker apart from the Agents still working, from Host facts only (0.2566ms)
+✔ T13.3 H the chip applies the skin from the snapshot, keeps motion gated by the Host state, and names the speaker (1.7034ms)
+✔ T13.3 H a material effect is cached at device scale, so a moving chip does not re-run the shader every frame (1.1735ms)
+✔ T13.3 H the native style evidence receipts, when present, record every check as passing (4.5512ms)
+✔ V47-V49: every edge, work area, size and offset places the notch fully inside the WorkArea (4269.0867ms)
+✔ V47: top and bottom are horizontal with agent indicators LEFT of the body (1.5435ms)
+✔ V48: left and right are vertical with agent indicators at the TOP of the body (3.167ms)
+✔ V49: indicator layout is bounded (at most 4 weapon chips plus one overflow chip) and counts overflow exactly (3.9011ms)
+✔ V47/V48: the indicator axis follows the notch orientation (ONE row beside a horizontal notch, ONE column above a vertical one) (1.9075ms)
+✔ V49: the DPI-scaled 1536x816 work area (125%) keeps the default top notch centred and on-screen (0.8193ms)
+✔ V49: the bottom notch sits above the taskbar edge with the same margin as the top (0.4079ms)
+✔ Visual layer routes every edge through Get-BunnyPlacement and keeps the window title unchanged (8.5859ms)
+✔ V47/V48: the vertical size is swapped before placement (length along the edge, thickness across it) (5.3497ms)
+✔ Settings offers Top, Bottom, Left and Right, and the choice is persisted under the edge key (4.0964ms)
+✔ display-settings and DPI changes re-fit the notch through Resize-Bunny (size clamp and placement), not only the position (2.715ms)
+✔ the indicator rule is shared: Visual asks Get-BunnyIndicatorLayout for the side and axis, never a second rule (3.724ms)
+✔ no random value anywhere in the Island layer (placement, indicators and layout are deterministic) (15.8809ms)
+✔ T13 chips: team members get no letter; their tooltip names role, state and their own task (1164.319ms)
+✔ T13 strip: the notch draws weapon characters from the slot contract, never letters or team members (4.6343ms)
+✔ every theme (and its high-contrast form) reaches the Notch as validated tokens; hostile values fall back to glass (1664.682ms)
+✔ the Notch theme module is data-only, wired into the Visual layer and packaged (3.8605ms)
+✔ every Bunny-Island PowerShell file parses with zero errors under the PowerShell 5.1 parser (2401.4748ms)
+✔ island PowerShell sources are ASCII-only so PowerShell 5.1 reads them without a BOM (1.8201ms)
+✔ window title stays "Bunny Island" (the launcher keys readiness on it) (0.6687ms)
+✔ new Island files are in the packaged install file list (0.4685ms)
+✔ every voice action the panel sends is a workstation action in the shared contract (2.7677ms)
+✔ V46: Listening requires worker capture AND a fresh poll; otherwise the panel says Reconnecting (0.5736ms)
+✔ V46: Speaking is shown only from snapshot.playing, and only one branch produces it (0.601ms)
+✔ V46: the level meter is driven only by snapshot.level with a freshness check, never by a timer or random value (0.7314ms)
+✔ V51: the voice layer adds no decorative animation (reduced motion and high contrast stay quiet) (0.8419ms)
+✔ V50: every voice control has an AutomationProperties.Name in the Visual XAML (1.041ms)
+✔ V45: closing the Island releases voice (voice.session.close) and never calls agent.* or mission.* (1.0091ms)
+✔ the product hotkey is Ctrl+Alt+Space with MOD_NOREPEAT; the test chord is used only with -HotkeyTest; unregistered on close (0.5147ms)
+✔ a refused shortcut reports Shortcut unavailable and does not stop the Island (0.3885ms)
+✔ voice requests never run synchronously on the UI thread (0.5466ms)
+✔ no raw audio, transcripts or credentials are written to logs or files by the voice layer (0.5947ms)
+✔ push-to-talk while SPEAKING sends voice.listen.start (no gate on playing) and the press never sends an interrupt (0.6474ms)
+✔ the Interrupt control sends voice.interrupt and is the only control that cancels speech (0.5158ms)
+✔ the mic glyph carries Listening and Speaking as an accent, and a fault as a warning (collapsed notch has no status line) (0.447ms)
+✔ -HotkeyTest is the only way the alternate test chord is selected, and blur is opt-in (default off) (0.926ms)
+✔ R1-races#1 R1-truth#0 the on-screen Confirm and Mute send the keys the Host reads (proposalId, on) (8.5309ms)
+✔ R1-truth#1 the WPF Mute button sends voice.mute with the Host key on (not muted) and reflects snapshot.muted (0.8266ms)
+✔ R1-truth#2 a quick WPF tap latches tap-to-talk: a visible finish state, a second tap ends it, and a deadline bounds it (0.8997ms)
+✔ R1-truth#8 the WPF uiIntent seq is scoped to the Host epoch: a new epoch resets the floor and never replays an old seq (0.5949ms)
+✔ R1-truth#6 the WPF Interrupt control is enabled only from a fresh snapshot, like the Speaking label (0.6001ms)
+✔ R1-races#2 acceptVoice drops a stale answer before any press reset or polling stop (2.1499ms)
+✔ R1-truth#5 the desktop level meter and the WPF level meter both read snapshot.level.at against the local clock (1.9305ms)
+✔ R2-races#0 holding the mic 600 ms sends one listen.start and one listen.end, and the release Click restarts nothing (2406.3872ms)
+✔ R2-races#0 a second tap held 600 ms ends the latched turn and its release Click starts nothing new (0.3441ms)
+✔ R2-races#0 keyboard activation still toggles (no pointer Click pending) (0.2882ms)
+✔ R2-races#0 static: the pointer Click is consumed by a flag set on release, not by the mouse-down timestamp (0.8334ms)
+✔ R2-races#1 a release queued before the listen.start is acknowledged binds to that start turn (0.2479ms)
+✔ R2-races#1 a lost listen.start leaves the later release unbound, so it ends whatever capture the Host holds (0.323ms)
+✔ R2-races#5 closing sends no queued-but-unsent open or listen, and the close lands after the open in flight (0.233ms)
+✔ R2-races#5 static: the window close sends the session close whenever an open or listen was sent or queued (0.6752ms)
+✔ R2-truth#0 the first snapshot without an intent seeds the floor, so the first intent after start opens the workspace once (0.214ms)
+✔ R2-truth#1 an expired proposal shows neither Needs approval nor a Confirm target (0.6452ms)
+✔ R2-fixcheck#1 the desktop hold-to-talk listen.start sends source push_to_talk through the store (3.3434ms)
+✔ R2-races#2 the desktop press maps a transport failure to unknown (defensive end) and a Host refusal to refused (4.1672ms)
+✔ T12 UI-07 the WPF hands-free notice and the AEC copy are the same strings as voice-model.ts (2.9741ms)
+✔ T12 UI-01 the hands-free toggle is mode-only in WPF, and a mode switch never sends listen.start (0.909ms)
+✔ T12 UI-01 the explicit Start hands-free is the only WPF path that sends a hands-free listen.start, and it is named (1.0054ms)
+✔ T12 P7 unmute never reopens the microphone in WPF: the Mute handler sends voice.mute only (0.9963ms)
+✔ T12 UI-02 the WPF Finish my turn control ends the live input by its input id and is named (1.2306ms)
+✔ T12 UI-02 the WPF talk button is disabled in hands-free, so no release caption can sit on a disabled control (0.6832ms)
+✔ T12 UI-04 WPF interrupt enablement matches React: playing, thinking or holding a reply, from a fresh snapshot (0.7314ms)
+✔ T12 UI-04 WPF proposal sentence for a Mission stop is "Stop the Mission <title>" and never offers voice confirmation (1.7495ms)
+✔ T12 UI-09 the WPF composite label order: releasing, then both halves, then speaking only from playing, then held (0.7764ms)
+✔ T12 UI-03 WPF status row and barge-in receipt are data-only, derived from snapshot.duplex and lastBargeIn, never animated (1.0049ms)
+✔ T12 UI-01 the WPF hands-free status row is derived from snapshot.duplex, empty outside hands-free, and never claims more than the Host reports (0.2352ms)
+✔ T12 composite truth in WPF: Listening and speaking only with capture and playback, Speaking only from playback, Paused for a held reply (0.3187ms)
+✔ T12 UI-03 the WPF barge-in receipt shows the measured time and nothing when unmeasured (0.186ms)
+✔ T12 UI-01/P7 WPF: Start hands-free sends the one explicit grant, Finish my turn ends the input by id, and a toggle never starts listening (0.2659ms)
+✔ T12 lane2 the WPF shortcut press in hands-free is the explicit hands-free start: no hold, no release, no duplex restart (0.2533ms)
+✔ T12 lane2 the WPF push-to-talk start is refused in hands-free: no listen.start and no capture intent (0.1432ms)
+✔ T12 lane2 the WPF mode switch ends a held press before the mode changes (0.206ms)
+✔ T12 lane2 the WPF status row and barge-in receipt are empty while no session is open, even if the Host kept mode and the last receipt (0.1458ms)
+✔ T12 lane2 static: the shortcut branches to the hands-free start before any hold, and push-to-talk never starts in hands-free (0.6293ms)
+✔ T12 lane2 static: the hands-free start is refused unless the session is open in hands_free and the duplex is idle (0.9754ms)
+✔ _migrations keys on basename, not path (3.6487ms)
+✔ a file already applied from another directory does not re-apply (1.9386ms)
+✔ pending migrations are returned in name order (19.1491ms)
+✔ non-.sql entries are dropped (readdir also yields the auth/ directory) (0.6386ms)
+✔ the auth schema ships outside the globbed directory (1.4923ms)
+✔ this workspace's auth schema copy is byte-identical to its source (0.826ms)
+✔ the copy check reads both files and catches an edit (13.2105ms)
+✔ T4: native ownership builds reproducibly in independent directories (4348.3091ms)
+✔ parsePreviewArgs accepts the two actions (3.1138ms)
+✔ parsePreviewArgs rejects missing, unknown and extra arguments (0.4527ms)
+✔ parsePid reads a pidfile and rejects junk (0.3409ms)
+✔ parsePgid reads the pgrp field past a comm containing spaces (0.4829ms)
+✔ parseListenerInodes picks LISTEN sockets on the wanted port only (0.7175ms)
+✔ parseListenerInodes reads the tcp6 dump the same way (0.3335ms)
+✔ looksLikePreviewProcess matches the npm wrapper and its vite child (0.7191ms)
+✔ looksLikePreviewProcess spares the sibling scripts and re-used pids (0.2506ms)
+✔ previewOwners trusts port owners and dedupes the pidfile pid (0.2599ms)
+✔ previewOwners adds a pidfile pid whose command line is still the preview (0.3234ms)
+✔ previewOwners drops a stale pidfile pid re-used by another process (0.2493ms)
+✔ previewOwners drops a pidfile pid that no longer exists (0.1857ms)
+✔ previewOwners on a free port with no pidfile signals nothing (0.1822ms)
+✔ stopOutcome fails when a pid survives or the port is still held (0.5366ms)
+✔ stopOutcome reports a verified free port (0.3857ms)
+✔ stopOutcome fails on a listener whose owner cannot be attributed (0.286ms)
+✔ terminatePids SIGTERMs live pids and skips dead ones (0.7786ms)
+✔ terminatePids escalates to SIGKILL when SIGTERM is ignored (0.552ms)
+✔ terminatePids reports a pid that survives SIGKILL as stubborn (0.7088ms)
+✔ terminatePids on a free port signals nothing (0.3521ms)
+✔ preview: a successful sign-out clears the token, then redirects (4.4164ms)
+✔ preview: a rejected sign-out still clears the token and redirects (0.6802ms)
+✔ preview: a sign-out that throws synchronously still clears and redirects (0.4802ms)
+✔ preview: a sign-out that never settles clears and redirects once the wait expires (10.893ms)
+✔ preview: no bearer means nothing to invalidate, so no request is made (0.5504ms)
+✔ preview: a stored bearer is still invalidated server-side (0.3199ms)
+✔ deployed: a confirmed sign-out clears the token, then redirects (0.4065ms)
+✔ deployed: a sign-out that never settles throws and does NOT redirect (24.6154ms)
+✔ deployed: a rejected sign-out throws and does NOT redirect (1.2508ms)
+✔ deployed: the timeout is distinguishable from a rejection (24.9625ms)
+✔ settleWithin reports the outcome and never rejects (30.8594ms)
+✔ settleWithin waits its full window, then gives up rather than hanging (0.8579ms)
+✔ pre-sign-in: the preview clear gives up at the preview bound (0.7588ms)
+✔ pre-sign-in: a deployed session gets the deployed window, not the preview one (0.6717ms)
+✔ pre-sign-in: a failed clear never blocks sign-in (0.4135ms)
+✔ pre-sign-in: the preview skips the request when there is no bearer (0.1433ms)
+✔ every sign-out bound comes from one rule (0.0812ms)
+✔ the defaults are bounded, and deployed waits longer than preview (0.296ms)
+✔ T9R harness cleanup selects only its explicitly created target, preserving user targets (3.382ms)
+✔ T9R harness refuses user-owned or pre-existing windows even with a plausible PID (1.5266ms)
+✔ T9R harness refuses stale PID/native handle and content lifetime (2.8004ms)
+✔ T9R harness refuses ambiguous ownership and unverified package identity (0.4912ms)
+✔ build record matches the source and the compiled worker (9.889ms)
+✔ ready event reports local SAPI engines and the worker protocol (423.0435ms)
+✔ devices event is a read-only real enumeration with structure only (165.441ms)
+✔ V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD (2696.8864ms)
+✔ manual endpointing finalizes only on capture.end (2532.6074ms)
+✔ V11 silence never becomes a command: stt.none no_speech, no final (1744.231ms)
+✔ V12 noise-only input fails safely: vad noise_only and no final (1251.1783ms)
+✔ V06 total capture is bounded by maxMs and reports the buffered peak (538.4068ms)
+✔ V05 a second capture.start while capturing is refused with DEVICE_BUSY (436.2583ms)
+✔ V28 capture during playback is refused with BUSY_PLAYBACK (half duplex) (456.5023ms)
+✔ V19 V22 LIVE-B03 push-to-talk barge-in: speak.cancel immediately followed by capture.start opens the capture (no BUSY_PLAYBACK) (627.8655ms)
+✔ V24 mute aborts an active capture and refuses capture.start until unmuted (508.999ms)
+✔ V18 speech chunks play strictly in seq order on the null sink (2094.4413ms)
+✔ V19 V20 speak.cancel stops audible playback and nothing from that gen starts afterwards (1201.2456ms)
+✔ V21 a late speak with an old gen after cancel never plays (1004.0951ms)
+✔ V22 rapid cancel and speak cycles keep turn state and gen monotonic (387.4521ms)
+✔ V25 shutdown with an active capture releases everything and exits 0 within 2 s (359.3353ms)
+✔ unknown op is answered with UNKNOWN_OP and malformed JSON keeps the process alive (201.7833ms)
+✔ BUFFER_LIMIT rejects oversized speech text (186.6583ms)
+✔ V52 stdout carries only bounded JSON events with no audio-looking payload (3208.1773ms)
+✔ a command line over 64 KiB is rejected and the worker stays alive (446.6027ms)
+✔ T10 endpointing: recognizer evidence keeps no_speech from firing and bounds the turn end (8265.1598ms)
+✔ T10 Part-B endpointing: room noise above the calibrated floor still ends the turn; one loud click does not (8170.0338ms)
+✔ T10 stop decision: rejected-only recognizer text is stt.none rejected, never a final (8085.3664ms)
+✔ T10 AGC: the gained audio never changes the reported levels, and gain stays in 1x..24x (8093.1804ms)
+✔ T10 levels: reported rms and peak equal the raw fixture samples window by window (AGC cannot change them) (638.1179ms)
+✔ T10 staleDropped: speak commands at or below the highest cancelled gen are counted per cancel receipt (186.8994ms)
+✔ native#0 a stalled playback driver never holds the command loop: cancel, enqueue and shutdown stay bounded (8177.8223ms)
+✔ T12 closeout: cancelling while the driver opens never submits the cancelled chunk when Open returns (0.4798ms)
+✔ native#0 live: a healthy speak.cancel applies the reset within the bounded wait and reports no resetPending (361.1647ms)
+✔ native#2 abandoned recognizers: raw audio is zeroed and released, and the ledger refuses past its bound (0.719ms)
+✔ native#3 speak.cancel receipts share one meter worker, and a full queue starts no thread (0.2677ms)
+✔ native#4 device index is range-checked: out of range is DEVICE_UNAVAILABLE and never wraps to another device (675.3014ms)
+✔ native#5 a worker thread fault is contained: the guard runs its handler and the body never escapes (0.4602ms)
+✔ native#6 the finalize decision reads the onset state published during capture, not a value set at thread exit (0.1854ms)
+✔ R2-native#0 a recognizer whose start throws is disposed before the error propagates, so the turn holds no engine (3.1278ms)
+✔ R2-native#1 the capture thread body is guarded: a protocol write that fails on a closed pipe ends the turn, not the process (4.8262ms)
+✔ R2-native#2 a playback chunk whose header never completes is released after the reset, and its device handle is closed (2.8182ms)
+✔ R2-native#3 raw microphone buffers are zeroed before they are freed, and capture frames are cleared when the turn ends (2.5198ms)
+✔ T12-native VT-01 a short duplex burst (200 ms) ends its speech turn: onset, then speech_end within 1.2 s, flagged short (0.2867ms)
+✔ T12-native VT-02 stationary ambient never counts as speech: no onset in 10 s and the floor learns the level (0.2063ms)
+✔ T12-native VT-03 speech over a calibrated noise floor starts and ends about 900 ms after it stops (0.1536ms)
+✔ T12-native VT-G3 a loud click does not permanently suppress soft speech that follows it (0.1296ms)
+✔ T12-native VT-05 output-aware onset: our own residual at 0.003 never starts a turn, but user speech over it does (0.2117ms)
+✔ T12-native AEC-01/06 echo after quiet first frames, a pause and a gap is never an onset (the residual is floored and held) (0.1385ms)
+✔ T12-native AEC-01 the learned residual is not decayed by a paused (silent) window (0.1396ms)
+✔ T12-native AEC-05 user speech at 0.008 over 0.003 echo starts a turn, and never lifts the residual above the echo cap (0.1316ms)
+✔ T12-native round-2 AEC-01/05 a steady echo at 0.0045 or 0.005, or a loud echo after a quiet start, is no onset while output is audible (0.1408ms)
+✔ T12-native live calibration: the measured device residual never starts a turn and 0.003 speech over it does within 120 ms (0.1586ms)
+✔ T12-native review round 3: a seed taken while the user talked over the first reply is lowered by the next reply and never raised later (0.1344ms)
+✔ T12-native endpointing ignores whisper's trailing full stop and waits longer after a word that cannot end a sentence (0.1019ms)
+✔ T12-native AEC-02 a pre-roll replay never carries frames captured while our output was audible or in its reverb tail (0.113ms)
+✔ T12-native PRIV-03 a capture loop that ends because the microphone is muted reports 'mute', and the lifetime bound reports 'lifetime' (0.1012ms)
+✔ T12-native AEC-02 round-2 user speech at 0.03 captured during our output is kept in the pre-roll for the next turn (0.0915ms)
+✔ T12-native RC-02 a playback.error for a generation releases its pause: the next chunk of that gen is not paused (0.0939ms)
+✔ T12-native VT-01 stationary loud ambient in a duplex turn ends after the silence clock, not at the cap (0.1117ms)
+✔ T12-native N-02 behaviour: on the playback thread a pause precedes the reset, and no restart happens before it (0.108ms)
+✔ T12-native VT-09 soft speech with no frame above the onset threshold for 4 s ends the turn, even with evidence held fresh (0.124ms)
+✔ T12-native N-07 the render-identity checks are labelled as guards, and claim no echo cancellation (1.8981ms)
+✔ T12-native N-03 the stdout queue is 2048 lines / 1 MiB and the stall watchdog is 10 s, both bounded (3.3162ms)
+✔ T12-native N-01 duplex open honors stop and mute before, during and after the device open (4.0525ms)
+✔ T12-native N-02 a pending reset is applied before any pause decision, and a cancelled chunk never restarts the device (3.8951ms)
+✔ T12-native N-06 speak.pause emits a measured receipt off the playback thread, bounded to 1.5 s (3.4937ms)
+✔ T12-native N-04 AEC output is drained while INCOMPLETE is set, into a bounded one-second pending buffer (3.9775ms)
+✔ T12-native N-05 three rotating silence buffers keep the render endpoint fed (3.5803ms)
+✔ T12-native N-10 timeBeginPeriod(1) is paired with timeEndPeriod(1) on every path of a duplex session (2.3132ms)
+✔ T12-native VT-09 the finalizing turns stay abortable through a bounded list, so a new capture can attach (2.4629ms)
+✔ T12-native AUD-04 capture.abort with a turn id matches turn AND gen exactly (3.1217ms)
+✔ T12-native VT-01 duplex speech_end always reports speechMs and short, and short bursts skip the decode (2.6939ms)
+✖ whisper: the staged runtime and model match native/voice/whisper-pin.json and the build record (2.5663ms)
+✖ whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error (1.1984ms)
+✖ whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final (1.0449ms)
+✖ whisper: silence never becomes a final (no VAD onset, so stt.none no_speech) (0.8285ms)
+✖ whisper: noise-only input never becomes a final with words (0.8374ms)
+✖ whisper: capture.abort that lands during the final decode never emits a final (0.8724ms)
+✖ whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently (0.8727ms)
+✔ keeps VITE_-prefixed string entries (2.6461ms)
+✔ drops non-VITE keys, non-string values and malformed documents (0.3409ms)
+✔ a missing app-env.json is a clean no-op (1.7154ms)
+✔ reads the app env from a workspace (4.0635ms)
+✔ an explicit process-env override wins over the file (0.4391ms)
+✔ the template ships auth off (1.4681ms)
+✔ vite loadEnv resolves the wrapped value (2.8881ms)
+✔ the wrapped command runs with the app env applied (199.2177ms)
+✔ the wrapped command sees an explicit override, not the file value (200.8154ms)
+✔ the wrapper propagates the command's exit code (175.1897ms)
+✔ a signal-killed command is never reported as success (185.1242ms)
+✔ the CLI still runs when invoked through a symlinked path (204.6908ms)
+✔ parseWriteAtomicArgs needs exactly a staged file and a target (2.8432ms)
+✔ stagingError refuses a temp inside public/ and a no-op move (0.492ms)
+✔ handOver replaces the target and clears the staged file (4.6778ms)
+✔ handOver creates a missing target directory (8.6038ms)
+✔ an interrupted pass leaves the target on its old bytes, temp-free (7.213ms)
+✔ a failed hand-over creates no directory for the target it never wrote (2.6882ms)
+✔ a staged file on another filesystem is refused, not copied (5.4528ms)
+✔ cli: hands the file over, and refuses a temp staged in public/ (207.2308ms)
+✔ cli: relative paths follow the script's root, not the caller's cwd (133.1511ms)
+✔ every hand-over the og skill prints is one this script accepts (14.3693ms)
+✔ cli: a missing staged file fails without touching the target (109.9625ms)
+ℹ tests 454
+ℹ suites 0
+ℹ pass 446
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 294557.7785
+
+✖ failing tests:
+
+test at scripts\bunny-release.test.mjs:46:1
+✖ M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it (29920.1428ms)
+  AssertionError [ERR_ASSERTION]: Node runtime license unavailable; package must not ship without it.
+  At C:\Users\allam\Documents\new\bun-router-s1r4\scripts\package-bunny-desktop.ps1:179 char:9
+  +   else {throw 'Node runtime license unavailable; package must not shi ...
+  +         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      + CategoryInfo          : OperationStopped: (Node runtime li...hip without it.:String) [], RuntimeException
+      + FullyQualifiedErrorId : Node runtime license unavailable; package must not ship without it.
+   
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/bunny-release.test.mjs:61:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:974:1
+✖ whisper: the staged runtime and model match native/voice/whisper-pin.json and the build record (2.5663ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:975:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:990:1
+✖ whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error (1.1984ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:991:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1012:1
+✖ whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final (1.0449ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:1013:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1039:1
+✖ whisper: silence never becomes a final (no VAD onset, so stt.none no_speech) (0.8285ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:1040:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1057:1
+✖ whisper: noise-only input never becomes a final with words (0.8374ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:1058:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1071:1
+✖ whisper: capture.abort that lands during the final decode never emits a final (0.8724ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:1072:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1090:1
+✖ whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently (0.8727ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:971:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s1r4/scripts/voice-worker.test.mjs:1091:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+EXIT 1

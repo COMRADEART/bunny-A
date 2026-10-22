@@ -13,12 +13,16 @@
 // file so historical S1R2 evidence is never overwritten; each run also records the S1R3 failure attributions and repairs.
 // G7_RESUME=1 continues an interrupted run in the same G7_OUT (same task hash and pin required): recorded trials are kept
 // unchanged and only missing ones run. The model is unloaded after every trial so Ollama's runner memory cannot accumulate.
+// MA4-S1R4 harness-only changes (tasks, trials, rules, threshold and invariants unchanged): G7_STRATEGY=s1r4 selects the
+// S1R4 workflow strategy (default: the S1R3 workflow, byte-identical requests); G7_PINS=Role=model,... overrides single
+// roles (the router's role assignment); the per-role sampling the strategy requests is forwarded to Ollama; each run
+// also records Worker samples, tool receipts and per-call token receipts.
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { freemem } from 'node:os';
 import { G7_TASKS, G7_VERSION } from './g7-tasks.mjs';
-import { runCodingWorkflow } from '../../src/lib/bunny-host/ma4/coding-workflow.server.ts';
+import { runCodingWorkflow, STRATEGY_S1R3, STRATEGY_S1R4 } from '../../src/lib/bunny-host/ma4/coding-workflow.server.ts';
 import { runSandboxed, sandboxAvailability } from '../../src/lib/bunny-host/ma4/sandbox.server.ts';
 import { execute } from '../../src/lib/orch/exec.server.ts';
 
@@ -34,25 +38,34 @@ globalThis.fetch = async (input, init) => {
   live++; try { return await realFetch(input, init); } finally { live--; }
 };
 const sha = v => createHash('sha256').update(v).digest('hex');
-const pins = { Planner: PIN, Worker: PIN, Tester: PIN, Reviewer: PIN };
-const call = async ({ model, prompt, schema, signal }) => {
-  if (freemem() < 2.5 * 1024 ** 3) return { ok: false, error: 'Free memory below 2.5 GiB; refusing to load more work.', durationMs: 0 };
+const STRATEGY = process.env.G7_STRATEGY === 's1r4' ? STRATEGY_S1R4 : STRATEGY_S1R3;
+const pins = { Planner: PIN, Worker: PIN, Tester: PIN, Reviewer: PIN, ...Object.fromEntries((process.env.G7_PINS ?? '').split(',').filter(Boolean).map(kv => kv.split('='))) };
+if (Object.values(pins).some(m => m.endsWith(':cloud'))) throw new Error('cloud-backed tags are refused');
+const receipts = [], memoryWaits = [];
+const call = async ({ role, model, prompt, schema, signal, options }) => {
+  // S1R4: other workloads on this host swing RAM by several GiB; wait (bounded, logged) for headroom instead of
+  // failing a trial on a momentary dip, and still refuse after 15 minutes.
+  for (const until = Date.now() + 15 * 60_000; freemem() < 4 * 1024 ** 3;) {
+    if (Date.now() > until || signal?.aborted) return { ok: false, error: 'Free memory below 4 GiB for 15 minutes; refusing to load more work.', durationMs: 0 };
+    memoryWaits.push(new Date().toISOString()); await new Promise(r => setTimeout(r, 5000));
+  }
   const started = Date.now();
-  const r = await execute({ taskId: 'g7-' + randomUUID(), provider: 'ollama', model, prompt, localOnly: true, numCtx: 8192, numPredict: 2048, format: schema }, { signal, timeoutMs: 240_000 });
-  const durationMs = Date.now() - started;
+  const r = await execute({ taskId: 'g7-' + randomUUID(), provider: 'ollama', model, prompt, localOnly: true, numCtx: 8192, numPredict: options?.numPredict ?? 2048, ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}), ...(schema ? { format: schema } : {}) }, { signal, timeoutMs: 240_000 });
+  const durationMs = Date.now() - started, x = r.receipt;
+  receipts.push({ role, model, ok: r.ok, durationMs, doneReason: x?.doneReason ?? null, promptTokens: x?.promptEvalCount ?? null, outputTokens: x?.evalCount ?? null, evalNs: x?.evalDurationNs ?? null, loadNs: x?.loadDurationNs ?? null });
   return r.ok ? { ok: true, text: r.output ?? '', servedModel: r.receipt?.model ?? '', durationMs } : { ok: false, error: r.error ?? 'failed', stopped: !!r.stopped, durationMs };
 };
 
 const sandbox = await sandboxAvailability();
 if (!sandbox.available) throw new Error('Sandbox unavailable: dynamic execution BLOCKED; G7 not run.');
-const fresh = { version: G7_VERSION, pin: PIN, trials: TRIALS, startedAt: new Date().toISOString(), sandbox, taskHash: sha(JSON.stringify(G7_TASKS)), preflight: [], runs: [] };
+const fresh = { version: G7_VERSION, pin: PIN, ...(STRATEGY !== STRATEGY_S1R3 || process.env.G7_PINS ? { strategy: STRATEGY.id, pins } : {}), trials: TRIALS, startedAt: new Date().toISOString(), sandbox, taskHash: sha(JSON.stringify(G7_TASKS)), preflight: [], runs: [] };
 const evidence = process.env.G7_RESUME === '1' && existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : fresh;
 if (evidence !== fresh) {
-  if (evidence.taskHash !== fresh.taskHash || evidence.pin !== PIN || evidence.g7) throw new Error('Resume refused: different task set or pin, or the run is already complete.');
+  if (evidence.taskHash !== fresh.taskHash || evidence.pin !== PIN || evidence.strategy !== fresh.strategy || JSON.stringify(evidence.pins) !== JSON.stringify(fresh.pins) || evidence.g7) throw new Error('Resume refused: different task set or pin, or the run is already complete.');
   (evidence.resumes ??= []).push({ at: fresh.startedAt, keptTrials: evidence.runs.length, sandbox });
 }
 const preflight = evidence === fresh ? evidence.preflight : (evidence.resumes.at(-1).preflight = []);
-const unload = () => fetch(ORIGIN + '/api/generate', { method: 'POST', body: JSON.stringify({ model: PIN, keep_alive: 0 }) }).then(r => r.text()).catch(() => {});
+const unload = () => Promise.all([...new Set(Object.values(pins))].map(model => fetch(ORIGIN + '/api/generate', { method: 'POST', body: JSON.stringify({ model, keep_alive: 0 }) }).then(r => r.text()).catch(() => {})));
 const save = () => { mkdirSync(dirname(OUT), { recursive: true }); writeFileSync(OUT, JSON.stringify(evidence, null, 2) + '\n'); };
 
 // Pre-flight: each frozen reference passes its hidden tests, so a failure is never the harness's fault.
@@ -71,15 +84,16 @@ for (const task of G7_TASKS) {
   const n = task.kind === 'regression' ? TRIALS.regression : TRIALS.heldout;
   for (let trial = 1; trial <= n; trial++) {
     if (evidence.runs.some(r => r.task === task.id && r.trial === trial)) continue;
-    const started = Date.now();
-    const r = await runCodingWorkflow(task, { call, sandbox: runSandboxed, pins, maxRepairs: 2, onEvent: e => console.log(`  ${task.id}#${trial} ${e}`) });
+    const started = Date.now(), firstReceipt = receipts.length;
+    const r = await runCodingWorkflow(task, { call, sandbox: runSandboxed, pins, maxRepairs: 2, strategy: STRATEGY, onEvent: e => console.log(`  ${task.id}#${trial} ${e}`) });
     const final = r.attempts.at(-1);
     evidence.runs.push({ task: task.id, kind: task.kind, trial, status: r.status, reason: r.reason, repairsUsed: r.repairsUsed, durationMs: Date.now() - started,
       attempts: r.attempts, repairs: r.repairs, failures: r.failures, contractVersion: r.contractVersion, reviewer: r.reviewer, reviewerFalseApproval: r.reviewerFalseApproval, reviewerFalseRejection: r.reviewerFalseRejection, workerTesterConcurrent: r.workerTesterConcurrent,
       calls: r.calls.map(({ role, model, attempt, ok, durationMs, servedModel, startedAt, endedAt }) => ({ role, model, attempt, ok, durationMs, servedModel, startedAt, endedAt })),
       invariants: { pinsHeld: r.calls.every(c => c.model === pins[c.role] && (!c.ok || c.servedModel === pins[c.role])), ordering: r.status === 'passed' || r.status === 'failed' ? order(r.calls) : null,
         gateIsAuthority: (r.status === 'passed') === !!final?.accepted || !['passed', 'failed'].includes(r.status) },
-      finalSourceSha256: r.finalSource ? sha(r.finalSource) : null, finalSource: r.finalSource?.slice(0, 2500) ?? null });
+      finalSourceSha256: r.finalSource ? sha(r.finalSource) : null, finalSource: r.finalSource?.slice(0, 2500) ?? null,
+      ...(STRATEGY !== STRATEGY_S1R3 ? { strategy: r.strategy, workerSamples: r.graph?.workerSamples ?? 1, candidates: r.candidates, toolCalls: r.toolReceipts.length, toolReceiptsOk: r.toolReceipts.every(t => t.ok && t.invoker === 'orchestrator'), callReceipts: receipts.slice(firstReceipt) } : {}) });
     console.log(`${task.id}#${trial}: ${r.status} (${r.reason})`);
     save();
     await unload();
@@ -90,7 +104,7 @@ for (const task of G7_TASKS) {
 {
   const controller = new AbortController(); let sandboxRuns = 0;
   const watching = async (req) => { if (req.role === 'Worker') setTimeout(() => controller.abort(), 1000); return call(req); };
-  const r = await runCodingWorkflow(G7_TASKS[1], { call: watching, sandbox: async (q, s) => { sandboxRuns++; return runSandboxed(q, s); }, pins, signal: controller.signal });
+  const r = await runCodingWorkflow(G7_TASKS[1], { call: watching, sandbox: async (q, s) => { sandboxRuns++; return runSandboxed(q, s); }, pins, signal: controller.signal, strategy: STRATEGY });
   await new Promise(res => setTimeout(res, 500));
   evidence.cancellation = { status: r.status, sandboxRuns, liveRequestsAfter: live, calls: r.calls.map(c => ({ role: c.role, ok: c.ok })) };
   console.log('cancellation:', JSON.stringify(evidence.cancellation));
@@ -107,7 +121,7 @@ evidence.summary = {
   repairsByTarget: evidence.runs.flatMap(r => r.repairs ?? []).reduce((a, x) => ({ ...a, [`${x.target}:${x.outcome}`]: (a[`${x.target}:${x.outcome}`] ?? 0) + 1 }), {}), passedAfterRepair: evidence.runs.filter(r => r.status === 'passed' && r.repairsUsed > 0).length,
   reviewerFalseApprovals: evidence.runs.filter(r => r.reviewerFalseApproval).length, reviewerFalseRejections: evidence.runs.filter(r => r.reviewerFalseRejection).length,
   invariants: { pinsHeld: inv.every(i => i.pinsHeld), ordering: inv.every(i => i.ordering !== false), gateIsAuthority: inv.every(i => i.gateIsAuthority), cancellation: evidence.cancellation.status === 'cancelled' && evidence.cancellation.sandboxRuns === 0 && evidence.cancellation.liveRequestsAfter === 0 },
-  externalRequestsRefused: refused,
+  externalRequestsRefused: refused, memoryWaitSamples: memoryWaits.length,
 };
 const s = evidence.summary;
 evidence.g7 = s.heldout.passed >= 14 && s.regression.passed >= 2 && Object.values(s.invariants).every(Boolean) ? 'PASS' : 'FAIL';

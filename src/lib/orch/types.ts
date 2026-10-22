@@ -368,6 +368,8 @@ export type ExecRequest = {
   /** M-A-3 T11: Ollama num_ctx; absent leaves the request body unchanged. */
   numCtx?: number;
   numPredict?: number;
+  /** MA4-S1R4: Ollama sampling temperature; absent leaves the model's default. */
+  temperature?: number;
   /** M-A-3 T11: Ollama structured-output JSON schema; absent leaves the request body unchanged. */
   format?: { [key: string]: SchemaJson };
   /** Provider-native effort/reasoning override Bunny selected; null when the provider does not expose one. */
