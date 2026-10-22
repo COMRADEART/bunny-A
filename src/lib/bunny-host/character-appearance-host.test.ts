@@ -57,8 +57,14 @@ async function boot(directory: string, port: number) {
     assert.equal(response.status, 200);
     return (await response.json()) as { token: string; deviceId: string };
   };
-  const enabled = await command("mission.configure", { enabled: true });
-  assert.equal(enabled.status, 200, JSON.stringify(enabled.body));
+  try {
+    const enabled = await command("mission.configure", { enabled: true });
+    assert.equal(enabled.status, 200, JSON.stringify(enabled.body));
+  } catch (error) {
+    // The caller never receives this Host, so close it here; a leaked Host keeps its port and state files open.
+    await host.close();
+    throw error;
+  }
   return { host, command, state, pair, close: () => host.close() };
 }
 
