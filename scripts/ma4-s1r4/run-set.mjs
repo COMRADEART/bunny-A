@@ -1,10 +1,12 @@
 // MA4-S1R4 workflow runner for the DEVELOPMENT set (never decides a gate; G7 runs only through scripts/ma4-s1r2/g7.mjs).
 //   node --experimental-strip-types scripts/ma4-s1r4/run-set.mjs --strategy s1r3|s1r4 [--samples 1|2|3|adaptive]
-//     [--pin model] [--pins Planner=m,Worker=m,Tester=m,Reviewer=m] [--trials 2] [--only id,id] --out file.json
+//     [--pin model] [--pins Planner=m,Worker=m,Tester=m,Reviewer=m] [--trials 2] [--only id,id] [--resume] --out file.json
+// --resume keeps every recorded trial except those refused by the free-memory guard (no model ran for them because
+// the host was short of RAM); only those re-run. Same task hash, strategy and pins are required.
 // Same execution path as G7: production Ollama execute() with a served-model receipt, generated code only in the
 // OS-enforced sandbox, a localhost-only fetch allowlist, the model unloaded after every trial, a free-memory floor.
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { freemem } from 'node:os';
 import { DEV_TASKS, DEV_VERSION } from './dev-tasks.mjs';
@@ -42,10 +44,18 @@ const unload = () => Promise.all([...new Set(Object.values(pins))].map(model => 
 
 const sandbox = await sandboxAvailability();
 if (!sandbox.available) throw new Error('Sandbox unavailable: dynamic execution BLOCKED.');
-const evidence = { version: DEV_VERSION, strategy, pins, trials: TRIALS, taskHash: sha(JSON.stringify(DEV_TASKS)), sandbox, startedAt: new Date().toISOString(), runs: [] };
+const fresh = { version: DEV_VERSION, strategy, pins, trials: TRIALS, taskHash: sha(JSON.stringify(DEV_TASKS)), sandbox, startedAt: new Date().toISOString(), runs: [] };
+const evidence = process.argv.includes('--resume') && existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : fresh;
+if (evidence !== fresh) {
+  if (evidence.taskHash !== fresh.taskHash || JSON.stringify(evidence.strategy) !== JSON.stringify(strategy) || JSON.stringify(evidence.pins) !== JSON.stringify(pins)) throw new Error('Resume refused: different task set, strategy or pins.');
+  const memoryRefused = r => r.status === 'model_error' && /Free memory below/.test(r.reason);
+  (evidence.resumes ??= []).push({ at: fresh.startedAt, replaced: evidence.runs.filter(memoryRefused).map(r => `${r.task}#${r.trial}`) });
+  evidence.runs = evidence.runs.filter(r => !memoryRefused(r)); delete evidence.summary;
+}
 const save = () => { mkdirSync(dirname(OUT), { recursive: true }); writeFileSync(OUT, JSON.stringify(evidence, null, 2) + '\n'); };
 for (const task of DEV_TASKS.filter(t => !only || only.includes(t.id))) {
   for (let trial = 1; trial <= TRIALS; trial++) {
+    if (evidence.runs.some(r => r.task === task.id && r.trial === trial)) continue;
     const started = Date.now(), first = receipts.length;
     const r = await runCodingWorkflow(task, { call, sandbox: runSandboxed, pins, maxRepairs: 2, strategy, onEvent: e => console.log(`  ${task.id}#${trial} ${e}`) });
     const mine = receipts.slice(first);
@@ -59,6 +69,7 @@ for (const task of DEV_TASKS.filter(t => !only || only.includes(t.id))) {
     await unload();
   }
 }
+evidence.runs.sort((a, b) => DEV_TASKS.findIndex(t => t.id === a.task) - DEV_TASKS.findIndex(t => t.id === b.task) || a.trial - b.trial);
 const runs = evidence.runs;
 const by = k => Object.fromEntries([...new Set(runs.map(r => r[k]))].map(v => [v, `${runs.filter(r => r[k] === v && r.status === 'passed').length}/${runs.filter(r => r[k] === v).length}`]));
 const lat = runs.flatMap(r => r.calls.filter(c => c.ok).map(c => c.durationMs)).sort((a, b) => a - b);
