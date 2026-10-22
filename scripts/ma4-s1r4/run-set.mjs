@@ -30,9 +30,14 @@ const only = arg('--only', null)?.split(',');
 const OUT = arg('--out', `docs/ma4-s1r4/evidence/dev-${strategy.id}.json`);
 const sha = v => createHash('sha256').update(v).digest('hex');
 
-const receipts = [];
+const receipts = [], memoryWaits = [];
 const call = async ({ role, model, prompt, schema, signal, options }) => {
-  if (freemem() < 2.5 * 1024 ** 3) return { ok: false, error: 'Free memory below 2.5 GiB; refusing to load more work.', durationMs: 0 };
+  // S1R4: other workloads on this host swing RAM by several GiB; wait (bounded, logged) for headroom instead of
+  // failing a trial on a momentary dip, and still refuse after 15 minutes.
+  for (const until = Date.now() + 15 * 60_000; freemem() < 4 * 1024 ** 3;) {
+    if (Date.now() > until || signal?.aborted) return { ok: false, error: 'Free memory below 4 GiB for 15 minutes; refusing to load more work.', durationMs: 0 };
+    memoryWaits.push(new Date().toISOString()); await new Promise(r => setTimeout(r, 5000));
+  }
   const started = Date.now();
   const r = await execute({ taskId: 'dev-' + randomUUID(), provider: 'ollama', model, prompt, localOnly: true, numCtx: 8192, numPredict: options?.numPredict ?? 2048, ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}), ...(schema ? { format: schema } : {}) }, { signal, timeoutMs: 240_000 });
   const durationMs = Date.now() - started;
@@ -77,7 +82,7 @@ evidence.summary = { passed: runs.filter(r => r.status === 'passed').length, tri
   statuses: runs.reduce((a, r) => ({ ...a, [r.status]: (a[r.status] ?? 0) + 1 }), {}), firstAttemptPasses: runs.filter(r => r.status === 'passed' && r.repairsUsed === 0).length,
   modelCalls: runs.reduce((a, r) => a + r.modelCalls, 0), outputTokens: runs.reduce((a, r) => a + r.outputTokens, 0), truncatedReplies: runs.reduce((a, r) => a + r.truncated, 0),
   callLatencyMs: { median: lat[Math.floor(lat.length / 2)] ?? null, p95: lat[Math.floor(lat.length * 0.95)] ?? null }, trialMs: { total: runs.reduce((a, r) => a + r.durationMs, 0) },
-  reviewerFalseApprovals: runs.filter(r => r.reviewerFalseApproval).length, externalRequestsRefused: refused };
+  reviewerFalseApprovals: runs.filter(r => r.reviewerFalseApproval).length, externalRequestsRefused: refused, memoryWaitSamples: memoryWaits.length };
 evidence.finishedAt = new Date().toISOString();
 save();
 console.log(JSON.stringify(evidence.summary, null, 1));

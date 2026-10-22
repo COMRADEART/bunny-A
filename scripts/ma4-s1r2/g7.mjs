@@ -41,9 +41,14 @@ const sha = v => createHash('sha256').update(v).digest('hex');
 const STRATEGY = process.env.G7_STRATEGY === 's1r4' ? STRATEGY_S1R4 : STRATEGY_S1R3;
 const pins = { Planner: PIN, Worker: PIN, Tester: PIN, Reviewer: PIN, ...Object.fromEntries((process.env.G7_PINS ?? '').split(',').filter(Boolean).map(kv => kv.split('='))) };
 if (Object.values(pins).some(m => m.endsWith(':cloud'))) throw new Error('cloud-backed tags are refused');
-const receipts = [];
+const receipts = [], memoryWaits = [];
 const call = async ({ role, model, prompt, schema, signal, options }) => {
-  if (freemem() < 2.5 * 1024 ** 3) return { ok: false, error: 'Free memory below 2.5 GiB; refusing to load more work.', durationMs: 0 };
+  // S1R4: other workloads on this host swing RAM by several GiB; wait (bounded, logged) for headroom instead of
+  // failing a trial on a momentary dip, and still refuse after 15 minutes.
+  for (const until = Date.now() + 15 * 60_000; freemem() < 4 * 1024 ** 3;) {
+    if (Date.now() > until || signal?.aborted) return { ok: false, error: 'Free memory below 4 GiB for 15 minutes; refusing to load more work.', durationMs: 0 };
+    memoryWaits.push(new Date().toISOString()); await new Promise(r => setTimeout(r, 5000));
+  }
   const started = Date.now();
   const r = await execute({ taskId: 'g7-' + randomUUID(), provider: 'ollama', model, prompt, localOnly: true, numCtx: 8192, numPredict: options?.numPredict ?? 2048, ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}), ...(schema ? { format: schema } : {}) }, { signal, timeoutMs: 240_000 });
   const durationMs = Date.now() - started, x = r.receipt;
@@ -116,7 +121,7 @@ evidence.summary = {
   repairsByTarget: evidence.runs.flatMap(r => r.repairs ?? []).reduce((a, x) => ({ ...a, [`${x.target}:${x.outcome}`]: (a[`${x.target}:${x.outcome}`] ?? 0) + 1 }), {}), passedAfterRepair: evidence.runs.filter(r => r.status === 'passed' && r.repairsUsed > 0).length,
   reviewerFalseApprovals: evidence.runs.filter(r => r.reviewerFalseApproval).length, reviewerFalseRejections: evidence.runs.filter(r => r.reviewerFalseRejection).length,
   invariants: { pinsHeld: inv.every(i => i.pinsHeld), ordering: inv.every(i => i.ordering !== false), gateIsAuthority: inv.every(i => i.gateIsAuthority), cancellation: evidence.cancellation.status === 'cancelled' && evidence.cancellation.sandboxRuns === 0 && evidence.cancellation.liveRequestsAfter === 0 },
-  externalRequestsRefused: refused,
+  externalRequestsRefused: refused, memoryWaitSamples: memoryWaits.length,
 };
 const s = evidence.summary;
 evidence.g7 = s.heldout.passed >= 14 && s.regression.passed >= 2 && Object.values(s.invariants).every(Boolean) ? 'PASS' : 'FAIL';

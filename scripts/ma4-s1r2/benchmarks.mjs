@@ -18,7 +18,6 @@ const SPLIT = arg('--split', 'dev');
 const OUT = arg('--out', `docs/ma4-s1r2/evidence/bench-${SPLIT}.json`);
 const OPTIONS = { temperature: 0.2, num_ctx: 4096, num_predict: 900 };
 const OLLAMA = 'http://127.0.0.1:11434';
-const MIN_FREE_BYTES = 2.5 * 1024 ** 3;
 
 const realFetch = globalThis.fetch; let refused = 0;
 globalThis.fetch = async (input, init) => {
@@ -59,7 +58,11 @@ const evidence = { suite: SUITE_VERSION, split: SPLIT, startedAt: new Date().toI
 const save = () => { mkdirSync('docs/ma4-s1r2/evidence', { recursive: true }); writeFileSync(OUT, JSON.stringify(evidence, null, 2) + '\n'); };
 
 export async function runTask(model, task, sample) {
-  if (freemem() < MIN_FREE_BYTES) throw new Error(`Free memory below ${MIN_FREE_BYTES / 1024 ** 3} GiB; stopping to avoid swapping.`);
+  // MA4-S1R4 harness-only: wait (bounded) for headroom when other host workloads dip RAM; still stop after 15 minutes.
+  for (const until = Date.now() + 15 * 60_000; freemem() < 4 * 1024 ** 3;) {
+    if (Date.now() > until) throw new Error('Free memory below 4 GiB for 15 minutes; stopping to avoid swapping.');
+    evidence.memoryWaitSamples = (evidence.memoryWaitSamples ?? 0) + 1; await new Promise(r => setTimeout(r, 5000));
+  }
   const options = { ...OPTIONS, seed: 1000 + sample };
   const started = Date.now();
   if (task.tools) {
