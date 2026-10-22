@@ -50,18 +50,18 @@ async function boot(directory: string, port: number) {
   const command = async (action: string, data: unknown = {}, token = host.token) => {
     const response = await traced(`command ${action}`, () => fetch(`${base}/command`, {
       method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json", connection: "close" },
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify({ action, data }),
     }));
     return { status: response.status, body: (await response.json()) as Body };
   };
   const state = async (token = host.token) => {
-    const response = await traced("state", () => fetch(`${base}/state`, { headers: { authorization: `Bearer ${token}`, connection: "close" } }));
+    const response = await traced("state", () => fetch(`${base}/state`, { headers: { authorization: `Bearer ${token}` } }));
     return { status: response.status, body: (await response.json()) as Body };
   };
   const pair = async (name: string) => {
     const code = (await command("pairing.create")).body.pairCode;
-    const response = await fetch(`${base}/pair`, { method: "POST", headers: { "content-type": "application/json", connection: "close" }, body: JSON.stringify({ code, name }) });
+    const response = await fetch(`${base}/pair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, name }) });
     assert.equal(response.status, 200);
     return (await response.json()) as { token: string; deviceId: string };
   };

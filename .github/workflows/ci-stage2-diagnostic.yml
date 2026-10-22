@@ -66,7 +66,9 @@ jobs:
           FILES: ${{ inputs.files }}
           LANE: ${{ matrix.lane }}
         run: |
-          export NODE_OPTIONS="--import $(node -p 'require("url").pathToFileURL(require("path").resolve("scripts/ci/handle-report.mjs")).href')"
+          url() { node -p "require('url').pathToFileURL(require('path').resolve('$1')).href"; }
+          export NODE_OPTIONS="--import $(url scripts/ci/handle-report.mjs)"
+          if [ "$LANE" = isolated ]; then mkdir -p ci-diag/http; export BUNNY_CI_HTTP_TRACE="$PWD/ci-diag/http"; NODE_OPTIONS="$NODE_OPTIONS --import $(url scripts/ci/http-trace.mjs)"; fi
           flags="--test-reporter=tap --test-timeout=180000"
           case "$LANE" in
             isolated) cmd="node --experimental-strip-types --test $flags --test-concurrency=1 src/lib/bunny-host/character-appearance-host.test.ts"; budget=300 ;;
