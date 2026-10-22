@@ -39,16 +39,24 @@ async function boot(directory: string, port: number) {
     missions: { adapters: [new FilesystemCapability(), new TerminalCapability(), new GitCapability(directory)] },
   });
   const base = `http://127.0.0.1:${port}`;
+  const instance = (host as any).instanceId ?? String(host.token).slice(0, 6);
+  const traced = async (what: string, run: () => Promise<Response>) => {
+    try {
+      return await run();
+    } catch (error: any) {
+      throw new Error(`[diag] ${what} on Host ${instance} port ${port} at ${new Date().toISOString()}: ${error.message}; cause ${error.cause?.code ?? ""} ${error.cause?.name ?? ""} ${error.cause?.message ?? ""} socket ${JSON.stringify(error.cause?.socket ?? null)}`);
+    }
+  };
   const command = async (action: string, data: unknown = {}, token = host.token) => {
-    const response = await fetch(`${base}/command`, {
+    const response = await traced(`command ${action}`, () => fetch(`${base}/command`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       body: JSON.stringify({ action, data }),
-    });
+    }));
     return { status: response.status, body: (await response.json()) as Body };
   };
   const state = async (token = host.token) => {
-    const response = await fetch(`${base}/state`, { headers: { authorization: `Bearer ${token}` } });
+    const response = await traced("state", () => fetch(`${base}/state`, { headers: { authorization: `Bearer ${token}` } }));
     return { status: response.status, body: (await response.json()) as Body };
   };
   const pair = async (name: string) => {
