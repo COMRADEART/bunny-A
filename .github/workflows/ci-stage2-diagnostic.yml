@@ -1,0 +1,83 @@
+# MA4-S1R3-CI2 diagnostic: runs `npm test` stage 2 on the same hosted runner as the regression job, with the TAP
+# reporter (failures stream inline), a per-test timeout, a process watchdog and always-uploaded diagnostics.
+# Manual (workflow_dispatch) or a push to a ci-diag/** branch; never part of the gating ci workflow.
+name: ci-stage2-diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      files:
+        description: "Test files for the 'custom' lane (space-separated); empty runs only the isolated and stage2 lanes"
+        required: false
+        default: ""
+  push:
+    branches: ["ci-diag/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  stage2:
+    name: stage 2 diagnostic (${{ matrix.lane }})
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [isolated, stage2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc
+          location: C:\msys64-ci
+      - run: npm ci
+      - run: npm run pretest
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+      - name: Runtime environment
+        shell: bash
+        run: |
+          mkdir -p ci-diag/handles
+          node -e '
+            const os=require("os"),fs=require("fs");
+            const env={node:process.version,platform:process.platform,release:os.release(),cpus:os.cpus().length,memGiB:+(os.totalmem()/2**30).toFixed(1),
+              cwd:process.cwd(),tmpdir:os.tmpdir(),tmpdirReal:fs.realpathSync.native(os.tmpdir()),TEMP:process.env.TEMP,TMP:process.env.TMP,
+              gitIdentity:!!require("child_process").spawnSync("git",["config","user.email"]).stdout.toString().trim()};
+            fs.writeFileSync("ci-diag/env.json",JSON.stringify(env,null,2));console.log(env)'
+      - name: Stage 2 under the watchdog (${{ matrix.lane }})
+        shell: bash
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+          BUNNY_CI_HANDLE_DIR: ${{ github.workspace }}\ci-diag\handles
+          FILES: ${{ inputs.files }}
+          LANE: ${{ matrix.lane }}
+        run: |
+          export NODE_OPTIONS="--import $(node -p 'require("url").pathToFileURL(require("path").resolve("scripts/ci/handle-report.mjs")).href')"
+          flags="--test-reporter=tap --test-timeout=180000"
+          case "$LANE" in
+            isolated) cmd="node --experimental-strip-types --test $flags --test-concurrency=1 src/lib/bunny-host/character-appearance-host.test.ts"; budget=300 ;;
+            stage2)   cmd=$(node scripts/ci/test-stage.mjs 1 $flags); budget=1800 ;;
+          esac
+          if [ -n "$FILES" ] && [ "$LANE" = isolated ]; then
+            cmd="node --experimental-strip-types --test $flags --test-concurrency=1 $FILES"
+          fi
+          echo "$cmd" > ci-diag/command.txt
+          node scripts/ci/watchdog.mjs --label "$LANE" --budget-s "$budget" --out ci-diag -- bash -c "$cmd"
+      - name: Failures from the TAP stream
+        if: always()
+        shell: bash
+        run: grep -n -E "^\s*not ok|# (fail|cancelled|tests|pass) " ci-diag/*.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stage2-diagnostic-${{ matrix.lane }}
+          path: ci-diag
+          retention-days: 14
