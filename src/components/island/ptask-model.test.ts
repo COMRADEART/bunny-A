@@ -5,7 +5,7 @@ import type { TaskView } from "../../lib/bunny-host/ma4/task-runtime.ts";
 
 const base: TaskView = { id: "t", title: "Digest", projectId: "p", state: "RUNNING", display: "Working", version: 4, createdAt: 1, updatedAt: 10, deadlineAt: null,
   progress: { done: 1, total: 3, current: "b" }, approval: { required: false, approvedUntil: null }, background: false, blocked: null, failure: null,
-  uncertainOperation: null, models: [], dependsOn: [], evidence: [] };
+  uncertainOperation: null, models: [], dependsOn: [], evidence: [], activity: null, pendingAction: null };
 const snap = (tasks: PtaskSnapshot["tasks"]) => ({ schema: "ma4.ptask.snapshot.v1", hostInstance: "h", at: 0, readOnly: null, policy: { background: false, resumeOnStart: false, notifications: { enabled: true, kinds: [] } }, uiAttached: true, tasks, notifications: [] }) as PtaskSnapshot;
 const live = { live: true, snapshotAt: 1000, workstation: true, format: () => "14:05" };
 
@@ -30,4 +30,22 @@ test("S2-T1 task rows: a phone supervises but approves and resolves on the PC; c
   assert.deepEqual(by.w.controls, ["cancel"]); assert.equal(by.w.note, "Approve or resolve this on your PC.");
   assert.deepEqual(by.p.controls, ["resume", "cancel"]);
   assert.deepEqual(by.x.controls, []); assert.equal(by.x.title, "Unreadable task");
+});
+
+test("S2-T2 connected rows: activity refines the state; a waiting action gets Approval Center controls on the PC only", () => {
+  const pendingAction = { actionId: "act-1", stepId: "send", kind: "email.send", connector: "email", target: "Email · me", summary: "Send \"Status\" to 1 recipient", effects: ["Delivers an email to 1 recipient.", "It cannot be unsent."], reversible: false, payloadSha256: "a".repeat(64), expiresAt: 2000 };
+  const working = { ...base, activity: "Reading files" as const };
+  const waiting = { ...base, id: "w", state: "AWAITING_APPROVAL" as const, display: "Waiting for approval" as const, activity: "Waiting for permission" as const, pendingAction };
+  const [w, r] = ptaskRows(snap([working, waiting]), live);
+  assert.equal(w.label, "Waiting for approval · Waiting for permission");
+  assert.deepEqual(w.controls, ["approve_action", "deny_action", "inspect", "cancel"]);
+  assert.equal(w.pending?.payloadSha256, "a".repeat(64), "the decision carries the exact hash that was shown");
+  assert.match(w.detail ?? "", /cannot be undone/);
+  assert.equal(r.label, "Working · Reading files");
+  const phone = ptaskRows(snap([waiting]), { ...live, workstation: false })[0];
+  assert.deepEqual(phone.controls, ["cancel"]); assert.equal(phone.pending, null); assert.equal(phone.note, "Approve or resolve this on your PC.");
+  const offline = ptaskRows(snap([waiting]), { ...live, live: false })[0];
+  assert.deepEqual(offline.controls, []); assert.match(offline.label, /^Last known: /);
+  const s2t1 = ptaskRows(snap([{ ...base, state: "AWAITING_APPROVAL", display: "Waiting for approval" }]), live)[0];
+  assert.deepEqual(s2t1.controls, ["approve", "cancel"], "a task-level approval is unchanged");
 });

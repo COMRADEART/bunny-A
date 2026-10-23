@@ -4,7 +4,7 @@ import { isTrustedLocalActor } from "../../bunny-missions/authorization.server.t
 import { CHECKPOINT_SECRET_PATTERNS } from "../agent-checkpoint.server.ts";
 import { gateCalls } from "./coordinator.ts";
 import type { ModelCall } from "./coding-workflow.server.ts";
-import { approvalRequired, canonical, EnvelopeSchema, sha256, TaskSpecSchema, taskView, TERMINAL_TASK_STATES, validateTask, type BlockCode, type CorruptTaskView, type ExecutorFacts, type TaskFailureCode, type TaskRecord, type TaskState, type TaskView } from "./task-runtime.ts";
+import { approvalRequired, canonical, EnvelopeSchema, sha256, TaskSpecSchema, taskView, TERMINAL_TASK_STATES, validateTask, type ActionApproval, type ActionProposal, type BlockCode, type CorruptTaskView, type Envelope, type ExecutorFacts, type TaskFailureCode, type TaskRecord, type TaskState, type TaskView } from "./task-runtime.ts";
 import { StaleLeaseError, TaskConflictError, type Lease, type NotificationKind, type ProcessIdentity, type TaskPolicy, type TaskStore, type Update, type Updated } from "./task-store.server.ts";
 
 /**
@@ -21,19 +21,26 @@ export type StepResult =
   /** Proven: the effect was never attempted (nothing was sent). */
   | { ok: false; error: string; dispatched: false; fatal?: TaskFailureCode }
   /** Attempted. `definite` means the other side reported failure (no effect); otherwise the outcome is unknown. */
-  | { ok: false; error: string; dispatched: true; definite: boolean; fatal?: TaskFailureCode };
+  | { ok: false; error: string; dispatched: true; definite: boolean; fatal?: TaskFailureCode }
+  /** MA4-S2-T2: nothing was sent; this exact payload waits for the owner's approval (the attempt is not spent). */
+  | { ok: false; error: string; dispatched: false; proposal: ActionProposal };
 export type StepContext = {
   taskId: string; stepId: string; attempt: number; idempotencyKey: string; model: string | null; signal: AbortSignal;
   /** The Host-wide gated model call (one GPU-heavy call at a time across all tasks). */
   call: ModelCall;
   /** Registers a child process: it is killed on cancel/stop, and its verified identity is cleaned up after a crash. */
   track(child: ChildProcess): void;
+  /** MA4-S2-T2: the task's immutable envelope (its grants), the owner's approval of this step's payload, earlier results. */
+  envelope: Envelope;
+  approval: ActionApproval | null;
+  outputOf(stepId: string): string | null;
+  now(): number;
 };
 export type Executor = ExecutorFacts & {
   timeoutMs: number;
   run(input: Record<string, string | number | boolean | null>, ctx: StepContext): Promise<StepResult>;
   /** Idempotent executors: was an operation with this key already applied? Called before any re-execution after a crash. */
-  verify?(idempotencyKey: string, signal: AbortSignal): Promise<{ found: boolean; output?: string; receipt?: string }>;
+  verify?(idempotencyKey: string, signal: AbortSignal, input?: Record<string, string | number | boolean | null>, envelope?: Envelope, ctx?: Pick<StepContext, "taskId" | "stepId" | "outputOf" | "now">): Promise<{ found: boolean; output?: string; receipt?: string }>;
 };
 export type FaultPoint = "after-claim" | "before-operation-start" | "after-operation-start" | "after-effect" | "after-receipt";
 /** Thrown by a fault hook to simulate the Host dying at that instant: the runtime stops without writing anything else. */
@@ -63,6 +70,8 @@ export type RuntimeDeps = {
   faults?(point: FaultPoint, taskId: string): void;
   /** This runtime is the only one on its database (the Host holds its port): at startup, every foreign lease is a dead Host's. */
   exclusive?: boolean;
+  /** MA4-S2-T2: a task reached a terminal state (its task-scoped browser session is closed). */
+  onTerminal?(taskId: string): void;
 };
 type Active = { lease: Lease; abort: AbortController; done: Promise<void>; children: Set<ChildProcess> };
 const WORKSTATION = "workstation";
@@ -97,8 +106,12 @@ export class PersistentTaskRuntime {
   }
   private now() { return this.deps.now?.() ?? Date.now(); }
   private emit(type: string, detail: string, taskId: string | null) { if (!this.dead) this.deps.emit?.(type, detail, taskId); }
-  private facts() { return new Map([...this.executors].map(([k, e]) => [k, { kind: e.kind, category: e.category, gpu: e.gpu, sideEffect: e.sideEffect }])); }
+  private facts() { return new Map<string, ExecutorFacts>([...this.executors].map(([k, e]) => [k, { kind: e.kind, category: e.category, gpu: e.gpu, sideEffect: e.sideEffect, consequential: e.consequential, activity: e.activity, preflight: e.preflight }])); }
   gateStats() { return this.gate.stats(); }
+  /** The Host-wide gated local model call (the Planner uses it outside any task). */
+  modelCall(): ModelCall { return this.gate.call; }
+  /** Registered executor facts, as validation sees them. */
+  executorFacts() { return this.facts(); }
   activeCount() { return this.active.size; }
 
   /** Every write funnels through here: a crashed runtime never writes again (it is, for the store, a dead process). */
@@ -109,6 +122,7 @@ export class PersistentTaskRuntime {
     const result = this.store.update(id, { ...change, notify });
     for (const n of result.notified) if (n.delivered) this.emit("ptask.notification", `${n.kind}: ${n.text}`, id);
     this.emit("ptask.changed", `${result.record.spec.title}: ${result.record.state}`, id);
+    if (TERMINAL_TASK_STATES.includes(result.record.state)) try { this.deps.onTerminal?.(id); } catch { /* cleanup never blocks a commit */ }
     return result;
   }
   private note(kind: NotificationKind, record: TaskRecord, text: string, discriminator = ""): NonNullable<Update["notify"]>[number] {
@@ -137,6 +151,7 @@ export class PersistentTaskRuntime {
       state: "CREATED", createdAt: now, updatedAt: now, approval: null, approvalRequired: approvalRequired(spec, envelope, facts), revokedAt: null,
       steps: spec.steps.map(s => ({ id: s.id, state: "pending", attempts: 0, outputSha256: null, error: null })),
       usage: { modelCalls: 0, workMs: 0 }, controls: { pauseRequested: false, cancelRequested: false }, blocked: null, failure: null, uncertainOperation: null, suspendedMs: 0,
+      activities: spec.steps.map(s => facts.get(s.kind)?.activity ?? null), pendingAction: null, actionApprovals: [],
     };
     this.store.insert(record, WORKSTATION, now);
     if (problems.length) {
@@ -156,9 +171,45 @@ export class PersistentTaskRuntime {
     if (!isTrustedLocalActor(actor)) throw new Error("Task approval requires the workstation owner on the Windows Host.");
     const now = this.now(), ttl = Math.min(Math.max(options.ttlMs ?? 24 * 3_600_000, 60_000), 7 * 24 * 3_600_000);
     const result = this.write(id, { actor: WORKSTATION, reason: "approved by owner", now, from: ["AWAITING_APPROVAL"], to: "QUEUED", expectVersion: options.expectVersion,
-      mutate: r => { r.approval = { by: "workstation", at: now, expiresAt: Math.min(now + ttl, r.envelope.expiresAt), specSha256: r.specSha256, envelopeSha256: r.envelopeSha256, round: (r.approval?.round ?? 0) + 1 }; } });
+      mutate: r => { if (r.pendingAction) throw new TaskConflictError("This task is waiting for permission for one specific action. Approve or deny that action."); r.approval = { by: "workstation", at: now, expiresAt: Math.min(now + ttl, r.envelope.expiresAt), specSha256: r.specSha256, envelopeSha256: r.envelopeSha256, round: (r.approval?.round ?? 0) + 1 }; } });
     this.wake();
     return taskView(result.record, result.version);
+  }
+  /**
+   * MA4-S2-T2, workstation-only: approves exactly one proposed action. The owner names the payload hash they reviewed; a
+   * different hash (the action changed, or the request is forged) is refused. The approval is spent when the step succeeds.
+   */
+  approveAction(id: string, actionId: string, payloadSha256: string, actor: unknown, options: { ttlMs?: number } = {}): TaskView {
+    if (!isTrustedLocalActor(actor)) throw new Error("Approving a connected action requires the workstation owner on the Windows Host.");
+    const now = this.now(), ttl = Math.min(Math.max(options.ttlMs ?? 15 * 60_000, 60_000), 3_600_000);
+    const result = this.write(id, { actor: WORKSTATION, reason: "action approved by owner", now, from: ["AWAITING_APPROVAL"], to: "QUEUED",
+      mutate: r => {
+        const p = r.pendingAction;
+        if (!p || p.actionId !== actionId) throw new TaskConflictError("That action is not waiting for permission.");
+        if (p.payloadSha256 !== payloadSha256) throw new TaskConflictError("The action changed since you reviewed it; nothing was approved. Inspect it again.");
+        if (p.expiresAt <= now) throw new TaskConflictError("This proposal expired; it will be prepared again with current data.");
+        r.actionApprovals = [...(r.actionApprovals ?? []).filter(a => a.stepId !== p.stepId), { stepId: p.stepId, actionId, payloadSha256, at: now, expiresAt: Math.min(now + ttl, r.envelope.expiresAt) }];
+        r.pendingAction = null;
+      } });
+    this.wake();
+    return taskView(result.record, result.version);
+  }
+  /** Denying one action ends the task at that step; nothing of it is sent. */
+  denyAction(id: string, actionId: string, actor: unknown): TaskView {
+    if (!isTrustedLocalActor(actor)) throw new Error("Denying a connected action happens on the Windows workstation.");
+    const now = this.now();
+    const result = this.write(id, { actor: WORKSTATION, reason: "action denied by owner", now, from: ["AWAITING_APPROVAL"], to: "FAILED", leaseOp: { kind: "fence" },
+      mutate: r => {
+        if (r.pendingAction?.actionId !== actionId) throw new TaskConflictError("That action is not waiting for permission.");
+        r.failure = { code: "ACTION_DENIED", detail: `You denied: ${r.pendingAction.summary}`.slice(0, 300) };
+        r.pendingAction = null;
+      } });
+    return taskView(result.record, result.version);
+  }
+  /** Workstation-only full detail of the action waiting for permission (preview included). */
+  pendingAction(id: string, actor: unknown): ActionProposal | null {
+    if (!isTrustedLocalActor(actor)) throw new Error("Action details are shown on the Windows workstation.");
+    return this.store.get(id).record.pendingAction ?? null;
   }
   /** Ends the task's authority at once. A running worker observes it at its next boundary or lease check. */
   revoke(id: string, actor: unknown): TaskView {
@@ -215,7 +266,7 @@ export class PersistentTaskRuntime {
       ? this.write(id, { actor: WORKSTATION, reason: "owner abandoned uncertain action", now, to: "FAILED", operation: { key, stepId, category, state: "uncertain" }, mutate: r => { r.uncertainOperation = null; r.failure = { code: "OWNER_ABANDONED", detail: "You abandoned the task at an uncertain action." }; } })
       : this.write(id, { actor: WORKSTATION, reason: `owner reconciled: ${decision}`, now, to: "QUEUED",
           operation: { key, stepId, category, state: decision === "happened" ? "succeeded" : "failed", receipt: decision === "happened" ? "owner-attested" : null },
-          mutate: r => { r.uncertainOperation = null; if (index >= 0) Object.assign(r.steps[index], decision === "happened" ? { state: "succeeded", error: null, outputSha256: sha256("owner-attested") } : { state: "pending", error: "Owner confirmed it did not happen." }); } });
+          mutate: r => { r.uncertainOperation = null; r.actionApprovals = (r.actionApprovals ?? []).filter(a => a.stepId !== stepId); if (index >= 0) Object.assign(r.steps[index], decision === "happened" ? { state: "succeeded", error: null, outputSha256: sha256("owner-attested") } : { state: "pending", error: "Owner confirmed it did not happen." }); } });
     this.wake();
     return taskView(result.record, result.version);
   }
@@ -371,6 +422,8 @@ export class PersistentTaskRuntime {
       const r = row.record;
       // Deadlines and dependency failures settle waiting tasks too, so nothing sits forever on a dead plan.
       if (r.spec.deadlineAt !== null && r.spec.deadlineAt <= now) { this.settle(row.record.id, row.version, "FAILED", "deadline missed", { code: "DEADLINE_MISSED", detail: "The deadline passed before the task finished." }, [this.note("deadline_missed", r, "missed its deadline")]); continue; }
+      // An unanswered proposal goes stale: the step prepares it again from current data (versions, content, recipients).
+      if (r.state === "AWAITING_APPROVAL" && r.pendingAction && r.pendingAction.expiresAt <= now) { this.settle(r.id, row.version, "QUEUED", "action proposal expired; preparing it again", undefined, undefined, x => { x.pendingAction = null; }); continue; }
       const deps = r.spec.dependsOn.map(d => states.get(d));
       if (deps.some(s => s === "FAILED" || s === "CANCELLED" || s === undefined)) { this.settle(r.id, row.version, "FAILED", "dependency failed", { code: "DEPENDENCY_FAILED", detail: "A task this one depends on did not complete." }, [this.note("failed", r, "cannot run: a dependency did not complete")]); continue; }
       if ((r.state === "QUEUED" || r.state === "RESUMING") && deps.every(s => s === "COMPLETED") && !this.active.has(r.id) && this.mayRun(r, policy)) ready.push(row);
@@ -392,8 +445,8 @@ export class PersistentTaskRuntime {
       active.done = this.work(r.id, active).finally(() => { this.active.delete(r.id); this.wake(); });
     }
   }
-  private settle(id: string, version: number, to: TaskState, reason: string, failure?: { code: TaskFailureCode; detail: string }, notify?: NonNullable<Update["notify"]>) {
-    try { this.write(id, { actor: "scheduler", reason, now: this.now(), to, expectVersion: version, leaseOp: { kind: "fence" }, ...(failure ? { mutate: r => { r.failure = failure; } } : {}), notify }); }
+  private settle(id: string, version: number, to: TaskState, reason: string, failure?: { code: TaskFailureCode; detail: string }, notify?: NonNullable<Update["notify"]>, mutate?: (r: TaskRecord) => void) {
+    try { this.write(id, { actor: "scheduler", reason, now: this.now(), to, expectVersion: version, leaseOp: { kind: "fence" }, mutate: r => { if (failure) r.failure = failure; mutate?.(r); }, notify }); }
     catch (error) { if (!(error instanceof TaskConflictError)) throw error; }
   }
 
@@ -440,7 +493,8 @@ export class PersistentTaskRuntime {
     const key = `${id}:${spec.id}`, op = this.store.operation(key), now = this.now();
     const succeed = (output: string, receipt: string | null, reason: string) => commit({ reason, operation: { key, stepId: spec.id, category: executor.category, state: "succeeded", receipt },
       output: { stepId: spec.id, content: output }, checkpoint: { phase: "step_succeeded", step: spec.id },
-      mutate: r => { Object.assign(r.steps[index], { state: "succeeded", outputSha256: sha256(output.slice(0, 64_000)), error: null }); } });
+      // A step's approval is spent by its success; it never carries over to another run.
+      mutate: r => { Object.assign(r.steps[index], { state: "succeeded", outputSha256: sha256(output.slice(0, 64_000)), error: null }); r.actionApprovals = (r.actionApprovals ?? []).filter(x => x.stepId !== spec.id); } });
     if (op?.state === "succeeded") { succeed(this.store.output(id, spec.id)?.content ?? "", op.receipt, "consumed a recorded result; not re-executed"); return; }
     if (op?.state === "started" || op?.state === "uncertain") {
       // Cannot happen while this worker holds the lease unless state was lost; never guess — the owner decides.
@@ -448,7 +502,7 @@ export class PersistentTaskRuntime {
       return;
     }
     if (op?.state === "needs_verify" && executor.verify) {
-      const found = await executor.verify(key, a.abort.signal);
+      const found = await executor.verify(key, a.abort.signal, spec.input, record.envelope, { taskId: id, stepId: spec.id, outputOf: stepId => this.store.output(id, stepId)?.content ?? null, now: () => this.now() });
       if (found.found) { succeed(found.output ?? "", found.receipt ?? "verified-by-key", "idempotent operation verified as already applied"); return; }
     }
     if (state.attempts >= spec.maxAttempts) { stop("FAILED", "attempts exhausted", { mutate: r => { r.failure = { code: "STEP_FAILED", detail: `Step ${spec.id} failed ${state.attempts} time(s): ${state.error ?? "no detail"}`.slice(0, 300) }; }, notify: [this.note("failed", record, `failed at step ${spec.id}`)] }); return; }
@@ -469,12 +523,20 @@ export class PersistentTaskRuntime {
     const started = this.now(), signal = AbortSignal.any([a.abort.signal, AbortSignal.timeout(executor.timeoutMs)]);
     let result: StepResult;
     try {
-      result = await executor.run(spec.input, { taskId: id, stepId: spec.id, attempt: state.attempts + 1, idempotencyKey: key, model: spec.model, signal, call: this.gate.call, track: child => this.track(id, a, child) });
+      result = await executor.run(spec.input, { taskId: id, stepId: spec.id, attempt: state.attempts + 1, idempotencyKey: key, model: spec.model, signal, call: this.gate.call, track: child => this.track(id, a, child),
+        envelope: record.envelope, approval: record.actionApprovals?.find(x => x.stepId === spec.id) ?? null, outputOf: stepId => this.store.output(id, stepId)?.content ?? null, now: () => this.now() });
     } catch (error) { result = { ok: false, error: shortError(error), dispatched: true, definite: false }; }
     fault("after-effect");
     if (this.dead) return;
     const workMs = Math.max(0, this.now() - started);
     if (result.ok) { commit({ reason: "work time", mutate: r => { r.usage.workMs += workMs; } }); succeed(result.output, result.receipt ?? null, `step ${spec.id} succeeded`); fault("after-receipt"); return; }
+    if ("proposal" in result) {
+      const proposal = result.proposal;
+      stop("AWAITING_APPROVAL", `action needs your permission: ${proposal.summary}`, { operation: { key, stepId: spec.id, category: executor.category, state: "failed" },
+        mutate: r => { r.usage.workMs += workMs; r.steps[index] = { ...r.steps[index], state: "pending", attempts: r.steps[index].attempts - 1, error: null }; r.pendingAction = proposal; },
+        notify: [this.note("approval_required", record, `waiting for permission: ${proposal.summary}`, proposal.actionId)] });
+      return;
+    }
     const failed = result;
     if (failed.fatal) { stop("FAILED", failed.fatal.toLowerCase(), { operation: { key, stepId: spec.id, category: executor.category, state: "failed" }, mutate: r => { r.usage.workMs += workMs; r.steps[index] = { ...r.steps[index], state: "failed", error: failed.error }; r.failure = { code: failed.fatal!, detail: failed.error }; }, notify: [this.note("failed", record, `failed at step ${spec.id}`)] }); return; }
     const known = !failed.dispatched || failed.definite;

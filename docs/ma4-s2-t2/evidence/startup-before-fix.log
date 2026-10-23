@@ -1,0 +1,69 @@
+Bunny-A Host ready on loopback (286737a7-2d7e-4f7c-ae75-6a84d0b072f8).
+✖ T2-H1 a second Host on the same data directory and port is refused before it opens or changes any state (905.6388ms)
+✖ T2-H2 a Host refused at listen() on its own data directory creates no state there and leaks no handle (702.2803ms)
+✖ T2-H3 a start that fails after the port is taken closes its database, frees the port, and a retry then succeeds (253.9376ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2318.0984
+
+✖ failing tests:
+
+test at src\lib\bunny-host\ma4-s2t2-startup.test.ts:28:1
+✖ T2-H1 a second Host on the same data directory and port is refused before it opens or changes any state (905.6388ms)
+  AssertionError [ERR_ASSERTION]: the refused Host changed no task, event or persistent-task row
+  + actual - expected
+  
+  + `{"tasks":[{"id":"live-ma3","record":"{\\"id\\":\\"live-ma3\\",\\"state\\":\\"failed\\",\\"provider\\":\\"ollama\\",\\"prompt\\":\\"p\\",\\"createdAt\\":1792788187457,\\"startedAt\\":1792788187457,\\"executionScope\\":{\\"access\\":\\"read\\"},\\"logs\\":[{\\"at\\":1792788187531,\\"line\\":\\"Host restarted; session recovery unsupported.\\"}],\\"mode\\":\\"fast\\",\\"model\\":null,\\"decision\\":{\\"task_type\\":\\"chat\\",\\"complexity\\":\\"low\\",\\"scores\\":[]},\\"error\\":\\"Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.\\",\\"finishedAt\\":1792788187530}"}],"events":6,"ptasks":[{"id":"ptask-436ec80e-e9e3-435b-bf07-dcd39ea24d91","project_id":"p1","state":"RUNNING","version":5,"fence":1,"lease_holder":"286737a7-2d7e-4f7c-ae75-6a84d0b072f8","lease_expires":1792788217440,"created_at":1792788187414,"updated_at":1792788187448,"record":"{\\"schema\\":\\"ma4.task.v1\\",\\"id\\":\\"ptask-436ec80e-e9e3-435b-bf07-dcd39ea24d91\\",\\"owner\\":\\"workstation\\",\\"projectId\\":\\"p1\\",\\"spec\\":{\\"title\\":\\"Held\\",\\"projectId\\":\\"p1\\",\\"steps\\":[{\\"id\\":\\"w\\",\\"kind\\":\\"local.read\\",\\"input\\":{\\"wait\\":true},\\"model\\":null,\\"maxAttempts\\":2},{\\"id\\":\\"z\\",\\"kind\\":\\"local.read\\",\\"input\\":{},\\"model\\":null,\\"maxAttempts\\":2}],\\"dependsOn\\":[],\\"acceptance\\":{\\"requiredSteps\\":[\\"w\\",\\"z\\"],\\"description\\":\\"\\"},\\"deadlineAt\\":null},\\"specSha256\\":\\"944d11b51434219e30326e6ff95a78cd7dd212d923ebaa66c07e4d81f8420752\\",\\"envelope\\":{\\"capabilities\\":[\\"local.read\\"],\\"providers\\":[\\"ollama\\"],\\"localOnly\\":true,\\"models\\":[],\\"projectScopes\\":[\\"p1\\"],\\"sideEffects\\":false,\\"background\\":false,\\"budgets\\":{\\"maxModelCalls\\":0,\\"maxWallMs\\":3600000},\\"expiresAt\\":1792874586716},\\"envelopeSha256\\":\\"04e117b940b5fa6956821f33b8a1a06042ef0aedfc8133c73122793b1b016559\\",\\"state\\":\\"RUNNING\\",\\"createdAt\\":1792788187414,\\"updatedAt\\":1792788187448,\\"approval\\":null,\\"approvalRequired\\":false,\\"revokedAt\\":null,\\"steps\\":[{\\"id\\":\\"w\\",\\"state\\":\\"running\\",\\"attempts\\":1,\\"outputSha256\\":null,\\"error\\":null},{\\"id\\":\\"z\\",\\"state\\":\\"pending\\",\\"attempts\\":0,\\"outputSha256\\":null,\\"error\\":null}],\\"usage\\":{\\"modelCalls\\":0,\\"workMs\\":0},\\"controls\\":{\\"pauseRequested\\":false,\\"cancelRequested\\":false},\\"blocked\\":null,\\"failure\\":null,\\"uncertainOperation\\":null,\\"suspendedMs\\":0}","record_sha256":"79965a2714b509bd543a3e238059a94f869f2097ea180c89f1660c55117f2c19"}]}`
+  - '{"tasks":[{"id":"live-ma3","record":"{\\"id\\":\\"live-ma3\\",\\"state\\":\\"running\\",\\"provider\\":\\"ollama\\",\\"prompt\\":\\"p\\",\\"createdAt\\":1792788187457,\\"startedAt\\":1792788187457,\\"executionScope\\":{\\"access\\":\\"read\\"},\\"logs\\":[],\\"mode\\":\\"fast\\",\\"model\\":null,\\"decision\\":{\\"task_type\\":\\"chat\\",\\"complexity\\":\\"low\\",\\"scores\\":[]}}"}],"events":5,"ptasks":[{"id":"ptask-436ec80e-e9e3-435b-bf07-dcd39ea24d91","project_id":"p1","state":"RUNNING","version":5,"fence":1,"lease_holder":"286737a7-2d7e-4f7c-ae75-6a84d0b072f8","lease_expires":1792788217440,"created_at":1792788187414,"updated_at":1792788187448,"record":"{\\"schema\\":\\"ma4.task.v1\\",\\"id\\":\\"ptask-436ec80e-e9e3-435b-bf07-dcd39ea24d91\\",\\"owner\\":\\"workstation\\",\\"projectId\\":\\"p1\\",\\"spec\\":{\\"title\\":\\"Held\\",\\"projectId\\":\\"p1\\",\\"steps\\":[{\\"id\\":\\"w\\",\\"kind\\":\\"local.read\\",\\"input\\":{\\"wait\\":true},\\"model\\":null,\\"maxAttempts\\":2},{\\"id\\":\\"z\\",\\"kind\\":\\"local.read\\",\\"input\\":{},\\"model\\":null,\\"maxAttempts\\":2}],\\"dependsOn\\":[],\\"acceptance\\":{\\"requiredSteps\\":[\\"w\\",\\"z\\"],\\"description\\":\\"\\"},\\"deadlineAt\\":null},\\"specSha256\\":\\"944d11b51434219e30326e6ff95a78cd7dd212d923ebaa66c07e4d81f8420752\\",\\"envelope\\":{\\"capabilities\\":[\\"local.read\\"],\\"providers\\":[\\"ollama\\"],\\"localOnly\\":true,\\"models\\":[],\\"projectScopes\\":[\\"p1\\"],\\"sideEffects\\":false,\\"background\\":false,\\"budgets\\":{\\"maxModelCalls\\":0,\\"maxWallMs\\":3600000},\\"expiresAt\\":1792874586716},\\"envelopeSha256\\":\\"04e117b940b5fa6956821f33b8a1a06042ef0aedfc8133c73122793b1b016559\\",\\"state\\":\\"RUNNING\\",\\"createdAt\\":1792788187414,\\"updatedAt\\":1792788187448,\\"approval\\":null,\\"approvalRequired\\":false,\\"revokedAt\\":null,\\"steps\\":[{\\"id\\":\\"w\\",\\"state\\":\\"running\\",\\"attempts\\":1,\\"outputSha256\\":null,\\"error\\":null},{\\"id\\":\\"z\\",\\"state\\":\\"pending\\",\\"attempts\\":0,\\"outputSha256\\":null,\\"error\\":null}],\\"usage\\":{\\"modelCalls\\":0,\\"workMs\\":0},\\"controls\\":{\\"pauseRequested\\":false,\\"cancelRequested\\":false},\\"blocked\\":null,\\"failure\\":null,\\"uncertainOperation\\":null,\\"suspendedMs\\":0}","record_sha256":"79965a2714b509bd543a3e238059a94f869f2097ea180c89f1660c55117f2c19"}]}'
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s2t2/src/lib/bunny-host/ma4-s2t2-startup.test.ts:50:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: `{"tasks":[{"id":"live-ma3","record":"{\\"id\\":\\"live-ma3\\",\\"state\\":\\"failed\\",\\"provider\\":\\"ollama\\",\\"prompt\\":\\"p\\",\\"createdAt\\":1792788187457,\\"startedAt\\":1792788187457,\\"executionScope\\":{\\"access\\":\\"read\\"},\\"logs\\":[{\\"at\\":1792788187531,\\"line\\":\\"Host restarted; session recovery unsupported.\\"}],\\"mode\\":\\"fast\\",\\"model\\":null,\\"decision\\":{\\"task_type\\":\\"chat\\",\\"complexity\\":\\"low\\",\\"scores\\":[]},\\"error\\":\\"Host process restarted; this adapter cannot reattach its old pipes. Previous PID retained for diagnosis. Its provider processes ran in a Bunny-owned Windows job that the kernel ends when the previous Host's handles close; this Host verifies the recorded process identities (provider_session events) and killed no process.\\",\\"finishedAt\\":1792788187530}"}],"events":6,"ptasks":[{"id":"ptask-436ec80e-e9e3-435b-bf07-dcd39ea24d91","project_id":"p1","state":"RUNNING","version":5,"fence":1,"lease_holder":"286737a7-2d7e-4f7c-ae75-6a84d0b072f8","lease_expires":1792788217440,"created_at":1792788187414,"updated_at":1792788187448,"record":"{\\"schema\\":\\"ma4.task.v1\\",\\"id\\":\\"ptask-436ec80e-e9e3-435b-bf07-dcd39ea24d91\\",\\"owner\\":\\"workstation\\",\\"projectId\\":\\"p1\\",\\"spec\\":{\\"title\\":\\"Held\\",\\"projectId\\":\\"p1\\",\\"steps\\":[{\\"id\\":\\"w\\",\\"kind\\":\\"local.read\\",\\"input\\":{\\"wait\\":true},\\"model\\":null,\\"maxAttempts\\":2},{\\"id\\":\\"z\\",\\"kind\\":\\"local.read\\",\\"input\\":{},\\"model\\":null,\\"maxAttempts\\":2}],\\"dependsOn\\":[],\\"acceptance\\":{\\"requiredSteps\\":[\\"w\\",\\"z\\"],\\"description\\":\\"\\"},\\"deadlineAt\\":null},\\"specSha256\\":\\"944d11b51434219e30326e6ff95a78cd7dd212d923ebaa66c07e4d81f8420752\\",\\"envelope\\":{\\"capabilities\\":[\\"local.read\\"],\\"providers\\":[\\"ollama\\"],\\"localOnly\\":true,\\"models\\":[],\\"projectScopes\\":[\\"p1\\"],\\"sideEffects\\":false,\\"background\\":false,\\"budgets\\":{\\"maxModelCalls\\":0,\\"maxWallMs\\":3600000},\\"expiresAt\\":1792874586716},\\"envelopeSha256\\":\\"04e117b940b5fa6956821f33b8a1a06042ef0aedfc8133c73122793b1b016559\\",\\"state\\":\\"RUNNING\\",\\"createdAt\\":1792788187414,\\"updatedAt\\":1792788187448,\\"approval\\":null,\\"approvalRequired\\":false,\\"revokedAt\\":null,\\"steps\\":[{\\"id\\":\\"w\\",\\"state\\":\\"running\\",\\"attempts\\":1,\\"outputSha256\\":null,\\"error\\":null},{\\"id\\":\\"z\\",\\"state\\":\\"pending\\",\\"attempts\\":0,\\"outputSha256\\":null,\\"error\\":null}],\\"usage\\":{\\"modelCalls\\":0,\\"workMs\\":0},\\"controls\\":{\\"pauseRequested\\":false,\\"cancelRequested\\":false},\\"blocked\\":null,\\"failure\\":null,\\"uncertainOperation\\":null,\\"suspendedMs\\":0}","record_sha256":"79965a2714b509bd543a3e238059a94f869f2097ea180c89f1660c55117f2c19"}]}`,
+    expected: '{"tasks":[{"id":"live-ma3","record":"{\\"id\\":\\"live-ma3\\",\\"state\\":\\"running\\",\\"provider\\":\\"ollama\\",\\"prompt\\":\\"p\\",\\"createdAt\\":1792788187457,\\"startedAt\\":1792788187457,\\"executionScope\\":{\\"access\\":\\"read\\"},\\"logs\\":[],\\"mode\\":\\"fast\\",\\"model\\":null,\\"decision\\":{\\"task_type\\":\\"chat\\",\\"complexity\\":\\"low\\",\\"scores\\":[]}}"}],"events":5,"ptasks":[{"id":"ptask-436ec80e-e9e3-435b-bf07-dcd39ea24d91","project_id":"p1","state":"RUNNING","version":5,"fence":1,"lease_holder":"286737a7-2d7e-4f7c-ae75-6a84d0b072f8","lease_expires":1792788217440,"created_at":1792788187414,"updated_at":1792788187448,"record":"{\\"schema\\":\\"ma4.task.v1\\",\\"id\\":\\"ptask-436ec80e-e9e3-435b-bf07-dcd39ea24d91\\",\\"owner\\":\\"workstation\\",\\"projectId\\":\\"p1\\",\\"spec\\":{\\"title\\":\\"Held\\",\\"projectId\\":\\"p1\\",\\"steps\\":[{\\"id\\":\\"w\\",\\"kind\\":\\"local.read\\",\\"input\\":{\\"wait\\":true},\\"model\\":null,\\"maxAttempts\\":2},{\\"id\\":\\"z\\",\\"kind\\":\\"local.read\\",\\"input\\":{},\\"model\\":null,\\"maxAttempts\\":2}],\\"dependsOn\\":[],\\"acceptance\\":{\\"requiredSteps\\":[\\"w\\",\\"z\\"],\\"description\\":\\"\\"},\\"deadlineAt\\":null},\\"specSha256\\":\\"944d11b51434219e30326e6ff95a78cd7dd212d923ebaa66c07e4d81f8420752\\",\\"envelope\\":{\\"capabilities\\":[\\"local.read\\"],\\"providers\\":[\\"ollama\\"],\\"localOnly\\":true,\\"models\\":[],\\"projectScopes\\":[\\"p1\\"],\\"sideEffects\\":false,\\"background\\":false,\\"budgets\\":{\\"maxModelCalls\\":0,\\"maxWallMs\\":3600000},\\"expiresAt\\":1792874586716},\\"envelopeSha256\\":\\"04e117b940b5fa6956821f33b8a1a06042ef0aedfc8133c73122793b1b016559\\",\\"state\\":\\"RUNNING\\",\\"createdAt\\":1792788187414,\\"updatedAt\\":1792788187448,\\"approval\\":null,\\"approvalRequired\\":false,\\"revokedAt\\":null,\\"steps\\":[{\\"id\\":\\"w\\",\\"state\\":\\"running\\",\\"attempts\\":1,\\"outputSha256\\":null,\\"error\\":null},{\\"id\\":\\"z\\",\\"state\\":\\"pending\\",\\"attempts\\":0,\\"outputSha256\\":null,\\"error\\":null}],\\"usage\\":{\\"modelCalls\\":0,\\"workMs\\":0},\\"controls\\":{\\"pauseRequested\\":false,\\"cancelRequested\\":false},\\"blocked\\":null,\\"failure\\":null,\\"uncertainOperation\\":null,\\"suspendedMs\\":0}","record_sha256":"79965a2714b509bd543a3e238059a94f869f2097ea180c89f1660c55117f2c19"}]}',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\lib\bunny-host\ma4-s2t2-startup.test.ts:63:1
+✖ T2-H2 a Host refused at listen() on its own data directory creates no state there and leaks no handle (702.2803ms)
+  AssertionError [ERR_ASSERTION]: no database was opened
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s2t2/src/lib/bunny-host/ma4-s2t2-startup.test.ts:70:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\lib\bunny-host\ma4-s2t2-startup.test.ts:79:1
+✖ T2-H3 a start that fails after the port is taken closes its database, frees the port, and a retry then succeeds (253.9376ms)
+  AssertionError [ERR_ASSERTION]: the database file is closed
+  
+  'EPERM' !== 'removed'
+  
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s2t2/src/lib/bunny-host/ma4-s2t2-startup.test.ts:87:10)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'EPERM',
+    expected: 'removed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

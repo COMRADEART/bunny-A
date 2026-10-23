@@ -123,6 +123,8 @@ function Get-BunnyTaskStrip($Snapshot, [bool]$Online = $true) {
   }
   $lines = foreach ($task in $open) {
     $line = [string]$task.title + ' - ' + [string]$task.display
+    # MA4-S2-T2: a connected step's Host-reported activity ("Reading files", "Browsing", "Waiting for permission").
+    if ($task.activity -and [string]$task.activity -ne [string]$task.display -and [string]$task.activity -notin @('Completed', 'Failed')) { $line += ' - ' + [string]$task.activity }
     if ($task.progress -and [int]$task.progress.total -gt 0) { $line += ' - step ' + [string]([int]$task.progress.done + [int]($task.display -eq 'Working')) + ' of ' + [string]$task.progress.total }
     $line
   }

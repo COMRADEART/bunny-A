@@ -426,7 +426,9 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
           readOnly: snapshot.persistentTasks.readOnly ? "Task storage needs review on the Windows Host." : null,
           tasks: snapshot.persistentTasks.tasks.map((task) => task.corrupt
             ? { ...task, detail: "Review this task on the Windows Host." }
-            : { ...task, failure: task.failure ? { code: task.failure.code, detail: "Details are retained on the Windows Host." } : null }),
+            : { ...task, failure: task.failure ? { code: task.failure.code, detail: "Details are retained on the Windows Host." } : null,
+                // MA4-S2-T2: the phone learns that an action waits and what kind it is; names, paths and subjects stay on the PC.
+                pendingAction: task.pendingAction ? { ...task.pendingAction, target: task.pendingAction.connector, summary: `A ${task.pendingAction.connector} action is waiting for your permission on the PC.` } : null }),
         }
       : snapshot.persistentTasks,
     // M-A-3 T13.1: credential state, provider limits and usage are workstation-owner settings.
