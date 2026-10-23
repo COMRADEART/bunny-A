@@ -21,6 +21,8 @@ const cases = {
   // A recovered task arrives twice in a merged view: it is still one entry, never two badges.
   recoveredOnce: { snapshot: { tasks: [task('r', 'Recovering'), task('r', 'Recovering')] }, online: true },
   offline: { snapshot: { tasks: [task('a', 'Working')] }, online: false },
+  // MA4-S2-T2: connected steps report what they are doing; the tooltip says so, the cell and headline rules are unchanged.
+  connected: { snapshot: { tasks: [task('f', 'Working', { activity: 'Reading files' }), task('e', 'Waiting for approval', { activity: 'Waiting for permission' }), task('g', 'Working', { activity: null })] }, online: true },
 };
 
 function run() {
@@ -54,6 +56,10 @@ test('S2-T1 notch: one cell for open tasks, urgent state first, one entry per ta
   assert.equal(f.recoveredOnce.Count, 1); assert.deepEqual(f.recoveredOnce.Ids, ['r']); assert.equal(f.recoveredOnce.Headline, 'Recovering');
   assert.equal(f.offline.Headline, 'Tasks: last known', 'a cached Working is not shown as current');
   assert.match(f.offline.ToolTip, /^Host unavailable\. Last known task states:/); assert.equal(f.offline.Tone, 'BunnyMuted');
+  assert.match(f.connected.ToolTip, /Task f - Working - Reading files - step 2 of 3/);
+  assert.match(f.connected.ToolTip, /Task e - Waiting for approval - Waiting for permission/);
+  assert.match(f.connected.ToolTip, /Task g - Working - step 2 of 3/, 'an S2-T1 task keeps its line');
+  assert.equal(f.connected.Headline, 'Waiting for approval');
   // The task cell lives in the agent strip, so the existing rule places it: left of a horizontal notch, above a side notch.
   assert.equal(f.horizontal.Side, 'left'); assert.equal(f.horizontal.Axis, 'row');
   assert.equal(f.vertical.Side, 'top'); assert.equal(f.vertical.Axis, 'column');

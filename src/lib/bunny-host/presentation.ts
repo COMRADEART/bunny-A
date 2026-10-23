@@ -638,6 +638,11 @@ export function publicTeamView(view: NonNullable<MissionView["teamView"]>): NonN
   };
 }
 
+/**
+ * MA4-S2-T2: Approval Center reads whose answer the dashboard shows (the waiting action's preview, receipts, registered
+ * folders, a Planner proposal, a step's output). The Host answers them for the workstation owner only.
+ */
+const DASHBOARD_DATA_ACTIONS = ["action.inspect", "action.receipts", "connector.roots.list", "ptask.plan", "ptask.output"];
 /** Only the fields used by the dashboard cross its command boundary. Private session/capability data stays local. */
 export function dashboardCommand<
   T extends { snapshot?: HostSnapshot; task?: OrchTask; mission?: MissionView; pairCode?: string ;
@@ -650,7 +655,7 @@ export function dashboardCommand<
   const voiceData = VOICE_ACTIONS.has(projectAction ?? "") && result.data !== undefined;
   return {
     ...(snapshot ? { snapshot } : {}),
-    ...(voiceData || (result.data !== undefined && ["project.list", "project.get", "project.add", "project.create", "project.update", "project.relink", "project.remove", "project.artifact", "project.repository", "project.agent.create", "operation.status"].includes(projectAction ?? "")) ? { data: result.data as import("../bunny-missions/types.ts").JsonValue } : {}),
+    ...(voiceData || (result.data !== undefined && ["project.list", "project.get", "project.add", "project.create", "project.update", "project.relink", "project.remove", "project.artifact", "project.repository", "project.agent.create", "operation.status", ...DASHBOARD_DATA_ACTIONS].includes(projectAction ?? "")) ? { data: result.data as import("../bunny-missions/types.ts").JsonValue } : {}),
     ...(result.operation ? { operation: result.operation } : {}),
     pairCode: result.pairCode,
     task: result.task && snapshot ? snapshot.tasks.find((task) => task.id === result.task!.id) : undefined,
