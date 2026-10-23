@@ -158,7 +158,8 @@ export const WEIGHTS = Object.freeze({ operation: 2, format: 2, output: 1, domai
 // Set on the dev split (RELEVANCE_GATE_EVIDENCE.md): the lowest eligible applicable dev score was 3.14; every eligible dev
 // candidate was applicable, so the threshold only removes weak or failing skills (failures cost 1 each).
 export const RELEVANCE_THRESHOLD = 3;
-export const SKILL_EXCERPT_CHARS = 400;
+// 400 → 320 after the dev run measured 4.92 % injected-token share against the 5 % gate (pre-registered ceiling 400).
+export const SKILL_EXCERPT_CHARS = 320;
 
 /** Explainable score of an ELIGIBLE skill: what matched, what it is worth, what it costs. */
 export function relevanceScore(skill: AttestedSkill, sig: TaskSignature, excerptChars: number): { score: number; parts: Record<string, number> } {

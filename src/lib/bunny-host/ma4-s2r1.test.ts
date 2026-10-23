@@ -153,7 +153,7 @@ test("S2R1 experience gating: S2-era records without a signature are ineligible;
 });
 
 // ── C: context efficiency and B1 conservative defaults ──────────────────────────────────────────────────────────────
-test("S2R1 context: one skill at most, whole steps within 400 characters, near-duplicates collapse, the block is bounded", () => {
+test("S2R1 context: one skill at most, whole steps within the excerpt budget, near-duplicates collapse, the block is bounded", () => {
   const reg = new SkillRegistry(new HostDatabase(":memory:"));
   const a = qualified(reg, medianSkill, MEDIAN_SRC), b = qualified(reg, { ...medianSkill, name: "middle-value-copy", procedure: [...medianSkill.procedure, "Return a float."] }, MEDIAN_SRC);
   const pick = selectRelevant([b, a], sig("Define mad(values) returning, as a float, the median absolute deviation of a non-empty list of numbers.", "intermediate"), ctx);
