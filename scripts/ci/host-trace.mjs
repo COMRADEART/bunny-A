@@ -53,6 +53,11 @@ if (dir) {
     socket.once("close", (hadError) => log("socket-close", { local, hadError }));
   });
   diagnostics.subscribe("undici:client:sendHeaders", ({ request, socket }) => log("send", { local: socket?.localPort, method: request.method, path: String(request.path).split("?")[0] }));
-  diagnostics.subscribe("undici:request:error", ({ request, error }) => log("error", { path: String(request.path).split("?")[0], code: error?.code, message: error?.message }));
+  // Where each request was created (repository frames only), so a failed request names the code that sent it.
+  const born = new WeakMap();
+  const repo = /[\\/](src|scripts)[\\/]/;
+  const deep = () => { const limit = Error.stackTraceLimit; Error.stackTraceLimit = 80; const stack = new Error().stack; Error.stackTraceLimit = limit; return stack; };
+  diagnostics.subscribe("undici:request:create", ({ request }) => born.set(request, deep().split("\n").filter((f) => repo.test(f) && !f.includes("host-trace")).map((f) => f.trim().replace(/^at /, "").replace(/.*[\\/](src|scripts)[\\/]/, "$1/")).slice(0, 6)));
+  diagnostics.subscribe("undici:request:error", ({ request, error }) => log("error", { path: String(request.path).split("?")[0], code: error?.code, message: error?.message, from: born.get(request) }));
   process.once("exit", (code) => log("process-exit", { code }));
 }
