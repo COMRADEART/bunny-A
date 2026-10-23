@@ -104,8 +104,13 @@ export function assertTransition(skill: Pick<Skill, "state" | "evidence" | "requ
   }
 }
 
-/** Product use needs ACTIVE. An evaluation run may use benchmark-qualified skills under its own authorization. */
-export function usable(skill: Pick<Skill, "state">, mode: "product" | "evaluation"): boolean {
+/**
+ * product = ACTIVE only. evaluation = benchmark-qualified or later, under that evaluation's own authorization.
+ * validation = the harness gating a skill (candidate or sandbox-validated) on its own stage; never product use.
+ */
+export type UseMode = "product" | "evaluation" | "validation";
+export function usable(skill: Pick<Skill, "state">, mode: UseMode): boolean {
+  if (mode === "validation") return skill.state === "candidate" || skill.state === "sandbox_validated";
   return mode === "product" ? skill.state === "active" : ["benchmark_qualified", "approved", "active"].includes(skill.state);
 }
 
@@ -130,7 +135,7 @@ export function taskTags(task: { spec: string; testerRule: string }): TaskTag[] 
 }
 
 /** Ranks usable skills for one role: shared task tags first, then (for a repair) matching failure categories. */
-export function selectSkills(skills: readonly Skill[], input: { role: string; tags: readonly string[]; categories?: readonly string[]; mode: "product" | "evaluation"; limit?: number }): Skill[] {
+export function selectSkills(skills: readonly Skill[], input: { role: string; tags: readonly string[]; categories?: readonly string[]; mode: UseMode; limit?: number }): Skill[] {
   return skills
     .filter(s => usable(s, input.mode) && (s.roles as readonly string[]).includes(input.role))
     .map(s => ({ s, tag: s.categories.filter(c => input.tags.includes(c)).length, cat: s.failureCategories.filter(c => input.categories?.includes(c)).length }))

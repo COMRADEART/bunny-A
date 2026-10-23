@@ -4,7 +4,7 @@ import type { LotusScope } from "../lotus.ts";
 import type { CodingTask, Guidance, ModelCall, WorkflowResult } from "./coding-workflow.server.ts";
 import type { ExperienceMemory } from "./experience.server.ts";
 import type { SkillRegistry } from "./skills.server.ts";
-import { renderGuidance, selectSkills, SkillProposalSchema, taskTags, usable, type Skill, type SkillProposal } from "./skills.ts";
+import { renderGuidance, selectSkills, SkillProposalSchema, taskTags, usable, type Skill, type SkillProposal, type UseMode } from "./skills.ts";
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 
@@ -13,7 +13,7 @@ const sha = (text: string) => createHash("sha256").update(text).digest("hex");
  * records for the task's Host-derived tags from the authorized scopes; the registry supplies the procedure text of
  * pointed-to skills that are usable in this mode. Memory disabled → no pointers → no guidance at all.
  */
-export function buildGuidance(input: { registry: SkillRegistry; memory: ExperienceMemory; scopes: LotusScope[]; task: Pick<CodingTask, "spec" | "testerRule">; mode: "product" | "evaluation"; maxChars?: number; now?: number }): { guidance: Guidance; skillIds: () => string[] } {
+export function buildGuidance(input: { registry: SkillRegistry; memory: ExperienceMemory; scopes: LotusScope[]; task: Pick<CodingTask, "spec" | "testerRule">; mode: UseMode; maxChars?: number; now?: number }): { guidance: Guidance; skillIds: () => string[] } {
   const tags = taskTags(input.task), max = input.maxChars ?? 1200, used = new Set<string>();
   const pointers = input.memory.retrieve(input.scopes, tags, { types: ["skill-pointer"], limit: 6, now: input.now });
   const pointed = pointers.map(p => /^skill:([a-z0-9-]+)@v(\d+)$/.exec(p.memory.key)).filter((m): m is RegExpExecArray => !!m);
