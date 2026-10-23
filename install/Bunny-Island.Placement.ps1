@@ -99,6 +99,38 @@ function Get-BunnyAgentChipFacts($Agent) {
   return @{ ToolTip = ($parts -join ' - '); Role = $role; MissionId = [string]$Agent.missionId }
 }
 
+# MA4-S2-T1: persistent task facts for the Notch. Pure: the Host's persistentTasks snapshot in, display facts out. One
+# entry per task id (a recovered task never gets a second badge); only open tasks count; the most urgent state leads.
+# Offline, the Island never presents a cached state as current: the headline says it is the last known state.
+$script:BunnyTaskOrder = @('Needs attention', 'Waiting for approval', 'Recovering', 'Working', 'Paused', 'Queued')
+$script:BunnyTaskTone = @{ 'Needs attention' = 'BunnyWarning'; 'Waiting for approval' = 'BunnyWarning'; 'Recovering' = 'BunnyAccent'; 'Working' = 'BunnyAccent'; 'Paused' = 'BunnyMuted'; 'Queued' = 'BunnyMuted' }
+function Get-BunnyTaskStrip($Snapshot, [bool]$Online = $true) {
+  $none = @{ Count = 0; Lead = ''; Headline = ''; Tone = 'BunnyMuted'; ToolTip = ''; Ids = @() }
+  if (-not $Snapshot) { return $none }
+  $seen = @{}; $open = @()
+  foreach ($task in @($Snapshot.tasks)) {
+    if (-not $task -or -not $task.id -or $seen.ContainsKey([string]$task.id)) { continue }
+    $seen[[string]$task.id] = $true
+    if ([string]$task.display -in $script:BunnyTaskOrder) { $open += $task }
+  }
+  if ($open.Count -eq 0) { return $none }
+  $lead = ($script:BunnyTaskOrder | Where-Object { $state = $_; @($open | Where-Object { [string]$_.display -eq $state }).Count } | Select-Object -First 1)
+  $leadCount = @($open | Where-Object { [string]$_.display -eq $lead }).Count
+  $headline = switch ($lead) {
+    'Working' { [string]$leadCount + ' working' }
+    'Queued' { [string]$leadCount + ' queued' }
+    default { $lead }
+  }
+  $lines = foreach ($task in $open) {
+    $line = [string]$task.title + ' - ' + [string]$task.display
+    if ($task.progress -and [int]$task.progress.total -gt 0) { $line += ' - step ' + [string]([int]$task.progress.done + [int]($task.display -eq 'Working')) + ' of ' + [string]$task.progress.total }
+    $line
+  }
+  $tone = $script:BunnyTaskTone[$lead]
+  if (-not $Online) { $headline = 'Tasks: last known'; $tone = 'BunnyMuted'; $lines = @('Host unavailable. Last known task states:') + @($lines) }
+  return @{ Count = $open.Count; Lead = $lead; Headline = $headline; Tone = $tone; ToolTip = (@($lines) -join "`n"); Ids = @($open | ForEach-Object { [string]$_.id }) }
+}
+
 # M-A-3 T13: pure geometry for drag-to-dock. Device pixels are converted to DIPs by the caller's scale (the monitor's
 # DPI), so every rule here is in the same logical units as Get-BunnyPlacement. No WPF or Win32 objects in this section.
 function Convert-BunnyDeviceRect {

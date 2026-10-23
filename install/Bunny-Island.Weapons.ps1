@@ -16,7 +16,33 @@ $script:bunnyWeaponTaskMs = @{ planning = 2400; researching = 1800; coding = 140
 
 function Get-BunnyStripCellCount {
   $view = Get-BunnyPersonalAgentStrip $bunnySnapshot.personalAgents
-  return (@($view.Slots).Count + $(if ($view.Unslotted -gt 0) { 1 } else { 0 }))
+  $tasks = Get-BunnyTaskStrip $bunnySnapshot.persistentTasks ([bool]$bunnyOnline)
+  return (@($view.Slots).Count + $(if ($view.Unslotted -gt 0) { 1 } else { 0 }) + $(if ($tasks.Count -gt 0) { 1 } else { 0 }))
+}
+
+# MA4-S2-T1: one neutral cell for persistent tasks in the same strip as the weapons, so it follows the strip's placement
+# (left of a horizontal notch, above a side notch). Its dot and number are the Host's current task facts; it never
+# animates. The element is created once and only updated on each poll. A click opens the task details in the dashboard.
+$script:bunnyTaskChip = $null
+function Get-BunnyTaskChip($Tasks) {
+  if (-not $script:bunnyTaskChip) {
+    $chip = New-BunnyCharacterButton 12
+    $chip.Width = $script:bunnyWeaponCellWidth; $chip.Height = $script:bunnyWeaponCellHeight; $chip.Margin = [Windows.Thickness]::new(2); $chip.Cursor = [Windows.Input.Cursors]::Hand
+    $stack = [Windows.Controls.StackPanel]::new(); $stack.HorizontalAlignment = 'Center'; $stack.VerticalAlignment = 'Center'
+    $dot = [Windows.Shapes.Ellipse]::new(); $dot.Width = 8; $dot.Height = 8; $dot.HorizontalAlignment = 'Center'; $dot.Margin = [Windows.Thickness]::new(0, 0, 0, 3)
+    $number = [Windows.Controls.TextBlock]::new(); $number.FontSize = 10; $number.FontWeight = 'SemiBold'; $number.HorizontalAlignment = 'Center'
+    $number.SetResourceReference([Windows.Controls.TextBlock]::ForegroundProperty, 'BunnyText')
+    [void]$stack.Children.Add($dot); [void]$stack.Children.Add($number); $chip.Content = $stack
+    $chip.Tag = @{ Dot = $dot; Number = $number }
+    $chip.Add_Click({ Open-BunnyApplication '' })
+    $script:bunnyTaskChip = $chip
+  }
+  $chip = $script:bunnyTaskChip
+  $chip.Tag.Dot.SetResourceReference([Windows.Shapes.Shape]::FillProperty, $Tasks.Tone)
+  $chip.Tag.Number.Text = [string]$Tasks.Count
+  $chip.ToolTip = $Tasks.ToolTip
+  [Windows.Automation.AutomationProperties]::SetName($chip, ('Persistent tasks: ' + $Tasks.Headline))
+  return $chip
 }
 
 # Horizontal notch: the strip is ONE row beside the body (spec section 10), so its extent is every cell in that row, plus the
@@ -263,7 +289,8 @@ function Update-BunnyAgentStrip {
   } else { $script:bunnyHappyUntil = 0.0 }
   if (@($transitions | Where-Object { $_.Kind -eq 'verified' }).Count) { $script:bunnyHappyUntil = [double](Get-BunnyNowMs) + $script:bunnyHappyMs }
   $slots = @($view.Slots)
-  $cells = $slots.Count + $(if ($view.Unslotted -gt 0) { 1 } else { 0 })
+  $tasks = Get-BunnyTaskStrip $bunnySnapshot.persistentTasks ([bool]$bunnyOnline)
+  $cells = $slots.Count + $(if ($view.Unslotted -gt 0) { 1 } else { 0 }) + $(if ($tasks.Count -gt 0) { 1 } else { 0 })
   $strip.Children.Clear()
   if ($cells -eq 0) { Stop-BunnyWeaponStrip; $strip.Visibility = 'Collapsed'; $bunnyControls.StripCapsule.Visibility = 'Collapsed'; Set-BunnyJoin; return }
   $strip.Visibility = 'Visible'; $bunnyControls.StripCapsule.Visibility = 'Visible'; Set-BunnyJoin
@@ -279,6 +306,7 @@ function Update-BunnyAgentStrip {
     if (-not @($slots | Where-Object { [int]$_.slot -eq [int]$id }).Count) { Stop-BunnyWeaponMotion $script:bunnyWeaponChips[$id]; $script:bunnyWeaponChips[$id].Tag.Key = '' }
   }
   if ($view.Unslotted -gt 0) { $items += New-BunnyUnslottedChip $view.Unslotted }
+  if ($tasks.Count -gt 0) { $items += Get-BunnyTaskChip $tasks }
   # One container for every cell, in slot order: the orientation (row or column) is set by the layout (Set-BunnyLayout).
   foreach ($item in $items) { [void]$strip.Children.Add($item) }
   foreach ($transition in $transitions) {

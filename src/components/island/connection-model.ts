@@ -204,6 +204,10 @@ export const READ_ACTIONS = new Set([
   // M-A-3 T13.3: Lotus export and authorized recall change nothing.
   "lotus.export",
   "lotus.recall",
+  // MA4-S2-T1: reading persistent tasks and a step's output changes nothing.
+  "ptask.list",
+  "ptask.get",
+  "ptask.output",
 ]);
 export const isMutating = (action: string) => !READ_ACTIONS.has(action);
 

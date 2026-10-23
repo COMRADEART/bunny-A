@@ -25,6 +25,10 @@ import { stopOwnedChildren } from "./owned-processes.server.ts";
 import { dashboardSnapshot, publicEventDetail, projectHostActivity } from "./presentation.ts";
 import { releaseIdentity } from "./release-identity.server.ts";
 import { AGENT_ACTIONS, AgentRuntime, agentCommand } from "./agent-runtime.server.ts";
+import { PersistentTaskRuntime, type RuntimeDeps } from "./ma4/task-runtime.server.ts";
+import { TaskStore } from "./ma4/task-store.server.ts";
+import { productionTaskDeps } from "./ma4/task-executors.server.ts";
+import { PTASK_ACTIONS, PTASK_SAFE_ACTIONS, ptaskCommand } from "./ma4/task-commands.server.ts";
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
 import { SLOT_IDS, clean, isUserFacingAgent, projectPersonalAgents, type SlotId } from "./personal-agents.ts";
 import { WorkerStore } from "./workers.server.ts";
@@ -320,6 +324,8 @@ export async function startHost(
     ma4Fetch?: typeof fetch;
     /** M-A-3 T13.3 Gate E test-only harness `--version` probe. Never reachable from HTTP. */
     harnessProbe?: typeof probeHarness;
+    /** MA4-S2-T1 test-only task executors and model seams (recorded fakes). Never reachable from HTTP. */
+    ptasks?: Partial<Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "leaseMs" | "maintenanceMs">>;
   } = {},
 ) {
   const paths = hostStatePaths(options.dataDirectory);
@@ -384,6 +390,19 @@ export async function startHost(
   // M-A-3 T4: the durable Agent runtime sits above Missions — it owns continuity only, and construction
   // runs the recovery walk after MissionManager.recover() has reconciled the mission rows.
   const agents = new AgentRuntime(db, missions);
+  // MA4-S2-T1: work continues with no window open only while this Host runs, and only under the owner's policy.
+  // A workstation client (Island poll or dashboard stream) seen in the last 20 s counts as an attached window.
+  const workstationClients = { seen: 0, streams: 0 };
+  const ptasks = new PersistentTaskRuntime({
+    store: new TaskStore(db),
+    ...productionTaskDeps(),
+    ...options.ptasks,
+    instanceId: manager.instanceId,
+    uiAttached: () => workstationClients.streams > 0 || Date.now() - workstationClients.seen < 20_000,
+    emit: (type, detail) => manager.emit(db.event(type, null, detail)),
+    // Started only after this Host holds its port (below), so a lease left by any other instance is a dead Host's.
+    exclusive: true,
+  });
   const projects = new ProjectService(missions, agents);
   // M-A-3 T13.3: Personal Agent ownership, profiles and conversations. Context only; it owns no execution.
   const personalContext = new PersonalAgentContextStore(db);
@@ -698,6 +717,7 @@ export async function startHost(
       ...manager.snapshot(after),
       missions: missions.snapshot(),
       agents: agents.snapshot(),
+      persistentTasks: ptasks.snapshot(),
     };
     const retainedFrom = Number(
       (db.db.prepare("SELECT COALESCE(MIN(sequence),0) n FROM events").get() as { n: number }).n,
@@ -1079,8 +1099,10 @@ export async function startHost(
     try {
       const after = Number(path.searchParams.get("after") ?? 0);
       if (!Number.isSafeInteger(after) || after < 0) throw new Error("Invalid event cursor.");
+      if (local && (path.pathname === "/state" || path.pathname === "/events")) workstationClients.seen = Date.now();
       if (req.method === "GET" && path.pathname === "/state") return json(res, viewFor(after, principal));
       if (req.method === "GET" && path.pathname === "/events") {
+        if (local) { workstationClients.streams++; res.once("close", () => { workstationClients.streams--; workstationClients.seen = Date.now(); }); }
         if (device && !deviceStreams.admit(device.id))
           return json(res, { error: "Too many open activity streams for this device.", code: "RATE_LIMITED", retryAfterMs: 5000 }, 429, { "retry-after": "5" });
         res.writeHead(200, {
@@ -1171,6 +1193,7 @@ export async function startHost(
         "operation.status",
         // M-A-3 T10: stopping audio, releasing devices and cancelling a proposal never wait for a degraded Host.
         ...VOICE_SAFE_ACTIONS,
+        ...PTASK_SAFE_ACTIONS,
       ]);
       if (!safeActions.has(action)) containment.assertAccepting("http");
       if (typeof input.action === "string" && AGENT_ACTIONS.has(input.action)) {
@@ -1183,6 +1206,8 @@ export async function startHost(
         )
           throw new CommandRefusedError("Remote approval can only answer the exact Host offer.");
         extra = await agentCommand(agents, input.action, data, actor);
+      } else if (typeof input.action === "string" && PTASK_ACTIONS.has(input.action)) {
+        extra = { data: ptaskCommand(ptasks, input.action, data, actor) };
       } else if (typeof input.action === "string" && VOICE_ACTIONS.has(input.action)) {
         // Device principals never reach here: assertDeviceAction refuses every voice action (default-deny).
         if (device) throw new WorkstationRequiredError("Voice requires the workstation on the Windows Host.");
@@ -2161,6 +2186,7 @@ export async function startHost(
     JSON.stringify({ token, port, pid: process.pid, instanceId: manager.instanceId }),
     { mode: 0o600 },
   );
+  await ptasks.start();
   let closing = false;
   let closed: Promise<void> | null = null;
   const loops: { stop: () => void }[] = [];
@@ -2174,6 +2200,8 @@ export async function startHost(
       try {
         // M-A-3 T10: release the microphone and speaker before anything else stops.
         await voice.close().catch(() => undefined);
+        // MA4-S2-T1: running task steps stop and are handed to recovery with their durable state intact.
+        await ptasks.close().catch(() => undefined);
         await Promise.allSettled(
           [...manager.sessions.keys()].map((id) =>
             containment.health.operationalState === "draining"
@@ -2264,7 +2292,7 @@ export async function startHost(
     ),
   );
   console.log(`Bunny-A Host ready on loopback (${manager.instanceId}).`);
-  return { server, manager, missions, agents, projects, close, token, port, containment };
+  return { server, manager, missions, agents, projects, ptasks, close, token, port, containment };
 }
 
 /** M-A-3 T10: maps one voice action to the session. Every branch is a workstation-only session operation. */

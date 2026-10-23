@@ -1,0 +1,247 @@
+{
+  "at": "2026-10-23T17:01:04.747Z",
+  "pin": "qwen2.5-coder:7b",
+  "port": 61122,
+  "freeMemGiBAtStart": 14.1,
+  "steps": [
+    {
+      "name": "host.start",
+      "ms": 1410
+    },
+    {
+      "name": "Q1 background off, no window, 25 s",
+      "state": "QUEUED",
+      "done": 0
+    },
+    {
+      "name": "Q2 created",
+      "state": "AWAITING_APPROVAL"
+    },
+    {
+      "name": "Q2 running before kill",
+      "state": "RUNNING",
+      "current": "g1",
+      "done": 0,
+      "ollamaLoaded": [
+        "qwen2.5-coder:7b"
+      ]
+    },
+    {
+      "name": "Q2 Host killed (taskkill /F)",
+      "ms": 197
+    },
+    {
+      "name": "Q3 restart → recovered state (P11)",
+      "hostStartMs": 845,
+      "toCorrectStateMs": 909,
+      "state": "PAUSED",
+      "blocked": "HOST_RESTARTED",
+      "done": 1
+    },
+    {
+      "name": "Q3 nothing ran on its own for 10 s",
+      "state": "PAUSED"
+    },
+    {
+      "name": "Q4 resumed with no window",
+      "state": "COMPLETED",
+      "failure": null,
+      "ms": 1531,
+      "evidence": [
+        {
+          "stepId": "g1",
+          "outputSha256": "64e0b55d9477817ba0bd36fea38276dd61fa7e05f3cb65a90ff17f000e92afa2"
+        },
+        {
+          "stepId": "g2",
+          "outputSha256": "94bf1cdcb9084b370138a050543ba4b198aa926d120af5b6b5dc959fee682a2f"
+        }
+      ],
+      "outputs": [
+        {
+          "step": "g1",
+          "chars": 570,
+          "sha256": "64e0b55d9477817ba0bd36fea38276dd61fa7e05f3cb65a90ff17f000e92afa2"
+        },
+        {
+          "step": "g2",
+          "chars": 81,
+          "sha256": "94bf1cdcb9084b370138a050543ba4b198aa926d120af5b6b5dc959fee682a2f"
+        }
+      ]
+    },
+    {
+      "name": "Q5 hosted model pin",
+      "state": "PAUSED",
+      "blocked": "MODEL_UNAVAILABLE",
+      "done": 0
+    },
+    {
+      "name": "P9 idle CPU",
+      "cpuMs": 172,
+      "wallMs": 60256,
+      "percentOfOneCore": 0.29
+    }
+  ],
+  "operations": [
+    {
+      "key": "ptask-cccf53f1-b492-4e7e-9e12-6a45856b9128:g1",
+      "category": "read_only",
+      "state": "succeeded",
+      "attempts": 1
+    },
+    {
+      "key": "ptask-cccf53f1-b492-4e7e-9e12-6a45856b9128:g2",
+      "category": "read_only",
+      "state": "succeeded",
+      "attempts": 2
+    }
+  ],
+  "q2Transitions": [
+    {
+      "from_state": null,
+      "to_state": "CREATED",
+      "actor": "workstation",
+      "reason": "created"
+    },
+    {
+      "from_state": "CREATED",
+      "to_state": "VALIDATED",
+      "actor": "workstation",
+      "reason": "validated"
+    },
+    {
+      "from_state": "VALIDATED",
+      "to_state": "AWAITING_APPROVAL",
+      "actor": "workstation",
+      "reason": "approval required"
+    },
+    {
+      "from_state": "AWAITING_APPROVAL",
+      "to_state": "QUEUED",
+      "actor": "workstation",
+      "reason": "approved by owner"
+    },
+    {
+      "from_state": "QUEUED",
+      "to_state": "RUNNING",
+      "actor": "232661e6-73fc-4f4c-9eb9-1d1a458e823e",
+      "reason": "claimed by worker"
+    },
+    {
+      "from_state": "RUNNING",
+      "to_state": "RUNNING",
+      "actor": "232661e6-73fc-4f4c-9eb9-1d1a458e823e",
+      "reason": "step g1 attempt 1 started"
+    },
+    {
+      "from_state": "RUNNING",
+      "to_state": "RUNNING",
+      "actor": "232661e6-73fc-4f4c-9eb9-1d1a458e823e",
+      "reason": "work time"
+    },
+    {
+      "from_state": "RUNNING",
+      "to_state": "RUNNING",
+      "actor": "232661e6-73fc-4f4c-9eb9-1d1a458e823e",
+      "reason": "step g1 succeeded"
+    },
+    {
+      "from_state": "RUNNING",
+      "to_state": "RUNNING",
+      "actor": "232661e6-73fc-4f4c-9eb9-1d1a458e823e",
+      "reason": "step g2 attempt 1 started"
+    },
+    {
+      "from_state": "RUNNING",
+      "to_state": "RESUMING",
+      "actor": "recovery",
+      "reason": "Host restarted; recovering"
+    },
+    {
+      "from_state": "RESUMING",
+      "to_state": "PAUSED",
+      "actor": "recovery",
+      "reason": "startup policy: wait for the user"
+    },
+    {
+      "from_state": "PAUSED",
+      "to_state": "RESUMING",
+      "actor": "workstation",
+      "reason": "resume requested"
+    },
+    {
+      "from_state": "RESUMING",
+      "to_state": "RUNNING",
+      "actor": "2d541351-f8f0-4da4-8e34-cfe6f614754a",
+      "reason": "resumed by worker"
+    },
+    {
+      "from_state": "RUNNING",
+      "to_state": "RUNNING",
+      "actor": "2d541351-f8f0-4da4-8e34-cfe6f614754a",
+      "reason": "step g2 attempt 2 started"
+    },
+    {
+      "from_state": "RUNNING",
+      "to_state": "RUNNING",
+      "actor": "2d541351-f8f0-4da4-8e34-cfe6f614754a",
+      "reason": "work time"
+    },
+    {
+      "from_state": "RUNNING",
+      "to_state": "RUNNING",
+      "actor": "2d541351-f8f0-4da4-8e34-cfe6f614754a",
+      "reason": "step g2 succeeded"
+    },
+    {
+      "from_state": "RUNNING",
+      "to_state": "COMPLETED",
+      "actor": "2d541351-f8f0-4da4-8e34-cfe6f614754a",
+      "reason": "acceptance contract met"
+    }
+  ],
+  "notifications": [
+    {
+      "kind": "approval_required",
+      "text": "Release notes draft: needs your approval",
+      "delivered": 1
+    },
+    {
+      "kind": "completed",
+      "text": "Release notes draft: completed",
+      "delivered": 1
+    },
+    {
+      "kind": "approval_required",
+      "text": "Hosted pin: needs your approval",
+      "delivered": 1
+    }
+  ],
+  "events": [
+    {
+      "type": "ptask.policy_changed",
+      "detail": "Background execution off; resume after restart off."
+    },
+    {
+      "type": "ptask.policy_changed",
+      "detail": "Background execution on; resume after restart off."
+    },
+    {
+      "type": "ptask.notification",
+      "detail": "approval_required: Release notes draft: needs your approval"
+    },
+    {
+      "type": "ptask.recovered",
+      "detail": "Release notes draft: recovered (read_only step g2 interrupted)."
+    },
+    {
+      "type": "ptask.notification",
+      "detail": "completed: Release notes draft: completed"
+    },
+    {
+      "type": "ptask.notification",
+      "detail": "approval_required: Hosted pin: needs your approval"
+    }
+  ]
+}

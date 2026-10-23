@@ -395,8 +395,10 @@ function Get-BunnyBargeInNote($Snap) {
 
 # A render fault is reported in the device line; it must never mark the Host offline in Update-Bunny.
 # The Notch's short voice line. The full headline stays in the expanded panel; nothing here is claimed beyond the headline.
-function Get-BunnyNotchStatus([string]$Headline) {
+# MA4-S2-T1: when voice has nothing to say (Ready, or off), the line shows the persistent tasks' headline instead.
+function Get-BunnyNotchStatus([string]$Headline, [string]$TaskHeadline = '') {
   $ellipsis = $bunnyEllipsis
+  if ($TaskHeadline -and $Headline -in @('Ready', 'Voice is off')) { return $TaskHeadline }
   switch ($Headline) {
     'Host offline - voice unavailable' { return 'Host offline' }
     'Voice is off' { return 'Voice is off' }
@@ -459,7 +461,7 @@ function Update-BunnyVoiceView {
   }
   $bunnyControls.VoiceMeter.Width = [Math]::Round($maxWidth * $rms, 1)
   # The Notch shows the same truth in a short form, and its bars move only with that real level (flat when there is none).
-  $bunnyControls.NotchStatus.Text = Get-BunnyNotchStatus $headline
+  $bunnyControls.NotchStatus.Text = Get-BunnyNotchStatus $headline (Get-BunnyTaskStrip $bunnySnapshot.persistentTasks ([bool]$bunnyOnline)).Headline
   Update-BunnyNotchBars $rms ([bool]($open -and $fresh -and $snap.capturing))
 
   $device = Get-BunnyVoiceDeviceLine $snap
