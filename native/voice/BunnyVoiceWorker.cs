@@ -1715,6 +1715,8 @@ internal sealed class DuplexInput
     }
 
     // One input turn's view of the continuous frames. Bounded: a consumer that falls more than 5 s behind is a BUFFER_LIMIT.
+    // MA4-S2R1: before the turn's reader starts (the recognizer can take seconds to load after attach), the queue keeps the
+    // newest 5 s like the pre-roll does; a reader that has not started yet is not behind, and must not kill the turn.
     internal sealed class TurnFrames : IFrameSource
     {
         const int MaxFrames = 250;
@@ -1722,6 +1724,7 @@ internal sealed class DuplexInput
         readonly Queue<PreRollFrame> frames = new Queue<PreRollFrame>();
         public bool Closed;
         bool overflow;
+        bool reading;
         long lastMono = -1;
         // T12 (AEC-02): the capture time of the frame last read. A replayed pre-roll frame keeps the time it was heard.
         public long LastMono { get { lock (gate) { return lastMono; } } }
@@ -1730,7 +1733,8 @@ internal sealed class DuplexInput
             lock (gate)
             {
                 if (Closed) return;
-                if (frames.Count >= MaxFrames) { overflow = true; return; }
+                if (frames.Count >= MaxFrames && reading) { overflow = true; return; }
+                if (frames.Count >= MaxFrames) { PreRollFrame old = frames.Dequeue(); Array.Clear(old.Data, 0, old.Data.Length); }
                 frames.Enqueue(new PreRollFrame { Data = (byte[])frame.Clone(), Mono = mono, Tainted = false });
             }
         }
@@ -1738,6 +1742,7 @@ internal sealed class DuplexInput
         {
             lock (gate)
             {
+                reading = true;
                 if (overflow) throw new VoiceFault("BUFFER_LIMIT", "continuous recognition queue exceeded 5 seconds");
                 if (frames.Count == 0) return Closed ? -1 : 0;
                 PreRollFrame next = frames.Dequeue();
@@ -2513,7 +2518,9 @@ internal sealed class CaptureTurn : IAbandonedRecognizer
         }
         catch (Exception e)
         {
-            EmitCaptureError("INTERNAL", "capture loop failed: " + e.GetType().Name);
+            // A typed fault (BUFFER_LIMIT, DEVICE_LOST) keeps its own code; only an unexpected exception is INTERNAL.
+            VoiceFault fault = e as VoiceFault;
+            EmitCaptureError(fault != null ? fault.Code : "INTERNAL", fault != null ? fault.Message : "capture loop failed: " + e.GetType().Name);
             Finish("error");
         }
         finally
@@ -4332,6 +4339,21 @@ internal static class SelfTest
         r["onsetMonoFromCapture"] = turn.OnsetMonoForTest;
     }
 
+    // MA4-S2R1: before the turn's reader starts the attached queue keeps the newest 250 frames (no BUFFER_LIMIT); once it
+    // reads, a reader that falls 250 frames behind is a BUFFER_LIMIT.
+    static void TurnFramesBoundCheck(Dictionary<string, object> r)
+    {
+        DuplexInput.TurnFrames q = new DuplexInput.TurnFrames();
+        byte[] frame = new byte[Consts.FrameBytes];
+        for (int i = 0; i < 300; i++) q.Push(frame, i);
+        bool firstOk = q.Read(frame) == 1;
+        r["turnFramesKeepsNewestBeforeRead"] = firstOk && q.LastMono == 50;
+        for (int i = 0; i < 2; i++) q.Push(frame, 300 + i);
+        string code = null;
+        try { q.Read(frame); } catch (VoiceFault f) { code = f.Code; }
+        r["turnFramesOverflowAfterRead"] = code;
+    }
+
     static void WaitUntil(Func<bool> condition, int ms)
     {
         Stopwatch w = Stopwatch.StartNew();
@@ -4671,6 +4693,7 @@ internal static class SelfTest
         DuplexStopReasonCheck(r);
         PauseReleaseCheck(r);
         DuplexOnsetTimeCheck(r);
+        TurnFramesBoundCheck(r);
 
         Out.Emit(Out.Ev("selftest", "results", r));
         return 0;
@@ -4707,6 +4730,8 @@ internal static class Program
     static WhisperEngine whisperEngine;
     static string whisperError;
     static DuplexInput duplex;
+    // Fixture-only test seam: a slow speech-recognizer start (hosted runners load the dictation grammar in seconds).
+    static int fixtureRecognizerDelayMs;
 
     static Dictionary<string, object> Ev(string name, params object[] kv) { return Out.Ev(name, kv); }
 
@@ -4722,6 +4747,7 @@ internal static class Program
             else if (a == "--input-silence") inputKind = "silence";
             else if (a == "--input-noise") inputKind = "noise";
             else if (a == "--input-stall") inputKind = "stall";
+            else if (a == "--fixture-recognizer-delay-ms" && i + 1 < args.Length) fixtureRecognizerDelayMs = Math.Max(0, Math.Min(30000, int.Parse(args[++i], NumberStyles.None, CultureInfo.InvariantCulture)));
             else if (a == "--input-wav" && i + 1 < args.Length) { inputKind = "wav"; wavPath = args[++i]; }
             else if (a == "--output" && i + 1 < args.Length) nullOutput = args[++i] == "null";
             else if (a == "--stt" && i + 1 < args.Length)
@@ -5149,6 +5175,7 @@ internal static class Program
             if (continuous) t.Ambient = duplex.Ambient;
             try
             {
+                if (fixtureRecognizerDelayMs > 0 && inputKind != null) Thread.Sleep(fixtureRecognizerDelayMs);
                 t.StartRecognizer(recognizer);
             }
             catch (Exception e)

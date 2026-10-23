@@ -5,6 +5,7 @@ import {
   BASE_TOOLS, SKILL_SCHEMA_VERSION, SkillProposalSchema, assertTransition, screen, shouldQuarantine,
   type Skill, type SkillActor, type SkillEvidence, type SkillState,
 } from "./skills.ts";
+import { skillContentHash, type Applicability } from "./relevance.ts";
 
 /**
  * MA4-S2 skill registry on the Host's SQLite file (additive table, created by its owner). Versioned by name; every
@@ -56,6 +57,18 @@ export class SkillRegistry {
   addEvidence(id: string, evidence: Omit<SkillEvidence, "at">, now = Date.now()): Skill {
     const skill = this.require(id);
     skill.evidence.push({ ...evidence, at: new Date(now).toISOString() });
+    return this.save(skill);
+  }
+
+  /**
+   * MA4-S2R1: binds a Host applicability attestation (relevance.ts attestApplicability) to the skill. It never changes
+   * the state; a later change of the skill text breaks the attested content hash, so the skill stops being retrievable.
+   */
+  attest(id: string, applicability: Applicability, now = Date.now()): Skill {
+    const skill = this.require(id) as Skill & { applicability?: Applicability };
+    if (applicability.contentSha256 !== skillContentHash(skill)) throw new Error("The attestation does not match this skill's content.");
+    skill.applicability = applicability;
+    skill.history.push({ at: new Date(now).toISOString(), from: skill.state, to: skill.state, actor: "host", reason: `applicability attested from ${applicability.validatedOn.map(v => v.taskId).join(", ")}` });
     return this.save(skill);
   }
 

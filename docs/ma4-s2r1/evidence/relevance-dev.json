@@ -1,0 +1,895 @@
+{
+  "summary": {
+    "split": "dev",
+    "tasks": 8,
+    "skills": 9,
+    "TP": 3,
+    "FN": 0,
+    "FP": 0,
+    "TN": 5,
+    "noSkill": 5
+  },
+  "at": "2026-10-23T12:26:20.912Z",
+  "rows": [
+    {
+      "task": "d-adddays",
+      "relation": "applicable",
+      "family": "date-iso",
+      "selected": "parse-date-procedure@v1",
+      "outcome": "TP",
+      "excerptChars": 305,
+      "signature": {
+        "category": "implement",
+        "operations": [
+          "parse-date"
+        ],
+        "inputTypes": [
+          "str"
+        ],
+        "formats": [
+          "YYYY-MM-DD"
+        ],
+        "outputTypes": [
+          "str"
+        ]
+      },
+      "decisions": [
+        {
+          "skill": "caesar-shift-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "caesar-shift-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "calculate-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (parse-date)",
+            "input list<number> incompatible with str"
+          ]
+        },
+        {
+          "skill": "compute-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (parse-date)",
+            "input list<number> incompatible with str"
+          ]
+        },
+        {
+          "skill": "merge-intervals-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-csv-line@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v1",
+          "eligible": true,
+          "score": 5.237,
+          "parts": {
+            "operation": 2,
+            "format": 2,
+            "output": 0,
+            "domain": 1,
+            "evidence": 1,
+            "success": 0,
+            "failure": 0,
+            "cost": -0.7625
+          },
+          "reasons": []
+        },
+        {
+          "skill": "parse-date-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "slugify@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation slugify not required by the task (parse-date)"
+          ]
+        }
+      ]
+    },
+    {
+      "task": "d-medskip",
+      "relation": "applicable",
+      "family": "median",
+      "selected": "compute-median@v1",
+      "outcome": "TP",
+      "excerptChars": 270,
+      "signature": {
+        "category": "implement",
+        "operations": [
+          "median"
+        ],
+        "inputTypes": [
+          "list<number>"
+        ],
+        "formats": [],
+        "outputTypes": [
+          "float"
+        ]
+      },
+      "decisions": [
+        {
+          "skill": "caesar-shift-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "caesar-shift-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "calculate-median@v1",
+          "eligible": true,
+          "score": 3.22,
+          "parts": {
+            "operation": 2,
+            "format": 0,
+            "output": 0,
+            "domain": 1,
+            "evidence": 1,
+            "success": 0,
+            "failure": 0,
+            "cost": -0.78
+          },
+          "reasons": []
+        },
+        {
+          "skill": "compute-median@v1",
+          "eligible": true,
+          "score": 3.325,
+          "parts": {
+            "operation": 2,
+            "format": 0,
+            "output": 0,
+            "domain": 1,
+            "evidence": 1,
+            "success": 0,
+            "failure": 0,
+            "cost": -0.675
+          },
+          "reasons": []
+        },
+        {
+          "skill": "merge-intervals-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-csv-line@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation parse-date not required by the task (median)",
+            "input str incompatible with list<number>",
+            "precondition formats ∋ YYYY-MM-DD not satisfied"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "slugify@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation slugify not required by the task (median)",
+            "input str incompatible with list<number>"
+          ]
+        }
+      ]
+    },
+    {
+      "task": "d-slugpath",
+      "relation": "applicable",
+      "family": "slug",
+      "selected": "slugify@v1",
+      "outcome": "TP",
+      "excerptChars": 230,
+      "signature": {
+        "category": "implement",
+        "operations": [
+          "slugify"
+        ],
+        "inputTypes": [
+          "list<str>",
+          "str"
+        ],
+        "formats": [],
+        "outputTypes": []
+      },
+      "decisions": [
+        {
+          "skill": "caesar-shift-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "caesar-shift-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "calculate-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (slugify)",
+            "input list<number> incompatible with list<str>/str"
+          ]
+        },
+        {
+          "skill": "compute-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (slugify)",
+            "input list<number> incompatible with list<str>/str"
+          ]
+        },
+        {
+          "skill": "merge-intervals-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-csv-line@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation parse-date not required by the task (slugify)",
+            "precondition formats ∋ YYYY-MM-DD not satisfied"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "slugify@v1",
+          "eligible": true,
+          "score": 3.425,
+          "parts": {
+            "operation": 2,
+            "format": 0,
+            "output": 0,
+            "domain": 1,
+            "evidence": 1,
+            "success": 0,
+            "failure": 0,
+            "cost": -0.575
+          },
+          "reasons": []
+        }
+      ]
+    },
+    {
+      "task": "d-hhmm",
+      "relation": "near-miss",
+      "family": "date-iso",
+      "selected": null,
+      "outcome": "TN",
+      "excerptChars": 0,
+      "signature": {
+        "category": "implement",
+        "operations": [
+          "parse-time"
+        ],
+        "inputTypes": [
+          "str"
+        ],
+        "formats": [
+          "HH:MM"
+        ],
+        "outputTypes": [
+          "int"
+        ]
+      },
+      "decisions": [
+        {
+          "skill": "caesar-shift-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "caesar-shift-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "calculate-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (parse-time)",
+            "input list<number> incompatible with str"
+          ]
+        },
+        {
+          "skill": "compute-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (parse-time)",
+            "input list<number> incompatible with str"
+          ]
+        },
+        {
+          "skill": "merge-intervals-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-csv-line@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation parse-date not required by the task (parse-time)",
+            "precondition formats ∋ YYYY-MM-DD not satisfied"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "slugify@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation slugify not required by the task (parse-time)"
+          ]
+        }
+      ]
+    },
+    {
+      "task": "d-mean",
+      "relation": "near-miss",
+      "family": "median",
+      "selected": null,
+      "outcome": "TN",
+      "excerptChars": 0,
+      "signature": {
+        "category": "implement",
+        "operations": [
+          "mean"
+        ],
+        "inputTypes": [
+          "list<number>"
+        ],
+        "formats": [],
+        "outputTypes": [
+          "float"
+        ]
+      },
+      "decisions": [
+        {
+          "skill": "caesar-shift-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "caesar-shift-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "calculate-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (mean)"
+          ]
+        },
+        {
+          "skill": "compute-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (mean)"
+          ]
+        },
+        {
+          "skill": "merge-intervals-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-csv-line@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation parse-date not required by the task (mean)",
+            "input str incompatible with list<number>",
+            "precondition formats ∋ YYYY-MM-DD not satisfied"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "slugify@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation slugify not required by the task (mean)",
+            "input str incompatible with list<number>"
+          ]
+        }
+      ]
+    },
+    {
+      "task": "d-chunksum",
+      "relation": "none",
+      "family": null,
+      "selected": null,
+      "outcome": "TN",
+      "excerptChars": 0,
+      "signature": {
+        "category": "implement",
+        "operations": [],
+        "inputTypes": [],
+        "formats": [],
+        "outputTypes": []
+      },
+      "decisions": [
+        {
+          "skill": "caesar-shift-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "caesar-shift-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "calculate-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (none)",
+            "input list<number> incompatible with unknown"
+          ]
+        },
+        {
+          "skill": "compute-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (none)",
+            "input list<number> incompatible with unknown"
+          ]
+        },
+        {
+          "skill": "merge-intervals-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-csv-line@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation parse-date not required by the task (none)",
+            "input str incompatible with unknown",
+            "precondition formats ∋ YYYY-MM-DD not satisfied"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "slugify@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation slugify not required by the task (none)",
+            "input str incompatible with unknown"
+          ]
+        }
+      ]
+    },
+    {
+      "task": "d-clamp",
+      "relation": "none",
+      "family": null,
+      "selected": null,
+      "outcome": "TN",
+      "excerptChars": 0,
+      "signature": {
+        "category": "debug",
+        "operations": [],
+        "inputTypes": [],
+        "formats": [],
+        "outputTypes": []
+      },
+      "decisions": [
+        {
+          "skill": "caesar-shift-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "caesar-shift-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "calculate-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (none)",
+            "input list<number> incompatible with unknown"
+          ]
+        },
+        {
+          "skill": "compute-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation median not required by the task (none)",
+            "input list<number> incompatible with unknown"
+          ]
+        },
+        {
+          "skill": "merge-intervals-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-csv-line@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation parse-date not required by the task (none)",
+            "input str incompatible with unknown",
+            "precondition formats ∋ YYYY-MM-DD not satisfied"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "slugify@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "operation slugify not required by the task (none)",
+            "input str incompatible with unknown"
+          ]
+        }
+      ]
+    },
+    {
+      "task": "d-wordindex",
+      "relation": "none",
+      "family": null,
+      "selected": null,
+      "outcome": "TN",
+      "excerptChars": 0,
+      "signature": {
+        "category": "plan",
+        "operations": [],
+        "inputTypes": [
+          "str"
+        ],
+        "formats": [],
+        "outputTypes": [
+          "object"
+        ]
+      },
+      "decisions": [
+        {
+          "skill": "caesar-shift-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "caesar-shift-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "calculate-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "category plan not in implement/debug",
+            "operation median not required by the task (none)",
+            "input list<number> incompatible with str"
+          ]
+        },
+        {
+          "skill": "compute-median@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "category plan not in implement/debug",
+            "operation median not required by the task (none)",
+            "input list<number> incompatible with str"
+          ]
+        },
+        {
+          "skill": "merge-intervals-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-csv-line@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "category plan not in implement/debug",
+            "operation parse-date not required by the task (none)",
+            "precondition formats ∋ YYYY-MM-DD not satisfied"
+          ]
+        },
+        {
+          "skill": "parse-date-procedure@v2",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "missing applicability metadata"
+          ]
+        },
+        {
+          "skill": "slugify@v1",
+          "eligible": false,
+          "score": null,
+          "parts": null,
+          "reasons": [
+            "category plan not in implement/debug",
+            "operation slugify not required by the task (none)"
+          ]
+        }
+      ]
+    }
+  ]
+}

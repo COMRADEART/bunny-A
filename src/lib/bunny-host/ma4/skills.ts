@@ -133,28 +133,3 @@ export function taskTags(task: { spec: string; testerRule: string }): TaskTag[] 
   if (/\bnumbers?\b|\bints?\b|\bdigits?\b|\bsum\b|average|median|seconds|cents/i.test(s)) tags.push("numeric");
   return tags;
 }
-
-/** Ranks usable skills for one role: shared task tags first, then (for a repair) matching failure categories. */
-export function selectSkills(skills: readonly Skill[], input: { role: string; tags: readonly string[]; categories?: readonly string[]; mode: UseMode; limit?: number }): Skill[] {
-  return skills
-    .filter(s => usable(s, input.mode) && (s.roles as readonly string[]).includes(input.role))
-    .map(s => ({ s, tag: s.categories.filter(c => input.tags.includes(c)).length, cat: s.failureCategories.filter(c => input.categories?.includes(c)).length }))
-    .filter(x => x.tag > 0 && (!input.categories?.length || x.cat > 0 || x.tag >= 2))
-    .sort((a, b) => b.tag + b.cat - (a.tag + a.cat) || a.s.name.localeCompare(b.s.name))
-    .slice(0, input.limit ?? 3)
-    .map(x => x.s);
-}
-
-/** The advisory block a role sees. Bounded; labelled with where it came from; the contract always wins. */
-export function renderGuidance(skills: readonly Skill[], maxChars = 1200): string {
-  if (!skills.length) return "";
-  const head = "VERIFIED PROCEDURES (advisory: proposed by a model, validated by Host sandbox and benchmark runs; the task contract above always wins):";
-  const lines: string[] = [];
-  let used = head.length;
-  for (const s of skills) {
-    const text = `- [${s.name} v${s.version}] ${s.procedure.join(" ")}`.slice(0, s.budget.maxGuidanceChars);
-    if (used + text.length + 1 > maxChars) break;
-    lines.push(text); used += text.length + 1;
-  }
-  return lines.length ? [head, ...lines].join("\n") : "";
-}

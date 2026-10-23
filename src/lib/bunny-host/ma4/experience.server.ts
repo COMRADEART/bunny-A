@@ -3,6 +3,7 @@ import type { HostDatabase } from "../persistence.server.ts";
 import { LotusStore } from "../lotus.server.ts";
 import { rank, render, type LotusMemory, type LotusScope } from "../lotus.ts";
 import type { Skill } from "./skills.ts";
+import { signatureTags, type TaskSignature } from "./relevance.ts";
 
 /**
  * MA4-S2 Lotus Memory integration for agent experience. This is an ADAPTER over the existing Lotus store, not a second
@@ -27,6 +28,7 @@ export type Retrieved = { memory: LotusMemory; meta: MemoryMeta; line: string };
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 const TAG = /^[a-z][a-z0-9-]{1,40}$/;
+const SIG_TAG = /^(?:cat|op|fmt|in):[A-Za-z0-9<>.:_-]{1,40}$/;
 
 export class ExperienceMemory {
   host: HostDatabase;
@@ -50,12 +52,15 @@ export class ExperienceMemory {
   }
 
   /** A deterministic-gate outcome, written as Host text built only from Host facts (status, kinds, categories). */
-  recordExperience(scope: LotusScope, e: Experience, sensitivity: Sensitivity, now = Date.now()): LotusMemory | null {
+  recordExperience(scope: LotusScope, e: Experience, sensitivity: Sensitivity, now = Date.now(), signature?: TaskSignature): LotusMemory | null {
     if (!this.policy().enabled) return null;
     const tags = e.tags.filter(t => TAG.test(t)).slice(0, 8);
+    // MA4-S2R1: the task signature travels as metadata tags so retrieval can gate the record like a skill.
+    const sigTags = signature ? signatureTags(signature).filter(t => SIG_TAG.test(t)).slice(0, 12) : [];
     const repairs = e.repairs.map(r => `${r.target} repair for ${r.categories.join("/")} ${r.outcome}`).join("; ");
     const value = `${e.kind} task [${tags.join(", ")}]: ${e.status}${e.status === "passed" ? (e.firstAttempt ? " on the first attempt" : " after repair") : ""}${repairs ? `; ${repairs}` : ""}${e.skills.length ? `; skills used: ${e.skills.join(", ")}` : ""}.`;
-    return this.write(scope, "inner", `experience:${e.kind}:${tags.join("+") || "untagged"}`, value, "experience", tags, sensitivity, 1, now, [`host:workflow:${e.taskId}`]);
+    const key = signature ? `experience:${e.kind}:${[...signature.operations, ...signature.formats].join("+") || "unsigned"}` : `experience:${e.kind}:${tags.join("+") || "untagged"}`;
+    return this.write(scope, "inner", key, value, "experience", [...tags, ...sigTags], sensitivity, 1, now, [`host:workflow:${e.taskId}`]);
   }
 
   /** The central bud holds a Host-written pointer to a qualified skill: name, version, tags and evidence counts only. */

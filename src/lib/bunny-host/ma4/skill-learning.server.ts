@@ -4,33 +4,58 @@ import type { LotusScope } from "../lotus.ts";
 import type { CodingTask, Guidance, ModelCall, WorkflowResult } from "./coding-workflow.server.ts";
 import type { ExperienceMemory } from "./experience.server.ts";
 import type { SkillRegistry } from "./skills.server.ts";
-import { renderGuidance, selectSkills, SkillProposalSchema, taskTags, usable, type Skill, type SkillProposal, type UseMode } from "./skills.ts";
+import { SkillProposalSchema, type Skill, type SkillProposal, type UseMode } from "./skills.ts";
+import { eligibility, experienceEligibility, renderAdvisory, safeMemoryText, selectRelevant, signatureHash, taskSignature, type GateContext, type SignatureInput, type SkillDecision, type TaskSignature } from "./relevance.ts";
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 
+/** What one task's retrieval did: the signature, every candidate's decision, what was selected, cost and latency. */
+export type RetrievalDecision = {
+  signature: TaskSignature; signatureSha256: string; latencyMs: number;
+  skills: { inspected: number; eligible: number; rejected: number; selected: { id: string; name: string; version: number; score: number | null; excerptChars: number } | null; decisions: SkillDecision[] };
+  experience: { inspected: number; selected: string | null; rejected: { memoryId: string; reasons: string[] }[] };
+};
+
 /**
- * Arm C guidance. Lotus is the retrieval stem: it returns the Host-written skill pointers and verified experience
- * records for the task's Host-derived tags from the authorized scopes; the registry supplies the procedure text of
- * pointed-to skills that are usable in this mode. Memory disabled → no pointers → no guidance at all.
+ * MA4-S2R1 guidance. Lotus is the retrieval stem: it returns the Host-written skill pointers (and, unless
+ * `experience` is false, verified experience records) from the authorized scopes only; the registry supplies the
+ * pointed-to skills; relevance.ts decides — at most one skill, only if it is eligible for this task's signature, and
+ * nothing when none is. The chosen skill is re-checked against the registry on every call, so a rollback, quarantine
+ * or replaced text removes it from the next prompt. Memory disabled → no pointers → no guidance at all.
  */
-export function buildGuidance(input: { registry: SkillRegistry; memory: ExperienceMemory; scopes: LotusScope[]; task: Pick<CodingTask, "spec" | "testerRule">; mode: UseMode; maxChars?: number; now?: number }): { guidance: Guidance; skillIds: () => string[] } {
-  const tags = taskTags(input.task), max = input.maxChars ?? 1200, used = new Set<string>();
-  const pointers = input.memory.retrieve(input.scopes, tags, { types: ["skill-pointer"], limit: 6, now: input.now });
-  const pointed = pointers.map(p => /^skill:([a-z0-9-]+)@v(\d+)$/.exec(p.memory.key)).filter((m): m is RegExpExecArray => !!m);
-  const skills = input.registry.list().filter(s => pointed.some(m => m[1] === s.name && Number(m[2]) === s.version) && usable(s, input.mode));
-  const experiences = input.memory.retrieve(input.scopes, tags, { types: ["experience"], limit: 3, now: input.now });
-  const guidance: Guidance = ({ role, phase, categories }) => {
-    const chosen = selectSkills(skills, { role, tags, categories: phase === "repair" ? categories : undefined, mode: input.mode, limit: 3 });
-    const notes = role === "Planner" || phase === "repair" ? experiences.map(e => `- ${e.line}`) : [];
-    let text = renderGuidance(chosen, max);
-    if (notes.length) {
-      const block = ["VERIFIED EXPERIENCE (Host records of earlier outcomes on similar tasks; advisory):", ...notes].join("\n");
-      if (text.length + block.length + 1 <= max) text = text ? `${text}\n${block}` : block;
-    }
-    for (const s of chosen) used.add(s.id);
-    return { text, sources: [...chosen.map(s => `skill:${s.id}`), ...(notes.length && text.includes("VERIFIED EXPERIENCE") ? experiences.map(e => `memory:${e.memory.id}`) : [])] };
+export function buildGuidance(input: { registry: SkillRegistry; memory: ExperienceMemory; scopes: LotusScope[]; task: SignatureInput; mode: UseMode; experience?: boolean; now?: number; authorizedScopes?: string[]; grantedPermissions?: string[] }): { guidance: Guidance; skillIds: () => string[]; decision: RetrievalDecision } {
+  const started = performance.now(), now = input.now ?? Date.now();
+  const sig = taskSignature(input.task, { projectScope: input.scopes[0] ?? "" });
+  const ctx: GateContext = { mode: input.mode, now, authorizedScopes: input.authorizedScopes, grantedPermissions: input.grantedPermissions };
+  const pointed = input.memory.retrieve(input.scopes, [], { types: ["skill-pointer"], limit: 50, now })
+    .map(p => /^skill:([a-z0-9-]+)@v(\d+)$/.exec(p.memory.key)).filter((m): m is RegExpExecArray => !!m);
+  const candidates = input.registry.list().filter(s => pointed.some(m => m[1] === s.name && Number(m[2]) === s.version));
+  const pick = selectRelevant(candidates, sig, ctx);
+  let line = "", lineId: string | null = null;
+  const records = input.experience === false ? [] : input.memory.retrieve(input.scopes, [], { types: ["experience"], limit: 50, now });
+  const rejected: { memoryId: string; reasons: string[] }[] = [];
+  for (const r of records) {
+    const reasons = [...experienceEligibility(r.meta.tags, sig), ...(safeMemoryText(`${r.memory.key} ${r.memory.value}`) ? [] : ["unsafe content"])];
+    if (reasons.length || lineId) { if (reasons.length) rejected.push({ memoryId: r.memory.id, reasons }); continue; }
+    line = r.line; lineId = r.memory.id;
+  }
+  const chosen = pick.selected ? pick.decisions.find(d => d.skillId === pick.selected!.id)! : null;
+  const decision: RetrievalDecision = { signature: sig, signatureSha256: signatureHash(sig), latencyMs: +(performance.now() - started).toFixed(2),
+    skills: { inspected: candidates.length, eligible: pick.decisions.filter(d => d.eligible).length, rejected: pick.decisions.filter(d => !d.eligible).length,
+      selected: chosen && { id: chosen.skillId, name: chosen.name, version: chosen.version, score: chosen.score, excerptChars: chosen.excerptChars }, decisions: pick.decisions },
+    experience: { inspected: records.length, selected: lineId, rejected } };
+  const used = new Set<string>();
+  const guidance: Guidance = ({ role, phase }) => {
+    const s = pick.selected;
+    const current = s && (s.roles as readonly string[]).includes(role) ? input.registry.get(s.id) : null;
+    const skillText = current && !eligibility(current, sig, { ...ctx, now: input.now ?? Date.now() }).length ? pick.text : "";
+    const note = role === "Planner" || phase === "repair" ? line : "";
+    const text = renderAdvisory(skillText, note);
+    const sources = [...(skillText && text.includes("- procedure") ? [`skill:${s!.id}`] : []), ...(note && text.includes("- experience") ? [`memory:${lineId}`] : [])];
+    if (sources.some(x => x.startsWith("skill:"))) used.add(s!.id);
+    return { text, sources };
   };
-  return { guidance, skillIds: () => [...used] };
+  return { guidance, skillIds: () => [...used], decision };
 }
 
 const EXTRACT_SCHEMA = z.toJSONSchema(SkillProposalSchema) as Record<string, unknown>;
