@@ -33,4 +33,4 @@ no persistent external monitoring.
 
 ## 3. Regression and sandbox results
 
-Filled in from the actual runs in ENGINEERING_REPORT.md (RELEASE section).
+WSL2 adversarial sandbox F4.1–F4.11 and F5 seccomp: pass live (`evidence/regression-stage4-test-ma4.log`). Full regression, UI, typecheck, builds and audit: ENGINEERING_REPORT.md RELEASE. Hosted runners lack WSL2 user namespaces, so CI reports the sandbox fixtures SKIPPED (never counted as passed).
