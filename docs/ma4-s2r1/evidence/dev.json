@@ -1,0 +1,2614 @@
+{
+  "version": "bunny-ma4-s2r1-eval-v1",
+  "phase": "dev",
+  "taskHash": "76238698bc53c99b510606afcc5a91597955f06a91fa3f1cb9005e827ad72d8e",
+  "pins": {
+    "Planner": "qwen2.5-coder:7b",
+    "Worker": "qwen2.5-coder:7b",
+    "Tester": "huihui_ai/qwen2.5-abliterate:7b",
+    "Reviewer": "qwen2.5-coder:7b"
+  },
+  "seed": 2610230001,
+  "candidate": {
+    "commit": "8b2fff89a72e094783d424e0c472448af8729273",
+    "dirty": "?? scripts/ma4-s2r1/corpus.mjs\n?? scripts/ma4-s2r1/eval.mjs\n?? scripts/ma4-s2r1/relevance-report.mjs"
+  },
+  "corpus": {
+    "scope": "project:ma4-s2r1-eval",
+    "copied": []
+  },
+  "team": {
+    "members": [
+      "Coordinator",
+      "Planner",
+      "Worker",
+      "Tester",
+      "Reviewer",
+      "Researcher"
+    ]
+  },
+  "schedule": {
+    "mode": "grouped",
+    "reason": "Worker and Tester models need 8.4 GiB together but 6 GiB of VRAM is available; calls are grouped by model."
+  },
+  "sandbox": {
+    "available": true,
+    "backend": "wsl2-userns-pivot_root-cgroupv2",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2"
+  },
+  "order": [
+    "A:d-medskip#1",
+    "C:d-medskip#1",
+    "C:d-wordindex#1",
+    "A:d-wordindex#1",
+    "C:d-clamp#1",
+    "A:d-clamp#1",
+    "C:d-hhmm#1",
+    "A:d-hhmm#1",
+    "C:d-slugpath#1",
+    "A:d-slugpath#1",
+    "A:d-chunksum#1",
+    "C:d-chunksum#1",
+    "A:d-adddays#1",
+    "C:d-adddays#1",
+    "A:d-mean#1",
+    "C:d-mean#1"
+  ],
+  "startedAt": "2026-10-23T12:03:38.149Z",
+  "runs": [
+    {
+      "arm": "A",
+      "task": "d-medskip",
+      "kind": "simple",
+      "relation": "applicable",
+      "family": "median",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 70924,
+      "modelCalls": 5,
+      "promptTokens": 2460,
+      "outputTokens": 759,
+      "promptChars": 10084,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 31685,
+          "loadMs": 19581,
+          "promptTokens": 166
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 8377,
+          "loadMs": 48,
+          "promptTokens": 529
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7677,
+          "loadMs": 13,
+          "promptTokens": 529
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 10747,
+          "loadMs": 6952,
+          "promptTokens": 569
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7780,
+          "loadMs": 6171,
+          "promptTokens": 667
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 9,
+        "refused": 0
+      },
+      "retrieval": null,
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 1,
+            "valid": 1,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def median_ignore_none(values):\n    filtered_values = [v for v in values if v is not None]\n    if not filtered_values:\n        raise ValueError(\"No numbers left after ignoring None values\")\n    sorted_values = sorted(filtered_values)\n    n = len(sorted_values)\n    mid = n // 2\n    if n % 2 == 1:\n        return float(sorted_values[mid])\n    else:\n        return (sorted_values[mid - 1] + sorted_values[mid]) / 2.0\n"
+    },
+    {
+      "arm": "C",
+      "task": "d-medskip",
+      "kind": "simple",
+      "relation": "applicable",
+      "family": "median",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 80924,
+      "modelCalls": 6,
+      "promptTokens": 4214,
+      "outputTokens": 1457,
+      "promptChars": 16514,
+      "injectedChars": 2526,
+      "callsWithGuidance": 5,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15864,
+          "loadMs": 3823,
+          "promptTokens": 292
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11481,
+          "loadMs": 9,
+          "promptTokens": 656
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11883,
+          "loadMs": 11,
+          "promptTokens": 656
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 15371,
+          "loadMs": 5427,
+          "promptTokens": 696
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15352,
+          "loadMs": 5368,
+          "promptTokens": 1040
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5584,
+          "loadMs": 9,
+          "promptTokens": 874
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 11,
+        "refused": 0
+      },
+      "retrieval": {
+        "latencyMs": 12.54,
+        "signature": {
+          "category": "implement",
+          "operations": [
+            "median"
+          ],
+          "inputTypes": [
+            "list<number>"
+          ],
+          "formats": []
+        },
+        "inspected": 4,
+        "eligible": 2,
+        "rejected": 2,
+        "selected": {
+          "id": "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+          "name": "compute-median",
+          "version": 1,
+          "score": 3.325,
+          "excerptChars": 270
+        },
+        "experienceInspected": 1,
+        "experienceSelected": "e12804fc-61ff-4749-a2ef-962cb8e19b67",
+        "experienceRejected": 0
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "2c08be0a18ae2ad6cb2f2cd72d6e645dd6c32d4792aab0be32e8e4472b9d1772",
+          "chars": 535,
+          "sources": [
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7",
+            "memory:e12804fc-61ff-4749-a2ef-962cb8e19b67"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "fd854861a6055ef150b46638aea67fca968bc9fa040869fbde444212076fb8b0",
+          "chars": 364,
+          "sources": [
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "fd854861a6055ef150b46638aea67fca968bc9fa040869fbde444212076fb8b0",
+          "chars": 364,
+          "sources": [
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "2c08be0a18ae2ad6cb2f2cd72d6e645dd6c32d4792aab0be32e8e4472b9d1772",
+          "chars": 535,
+          "sources": [
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7",
+            "memory:e12804fc-61ff-4749-a2ef-962cb8e19b67"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "871ea9a5-c919-4c37-bb7a-722ab18113d7"
+      ],
+      "memorySeen": [
+        "memory:e12804fc-61ff-4749-a2ef-962cb8e19b67"
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 4,
+            "valid": 3,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def median_ignore_none(values):\n    # Check if the list is empty\n    if not values:\n        raise ValueError(\"No numbers left after ignoring None values\")\n    \n    # Filter out None values from the list\n    filtered_values = [x for x in values if x is not None]\n    \n    # Sort the filtered list of numbers\n    sorted_values = sorted(filtered_values)\n    \n    # Determine the length of the sorted list\n    n = len(sorted_values)\n    \n    # If the length is odd, return the middle element\n    if n % 2 == 1:\n        return float(sorted_values[n // 2])\n    # If the length is even, return the average of the two middle elements\n    else:\n        return (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2.0\n"
+    },
+    {
+      "arm": "C",
+      "task": "d-wordindex",
+      "kind": "planning",
+      "relation": "none",
+      "family": null,
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 87599,
+      "modelCalls": 5,
+      "promptTokens": 3343,
+      "outputTokens": 1565,
+      "promptChars": 13798,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17419,
+          "loadMs": 3673,
+          "promptTokens": 182
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12799,
+          "loadMs": 9,
+          "promptTokens": 619
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12464,
+          "loadMs": 69,
+          "promptTokens": 619
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 32328,
+          "loadMs": 5956,
+          "promptTokens": 659
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7903,
+          "loadMs": 5844,
+          "promptTokens": 1264
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 9,
+        "refused": 0
+      },
+      "retrieval": {
+        "latencyMs": 1.39,
+        "signature": {
+          "category": "plan",
+          "operations": [],
+          "inputTypes": [
+            "str"
+          ],
+          "formats": []
+        },
+        "inspected": 4,
+        "eligible": 0,
+        "rejected": 4,
+        "selected": null,
+        "experienceInspected": 2,
+        "experienceSelected": null,
+        "experienceRejected": 2
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 6,
+            "valid": 4,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\nclass WordIndex:\n    def __init__(self):\n        self.index = {}\n\n    def add(self, doc_id, text):\n        if not doc_id:\n            raise ValueError(\"doc_id must be a non-empty string\")\n        words = re.findall(r'\\b[a-z]+\\b', text.lower())\n        self.index[doc_id] = set(words)\n\n    def lookup(self, word):\n        word = word.lower()\n        return sorted(doc_id for doc_id, words in self.index.items() if word in words)\n\n    def remove(self, doc_id):\n        if doc_id not in self.index:\n            raise KeyError(\"doc_id was never added\")\n        del self.index[doc_id]\n"
+    },
+    {
+      "arm": "A",
+      "task": "d-wordindex",
+      "kind": "planning",
+      "relation": "none",
+      "family": null,
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 77647,
+      "modelCalls": 5,
+      "promptTokens": 3293,
+      "outputTokens": 1401,
+      "promptChars": 13035,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19244,
+          "loadMs": 4312,
+          "promptTokens": 182
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11662,
+          "loadMs": 7,
+          "promptTokens": 667
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10644,
+          "loadMs": 9,
+          "promptTokens": 667
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 20995,
+          "loadMs": 5355,
+          "promptTokens": 707
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10467,
+          "loadMs": 5441,
+          "promptTokens": 1070
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 9,
+        "refused": 0
+      },
+      "retrieval": null,
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 6,
+            "valid": 2,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\nclass WordIndex:\n    def __init__(self):\n        self.index = {}\n\n    def add(self, doc_id, text):\n        if not doc_id:\n            raise ValueError(\"doc_id must be a non-empty string\")\n        words = re.findall(r'\\b[a-z]+\\b', text.lower())\n        self.index[doc_id] = words\n\n    def lookup(self, word):\n        word = word.lower()\n        return sorted(doc_id for doc_id, words in self.index.items() if word in words)\n\n    def remove(self, doc_id):\n        if doc_id not in self.index:\n            raise KeyError(f\"Document with id '{doc_id}' not found\")\n        del self.index[doc_id]\n"
+    },
+    {
+      "arm": "C",
+      "task": "d-clamp",
+      "kind": "debugging",
+      "relation": "none",
+      "family": null,
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 78116,
+      "modelCalls": 7,
+      "promptTokens": 3700,
+      "outputTokens": 1480,
+      "promptChars": 13512,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12226,
+          "loadMs": 3593,
+          "promptTokens": 170
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6153,
+          "loadMs": 16,
+          "promptTokens": 507
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 4307,
+          "loadMs": 8,
+          "promptTokens": 507
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5547,
+          "loadMs": 11,
+          "promptTokens": 507
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 24640,
+          "loadMs": 4570,
+          "promptTokens": 547
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9080,
+          "loadMs": 4475,
+          "promptTokens": 619
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11368,
+          "loadMs": 11,
+          "promptTokens": 843
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0
+      },
+      "retrieval": {
+        "latencyMs": 1.09,
+        "signature": {
+          "category": "debug",
+          "operations": [],
+          "inputTypes": [],
+          "formats": []
+        },
+        "inspected": 4,
+        "eligible": 0,
+        "rejected": 4,
+        "selected": null,
+        "experienceInspected": 3,
+        "experienceSelected": null,
+        "experienceRejected": 3
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 10,
+            "valid": 6,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def clamp(x, lo, hi):\n    if lo > hi:\n        lo, hi = hi, lo\n    if x < lo:\n        return lo\n    if x > hi:\n        return hi\n    return x\n"
+    },
+    {
+      "arm": "A",
+      "task": "d-clamp",
+      "kind": "debugging",
+      "relation": "none",
+      "family": null,
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 98008,
+      "modelCalls": 8,
+      "promptTokens": 4740,
+      "outputTokens": 1806,
+      "promptChars": 17652,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14220,
+          "loadMs": 4308,
+          "promptTokens": 170
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5483,
+          "loadMs": 8,
+          "promptTokens": 542
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 3841,
+          "loadMs": 11,
+          "promptTokens": 542
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7057,
+          "loadMs": 8,
+          "promptTokens": 542
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 30578,
+          "loadMs": 5987,
+          "promptTokens": 582
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10563,
+          "loadMs": 5906,
+          "promptTokens": 654
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5118,
+          "loadMs": 8,
+          "promptTokens": 810
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14254,
+          "loadMs": 6,
+          "promptTokens": 898
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 14,
+        "refused": 0
+      },
+      "retrieval": null,
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 11,
+            "valid": 7,
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 11,
+            "valid": 7,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 11,
+            "valid": 7,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 3
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def clamp(x, lo, hi):\n    if lo > hi:\n        lo, hi = hi, lo\n    if x < lo:\n        return lo\n    if x > hi:\n        return hi\n    return x\n"
+    },
+    {
+      "arm": "C",
+      "task": "d-hhmm",
+      "kind": "strict",
+      "relation": "near-miss",
+      "family": "date-iso",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 101290,
+      "modelCalls": 7,
+      "promptTokens": 5085,
+      "outputTokens": 1881,
+      "promptChars": 19173,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 22754,
+          "loadMs": 3949,
+          "promptTokens": 163
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17157,
+          "loadMs": 9,
+          "promptTokens": 727
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7402,
+          "loadMs": 8,
+          "promptTokens": 727
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 16338,
+          "loadMs": 11,
+          "promptTokens": 727
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 15453,
+          "loadMs": 6256,
+          "promptTokens": 767
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 7736,
+          "loadMs": 10,
+          "promptTokens": 1030
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7694,
+          "loadMs": 5932,
+          "promptTokens": 944
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0
+      },
+      "retrieval": {
+        "latencyMs": 1.78,
+        "signature": {
+          "category": "implement",
+          "operations": [
+            "parse-time"
+          ],
+          "inputTypes": [
+            "str"
+          ],
+          "formats": [
+            "HH:MM"
+          ]
+        },
+        "inspected": 4,
+        "eligible": 0,
+        "rejected": 4,
+        "selected": null,
+        "experienceInspected": 5,
+        "experienceSelected": null,
+        "experienceRejected": 5
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "outcome": "resolved"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 4,
+            "valid": 4,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 3,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef hhmm_minutes(text):\n    if not isinstance(text, str):\n        raise ValueError(\"Input must be a string.\")\n    \n    if not re.match(r'^\\d{2}:\\d{2}$', text):\n        raise ValueError(\"Input must be in the format HH:MM.\")\n    \n    hours, minutes = map(int, text.split(':'))\n    if hours < 0 or hours > 23 or minutes < 0 or minutes > 59:\n        raise ValueError(\"Invalid time format.\")\n    \n    return hours * 60 + minutes\n"
+    },
+    {
+      "arm": "A",
+      "task": "d-hhmm",
+      "kind": "strict",
+      "relation": "near-miss",
+      "family": "date-iso",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 85647,
+      "modelCalls": 7,
+      "promptTokens": 4690,
+      "outputTokens": 1579,
+      "promptChars": 18187,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19553,
+          "loadMs": 3674,
+          "promptTokens": 163
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 8530,
+          "loadMs": 12,
+          "promptTokens": 667
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 8739,
+          "loadMs": 7,
+          "promptTokens": 667
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7405,
+          "loadMs": 7,
+          "promptTokens": 667
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 16675,
+          "loadMs": 6069,
+          "promptTokens": 707
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12065,
+          "loadMs": 5457,
+          "promptTokens": 833
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7853,
+          "loadMs": 10,
+          "promptTokens": 986
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0
+      },
+      "retrieval": null,
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 5,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef hhmm_minutes(text):\n    if not isinstance(text, str) or len(text) != 5 or text[2] != ':':\n        raise ValueError(\"Input must be a string in the format 'HH:MM'\")\n    \n    if not re.match(r'^\\d{2}:\\d{2}$', text):\n        raise ValueError(\"Invalid time format\")\n    \n    hours, minutes = map(int, text.split(':'))\n    return hours * 60 + minutes\n"
+    },
+    {
+      "arm": "C",
+      "task": "d-slugpath",
+      "kind": "simple",
+      "relation": "applicable",
+      "family": "slug",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 76435,
+      "modelCalls": 6,
+      "promptTokens": 4929,
+      "outputTokens": 1357,
+      "promptChars": 20396,
+      "injectedChars": 1314,
+      "callsWithGuidance": 3,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 24350,
+          "loadMs": 3961,
+          "promptTokens": 181
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 8536,
+          "loadMs": 14,
+          "promptTokens": 891
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7786,
+          "loadMs": 7,
+          "promptTokens": 891
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13683,
+          "loadMs": 5254,
+          "promptTokens": 831
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12445,
+          "loadMs": 5281,
+          "promptTokens": 1158
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5094,
+          "loadMs": 7,
+          "promptTokens": 977
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 11,
+        "refused": 0
+      },
+      "retrieval": {
+        "latencyMs": 2.05,
+        "signature": {
+          "category": "implement",
+          "operations": [
+            "slugify"
+          ],
+          "inputTypes": [
+            "list<str>",
+            "str"
+          ],
+          "formats": []
+        },
+        "inspected": 4,
+        "eligible": 1,
+        "rejected": 3,
+        "selected": {
+          "id": "3b6999ed-7583-43ca-aab9-ca05975ace17",
+          "name": "slugify",
+          "version": 1,
+          "score": 3.14,
+          "excerptChars": 344
+        },
+        "experienceInspected": 7,
+        "experienceSelected": null,
+        "experienceRejected": 7
+      },
+      "guidance": [
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "7cdd1f6f8abac8a19e6af1f179e3e529597c45269b02e49d80e972898b874358",
+          "chars": 438,
+          "sources": [
+            "skill:3b6999ed-7583-43ca-aab9-ca05975ace17"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "7cdd1f6f8abac8a19e6af1f179e3e529597c45269b02e49d80e972898b874358",
+          "chars": 438,
+          "sources": [
+            "skill:3b6999ed-7583-43ca-aab9-ca05975ace17"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "3b6999ed-7583-43ca-aab9-ca05975ace17"
+      ],
+      "memorySeen": [],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 3,
+            "valid": 3,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef slug_path(parts):\n    slugged_parts = []\n    for part in parts:\n        slug = re.sub(r'[^a-z0-9]+', '-', part).strip('-').lower()\n        if slug:\n            slugged_parts.append(slug)\n    if not slugged_parts:\n        raise ValueError(\"No valid parts left after processing\")\n    return '/'.join(slugged_parts)\n"
+    },
+    {
+      "arm": "A",
+      "task": "d-slugpath",
+      "kind": "simple",
+      "relation": "applicable",
+      "family": "slug",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 53816,
+      "modelCalls": 5,
+      "promptTokens": 2573,
+      "outputTokens": 786,
+      "promptChars": 10010,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14333,
+          "loadMs": 3731,
+          "promptTokens": 181
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6822,
+          "loadMs": 6,
+          "promptTokens": 542
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5114,
+          "loadMs": 9,
+          "promptTokens": 542
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 15215,
+          "loadMs": 6211,
+          "promptTokens": 582
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7620,
+          "loadMs": 5949,
+          "promptTokens": 726
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 9,
+        "refused": 0
+      },
+      "retrieval": null,
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 4,
+            "valid": 4,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef slug_path(parts):\n    slugs = []\n    for part in parts:\n        slug = re.sub(r'[^a-z0-9]+', '-', part.lower()).strip('-')\n        if slug:\n            slugs.append(slug)\n    if not slugs:\n        raise ValueError(\"No valid slug parts left\")\n    return '/'.join(slugs)\n"
+    },
+    {
+      "arm": "A",
+      "task": "d-chunksum",
+      "kind": "intermediate",
+      "relation": "none",
+      "family": null,
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 98916,
+      "modelCalls": 5,
+      "promptTokens": 4470,
+      "outputTokens": 1922,
+      "promptChars": 14171,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 29728,
+          "loadMs": 3470,
+          "promptTokens": 171
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14368,
+          "loadMs": 14,
+          "promptTokens": 923
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 35406,
+          "loadMs": 5378,
+          "promptTokens": 963
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10790,
+          "loadMs": 5054,
+          "promptTokens": 1045
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5288,
+          "loadMs": 11,
+          "promptTokens": 1368
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 10,
+        "refused": 0
+      },
+      "retrieval": null,
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "reviewer_false_approval",
+          "component": "reviewer"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 9,
+            "valid": 8,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def chunk_sums(xs, size):\n    if not isinstance(size, int) or size < 1:\n        raise ValueError(\"size must be an int >= 1\")\n    return [sum(xs[i:i+size]) for i in range(0, len(xs), size)]\n"
+    },
+    {
+      "arm": "C",
+      "task": "d-chunksum",
+      "kind": "intermediate",
+      "relation": "none",
+      "family": null,
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 83145,
+      "modelCalls": 5,
+      "promptTokens": 4097,
+      "outputTokens": 1526,
+      "promptChars": 13237,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 27831,
+          "loadMs": 4892,
+          "promptTokens": 171
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7439,
+          "loadMs": 11,
+          "promptTokens": 851
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 28463,
+          "loadMs": 5131,
+          "promptTokens": 891
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11085,
+          "loadMs": 5996,
+          "promptTokens": 974
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5213,
+          "loadMs": 11,
+          "promptTokens": 1210
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 10,
+        "refused": 0
+      },
+      "retrieval": {
+        "latencyMs": 1.47,
+        "signature": {
+          "category": "implement",
+          "operations": [],
+          "inputTypes": [],
+          "formats": []
+        },
+        "inspected": 4,
+        "eligible": 0,
+        "rejected": 4,
+        "selected": null,
+        "experienceInspected": 10,
+        "experienceSelected": null,
+        "experienceRejected": 10
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "reviewer_false_approval",
+          "component": "reviewer"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 7,
+            "valid": 6,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def chunk_sums(xs, size):\n    if not isinstance(size, int) or size < 1:\n        raise ValueError(\"size must be an int >= 1\")\n    \n    return [sum(xs[i:i+size]) for i in range(0, len(xs), size)]\n"
+    },
+    {
+      "arm": "A",
+      "task": "d-adddays",
+      "kind": "strict",
+      "relation": "applicable",
+      "family": "date-iso",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 106260,
+      "modelCalls": 7,
+      "promptTokens": 5667,
+      "outputTokens": 2067,
+      "promptChars": 21532,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 22608,
+          "loadMs": 3853,
+          "promptTokens": 225
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 16727,
+          "loadMs": 7,
+          "promptTokens": 799
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15059,
+          "loadMs": 8,
+          "promptTokens": 799
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14599,
+          "loadMs": 11,
+          "promptTokens": 799
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 10034,
+          "loadMs": 4816,
+          "promptTokens": 839
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20198,
+          "loadMs": 6103,
+          "promptTokens": 1109
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 1910,
+          "loadMs": 6,
+          "promptTokens": 1097
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0
+      },
+      "retrieval": null,
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "reviewer_false_approval",
+          "component": "reviewer"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 1,
+            "valid": 1,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": true,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\nfrom datetime import datetime, timedelta\n\ndef add_days(text, n):\n    # Regular expression to validate the date format\n    date_pattern = r'^\\d{4}-\\d{2}-\\d{2}$'\n    \n    # Validate the input date format\n    if not re.match(date_pattern, text):\n        raise ValueError(\"Invalid date format. Please use YYYY-MM-DD.\")\n    \n    # Convert the input date string to a datetime object\n    date_obj = datetime.strptime(text, '%Y-%m-%d')\n    \n    # Add or subtract the specified number of days\n    new_date_obj = date_obj + timedelta(days=n)\n    \n    # Check if the resulting date is within the valid range (1 to 9999)\n    if new_date_obj.year < 1 or new_date_obj.year > 9999:\n        raise ValueError(\"Resulting date is outside the valid range of years (1 to 9999).\")\n    \n    # Convert the resulting datetime object back to a string in the 'YYYY-MM-DD' format\n    new_date_str = new_date_obj.strftime('%Y-%m-%d')\n    \n    return new_date_str\n"
+    },
+    {
+      "arm": "C",
+      "task": "d-adddays",
+      "kind": "strict",
+      "relation": "applicable",
+      "family": "date-iso",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 117367,
+      "modelCalls": 7,
+      "promptTokens": 7067,
+      "outputTokens": 2302,
+      "promptChars": 27122,
+      "injectedChars": 2778,
+      "callsWithGuidance": 6,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 27515,
+          "loadMs": 3941,
+          "promptTokens": 333
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19092,
+          "loadMs": 10,
+          "promptTokens": 1024
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13851,
+          "loadMs": 8,
+          "promptTokens": 1024
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19057,
+          "loadMs": 7,
+          "promptTokens": 1024
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 10220,
+          "loadMs": 5345,
+          "promptTokens": 1064
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20303,
+          "loadMs": 5367,
+          "promptTokens": 1364
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 2039,
+          "loadMs": 6,
+          "promptTokens": 1234
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0
+      },
+      "retrieval": {
+        "latencyMs": 1.41,
+        "signature": {
+          "category": "implement",
+          "operations": [
+            "parse-date"
+          ],
+          "inputTypes": [
+            "str"
+          ],
+          "formats": [
+            "YYYY-MM-DD"
+          ]
+        },
+        "inspected": 4,
+        "eligible": 1,
+        "rejected": 3,
+        "selected": {
+          "id": "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+          "name": "parse-date-procedure",
+          "version": 1,
+          "score": 5.077,
+          "excerptChars": 369
+        },
+        "experienceInspected": 11,
+        "experienceSelected": "55535250-e1cf-45e2-96d3-4d29b422c577",
+        "experienceRejected": 10
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "f7623d9e505b2528b4ee9b8f46d0746172ec28bdd27dd207aca1e4a30eb8d979",
+          "chars": 463,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "f7623d9e505b2528b4ee9b8f46d0746172ec28bdd27dd207aca1e4a30eb8d979",
+          "chars": 463,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "f7623d9e505b2528b4ee9b8f46d0746172ec28bdd27dd207aca1e4a30eb8d979",
+          "chars": 463,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "f7623d9e505b2528b4ee9b8f46d0746172ec28bdd27dd207aca1e4a30eb8d979",
+          "chars": 463,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "9074bbd4-ae5e-4863-96bd-36a7150064b4"
+      ],
+      "memorySeen": [],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "reviewer_false_approval",
+          "component": "reviewer"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 1,
+            "valid": 1,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": true,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\nfrom datetime import datetime, timedelta\n\ndef add_days(text, n):\n    # Regular expression pattern to match the date format YYYY-MM-DD\n    date_pattern = r'^\\d{4}-\\d{2}-\\d{2}$'\n    \n    # Check if the input text matches the date pattern\n    if not re.match(date_pattern, text):\n        raise ValueError('Invalid date format')\n    \n    # Split the input text by hyphens to extract the year, month, and day as strings\n    year, month, day = map(int, text.split('-'))\n    \n    # Create a datetime object from the year, month, and day\n    date_obj = datetime(year, month, day)\n    \n    # Add or subtract n days from the datetime object\n    new_date_obj = date_obj + timedelta(days=n)\n    \n    # Check if the resulting date is within the valid range of years from 1 to 9999\n    if new_date_obj.year < 1 or new_date_obj.year > 9999:\n        raise ValueError('Resulting date is outside the valid range of years from 1 to 9999')\n    \n    # Convert the resulting datetime object back to the YYYY-MM-DD format and return it\n    return new_date_obj.strftime('%Y-%m-%d')\n"
+    },
+    {
+      "arm": "A",
+      "task": "d-mean",
+      "kind": "simple",
+      "relation": "near-miss",
+      "family": "median",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 49481,
+      "modelCalls": 5,
+      "promptTokens": 2391,
+      "outputTokens": 703,
+      "promptChars": 10009,
+      "injectedChars": 0,
+      "callsWithGuidance": 0,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 16151,
+          "loadMs": 3715,
+          "promptTokens": 130
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7093,
+          "loadMs": 9,
+          "promptTokens": 535
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 4297,
+          "loadMs": 7,
+          "promptTokens": 535
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 9799,
+          "loadMs": 5466,
+          "promptTokens": 575
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7517,
+          "loadMs": 5929,
+          "promptTokens": 616
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 9,
+        "refused": 0
+      },
+      "retrieval": null,
+      "guidance": [],
+      "skillsSeen": [],
+      "memorySeen": [],
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 2,
+            "valid": 2,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def arithmetic_mean(values):\n    if not values:\n        raise ValueError('Input list is empty.')\n    return sum(values) / len(values)\n"
+    },
+    {
+      "arm": "C",
+      "task": "d-mean",
+      "kind": "simple",
+      "relation": "near-miss",
+      "family": "median",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 49139,
+      "modelCalls": 5,
+      "promptTokens": 2418,
+      "outputTokens": 715,
+      "promptChars": 10090,
+      "injectedChars": 239,
+      "callsWithGuidance": 1,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15713,
+          "loadMs": 3712,
+          "promptTokens": 182
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6768,
+          "loadMs": 8,
+          "promptTokens": 531
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5258,
+          "loadMs": 9,
+          "promptTokens": 531
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 10265,
+          "loadMs": 5987,
+          "promptTokens": 571
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6755,
+          "loadMs": 5165,
+          "promptTokens": 603
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 9,
+        "refused": 0
+      },
+      "retrieval": {
+        "latencyMs": 1.55,
+        "signature": {
+          "category": "implement",
+          "operations": [
+            "mean"
+          ],
+          "inputTypes": [
+            "list<number>"
+          ],
+          "formats": []
+        },
+        "inspected": 4,
+        "eligible": 0,
+        "rejected": 4,
+        "selected": null,
+        "experienceInspected": 13,
+        "experienceSelected": "94056729-9021-4233-aa36-1ad59bf9d2b2",
+        "experienceRejected": 12
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "af4f0f44db7c4b3c9abe768ab7e834e94c33d64cb5a1adebca961ea136578b48",
+          "chars": 239,
+          "sources": [
+            "memory:94056729-9021-4233-aa36-1ad59bf9d2b2"
+          ]
+        }
+      ],
+      "skillsSeen": [],
+      "memorySeen": [
+        "memory:94056729-9021-4233-aa36-1ad59bf9d2b2"
+      ],
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 1,
+            "valid": 1,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def arithmetic_mean(values):\n    if not values:\n        raise ValueError('Input list is empty.')\n    return sum(values) / len(values)\n"
+    }
+  ],
+  "skillsAtStart": [
+    {
+      "id": "27288db5-07b0-43c8-bd1f-a4ce6ceb53db",
+      "name": "caesar-shift-procedure",
+      "version": 1,
+      "state": "rejected",
+      "attested": false
+    },
+    {
+      "id": "cea87647-89d7-4152-9106-c5813de94518",
+      "name": "caesar-shift-procedure",
+      "version": 2,
+      "state": "rejected",
+      "attested": false
+    },
+    {
+      "id": "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+      "name": "calculate-median",
+      "version": 1,
+      "state": "benchmark_qualified",
+      "attested": true
+    },
+    {
+      "id": "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+      "name": "compute-median",
+      "version": 1,
+      "state": "benchmark_qualified",
+      "attested": true
+    },
+    {
+      "id": "87a6e429-6db0-4cd4-bddd-92b87e2dc017",
+      "name": "merge-intervals-procedure",
+      "version": 1,
+      "state": "rejected",
+      "attested": false
+    },
+    {
+      "id": "093ac0fc-4e32-44f2-8a80-c86081d6ef56",
+      "name": "parse-csv-line",
+      "version": 1,
+      "state": "rejected",
+      "attested": false
+    },
+    {
+      "id": "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+      "name": "parse-date-procedure",
+      "version": 1,
+      "state": "benchmark_qualified",
+      "attested": true
+    },
+    {
+      "id": "a8467799-6f8a-4931-9a28-7299f5d5ab8c",
+      "name": "parse-date-procedure",
+      "version": 2,
+      "state": "rejected",
+      "attested": false
+    },
+    {
+      "id": "3b6999ed-7583-43ca-aab9-ca05975ace17",
+      "name": "slugify",
+      "version": 1,
+      "state": "benchmark_qualified",
+      "attested": true
+    }
+  ],
+  "summary": {
+    "byArm": {
+      "A": {
+        "trials": 8,
+        "passed": 4,
+        "passInterval": [
+          0.2152125268244419,
+          0.7847874731755581
+        ],
+        "firstAttempt": 4,
+        "byKind": {
+          "simple": "3/3",
+          "planning": "1/1",
+          "debugging": "0/1",
+          "strict": "0/2",
+          "intermediate": "0/1"
+        },
+        "byRelation": {
+          "applicable": "2/3",
+          "none": "1/3",
+          "near-miss": "1/2"
+        },
+        "statuses": {
+          "passed": 4,
+          "failed": 4
+        },
+        "repairsUsed": 5,
+        "passedAfterRepair": 0,
+        "modelCalls": 47,
+        "promptTokens": 30284,
+        "outputTokens": 11023,
+        "injectedTokens": 0,
+        "injectedShareOfPrompt": 0,
+        "callsWithGuidance": 0,
+        "trialsWithSkill": 0,
+        "trialsWithExperience": 0,
+        "zeroInjectionTrials": 8,
+        "retrievalLatencyMs": null,
+        "modelLoads": 24,
+        "modelSwitches": 16,
+        "peakConcurrent": 1,
+        "callLatencyMs": {
+          "median": 10644,
+          "p95": 30578
+        },
+        "trialMs": {
+          "total": 640699,
+          "median": 85647
+        },
+        "failureCategories": {
+          "implementation_defect": 7,
+          "reviewer_false_approval": 2
+        },
+        "reviewerFalseApprovals": 2,
+        "handoffs": 84,
+        "handoffsRefused": 0,
+        "invariants": {
+          "pinsHeld": true,
+          "gateIsAuthority": true,
+          "noHandoffRefused": true
+        }
+      },
+      "C": {
+        "trials": 8,
+        "passed": 3,
+        "passInterval": [
+          0.13684175946152105,
+          0.6942621454161981
+        ],
+        "firstAttempt": 2,
+        "byKind": {
+          "simple": "1/3",
+          "planning": "1/1",
+          "debugging": "0/1",
+          "strict": "1/2",
+          "intermediate": "0/1"
+        },
+        "byRelation": {
+          "applicable": "0/3",
+          "none": "1/3",
+          "near-miss": "2/2"
+        },
+        "statuses": {
+          "failed": 5,
+          "passed": 3
+        },
+        "repairsUsed": 6,
+        "passedAfterRepair": 1,
+        "modelCalls": 48,
+        "promptTokens": 34853,
+        "outputTokens": 12283,
+        "injectedTokens": 1714,
+        "injectedShareOfPrompt": 0.0492,
+        "callsWithGuidance": 15,
+        "trialsWithSkill": 3,
+        "trialsWithExperience": 2,
+        "zeroInjectionTrials": 4,
+        "retrievalLatencyMs": 12.54,
+        "modelLoads": 24,
+        "modelSwitches": 16,
+        "peakConcurrent": 1,
+        "callLatencyMs": {
+          "median": 12226,
+          "p95": 27831
+        },
+        "trialMs": {
+          "total": 674015,
+          "median": 83145
+        },
+        "failureCategories": {
+          "implementation_defect": 7,
+          "test_invalid": 1,
+          "reviewer_false_approval": 2
+        },
+        "reviewerFalseApprovals": 2,
+        "handoffs": 86,
+        "handoffsRefused": 0,
+        "invariants": {
+          "pinsHeld": true,
+          "gateIsAuthority": true,
+          "noHandoffRefused": true
+        }
+      }
+    },
+    "retrievalQuality": {
+      "C": {
+        "falsePositiveTrials": [
+          "C:d-mean#1"
+        ],
+        "applicableTrials": 3,
+        "applicableWithSkill": 3
+      }
+    },
+    "externalRequestsRefused": 0,
+    "memoryWaitSamples": 0,
+    "minFreeGiB": 12.56,
+    "ledger": {
+      "id": "s2r1-dev",
+      "state": "completed",
+      "persisted": true,
+      "counts": {
+        "done": 16
+      },
+      "attempts": 16
+    },
+    "CvsA": {
+      "pairs": 8,
+      "wins": 1,
+      "losses": 2,
+      "difference": -1,
+      "signTestP": 0.875,
+      "taskLevel": {
+        "wins": 1,
+        "losses": 2,
+        "p": 0.875
+      }
+    }
+  },
+  "skillsAtEnd": [
+    {
+      "id": "27288db5-07b0-43c8-bd1f-a4ce6ceb53db",
+      "name": "caesar-shift-procedure",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "cea87647-89d7-4152-9106-c5813de94518",
+      "name": "caesar-shift-procedure",
+      "version": 2,
+      "state": "rejected"
+    },
+    {
+      "id": "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+      "name": "calculate-median",
+      "version": 1,
+      "state": "benchmark_qualified"
+    },
+    {
+      "id": "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+      "name": "compute-median",
+      "version": 1,
+      "state": "benchmark_qualified"
+    },
+    {
+      "id": "87a6e429-6db0-4cd4-bddd-92b87e2dc017",
+      "name": "merge-intervals-procedure",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "093ac0fc-4e32-44f2-8a80-c86081d6ef56",
+      "name": "parse-csv-line",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+      "name": "parse-date-procedure",
+      "version": 1,
+      "state": "benchmark_qualified"
+    },
+    {
+      "id": "a8467799-6f8a-4931-9a28-7299f5d5ab8c",
+      "name": "parse-date-procedure",
+      "version": 2,
+      "state": "rejected"
+    },
+    {
+      "id": "3b6999ed-7583-43ca-aab9-ca05975ace17",
+      "name": "slugify",
+      "version": 1,
+      "state": "benchmark_qualified"
+    }
+  ],
+  "finishedAt": "2026-10-23T12:25:34.659Z"
+}
