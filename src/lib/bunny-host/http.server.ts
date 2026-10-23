@@ -400,8 +400,9 @@ export async function startHost(
     instanceId: manager.instanceId,
     uiAttached: () => workstationClients.streams > 0 || Date.now() - workstationClients.seen < 20_000,
     emit: (type, detail) => manager.emit(db.event(type, null, detail)),
+    // Started only after this Host holds its port (below), so a lease left by any other instance is a dead Host's.
+    exclusive: true,
   });
-  await ptasks.start();
   const projects = new ProjectService(missions, agents);
   // M-A-3 T13.3: Personal Agent ownership, profiles and conversations. Context only; it owns no execution.
   const personalContext = new PersonalAgentContextStore(db);
@@ -2117,6 +2118,7 @@ export async function startHost(
     JSON.stringify({ token, port, pid: process.pid, instanceId: manager.instanceId }),
     { mode: 0o600 },
   );
+  await ptasks.start();
   let closing = false;
   let closed: Promise<void> | null = null;
   const loops: { stop: () => void }[] = [];

@@ -61,6 +61,8 @@ export type RuntimeDeps = {
   /** Kills a recorded child only if its identity (pid, birth time, image) still matches; returns whether it was alive. */
   killVerified?(identity: ProcessIdentity): Promise<boolean>;
   faults?(point: FaultPoint, taskId: string): void;
+  /** This runtime is the only one on its database (the Host holds its port): at startup, every foreign lease is a dead Host's. */
+  exclusive?: boolean;
 };
 type Active = { lease: Lease; abort: AbortController; done: Promise<void>; children: Set<ChildProcess> };
 const WORKSTATION = "workstation";
@@ -311,7 +313,7 @@ export class PersistentTaskRuntime {
     for (const row of this.store.list(["RUNNING"])) {
       if (!row.ok || this.active.has(row.record.id)) continue;
       const leased = row.leaseHolder && (row.leaseExpires ?? 0) > now;
-      if (leased && row.leaseHolder !== this.instanceId) continue; // another live Host holds it
+      if (leased && row.leaseHolder !== this.instanceId && !(startup && this.deps.exclusive)) continue; // another live Host holds it
       const record = row.record, ops = this.store.operations(record.id).filter(o => o.state === "started");
       const op = ops[0] ?? null, index = op ? record.steps.findIndex(s => s.id === op.stepId) : -1;
       try {
@@ -337,7 +339,11 @@ export class PersistentTaskRuntime {
     // Children recorded by a previous Host life: killed only when their exact identity still matches.
     for (const p of this.store.processes()) {
       if (this.active.has(p.taskId)) continue;
-      try { if (this.deps.killVerified) await this.deps.killVerified(p); this.store.forgetProcess(p); this.emit("ptask.orphan_cleaned", `Cleaned up a leftover child process of a recovered task.`, p.taskId); }
+      try {
+        const killed = this.deps.killVerified ? await this.deps.killVerified(p) : false;
+        this.store.forgetProcess(p);
+        this.emit("ptask.orphan_cleaned", killed ? "Stopped a leftover child process of a recovered task." : "A recorded child process had already ended with its Host.", p.taskId);
+      }
       catch (error) { this.emit("ptask.orphan_review", `A leftover child process could not be verified for cleanup: ${shortError(error)}`, p.taskId); }
     }
   }
