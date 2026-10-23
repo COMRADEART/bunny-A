@@ -15,6 +15,8 @@ import { killVerifiedProcess, processIdentity } from "./ma4/task-executors.serve
 
 const root = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
 const skip = process.platform === "win32" ? false : "verified process cleanup is a Windows Host capability";
+// Verified termination loads the reviewed native helper, which `npm run pretest` builds (it is not committed).
+const nativeSkip = skip || (existsSync(join(root, "native/bunny-owned-process.node")) ? false : "the native ownership helper is not built (run npm run pretest)");
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
 async function killedMidStep(mode: "read" | "send", detached = false) {
@@ -47,7 +49,7 @@ test("T1-18 real kill: a Host's ordinary child dies with it (kill-on-close Job);
   } finally { rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); }
 });
 
-test("T1-4/18 real kill during a read-only step: an escaped (detached) child is killed by verified identity; the step reruns once", { skip }, async () => {
+test("T1-4/18 real kill during a read-only step: an escaped (detached) child is killed by verified identity; the step reruns once", { skip: nativeSkip }, async () => {
   const { dir, db, inFlight } = await killedMidStep("read", true);
   try {
     assert.ok(inFlight.child && alive(inFlight.child), "the escaped child outlived the killed Host (an orphan)");
