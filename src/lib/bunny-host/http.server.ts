@@ -328,7 +328,7 @@ type HostOptions = {
     /** M-A-3 T13.3 Gate E test-only harness `--version` probe. Never reachable from HTTP. */
     harnessProbe?: typeof probeHarness;
     /** MA4-S2-T1 test-only task executors and model seams (recorded fakes). Never reachable from HTTP. */
-    ptasks?: Partial<Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "leaseMs" | "maintenanceMs">>;
+    ptasks?: Partial<Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "leaseMs" | "maintenanceMs" | "now">>;
     /** MA4-S2-T2 test-only connected-action seams (loopback synthetic sites, recorded synthetic services). Never reachable from HTTP. */
     connected?: ConnectedOptions;
     /** MA4-S2-T3 test-only proactive seams (recorded synthetic sources, a fake clock, a short idle sleep). Never reachable from HTTP. */
@@ -2371,7 +2371,7 @@ async function openHost(
     ),
   );
   console.log(`Bunny-A Host ready on loopback (${manager.instanceId}).`);
-  return { server, manager, missions, agents, projects, ptasks, connected, close, token, port, containment };
+  return { server, manager, missions, agents, projects, ptasks, proactive, connected, close, token, port, containment };
 }
 
 /** M-A-3 T10: maps one voice action to the session. Every branch is a workstation-only session operation. */
