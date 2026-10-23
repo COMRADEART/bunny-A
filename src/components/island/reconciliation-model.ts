@@ -146,5 +146,8 @@ function evidenceOfTask(task: OrchTask): string[] {
   return out.slice(0, 4);
 }
 
-/** Who may decide. A paired device or anything that is not the workstation owner gets the review without controls. */
-export const mayReconcile = (viewer: { kind: string } | null | undefined) => viewer?.kind !== "device";
+/**
+ * Who may decide. Only a viewer the Host identified as the workstation gets controls; a paired device, an unknown kind
+ * or a snapshot without a viewer yet (still loading) gets the review without them (M-A-3 T14: fail closed).
+ */
+export const mayReconcile = (viewer: { kind: string } | null | undefined) => viewer?.kind === "workstation";
