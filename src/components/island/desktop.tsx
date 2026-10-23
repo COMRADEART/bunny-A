@@ -49,6 +49,7 @@ import { Constellation } from "./motion";
 import { isPrivateEvent } from "./motion-model";
 import { MissionsSection } from "./mission";
 import { AgentsSection } from "./agent";
+import { PersistentTasks } from "./ptasks";
 import { ActivityTimeline } from "./activity";
 
 const NAV = [
@@ -388,6 +389,7 @@ function Today({ now }: { now: number }) {
       </div>
       <MissionsSection now={now} />
       <AgentsSection />
+      <PersistentTasks />
       <section className="today-section">
         <div className="section-heading">
           <h2 className="eyebrow">Active</h2>
