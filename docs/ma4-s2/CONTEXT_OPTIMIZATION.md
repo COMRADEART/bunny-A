@@ -15,3 +15,8 @@
 
 Measured cost of retrieval (latency, tokens) is reported per arm in `INTELLIGENCE_EVALUATION.md` §2: arm C vs arm B
 differs only by retrieval and guidance, so the difference in prompt tokens and call latency is the cost of memory.
+
+Measured on the held-out run: arm C used **+26 % prompt tokens** vs B (149,519 vs 118,313; ≈ 700 characters of
+guidance per role call), call latency was unchanged (median 14.1 s vs 14.2 s, P95 34.3 s vs 31.2 s), and correctness
+was lower (10/24 vs 14/24). The bound held, but relevance did not: one shared coarse tag was enough to attach a skill,
+so unrelated procedures filled most of the budget (INTELLIGENCE_EVALUATION §2.4). Context was bounded, not optimized.
