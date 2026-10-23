@@ -44,6 +44,11 @@ license notice → release packaging test). After staging both, stage 1 was 454/
   `127.0.0.1:11434` only and refuses `:cloud` tags; `externalRequestsRefused` = 0 in every evidence file.
 * No prompt, source or artifact was sent to an external inference endpoint. Groq `openai/gpt-oss-120b` remains a
   PENDING proposal (S1R2 `CLOUD_APPROVAL_REQUEST.md`); see ENGINEERING_REPORT for the updated request.
+* Exception, MA4-S1R4-G7C only (owner-approved, harness-scoped, not a Bunny A feature): 12 Worker/Tester requests with
+  synthetic G7 v2 specs went to Groq `openai/gpt-oss-120b` on 2026-10-23; no hidden tests, references, project files or
+  credentials were sent; the approval was revoked and the credential deleted afterwards. `registry.ts` and
+  `cloud-candidates.ts` are unchanged, so general operation still has external inference DISABLED. See
+  [G7C_CLOUD_QUALIFICATION](G7C_CLOUD_QUALIFICATION.md).
 
 ## Dependency audit
 

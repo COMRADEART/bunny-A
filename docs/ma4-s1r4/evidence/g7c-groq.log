@@ -1,0 +1,75 @@
+  g7-v2-duration#1 Planner#0 ok
+  g7-v2-duration#1 Worker#0 ok
+  g7-v2-duration#1 Tester#0 ok
+  g7-v2-duration#1 Worker#0 ok
+  g7-v2-duration#1 Worker#0 ok
+  g7-v2-duration#1 samples: 0:17/18 1:18/18 2:18/18 → 1
+  g7-v2-duration#1 failure implementation_defect → worker
+  g7-v2-duration#1 failure test_invalid → tester
+  g7-v2-duration#1 attempt 0: static=true hidden=false tester=true → worker,tester
+  g7-v2-duration#1 Worker#1 error
+  g7-v2-duration#1 failure model_error → router
+  g7-v2-duration#1 Tester#1 error
+  g7-v2-duration#1 failure model_error → router
+g7-v2-duration#1: model_error (Tester: Cloud request budget exhausted (4 per trial).)
+  g7-v2-duration#2 Planner#0 ok
+  g7-v2-duration#2 Worker#0 ok
+  g7-v2-duration#2 Tester#0 ok
+  g7-v2-duration#2 Worker#0 ok
+  g7-v2-duration#2 Worker#0 ok
+  g7-v2-duration#2 samples: 0:11/11 1:11/11 2:10/11 → 0
+  g7-v2-duration#2 failure implementation_defect → worker
+  g7-v2-duration#2 failure test_invalid → tester
+  g7-v2-duration#2 attempt 0: static=true hidden=false tester=true → worker,tester
+  g7-v2-duration#2 Worker#1 error
+  g7-v2-duration#2 failure model_error → router
+  g7-v2-duration#2 Tester#1 error
+  g7-v2-duration#2 failure model_error → router
+g7-v2-duration#2: model_error (Tester: Cloud request budget exhausted (4 per trial).)
+  g7-v2-duration#3 Planner#0 ok
+  g7-v2-duration#3 Worker#0 ok
+  g7-v2-duration#3 Tester#0 ok
+  g7-v2-duration#3 Worker#0 ok
+  g7-v2-duration#3 Worker#0 ok
+  g7-v2-duration#3 samples: 0:9/9 1:9/9 2:9/9 → 0
+  g7-v2-duration#3 attempt 0: static=true hidden=true tester=true → none
+  g7-v2-duration#3 Reviewer#1 ok
+g7-v2-duration#3: passed (Deterministic gate passed after 0 repair(s).)
+{
+ "g7": "FAIL",
+ "heldout": {
+  "passed": 0,
+  "trials": 0
+ },
+ "regression": {
+  "passed": 1,
+  "trials": 3
+ },
+ "byKind": {
+  "simple": "0/0",
+  "intermediate": "0/0",
+  "debugging": "0/0",
+  "planning": "0/0"
+ },
+ "statuses": {
+  "model_error": 2,
+  "passed": 1
+ },
+ "repairsUsed": 2,
+ "repairsByTarget": {
+  "Worker:not_retested": 2,
+  "Tester:not_retested": 2
+ },
+ "passedAfterRepair": 0,
+ "reviewerFalseApprovals": 0,
+ "reviewerFalseRejections": 0,
+ "invariants": {
+  "pinsHeld": true,
+  "ordering": true,
+  "gateIsAuthority": true,
+  "cancellation": null
+ },
+ "externalRequestsRefused": 0,
+ "memoryWaitSamples": 0
+}
+exit=0

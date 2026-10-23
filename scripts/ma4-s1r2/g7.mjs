@@ -17,6 +17,10 @@
 // S1R4 workflow strategy (default: the S1R3 workflow, byte-identical requests); G7_PINS=Role=model,... overrides single
 // roles (the router's role assignment); the per-role sampling the strategy requests is forwarded to Ollama; each run
 // also records Worker samples, tool receipts and per-call token receipts.
+// MA4-S1R4-G7C harness-only change (tasks, hidden tests, references, rules, threshold and repairs unchanged): G7_CLOUD=groq
+// runs ONLY the 3 v2 trials with Worker and Tester on the owner-approved groq/openai/gpt-oss-120b (scripts/ma4-s1r4/
+// g7c-cloud.mjs: <= 4 requests per trial, a refused 5th call ends the trial, <= 12 total), Planner/Reviewer local. The
+// cancellation trial is not rerun (it would spend cloud budget; the local result stands). The approval is revoked after.
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -30,19 +34,35 @@ const PIN = process.env.G7_PIN ?? 'qwen2.5-coder:7b';
 const TRIALS = { regression: 3, heldout: 2 };
 const OUT = process.env.G7_OUT ?? `docs/ma4-s1r2/evidence/g7${process.env.G7_PIN ? '-' + PIN.replace(/[^a-z0-9]+/gi, '_') : ''}.json`;
 const ORIGIN = 'http://127.0.0.1:11434';
+const CLOUD = process.env.G7_CLOUD === 'groq' ? await import('../ma4-s1r4/g7c-cloud.mjs') : null;
+if (process.env.G7_CLOUD && !CLOUD) throw new Error('Only G7_CLOUD=groq is approved.');
+if (CLOUD && process.env.G7_RESUME === '1') throw new Error('Cloud runs cannot resume: the request caps are per run.');
 const realFetch = globalThis.fetch; let refused = 0, live = 0;
 globalThis.fetch = async (input, init) => {
-  const url = new URL(String(input));
-  if (url.origin !== ORIGIN) { refused++; throw new Error('G7 network allowlist refused ' + url.origin); }
-  if (url.pathname !== '/api/generate') return realFetch(input, init);
+  const url = new URL(String(input)), cloudUrl = !!CLOUD && url.origin === CLOUD.ORIGIN && url.pathname === CLOUD.PATH;
+  if (url.origin !== ORIGIN && !cloudUrl) { refused++; throw new Error('G7 network allowlist refused ' + url.origin); }
+  if (!cloudUrl && url.pathname !== '/api/generate') return realFetch(input, init);
   live++; try { return await realFetch(input, init); } finally { live--; }
 };
 const sha = v => createHash('sha256').update(v).digest('hex');
 const STRATEGY = process.env.G7_STRATEGY === 's1r4' ? STRATEGY_S1R4 : STRATEGY_S1R3;
 const pins = { Planner: PIN, Worker: PIN, Tester: PIN, Reviewer: PIN, ...Object.fromEntries((process.env.G7_PINS ?? '').split(',').filter(Boolean).map(kv => kv.split('='))) };
+if (CLOUD) Object.assign(pins, { Worker: CLOUD.MODEL, Tester: CLOUD.MODEL });
 if (Object.values(pins).some(m => m.endsWith(':cloud'))) throw new Error('cloud-backed tags are refused');
+const loaded = CLOUD && await CLOUD.loadCloud();
+const cloud = CLOUD && CLOUD.createCloud({ ...loaded, fetcher: (u, i) => fetch(u, i), forbidden: G7_TASKS.flatMap(t => [t.hiddenTests, t.reference]) });
+const cloudEvidence = () => ({ provider: CLOUD.PROVIDER, model: CLOUD.MODEL, caps: CLOUD.CAPS, reasoningHeadroomTokens: CLOUD.REASONING_TOKENS, attestation: loaded.attestation, approval: loaded.approval,
+  assignments: Object.fromEntries(Object.entries(pins).map(([role, m]) => [role, m === CLOUD.MODEL ? `cloud:${CLOUD.PROVIDER}/${m}` : `local:ollama/${m}`])),
+  requests: cloud.sent(), refusedByCap: cloud.calls.filter(c => !c.sent).length, calls: cloud.calls,
+  usage: ['promptTokens', 'completionTokens', 'reasoningTokens'].reduce((a, k) => ({ ...a, [k]: cloud.calls.reduce((n, c) => n + (c.usage?.[k] ?? 0), 0) }), {}),
+  costUsd: 0, costBasis: 'Free plan without payment method (owner-attested), approval spending_limit_usd 0; any 402 stops the run.' });
+const stopRun = reason => { evidence.cloud = { ...cloudEvidence(), stopped: reason }; save(); CLOUD.revoke(); console.error('G7C STOPPED: ' + reason); process.exit(2); };
 const receipts = [], memoryWaits = [];
-const call = async ({ role, model, prompt, schema, signal, options }) => {
+const call = async ({ role, model, prompt, schema, signal, attempt, options }) => {
+  if (cloud && model === CLOUD.MODEL) {
+    try { const r = await cloud.call({ role, prompt, schema, signal, attempt, options }); receipts.push({ role, model, ok: r.ok, durationMs: r.durationMs, cloud: true }); return r; }
+    catch (e) { if (e instanceof CLOUD.StopRun) return stopRun(e.message); throw e; }
+  }
   // S1R4: other workloads on this host swing RAM by several GiB; wait (bounded, logged) for headroom instead of
   // failing a trial on a momentary dip, and still refuse after 15 minutes.
   for (const until = Date.now() + 15 * 60_000; freemem() < 4 * 1024 ** 3;) {
@@ -65,7 +85,7 @@ if (evidence !== fresh) {
   (evidence.resumes ??= []).push({ at: fresh.startedAt, keptTrials: evidence.runs.length, sandbox });
 }
 const preflight = evidence === fresh ? evidence.preflight : (evidence.resumes.at(-1).preflight = []);
-const unload = () => Promise.all([...new Set(Object.values(pins))].map(model => fetch(ORIGIN + '/api/generate', { method: 'POST', body: JSON.stringify({ model, keep_alive: 0 }) }).then(r => r.text()).catch(() => {})));
+const unload = () => Promise.all([...new Set(Object.values(pins))].filter(m => !CLOUD || m !== CLOUD.MODEL).map(model => fetch(ORIGIN + '/api/generate', { method: 'POST', body: JSON.stringify({ model, keep_alive: 0 }) }).then(r => r.text()).catch(() => {})));
 const save = () => { mkdirSync(dirname(OUT), { recursive: true }); writeFileSync(OUT, JSON.stringify(evidence, null, 2) + '\n'); };
 
 // Pre-flight: each frozen reference passes its hidden tests, so a failure is never the harness's fault.
@@ -80,11 +100,12 @@ const order = (calls) => {
   const p = calls.find(c => c.role === 'Planner'), rv = calls.filter(c => c.role === 'Reviewer');
   return !!p && calls.filter(c => c.role === 'Worker' || c.role === 'Tester').every(c => c.startedAt >= p.endedAt) && rv.every(r => calls.every(c => c === r || c.endedAt <= r.startedAt));
 };
-for (const task of G7_TASKS) {
+for (const task of G7_TASKS.filter(t => !CLOUD || t.kind === 'regression')) {
   const n = task.kind === 'regression' ? TRIALS.regression : TRIALS.heldout;
   for (let trial = 1; trial <= n; trial++) {
     if (evidence.runs.some(r => r.task === task.id && r.trial === trial)) continue;
     const started = Date.now(), firstReceipt = receipts.length;
+    cloud?.setTrial(`${task.id}#${trial}`);
     const r = await runCodingWorkflow(task, { call, sandbox: runSandboxed, pins, maxRepairs: 2, strategy: STRATEGY, onEvent: e => console.log(`  ${task.id}#${trial} ${e}`) });
     const final = r.attempts.at(-1);
     evidence.runs.push({ task: task.id, kind: task.kind, trial, status: r.status, reason: r.reason, repairsUsed: r.repairsUsed, durationMs: Date.now() - started,
@@ -95,13 +116,16 @@ for (const task of G7_TASKS) {
       finalSourceSha256: r.finalSource ? sha(r.finalSource) : null, finalSource: r.finalSource?.slice(0, 2500) ?? null,
       ...(STRATEGY !== STRATEGY_S1R3 ? { strategy: r.strategy, workerSamples: r.graph?.workerSamples ?? 1, candidates: r.candidates, toolCalls: r.toolReceipts.length, toolReceiptsOk: r.toolReceipts.every(t => t.ok && t.invoker === 'orchestrator'), callReceipts: receipts.slice(firstReceipt) } : {}) });
     console.log(`${task.id}#${trial}: ${r.status} (${r.reason})`);
+    if (cloud) evidence.cloud = cloudEvidence();
     save();
+    if (cloud && (['sandbox_error', 'pin_violation'].includes(r.status) || !evidence.runs.at(-1).invariants.pinsHeld)) stopRun(`security invariant: ${r.status}`);
     await unload();
   }
 }
 
 // Controlled cancellation: abort as soon as the Worker starts.
-{
+if (CLOUD) evidence.cancellation = { notRun: 'G7C: would spend cloud budget; the local S1R4 cancellation result stands (evidence/g7-s1r4-auto.json).' };
+else {
   const controller = new AbortController(); let sandboxRuns = 0;
   const watching = async (req) => { if (req.role === 'Worker') setTimeout(() => controller.abort(), 1000); return call(req); };
   const r = await runCodingWorkflow(G7_TASKS[1], { call: watching, sandbox: async (q, s) => { sandboxRuns++; return runSandboxed(q, s); }, pins, signal: controller.signal, strategy: STRATEGY });
@@ -120,11 +144,16 @@ evidence.summary = {
   repairsUsed: evidence.runs.reduce((a, r) => a + r.repairsUsed, 0),
   repairsByTarget: evidence.runs.flatMap(r => r.repairs ?? []).reduce((a, x) => ({ ...a, [`${x.target}:${x.outcome}`]: (a[`${x.target}:${x.outcome}`] ?? 0) + 1 }), {}), passedAfterRepair: evidence.runs.filter(r => r.status === 'passed' && r.repairsUsed > 0).length,
   reviewerFalseApprovals: evidence.runs.filter(r => r.reviewerFalseApproval).length, reviewerFalseRejections: evidence.runs.filter(r => r.reviewerFalseRejection).length,
-  invariants: { pinsHeld: inv.every(i => i.pinsHeld), ordering: inv.every(i => i.ordering !== false), gateIsAuthority: inv.every(i => i.gateIsAuthority), cancellation: evidence.cancellation.status === 'cancelled' && evidence.cancellation.sandboxRuns === 0 && evidence.cancellation.liveRequestsAfter === 0 },
+  invariants: { pinsHeld: inv.every(i => i.pinsHeld), ordering: inv.every(i => i.ordering !== false), gateIsAuthority: inv.every(i => i.gateIsAuthority), cancellation: evidence.cancellation.notRun ? null : evidence.cancellation.status === 'cancelled' && evidence.cancellation.sandboxRuns === 0 && evidence.cancellation.liveRequestsAfter === 0 },
   externalRequestsRefused: refused, memoryWaitSamples: memoryWaits.length,
 };
 const s = evidence.summary;
 evidence.g7 = s.heldout.passed >= 14 && s.regression.passed >= 2 && Object.values(s.invariants).every(Boolean) ? 'PASS' : 'FAIL';
+if (CLOUD) {
+  evidence.g7 = s.regression.passed >= 2 && Object.values(s.invariants).every(v => v !== false) ? 'PASS' : 'FAIL';
+  evidence.verdictScope = 'G7 v2 regression only (>= 2/3), CLOUD-ASSISTED (Worker+Tester groq/openai/gpt-oss-120b). Held-out not rerun (local S1R4 17/20 stands). Not evidence of local-model capability.';
+  evidence.cloud = cloudEvidence(); CLOUD.revoke(); evidence.cloud.revokedAt = new Date().toISOString();
+}
 evidence.finishedAt = new Date().toISOString();
 save();
 console.log(JSON.stringify({ g7: evidence.g7, ...s }, null, 1));
