@@ -252,6 +252,10 @@ type Island = Preferences & {
   scheduler: SchedulerView | null;
   /** One `scheduler.*` command; the Host's answer or null when refused. */
   schedulerCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** MA4-S2-T1 persistent tasks as the Host projected them (null until a Host that knows them answers). */
+  persistentTasks: NonNullable<HostSnapshot["persistentTasks"]> | null;
+  /** One `ptask.*` command; the Host's answer or null when refused. */
+  ptaskCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** M-A-3 T13.3 Gate G: routing-improvement evidence and policy lifecycle (workstation only; null on devices). */
   routingLearning: RoutingLearningView | null;
   /** One `routing.learning.*` command; the Host's answer or null when refused. */
@@ -851,6 +855,7 @@ export const useIsland = create<Island>((set, get) => {
       remoteConfigured: snapshot.remoteConfigured,
       missions: snapshot.missions ?? null,
       agents: snapshot.agents ?? null,
+      persistentTasks: snapshot.persistentTasks ?? null,
       personalAgents: snapshot.personalAgents ?? null,
       personalAgentContext: snapshot.personalAgentContext ?? null,
       harnesses: snapshot.harnesses?.harnesses ?? null,
@@ -920,6 +925,7 @@ export const useIsland = create<Island>((set, get) => {
       connectionChecked: true,
       pairingRequired: true,
       agents: null,
+      persistentTasks: null,
       personalAgents: null,
       personalAgentContext: null,
       harnesses: null,
@@ -1325,6 +1331,8 @@ export const useIsland = create<Island>((set, get) => {
     devices: [],
     missions: null,
     agents: null,
+    persistentTasks: null,
+    ptaskCommand: (action, data, onRefused) => command(action, data, typeof data.id === "string" ? data.id : "ptask", onRefused),
     personalAgents: null,
     personalAgentContext: null,
     personalAgentCommand: (action, data, onRefused) => command(action, data, "personal-agent", onRefused),
