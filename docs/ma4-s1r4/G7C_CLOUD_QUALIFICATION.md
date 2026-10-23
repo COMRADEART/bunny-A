@@ -37,4 +37,32 @@ separately from local-only qualification and is **not** evidence of local-model 
 
 ## Results
 
-PENDING — not run. Blocked on the owner steps above (no credential, no approval issued as of this commit).
+**G7 v2 cloud-assisted: 1/3 — FAIL** (threshold ≥ 2/3). Not cloud-assisted qualification; R4-G7 stays FAIL.
+
+One decisive run, 2026-10-23 02:15:18Z → 02:21:41Z, exit 0, no resume, no retries
+(`evidence/g7c-groq.json`, `evidence/g7c-groq.log`). Task hash `aa5d5c19…4cb8` and reference pre-flight matched;
+strategy `s1r4-v3c`; sandbox `wsl2-userns-pivot_root-cgroupv2`.
+
+| Trial | Result | Cloud requests sent | Refused unsent | What happened |
+|---|---|---|---|---|
+| g7-v2-duration#1 | `model_error` | 4 | 2 | Attempt 0: Worker samples 17/18, 18/18, 18/18 on the Tester suite → sample 1; static pass, hidden **1/2 failed**; Tester case `test_invalid_1h30m45s` fails on the frozen reference (test_invalid). Repair needed a 5th call → refused by the per-trial cap. |
+| g7-v2-duration#2 | `model_error` | 4 | 2 | Same pattern: samples 11/11, 11/11, 10/11 → sample 0; hidden 1/2 failed; same invalid Tester case; repair refused by cap. |
+| g7-v2-duration#3 | **passed** | 4 | 0 | Samples 9/9 ×3 → sample 0; static, hidden 2/2 and Tester all pass on attempt 0; local Reviewer approved. |
+
+* **Requests:** 12 sent (12/12 total cap, 4/4 per trial), all HTTP 200; 4 further calls refused before sending by the
+  strict per-trial cap. Tokens: 10,397 prompt / 15,807 completion (7,966 reasoning). **Cost $0** (Free plan, no
+  payment method, owner-attested; no 402).
+* **Errors:** no HTTP 401/402/403/429, no forbidden-content block, no sandbox error, no pin violation, no stop.
+  The two `model_error` results are the cap refusals defined by the strict policy, not provider errors.
+* **Invariants:** pins held (Planner/Reviewer local `qwen2.5-coder:7b`, Worker/Tester `groq/openai/gpt-oss-120b`),
+  ordering held, the deterministic gate was the only authority; Reviewer false approvals/rejections 0; non-allowlisted
+  external requests refused 0. Cancellation not rerun (local S1R4 result stands).
+* **Revocation:** approval marked `revoked` and the DPAPI-stored credential deleted by the harness at
+  2026-10-23T02:21:41Z; `g7c-cloud.mjs status` afterwards: `credentialSaved: false`, `approval_status: revoked`,
+  block "External model approval was revoked." External inference is DISABLED again. The owner should also delete the
+  key in the Groq console.
+
+**Reading:** with gpt-oss-120b the first-attempt pass rate on v2 was 1/3. Both failures were still repairable under the
+frozen 2-repair budget (the gate attributed them to Worker and Tester), but the owner-chosen strict cap of 4 requests
+per trial leaves no budget for any repair, because the frozen strategy spends all 4 on attempt 0. This run does not show
+whether gpt-oss-120b would pass with repairs, and it says nothing about local-model capability.

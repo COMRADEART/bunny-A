@@ -80,7 +80,7 @@ RELEASE
 
 GATES
   Passed:  R4-G1, G2, G3, G4, G5, G6, G8, G9, G10, G11, G12, G13, G14, G15
-  Failed:  R4-G7 (G7 v2 0/3)
+  Failed:  R4-G7 (G7 v2 0/3 local; 1/3 cloud-assisted G7C, see G7C_CLOUD_QUALIFICATION)
   Partial: none
   Blocked: none as a gate (27B/30B trials BLOCKED_RESOURCE_LIMIT; NPU NOT TESTED)
 
@@ -89,7 +89,8 @@ FINAL STATUS: PARTIAL
 NEXT RECOMMENDED ACTION: the owner chooses one of two ways to a stronger Worker, on the unchanged G7:
   (a) free ≈ 6 GiB host RAM (close applications or cap the WSL2 VM) and qualify huihui_ai/qwen3-abliterated:30b
       locally with load-probe.mjs then the S1R4 G7 command; or
-  (b) answer docs/ma4-s1r4/CLOUD_APPROVAL_REQUEST.md (Groq gpt-oss-120b, Worker/Tester only, synthetic data, $0).
+  (b) DONE 2026-10-23 as MA4-S1R4-G7C: cloud-assisted G7 v2 1/3 FAIL under the strict 4-requests/trial cap (no
+      budget left for repairs); approval revoked, credential deleted. Any further cloud run needs a new owner approval.
   Do not start MA4-S2 until one of them has been evaluated.
 ```
 
@@ -103,7 +104,7 @@ NEXT RECOMMENDED ACTION: the owner chooses one of two ways to a stronger Worker,
 | R4-G4 role assignments from measured evidence | PASS — measured, not statistically significant | [AGENT_ROLE_QUALIFICATION](AGENT_ROLE_QUALIFICATION.md) |
 | R4-G5 repair preserves test integrity | PASS | [REPAIR_ENGINE_EVIDENCE](REPAIR_ENGINE_EVIDENCE.md) |
 | R4-G6 tools behind permissions | PASS | [TOOL_AUGMENTATION_REPORT](TOOL_AUGMENTATION_REPORT.md) |
-| **R4-G7 G7 v2 ≥ 2/3** | **FAIL (0/3)** | [G7_FROZEN_RESULTS](G7_FROZEN_RESULTS.md) |
+| **R4-G7 G7 v2 ≥ 2/3** | **FAIL (0/3 local; 1/3 cloud-assisted, Groq gpt-oss-120b Worker+Tester, 12 requests, $0)** | [G7_FROZEN_RESULTS](G7_FROZEN_RESULTS.md), [G7C_CLOUD_QUALIFICATION](G7C_CLOUD_QUALIFICATION.md) |
 | R4-G8 held-out ≥ 14/20 | **PASS (17/20)** | same |
 | R4-G9 pins and privacy | PASS | [SECURITY_REGRESSION](SECURITY_REGRESSION.md) |
 | R4-G10 sandbox adversarial | PASS (13/13) | [SANDBOX_VALIDATION](SANDBOX_VALIDATION.md) |
