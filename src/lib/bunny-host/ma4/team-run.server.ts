@@ -23,7 +23,7 @@ export class TeamRuns {
     host?.db.exec("CREATE TABLE IF NOT EXISTS ma4_team_runs(id TEXT PRIMARY KEY,record TEXT NOT NULL,updated_at INTEGER NOT NULL)");
   }
   create(id: string, nodes: { id: string; dependsOn?: string[]; reversible: boolean }[], options: { maxConcurrent?: number; maxRetries?: number; persist: boolean }, now = Date.now()): TeamRun {
-    const problems = validateGraph({ taskId: id, workerSamples: 1, nodes: nodes.map(n => ({ id: n.id, kind: "verify", actor: "orchestrator", dependsOn: n.dependsOn ?? [] })) }, { maxAgents: 4, maxNodes: 64 });
+    const problems = validateGraph({ taskId: id, workerSamples: 1, nodes: nodes.map(n => ({ id: n.id, kind: "verify", actor: "orchestrator", dependsOn: n.dependsOn ?? [] })) }, { maxAgents: 4, maxNodes: 128 });
     if (problems.length) throw new Error(`Invalid run plan: ${problems.join("; ")}`);
     if (this.get(id)) throw new Error("A run with this id already exists.");
     const run: TeamRun = { id, state: "running", nodes: nodes.map(n => ({ id: n.id, dependsOn: n.dependsOn ?? [], reversible: n.reversible, state: "pending", attempts: 0, resultSha256: null, error: null })),

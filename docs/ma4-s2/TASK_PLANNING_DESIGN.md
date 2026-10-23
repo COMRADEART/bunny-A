@@ -29,7 +29,7 @@ schedule: two different models run concurrently only when both fit in VRAM.
 
 ## Multi-step workflow control (`team-run.server.ts`)
 
-A run is a validated DAG of steps (≤ 64, acyclic). Each step is reversible (sandboxed generation, tests) or
+A run is a validated DAG of steps (≤ 128, acyclic). Each step is reversible (sandboxed generation, tests) or
 irreversible (a consequential external action).
 
 | Capability | Behaviour |
