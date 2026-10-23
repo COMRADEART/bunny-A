@@ -179,10 +179,10 @@ export class ProactiveStore {
   occurrencesSince(since: number): Occurrence[] { return (this.db.prepare("SELECT * FROM ma4_occurrences WHERE at>=? ORDER BY at,key").all(since) as OccRow[]).map(occ); }
   /** Runs that actually created work or a reminder, in a rolling window. */
   runsSince(scheduleId: string, since: number): number {
-    return (this.db.prepare("SELECT COUNT(*) n FROM ma4_occurrences WHERE schedule_id=? AND at>=? AND outcome IN ('execute','queue','notify')").get(scheduleId, since) as { n: number }).n;
+    return (this.db.prepare("SELECT COUNT(*) n FROM ma4_occurrences WHERE schedule_id=? AND at>? AND outcome IN ('execute','queue','notify')").get(scheduleId, since) as { n: number }).n;
   }
   /** Model calls reserved by proactive occurrences in a rolling window (reserved at dispatch, before any call). */
-  modelStepsSince(since: number): number { return (this.db.prepare("SELECT COALESCE(SUM(model_steps),0) n FROM ma4_occurrences WHERE at>=?").get(since) as { n: number }).n; }
+  modelStepsSince(since: number): number { return (this.db.prepare("SELECT COALESCE(SUM(model_steps),0) n FROM ma4_occurrences WHERE at>?").get(since) as { n: number }).n; }
   markDispatched(key: string) { this.db.prepare("UPDATE ma4_occurrences SET dispatched=1 WHERE key=?").run(key); }
   settle(key: string, notify: NewNotification[], now: number): string[] {
     return this.tx(() => {

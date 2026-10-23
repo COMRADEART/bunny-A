@@ -180,11 +180,12 @@ export class ProactiveEngine {
     const r = control === "pause" ? this.store.update("schedule", id, { actor, reason: "paused", now, from: ["ACTIVE"], to: "PAUSED" })
       : control === "cancel" ? this.store.update("schedule", id, { actor, reason: "cancelled", now, from: ["AWAITING_APPROVAL", "ACTIVE", "PAUSED"], to: "CANCELLED", mutate: x => { x.nextAt = null; x.retryAt = null; } })
       // Resume never widens authority: a lapsed or mismatched approval sends it back to the owner. Paused slots are skipped.
-      : this.store.update("schedule", id, { actor, reason: "resumed", now, from: ["PAUSED"], mutate: s => {
-          const live = !!s.approval && s.approval.expiresAt > now && s.approval.specSha256 === s.specSha256;
-          (s as { state: string }).state = live ? "ACTIVE" : "AWAITING_APPROVAL";
-          s.cursor = Math.max(s.cursor, now); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null;
-        } });
+      : (() => {
+          const { record, version } = this.store.get("schedule", id);
+          const live = !!record.approval && record.approval.expiresAt > now && record.approval.specSha256 === record.specSha256;
+          return this.store.update("schedule", id, { actor, reason: live ? "resumed" : "resumed; its approval lapsed, so it waits for the owner", now, from: ["PAUSED"], expectVersion: version, to: live ? "ACTIVE" : "AWAITING_APPROVAL",
+            mutate: s => { s.cursor = Math.max(s.cursor, now); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null; } });
+        })();
     // Cancelling a schedule also stops the run it started (its processes are killed by the runtime); nothing new starts.
     if (control === "cancel") for (const taskId of this.activeTaskIds(id)) try { this.deps.runtime.cancel(taskId, actor); } catch (e) { if (!(e instanceof TaskConflictError)) throw e; }
     this.changed(`Schedule ${control}: ${r.record.spec.title}`);
@@ -241,10 +242,11 @@ export class ProactiveEngine {
     const now = this.now();
     const r = control === "pause" ? this.store.update("monitor", id, { actor, reason: "paused", now, from: ["ACTIVE"], to: "PAUSED" })
       : control === "disable" ? this.store.update("monitor", id, { actor, reason: "disabled (authorization revoked)", now, from: ["AWAITING_APPROVAL", "ACTIVE", "PAUSED"], to: "DISABLED" })
-      : this.store.update("monitor", id, { actor, reason: "resumed", now, from: ["PAUSED"], mutate: m => {
-          const live = !!m.approval && m.approval.expiresAt > now && m.approval.specSha256 === m.specSha256;
-          (m as { state: string }).state = live ? "ACTIVE" : "AWAITING_APPROVAL"; m.nextCheckAt = now;
-        } });
+      : (() => {
+          const { record, version } = this.store.get("monitor", id);
+          const live = !!record.approval && record.approval.expiresAt > now && record.approval.specSha256 === record.specSha256;
+          return this.store.update("monitor", id, { actor, reason: live ? "resumed" : "resumed; its approval lapsed, so it waits for the owner", now, from: ["PAUSED"], expectVersion: version, to: live ? "ACTIVE" : "AWAITING_APPROVAL", mutate: m => { m.nextCheckAt = now; } });
+        })();
     this.changed(`Monitor ${control}: ${r.record.spec.title}`);
     return this.monitorView(r.record, r.version);
   }
@@ -356,13 +358,16 @@ export class ProactiveEngine {
     // Never all of them: earlier slots are recorded as missed with one notification, and only the latest is considered.
     if (earlier.length) v = this.missed(s, v, now, earlier[earlier.length - 1], earlier.length, "while Bunny-A was not running or the PC was asleep");
     const late = now - latest;
-    if (late > s.spec.graceMs && s.spec.missedPolicy === "skip") return void this.missed({ ...s, cursor: earlier.length ? earlier[earlier.length - 1] : s.cursor }, v, now, latest, 1, `it was due ${duration(late)} ago, beyond its ${duration(s.spec.graceMs)} grace period`);
+    // A slot that waited on a transient reason (model, window, previous run) and outlived its grace keeps that reason.
+    const waited = s.lastAttempt?.slot === latest && s.lastAttempt.outcome === "defer" ? s.lastAttempt.reason : null;
+    if (late > s.spec.graceMs && (waited || s.spec.missedPolicy === "skip"))
+      return void this.missed(s, v, now, latest, 1, waited ? `because ${waited.replace(/\.$/, "").replace(/^./, c => c.toLowerCase())} for its whole ${duration(s.spec.graceMs)} grace period` : `it was due ${duration(late)} ago, beyond its ${duration(s.spec.graceMs)} grace period`, waited ? "defer" : "missed");
     await this.fire(this.store.get("schedule", s.id).record, v, latest, `${s.id}:${latest}`, "meaningful", now);
   }
-  private missed(s: ScheduleRecord, version: number, now: number, slot: number, count: number, why: string): number {
+  private missed(s: ScheduleRecord, version: number, now: number, slot: number, count: number, why: string, outcome: "missed" | "defer" = "missed"): number {
     const r = this.store.update("schedule", s.id, { actor: "proactive", reason: `${count} run(s) missed`, now, expectVersion: version,
-      mutate: x => { x.cursor = slot; x.nextAt = nextSlot(x.spec.trigger, slot); x.retryAt = null; x.lastAttempt = { at: now, slot, outcome: "missed", reason: `Missed ${why}.`, taskId: null }; },
-      occurrence: { key: `${s.id}:${slot}`, scheduleId: s.id, slot, outcome: "missed", reason: `${count} run(s) missed ${why}`, taskId: null, modelSteps: 0 },
+      mutate: x => { x.cursor = slot; x.nextAt = nextSlot(x.spec.trigger, slot); x.retryAt = null; x.lastAttempt = { at: now, slot, outcome, reason: `Missed ${why}.`, taskId: null }; },
+      occurrence: { key: `${s.id}:${slot}`, scheduleId: s.id, slot, outcome, reason: `${count} run(s) missed ${why}`, taskId: null, modelSteps: 0 },
       notify: [this.note("schedule_missed", "schedule", s.id, s.spec.title, `${count === 1 ? "A run was" : `${count} runs were`} missed ${why}. Nothing ran for ${count === 1 ? "it" : "them"}.`, "MISSED", "open", `${s.id}:${slot}`)] });
     return r.version;
   }
