@@ -1,6 +1,6 @@
 import { redactReviewListing } from "../bunny-missions/authorization.server.ts";
 import { DATA_CATEGORIES, ROUTING_MODES } from "./ma4/hybrid.ts";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -303,8 +303,7 @@ export function streamSse(
   return close;
 }
 
-export async function startHost(
-  options: {
+type HostOptions = {
     dataDirectory?: string;
     root?: string;
     workspaceRoot?: string;
@@ -326,7 +325,52 @@ export async function startHost(
     harnessProbe?: typeof probeHarness;
     /** MA4-S2-T1 test-only task executors and model seams (recorded fakes). Never reachable from HTTP. */
     ptasks?: Partial<Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "leaseMs" | "maintenanceMs">>;
-  } = {},
+};
+
+export async function startHost(options: HostOptions = {}) {
+  const port = options.port ?? Number(process.env.BUNNY_HOST_PORT ?? 43119);
+  // MA4-S2-T2 (F-CI1-1): the port is the single-Host guard, so it is held before any state is opened or recovered. A
+  // refused Host never opens or changes a running Host's data; a start that fails later releases everything it opened.
+  let serve: ((req: IncomingMessage, res: ServerResponse) => void) | null = null;
+  const server = createServer((req, res) => {
+    if (serve) return serve(req, res);
+    res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "1", Connection: "close" });
+    res.end(JSON.stringify({ error: "The Host is starting." }));
+  });
+  await new Promise<void>((resolveListen, reject) => {
+    const refused = (error: Error) => {
+      // A refused listen() still holds its socket handle until the server is closed.
+      server.close(() => reject(error));
+    };
+    server.once("error", refused);
+    server.listen(port, "127.0.0.1", () => {
+      server.off("error", refused);
+      resolveListen();
+    });
+  });
+  const undo: (() => unknown)[] = [];
+  try {
+    return await openHost(options, port, server, (handler) => { serve = handler; }, undo);
+  } catch (error) {
+    for (const release of undo.reverse()) {
+      try {
+        await release();
+      } catch {
+        // Keep releasing the rest; the original failure is the one reported.
+      }
+    }
+    server.closeAllConnections();
+    await new Promise<void>((r) => server.close(() => r()));
+    throw error;
+  }
+}
+
+async function openHost(
+  options: HostOptions,
+  port: number,
+  server: Server,
+  attach: (handler: (req: IncomingMessage, res: ServerResponse) => void) => void,
+  undo: (() => unknown)[],
 ) {
   const paths = hostStatePaths(options.dataDirectory);
   const dataDirectory = paths.data;
@@ -344,8 +388,8 @@ export async function startHost(
     });
   containment.options.secrets = [...(containment.options.secrets ?? []), token];
   registerDiagnosticSecret(token);
-  const port = options.port ?? Number(process.env.BUNNY_HOST_PORT ?? 43119);
   const db = new HostDatabase(paths.database);
+  undo.push(() => db.close());
   // M-A-3 T9: additive device tables exist before the state marker is reconciled below; never on a request path.
   ensureDeviceSchema(db.db);
   containment.options.persist = (type, detail, owner) => {
@@ -375,6 +419,7 @@ export async function startHost(
     ...(options.modelProbes ? { modelProbes: options.modelProbes } : {}),
     ...(options.ma4Fetch ? { ma4Fetch: options.ma4Fetch } : {}),
   });
+  undo.push(() => manager.dispose());
   containment.options.persist = (type, detail, owner) =>
     manager.emit(db.event(type, owner.taskId ?? null, detail, owner.missionId ?? null));
   db.onFailure = (error, rollbackFailed) => {
@@ -387,9 +432,11 @@ export async function startHost(
   };
   // M-A-0 mission layer: additive tables are created, but nothing runs unless missions are enabled.
   const missions = new MissionManager(manager, { dataDirectory, ...options.missions });
+  undo.push(() => missions.close());
   // M-A-3 T4: the durable Agent runtime sits above Missions — it owns continuity only, and construction
   // runs the recovery walk after MissionManager.recover() has reconciled the mission rows.
   const agents = new AgentRuntime(db, missions);
+  undo.push(() => agents.close());
   // MA4-S2-T1: work continues with no window open only while this Host runs, and only under the owner's policy.
   // A workstation client (Island poll or dashboard stream) seen in the last 20 s counts as an attached window.
   const workstationClients = { seen: 0, streams: 0 };
@@ -2150,7 +2197,7 @@ export async function startHost(
     if (cause === "revocation") await missions.endDeviceDriven(deviceActor);
     return { answers, staged, batches, delegations, approvals, unstopped };
   };
-  const server = createServer((req, res) => {
+  attach((req, res) => {
     const requestId = randomUUID();
     res.on("error", () => {
       try {
@@ -2177,15 +2224,12 @@ export async function startHost(
       },
     );
   });
-  await new Promise<void>((resolveListen, reject) => {
-    server.once("error", reject);
-    server.listen(port, "127.0.0.1", resolveListen);
-  });
   writeFileSync(
     credentialPath,
     JSON.stringify({ token, port, pid: process.pid, instanceId: manager.instanceId }),
     { mode: 0o600 },
   );
+  undo.push(() => ptasks.close());
   await ptasks.start();
   let closing = false;
   let closed: Promise<void> | null = null;
@@ -2233,6 +2277,8 @@ export async function startHost(
     return closed;
   };
   containment.options.shutdown = close;
+  // From here a failed start releases everything through the Host's own shutdown.
+  undo.splice(0, undo.length, close);
   const signalClose = () =>
     containment.background(
       { subsystem: "shutdown" },
