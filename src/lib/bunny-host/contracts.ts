@@ -53,6 +53,8 @@ export type HostSnapshot = {
   modelIntelligence?: { version: 1; configuration: import("./ma4/registry.ts").Configuration; models: import("./ma4/registry.ts").ModelMetadata[]; cooldownUntil: number };
   /** MA4-S2-T1 persistent tasks: privacy-safe views (no step inputs or outputs), policy and local notifications. */
   persistentTasks?: ReturnType<import("./ma4/task-runtime.server.ts").PersistentTaskRuntime["snapshot"]>;
+  /** MA4-S2-T3: goals, schedules, monitors and proactive notifications (path-free, sanitized views). */
+  proactive?: import("./ma4/proactive.server.ts").ProactiveSnapshot;
   /** M-A-3 T4 durable Agent runtime snapshot (agent-level continuity state). Optional: older clients ignore it. */
   agents?: AgentSnapshot;
   /** M-A-3 T13 Personal Agent slots projected onto live Host facts (presentation only). Optional: older clients ignore it. */
