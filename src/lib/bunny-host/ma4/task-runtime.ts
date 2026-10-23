@@ -54,6 +54,25 @@ export const TaskSpecSchema = z.object({
 export type StepSpec = z.infer<typeof StepSpecSchema>;
 export type TaskSpec = z.infer<typeof TaskSpecSchema>;
 
+const origin = z.string().max(200).refine(v => { try { const u = new URL(v); return (u.protocol === "https:" || u.protocol === "http:") && u.origin === v; } catch { return false; } }, "An origin is scheme://host[:port], nothing more.");
+export const EMAIL_ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,24}$/;
+/** A connected account: usually its address. */
+export const ACCOUNT_ID = /^[A-Za-z0-9][A-Za-z0-9._:@+-]{0,119}$/;
+/** Service access levels, each including the ones before it. */
+export const SERVICE_ACCESS = ["read", "draft", "write", "send"] as const;
+export type ServiceAccess = (typeof SERVICE_ACCESS)[number];
+/**
+ * MA4-S2-T2 resource grants: what one task may touch. Files name an owner-registered root (never a path), browser access
+ * names exact origins, services name a registered account and, for anything that reaches people, the exact recipients.
+ * A grant only narrows what the Host has registered; it can never name a root, origin or account the Host does not know.
+ */
+export const GrantsSchema = z.object({
+  files: z.array(z.object({ root: id, access: z.enum(["read", "write"]) }).strict()).max(4).default([]),
+  origins: z.array(origin).max(8).default([]),
+  services: z.array(z.object({ connector: z.enum(["email", "calendar", "docs"]), account: z.string().regex(ACCOUNT_ID), access: z.enum(SERVICE_ACCESS), recipients: z.array(z.string().regex(EMAIL_ADDRESS)).max(20).default([]) }).strict()).max(6).default([]),
+}).strict();
+export type Grants = z.infer<typeof GrantsSchema>;
+
 /** The owner-issued authorization envelope. Cloud inference is not expressible: provider and locality are literals. */
 export const EnvelopeSchema = z.object({
   capabilities: z.array(z.string().regex(/^[a-z][a-z0-9.-]{1,47}$/)).min(1).max(16),
@@ -65,11 +84,29 @@ export const EnvelopeSchema = z.object({
   background: z.boolean(),
   budgets: z.object({ maxModelCalls: z.number().int().min(0).max(500), maxWallMs: z.number().int().min(1_000).max(7 * 24 * 3_600_000) }).strict(),
   expiresAt: z.number().int().positive(),
+  /** MA4-S2-T2: absent on S2-T1 envelopes, which therefore grant no connected resource at all. */
+  grants: GrantsSchema.optional(),
 }).strict();
 export type Envelope = z.infer<typeof EnvelopeSchema>;
 
 export type StepState = "pending" | "running" | "succeeded" | "failed" | "uncertain";
-export type TaskFailureCode = "VALIDATION" | "AUTHORITY_REVOKED" | "ENVELOPE_EXPIRED" | "DEADLINE_MISSED" | "DEPENDENCY_FAILED" | "STEP_FAILED" | "BUDGET_EXHAUSTED" | "PIN_VIOLATION" | "ACCEPTANCE_UNMET" | "OWNER_ABANDONED";
+export type TaskFailureCode = "VALIDATION" | "AUTHORITY_REVOKED" | "ENVELOPE_EXPIRED" | "DEADLINE_MISSED" | "DEPENDENCY_FAILED" | "STEP_FAILED" | "BUDGET_EXHAUSTED" | "PIN_VIOLATION" | "ACCEPTANCE_UNMET" | "OWNER_ABANDONED" | "ACTION_DENIED" | "PERMISSION_DENIED";
+/** What the notch and phone say a connected step is doing; derived from the Host-registered contract, never from the spec. */
+export const ACTIVITIES = ["Reading files", "Browsing", "Waiting for permission", "Preparing draft", "Executing", "Verifying result", "Completed", "Failed", "Uncertain"] as const;
+export type Activity = (typeof ACTIVITIES)[number];
+/**
+ * A consequential action waiting for the owner. The approval binds payloadSha256: the canonical hash of exactly what will
+ * be sent, written or created (recipients, destination, content, expected version). Any change means a new proposal.
+ */
+export type ActionProposal = {
+  actionId: string; stepId: string; kind: string; connector: string;
+  /** Short, path-free labels: safe for the phone. */
+  target: string; summary: string; effects: string[]; reversible: boolean;
+  /** Workstation-only detail: what is read or sent, what changes, and the full preview. */
+  data: string[]; changes: string[]; preview: string;
+  payloadSha256: string; proposedAt: number; expiresAt: number;
+};
+export type ActionApproval = { stepId: string; actionId: string; payloadSha256: string; at: number; expiresAt: number };
 export type BlockCode = "MODEL_UNAVAILABLE" | "RESOURCES_UNAVAILABLE" | "BACKGROUND_DISABLED" | "HOST_RESTARTED" | "OWNER_PAUSED";
 export type TaskRecord = {
   schema: "ma4.task.v1";
@@ -96,6 +133,12 @@ export type TaskRecord = {
   uncertainOperation: string | null;
   /** Wall-clock gaps the Host observed while it could not run (sleep, suspend); no progress is ever claimed for them. */
   suspendedMs: number;
+  /** MA4-S2-T2 (absent on S2-T1 records): per-step activity from the registered contracts, fixed at creation. */
+  activities?: (Activity | null)[];
+  /** The consequential action waiting for the owner's decision, if any. */
+  pendingAction?: ActionProposal | null;
+  /** Owner approvals of exact action payloads; each is spent by the step it names. */
+  actionApprovals?: ActionApproval[];
 };
 
 export const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -106,7 +149,14 @@ export function canonical(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export type ExecutorFacts = { kind: string; category: OperationCategory; gpu: boolean; sideEffect: boolean };
+export type ExecutorFacts = {
+  kind: string; category: OperationCategory; gpu: boolean; sideEffect: boolean;
+  /** MA4-S2-T2: needs a fresh, payload-bound owner approval every time it executes. */
+  consequential?: boolean;
+  activity?: Activity;
+  /** Static scope check of one step's input against the envelope (and the Host's registered resources). */
+  preflight?(input: StepSpec["input"], envelope: Envelope): string[];
+};
 /**
  * Validation against the envelope and the Host's registered executors. The executor — never the spec — decides an
  * operation's category, so a spec cannot relabel an irreversible action as read-only. Returns problems, not a verdict.
@@ -123,6 +173,8 @@ export function validateTask(spec: TaskSpec, envelope: Envelope, executors: Read
     if (executor.sideEffect && !envelope.sideEffects) problems.push(`Step ${step.id} has side effects; the envelope does not permit them.`);
     if (executor.gpu && !step.model) problems.push(`Step ${step.id} needs a pinned local model.`);
     if (step.model && !envelope.models.includes(step.model)) problems.push(`Model ${step.model} is not in the envelope.`);
+    if (executor.consequential && !envelope.sideEffects) problems.push(`Step ${step.id} is a consequential action; the envelope does not permit side effects.`);
+    for (const problem of executor.preflight?.(step.input, envelope) ?? []) problems.push(`Step ${step.id}: ${problem}`);
   }
   for (const required of spec.acceptance.requiredSteps) if (!ids.has(required)) problems.push(`Acceptance names unknown step ${required}.`);
   if (!envelope.projectScopes.includes(spec.projectId)) problems.push("The task's project is outside the envelope's scope.");
@@ -133,7 +185,7 @@ export function validateTask(spec: TaskSpec, envelope: Envelope, executors: Read
 }
 /** Approval is required whenever impact demands it: side effects, or work that may continue without the user present. */
 export function approvalRequired(spec: TaskSpec, envelope: Envelope, executors: ReadonlyMap<string, ExecutorFacts>): boolean {
-  return envelope.background || envelope.sideEffects || spec.steps.some(s => executors.get(s.kind)?.category !== "read_only");
+  return envelope.background || envelope.sideEffects || spec.steps.some(s => executors.get(s.kind)?.category !== "read_only" || executors.get(s.kind)?.consequential);
 }
 
 export const DISPLAY_STATES = ["Queued", "Working", "Waiting for approval", "Paused", "Recovering", "Needs attention", "Completed", "Failed", "Cancelled"] as const;
@@ -162,8 +214,24 @@ export type TaskView = {
   background: boolean; blocked: { code: BlockCode; detail: string } | null; failure: { code: TaskFailureCode; detail: string } | null;
   uncertainOperation: string | null; models: string[]; dependsOn: string[];
   evidence: { stepId: string; outputSha256: string }[];
+  /** MA4-S2-T2: what the current connected step is doing (null for steps that are not connected actions). */
+  activity: Activity | null;
+  /** The action waiting for permission, without its preview or local detail (inspect it on the workstation). */
+  pendingAction: Pick<ActionProposal, "actionId" | "stepId" | "kind" | "connector" | "target" | "summary" | "effects" | "reversible" | "payloadSha256" | "expiresAt"> | null;
   corrupt?: false;
 };
+/** Derived from the trusted record only. */
+export function activityOf(task: Pick<TaskRecord, "state" | "steps" | "activities" | "pendingAction">): Activity | null {
+  if (!task.activities?.some(Boolean)) return null;
+  switch (task.state) {
+    case "COMPLETED": return "Completed";
+    case "FAILED": return "Failed";
+    case "UNCERTAIN": return "Uncertain";
+    case "AWAITING_APPROVAL": return "Waiting for permission";
+    case "RUNNING": { const i = task.steps.findIndex(s => s.state !== "succeeded"); return i >= 0 ? task.activities[i] ?? null : null; }
+    default: return null;
+  }
+}
 export type CorruptTaskView = { id: string; corrupt: true; display: "Needs attention"; detail: string };
 export function taskView(task: TaskRecord, version: number): TaskView {
   const done = task.steps.filter(s => s.state === "succeeded").length;
@@ -177,5 +245,7 @@ export function taskView(task: TaskRecord, version: number): TaskView {
     failure: task.failure, uncertainOperation: task.uncertainOperation,
     models: [...new Set(task.spec.steps.flatMap(s => s.model ? [s.model] : []))], dependsOn: task.spec.dependsOn,
     evidence: task.steps.flatMap(s => s.outputSha256 ? [{ stepId: s.id, outputSha256: s.outputSha256 }] : []),
+    activity: activityOf(task),
+    pendingAction: task.pendingAction ? (({ actionId, stepId, kind, connector, target, summary, effects, reversible, payloadSha256, expiresAt }) => ({ actionId, stepId, kind, connector, target, summary, effects, reversible, payloadSha256, expiresAt }))(task.pendingAction) : null,
   };
 }

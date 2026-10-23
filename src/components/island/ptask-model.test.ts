@@ -5,7 +5,7 @@ import type { TaskView } from "../../lib/bunny-host/ma4/task-runtime.ts";
 
 const base: TaskView = { id: "t", title: "Digest", projectId: "p", state: "RUNNING", display: "Working", version: 4, createdAt: 1, updatedAt: 10, deadlineAt: null,
   progress: { done: 1, total: 3, current: "b" }, approval: { required: false, approvedUntil: null }, background: false, blocked: null, failure: null,
-  uncertainOperation: null, models: [], dependsOn: [], evidence: [] };
+  uncertainOperation: null, models: [], dependsOn: [], evidence: [], activity: null, pendingAction: null };
 const snap = (tasks: PtaskSnapshot["tasks"]) => ({ schema: "ma4.ptask.snapshot.v1", hostInstance: "h", at: 0, readOnly: null, policy: { background: false, resumeOnStart: false, notifications: { enabled: true, kinds: [] } }, uiAttached: true, tasks, notifications: [] }) as PtaskSnapshot;
 const live = { live: true, snapshotAt: 1000, workstation: true, format: () => "14:05" };
 
