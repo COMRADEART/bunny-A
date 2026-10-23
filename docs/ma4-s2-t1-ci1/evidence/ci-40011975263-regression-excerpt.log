@@ -1,0 +1,206 @@
+# run 40011975263 job 120614366070 (full MA3/MA4 regression): stage totals and the stage 4 section, unedited lines
+2917:2026-10-23T19:34:59.1733403Z # tests 380
+2919:2026-10-23T19:34:59.1734844Z # pass 380
+2920:2026-10-23T19:34:59.1735180Z # fail 0
+2921:2026-10-23T19:34:59.1735619Z # cancelled 0
+2922:2026-10-23T19:34:59.1736199Z # skipped 0
+2925:2026-10-23T19:34:59.7277705Z ##[group]Run node scripts/ci/watchdog.mjs --label stage2 --budget-s 2400 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 1 $TEST_FLAGS)"
+13050:2026-10-23T19:50:48.8148098Z # tests 1643
+13052:2026-10-23T19:50:48.8150149Z # pass 1641
+13053:2026-10-23T19:50:48.8150509Z # fail 0
+13054:2026-10-23T19:50:48.8150806Z # cancelled 0
+13055:2026-10-23T19:50:48.8151125Z # skipped 2
+13058:2026-10-23T19:50:49.4125580Z ##[group]Run node scripts/ci/watchdog.mjs --label stage3 --budget-s 900 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 2 $TEST_FLAGS)"
+13418:2026-10-23T19:55:17.3248187Z # tests 58
+13420:2026-10-23T19:55:17.3248939Z # pass 58
+13421:2026-10-23T19:55:17.3249244Z # fail 0
+13422:2026-10-23T19:55:17.3249562Z # cancelled 0
+13423:2026-10-23T19:55:17.3249917Z # skipped 0
+13426:2026-10-23T19:55:17.9388310Z ##[group]Run node scripts/ci/watchdog.mjs --label stage4 --budget-s 600 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 3)"
+--- stage 4 ---
+2026-10-23T19:55:17.9388310Z ##[group]Run node scripts/ci/watchdog.mjs --label stage4 --budget-s 600 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 3)"
+2026-10-23T19:55:17.9389415Z node scripts/ci/watchdog.mjs --label stage4 --budget-s 600 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 3)"
+2026-10-23T19:55:17.9405504Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-10-23T19:55:17.9405907Z env:
+2026-10-23T19:55:17.9406079Z   MSYSTEM: UCRT64
+2026-10-23T19:55:17.9406339Z   BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+2026-10-23T19:55:17.9406702Z ##[endgroup]
+2026-10-23T19:55:19.1454029Z 
+2026-10-23T19:55:19.1455063Z > test:ma4
+2026-10-23T19:55:19.1460370Z > node --experimental-strip-types --test src/lib/bunny-host/ma4.test.ts src/lib/bunny-host/ma4-s1r.test.ts src/lib/bunny-host/ma4.live.test.ts src/lib/bunny-host/ma4-sandbox.test.ts src/lib/bunny-host/ma4-tools.test.ts src/lib/bunny-host/ma4-hybrid.test.ts src/lib/bunny-host/ma4-workflow.test.ts src/lib/bunny-host/ma4-repair.test.ts src/lib/bunny-host/ma4-cloud.test.ts src/lib/bunny-host/ma4-s1r4.test.ts src/lib/bunny-host/ma4-s2.test.ts src/lib/bunny-host/ma4-s2r1.test.ts src/lib/bunny-host/ma4-s2t1.test.ts src/lib/bunny-host/ma4-s2t1-host.test.ts src/lib/bunny-host/ma4-s2t1-process.test.ts
+2026-10-23T19:55:19.1463468Z 
+2026-10-23T19:55:19.7993236Z ✔ candidates are documentation data only: disabled, not routable, sensitive data refused (3.1693ms)
+2026-10-23T19:55:19.8045893Z ✔ rate limit: 429 with Retry-After surfaces as rate_limited and the backoff never shortens it (58.2711ms)
+2026-10-23T19:55:19.8057390Z ✔ quota exhaustion (402) and outage (503/network) fail closed without a result (6.0563ms)
+2026-10-23T19:55:19.8083329Z ✔ streaming: complete streams succeed; interrupted, malformed or mismatched streams fail (12.0135ms)
+2026-10-23T19:55:19.8101447Z ✔ OpenAI-format tool calls: ids map back, malformed arguments and unknown tools never execute (12.8611ms)
+2026-10-23T19:55:20.4126615Z ✔ B3 routing modes only add restrictions; MODEL_PINNED never chooses a model itself (58.1112ms)
+2026-10-23T19:55:20.4146379Z ✔ H1 reliability-aware ranking: measured category correctness outranks valid-JSON-only evidence; UNPROVEN earns nothing (2.065ms)
+2026-10-23T19:55:20.4154082Z ✔ B4 approvals are scoped to provider, exact model, purpose, data category, expiry and spend (1.8094ms)
+2026-10-23T19:55:20.4167262Z ✔ B4 only the workstation issues approvals; imported or agent-written records stay pending (16.6281ms)
+2026-10-23T19:55:20.4180634Z ✔ H2 reliability evidence: benchmark import replaces only its source; runtime outcomes accumulate (4.3615ms)
+2026-10-23T19:55:20.4495207Z ✔ A2 attribution: static errors are blamed on the file that has them (3.2136ms)
+2026-10-23T19:55:20.4498362Z ✔ A2 attribution: a failing generated test is the Tester's fault only when the frozen reference also fails it (0.736ms)
+2026-10-23T19:55:20.4500758Z ✔ A2 attribution: load errors are decided by the oracle; without one the failure is ambiguous, never guessed (0.4425ms)
+2026-10-23T19:55:20.4502842Z ✔ B2/A1 decode-time module-name constraint replaces prose dependencies (8.1296ms)
+2026-10-23T19:55:20.4504899Z ✔ A3 a structured reply the execution layer rejects is a malformed artifact for its producer, not a model failure (7.3529ms)
+2026-10-23T19:55:20.4510568Z ﹣ R3-G3 an invalid generated test is repaired by the Tester, without spending a Worker repair (0.9851ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:20.4513310Z ﹣ R3-G3 a Tester policy violation goes to the Tester; R3-G4 a valid failing test goes to the Worker; both in one round (0.1296ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:20.4515999Z ﹣ A3 planner contradicting host facts is repaired by the Planner; the budget is shared and stops cleanly (0.2281ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:20.4524570Z ﹣ A3 without an oracle a test/code disagreement is diagnosed as ambiguous, not blindly repaired (0.2379ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:20.4527601Z ﹣ B2 artifacts are typed, hashed, versioned to the contract, and a malformed Worker reply is repaired without execution (0.2085ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:20.4530010Z ✔ S1R: incomplete streams and served-model substitutions cannot certify success (41.0686ms)
+2026-10-23T19:55:20.4532690Z ✔ S1R: nonstream substitutions, missing completion and malformed JSON fail validation (2.6925ms)
+2026-10-23T19:55:20.4535261Z ✔ S1R: actual architecture-qualified Ollama context metadata is discovered (5.0258ms)
+2026-10-23T19:55:20.4537339Z ✔ S1R: read-only agent formatting is not contradicted by a mandatory prose summary (0.4753ms)
+2026-10-23T19:55:20.5767986Z ✔ R4-G2 task graph: bounded, acyclic, four agents at most; samples follow the deterministic profile (14.0384ms)
+2026-10-23T19:55:20.5776055Z ✔ fenced transport: the module is the longest block; an unfenced reply is the file; empty is nothing (0.8798ms)
+2026-10-23T19:55:20.5919260Z ✔ R4-G6 tools: a broker denial fails closed before any execution; receipts name the orchestrator (22.8486ms)
+2026-10-23T19:55:20.6173233Z ✔ R4-G6 tools: the per-workflow tool budget is enforced as resource exhaustion (25.9382ms)
+2026-10-23T19:55:20.6179740Z ﹣ R4-G3 verified sampling: Worker samples are ranked by the Tester's own tests, never by hidden tests or the reference (0.4615ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:20.6188048Z ﹣ R4-G5 an identical repair is unproductive: recorded with both hashes, and the loop stops (0.2093ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:20.6190603Z ✔ R4-G4/R4-G9 role assignment: pins win and are never substituted; evidence ranks eligible models; high risk abstains (1.3034ms)
+2026-10-23T19:55:20.7206684Z ✔ S2-G2 protocol: a valid Coordinator handoff is admitted; edges are hub-and-spoke (12.1664ms)
+2026-10-23T19:55:20.7218367Z ✔ S2-G2/G6 protocol: pins, permissions and acceptance cannot travel in a message; tampering is refused with a reason (5.2378ms)
+2026-10-23T19:55:20.7228114Z ✔ S2 prompt injection: steering content in a handoff is held as untrusted data and rendered quoted (0.8651ms)
+2026-10-23T19:55:20.7244287Z ✔ S2-G3 team composition: smallest covering team; Researcher is Host retrieval; four model roles at most (0.8891ms)
+2026-10-23T19:55:20.7248465Z ✔ S2-G3/G11 assignment: pins are never substituted; ineligible pins abstain; measured evidence breaks ties (2.0005ms)
+2026-10-23T19:55:20.7253349Z ✔ S2-T8 schedule: two 7B models that cannot share 6 GiB of VRAM are grouped; one model runs in parallel (0.3919ms)
+2026-10-23T19:55:20.8974961Z ✔ S2 concurrency gate: bounded in-flight calls, model switches counted, cancellation and timeout propagate (125.4124ms)
+2026-10-23T19:55:20.9678872Z ✔ S2-G2 workflow: every role transfer is an admitted protocol message; the run passes unchanged (120.7182ms)
+2026-10-23T19:55:20.9685471Z ✔ S2-G2 workflow: a tampered requirement hash stops the run before any model call (2.1545ms)
+2026-10-23T19:55:21.0664368Z ✔ S2-T8 grouped schedule: Worker samples then Tester, never two models in flight; same prompts as S1R4 (98.614ms)
+2026-10-23T19:55:21.2506576Z ✔ S2-G7 experience-guided repair: guidance reaches the repair prompt; acceptance tests are never altered; Reviewer cannot pass a failure (110.9206ms)
+2026-10-23T19:55:21.2510130Z ✔ S2-G4 memory is off by default: nothing is written or read until the policy enables it (4.867ms)
+2026-10-23T19:55:21.2511932Z ✔ S2-G4 provenance: an experience is a Host-trusted inner-petal Lotus memory with hashed, expiring metadata (9.2727ms)
+2026-10-23T19:55:21.2514289Z ✔ S2-G4 incorrect-memory resistance: model, untrusted, steering, expired, tampered, cross-project and personal records never reach retrieval (7.684ms)
+2026-10-23T19:55:21.2524232Z ✔ S2-G4/T9 retrieval quality: on a fixed corpus the stem returns the relevant records first (precision@3 = 1.0) (8.454ms)
+2026-10-23T19:55:21.2533170Z ✔ S2-G6 screening rejects steering, credentials, named models, acceptance tampering, new tools and leaked test text (1.6924ms)
+2026-10-23T19:55:21.2539219Z ✔ S2-G5 lifecycle: stages cannot be skipped; evidence is required; only the owner approves, activates or removes (6.1672ms)
+2026-10-23T19:55:21.2545763Z ✔ S2-G6 privilege: a skill that needs a new tool cannot be approved without naming that permission (2.6623ms)
+2026-10-23T19:55:21.2548565Z ✔ S2-G5 monitoring, quarantine and rollback: failing or unsafe skills leave use; the previous approved version returns (6.3202ms)
+2026-10-23T19:55:21.2554590Z ✔ S2R1 (replaces S2 tag selection): one shared coarse tag no longer selects a skill; rendering is bounded (4.3384ms)
+2026-10-23T19:55:21.2560335Z ✔ S2-G4/G8 guidance only flows through Lotus pointers, the memory policy and an attested applicability contract (11.2573ms)
+2026-10-23T19:55:21.2564626Z ✔ S2 leakage: the extraction prompt carries only public material, never hidden tests or the reference (0.852ms)
+2026-10-23T19:55:21.2572039Z ✔ S2-T7 run control: dependency order, bounded concurrency, pause/resume, partial failure and controlled retry (5.0317ms)
+2026-10-23T19:55:21.2583338Z ✔ S2-T7 restart safety: reversible work is retried; irreversible work in flight is never replayed automatically (3.7844ms)
+2026-10-23T19:55:21.2585654Z ✔ S2-T5 performance: per model/role/kind rates with intervals; small differences stay unresolved; sign test (1.0042ms)
+2026-10-23T19:55:21.3835639Z ✔ S2R1 task signature: typed, Host-derived from the contract; formats, operations and inputs are explicit (6.6761ms)
+2026-10-23T19:55:21.3837478Z ✔ S2R1 negative retrieval: matrix rotation never receives a date-parsing skill (the S2 failure) (15.9727ms)
+2026-10-23T19:55:21.3839492Z ✔ S2R1 negative retrieval: same tags and format but an incompatible input type is rejected (5.6205ms)
+2026-10-23T19:55:21.3841079Z ✔ S2R1 negative retrieval: correct domain, wrong operation (median skill, most-frequent task) (3.2226ms)
+2026-10-23T19:55:21.3842690Z ✔ S2R1 negative retrieval: correct operation but a required tool the task does not grant (3.147ms)
+2026-10-23T19:55:21.3844403Z ✔ S2R1 negative retrieval: expired, untrusted, wrong-scope, re-hashed and unattested records fail closed (3.609ms)
+2026-10-23T19:55:21.3846235Z ✔ S2R1 negative retrieval: malicious instructions inside a retrieved skill are refused even with a valid hash (3.1168ms)
+2026-10-23T19:55:21.3847877Z ✔ S2R1 near-misses from the pre-registered families are rejected with the specific reason (6.6583ms)
+2026-10-23T19:55:21.3849542Z ✔ S2R1-H skills cannot request tools, cite validation they lack, or come back after a malicious replacement (12.9881ms)
+2026-10-23T19:55:21.3851373Z ✔ S2R1-H memory: forged approvals, steering, expired and cross-project records never reach guidance or grant authority (7.9999ms)
+2026-10-23T19:55:21.3853392Z ✔ S2R1 experience gating: S2-era records without a signature are ineligible; signature-tagged ones match only compatible tasks (0.4168ms)
+2026-10-23T19:55:21.3855385Z ✔ S2R1 context: one skill at most, whole steps within the excerpt budget, near-duplicates collapse, the block is bounded (3.5579ms)
+2026-10-23T19:55:21.3857764Z ✔ S2R1 no-skill fallback: nothing eligible means no guidance, no record and prompts identical to a run without retrieval (159.1907ms)
+2026-10-23T19:55:21.3859892Z ✔ S2R1-D2 rollback in an isolated execution: a rolled-back skill leaves the next run and any cached selection (190.9749ms)
+2026-10-23T19:55:21.5077226Z ✔ S2R1-E grouped schedule: retrieval changes neither the calls, their order, the pins nor the concurrency (129.7417ms)
+2026-10-23T19:55:23.9433546Z Bunny-A Host ready on loopback (f7216ab1-a2be-4851-82a7-29b927e94bbd).
+2026-10-23T19:55:25.6988711Z Bunny-A Host ready on loopback (1d620a48-ca77-4ff5-aeb6-2d02e4ddef21).
+2026-10-23T19:55:25.7451505Z ✖ T1-11/12 Host API: workstation creates and runs; a paired phone reads and supervises but cannot create, approve, resolve or read outputs (4378.6009ms)
+2026-10-23T19:55:27.9336142Z ✔ T1-18 real kill: a Host's ordinary child dies with it (kill-on-close Job); recovery forgets the stale record (3216.4859ms)
+2026-10-23T19:55:27.9337715Z S2T1_RECOVERY_MS read 640.9
+2026-10-23T19:55:27.9777306Z ✔ T1-4/18 real kill during a read-only step: an escaped (detached) child is killed by verified identity; the step reruns once (3089.9754ms)
+2026-10-23T19:55:29.6627057Z S2T1_RECOVERY_MS send 30.8
+2026-10-23T19:55:30.1221635Z ✔ T1-5 real kill after an irreversible send: UNCERTAIN on every restart, never re-sent, resolved only by the owner (2149.5259ms)
+2026-10-23T19:55:30.7860365Z ✔ T1 state machine: explicit table, terminal states never exit, UNCERTAIN leaves only by reconciliation targets (2.9537ms)
+2026-10-23T19:55:30.7861967Z ✔ T1 storage: versioned migration is additive and idempotent; a newer schema is refused; the store rejects invalid transitions (1017.7738ms)
+2026-10-23T19:55:30.7864398Z ✔ T1 crash-safe writes: an interrupted transaction leaves no partial task; repeated recovery is a no-op (624.031ms)
+2026-10-23T19:55:30.7866683Z ✔ T1-14 malformed persisted records are detected and never executed (301.7498ms)
+2026-10-23T19:55:30.7868994Z ✔ T1-1 UI closes: an authorized background task keeps running on the Host; reconnect shows the same task, no duplicate (807.3787ms)
+2026-10-23T19:55:30.7871333Z ✔ T1-10 background execution is refused when disabled (policy off, or the task's envelope does not allow it) (1311.1381ms)
+2026-10-23T19:55:30.7873277Z ✔ T1-2 pause and resume: pause lands at a step boundary, resume re-verifies and continues, no step runs twice (598.1617ms)
+2026-10-23T19:55:30.7874605Z ✔ T1-3 cancel an active task: the step is stopped, its child process is terminated, nothing further runs (887.1857ms)
+2026-10-23T19:55:30.7875610Z ✔ T1-4 Host killed during a read-only step: recovery retries it within budget and completes (504.9297ms)
+2026-10-23T19:55:30.7876590Z ✔ T1-5 crash at after-claim (claimed, nothing started): no consequential action is ever duplicated (422.8385ms)
+2026-10-23T19:55:30.7877711Z ✔ T1-5 crash at before-operation-start (no intent recorded, nothing sent): no consequential action is ever duplicated (1440.9786ms)
+2026-10-23T19:55:32.1323758Z ✔ T1-5 crash at after-operation-start (intent recorded; the Host cannot know whether it was sent): no consequential action is ever duplicated (1278.2081ms)
+2026-10-23T19:55:32.7039503Z ✔ T1-5 crash at after-effect (sent, no receipt recorded): no consequential action is ever duplicated (1288.5542ms)
+2026-10-23T19:55:33.1526131Z ✔ T1-5 crash at after-receipt (sent and receipted): no consequential action is ever duplicated (378.6263ms)
+2026-10-23T19:55:34.3789852Z ✔ T1-5 idempotent step after a crash is verified under its stable key before any re-execution (528.4613ms)
+2026-10-23T19:55:35.7485394Z ✔ T1-5 cancelling during an irreversible send after dispatch yields UNCERTAIN, never a silent success or a retry (1132.6446ms)
+2026-10-23T19:55:37.2826288Z ✔ T1-6 queued tasks recover in dependency order; a failed dependency fails its dependents (1688.5371ms)
+2026-10-23T19:55:38.6660971Z ✔ T1-7 stale ownership: a reclaimed task's old worker cannot commit; two Hosts never both claim one task (1420.0185ms)
+2026-10-23T19:55:39.8740050Z ✔ T1-8 restart re-verifies authority: expired approval waits, expired envelope and revocation stop the task (1278.7523ms)
+2026-10-23T19:55:41.2655068Z ✔ T1-9/13 pins survive recovery; a missing pinned model or low memory blocks the task — no other model is used (1439.4973ms)
+2026-10-23T19:55:42.3503736Z ✔ T1-9 a served model that differs from the pin fails the task (PIN_VIOLATION); budgets bound inference (1182.188ms)
+2026-10-23T19:55:42.9981907Z ✔ T1-11 after a restart, work resumes only under the owner's startup policy (default: wait for the user) (983.7454ms)
+2026-10-23T19:55:42.9983625Z ✔ T1-12/15 only the workstation creates or approves; envelopes cannot be widened; no cross-project leakage; no credentials stored (313.6301ms)
+2026-10-23T19:55:43.4332828Z ✔ T1-16 notifications are local, respect settings and are never duplicated by recovery (433.2959ms)
+2026-10-23T19:55:43.7378447Z ✔ T1 deadlines fail waiting tasks honestly; a sleep gap is recorded, never counted as progress (307.371ms)
+2026-10-23T19:55:45.1645821Z ✔ T1-18 repeated crash and recovery leaves no runaway child processes (1657.7945ms)
+2026-10-23T19:55:45.1803683Z ✔ request validation refuses traversal names, non-allowlisted programs and out-of-range limits (5.9838ms)
+2026-10-23T19:55:45.1809056Z ✔ fails closed: an unproven backend blocks execution and a malformed result is a failure (9.274ms)
+2026-10-23T19:55:45.1812038Z ﹣ F4.1 reading files outside the workspace fails (host files, Windows drives, home, the launcher) (1.6606ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1813720Z ﹣ F4.2 environment secrets do not reach the program (0.1914ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1815405Z ﹣ F4.3/F4.10 no external network, no DNS and no host services (Ollama/loopback) (0.1998ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1818939Z ﹣ F4.4 process spawning is capped and Windows interop executables cannot launch (0.1821ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1821720Z ﹣ F4.5 writes outside the private workspace fail and the workspace is discarded (0.104ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1824264Z ﹣ F4.6 memory limit is enforced by the cgroup (0.2077ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1827119Z ﹣ F4.7 runtime limit kills a busy loop (0.3974ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1828874Z ﹣ F4.8 excessive output is truncated and the program is stopped (0.3872ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1830345Z ﹣ F4.9 detached descendants do not outlive the run (0.1083ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1831744Z ﹣ F4.11 cancellation kills the whole tree and cleans up (0.0651ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1833503Z ﹣ F5 seccomp (S1R3): namespace, mount, tracing, keyring, BPF and io_uring syscalls fail with EPERM; ordinary work still runs (0.0617ms) # SKIPPED (not passed): WSL2 sandbox probe failed: Unexpected token ' ', " " is not valid JSON
+2026-10-23T19:55:45.1834975Z ✔ valid call executes through the broker, output returns as a tool message, final answer completes (10.7794ms)
+2026-10-23T19:55:45.1835953Z ✔ invalid schema, malformed JSON arguments and non-object calls are refused without execution (2.1574ms)
+2026-10-23T19:55:45.1836867Z ✔ unknown tool names and permission denials never execute; ask is not treated as allow (1.6374ms)
+2026-10-23T19:55:45.1838063Z ✔ missing capability is classified from Ollama facts, not model self-description (0.3551ms)
+2026-10-23T19:55:45.1839079Z ✔ S1R3 demonstrated tool calling is measured from receipts: prose, unknown names and invalid arguments never count (0.2892ms)
+2026-10-23T19:55:45.1840005Z ✔ per-tool timeout, call-count limit and multiple calls in one round (103.0337ms)
+2026-10-23T19:55:45.1840670Z ✔ cancellation stops the running tool and the loop (34.7262ms)
+2026-10-23T19:55:45.1841422Z ✔ prompt injection in tool output stays data: sanitized, and follow-up calls remain gated (1.8506ms)
+2026-10-23T19:55:45.1842159Z ✔ served-model mismatch and round exhaustion fail closed (0.8777ms)
+2026-10-23T19:55:45.1844262Z ﹣ E2/E4 happy path: typed artifacts, Worker ∥ Tester, sandboxed checks, deterministic pass (0.9219ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:45.1845709Z ﹣ E2/G8 the Reviewer cannot override failing deterministic tests (0.1179ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:45.1847145Z ﹣ E5 repair loop: bounded, receives contract + failing validated tests + previous code, never hidden tests (0.1001ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:45.1848727Z ﹣ E4 static validation: import-time code, disallowed imports and undeclared files fail closed (0.1051ms) # SKIPPED (not passed): sandbox unavailable
+2026-10-23T19:55:45.1849797Z ✔ E3/H3 malformed or authority-seeking artifacts fail closed before any execution (206.3417ms)
+2026-10-23T19:55:45.1850766Z ✔ pins: a served-model mismatch is a violation, never a substitution; cancellation stops the workflow (23.1339ms)
+2026-10-23T19:55:45.1851589Z ﹣ MA4 live free-model Host contract (opt-in; never paid) (0.9347ms) # SKIP
+2026-10-23T19:55:45.1852633Z ✔ MA4 registry: discovered models disabled, provenance explicit, configuration version strict and corrupt saved config fails closed (43.2268ms)
+2026-10-23T19:55:45.1853932Z ✔ MA4 privacy/capabilities: sensitive, unapproved, stale, language, modality, tools, structured and context mismatches rejected (10.5889ms)
+2026-10-23T19:55:45.1855208Z ✔ MA4 routing: automatic eligible/local choice, manual provider/model hard pins and no silent fallback when pinned model unavailable (4.2387ms)
+2026-10-23T19:55:45.1856432Z ✔ MA4 task analyzer: validated categories, capabilities, sensitivity and bounded-agent hint reuse MA3 classification (2.3259ms)
+2026-10-23T19:55:45.1857581Z ✔ MA4 model selection: leading owner directive, task and per-agent pins, conflicting scope rejected; tools unchanged (3.4741ms)
+2026-10-23T19:55:45.1858655Z ✔ MA4 transport contract: exact model, fail-closed stream, usage, JSON validation and secret redaction (10.5492ms)
+2026-10-23T19:55:45.1859748Z ✔ MA4 rate limit: Retry-After date/seconds floors, bounded jitter/backoff, no retry storm, cooldown survives restart (13.3248ms)
+2026-10-23T19:55:45.1860874Z ✔ MA4 accounting: atomic request/token/day/cost reservations count failures and cannot exceed budget concurrently (6.0996ms)
+2026-10-23T19:55:45.1862000Z ✔ MA4 cancellation: waiting agents stop promptly; completed and cancelled calls release concurrency resources (17.7738ms)
+2026-10-23T19:55:45.1862981Z ✔ MA4 timeout: bounded recovery, partial response never succeeds and body size is bounded (30.8781ms)
+2026-10-23T19:55:45.1864100Z ✔ MA4 output-validation failure never completes task; preflight denies tools/sensitivity/unknown models before any external call (11.1589ms)
+2026-10-23T19:55:45.1865881Z ✔ MA4 evaluation: explicit permission, reproducible version/sample sizes, no answer leakage, missing/stale evidence neutral and measured ranking changes (11.8414ms)
+2026-10-23T19:55:45.1866904Z ✔ MA4 real Windows DPAPI encrypt/decrypt round trip (749.999ms)
+2026-10-23T19:55:45.1867817Z ✔ MA4 premium: paid and unknown-priced models denied by default; explicit finite spend ceilings reserve worst-case cost (8.4245ms)
+2026-10-23T19:55:45.1868805Z Bunny-A Host ready on loopback (3ff7ea74-bb32-4c46-a8ee-d1507af7cb76).
+2026-10-23T19:55:45.1869902Z ✔ MA4 actual Host API: workstation-only activation/evaluation, unauthenticated/paired clients denied and snapshots contain no secrets (4361.3108ms)
+2026-10-23T19:55:45.1871284Z ✔ MA4 Host integration: existing consent, exact-model dispatch, status/output/usage propagation and backward-compatible configuration (6102.8427ms)
+2026-10-23T19:55:45.1874837Z ✔ MA4 MA3 integration: mission pins persist across planning/restart; dependency graph and single-agent work remain bounded (2850.091ms)
+2026-10-23T19:55:45.1877149Z ✔ MA4 exact-model constraints never escape through the legacy Host path when discovery has no facts (15.1043ms)
+2026-10-23T19:55:45.1878025Z ℹ tests 148
+2026-10-23T19:55:45.1878323Z ℹ suites 0
+2026-10-23T19:55:45.1878620Z ℹ pass 124
+2026-10-23T19:55:45.1878912Z ℹ fail 1
+2026-10-23T19:55:45.1879433Z ℹ cancelled 0
+2026-10-23T19:55:45.1879754Z ℹ skipped 23
+2026-10-23T19:55:45.1880087Z ℹ todo 0
+2026-10-23T19:55:45.1880421Z ℹ duration_ms 25963.7228
+2026-10-23T19:55:45.1880657Z 
+2026-10-23T19:55:45.1880829Z ✖ failing tests:
+2026-10-23T19:55:45.1881022Z 
+2026-10-23T19:55:45.1881327Z test at src\lib\bunny-host\ma4-s2t1-host.test.ts:25:1
+2026-10-23T19:55:45.1882830Z ✖ T1-11/12 Host API: workstation creates and runs; a paired phone reads and supervises but cannot create, approve, resolve or read outputs (4378.6009ms)
+2026-10-23T19:55:45.1883959Z   [TypeError [Error]: fetch failed] {
+2026-10-23T19:55:45.1884403Z     [cause]: Error: read ECONNRESET
+2026-10-23T19:55:45.1884999Z         at TCP.onStreamRead (node:internal/stream_base_commons:221:20) {
+2026-10-23T19:55:45.1885584Z       errno: -4077,
+2026-10-23T19:55:45.1885898Z       code: 'ECONNRESET',
+2026-10-23T19:55:45.1886587Z       syscall: 'read'
+2026-10-23T19:55:45.1886887Z     }
+2026-10-23T19:55:45.1887124Z   }
+2026-10-23T19:55:45.7235961Z ##[error]Process completed with exit code 1.

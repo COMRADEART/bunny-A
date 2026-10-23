@@ -1,0 +1,107 @@
+2026-10-23T20:09:28.7031511Z ##[group]Run actions/checkout@v4
+2026-10-23T20:09:45.2195801Z ##[group]Run actions/setup-node@v4
+2026-10-23T20:09:54.8600173Z ##[group]Run msys2/setup-msys2@v2
+2026-10-23T20:10:42.3630558Z ##[group]Run npm ci
+2026-10-23T20:11:04.7248558Z ##[group]Run npm run pretest
+2026-10-23T20:11:09.4111133Z ##[group]Run [ "$(node scripts/ci/test-stage.mjs count)" = 4 ] || { echo "::error::npm test no longer has 4 stages; update ci.yml"; exit 1; }
+2026-10-23T20:13:21.1306273Z # tests 380
+2026-10-23T20:13:21.1307501Z # pass 380
+2026-10-23T20:13:21.1307717Z # fail 0
+2026-10-23T20:13:21.1307922Z # cancelled 0
+2026-10-23T20:13:21.1308136Z # skipped 0
+2026-10-23T20:13:21.6981756Z ##[group]Run node scripts/ci/watchdog.mjs --label stage2 --budget-s 2400 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 1 $TEST_FLAGS)"
+2026-10-23T20:25:54.3739887Z # tests 1653
+2026-10-23T20:25:54.3740692Z # pass 1651
+2026-10-23T20:25:54.3740991Z # fail 0
+2026-10-23T20:25:54.3741305Z # cancelled 0
+2026-10-23T20:25:54.3741537Z # skipped 2
+2026-10-23T20:25:55.0087775Z ##[group]Run node scripts/ci/watchdog.mjs --label stage3 --budget-s 900 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 2 $TEST_FLAGS)"
+2026-10-23T20:29:36.4804545Z # tests 58
+2026-10-23T20:29:36.4806718Z # pass 58
+2026-10-23T20:29:36.4807078Z # fail 0
+2026-10-23T20:29:36.4807417Z # cancelled 0
+2026-10-23T20:29:36.4807842Z # skipped 0
+2026-10-23T20:29:37.0749971Z ##[group]Run node scripts/ci/watchdog.mjs --label stage4 --budget-s 600 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 3)"
+2026-10-23T20:29:46.2471764Z ✔ T1-11/12 Host API: workstation creates and runs; a paired phone reads and supervises but cannot create, approve, resolve or read outputs (2700.027ms)
+2026-10-23T20:29:47.5686553Z ✔ CI1-F4 a client that drops its connection mid-request never gets a task created or run twice; a phone's dropped create is still refused (4250.011ms)
+2026-10-23T20:29:47.5913099Z ✔ T1-18 real kill: a Host's ordinary child dies with it (kill-on-close Job); recovery forgets the stale record (3002.3913ms)
+2026-10-23T20:29:47.5915703Z ✔ T1-4/18 real kill during a read-only step: an escaped (detached) child is killed by verified identity; the step reruns once (2453.0291ms)
+2026-10-23T20:29:47.5918246Z ✔ T1-5 real kill after an irreversible send: UNCERTAIN on every restart, never re-sent, resolved only by the owner (1290.903ms)
+2026-10-23T20:29:47.8809350Z ✔ T1-14 malformed persisted records are detected and never executed (654.8989ms)
+2026-10-23T20:29:47.8811437Z ✔ T1-1 UI closes: an authorized background task keeps running on the Host; reconnect shows the same task, no duplicate (886.9952ms)
+2026-10-23T20:29:47.8842422Z ✔ T1-10 background execution is refused when disabled (policy off, or the task's envelope does not allow it) (1031.5737ms)
+2026-10-23T20:29:47.8844542Z ✔ T1-2 pause and resume: pause lands at a step boundary, resume re-verifies and continues, no step runs twice (1100.7093ms)
+2026-10-23T20:29:47.8846465Z ✔ T1-3 cancel an active task: the step is stopped, its child process is terminated, nothing further runs (1450.0196ms)
+2026-10-23T20:29:48.1803125Z ✔ T1-4 Host killed during a read-only step: recovery retries it within budget and completes (232.7551ms)
+2026-10-23T20:29:48.3530856Z ✔ T1-5 crash at after-claim (claimed, nothing started): no consequential action is ever duplicated (240.1552ms)
+2026-10-23T20:29:48.6115951Z ✔ T1-5 crash at before-operation-start (no intent recorded, nothing sent): no consequential action is ever duplicated (248.9922ms)
+2026-10-23T20:29:48.8425083Z ✔ T1-5 crash at after-operation-start (intent recorded; the Host cannot know whether it was sent): no consequential action is ever duplicated (256.545ms)
+2026-10-23T20:29:49.0739120Z ✔ T1-5 crash at after-effect (sent, no receipt recorded): no consequential action is ever duplicated (212.2161ms)
+2026-10-23T20:29:49.2731088Z ✔ T1-5 crash at after-receipt (sent and receipted): no consequential action is ever duplicated (227.6436ms)
+2026-10-23T20:29:49.4650279Z ✔ T1-5 idempotent step after a crash is verified under its stable key before any re-execution (188.3043ms)
+2026-10-23T20:29:49.7399423Z ✔ T1-5 cancelling during an irreversible send after dispatch yields UNCERTAIN, never a silent success or a retry (196.4858ms)
+2026-10-23T20:29:50.9122276Z ✔ T1-6 queued tasks recover in dependency order; a failed dependency fails its dependents (460.839ms)
+2026-10-23T20:29:52.0973384Z ✔ T1-7 stale ownership: a reclaimed task's old worker cannot commit; two Hosts never both claim one task (1194.6712ms)
+2026-10-23T20:29:52.7977636Z ✔ T1-8 restart re-verifies authority: expired approval waits, expired envelope and revocation stop the task (1113.4547ms)
+2026-10-23T20:29:53.0420836Z ✔ T1-9/13 pins survive recovery; a missing pinned model or low memory blocks the task — no other model is used (602.7022ms)
+2026-10-23T20:29:53.2869765Z ✔ T1-9 a served model that differs from the pin fails the task (PIN_VIOLATION); budgets bound inference (195.1825ms)
+2026-10-23T20:29:55.0316149Z ✔ T1-11 after a restart, work resumes only under the owner's startup policy (default: wait for the user) (355.5518ms)
+2026-10-23T20:29:55.0321870Z ✔ T1-12/15 only the workstation creates or approves; envelopes cannot be widened; no cross-project leakage; no credentials stored (846.5127ms)
+2026-10-23T20:29:56.3064042Z ✔ T1-16 notifications are local, respect settings and are never duplicated by recovery (1246.8723ms)
+2026-10-23T20:29:58.8364716Z ✔ T1-18 repeated crash and recovery leaves no runaway child processes (2306.4805ms)
+2026-10-23T20:29:58.8579884Z ℹ tests 149
+2026-10-23T20:29:58.8580347Z ℹ pass 126
+2026-10-23T20:29:58.8580553Z ℹ fail 0
+2026-10-23T20:29:58.8580768Z ℹ cancelled 0
+2026-10-23T20:29:58.8580998Z ℹ skipped 23
+2026-10-23T20:29:59.4074958Z ##[group]Run actions/upload-artifact@v4
+2026-10-23T20:09:26.7884457Z ##[group]Run actions/checkout@v4
+2026-10-23T20:09:49.3309789Z ##[group]Run actions/setup-node@v4
+2026-10-23T20:10:00.9858472Z ##[group]Run npm ci
+2026-10-23T20:10:25.4295783Z ##[group]Run npm run typecheck
+2026-10-23T20:10:45.1112990Z ##[group]Run npm run test:ma4
+2026-10-23T20:10:57.4366672Z ✔ T1-11/12 Host API: workstation creates and runs; a paired phone reads and supervises but cannot create, approve, resolve or read outputs (5145.245ms)
+2026-10-23T20:10:58.7896854Z ✔ CI1-F4 a client that drops its connection mid-request never gets a task created or run twice; a phone's dropped create is still refused (5387.8592ms)
+2026-10-23T20:11:02.5195602Z ✔ T1-18 real kill: a Host's ordinary child dies with it (kill-on-close Job); recovery forgets the stale record (14069.961ms)
+2026-10-23T20:11:04.4554273Z ✔ T1-5 real kill after an irreversible send: UNCERTAIN on every restart, never re-sent, resolved only by the owner (1939.9865ms)
+2026-10-23T20:11:05.1185300Z ✔ T1-14 malformed persisted records are detected and never executed (942.7473ms)
+2026-10-23T20:11:05.1186210Z ✔ T1-1 UI closes: an authorized background task keeps running on the Host; reconnect shows the same task, no duplicate (1344.6505ms)
+2026-10-23T20:11:05.1187224Z ✔ T1-10 background execution is refused when disabled (policy off, or the task's envelope does not allow it) (1454.2225ms)
+2026-10-23T20:11:05.1188194Z ✔ T1-2 pause and resume: pause lands at a step boundary, resume re-verifies and continues, no step runs twice (1330.078ms)
+2026-10-23T20:11:05.1189138Z ✔ T1-3 cancel an active task: the step is stopped, its child process is terminated, nothing further runs (1787.1425ms)
+2026-10-23T20:11:05.1190012Z ✔ T1-4 Host killed during a read-only step: recovery retries it within budget and completes (1166.3927ms)
+2026-10-23T20:11:05.1190889Z ✔ T1-5 crash at after-claim (claimed, nothing started): no consequential action is ever duplicated (1160.9855ms)
+2026-10-23T20:11:05.1191891Z ✔ T1-5 crash at before-operation-start (no intent recorded, nothing sent): no consequential action is ever duplicated (984.6767ms)
+2026-10-23T20:11:05.1193051Z ✔ T1-5 crash at after-operation-start (intent recorded; the Host cannot know whether it was sent): no consequential action is ever duplicated (1331.1438ms)
+2026-10-23T20:11:05.1194086Z ✔ T1-5 crash at after-effect (sent, no receipt recorded): no consequential action is ever duplicated (1469.4449ms)
+2026-10-23T20:11:06.5013237Z ✔ T1-5 crash at after-receipt (sent and receipted): no consequential action is ever duplicated (1185.6836ms)
+2026-10-23T20:11:07.8592369Z ✔ T1-5 idempotent step after a crash is verified under its stable key before any re-execution (1344.0139ms)
+2026-10-23T20:11:08.5524899Z ✔ T1-5 cancelling during an irreversible send after dispatch yields UNCERTAIN, never a silent success or a retry (1205.7348ms)
+2026-10-23T20:11:09.6564700Z ✔ T1-6 queued tasks recover in dependency order; a failed dependency fails its dependents (875.3704ms)
+2026-10-23T20:11:10.6036114Z ✔ T1-7 stale ownership: a reclaimed task's old worker cannot commit; two Hosts never both claim one task (1023.6147ms)
+2026-10-23T20:11:11.3887663Z ✔ T1-8 restart re-verifies authority: expired approval waits, expired envelope and revocation stop the task (905.0165ms)
+2026-10-23T20:11:12.6117051Z ✔ T1-9/13 pins survive recovery; a missing pinned model or low memory blocks the task — no other model is used (900.1707ms)
+2026-10-23T20:11:13.9426646Z ✔ T1-9 a served model that differs from the pin fails the task (PIN_VIOLATION); budgets bound inference (1190.2449ms)
+2026-10-23T20:11:16.5833363Z ✔ T1-11 after a restart, work resumes only under the owner's startup policy (default: wait for the user) (1373.0707ms)
+2026-10-23T20:11:16.5835797Z ✔ T1-12/15 only the workstation creates or approves; envelopes cannot be widened; no cross-project leakage; no credentials stored (1421.4703ms)
+2026-10-23T20:11:18.0734785Z ✔ T1-16 notifications are local, respect settings and are never duplicated by recovery (1561.1564ms)
+2026-10-23T20:11:20.9212459Z ✔ T1-18 repeated crash and recovery leaves no runaway child processes (2686.9398ms)
+2026-10-23T20:11:20.9477973Z ℹ tests 149
+2026-10-23T20:11:20.9478373Z ℹ pass 125
+2026-10-23T20:11:20.9478563Z ℹ fail 0
+2026-10-23T20:11:20.9478755Z ℹ cancelled 0
+2026-10-23T20:11:20.9479190Z ℹ skipped 24
+2026-10-23T20:11:21.0048192Z ##[group]Run node --experimental-strip-types --test --test-concurrency=1 src/lib/bunny-host/routing.test.ts src/lib/bunny-host/routing-matrix.test.ts src/lib/bunny-host/routing-learning.test.ts
+2026-10-23T20:11:26.1241600Z ℹ tests 69
+2026-10-23T20:11:26.1242397Z ℹ pass 69
+2026-10-23T20:11:26.1242604Z ℹ fail 0
+2026-10-23T20:11:26.1242826Z ℹ cancelled 0
+2026-10-23T20:11:26.1243086Z ℹ skipped 0
+2026-10-23T20:11:26.2578016Z ##[group]Run npm run test:ui
+2026-10-23T20:11:29.7211298Z ℹ tests 411
+2026-10-23T20:11:29.7212009Z ℹ pass 411
+2026-10-23T20:11:29.7212245Z ℹ fail 0
+2026-10-23T20:11:29.7212492Z ℹ cancelled 0
+2026-10-23T20:11:29.7212777Z ℹ skipped 0
+2026-10-23T20:11:29.8113118Z ##[group]Run npm run build
+2026-10-23T20:11:41.4588779Z ##[group]Run npm run build
