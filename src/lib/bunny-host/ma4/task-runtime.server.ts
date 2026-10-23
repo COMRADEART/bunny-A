@@ -476,7 +476,7 @@ export class PersistentTaskRuntime {
     const workMs = Math.max(0, this.now() - started);
     if (result.ok) { commit({ reason: "work time", mutate: r => { r.usage.workMs += workMs; } }); succeed(result.output, result.receipt ?? null, `step ${spec.id} succeeded`); fault("after-receipt"); return; }
     const failed = result;
-    if (failed.fatal) { stop("FAILED", failed.fatal.toLowerCase(), { operation: { key, stepId: spec.id, category: executor.category, state: "failed" }, mutate: r => { r.usage.workMs += workMs; r.steps[index] = { ...r.steps[index], state: "failed", error: failed.error }; r.failure = { code: failed.fatal!, detail: failed.error }; }, notify: [this.note("failed", record, failed.error)] }); return; }
+    if (failed.fatal) { stop("FAILED", failed.fatal.toLowerCase(), { operation: { key, stepId: spec.id, category: executor.category, state: "failed" }, mutate: r => { r.usage.workMs += workMs; r.steps[index] = { ...r.steps[index], state: "failed", error: failed.error }; r.failure = { code: failed.fatal!, detail: failed.error }; }, notify: [this.note("failed", record, `failed at step ${spec.id}`)] }); return; }
     const known = !failed.dispatched || failed.definite;
     if (!known && executor.category === "irreversible") {
       stop("UNCERTAIN", "irreversible action outcome unknown; not replayed", { operation: { key, stepId: spec.id, category: executor.category, state: "uncertain" },

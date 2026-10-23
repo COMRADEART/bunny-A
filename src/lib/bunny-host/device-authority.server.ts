@@ -419,6 +419,16 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
           ].map((agent) => ({ ...agent, authorization: agent.authorization ? { ...agent.authorization, roots: agent.authorization.roots.map(() => "[Project folder on the Windows Host]"), commands: agent.authorization.commands.map((command) => ({ ...command, cwd: "[Project folder on the Windows Host]" })) } : agent.authorization })),
         }
       : snapshot.agents,
+    // MA4-S2-T1: codes and states reach the phone; free-text failure details (which may quote executor errors) stay on the PC.
+    persistentTasks: snapshot.persistentTasks
+      ? {
+          ...snapshot.persistentTasks,
+          readOnly: snapshot.persistentTasks.readOnly ? "Task storage needs review on the Windows Host." : null,
+          tasks: snapshot.persistentTasks.tasks.map((task) => task.corrupt
+            ? { ...task, detail: "Review this task on the Windows Host." }
+            : { ...task, failure: task.failure ? { code: task.failure.code, detail: "Details are retained on the Windows Host." } : null }),
+        }
+      : snapshot.persistentTasks,
     // M-A-3 T13.1: credential state, provider limits and usage are workstation-owner settings.
     intelligence: undefined,
     modelIntelligence: undefined,
