@@ -1,0 +1,64 @@
+# MA4-S2-T1-CI1 diagnostic (diagnostic branch only; never gating): runs the T1-11/12 Host API test the way the failing
+# hosted job did, with a client+server socket trace (scripts/ci/host-trace.mjs), under the CI2 process watchdog.
+name: ci-ci1-diagnostic
+
+on:
+  push:
+    branches: ["ci-diag/ma4-s2-t1-ci1"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    name: CI1 diagnostic (${{ matrix.lane }})
+    runs-on: windows-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [isolated-x10, test-ma4-x3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Environment
+        shell: bash
+        run: |
+          mkdir -p ci-diag/http
+          node -e 'const os=require("os");console.log(JSON.stringify({node:process.version,cpus:os.cpus().length,memGiB:+(os.totalmem()/2**30).toFixed(1),tmpdir:os.tmpdir()}))' | tee ci-diag/env.json
+          git log --oneline -1 | tee ci-diag/commit.txt
+      - name: Runs under the watchdog (${{ matrix.lane }})
+        shell: bash
+        env:
+          LANE: ${{ matrix.lane }}
+        run: |
+          url() { node -p "require('url').pathToFileURL(require('path').resolve('$1')).href"; }
+          export BUNNY_CI_HTTP_TRACE="$PWD/ci-diag/http"
+          export NODE_OPTIONS="--import $(url scripts/ci/host-trace.mjs)"
+          fails=0
+          case "$LANE" in
+            isolated-x10) n=10; cmd="node --experimental-strip-types --test --test-reporter=tap --test-timeout=120000 src/lib/bunny-host/ma4-s2t1-host.test.ts"; budget=240 ;;
+            test-ma4-x3)  n=3;  cmd=$(node -p 'require("./package.json").scripts["test:ma4"].replace(" --test ", " --test --test-reporter=tap --test-timeout=180000 ")'); budget=600 ;;
+          esac
+          for i in $(seq 1 $n); do
+            echo "=== run $i: $cmd"
+            if node scripts/ci/watchdog.mjs --label "$LANE-$i" --budget-s "$budget" --out ci-diag -- bash -c "$cmd" > "ci-diag/$LANE-$i.out" 2>&1; then r=PASS; else r="FAIL($?)"; fails=$((fails+1)); fi
+            echo "run $i: $r; $(grep -E '^# (tests|pass|fail|skip)' ci-diag/$LANE-$i.out | tr '\n' ' ')" | tee -a ci-diag/summary.txt
+            grep -n -E "^\s*not ok" "ci-diag/$LANE-$i.out" | tee -a ci-diag/summary.txt || true
+          done
+          echo "$LANE: $fails of $n runs failed" | tee -a ci-diag/summary.txt
+      - name: Trace around every client error
+        if: always()
+        shell: bash
+        run: grep -l '"code":"ECONNRESET"\| error ' ci-diag/http/*.log 2>/dev/null | while read f; do echo "== $f"; grep -n -B25 -A6 ' error ' "$f" | head -80; done || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci1-diagnostic-${{ matrix.lane }}
+          path: ci-diag
+          retention-days: 14
