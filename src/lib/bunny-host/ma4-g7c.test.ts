@@ -16,7 +16,8 @@ const setup = (respond: () => Response = ok, approved = () => null as string | n
   return { cloud, sent, ask };
 };
 
-test("per-trial cap refuses the 5th call without sending it; total cap stops the run", async () => {
+test("per-trial cap refuses the call over the cap without sending it; total cap stops the run", async () => {
+  assert.deepEqual({ ...CAPS }, { total: 24, perTrial: 8 }); // owner-approved G7C-2 caps; changing them needs a new approval
   const { cloud, sent, ask } = setup();
   for (let t = 1; t <= 3; t++) {
     cloud.setTrial(`v2#${t}`);

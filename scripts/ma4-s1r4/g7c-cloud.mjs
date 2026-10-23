@@ -1,7 +1,7 @@
 // @ts-nocheck untyped harness script like its scripts/ma4-* siblings; typechecked only because a test imports it
 // MA4-S1R4-G7C: owner-scoped Groq access for the frozen G7 v2 qualification ONLY. Not a Bunny A feature: nothing in
 // src/ imports this file and the product registry keeps every cloud candidate disabled. Scope (owner authorization):
-// groq / openai/gpt-oss-120b, Worker+Tester only, synthetic G7 specs only, <= 12 requests total and <= 4 per trial,
+// groq / openai/gpt-oss-120b, Worker+Tester only, synthetic G7 specs only, <= 24 requests total and <= 8 per trial,
 // $0, 7-day approval, no fallback provider. The credential and approval live in an isolated store, never the Host DB.
 //
 // Owner, in your OWN terminal (the key is read with echo off and never printed, logged or written in plaintext):
@@ -20,7 +20,9 @@ import { DpapiProtector } from '../../src/lib/bunny-host/jev-secrets.server.ts';
 import { registerDiagnosticSecret } from '../../src/lib/bunny-host/failure.server.ts';
 
 export const PROVIDER = 'groq', MODEL = 'openai/gpt-oss-120b', ORIGIN = 'https://api.groq.com', PATH = '/openai/v1/chat/completions';
-export const CAPS = Object.freeze({ total: 12, perTrial: 4 });
+// G7C-2 (owner decision 2026-10-23): 8/trial = attempt 0 (3 Worker samples + Tester) + 2 repair rounds x (Worker + Tester),
+// the frozen strategy's ceiling, so the cap can no longer end a trial. G7C-1 ran with 12 total / 4 per trial.
+export const CAPS = Object.freeze({ total: 24, perTrial: 8 });
 // shortcut: gpt-oss counts hidden reasoning inside max_completion_tokens; a flat headroom over the strategy's numPredict
 // keeps the visible-output budget comparable to the local runs. Upgrade to per-role measurement if replies truncate.
 export const REASONING_TOKENS = 2048;

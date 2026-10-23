@@ -19,7 +19,7 @@
 // also records Worker samples, tool receipts and per-call token receipts.
 // MA4-S1R4-G7C harness-only change (tasks, hidden tests, references, rules, threshold and repairs unchanged): G7_CLOUD=groq
 // runs ONLY the 3 v2 trials with Worker and Tester on the owner-approved groq/openai/gpt-oss-120b (scripts/ma4-s1r4/
-// g7c-cloud.mjs: <= 4 requests per trial, a refused 5th call ends the trial, <= 12 total), Planner/Reviewer local. The
+// g7c-cloud.mjs: <= 8 requests per trial (G7C-1: 4), a refused call over the cap ends the trial, <= 24 total), Planner/Reviewer local. The
 // cancellation trial is not rerun (it would spend cloud budget; the local result stands). The approval is revoked after.
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
