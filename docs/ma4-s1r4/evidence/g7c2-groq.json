@@ -1,0 +1,1082 @@
+{
+  "version": "bunny-ma4-s1r2-g7-v1",
+  "pin": "qwen2.5-coder:7b",
+  "strategy": "s1r4-v3c",
+  "pins": {
+    "Planner": "qwen2.5-coder:7b",
+    "Worker": "openai/gpt-oss-120b",
+    "Tester": "openai/gpt-oss-120b",
+    "Reviewer": "qwen2.5-coder:7b"
+  },
+  "trials": {
+    "regression": 3,
+    "heldout": 2
+  },
+  "startedAt": "2026-10-23T02:35:23.524Z",
+  "sandbox": {
+    "available": true,
+    "backend": "wsl2-userns-pivot_root-cgroupv2",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2"
+  },
+  "taskHash": "aa5d5c19d80e611ebee8ab37f2a3bf9f86d0553aedeccf7cda5f346fa09b4cb8",
+  "preflight": [
+    {
+      "task": "g7-v2-duration",
+      "referencePasses": true
+    },
+    {
+      "task": "s1-anagram",
+      "referencePasses": true
+    },
+    {
+      "task": "s2-chunk",
+      "referencePasses": true
+    },
+    {
+      "task": "s3-title",
+      "referencePasses": true
+    },
+    {
+      "task": "i1-roman",
+      "referencePasses": true
+    },
+    {
+      "task": "i2-kv",
+      "referencePasses": true
+    },
+    {
+      "task": "i3-lru",
+      "referencePasses": true
+    },
+    {
+      "task": "d1-flatten",
+      "referencePasses": true
+    },
+    {
+      "task": "d2-moving",
+      "referencePasses": true
+    },
+    {
+      "task": "p1-inventory",
+      "referencePasses": true
+    },
+    {
+      "task": "p2-bucket",
+      "referencePasses": true
+    }
+  ],
+  "runs": [
+    {
+      "task": "g7-v2-duration",
+      "kind": "regression",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 85501,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 9,
+            "valid": 9,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 1474,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:0bbd34eec0560a27",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 36102,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792722927745,
+          "endedAt": 1792722963850
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2301,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792722963852,
+          "endedAt": 1792722966158
+        },
+        {
+          "role": "Tester",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 1669,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792722963852,
+          "endedAt": 1792722967827
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2391,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792722967827,
+          "endedAt": 1792722970219
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2320,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792722970219,
+          "endedAt": 1792723000607
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 5711,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792723007528,
+          "endedAt": 1792723013240
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "49331678b6eed924b8b0181ddc3fdcfaef7f92cfd22013470cf04e62e872b860",
+      "finalSource": "import re\nfrom typing import Final\n\n# Mapping from unit to its multiplier in seconds\n_UNIT_MULTIPLIER: Final[dict[str, int]] = {\n    \"h\": 3600,\n    \"m\": 60,\n    \"s\": 1,\n}\n\n# Regular expression that captures a sequence of <digits><unit>\n_PART_RE: Final[re.Pattern] = re.compile(r\"(\\d+)([hms])\")\n\n\ndef parse_duration(text: str) -> int:\n    \"\"\"\n    Convert a duration string into whole seconds.\n\n    The string must consist of one or more parts of the form\n    <non‑negative integer><unit>, where unit is one of 'h', 'm', 's'.\n    Parts must appear in the order h → m → s, each unit at most once,\n    and the string must contain no spaces or other characters.\n\n    Parameters\n    ----------\n    text: str\n        The duration string to parse.\n\n    Returns\n    -------\n    int\n        Total number of seconds represented by the string.\n\n    Raises\n    ------\n    ValueError\n        If the string is empty or does not conform to the required format.\n    \"\"\"\n    if not text:\n        raise ValueError(\"Duration string is empty\")\n\n    # Find all parts\n    parts = list(_PART_RE.finditer(text))\n    if not parts:\n        raise ValueError(\"No valid duration parts found\")\n\n    # Verify that the concatenation of all matches equals the original text\n    concatenated = \"\".join(m.group(0) for m in parts)\n    if concatenated != text:\n        raise ValueError(\"Invalid characters or spacing in duration string\")\n\n    seen_units = set()\n    last_index = -1  # index in the order list of the previous unit\n\n    total_seconds = 0\n    for match in parts:\n        number_str, unit = match.group(1), match.group(2)\n\n        # Check for repeated unit\n        if unit in seen_units:\n            raise ValueError(f\"Unit '{unit}' appears more than once\")\n        seen_units.add(unit)\n\n        # Enforce correct order (h before m before s)\n        current_index = (\"h\", \"m\", \"s\").index(unit)\n        if current_index <= last_index:\n            raise ValueError(\"Units are out of order\")\n        last_index = current_index\n\n        # Convert number to int (regex guarantees digits)\n        value = int(number_str)\n\n        # Compute seconds for this part\n        total_seconds += value * _UNIT_MULTIPLIER[unit]\n\n    return total_seconds\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 3,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "49331678b6eed924b8b0181ddc3fdcfaef7f92cfd22013470cf04e62e872b860",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 9,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "9cac010a5376c28d93cd86fa9d06308fbc57d821b6612ce14e42f3482a67a592",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 9,
+          "selected": false
+        },
+        {
+          "index": 2,
+          "sha256": "98ad1d968db81d8ca0dea73134c5b56382acab75ca4d47fa975b9d3e754969b1",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 9,
+          "selected": false
+        }
+      ],
+      "toolCalls": 14,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 36102,
+          "doneReason": "stop",
+          "promptTokens": 228,
+          "outputTokens": 342,
+          "evalNs": 28876392000,
+          "loadNs": 6393031100
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2301,
+          "cloud": true
+        },
+        {
+          "role": "Tester",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 1669,
+          "cloud": true
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2391,
+          "cloud": true
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2320,
+          "cloud": true
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5711,
+          "doneReason": "stop",
+          "promptTokens": 1416,
+          "outputTokens": 26,
+          "evalNs": 2162190000,
+          "loadNs": 15616500
+        }
+      ]
+    },
+    {
+      "task": "g7-v2-duration",
+      "kind": "regression",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 88112,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 9,
+            "valid": 9,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 1474,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:1bd3333a03974aea",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 32660,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792723013253,
+          "endedAt": 1792723045914
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2390,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792723045915,
+          "endedAt": 1792723048307
+        },
+        {
+          "role": "Tester",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2185,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792723045915,
+          "endedAt": 1792723050492
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2701,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792723050492,
+          "endedAt": 1792723053195
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2389,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792723053195,
+          "endedAt": 1792723088550
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 5743,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792723095621,
+          "endedAt": 1792723101364
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "5961e71a9fa8710e9b3602f599938001cde6c4fcbe4bcb930bb507353c47540a",
+      "finalSource": "# duration.py\nimport re\nfrom typing import Optional\n\n# Mapping from unit to its multiplier in seconds\n_UNIT_SECONDS = {\n    'h': 3600,\n    'm': 60,\n    's': 1,\n}\n\n# Pre‑compiled regular expression that enforces the required order and uniqueness.\n# Each unit is optional but may appear only once and must be in the order h‑m‑s.\n_DURATION_RE = re.compile(\n    r'^'                     # start of string\n    r'(?:(?P<h>\\d+)h)?'      # optional hours\n    r'(?:(?P<m>\\d+)m)?'      # optional minutes\n    r'(?:(?P<s>\\d+)s)?'      # optional seconds\n    r'$'                     # end of string\n)\n\ndef parse_duration(text: str) -> int:\n    \"\"\"\n    Convert a duration string into whole seconds.\n\n    The string must consist of one or more parts of the form\n    <non‑negative integer><unit>, where unit is one of 'h', 'm', 's'.\n    Units must appear in the order hours → minutes → seconds,\n    each at most once, and without any spaces.\n\n    Parameters\n    ----------\n    text: str\n        The duration string to parse.\n\n    Returns\n    -------\n    int\n        The total number of seconds represented by the input.\n\n    Raises\n    ------\n    ValueError\n        If the input does not conform to the required format.\n    \"\"\"\n    if not isinstance(text, str):\n        raise ValueError(\"Input must be a string\")\n\n    match = _DURATION_RE.fullmatch(text)\n    if not match:\n        raise ValueError(f\"Invalid duration format: {text!r}\")\n\n    # Ensure at least one component is present\n    if not any(match.group(name) is not None for name in ('h', 'm', 's')):\n        raise ValueError(f\"Invalid duration format: {text!r}\")\n\n    total_seconds = 0\n    for unit, multiplier in _UNIT_SECONDS.items():\n        value_str: Optional[str] = match.group(unit)\n        if value_str is not None:\n            # The regex guarantees that value_str consists only of digits\n            total_seconds += int(value_str) * multiplier\n\n    return total_seconds\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 3,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "5961e71a9fa8710e9b3602f599938001cde6c4fcbe4bcb930bb507353c47540a",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 9,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "0667be876e206cea97cae34bf2a98dc863e62bb7eea412e7890e53c4968c9f15",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 9,
+          "selected": false
+        },
+        {
+          "index": 2,
+          "sha256": "65c2bd2537323c776a301cb23a41056b3c51e25502c2d9615f60000044631dcb",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 9,
+          "selected": false
+        }
+      ],
+      "toolCalls": 14,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 32660,
+          "doneReason": "stop",
+          "promptTokens": 228,
+          "outputTokens": 289,
+          "evalNs": 24962227000,
+          "loadNs": 6906561500
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2390,
+          "cloud": true
+        },
+        {
+          "role": "Tester",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2185,
+          "cloud": true
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2701,
+          "cloud": true
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2389,
+          "cloud": true
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5743,
+          "doneReason": "stop",
+          "promptTokens": 1330,
+          "outputTokens": 26,
+          "evalNs": 2251359000,
+          "loadNs": 9192000
+        }
+      ]
+    },
+    {
+      "task": "g7-v2-duration",
+      "kind": "regression",
+      "trial": 3,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 96557,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 9,
+            "valid": 9,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 1549,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:886f504c73bd3648",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 50447,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792723101374,
+          "endedAt": 1792723151822
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2424,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792723151822,
+          "endedAt": 1792723154249
+        },
+        {
+          "role": "Tester",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2056,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792723151822,
+          "endedAt": 1792723156306
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2241,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792723156306,
+          "endedAt": 1792723181808
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 2390,
+          "servedModel": "openai/gpt-oss-120b",
+          "startedAt": 1792723181808,
+          "endedAt": 1792723184199
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 6936,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792723190995,
+          "endedAt": 1792723197931
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "0e30c9f71e84f7041b7f7ebf487759562fe089d533428664af2b9764702d2a5e",
+      "finalSource": "import re\nfrom typing import Final\n\n# Mapping from unit to its multiplier in seconds\n_UNIT_SECONDS: Final[dict[str, int]] = {\n    \"h\": 3600,\n    \"m\": 60,\n    \"s\": 1,\n}\n\n# Pre‑compiled regular expression that enforces:\n#   - optional hours, then optional minutes, then optional seconds\n#   - each part is a sequence of digits followed by its unit\n#   - at least one part must be present\n_DURATION_RE: Final[re.Pattern] = re.compile(\n    r\"\"\"^\n        (?:\n            (?P<h>\\d+)h\n        )?\n        (?:\n            (?P<m>\\d+)m\n        )?\n        (?:\n            (?P<s>\\d+)s\n        )?\n        $\"\"\",\n    re.VERBOSE,\n)\n\n\ndef parse_duration(text: str) -> int:\n    \"\"\"\n    Parse a duration string and return the total number of seconds.\n\n    The string must consist of one or more parts of the form\n    <non‑negative integer><unit> where unit is one of 'h', 'm', 's'.\n    Parts must appear in the order hours → minutes → seconds,\n    each unit may appear at most once, and no whitespace is allowed.\n\n    Parameters\n    ----------\n    text: str\n        The duration string to parse.\n\n    Returns\n    -------\n    int\n        Total duration in whole seconds.\n\n    Raises\n    ------\n    ValueError\n        If the input does not conform to the required format.\n    \"\"\"\n    if not isinstance(text, str):\n        raise ValueError(\"Input must be a string\")\n\n    match = _DURATION_RE.fullmatch(text)\n    if not match:\n        raise ValueError(\"Invalid duration format\")\n\n    # Ensure at least one component was captured\n    if not any(match.group(name) is not None for name in (\"h\", \"m\", \"s\")):\n        raise ValueError(\"Duration string cannot be empty\")\n\n    total_seconds = 0\n    for unit, multiplier in _UNIT_SECONDS.items():\n        value_str = match.group(unit)\n        if value_str is not None:\n            # The regex guarantees value_str consists only of digits\n            total_seconds += int(value_str) * multiplier\n\n    return total_seconds\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 3,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "0e30c9f71e84f7041b7f7ebf487759562fe089d533428664af2b9764702d2a5e",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 9,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "29435d45bc908a9792f8000729dd41a1a30cad6bbb0f0a0e33cf9342462e2307",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 9,
+          "selected": false
+        },
+        {
+          "index": 2,
+          "sha256": "b230f3f666bf924ab8a259dc32b4c7393aba41dd34c0d528e39b6591a716d4df",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 9,
+          "selected": false
+        }
+      ],
+      "toolCalls": 14,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 50447,
+          "doneReason": "stop",
+          "promptTokens": 228,
+          "outputTokens": 494,
+          "evalNs": 44418949000,
+          "loadNs": 5249791300
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2424,
+          "cloud": true
+        },
+        {
+          "role": "Tester",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2056,
+          "cloud": true
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2241,
+          "cloud": true
+        },
+        {
+          "role": "Worker",
+          "model": "openai/gpt-oss-120b",
+          "ok": true,
+          "durationMs": 2390,
+          "cloud": true
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6936,
+          "doneReason": "stop",
+          "promptTokens": 1520,
+          "outputTokens": 26,
+          "evalNs": 2972933000,
+          "loadNs": 9853700
+        }
+      ]
+    }
+  ],
+  "cloud": {
+    "provider": "groq",
+    "model": "openai/gpt-oss-120b",
+    "caps": {
+      "total": 24,
+      "perTrial": 8
+    },
+    "reasoningHeadroomTokens": 2048,
+    "attestation": {
+      "zeroDataRetention": "owner-attested",
+      "freePlanNoPaymentMethod": "owner-attested",
+      "modelListed": true,
+      "checkedAt": "2026-10-23T02:33:16.681Z",
+      "metadataRequests": 1
+    },
+    "approval": {
+      "provider_id": "groq",
+      "model_id": "openai/gpt-oss-120b",
+      "approval_status": "approved",
+      "approved_purpose": [
+        "coding",
+        "debugging"
+      ],
+      "data_categories": [
+        "synthetic"
+      ],
+      "spending_limit_usd": 0,
+      "expiry": "2026-10-30T02:33:16.681Z",
+      "issued_by": "workstation",
+      "issued_at": "2026-10-23T02:33:16.681Z"
+    },
+    "assignments": {
+      "Planner": "local:ollama/qwen2.5-coder:7b",
+      "Worker": "cloud:groq/openai/gpt-oss-120b",
+      "Tester": "cloud:groq/openai/gpt-oss-120b",
+      "Reviewer": "local:ollama/qwen2.5-coder:7b"
+    },
+    "requests": 12,
+    "refusedByCap": 0,
+    "calls": [
+      {
+        "trial": "g7-v2-duration#1",
+        "role": "Worker",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:36:03.853Z",
+        "promptSha256": "1a73b9cbe74168bced36f5aa7e2487b14934063bb1294e7611b960b2e971ecec",
+        "promptChars": 2693,
+        "maxCompletionTokens": 4096,
+        "status": 200,
+        "durationMs": 2301,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 999,
+          "remainingTokens": 6931,
+          "resetRequestsS": 86.4,
+          "resetTokensS": 8.017
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 705,
+          "completionTokens": 887,
+          "reasoningTokens": 200
+        }
+      },
+      {
+        "trial": "g7-v2-duration#1",
+        "role": "Tester",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:36:06.157Z",
+        "promptSha256": "4d563bfd18c934787e4772068d8377c4e1ec429920e1b5284dfd65747b3ee1a5",
+        "promptChars": 2911,
+        "maxCompletionTokens": 5120,
+        "status": 200,
+        "durationMs": 1669,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 998,
+          "remainingTokens": 5584,
+          "resetRequestsS": 172.8,
+          "resetTokensS": 18.12
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 744,
+          "completionTokens": 707,
+          "reasoningTokens": 315
+        }
+      },
+      {
+        "trial": "g7-v2-duration#1",
+        "role": "Worker",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:36:07.827Z",
+        "promptSha256": "1a73b9cbe74168bced36f5aa7e2487b14934063bb1294e7611b960b2e971ecec",
+        "promptChars": 2693,
+        "maxCompletionTokens": 4096,
+        "status": 200,
+        "durationMs": 2391,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 997,
+          "remainingTokens": 4393,
+          "resetRequestsS": 259.2,
+          "resetTokensS": 27.052
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 705,
+          "completionTokens": 865,
+          "reasoningTokens": 288
+        }
+      },
+      {
+        "trial": "g7-v2-duration#1",
+        "role": "Worker",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:36:38.286Z",
+        "promptSha256": "1a73b9cbe74168bced36f5aa7e2487b14934063bb1294e7611b960b2e971ecec",
+        "promptChars": 2693,
+        "maxCompletionTokens": 4096,
+        "status": 200,
+        "durationMs": 2320,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 996,
+          "remainingTokens": 6430,
+          "resetRequestsS": 345.6,
+          "resetTokensS": 11.775
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 705,
+          "completionTokens": 920,
+          "reasoningTokens": 337
+        }
+      },
+      {
+        "trial": "g7-v2-duration#2",
+        "role": "Worker",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:37:25.915Z",
+        "promptSha256": "760ee0bcbcb3bedba9de56648b3c36c3bc949d16d16b300b72d29d5e31506aaf",
+        "promptChars": 2551,
+        "maxCompletionTokens": 4096,
+        "status": 200,
+        "durationMs": 2390,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 995,
+          "remainingTokens": 6454,
+          "resetRequestsS": 432,
+          "resetTokensS": 11.595
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 659,
+          "completionTokens": 1006,
+          "reasoningTokens": 380
+        }
+      },
+      {
+        "trial": "g7-v2-duration#2",
+        "role": "Tester",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:37:28.307Z",
+        "promptSha256": "cfc3bd2a9d96865479e43a176c12373f2e09ce164f38dfafaacb222094340b36",
+        "promptChars": 2769,
+        "maxCompletionTokens": 5120,
+        "status": 200,
+        "durationMs": 2185,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 994,
+          "remainingTokens": 5603,
+          "resetRequestsS": 518.4,
+          "resetTokensS": 17.977
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 698,
+          "completionTokens": 922,
+          "reasoningTokens": 529
+        }
+      },
+      {
+        "trial": "g7-v2-duration#2",
+        "role": "Worker",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:37:30.493Z",
+        "promptSha256": "760ee0bcbcb3bedba9de56648b3c36c3bc949d16d16b300b72d29d5e31506aaf",
+        "promptChars": 2551,
+        "maxCompletionTokens": 4096,
+        "status": 200,
+        "durationMs": 2701,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 993,
+          "remainingTokens": 3740,
+          "resetRequestsS": 604.8,
+          "resetTokensS": 31.95
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 659,
+          "completionTokens": 1125,
+          "reasoningTokens": 523
+        }
+      },
+      {
+        "trial": "g7-v2-duration#2",
+        "role": "Worker",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:38:06.159Z",
+        "promptSha256": "760ee0bcbcb3bedba9de56648b3c36c3bc949d16d16b300b72d29d5e31506aaf",
+        "promptChars": 2551,
+        "maxCompletionTokens": 4096,
+        "status": 200,
+        "durationMs": 2389,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 992,
+          "remainingTokens": 6634,
+          "resetRequestsS": 691.2,
+          "resetTokensS": 10.245
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 659,
+          "completionTokens": 1032,
+          "reasoningTokens": 330
+        }
+      },
+      {
+        "trial": "g7-v2-duration#3",
+        "role": "Worker",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:39:11.822Z",
+        "promptSha256": "bfd8ed340a74450a861d07b160b14932febb9828768f133286afb837ca202fa2",
+        "promptChars": 3230,
+        "maxCompletionTokens": 4096,
+        "status": 200,
+        "durationMs": 2424,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 991,
+          "remainingTokens": 6724,
+          "resetRequestsS": 777.599,
+          "resetTokensS": 9.57
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 855,
+          "completionTokens": 840,
+          "reasoningTokens": 228
+        }
+      },
+      {
+        "trial": "g7-v2-duration#3",
+        "role": "Tester",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:39:14.249Z",
+        "promptSha256": "def9628d9b7c87001972ab099e7d4404b3f02e0d1d5708285cd8248c19507e93",
+        "promptChars": 3448,
+        "maxCompletionTokens": 5120,
+        "status": 200,
+        "durationMs": 2056,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 990,
+          "remainingTokens": 5033,
+          "resetRequestsS": 864,
+          "resetTokensS": 22.252
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 894,
+          "completionTokens": 826,
+          "reasoningTokens": 401
+        }
+      },
+      {
+        "trial": "g7-v2-duration#3",
+        "role": "Worker",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:39:39.566Z",
+        "promptSha256": "bfd8ed340a74450a861d07b160b14932febb9828768f133286afb837ca202fa2",
+        "promptChars": 3230,
+        "maxCompletionTokens": 4096,
+        "status": 200,
+        "durationMs": 2241,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 989,
+          "remainingTokens": 6139,
+          "resetRequestsS": 950.4,
+          "resetTokensS": 13.957
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 855,
+          "completionTokens": 899,
+          "reasoningTokens": 276
+        }
+      },
+      {
+        "trial": "g7-v2-duration#3",
+        "role": "Worker",
+        "attempt": 0,
+        "sent": true,
+        "at": "2026-10-23T02:39:41.809Z",
+        "promptSha256": "bfd8ed340a74450a861d07b160b14932febb9828768f133286afb837ca202fa2",
+        "promptChars": 3230,
+        "maxCompletionTokens": 4096,
+        "status": 200,
+        "durationMs": 2390,
+        "rateLimit": {
+          "limitRequests": 1000,
+          "limitTokens": 8000,
+          "remainingRequests": 988,
+          "remainingTokens": 5315,
+          "resetRequestsS": 1036.8,
+          "resetTokensS": 20.137
+        },
+        "servedModel": "openai/gpt-oss-120b",
+        "finishReason": "stop",
+        "usage": {
+          "promptTokens": 855,
+          "completionTokens": 951,
+          "reasoningTokens": 431
+        }
+      }
+    ],
+    "usage": {
+      "promptTokens": 8993,
+      "completionTokens": 10980,
+      "reasoningTokens": 4238
+    },
+    "costUsd": 0,
+    "costBasis": "Free plan without payment method (owner-attested), approval spending_limit_usd 0; any 402 stops the run.",
+    "revokedAt": "2026-10-23T02:39:57.974Z"
+  },
+  "cancellation": {
+    "notRun": "G7C: would spend cloud budget; the local S1R4 cancellation result stands (evidence/g7-s1r4-auto.json)."
+  },
+  "summary": {
+    "heldout": {
+      "passed": 0,
+      "trials": 0
+    },
+    "regression": {
+      "passed": 3,
+      "trials": 3
+    },
+    "byKind": {
+      "simple": "0/0",
+      "intermediate": "0/0",
+      "debugging": "0/0",
+      "planning": "0/0"
+    },
+    "statuses": {
+      "passed": 3
+    },
+    "repairsUsed": 0,
+    "repairsByTarget": {},
+    "passedAfterRepair": 0,
+    "reviewerFalseApprovals": 0,
+    "reviewerFalseRejections": 0,
+    "invariants": {
+      "pinsHeld": true,
+      "ordering": true,
+      "gateIsAuthority": true,
+      "cancellation": null
+    },
+    "externalRequestsRefused": 0,
+    "memoryWaitSamples": 0
+  },
+  "g7": "PASS",
+  "verdictScope": "G7 v2 regression only (>= 2/3), CLOUD-ASSISTED (Worker+Tester groq/openai/gpt-oss-120b). Held-out not rerun (local S1R4 17/20 stands). Not evidence of local-model capability.",
+  "finishedAt": "2026-10-23T02:39:57.974Z"
+}

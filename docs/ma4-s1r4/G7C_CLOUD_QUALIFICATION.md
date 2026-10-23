@@ -94,4 +94,39 @@ whether gpt-oss-120b would pass with repairs, and it says nothing about local-mo
 
 ## G7C-2 results
 
-PENDING — waiting for the owner to issue the G7C-2 approval.
+**G7 v2 cloud-assisted (G7C-2): 3/3 — PASS** (threshold ≥ 2/3 met). This is **cloud-assisted G7 v2 qualification
+(G7C-2)**, not local-only qualification. G7C-1 (1/3 FAIL under the strict 4/trial cap) stays on record above, unchanged.
+
+* **Approval checked before the run:** fresh owner approval issued by `workstation` 2026-10-23T02:33:16Z (after G7C-1's
+  revocation at 02:21:41Z); `groq` / `openai/gpt-oss-120b`, status `approved`, purposes coding/debugging, data
+  category `synthetic` only, `spending_limit_usd` 0, expiry 2026-10-30T02:33:16Z, no block. Caps 24 total / 8 per
+  trial. Owner attestations: Zero Data Retention and Free plan without payment method (owner-attested; Groq exposes no
+  API to read them), model listed by one metadata request. Ollama 0.40.6 running with `qwen2.5-coder:7b`.
+* **One decisive run**, 2026-10-23 02:35:23Z → 02:39:58Z, exit 0, no resume, no retries
+  (`evidence/g7c2-groq.json`, `evidence/g7c2-groq.log`). Task hash `aa5d5c19…4cb8` and reference pre-flight
+  matched (11/11 references pass); strategy `s1r4-v3c`; sandbox `wsl2-userns-pivot_root-cgroupv2`.
+
+| Trial | Result | Cloud requests sent | Refused unsent | What happened |
+|---|---|---|---|---|
+| g7-v2-duration#1 | **passed** | 4 (3 Worker, 1 Tester) | 0 | Samples 9/9 ×3 → sample 0; static ok, hidden 2/2, Tester 9/9 valid; local Reviewer approved; 0 repairs. |
+| g7-v2-duration#2 | **passed** | 4 (3 Worker, 1 Tester) | 0 | Same: samples 9/9 ×3 → 0; static, hidden 2/2, Tester 9/9; Reviewer approved; 0 repairs. |
+| g7-v2-duration#3 | **passed** | 4 (3 Worker, 1 Tester) | 0 | Same: samples 9/9 ×3 → 0; static, hidden 2/2, Tester 9/9; Reviewer approved; 0 repairs. |
+
+* **Requests:** 12 sent of the 24 cap (4 of 8 per trial), all HTTP 200, all `finish_reason: stop`, served model
+  `openai/gpt-oss-120b` every time; 0 refused by cap. Tokens: 8,993 prompt / 10,980 completion (4,238 reasoning).
+  **Cost $0** (Free plan, no payment method, owner-attested; approval limit $0; no 402).
+* **Model output failures:** none — no malformed completions, truncations, network errors or non-200 responses.
+* **Errors / stops:** no HTTP 401/402/403/429, no forbidden-content block, no sandbox error, no pin violation, no stop.
+* **Invariants:** pins held (Planner/Reviewer local `qwen2.5-coder:7b`, Worker/Tester `groq/openai/gpt-oss-120b`),
+  ordering held, the deterministic gate was the only authority; Reviewer false approvals/rejections 0; non-allowlisted
+  external requests refused 0; repairs used 0. Cancellation not rerun (local S1R4 result stands).
+* **Revocation:** approval marked `revoked` and the DPAPI-stored credential deleted by the harness at
+  2026-10-23T02:39:57Z; `g7c-cloud.mjs status` afterwards: `credentialSaved: false`, `approval_status: revoked`,
+  block "External model approval was revoked." External inference is DISABLED again. The owner should also delete the
+  key in the Groq console.
+
+**Reading:** all three trials passed on attempt 0, so the larger cap was never needed: the repair budget went unused
+and G7C-2 says nothing about whether repairs would have recovered the G7C-1 failures. The two runs differ in model
+output, not in the cap — in G7C-1 the Tester produced an invalid case on two trials, in G7C-2 it produced valid suites
+(9/9) on all three. Across both runs gpt-oss-120b passed the same frozen trial 4 of 6 times, so the run-to-run variance
+is real. Groq stays disabled for general operation; this result is not evidence of local-model capability.
