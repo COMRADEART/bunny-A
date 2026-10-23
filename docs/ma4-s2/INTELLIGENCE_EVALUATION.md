@@ -92,8 +92,82 @@ action after a crash), prompt-injection resistance (handoff and memory content s
 
 ## 2. Results
 
-PENDING — no S2 evaluation has run.
+All runs local (Ollama 0.40.6, pins as in §1.2), generated code only in the WSL2 sandbox, 0 external requests.
+Evidence: `evidence/{discover,validate,qualify,heldout}.{json,log}` (per-trial calls, gate output, guidance hashes and
+sources, final sources). Wilson 95 % intervals in brackets.
+
+### 2.1 Discovery, validation, qualification (train and qualify splits only)
+
+| Phase | Result |
+|---|---|
+| Discovery (B, train, 16 trials) | 9/16 passed (7 first attempt); strict 2/4, simple 1/2, intermediate 2/4, debugging 4/4, planning 0/2; 172 handoffs, 0 refused; 9 extractions → 6 candidates (3 rejected: duplicate name ×2, candidate cap ×1) |
+| Sandbox validation (C, source task, skill alone) | 4/6 passed → SANDBOX_VALIDATED: `slugify`, `parse-date-procedure`, `calculate-median`, `compute-median`; rejected: `merge-intervals-procedure`, `parse-csv-line` |
+| Benchmark qualification (qualify, 8 slots) | B 2/8, C 4/8 (2 wins, 0 losses, sign test p = 0.25); all 4 retrieved, none harmful on its slots → all 4 BENCHMARK_QUALIFIED. None approved or activated |
+
+Observation recorded before the held-out run: the 7B extractor mostly restated the task-specific algorithm (two of the
+four qualified skills are near-duplicate median procedures) rather than a transferable procedure.
+
+### 2.2 Decisive held-out run (72 trials, 04:41–07:04 UTC, ledger `s2-heldout` completed 72/72, 0 resumes)
+
+| | A (S1R4) | B (S2 collab) | C (S2 + skills + Lotus) |
+|---|---|---|---|
+| Final passes | **14/24** [0.39, 0.76] | **14/24** [0.39, 0.76] | **10/24** [0.24, 0.61] |
+| First attempt | 11 | 11 | 7 |
+| strict / intermediate / debugging / planning | 2/8, 4/6, 5/6, 3/4 | 3/8, 3/6, 6/6, 2/4 | 3/8, 3/6, 2/6, 2/4 |
+| Repairs used / passes after repair | 20 / 3 | 21 / 3 | 26 / 3 |
+| Model calls | 154 | 151 | 155 |
+| Prompt / output tokens | 133,031 / 52,010 | 118,313 / 45,250 | 149,519 / 43,699 |
+| Model loads / switches | 88 / 68 | 76 / 52 | 76 / 52 |
+| Peak concurrent model calls | 2 | 1 | 1 |
+| Call latency median / P95 | 17.7 s / 76.4 s | 14.2 s / 31.2 s | 14.1 s / 34.3 s |
+| Trial time total | 52.5 min | 45.6 min | 45.1 min |
+| Reviewer false approvals | 3 | 4 | 6 |
+| Failure categories | impl 33, test_invalid 15, rev 3 | impl 35, test_invalid 5, rev 4 | impl 38, test_invalid 8, rev 6, dependency 2 |
+| Handoffs (refused) | — | 272 (0) | 280 (0) |
+| Invariants (pins, gate authority, no refused handoff) | hold | hold | hold |
+
+Run-wide: minimum free RAM 8.32 GiB, 0 memory waits, 0 external requests refused (none attempted).
+
+| Comparison (24 paired slots) | wins | losses | difference | one-sided sign test p |
+|---|---|---|---|---|
+| **C vs A (primary)** | 1 | 5 | **−4** | 0.98 |
+| C vs B | 2 | 6 | −4 | 0.96 |
+| B vs A | 4 | 4 | 0 | 0.64 |
+
+Per task (trial 1, trial 2; P = pass): h-time24 A fP B Pf C fP · h-money ff ff ff · h-phone fP Pf fP · h-pairs ff fP fP ·
+h-rpn PP Pf Pf · h-winmax PP PP PP · h-topo ff ff ff · h-rotate PP PP **ff** · h-palin PP PP PP · h-wavg fP PP **ff** ·
+h-parking fP ff ff · h-ttlcache PP PP PP.
+
+### 2.3 Verdict
+
+**Primary criterion NOT met** (C − A = −4, needed ≥ +3; p = 0.98). Per §1.4 the S2 result is:
+**functionally complete, intelligence improvement UNPROVEN.** The point estimate is in the wrong direction: arm C was
+worse than both A and B on this sample. With 24 slots the intervals overlap heavily and the C-vs-A difference is not
+statistically significant in either direction (two-sided sign test on 1 vs 5 discordant slots, p ≈ 0.22), so the
+honest reading is "no evidence of improvement, weak evidence of harm".
+
+B vs A: identical correctness (14/24, 4 wins / 4 losses), as pre-registered as the expectation. B's measured value is
+efficiency: −14 % model loads, −24 % model switches, peak concurrency 1 instead of 2 on the 6 GiB GPU, call-latency
+P95 31 s vs 76 s, 13 % less trial time.
+
+### 2.4 Why C underperformed (post-hoc analysis — explanatory only, not used to change any result)
+
+* **Irrelevant retrieval.** `selectSkills` admits a skill when it shares **one** coarse task tag with the task
+  (e.g. `numeric`, `collections`). The two median procedures were attached to 22 of 24 held-out C trials and
+  `parse-date-procedure` to 22 of 24, including matrix rotation, topological sort and weighted average. The advisory
+  block (~700 characters) therefore described an unrelated algorithm in most trials.
+* **Cost of that noise:** +26 % prompt tokens vs B, first-attempt passes 7 vs 11, debugging 2/6 vs 6/6, 2
+  `dependency_violation` failures (only in C), Reviewer false approvals 6 vs 4.
+* **Weak qualification signal.** Qualification (+2 on 8 slots, p = 0.25) was too small to distinguish a useful skill
+  from a harmless one; the rule "C ≥ B on retrieved slots" admitted all four. The extracted skills were near-copies of
+  train-task algorithms, not procedures.
+* What would need to change (future work, a new pre-registration, new held-out tasks — this held-out set is now
+  spent for tuning): retrieval relevance threshold (≥ 2 specific tags or an explicit applicability predicate, abstain
+  otherwise), duplicate merging by content, a larger qualification split with a minimum effect, and an extractor
+  prompt that forbids task-specific algorithms. None of this was done or tried in S2.
 
 ## 3. Deviations from the pre-registration
 
-None yet.
+1. **Harness `validation` use mode (before any qualification or held-out trial).** §1.3 step 3 re-runs a CANDIDATE skill on its source task, but the product rule only lets SANDBOX_VALIDATED or better skills be retrieved. A `validation` mode was added so a candidate is usable during its own gating run (and only then). It does not change any criterion.
+2. **Run-ledger node cap 64 → 128 (before any held-out trial ran).** The first held-out start was refused by `TeamRuns.create` ("more than 64 nodes": 72 trials) before any model call. The cap was raised to 128 (commit 65daf5f), the stale log deleted and the run restarted once. No trial result existed or was discarded.
+3. No other deviation: tasks, arms, pins, budgets, criteria and the held-out split are as pre-registered; no held-out trial was re-run; nothing was tuned after results were observed.
