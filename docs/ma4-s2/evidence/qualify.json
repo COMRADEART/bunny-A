@@ -1,0 +1,2992 @@
+{
+  "version": "bunny-ma4-s2-eval-v1",
+  "phase": "qualify",
+  "taskHash": "2b9d01a75e17464028543cd757c88df0542b442675bd5332c05fb44818165784",
+  "pins": {
+    "Planner": "qwen2.5-coder:7b",
+    "Worker": "qwen2.5-coder:7b",
+    "Tester": "huihui_ai/qwen2.5-abliterate:7b",
+    "Reviewer": "qwen2.5-coder:7b"
+  },
+  "team": {
+    "members": [
+      "Coordinator",
+      "Planner",
+      "Worker",
+      "Tester",
+      "Reviewer",
+      "Researcher"
+    ],
+    "reasons": [
+      "Planner: planning",
+      "Worker: code-generation",
+      "Tester: test-generation",
+      "Reviewer: review",
+      "Researcher: Host retrieval from Lotus Memory (no model)"
+    ]
+  },
+  "assignment": [
+    {
+      "role": "Planner",
+      "model": "qwen2.5-coder:7b",
+      "decision": "pinned"
+    },
+    {
+      "role": "Worker",
+      "model": "qwen2.5-coder:7b",
+      "decision": "pinned"
+    },
+    {
+      "role": "Tester",
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "decision": "pinned"
+    },
+    {
+      "role": "Reviewer",
+      "model": "qwen2.5-coder:7b",
+      "decision": "pinned"
+    }
+  ],
+  "schedule": {
+    "mode": "grouped",
+    "reason": "Worker and Tester models need 8.4 GiB together but 6 GiB of VRAM is available; calls are grouped by model."
+  },
+  "sandbox": {
+    "available": true,
+    "backend": "wsl2-userns-pivot_root-cgroupv2",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2"
+  },
+  "startedAt": "2026-10-23T04:02:41.321Z",
+  "runs": [
+    {
+      "arm": "B",
+      "task": "q-ipv4",
+      "kind": "strict",
+      "split": "qualify",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 293690,
+      "modelCalls": 9,
+      "promptTokens": 10413,
+      "outputTokens": 5628,
+      "truncated": 1,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23904,
+          "loadMs": 7031
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13520,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10475,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 21869,
+          "loadMs": 10
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 149888,
+          "loadMs": 8000
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 24255,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 18666,
+          "loadMs": 7745
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13018,
+          "loadMs": 10
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7336,
+          "loadMs": 10
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 16,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 18,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "outcome": "resolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": false,
+          "hidden": false,
+          "tester": {
+            "total": 0,
+            "valid": 0,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 7,
+            "valid": 7,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 7,
+            "valid": 7,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 3,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef parse_ipv4(text):\n    # Regular expression to match a valid IPv4 address\n    ipv4_pattern = r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'\n    \n    # Check if the input matches the IPv4 pattern\n    if not re.match(ipv4_pattern, text):\n        raise ValueError(\"Invalid IPv4 address\")\n    \n    # Split the input string into parts\n    parts = text.split('.')\n    \n    # Convert each part to an integer and check for leading zeros\n    numbers = [int(part) for part in parts if part == '0' or not part.startswith('0')]\n    \n    # Return the tuple of integers\n    return tuple(numbers)\n"
+    },
+    {
+      "arm": "C",
+      "task": "q-ipv4",
+      "kind": "strict",
+      "split": "qualify",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 127946,
+      "modelCalls": 7,
+      "promptTokens": 6212,
+      "outputTokens": 2141,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19745,
+          "loadMs": 7261
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14049,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14082,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14258,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 32399,
+          "loadMs": 7730
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20237,
+          "loadMs": 7226
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 2319,
+          "loadMs": 11
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "00d6d0ceec6e9b77317b4dae90b089681be74068845c0149fda977306619423f",
+          "chars": 1104,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "00d6d0ceec6e9b77317b4dae90b089681be74068845c0149fda977306619423f",
+          "chars": 1104,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "00d6d0ceec6e9b77317b4dae90b089681be74068845c0149fda977306619423f",
+          "chars": 1104,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+        "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+        "871ea9a5-c919-4c37-bb7a-722ab18113d7"
+      ],
+      "toolCalls": 18,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "resolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 10,
+            "valid": 10,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 10,
+            "valid": 10,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 3,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef parse_ipv4(text):\n    # Regular expression pattern to match the IPv4 address format\n    pattern = r'^((0|[1-9]\\d{0,2})\\.){3}(0|[1-9]\\d{0,2})$'\n    \n    # Check if the input text matches the pattern\n    if not re.match(pattern, text):\n        raise ValueError('Invalid IPv4 format')\n    \n    # Split the input text by dots to extract the four parts\n    parts = text.split('.')\n    \n    # Convert each part to an integer\n    numbers = [int(part) for part in parts]\n    \n    # Validate each integer to ensure it is within the range 0 to 255\n    for number in numbers:\n        if number < 0 or number > 255:\n            raise ValueError('Invalid IPv4 address')\n    \n    # Return the tuple of four integers\n    return tuple(numbers)\n"
+    },
+    {
+      "arm": "B",
+      "task": "q-ipv4",
+      "kind": "strict",
+      "split": "qualify",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 135721,
+      "modelCalls": 7,
+      "promptTokens": 5535,
+      "outputTokens": 2460,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23848,
+          "loadMs": 6749
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 16636,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19027,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12014,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 34153,
+          "loadMs": 7786
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20669,
+          "loadMs": 7092
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 2155,
+          "loadMs": 10
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 14,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "reviewer_false_approval",
+          "component": "reviewer"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 10,
+            "valid": 10,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": true,
+      "reviewerFalseRejection": false,
+      "workerSamples": 3,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef parse_ipv4(text):\n    # Regular expression to match a valid IPv4 address\n    ipv4_pattern = r'^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$'\n    \n    # Validate the input string format\n    if not re.match(ipv4_pattern, text):\n        raise ValueError(\"Invalid IPv4 address format\")\n    \n    # Split the input string into four parts\n    parts = text.split('.')\n    \n    # Convert each part to an integer and validate that it is within the range 0..255\n    try:\n        numbers = [int(part) for part in parts]\n        if any(num < 0 or num > 255 for num in numbers):\n            raise ValueError(\"Invalid IPv4 address value\")\n    except ValueError:\n        raise ValueError(\"Invalid IPv4 address value\")\n    \n    # Return a tuple containing the four validated integers\n    return tuple(numbers)\n"
+    },
+    {
+      "arm": "C",
+      "task": "q-ipv4",
+      "kind": "strict",
+      "split": "qualify",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 283698,
+      "modelCalls": 9,
+      "promptTokens": 11160,
+      "outputTokens": 5413,
+      "truncated": 1,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 18597,
+          "loadMs": 6740
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14183,
+          "loadMs": 6
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10699,
+          "loadMs": 8
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11494,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 148805,
+          "loadMs": 7388
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 28065,
+          "loadMs": 11
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20285,
+          "loadMs": 7928
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14145,
+          "loadMs": 12
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6926,
+          "loadMs": 8
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 16,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "00d6d0ceec6e9b77317b4dae90b089681be74068845c0149fda977306619423f",
+          "chars": 1104,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "00d6d0ceec6e9b77317b4dae90b089681be74068845c0149fda977306619423f",
+          "chars": 1104,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "00d6d0ceec6e9b77317b4dae90b089681be74068845c0149fda977306619423f",
+          "chars": 1104,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "repair",
+          "categories": [
+            "test_invalid"
+          ],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+        "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+        "871ea9a5-c919-4c37-bb7a-722ab18113d7"
+      ],
+      "toolCalls": 18,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 2,
+          "category": "reviewer_false_approval",
+          "component": "reviewer"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "outcome": "resolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": false,
+          "hidden": false,
+          "tester": {
+            "total": 0,
+            "valid": 0,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 11,
+            "valid": 11,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 11,
+            "valid": 11,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "reviewerFalseRejection": false,
+      "workerSamples": 3,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef parse_ipv4(text):\n    # Regular expression pattern to match the IPv4 address format\n    pattern = r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'\n    \n    # Check if the input text matches the pattern\n    if not re.match(pattern, text):\n        raise ValueError('Invalid IPv4 address format')\n    \n    # Split the input text by dots to extract the four parts\n    parts = text.split('.')\n    \n    # Convert each part to an integer\n    numbers = [int(part) for part in parts]\n    \n    # Validate each integer to ensure it is within the range 0 to 255\n    for number in numbers:\n        if number < 0 or number > 255:\n            raise ValueError('IPv4 address parts must be in the range 0 to 255')\n    \n    # Return the four integers as a tuple\n    return tuple(numbers)\n"
+    },
+    {
+      "arm": "B",
+      "task": "q-luhn",
+      "kind": "simple",
+      "split": "qualify",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 63861,
+      "modelCalls": 4,
+      "promptTokens": 2446,
+      "outputTokens": 860,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23985,
+          "loadMs": 7087
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7985,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 18050,
+          "loadMs": 7040
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9270,
+          "loadMs": 7372
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 8,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 5,
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 6,
+            "valid": 5,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def luhn_valid(number):\n    number = number.replace(\" \", \"\")\n    if len(number) < 2 or not number.isdigit():\n        return False\n    total = 0\n    for i, digit in enumerate(reversed(number)):\n        digit = int(digit)\n        if i % 2 == 1:\n            digit = digit * 2\n            if digit > 9:\n                digit -= 9\n        total += digit\n    return total % 10 == 0\n"
+    },
+    {
+      "arm": "C",
+      "task": "q-luhn",
+      "kind": "simple",
+      "split": "qualify",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 68947,
+      "modelCalls": 4,
+      "promptTokens": 2845,
+      "outputTokens": 939,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 22661,
+          "loadMs": 7024
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14081,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 17868,
+          "loadMs": 7521
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9662,
+          "loadMs": 7800
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 8,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "3741bbab2f9a37bb9f8360c732d3f208becaa29fea8ce7ac1bfa71888f2d19c4",
+          "chars": 937,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:3b6999ed-7583-43ca-aab9-ca05975ace17"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+        "3b6999ed-7583-43ca-aab9-ca05975ace17"
+      ],
+      "toolCalls": 5,
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 4,
+            "valid": 4,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def luhn_valid(number):\n    # Remove all spaces from the input string\n    number = number.replace(\" \", \"\")\n    \n    # Check if the length of the string is less than 2\n    if len(number) < 2:\n        return False\n    \n    # Initialize the sum of the digits\n    total_sum = 0\n    \n    # Iterate over the string from right to left\n    for i, digit in enumerate(reversed(number)):\n        if not digit.isdigit():\n            return False\n        \n        # Convert the digit to an integer\n        digit = int(digit)\n        \n        # Double every second digit from the right\n        if i % 2 == 1:\n            digit *= 2\n            if digit > 9:\n                digit -= 9\n        \n        # Add the digit to the total sum\n        total_sum += digit\n    \n    # Check if the total sum is divisible by 10\n    return total_sum % 10 == 0\n"
+    },
+    {
+      "arm": "B",
+      "task": "q-luhn",
+      "kind": "simple",
+      "split": "qualify",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 81103,
+      "modelCalls": 5,
+      "promptTokens": 3374,
+      "outputTokens": 1282,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 22946,
+          "loadMs": 5427
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 8252,
+          "loadMs": 10
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 19369,
+          "loadMs": 7449
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15668,
+          "loadMs": 7569
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10439,
+          "loadMs": 12
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 10,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 5,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 2,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.9,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def luhn_valid(number):\n    number = number.replace(\" \", \"\")\n    if len(number) < 2:\n        return False\n    total = 0\n    for i in range(len(number) - 1, -1, -1):\n        digit = int(number[i])\n        if i % 2 == 1:\n            doubled = digit * 2\n            if doubled > 9:\n                doubled -= 9\n            total += doubled\n        else:\n            total += digit\n    return total % 10 == 0\n"
+    },
+    {
+      "arm": "C",
+      "task": "q-luhn",
+      "kind": "simple",
+      "split": "qualify",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 2 repair(s).",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 445343,
+      "modelCalls": 6,
+      "promptTokens": 10019,
+      "outputTokens": 8245,
+      "truncated": 2,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20554,
+          "loadMs": 7356
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11734,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 147686,
+          "loadMs": 7619
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 167184,
+          "loadMs": 12
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 73189,
+          "loadMs": 11
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12688,
+          "loadMs": 9692
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "3741bbab2f9a37bb9f8360c732d3f208becaa29fea8ce7ac1bfa71888f2d19c4",
+          "chars": 937,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:3b6999ed-7583-43ca-aab9-ca05975ace17"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "repair",
+          "categories": [
+            "test_invalid"
+          ],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "repair",
+          "categories": [
+            "test_invalid"
+          ],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+        "3b6999ed-7583-43ca-aab9-ca05975ace17"
+      ],
+      "toolCalls": 11,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester"
+        },
+        {
+          "attempt": 1,
+          "category": "test_invalid",
+          "component": "tester"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "outcome": "resolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": false,
+          "hidden": true,
+          "tester": {
+            "total": 0,
+            "valid": 0,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": false,
+          "hidden": true,
+          "tester": {
+            "total": 0,
+            "valid": 0,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 2,
+            "valid": 1,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def luhn_valid(number):\n    # Remove all spaces from the input string\n    number = number.replace(\" \", \"\")\n    \n    # Check if the resulting string contains only digits\n    if not number.isdigit():\n        return False\n    \n    # If the string contains fewer than 2 digits, return False\n    if len(number) < 2:\n        return False\n    \n    # Apply the Luhn algorithm\n    total = 0\n    num_digits = len(number)\n    parity = num_digits % 2\n    \n    for i in range(num_digits):\n        digit = int(number[i])\n        if i % 2 == parity:\n            digit *= 2\n            if digit > 9:\n                digit -= 9\n        total += digit\n    \n    # Check if the total sum is divisible by 10\n    return total % 10 == 0\n"
+    },
+    {
+      "arm": "B",
+      "task": "q-flatten",
+      "kind": "intermediate",
+      "split": "qualify",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 80082,
+      "modelCalls": 6,
+      "promptTokens": 3912,
+      "outputTokens": 1150,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 22859,
+          "loadMs": 6946
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9898,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 8989,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 14836,
+          "loadMs": 7755
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15670,
+          "loadMs": 8427
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 1854,
+          "loadMs": 14
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 11,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 11,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "reviewer_false_approval",
+          "component": "reviewer"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 1,
+            "valid": 1,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": true,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def flatten_dict(d, sep='.'):\n    result = {}\n    for key, value in d.items():\n        if isinstance(value, dict) and value:\n            sub_dict = flatten_dict(value, sep=sep)\n            for sub_key, sub_value in sub_dict.items():\n                result[f\"{key}{sep}{sub_key}\"] = sub_value\n        else:\n            result[key] = value\n    return result\n"
+    },
+    {
+      "arm": "C",
+      "task": "q-flatten",
+      "kind": "intermediate",
+      "split": "qualify",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 99918,
+      "modelCalls": 6,
+      "promptTokens": 5516,
+      "outputTokens": 1609,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 28558,
+          "loadMs": 7270
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7903,
+          "loadMs": 8
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7523,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 29508,
+          "loadMs": 7442
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14328,
+          "loadMs": 6858
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5665,
+          "loadMs": 9
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 11,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "3741bbab2f9a37bb9f8360c732d3f208becaa29fea8ce7ac1bfa71888f2d19c4",
+          "chars": 937,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:3b6999ed-7583-43ca-aab9-ca05975ace17"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+        "3b6999ed-7583-43ca-aab9-ca05975ace17"
+      ],
+      "toolCalls": 11,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 6,
+            "valid": 6,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def flatten_dict(d, sep='.'):\n    result = {}\n\n    def flatten_helper(d, current_key, result):\n        for key, value in d.items():\n            new_key = f\"{current_key}{sep}{key}\" if current_key else key\n            if isinstance(value, dict) and value:\n                flatten_helper(value, new_key, result)\n            else:\n                result[new_key] = value\n\n    flatten_helper(d, '', result)\n    return result\n"
+    },
+    {
+      "arm": "B",
+      "task": "q-flatten",
+      "kind": "intermediate",
+      "split": "qualify",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 85207,
+      "modelCalls": 6,
+      "promptTokens": 4040,
+      "outputTokens": 1292,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 22174,
+          "loadMs": 7191
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9134,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6377,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 23093,
+          "loadMs": 8258
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13178,
+          "loadMs": 7053
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5241,
+          "loadMs": 10
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 11,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 11,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 5,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def flatten_dict(d, sep='.'):\n    result = {}\n    for key, value in d.items():\n        if isinstance(value, dict) and value:\n            sub_dict = flatten_dict(value, sep=sep)\n            for sub_key, sub_value in sub_dict.items():\n                result[f\"{key}{sep}{sub_key}\"] = sub_value\n        else:\n            result[key] = value\n    return result\n"
+    },
+    {
+      "arm": "C",
+      "task": "q-flatten",
+      "kind": "intermediate",
+      "split": "qualify",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 94405,
+      "modelCalls": 6,
+      "promptTokens": 4947,
+      "outputTokens": 1487,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23592,
+          "loadMs": 7938
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 8150,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7045,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 24308,
+          "loadMs": 7511
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14194,
+          "loadMs": 7280
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11168,
+          "loadMs": 9
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 11,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "3741bbab2f9a37bb9f8360c732d3f208becaa29fea8ce7ac1bfa71888f2d19c4",
+          "chars": 937,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4",
+            "skill:3b6999ed-7583-43ca-aab9-ca05975ace17"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "22bb3cdb27094ae127166b1d753b675b56a16058777be882eac59fb2a75292d1",
+          "chars": 536,
+          "sources": [
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+        "3b6999ed-7583-43ca-aab9-ca05975ace17"
+      ],
+      "toolCalls": 11,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 4,
+            "valid": 4,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def flatten_dict(d, sep='.'):\n    result = {}\n    \n    def _flatten(sub_dict, parent_key=''):\n        for key, value in sub_dict.items():\n            new_key = f\"{parent_key}{sep}{key}\" if parent_key else key\n            if isinstance(value, dict) and value:\n                _flatten(value, new_key)\n            else:\n                result[new_key] = value\n    \n    _flatten(d)\n    return result\n"
+    },
+    {
+      "arm": "B",
+      "task": "q-topk",
+      "kind": "debugging",
+      "split": "qualify",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 89182,
+      "modelCalls": 7,
+      "promptTokens": 4696,
+      "outputTokens": 1382,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20855,
+          "loadMs": 7064
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6956,
+          "loadMs": 8
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7058,
+          "loadMs": 10
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 19665,
+          "loadMs": 6990
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14240,
+          "loadMs": 7184
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5618,
+          "loadMs": 10
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7470,
+          "loadMs": 9
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 13,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 15,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def top_k(words, k):\n    counts = {}\n    for w in words:\n        counts[w] = counts.get(w, 0) + 1\n    if k < 0:\n        raise ValueError(\"k must be non-negative\")\n    if k == 0:\n        return []\n    if k >= len(counts):\n        return sorted(counts.values(), reverse=True)\n    return sorted(counts.items(), key=lambda x: (-x[1], x[0]))[:k]\n"
+    },
+    {
+      "arm": "C",
+      "task": "q-topk",
+      "kind": "debugging",
+      "split": "qualify",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 105035,
+      "modelCalls": 7,
+      "promptTokens": 6281,
+      "outputTokens": 1624,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 25094,
+          "loadMs": 9022
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 8695,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 8728,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 23089,
+          "loadMs": 8946
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14466,
+          "loadMs": 7030
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7434,
+          "loadMs": 8
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10502,
+          "loadMs": 9
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 13,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "29f9fd9eb395f39fc1cd98899ebef4444bb13075e6b3fd4fd3b225870cfbc133",
+          "chars": 1104,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7",
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "29f9fd9eb395f39fc1cd98899ebef4444bb13075e6b3fd4fd3b225870cfbc133",
+          "chars": 1104,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7",
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "29f9fd9eb395f39fc1cd98899ebef4444bb13075e6b3fd4fd3b225870cfbc133",
+          "chars": 1104,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7",
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "c3b55d680258f53f7d5a439cf842b009ab6e7426a177aee97959771327a63415",
+          "chars": 703,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "c3b55d680258f53f7d5a439cf842b009ab6e7426a177aee97959771327a63415",
+          "chars": 703,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+        "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+        "9074bbd4-ae5e-4863-96bd-36a7150064b4"
+      ],
+      "toolCalls": 15,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 2,
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 2,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def top_k(words, k):\n    counts = {}\n    for w in words:\n        counts[w] = counts.get(w, 0) + 1\n    if k < 0:\n        raise ValueError('k must be non-negative')\n    if k == 0:\n        return []\n    if k >= len(counts):\n        return sorted(counts.values(), reverse=True)\n    return sorted(counts.values(), reverse=True)[:k]\n"
+    },
+    {
+      "arm": "B",
+      "task": "q-topk",
+      "kind": "debugging",
+      "split": "qualify",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 2 repair(s).",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 87785,
+      "modelCalls": 7,
+      "promptTokens": 4651,
+      "outputTokens": 1256,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20102,
+          "loadMs": 6227
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5716,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7735,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 19830,
+          "loadMs": 7648
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15666,
+          "loadMs": 7203
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6056,
+          "loadMs": 10
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 1795,
+          "loadMs": 11
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 13,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 19,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "resolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 5,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def top_k(words, k):\n    counts = {}\n    for w in words:\n        counts[w] = counts.get(w, 0) + 1\n    if k < 0:\n        raise ValueError(\"k must be non-negative\")\n    sorted_counts = sorted(counts.items(), key=lambda x: (-x[1], x[0]))\n    if k == 0:\n        return []\n    return [word for word, _ in sorted_counts[:k]]\n"
+    },
+    {
+      "arm": "C",
+      "task": "q-topk",
+      "kind": "debugging",
+      "split": "qualify",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 2 repair(s).",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 98443,
+      "modelCalls": 7,
+      "promptTokens": 7440,
+      "outputTokens": 1533,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20571,
+          "loadMs": 5220
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9477,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7177,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 28750,
+          "loadMs": 7848
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14637,
+          "loadMs": 6718
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7140,
+          "loadMs": 9
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 1983,
+          "loadMs": 14
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 13,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [
+        {
+          "role": "Planner",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "29f9fd9eb395f39fc1cd98899ebef4444bb13075e6b3fd4fd3b225870cfbc133",
+          "chars": 1104,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7",
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "29f9fd9eb395f39fc1cd98899ebef4444bb13075e6b3fd4fd3b225870cfbc133",
+          "chars": 1104,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7",
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Tester",
+          "phase": "attempt",
+          "categories": [],
+          "sha256": "29f9fd9eb395f39fc1cd98899ebef4444bb13075e6b3fd4fd3b225870cfbc133",
+          "chars": 1104,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7",
+            "skill:9074bbd4-ae5e-4863-96bd-36a7150064b4"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "c3b55d680258f53f7d5a439cf842b009ab6e7426a177aee97959771327a63415",
+          "chars": 703,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        },
+        {
+          "role": "Worker",
+          "phase": "repair",
+          "categories": [
+            "implementation_defect"
+          ],
+          "sha256": "c3b55d680258f53f7d5a439cf842b009ab6e7426a177aee97959771327a63415",
+          "chars": 703,
+          "sources": [
+            "skill:c69d6cfe-6c1a-4858-ba61-442176137dd4",
+            "skill:871ea9a5-c919-4c37-bb7a-722ab18113d7"
+          ]
+        }
+      ],
+      "skillsSeen": [
+        "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+        "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+        "9074bbd4-ae5e-4863-96bd-36a7150064b4"
+      ],
+      "toolCalls": 19,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "resolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 8,
+            "valid": 7,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 8,
+            "valid": 7,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 8,
+            "valid": 7,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def top_k(words, k):\n    counts = {}\n    for w in words:\n        counts[w] = counts.get(w, 0) + 1\n    if k < 0:\n        raise ValueError('k must be non-negative')\n    if k == 0:\n        return []\n    sorted_counts = sorted(counts.items(), key=lambda x: (-x[1], x[0]))\n    return [word for word, count in sorted_counts[:k]]\n"
+    }
+  ],
+  "skillsAtStart": [
+    {
+      "id": "27288db5-07b0-43c8-bd1f-a4ce6ceb53db",
+      "name": "caesar-shift-procedure",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "cea87647-89d7-4152-9106-c5813de94518",
+      "name": "caesar-shift-procedure",
+      "version": 2,
+      "state": "rejected"
+    },
+    {
+      "id": "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+      "name": "calculate-median",
+      "version": 1,
+      "state": "sandbox_validated"
+    },
+    {
+      "id": "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+      "name": "compute-median",
+      "version": 1,
+      "state": "sandbox_validated"
+    },
+    {
+      "id": "87a6e429-6db0-4cd4-bddd-92b87e2dc017",
+      "name": "merge-intervals-procedure",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "093ac0fc-4e32-44f2-8a80-c86081d6ef56",
+      "name": "parse-csv-line",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+      "name": "parse-date-procedure",
+      "version": 1,
+      "state": "sandbox_validated"
+    },
+    {
+      "id": "a8467799-6f8a-4931-9a28-7299f5d5ab8c",
+      "name": "parse-date-procedure",
+      "version": 2,
+      "state": "rejected"
+    },
+    {
+      "id": "3b6999ed-7583-43ca-aab9-ca05975ace17",
+      "name": "slugify",
+      "version": 1,
+      "state": "sandbox_validated"
+    }
+  ],
+  "qualification": [
+    {
+      "id": "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+      "name": "calculate-median",
+      "slots": 4,
+      "cPass": 2,
+      "bPass": 1,
+      "violation": false,
+      "qualified": true
+    },
+    {
+      "id": "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+      "name": "compute-median",
+      "slots": 4,
+      "cPass": 2,
+      "bPass": 1,
+      "violation": false,
+      "qualified": true
+    },
+    {
+      "id": "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+      "name": "parse-date-procedure",
+      "slots": 8,
+      "cPass": 4,
+      "bPass": 2,
+      "violation": false,
+      "qualified": true
+    },
+    {
+      "id": "3b6999ed-7583-43ca-aab9-ca05975ace17",
+      "name": "slugify",
+      "slots": 4,
+      "cPass": 2,
+      "bPass": 1,
+      "violation": false,
+      "qualified": true
+    }
+  ],
+  "summary": {
+    "byArm": {
+      "B": {
+        "trials": 8,
+        "passed": 2,
+        "passInterval": [
+          0.07147768885802765,
+          0.5907301208974108
+        ],
+        "firstAttempt": 1,
+        "byKind": {
+          "strict": "0/2",
+          "simple": "1/2",
+          "intermediate": "0/2",
+          "debugging": "1/2"
+        },
+        "statuses": {
+          "failed": 6,
+          "passed": 2
+        },
+        "repairsUsed": 10,
+        "passedAfterRepair": 1,
+        "modelCalls": 51,
+        "promptTokens": 39067,
+        "outputTokens": 15310,
+        "truncated": 1,
+        "modelLoads": 24,
+        "modelSwitches": 16,
+        "peakConcurrent": 1,
+        "callLatencyMs": {
+          "median": 14240,
+          "p95": 24255
+        },
+        "trialMs": {
+          "total": 916631,
+          "median": 87785
+        },
+        "failureCategories": {
+          "test_invalid": 1,
+          "implementation_defect": 14,
+          "reviewer_false_approval": 2
+        },
+        "reviewerFalseApprovals": 2,
+        "guidanceShown": 0,
+        "skillsUsed": 0,
+        "handoffs": 94,
+        "handoffsRefused": 0,
+        "invariants": {
+          "pinsHeld": true,
+          "gateIsAuthority": true,
+          "noHandoffRefused": true
+        }
+      },
+      "C": {
+        "trials": 8,
+        "passed": 4,
+        "passInterval": [
+          0.2152125268244419,
+          0.7847874731755581
+        ],
+        "firstAttempt": 1,
+        "byKind": {
+          "strict": "1/2",
+          "simple": "2/2",
+          "intermediate": "0/2",
+          "debugging": "1/2"
+        },
+        "statuses": {
+          "passed": 4,
+          "failed": 4
+        },
+        "repairsUsed": 11,
+        "passedAfterRepair": 3,
+        "modelCalls": 52,
+        "promptTokens": 54420,
+        "outputTokens": 22991,
+        "truncated": 3,
+        "modelLoads": 24,
+        "modelSwitches": 16,
+        "peakConcurrent": 1,
+        "callLatencyMs": {
+          "median": 14194,
+          "p95": 147686
+        },
+        "trialMs": {
+          "total": 1323735,
+          "median": 105035
+        },
+        "failureCategories": {
+          "implementation_defect": 17,
+          "test_invalid": 3,
+          "reviewer_false_approval": 1
+        },
+        "reviewerFalseApprovals": 1,
+        "guidanceShown": 8,
+        "skillsUsed": 4,
+        "handoffs": 96,
+        "handoffsRefused": 0,
+        "invariants": {
+          "pinsHeld": true,
+          "gateIsAuthority": true,
+          "noHandoffRefused": true
+        }
+      }
+    },
+    "externalRequestsRefused": 0,
+    "memoryWaitSamples": 0,
+    "minFreeGiB": 8.75,
+    "ledger": {
+      "id": "s2-qualify",
+      "state": "completed",
+      "persisted": true,
+      "counts": {
+        "done": 16
+      },
+      "attempts": 16
+    },
+    "CvsB": {
+      "pairs": 8,
+      "wins": 2,
+      "losses": 0,
+      "difference": 2,
+      "signTestP": 0.25
+    }
+  },
+  "skillsAtEnd": [
+    {
+      "id": "27288db5-07b0-43c8-bd1f-a4ce6ceb53db",
+      "name": "caesar-shift-procedure",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "cea87647-89d7-4152-9106-c5813de94518",
+      "name": "caesar-shift-procedure",
+      "version": 2,
+      "state": "rejected"
+    },
+    {
+      "id": "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+      "name": "calculate-median",
+      "version": 1,
+      "state": "benchmark_qualified"
+    },
+    {
+      "id": "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+      "name": "compute-median",
+      "version": 1,
+      "state": "benchmark_qualified"
+    },
+    {
+      "id": "87a6e429-6db0-4cd4-bddd-92b87e2dc017",
+      "name": "merge-intervals-procedure",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "093ac0fc-4e32-44f2-8a80-c86081d6ef56",
+      "name": "parse-csv-line",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+      "name": "parse-date-procedure",
+      "version": 1,
+      "state": "benchmark_qualified"
+    },
+    {
+      "id": "a8467799-6f8a-4931-9a28-7299f5d5ab8c",
+      "name": "parse-date-procedure",
+      "version": 2,
+      "state": "rejected"
+    },
+    {
+      "id": "3b6999ed-7583-43ca-aab9-ca05975ace17",
+      "name": "slugify",
+      "version": 1,
+      "state": "benchmark_qualified"
+    }
+  ],
+  "finishedAt": "2026-10-23T04:40:04.559Z"
+}

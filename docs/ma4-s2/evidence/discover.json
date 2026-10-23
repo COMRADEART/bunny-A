@@ -1,0 +1,2566 @@
+{
+  "version": "bunny-ma4-s2-eval-v1",
+  "phase": "discover",
+  "taskHash": "2b9d01a75e17464028543cd757c88df0542b442675bd5332c05fb44818165784",
+  "pins": {
+    "Planner": "qwen2.5-coder:7b",
+    "Worker": "qwen2.5-coder:7b",
+    "Tester": "huihui_ai/qwen2.5-abliterate:7b",
+    "Reviewer": "qwen2.5-coder:7b"
+  },
+  "team": {
+    "members": [
+      "Coordinator",
+      "Planner",
+      "Worker",
+      "Tester",
+      "Reviewer",
+      "Researcher"
+    ],
+    "reasons": [
+      "Planner: planning",
+      "Worker: code-generation",
+      "Tester: test-generation",
+      "Reviewer: review",
+      "Researcher: Host retrieval from Lotus Memory (no model)"
+    ]
+  },
+  "assignment": [
+    {
+      "role": "Planner",
+      "model": "qwen2.5-coder:7b",
+      "decision": "pinned"
+    },
+    {
+      "role": "Worker",
+      "model": "qwen2.5-coder:7b",
+      "decision": "pinned"
+    },
+    {
+      "role": "Tester",
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "decision": "pinned"
+    },
+    {
+      "role": "Reviewer",
+      "model": "qwen2.5-coder:7b",
+      "decision": "pinned"
+    }
+  ],
+  "schedule": {
+    "mode": "grouped",
+    "reason": "Worker and Tester models need 8.4 GiB together but 6 GiB of VRAM is available; calls are grouped by model."
+  },
+  "sandbox": {
+    "available": true,
+    "backend": "wsl2-userns-pivot_root-cgroupv2",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2"
+  },
+  "startedAt": "2026-10-23T03:12:10.194Z",
+  "runs": [
+    {
+      "arm": "B",
+      "task": "tr-isodate",
+      "kind": "strict",
+      "split": "train",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 140064,
+      "modelCalls": 6,
+      "promptTokens": 4834,
+      "outputTokens": 2089,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 27137,
+          "loadMs": 9605
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17251,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14060,
+          "loadMs": 8
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17432,
+          "loadMs": 26
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 42231,
+          "loadMs": 12913
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14108,
+          "loadMs": 11741
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 10,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 14,
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 10,
+            "valid": 10,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 3,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\nimport calendar\n\ndef parse_date(text):\n    date_pattern = r'^\\d{4}-\\d{2}-\\d{2}$'\n    if not re.match(date_pattern, text):\n        raise ValueError(\"Invalid date format\")\n    \n    year, month, day = map(int, text.split('-'))\n    if not (1 <= month <= 12) or not (1 <= day <= calendar.monthrange(year, month)[1]):\n        raise ValueError(\"Invalid date\")\n    \n    return (year, month, day)\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-isodate",
+      "kind": "strict",
+      "split": "train",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 156236,
+      "modelCalls": 6,
+      "promptTokens": 6095,
+      "outputTokens": 2691,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 36509,
+          "loadMs": 7631
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 21832,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17862,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 21399,
+          "loadMs": 16
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 41187,
+          "loadMs": 9821
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10198,
+          "loadMs": 7614
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 10,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 14,
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 9,
+            "valid": 9,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 3,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\nimport calendar\n\ndef parse_date(text):\n    date_pattern = r'^\\d{4}-\\d{2}-\\d{2}$'\n    if not re.match(date_pattern, text):\n        raise ValueError(\"Invalid date format\")\n    \n    year, month, day = map(int, text.split('-'))\n    if not (1 <= month <= 12):\n        raise ValueError(\"Month must be between 01 and 12\")\n    if not (1 <= day <= calendar.monthrange(year, month)[1]):\n        raise ValueError(\"Day must be between 01 and the last day of the month\")\n    \n    return year, month, day\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-hexcolor",
+      "kind": "strict",
+      "split": "train",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): tester tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 146082,
+      "modelCalls": 8,
+      "promptTokens": 6467,
+      "outputTokens": 2451,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23855,
+          "loadMs": 7457
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 16681,
+          "loadMs": 12
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15370,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14762,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 22277,
+          "loadMs": 6989
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13930,
+          "loadMs": 10
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 10493,
+          "loadMs": 8
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17735,
+          "loadMs": 11307
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 14,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 24,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester"
+        },
+        {
+          "attempt": 1,
+          "category": "test_invalid",
+          "component": "tester"
+        },
+        {
+          "attempt": 2,
+          "category": "test_invalid",
+          "component": "tester"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 10,
+            "valid": 10,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 8,
+            "valid": 8,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 6,
+            "valid": 6,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 3,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef parse_color(text):\n    # Regular expression to match the valid hex color formats\n    pattern = r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$'\n    \n    if not re.match(pattern, text):\n        raise ValueError(\"Invalid hex color format\")\n    \n    # Remove the '#' character\n    hex_color = text[1:]\n    \n    # If the hex color is 3 digits, double each digit\n    if len(hex_color) == 3:\n        hex_color = ''.join([char * 2 for char in hex_color])\n    \n    # Convert the hex color to integers\n    r = int(hex_color[0:2], 16)\n    g = int(hex_color[2:4], 16)\n    b = int(hex_color[4:6], 16)\n    \n    return (r, g, b)\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-hexcolor",
+      "kind": "strict",
+      "split": "train",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): tester tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 183696,
+      "modelCalls": 8,
+      "promptTokens": 6954,
+      "outputTokens": 2987,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 29081,
+          "loadMs": 10420
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 21193,
+          "loadMs": 13
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12740,
+          "loadMs": 15
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17299,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 35885,
+          "loadMs": 9860
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 16551,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 16953,
+          "loadMs": 12
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 18717,
+          "loadMs": 9264
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 14,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 24,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester"
+        },
+        {
+          "attempt": 1,
+          "category": "test_invalid",
+          "component": "tester"
+        },
+        {
+          "attempt": 2,
+          "category": "test_invalid",
+          "component": "tester"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 13,
+            "valid": 13,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 10,
+            "valid": 10,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 10,
+            "valid": 10,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.9,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 3,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "import re\n\ndef parse_color(text):\n    if not text.startswith('#'):\n        raise ValueError(\"Invalid input: missing '#'\")\n    if len(text) != 7 and len(text) != 4:\n        raise ValueError(\"Invalid input: length must be 7 or 4\")\n    if not re.match(r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$', text):\n        raise ValueError(\"Invalid input: invalid hex characters\")\n    \n    if len(text) == 7:\n        r = int(text[1:3], 16)\n        g = int(text[3:5], 16)\n        b = int(text[5:7], 16)\n    else:\n        r = int(text[1] * 2, 16)\n        g = int(text[2] * 2, 16)\n        b = int(text[3] * 2, 16)\n    \n    return (r, g, b)\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-slug",
+      "kind": "simple",
+      "split": "train",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): static validation.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 72413,
+      "modelCalls": 6,
+      "promptTokens": 3320,
+      "outputTokens": 1002,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 18177,
+          "loadMs": 7272
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7376,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13290,
+          "loadMs": 7776
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14399,
+          "loadMs": 7989
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6403,
+          "loadMs": 11
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7655,
+          "loadMs": 13
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 7,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "dependency_violation",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 2,
+          "category": "dependency_violation",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "dependency_violation"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": false,
+          "hidden": false,
+          "tester": {
+            "total": 0,
+            "valid": 0,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 3,
+            "valid": 3,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": false,
+          "hidden": false,
+          "tester": {
+            "total": 0,
+            "valid": 0,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def slugify(text):\n    # Convert the input text to lowercase\n    text = text.lower()\n    # Replace all non-alphanumeric characters with '-' using a regular expression\n    import re\n    text = re.sub(r'[^a-z0-9]+', '-', text)\n    # Strip leading and trailing '-' characters from the result\n    text = text.strip('-')\n    # Return the slugified string\n    return text\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-slug",
+      "kind": "simple",
+      "split": "train",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 57889,
+      "modelCalls": 5,
+      "promptTokens": 2479,
+      "outputTokens": 666,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19018,
+          "loadMs": 6901
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5686,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 12926,
+          "loadMs": 7504
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13860,
+          "loadMs": 7909
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 1654,
+          "loadMs": 11
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 10,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 6,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "dependency_violation",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "dependency_violation"
+          ],
+          "outcome": "resolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": false,
+          "hidden": false,
+          "tester": {
+            "total": 0,
+            "valid": 0,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 3,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def slugify(text):\n    text = text.lower()\n    result = []\n    in_non_alphanumeric = False\n\n    for char in text:\n        if char.isalnum():\n            if in_non_alphanumeric:\n                result.append('-')\n                in_non_alphanumeric = False\n            result.append(char)\n        else:\n            in_non_alphanumeric = True\n\n    return ''.join(result).strip('-')\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-csvline",
+      "kind": "intermediate",
+      "split": "train",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 85924,
+      "modelCalls": 6,
+      "promptTokens": 3488,
+      "outputTokens": 1346,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19260,
+          "loadMs": 7163
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9473,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9351,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 19668,
+          "loadMs": 7528
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17533,
+          "loadMs": 6713
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 4672,
+          "loadMs": 9
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 11,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 11,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def split_csv_line(line):\n    if not line:\n        return ['']\n    \n    fields = []\n    in_quotes = False\n    current_field = []\n    \n    for char in line:\n        if char == '\"':\n            if in_quotes:\n                if len(current_field) > 1 and current_field[-1] == '\"':\n                    current_field.pop()\n                    current_field.append('\"')\n                else:\n                    in_quotes = False\n            else:\n                in_quotes = True\n        elif char == ',' and not in_quotes:\n            fields.append(''.join(current_field))\n            current_field = []\n        else:\n            current_field.append(char)\n    \n    if in_quotes:\n        raise ValueError(\"Unclosed quote\")\n    \n    fields.append(''.join(current_field))\n    return fields\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-csvline",
+      "kind": "intermediate",
+      "split": "train",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 79142,
+      "modelCalls": 5,
+      "promptTokens": 2844,
+      "outputTokens": 1172,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20907,
+          "loadMs": 7855
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11397,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11323,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 20235,
+          "loadMs": 7492
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9249,
+          "loadMs": 7386
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 9,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 11,
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 5,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def split_csv_line(line):\n    fields = []\n    in_quotes = False\n    current_field = []\n    i = 0\n\n    while i < len(line):\n        char = line[i]\n\n        if char == '\"':\n            if in_quotes:\n                if i + 1 < len(line) and line[i + 1] == '\"':\n                    current_field.append('\"')\n                    i += 1\n                else:\n                    in_quotes = False\n            else:\n                in_quotes = True\n        elif char == ',' and not in_quotes:\n            fields.append(''.join(current_field))\n            current_field = []\n        else:\n            current_field.append(char)\n\n        i += 1\n\n    if in_quotes:\n        raise ValueError(\"Unclosed quote\")\n\n    fields.append(''.join(current_field))\n    return fields\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-intervals",
+      "kind": "intermediate",
+      "split": "train",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 78014,
+      "modelCalls": 6,
+      "promptTokens": 3636,
+      "outputTokens": 1219,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17255,
+          "loadMs": 5237
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7495,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 21015,
+          "loadMs": 7700
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14531,
+          "loadMs": 7226
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7106,
+          "loadMs": 12
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5512,
+          "loadMs": 8
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 12,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 9,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 5,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 5,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def merge_intervals(pairs):\n    if not pairs:\n        return []\n    \n    pairs.sort(key=lambda x: x[0])\n    merged = [pairs[0]]\n    \n    for start, end in pairs[1:]:\n        if start > end:\n            raise ValueError(\"Interval start must be less than or equal to interval end.\")\n        if start <= merged[-1][1]:\n            merged[-1] = (merged[-1][0], max(merged[-1][1], end))\n        else:\n            merged.append((start, end))\n    \n    return merged\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-intervals",
+      "kind": "intermediate",
+      "split": "train",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "firstAttempt": false,
+      "durationMs": 66594,
+      "modelCalls": 5,
+      "promptTokens": 2812,
+      "outputTokens": 891,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17149,
+          "loadMs": 5433
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6851,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 17768,
+          "loadMs": 7224
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15160,
+          "loadMs": 7059
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 1983,
+          "loadMs": 10
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 10,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 9,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "resolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 5,
+            "valid": 5,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 5,
+            "valid": 5,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def merge_intervals(pairs):\n    if not pairs:\n        return []\n    \n    for start, end in pairs:\n        if start > end:\n            raise ValueError(\"Start time must be less than or equal to end time\")\n    \n    pairs.sort()\n    merged = [pairs[0]]\n    \n    for start, end in pairs[1:]:\n        if start <= merged[-1][1]:\n            merged[-1] = (merged[-1][0], max(merged[-1][1], end))\n        else:\n            merged.append((start, end))\n    \n    return merged\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-median",
+      "kind": "debugging",
+      "split": "train",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 84641,
+      "modelCalls": 4,
+      "promptTokens": 2030,
+      "outputTokens": 589,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 29999,
+          "loadMs": 6086
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14294,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 23014,
+          "loadMs": 8316
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12757,
+          "loadMs": 8974
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 8,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 5,
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 3,
+            "valid": 3,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def median(xs):\n    if not xs:\n        raise ValueError(\"The list is empty\")\n    \n    sorted_xs = sorted(xs)\n    n = len(sorted_xs)\n    \n    if n % 2 == 1:\n        return sorted_xs[n // 2]\n    else:\n        return (sorted_xs[n // 2 - 1] + sorted_xs[n // 2]) / 2\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-median",
+      "kind": "debugging",
+      "split": "train",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 95657,
+      "modelCalls": 4,
+      "promptTokens": 2102,
+      "outputTokens": 672,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 33651,
+          "loadMs": 7649
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14571,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 29252,
+          "loadMs": 7901
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13782,
+          "loadMs": 9649
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 8,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 5,
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 4,
+            "valid": 4,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 1,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def median(xs):\n    if not xs:\n        raise ValueError(\"Cannot compute median of an empty list\")\n    \n    sorted_xs = sorted(xs)\n    n = len(sorted_xs)\n    \n    if n % 2 == 1:\n        return sorted_xs[n // 2]\n    else:\n        return (sorted_xs[n // 2 - 1] + sorted_xs[n // 2]) / 2\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-caesar",
+      "kind": "debugging",
+      "split": "train",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 158749,
+      "modelCalls": 5,
+      "promptTokens": 3292,
+      "outputTokens": 1390,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 37278,
+          "loadMs": 5279
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17111,
+          "loadMs": 7
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13712,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 69730,
+          "loadMs": 8429
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14407,
+          "loadMs": 9506
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 9,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 11,
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 15,
+            "valid": 13,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def caesar(text, shift):\n    result = []\n    for c in text:\n        if c.isalpha():\n            base = ord('a') if c.islower() else ord('A')\n            shifted = (ord(c) - base + shift) % 26 + base\n            result.append(chr(shifted))\n        else:\n            result.append(c)\n    return ''.join(result)\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-caesar",
+      "kind": "debugging",
+      "split": "train",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "firstAttempt": true,
+      "durationMs": 151087,
+      "modelCalls": 5,
+      "promptTokens": 3373,
+      "outputTokens": 1305,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 43753,
+          "loadMs": 7584
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 16918,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15868,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 42051,
+          "loadMs": 7441
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 25926,
+          "loadMs": 9511
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 9,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 11,
+      "failures": [],
+      "repairs": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "total": 8,
+            "valid": 6,
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "def caesar(text, shift):\n    result = []\n    for c in text:\n        if c.isalpha():\n            base = 'a' if c.islower() else 'A'\n            shifted = chr((ord(c) - ord(base) + shift) % 26 + ord(base))\n            result.append(shifted)\n        else:\n            result.append(c)\n    return ''.join(result)\n"
+    },
+    {
+      "arm": "B",
+      "task": "tr-library",
+      "kind": "planning",
+      "split": "train",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 344006,
+      "modelCalls": 7,
+      "promptTokens": 6532,
+      "outputTokens": 4993,
+      "truncated": 1,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 44872,
+          "loadMs": 6128
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 151059,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 21847,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 54273,
+          "loadMs": 9466
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 29592,
+          "loadMs": 9832
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23070,
+          "loadMs": 12
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9472,
+          "loadMs": 8
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 13,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 13,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "not_retested",
+          "proposal": "identical"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 4,
+            "valid": 2,
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 4,
+            "valid": 2,
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.8,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "class Library:\n    def __init__(self):\n        self.books = {}\n        self.checked_out = {}\n\n    def add_book(self, isbn, copies=1):\n        if not isinstance(copies, int) or copies <= 0:\n            raise ValueError(\"Copies must be a positive integer\")\n        if isbn in self.books:\n            self.books[isbn] += copies\n        else:\n            self.books[isbn] = copies\n\n    def available(self, isbn):\n        if isbn not in self.books:\n            raise KeyError(f\"ISBN {isbn} not found\")\n        return self.books[isbn]\n\n    def checkout(self, isbn, member):\n        if isbn not in self.books:\n            raise KeyError(f\"ISBN {isbn} not found\")\n        if self.books[isbn] == 0:\n            raise ValueError(\"No copies available\")\n        if member in self.checked_out and isbn in self.checked_out[member]:\n            raise ValueError(\"Member already holds this book\")\n        if isbn not in self.checked_out:\n            self.checked_out[isbn] = {}\n        if member not in self.checked_out[isbn]:\n            self.checked_out[isbn][member] = 0\n        self.checked_out[isbn][member] += 1\n        self.books[isbn] -= 1\n\n    def return_book(self, isbn, member):\n        if isbn not in self.books:\n            raise KeyError(f\"ISBN {isbn} not found\")\n        if isbn not in self.checked_out or member not in self.checked_out[isbn]:\n            raise ValueError(\"Member does not hold this book\")\n        self.checked_out[isbn][member] -= 1\n        if self.checked_out[isbn][member] == 0:\n  "
+    },
+    {
+      "arm": "B",
+      "task": "tr-library",
+      "kind": "planning",
+      "split": "train",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "firstAttempt": false,
+      "durationMs": 168386,
+      "modelCalls": 7,
+      "promptTokens": 7326,
+      "outputTokens": 2964,
+      "truncated": 0,
+      "modelLoads": 3,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 26319,
+          "loadMs": 7156
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 18960,
+          "loadMs": 12
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17158,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 48853,
+          "loadMs": 8147
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 24681,
+          "loadMs": 8975
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13669,
+          "loadMs": 11
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7427,
+          "loadMs": 7
+        }
+      ],
+      "gate": {
+        "peakConcurrent": 1,
+        "modelSwitches": 2
+      },
+      "handoffs": {
+        "sent": 13,
+        "refused": 0,
+        "downgraded": 0
+      },
+      "guidance": [],
+      "skillsSeen": [],
+      "toolCalls": 19,
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker"
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker"
+        }
+      ],
+      "repairs": [
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        },
+        {
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "outcome": "unresolved",
+          "proposal": "valid"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 9,
+            "valid": 8,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 9,
+            "valid": 8,
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "total": 9,
+            "valid": 8,
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.9,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerSamples": 2,
+      "invariants": {
+        "pinsHeld": true,
+        "gateIsAuthority": true,
+        "handoffsRefused": 0
+      },
+      "finalSource": "class Library:\n    def __init__(self):\n        self.books = {}\n\n    def add_book(self, isbn, copies=1):\n        if not isinstance(copies, int) or copies <= 0:\n            raise ValueError(\"Copies must be a positive integer\")\n        if isbn in self.books:\n            self.books[isbn] += copies\n        else:\n            self.books[isbn] = copies\n\n    def available(self, isbn):\n        if isbn not in self.books:\n            raise KeyError(\"Unknown ISBN\")\n        return self.books[isbn]\n\n    def checkout(self, isbn, member):\n        if isbn not in self.books:\n            raise KeyError(\"Unknown ISBN\")\n        if self.books[isbn] == 0:\n            raise ValueError(\"No copy available\")\n        if isbn in self.books:\n            self.books[isbn] -= 1\n\n    def return_book(self, isbn, member):\n        if isbn not in self.books:\n            raise KeyError(\"Unknown ISBN\")\n        if isbn in self.books:\n            self.books[isbn] += 1\n"
+    }
+  ],
+  "skillsAtStart": [],
+  "extractions": [
+    {
+      "task": "tr-isodate",
+      "trial": 1,
+      "repaired": false,
+      "ok": true,
+      "error": null,
+      "promptSha256": "2c04a9b9be276aae4493d386c3bfa877f26f640f74fbadb87f058ff972d1f65b",
+      "durationMs": 17847,
+      "name": "parse-date-procedure",
+      "skillId": "9074bbd4-ae5e-4863-96bd-36a7150064b4"
+    },
+    {
+      "task": "tr-isodate",
+      "trial": 2,
+      "repaired": false,
+      "ok": true,
+      "error": null,
+      "promptSha256": "622f4d11fd91cc7f931d7bc12b6852f87b460135b51a4db236dc16fd2ecbec27",
+      "durationMs": 16668,
+      "name": "parse-date-procedure",
+      "skillId": "a8467799-6f8a-4931-9a28-7299f5d5ab8c"
+    },
+    {
+      "task": "tr-slug",
+      "trial": 2,
+      "repaired": true,
+      "ok": true,
+      "error": null,
+      "promptSha256": "19dc183167d290119b13d1dce0c1449da9e341d55f1150efbc2ae9523487e963",
+      "durationMs": 10053,
+      "name": "slugify",
+      "skillId": "3b6999ed-7583-43ca-aab9-ca05975ace17"
+    },
+    {
+      "task": "tr-csvline",
+      "trial": 2,
+      "repaired": false,
+      "ok": true,
+      "error": null,
+      "promptSha256": "05c3ba040eaf00303afad3528bd7a20734bd698891fff7ce40a3b1852a2e8c57",
+      "durationMs": 14175,
+      "name": "parse-csv-line",
+      "skillId": "093ac0fc-4e32-44f2-8a80-c86081d6ef56"
+    },
+    {
+      "task": "tr-intervals",
+      "trial": 2,
+      "repaired": true,
+      "ok": true,
+      "error": null,
+      "promptSha256": "539f154c3f37d6e0f0744367f4303e01e6f41a9def1975d06f719866fa33dca1",
+      "durationMs": 12059,
+      "name": "merge-intervals-procedure",
+      "skillId": "87a6e429-6db0-4cd4-bddd-92b87e2dc017"
+    },
+    {
+      "task": "tr-median",
+      "trial": 1,
+      "repaired": false,
+      "ok": true,
+      "error": null,
+      "promptSha256": "ab941f0570e9f44c843db048abccfe927e822b4843f95be3476a6bd00b5c4b4f",
+      "durationMs": 21085,
+      "name": "calculate-median",
+      "skillId": "c69d6cfe-6c1a-4858-ba61-442176137dd4"
+    },
+    {
+      "task": "tr-median",
+      "trial": 2,
+      "repaired": false,
+      "ok": true,
+      "error": null,
+      "promptSha256": "b45e022c641b2888d40fd76bc9024d7b8089783981518a10ccf9a702ed710252",
+      "durationMs": 19122,
+      "name": "compute-median",
+      "skillId": "871ea9a5-c919-4c37-bb7a-722ab18113d7"
+    },
+    {
+      "task": "tr-caesar",
+      "trial": 1,
+      "repaired": false,
+      "ok": true,
+      "error": null,
+      "promptSha256": "48ea6720d4645ef3910cac5066d8c33d26864f9c9c78986695a068e23745bad9",
+      "durationMs": 24065,
+      "name": "caesar-shift-procedure",
+      "skillId": "27288db5-07b0-43c8-bd1f-a4ce6ceb53db"
+    },
+    {
+      "task": "tr-caesar",
+      "trial": 2,
+      "repaired": false,
+      "ok": true,
+      "error": null,
+      "promptSha256": "ecba89153946b55c64b2f2c07702d014cddb9d1b34a4d80027795dc34e52c1d8",
+      "durationMs": 26179,
+      "name": "caesar-shift-procedure",
+      "skillId": "cea87647-89d7-4152-9106-c5813de94518"
+    }
+  ],
+  "candidates": [
+    {
+      "id": "3b6999ed-7583-43ca-aab9-ca05975ace17",
+      "name": "slugify",
+      "task": "tr-slug",
+      "trial": 2,
+      "state": "candidate",
+      "screen": "admissible",
+      "categories": [
+        "string-processing"
+      ],
+      "roles": [
+        "Worker"
+      ],
+      "procedure": [
+        "Convert the input text to lowercase.",
+        "Initialize an empty list to store the result.",
+        "Initialize a boolean flag to track if the current character is non-alphanumeric.",
+        "Iterate through each character in the text.",
+        "If the character is alphanumeric and the flag is true, append a '-' to the result list and set the flag to false.",
+        "If the character is alphanumeric, append it to the result list and set the flag to false."
+      ],
+      "tools": [
+        "ma4.static_check",
+        "ma4.run_tests"
+      ]
+    },
+    {
+      "id": "87a6e429-6db0-4cd4-bddd-92b87e2dc017",
+      "name": "merge-intervals-procedure",
+      "task": "tr-intervals",
+      "trial": 2,
+      "state": "candidate",
+      "screen": "admissible",
+      "categories": [
+        "algorithm"
+      ],
+      "roles": [
+        "Planner",
+        "Worker",
+        "Tester"
+      ],
+      "procedure": [
+        "Sort the input list of pairs by the start value.",
+        "Initialize a merged list with the first pair from the sorted list.",
+        "Iterate through the remaining pairs in the sorted list.",
+        "For each pair, check if it overlaps or touches the last pair in the merged list.",
+        "If it does, merge the current pair with the last pair in the merged list.",
+        "If it does not, append the current pair to the merged list."
+      ],
+      "tools": [
+        "ma4.static_check",
+        "ma4.import_smoke",
+        "ma4.run_tests"
+      ]
+    },
+    {
+      "id": "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+      "name": "parse-date-procedure",
+      "task": "tr-isodate",
+      "trial": 1,
+      "state": "candidate",
+      "screen": "admissible",
+      "categories": [
+        "string-processing",
+        "validation-errors",
+        "numeric"
+      ],
+      "roles": [
+        "Planner",
+        "Worker",
+        "Tester"
+      ],
+      "procedure": [
+        "Define a regular expression pattern to match the date format YYYY-MM-DD.",
+        "Check if the input text matches the date pattern. If not, raise a ValueError with the message 'Invalid date format'.",
+        "Split the input text by hyphens to extract the year, month, and day as strings.",
+        "Convert the extracted year, month, and day strings to integers.",
+        "Validate the month and day values. If the month is out of range (1-12) or the day is out of range for the given month, raise a ValueError with the message 'Invalid date'.",
+        "Return the year, month, and day as a tuple of integers."
+      ],
+      "tools": [
+        "ma4.static_check",
+        "ma4.import_smoke",
+        "ma4.run_tests"
+      ]
+    },
+    {
+      "id": "a8467799-6f8a-4931-9a28-7299f5d5ab8c",
+      "name": "parse-date-procedure",
+      "task": "tr-isodate",
+      "trial": 2,
+      "state": "rejected",
+      "screen": "duplicate name",
+      "categories": [
+        "string-processing",
+        "validation-errors",
+        "algorithm"
+      ],
+      "roles": [
+        "Planner",
+        "Worker",
+        "Tester"
+      ],
+      "procedure": [
+        "Define a regular expression pattern to match the date format YYYY-MM-DD.",
+        "Check if the input text matches the date pattern. If not, raise a ValueError with the message 'Invalid date format'.",
+        "Split the input text by hyphens to extract the year, month, and day as strings.",
+        "Convert the extracted year, month, and day strings to integers.",
+        "Validate the month value to ensure it is between 1 and 12. If not, raise a ValueError with the message 'Month must be between 01 and 12'.",
+        "Validate the day value to ensure it is between 1 and the last day of the month. If not, raise a ValueError with the message 'Day must be between 01 and the last day of the month'."
+      ],
+      "tools": [
+        "ma4.static_check",
+        "ma4.import_smoke",
+        "ma4.run_tests"
+      ]
+    },
+    {
+      "id": "093ac0fc-4e32-44f2-8a80-c86081d6ef56",
+      "name": "parse-csv-line",
+      "task": "tr-csvline",
+      "trial": 2,
+      "state": "candidate",
+      "screen": "admissible",
+      "categories": [
+        "string-processing",
+        "validation-errors"
+      ],
+      "roles": [
+        "Planner",
+        "Worker",
+        "Tester"
+      ],
+      "procedure": [
+        "Initialize an empty list to store fields.",
+        "Track whether the current character is within quotes.",
+        "Initialize an empty list to store the current field.",
+        "Iterate through each character in the line.",
+        "If the character is a double quote, toggle the in_quotes flag. If two consecutive double quotes are found, add a double quote to the current field.",
+        "If the character is a comma and not within quotes, add the current field to the list and reset the current field. If within quotes, add the character to the current field."
+      ],
+      "tools": [
+        "ma4.static_check",
+        "ma4.import_smoke",
+        "ma4.run_tests"
+      ]
+    },
+    {
+      "id": "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+      "name": "calculate-median",
+      "task": "tr-median",
+      "trial": 1,
+      "state": "candidate",
+      "screen": "admissible",
+      "categories": [
+        "algorithm",
+        "validation-errors"
+      ],
+      "roles": [
+        "Planner",
+        "Worker",
+        "Tester"
+      ],
+      "procedure": [
+        "Check if the list is empty. If it is, raise a ValueError with the message 'The list is empty'.",
+        "Sort the list of numbers.",
+        "Determine the length of the sorted list.",
+        "If the length is odd, return the middle element.",
+        "If the length is even, return the average of the two middle elements."
+      ],
+      "tools": [
+        "ma4.static_check",
+        "ma4.import_smoke",
+        "ma4.run_tests"
+      ]
+    },
+    {
+      "id": "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+      "name": "compute-median",
+      "task": "tr-median",
+      "trial": 2,
+      "state": "candidate",
+      "screen": "admissible",
+      "categories": [
+        "algorithm",
+        "validation-errors"
+      ],
+      "roles": [
+        "Planner",
+        "Worker",
+        "Tester"
+      ],
+      "procedure": [
+        "Check if the list is empty. If so, raise a ValueError.",
+        "Sort the list of numbers.",
+        "Determine the length of the sorted list.",
+        "If the length is odd, return the middle element.",
+        "If the length is even, return the average of the two middle elements."
+      ],
+      "tools": [
+        "ma4.static_check",
+        "ma4.import_smoke",
+        "ma4.run_tests"
+      ]
+    },
+    {
+      "id": "27288db5-07b0-43c8-bd1f-a4ce6ceb53db",
+      "name": "caesar-shift-procedure",
+      "task": "tr-caesar",
+      "trial": 1,
+      "state": "rejected",
+      "screen": "candidate cap reached",
+      "categories": [
+        "algorithm"
+      ],
+      "roles": [
+        "Planner",
+        "Worker",
+        "Tester"
+      ],
+      "procedure": [
+        "Initialize an empty list to store the result characters.",
+        "Iterate through each character in the input text.",
+        "Check if the character is an alphabet letter.",
+        "If it is, determine the base ASCII value ('a' for lowercase, 'A' for uppercase).",
+        "Calculate the shifted ASCII value using the formula: (ord(c) - base + shift) % 26 + base.",
+        "Convert the shifted ASCII value back to a character and append it to the result list. If not a letter, append the character as is."
+      ],
+      "tools": [
+        "ma4.static_check",
+        "ma4.import_smoke",
+        "ma4.run_tests"
+      ]
+    },
+    {
+      "id": "cea87647-89d7-4152-9106-c5813de94518",
+      "name": "caesar-shift-procedure",
+      "task": "tr-caesar",
+      "trial": 2,
+      "state": "rejected",
+      "screen": "duplicate name",
+      "categories": [
+        "algorithm",
+        "string-processing"
+      ],
+      "roles": [
+        "Planner",
+        "Worker",
+        "Tester"
+      ],
+      "procedure": [
+        "Initialize an empty list to store the shifted characters.",
+        "Iterate through each character in the input text.",
+        "Check if the character is an alphabet letter.",
+        "If it is, determine the base ('a' or 'A') based on the case of the character.",
+        "Calculate the shifted character using the formula: (ord(c) - ord(base) + shift) % 26 + ord(base).",
+        "Append the shifted character to the result list. If it's not a letter, append the original character."
+      ],
+      "tools": [
+        "ma4.static_check",
+        "ma4.import_smoke",
+        "ma4.run_tests"
+      ]
+    }
+  ],
+  "summary": {
+    "byArm": {
+      "B": {
+        "trials": 16,
+        "passed": 9,
+        "passInterval": [
+          0.3317819560677652,
+          0.7690163666481448
+        ],
+        "firstAttempt": 7,
+        "byKind": {
+          "strict": "2/4",
+          "simple": "1/2",
+          "intermediate": "2/4",
+          "debugging": "4/4",
+          "planning": "0/2"
+        },
+        "statuses": {
+          "passed": 9,
+          "failed": 7
+        },
+        "repairsUsed": 15,
+        "passedAfterRepair": 2,
+        "modelCalls": 93,
+        "promptTokens": 67584,
+        "outputTokens": 28427,
+        "truncated": 1,
+        "modelLoads": 48,
+        "modelSwitches": 32,
+        "peakConcurrent": 1,
+        "callLatencyMs": {
+          "median": 17158,
+          "p95": 44872
+        },
+        "trialMs": {
+          "total": 2068580,
+          "median": 140064
+        },
+        "failureCategories": {
+          "test_invalid": 6,
+          "dependency_violation": 3,
+          "implementation_defect": 17
+        },
+        "reviewerFalseApprovals": 0,
+        "guidanceShown": 0,
+        "skillsUsed": 0,
+        "handoffs": 172,
+        "handoffsRefused": 0,
+        "invariants": {
+          "pinsHeld": true,
+          "gateIsAuthority": true,
+          "noHandoffRefused": true
+        }
+      }
+    },
+    "externalRequestsRefused": 0,
+    "memoryWaitSamples": 0,
+    "minFreeGiB": 7.58,
+    "ledger": {
+      "id": "s2-discover",
+      "state": "completed",
+      "persisted": true,
+      "counts": {
+        "done": 16
+      },
+      "attempts": 16
+    }
+  },
+  "skillsAtEnd": [
+    {
+      "id": "27288db5-07b0-43c8-bd1f-a4ce6ceb53db",
+      "name": "caesar-shift-procedure",
+      "version": 1,
+      "state": "rejected"
+    },
+    {
+      "id": "cea87647-89d7-4152-9106-c5813de94518",
+      "name": "caesar-shift-procedure",
+      "version": 2,
+      "state": "rejected"
+    },
+    {
+      "id": "c69d6cfe-6c1a-4858-ba61-442176137dd4",
+      "name": "calculate-median",
+      "version": 1,
+      "state": "candidate"
+    },
+    {
+      "id": "871ea9a5-c919-4c37-bb7a-722ab18113d7",
+      "name": "compute-median",
+      "version": 1,
+      "state": "candidate"
+    },
+    {
+      "id": "87a6e429-6db0-4cd4-bddd-92b87e2dc017",
+      "name": "merge-intervals-procedure",
+      "version": 1,
+      "state": "candidate"
+    },
+    {
+      "id": "093ac0fc-4e32-44f2-8a80-c86081d6ef56",
+      "name": "parse-csv-line",
+      "version": 1,
+      "state": "candidate"
+    },
+    {
+      "id": "9074bbd4-ae5e-4863-96bd-36a7150064b4",
+      "name": "parse-date-procedure",
+      "version": 1,
+      "state": "candidate"
+    },
+    {
+      "id": "a8467799-6f8a-4931-9a28-7299f5d5ab8c",
+      "name": "parse-date-procedure",
+      "version": 2,
+      "state": "rejected"
+    },
+    {
+      "id": "3b6999ed-7583-43ca-aab9-ca05975ace17",
+      "name": "slugify",
+      "version": 1,
+      "state": "candidate"
+    }
+  ],
+  "finishedAt": "2026-10-23T03:49:22.977Z"
+}

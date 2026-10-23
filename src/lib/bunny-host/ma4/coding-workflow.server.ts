@@ -18,6 +18,8 @@ import type { SandboxRequest, SandboxResult } from "./sandbox.server.ts";
 import type { ActionManifest, PermissionDecision } from "../../bunny-missions/types.ts";
 import { decide } from "../../bunny-missions/authorization.server.ts";
 import { buildTaskGraph, profileCodingTask, workerSamplesFor, type TaskGraph, type TaskProfile } from "./task-intelligence.ts";
+import type { CoordinatorChannel } from "./coordinator.ts";
+import { requirementsHash, type Capability, type S2Role } from "./collaboration.ts";
 
 const line = (max = 300) => z.string().min(1).max(max);
 // Module names only; enforced at decode time (Ollama honours `pattern`), so prose like "re (regex module)" cannot be emitted.
@@ -67,8 +69,16 @@ export type WorkflowStrategy = {
   workerSamples: number | "adaptive";
   sampling: Partial<Record<Role | "WorkerSample" | "Repair", Sampling>>;
   maxToolCalls: number;
+  /** S2: "grouped" draws the Worker samples, then the Tester (no two models in flight). Absent = S1R3/S1R4 parallel pair. */
+  schedule?: "parallel" | "grouped";
 };
 export const STRATEGY_S1R3: WorkflowStrategy = Object.freeze({ id: "s1r3", transport: "json", workerSamples: 1, sampling: {}, maxToolCalls: 200 });
+/** MA4-S2: the S1R4 v3c strategy unchanged except the memory-aware, model-grouped schedule. */
+export const STRATEGY_S2: WorkflowStrategy = Object.freeze({
+  id: "s2-v1", transport: "fenced", workerSamples: "adaptive", schedule: "grouped",
+  sampling: { Planner: { temperature: 0.2 }, Worker: { temperature: 0.2, numPredict: 2048 }, WorkerSample: { temperature: 0.8, numPredict: 2048 }, Tester: { temperature: 0.2, numPredict: 3072 }, Repair: { temperature: 0.6, numPredict: 3072 }, Reviewer: { temperature: 0.2 } },
+  maxToolCalls: 60,
+});
 export const STRATEGY_S1R4: WorkflowStrategy = Object.freeze({
   id: "s1r4-v3c", transport: "fenced", workerSamples: "adaptive",
   sampling: { Planner: { temperature: 0.2 }, Worker: { temperature: 0.2, numPredict: 2048 }, WorkerSample: { temperature: 0.8, numPredict: 2048 }, Tester: { temperature: 0.2, numPredict: 3072 }, Repair: { temperature: 0.6, numPredict: 3072 }, Reviewer: { temperature: 0.2 } },
@@ -78,7 +88,7 @@ export const STRATEGY_S1R4: WorkflowStrategy = Object.freeze({
 export type FailureCategory =
   | "schema_error" | "plan_invalid" | "implementation_invalid" | "dependency_violation" | "implementation_defect" | "test_invalid"
   | "ambiguous" | "reviewer_false_approval" | "unsupported_capability" | "timeout" | "model_error" | "pin_violation" | "sandbox_failure"
-  | "tool_failure" | "resource_exhaustion";
+  | "tool_failure" | "resource_exhaustion" | "handoff_refused";
 export type Component = "planner" | "worker" | "tester" | "reviewer" | "router" | "infrastructure" | "none";
 /** Structured failure attribution (one per distinct cause). `verified` = decided by a deterministic oracle. */
 export type FailureRecord = {
@@ -110,13 +120,19 @@ export type AttemptRecord = {
   failures: FailureRecord[]; repaired: Role[]; feedback?: string;
 };
 export type WorkflowResult = {
-  taskId: string; status: "passed" | "failed" | "malformed_artifact" | "pin_violation" | "model_error" | "cancelled" | "sandbox_error";
+  taskId: string; status: "passed" | "failed" | "malformed_artifact" | "pin_violation" | "model_error" | "cancelled" | "sandbox_error" | "handoff_refused";
   reason: string; attempts: AttemptRecord[]; repairsUsed: number; calls: { role: Role; model: string; attempt: number; ok: boolean; durationMs: number; startedAt: number; endedAt: number; servedModel?: string }[];
   reviewer: { verdict: ReviewerArtifact["verdict"]; confidence: number; findings: number } | null; reviewerFalseApproval: boolean; reviewerFalseRejection: boolean;
   workerTesterConcurrent: boolean; finalSource: string | null; finalTests: string | null;
   contractVersion: string | null; failures: FailureRecord[]; repairs: RepairRecord[]; artifacts: ArtifactRecord[];
   strategy: string; profile: TaskProfile | null; graph: TaskGraph | null; candidates: CandidateRecord[]; toolReceipts: ToolReceipt[];
+  /** S2 only: the advisory guidance actually shown (hash and size, never the text), per role and phase. */
+  guidance?: GuidanceRecord[];
 };
+export type GuidanceRequest = { role: Role; phase: "attempt" | "repair"; categories: FailureCategory[] };
+/** Advisory text (rendered by the caller from verified memory/skills) and the ids it came from. Empty text = none. */
+export type Guidance = (request: GuidanceRequest) => { text: string; sources: string[] };
+export type GuidanceRecord = GuidanceRequest & { sha256: string; chars: number; sources: string[] };
 
 /** What one evaluation observed; the input of the pure attribution step. `oracle` = Tester tests run against the frozen reference. */
 export type AttemptObservation = {
@@ -237,6 +253,10 @@ const ACTION_OF: Record<Component, FailureRecord["recommendedAction"]> = { plann
 export async function runCodingWorkflow(task: CodingTask, deps: {
   call: ModelCall; sandbox: Sandbox; pins: Record<Role, string>; maxRepairs?: number; signal?: AbortSignal; onEvent?: (event: string) => void;
   strategy?: WorkflowStrategy; authorize?: Authorize;
+  /** S2: every transfer between roles is a protocol message admitted by the Coordinator; a refusal ends the run. */
+  channel?: CoordinatorChannel;
+  /** S2 arm C: verified procedures shown to a role as a labelled advisory block. Absent = prompts are unchanged. */
+  guidance?: Guidance;
 }): Promise<WorkflowResult> {
   if (!/^[a-z_][a-z0-9_]{0,40}$/.test(task.module)) throw new Error("Task module must be a plain Python identifier.");
   const signal = deps.signal ?? new AbortController().signal;
@@ -261,6 +281,20 @@ export async function runCodingWorkflow(task: CodingTask, deps: {
     return done(status, reason);
   };
   const isResult = (x: unknown): x is WorkflowResult => x === result;
+  // S2: hub-and-spoke protocol. Every transfer between roles is a message the Coordinator must admit; a refusal ends the run.
+  const handoff = (from: S2Role, to: S2Role, subtask: string, capabilities: Capability[], content: string, kind: "plan" | "source" | "tests" | "review" | "contract" | null, trust: "host" | "model", modelCalls = 0): WorkflowResult | null => {
+    if (!deps.channel) return null;
+    const artifacts = kind ? [{ kind, ...deps.channel.register(content) }] : [];
+    const a = deps.channel.send(from, to, subtask, { requirementsSha256: requirementsHash(task), capabilities, content: clip(content, 19_000), artifacts, trust, validation: trust === "host" ? "verified" : "schema-valid", cost: { modelCalls } });
+    return a.ok ? null : terminal(Math.max(0, result.attempts.length - 1), "infrastructure", "handoff_refused", "router", "handoff_refused", `Handoff ${from} → ${to} refused: ${a.reason}`);
+  };
+  /** Advisory guidance for one role and phase; recorded by hash. Empty unless the caller supplies verified guidance. */
+  const guidanceFor = (role: Role, phase: GuidanceRequest["phase"], categories: FailureCategory[] = []) => {
+    const g = deps.guidance?.({ role, phase, categories });
+    if (!g?.text) return "";
+    (result.guidance ??= []).push({ role, phase, categories, sha256: sha256(g.text), chars: g.text.length, sources: g.sources });
+    return `\n${g.text}`;
+  };
   let contractVersion = `task:${sha256(task.spec).slice(0, 16)}`;
   type Asked<T> = { ok: true; data: T } | { ok: false; issue: string };
   /** One model call. Terminal problems (pin, model, cancellation) end the workflow; a malformed artifact is returned for repair. */
@@ -306,14 +340,17 @@ export async function runCodingWorkflow(task: CodingTask, deps: {
   const allowedForPlan = new Set([...task.allowedImports, task.module, "unittest"]);
   const plannerBase = `You are the Planner agent. Task: ${task.spec}\nThe implementation is a Python module named ${task.module} (file ${task.module}.py). Allowed imports: ${task.allowedImports.join(", ") || "none"}.\nReturn JSON with requirements, plan (short steps), acceptance (checkable conditions), constraints and dependencies (module names only, each from the allowed imports).`;
   let planner: PlannerArtifact | null = null;
+  const toPlanner = handoff("Coordinator", "Planner", "plan", ["planning"], task.spec, "contract", "host", 1);
+  if (toPlanner) return toPlanner;
+  const plannerGuide = guidanceFor("Planner", "attempt");
   for (let feedback = ""; ;) {
-    const r = await ask("Planner", plannerBase + feedback, PlannerArtifactSchema, result.repairsUsed, { sampling: strategy.sampling.Planner });
+    const r = await ask("Planner", plannerBase + plannerGuide + feedback, PlannerArtifactSchema, result.repairsUsed, { sampling: strategy.sampling.Planner });
     if (isResult(r)) return r;
     const bad = r.ok ? r.data.dependencies.filter(d => !allowedForPlan.has(d.split(".")[0])) : [];
     const record = !r.ok ? schemaFailure(result.repairsUsed, "Planner", r.issue, "planning")
       : bad.length ? fail(result.repairsUsed, { failingStage: "planning", failureCategory: "plan_invalid", suspectedComponent: "planner", evidence: [`dependencies outside the allowed imports: ${bad.join(", ")}`], confidence: "verified" }) : null;
     if (result.repairs.length) settle(result.repairsUsed, record ? [record] : []);
-    if (!record && r.ok) { planner = r.data; break; }
+    if (!record && r.ok) { planner = r.data; const back = handoff("Planner", "Coordinator", "plan", ["orchestration"], JSON.stringify(r.data), "plan", "model"); if (back) return back; break; }
     if (result.repairsUsed >= maxRepairs) return done(r.ok ? "failed" : "malformed_artifact", `Planner: ${record!.evidence[0]} (repair budget exhausted).`);
     result.repairsUsed++; spend(result.repairsUsed, "Planner", [record!]);
     feedback = `\nREPAIR ${result.repairsUsed} of ${maxRepairs}. Your previous plan was rejected: ${record!.evidence[0]}. Allowed imports: ${task.allowedImports.join(", ") || "none"}.`;
@@ -324,28 +361,39 @@ export async function runCodingWorkflow(task: CodingTask, deps: {
   result.contractVersion = contractVersion = `contract:${sha256(contractText).slice(0, 16)}`;
   // A debugging task describes the defect; the described wrong behaviour is the bug, never a requirement.
   const defectNote = (profile ?? profileCodingTask(task, { maxRepairs })).category === "debugging" ? " The task describes a defect: the wrong behaviour it describes is the bug to remove, not a requirement to keep or test." : "";
-  const workerPrompt = (extra = "") => fenced
-    ? `You are the Worker agent. Implement the task contract below as the complete source of ${contract.file}. Rules: only imports, definitions and constants at top level (no demo code, prints, input or tests); standard library only, limited to the allowed imports; implement every stated requirement; raise exactly the errors the contract states for the invalid inputs it lists, and add no validation or errors it does not ask for.${defectNote}\nCONTRACT:\n${contractText}${extra}\n${extra ? "First state in one or two sentences what the failing checks show is wrong" : "First write a short checklist of the required behaviours (and of the invalid inputs, only if the contract lists any), one line each"}; then give the complete file in a single \`\`\`python code block.`
+  const workerPrompt = (extra = "", guide = "") => fenced
+    ? `You are the Worker agent. Implement the task contract below as the complete source of ${contract.file}. Rules: only imports, definitions and constants at top level (no demo code, prints, input or tests); standard library only, limited to the allowed imports; implement every stated requirement; raise exactly the errors the contract states for the invalid inputs it lists, and add no validation or errors it does not ask for.${defectNote}\nCONTRACT:\n${contractText}${guide}${extra}\n${extra ? "First state in one or two sentences what the failing checks show is wrong" : "First write a short checklist of the required behaviours (and of the invalid inputs, only if the contract lists any), one line each"}; then give the complete file in a single \`\`\`python code block.`
     : `You are the Worker agent. Implement the task contract below as the complete source of ${contract.file}. Only definitions at top level (no demo code, prints or input at import time). Standard library only, limited to the allowed imports.\nCONTRACT:\n${contractText}${extra}\nReturn JSON: source (the full file text), notes, dependencies (module names imported), files (["${contract.file}"]).`;
-  const testerPrompt = (extra = "") => fenced
-    ? `You are the Tester agent. Write a Python unittest module for the task contract below, without seeing any implementation. It must start with:\nimport unittest\nfrom ${task.module} import *\nTest only behaviour the contract states explicitly: use the examples given in the task text, and for every invalid-input class the contract lists, check the stated error. Do not test inputs whose result the contract does not determine. Write one test method per case (one assertion each), so each case passes or fails on its own. Derive every expected value from the contract text and double-check the arithmetic.${defectNote} Imports are limited to unittest, ${task.module} and the allowed imports.\nCONTRACT:\n${contractText}${extra}\n${extra ? "First state in one or two sentences which of your tests contradict the contract and why" : "First list each case you will test with its expected result as the contract determines it, one line each"}; then give the complete test file in a single \`\`\`python code block.`
+  const testerPrompt = (extra = "", guide = "") => fenced
+    ? `You are the Tester agent. Write a Python unittest module for the task contract below, without seeing any implementation. It must start with:\nimport unittest\nfrom ${task.module} import *\nTest only behaviour the contract states explicitly: use the examples given in the task text, and for every invalid-input class the contract lists, check the stated error. Do not test inputs whose result the contract does not determine. Write one test method per case (one assertion each), so each case passes or fails on its own. Derive every expected value from the contract text and double-check the arithmetic.${defectNote} Imports are limited to unittest, ${task.module} and the allowed imports.\nCONTRACT:\n${contractText}${guide}${extra}\n${extra ? "First state in one or two sentences which of your tests contradict the contract and why" : "First list each case you will test with its expected result as the contract determines it, one line each"}; then give the complete test file in a single \`\`\`python code block.`
     : `You are the Tester agent. Write a Python unittest module for the task contract below, without seeing any implementation. It must start with: import unittest\nfrom ${task.module} import *\nCover normal cases, edge cases and the required errors. Imports are limited to unittest, ${task.module} and the allowed imports.\nCONTRACT:\n${contractText}${extra}\nReturn JSON: tests_source (the full test file), cases (name and expected behaviour of each), rationale.`;
   type WorkerData = Pick<WorkerArtifact, "source"> & Partial<WorkerArtifact>;
   type TesterData = Pick<TesterArtifact, "tests_source"> & Partial<TesterArtifact>;
-  const askWorker = (extra: string, attempt: number, sampling?: Sampling) => ask<WorkerData>("Worker", workerPrompt(extra), fenced ? FencedWorkerSchema : WorkerArtifactSchema, attempt, { sampling, ...(fenced ? { fenced: "source" as const } : {}) });
-  const askTester = (extra: string, attempt: number, sampling?: Sampling) => ask<TesterData>("Tester", testerPrompt(extra), fenced ? FencedTesterSchema : TesterArtifactSchema, attempt, { sampling, ...(fenced ? { fenced: "tests_source" as const } : {}) });
+  const askWorker = (extra: string, attempt: number, sampling?: Sampling, guide = "") => ask<WorkerData>("Worker", workerPrompt(extra, guide), fenced ? FencedWorkerSchema : WorkerArtifactSchema, attempt, { sampling, ...(fenced ? { fenced: "source" as const } : {}) });
+  const askTester = (extra: string, attempt: number, sampling?: Sampling, guide = "") => ask<TesterData>("Tester", testerPrompt(extra, guide), fenced ? FencedTesterSchema : TesterArtifactSchema, attempt, { sampling, ...(fenced ? { fenced: "tests_source" as const } : {}) });
 
+  for (const [to, capability, n] of [["Worker", "code-generation", samples], ["Tester", "test-generation", 1]] as const) {
+    const out = handoff("Coordinator", to, to === "Worker" ? "implement" : "test", [capability], contractText, "contract", "host", n);
+    if (out) return out;
+  }
+  const workerGuide = guidanceFor("Worker", "attempt"), testerGuide = guidanceFor("Tester", "attempt");
   // Worker ∥ Tester as in S1R3; extra samples run afterwards, so no request queues behind more than one other.
-  const pair = await Promise.all([askWorker("", result.repairsUsed, strategy.sampling.Worker), askTester("", result.repairsUsed, strategy.sampling.Tester)]);
-  const first: (Asked<WorkerData> | Asked<TesterData> | WorkflowResult)[] = [pair[0]];
-  for (let i = 1; i < samples && !pair.some(isResult); i++) { const x = await askWorker("", result.repairsUsed, strategy.sampling.WorkerSample); first.push(x); if (isResult(x)) break; }
-  first.push(pair[1]);
+  // S2 "grouped": all Worker samples first, then the Tester, so two different models are never in flight together.
+  const grouped = strategy.schedule === "grouped";
+  const pair: (Asked<WorkerData> | Asked<TesterData> | WorkflowResult | null)[] = grouped
+    ? [await askWorker("", result.repairsUsed, strategy.sampling.Worker, workerGuide), null]
+    : await Promise.all([askWorker("", result.repairsUsed, strategy.sampling.Worker, workerGuide), askTester("", result.repairsUsed, strategy.sampling.Tester, testerGuide)]);
+  const first: (Asked<WorkerData> | Asked<TesterData> | WorkflowResult)[] = [pair[0]!];
+  for (let i = 1; i < samples && !pair.some(isResult); i++) { const x = await askWorker("", result.repairsUsed, strategy.sampling.WorkerSample, workerGuide); first.push(x); if (isResult(x)) break; }
+  first.push(pair[1] ?? (first.some(isResult) ? result : await askTester("", result.repairsUsed, strategy.sampling.Tester, testerGuide)));
   const w = result.calls.find(c => c.role === "Worker"), t = result.calls.find(c => c.role === "Tester");
   // In flight at the same time (the runtime may still serialize generation internally).
   result.workerTesterConcurrent = !!w && !!t && w.startedAt < t.endedAt && t.startedAt < w.endedAt;
   for (const x of first) if (isResult(x)) return x;
   const workerSamples = first.slice(0, samples) as Asked<WorkerData>[];
   let workerReply = workerSamples[0], testerReply = first[samples] as Asked<TesterData>;
+  for (const x of workerSamples) if (x.ok) { const back = handoff("Worker", "Coordinator", "implement", ["orchestration"], x.data.source, "source", "model"); if (back) return back; }
+  if (testerReply.ok) { const back = handoff("Tester", "Coordinator", "test", ["orchestration"], testerReply.data.tests_source, "tests", "model"); if (back) return back; }
 
   let toolCalls = 0;
   /** Every deterministic tool goes through the permission broker, is counted against a budget and leaves a receipt. */
@@ -471,10 +519,22 @@ export async function runCodingWorkflow(task: CodingTask, deps: {
       // Repair: original contract, the target's own attributed failures, its previous artifact and limits. Tests never see the implementation.
       const recheck = fenced ? "\nBefore rewriting, re-check every requirement and every listed invalid input of the contract one by one; keep what already works." : "";
       const sampling = strategy.sampling.Repair;
+      // S2 experience-guided repair: verified procedures matched to this target's attributed failure categories.
+      const repairGuide: Partial<Record<Role, string>> = Object.fromEntries(targets.map(target => [target, guidanceFor(target, "repair", [...new Set(record.failures.filter(f => ROLE_OF[f.suspectedComponent] === target).map(f => f.failureCategory))])]));
+      for (const target of targets) {
+        const out = handoff("Coordinator", target, "repair", [target === "Worker" ? "code-generation" : target === "Tester" ? "test-generation" : "planning"], (target === "Worker" ? wFeedback : tFeedback) || "(malformed artifact)", null, "host", 1);
+        if (out) return out;
+      }
       const repaired = await Promise.all(targets.map(target => target === "Worker"
-        ? askWorker(`\nREPAIR ${round} of ${maxRepairs}. Your previous implementation failed deterministic checks.\nFAILURES:\n${wFeedback}\nPREVIOUS IMPLEMENTATION:\n${clip(source ?? "(none)", 8000)}\nLimits: standard library only (allowed imports above), no I/O, the module must import cleanly.${recheck}`, round, sampling)
-        : askTester(`\nREPAIR ${round} of ${maxRepairs}. Some of your tests are invalid: they break the import policy, cannot load, or contradict the frozen task contract. Keep the valid tests, fix or remove the invalid ones, and keep covering every required behaviour. Do not weaken checks the contract requires.\nINVALID:\n${tFeedback}\nPREVIOUS TESTS:\n${clip(tests ?? "(none)", 6000)}`, round, sampling)));
+        ? askWorker(`\nREPAIR ${round} of ${maxRepairs}. Your previous implementation failed deterministic checks.\nFAILURES:\n${wFeedback}\nPREVIOUS IMPLEMENTATION:\n${clip(source ?? "(none)", 8000)}\nLimits: standard library only (allowed imports above), no I/O, the module must import cleanly.${recheck}${repairGuide.Worker ?? ""}`, round, sampling)
+        : askTester(`\nREPAIR ${round} of ${maxRepairs}. Some of your tests are invalid: they break the import policy, cannot load, or contradict the frozen task contract. Keep the valid tests, fix or remove the invalid ones, and keep covering every required behaviour. Do not weaken checks the contract requires.\nINVALID:\n${tFeedback}\nPREVIOUS TESTS:\n${clip(tests ?? "(none)", 6000)}${repairGuide.Tester ?? ""}`, round, sampling)));
       for (const x of repaired) if (isResult(x)) return x;
+      for (const [i, target] of targets.entries()) {
+        const reply = repaired[i] as Asked<WorkerData> | Asked<TesterData>;
+        if (!reply.ok) continue;
+        const back = handoff(target, "Coordinator", "repair", ["orchestration"], "source" in reply.data ? reply.data.source : reply.data.tests_source, target === "Worker" ? "source" : "tests", "model");
+        if (back) return back;
+      }
       let productive = false;
       targets.forEach((target, i) => {
         const reply = repaired[i] as Asked<WorkerData> | Asked<TesterData>;
@@ -500,10 +560,14 @@ export async function runCodingWorkflow(task: CodingTask, deps: {
   if (malformed) return done("malformed_artifact", `${malformed.evidence[0]} (repair budget exhausted).`);
   const testsText = testerReply.ok ? stripFence(testerReply.data.tests_source) : "";
   const summary = { static: final.static, hiddenAcceptance: final.hidden.passed ? "passed" : "failed", tester: final.tester };
+  const toReviewer = handoff("Coordinator", "Reviewer", "review", ["review"], result.finalSource ?? "", "source", "host", 1);
+  if (toReviewer) return toReviewer;
   const review = await ask("Reviewer", `You are the Reviewer agent. Review the final implementation and tests against the contract and the deterministic check results. Your verdict is advisory: it cannot change failing checks.\nCONTRACT:\n${contractText}\nIMPLEMENTATION:\n${clip(result.finalSource ?? "", 8000)}\nTESTS:\n${clip(testsText, 6000)}\nCHECK RESULTS:\n${JSON.stringify(summary)}\nReturn JSON: verdict (approve or reject), findings (severity, issue, recommendation, evidence), confidence 0..1.`, ReviewerArtifactSchema, result.attempts.length, { sampling: strategy.sampling.Reviewer });
   if (isResult(review)) return review;
   // A malformed review fails closed: the Reviewer is outside the repair loop and a missing review is missing evidence.
   if (!review.ok) { schemaFailure(final.attempt, "Reviewer", review.issue, "review"); return done("malformed_artifact", review.issue); }
+  const fromReviewer = handoff("Reviewer", "Coordinator", "review", ["orchestration"], JSON.stringify(review.data), "review", "model");
+  if (fromReviewer) return fromReviewer;
   result.reviewer = { verdict: review.data.verdict, confidence: review.data.confidence, findings: review.data.findings.length };
   result.reviewerFalseApproval = review.data.verdict === "approve" && !final.accepted;
   result.reviewerFalseRejection = review.data.verdict === "reject" && final.accepted;
