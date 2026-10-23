@@ -7,9 +7,9 @@ REPOSITORY
   Base commit:            e5006c5 (merge of PR #14 into ma4-s1r3-agent-reliability; hosted CI run 39866800595 green;
                           contains no G7C cloud harness — PRs #15/#16 are not a dependency)
   Implementation branch:  ma4-s2-adaptive-agent-intelligence (worktree ../bun-router-s2, own node_modules)
-  Final commit:           FINAL_COMMIT
-  PR:                     PR_LINE
-  Hosted CI:              CI_LINE
+  Final commit:           ecdf84e (last code+evidence commit, hosted CI green); later commits are docs only
+  PR:                     #17 (draft, not merged) https://github.com/COMRADEART/bunny-A/pull/17, base ma4-s1r3-agent-reliability
+  Hosted CI:              run 39918572857 (pull_request, ecdf84e): all three jobs SUCCESS; push run 39918538258 SUCCESS
 
 AGENT INTELLIGENCE
   Collaboration protocol: typed, versioned handoff (bunny-a.ma4-s2.handoff.v1), strict schema; hub-and-spoke through a
@@ -91,12 +91,12 @@ RELEASE
   Desktop build:          pass (JEV_DESKTOP_BUILD=1)
   Mobile build:           mobile-web build pass (automated web build only)
   Dependency audit:       0 vulnerabilities (prod and all); package-lock.json unchanged from base
-  Hosted CI:              CI_SHORT
+  Hosted CI:              SUCCESS — run 39918572857 at ecdf84e (security; typecheck/MA4/UI/builds; full regression). WSL2 adversarial sandbox not available on hosted runners (reported SKIPPED there; 13/13 locally)
   Windows installed release: NOT TESTED
   Physical mobile qualification: NOT TESTED
 
 GATES
-  Passed:   S2-G1, G2, G3, G4, G5, G6, G7, G8, G9, G10, G11, G12, G13, GATES_TAIL
+  Passed:   S2-G1, G2, G3, G4, G5, G6, G7, G8, G9, G10, G11, G12, G13, G14, G15 (all 15)
   Failed:   none of the functional/safety gates; the pre-registered QUALITY criterion is NOT MET
   Partial:  none
   Blocked:  none
@@ -129,8 +129,8 @@ forbids task-specific algorithms, and a larger qualification split with a minimu
 | S2-G11 hard-pin, privacy and sandbox gates pass | PASS — sandbox 13/13 live | [SECURITY_VALIDATION](SECURITY_VALIDATION.md) |
 | S2-G12 cloud inference disabled | PASS — 0 external requests | same |
 | S2-G13 regression, UI, typecheck, builds | PASS — one pre-existing flaky cleanup disclosed | `evidence/regression-full.log`, `ui.log`, `typecheck.log`, `build-*.log` |
-| S2-G14 hosted CI | G14_STATUS | G14_EVIDENCE |
-| S2-G15 draft PR and evidence published | G15_STATUS | G15_EVIDENCE |
+| S2-G14 hosted CI | PASS | run 39918572857 at `ecdf84e`, all jobs SUCCESS |
+| S2-G15 draft PR and evidence published | PASS | draft PR #17, `docs/ma4-s2/` (13 documents + evidence) |
 | **Pre-registered quality criterion** | **NOT MET** | INTELLIGENCE_EVALUATION §2.3 |
 
 ## Notes
