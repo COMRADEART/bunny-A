@@ -12,6 +12,10 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const placementPath = join(root, 'install', 'Bunny-Island.Placement.ps1');
 const skip = process.platform === 'win32' ? false : 'The Island is a Windows PowerShell surface';
 const task = (id, display, over = {}) => ({ id, title: `Task ${id}`, display, progress: { done: 1, total: 3 }, ...over });
+const NEXT = Date.UTC(2026, 9, 24, 18, 0);
+const sched = (state, over = {}) => ({ id: 's', title: 'Evening summary', state, nextAt: NEXT, runningTaskId: null, ...over });
+const pro = (status) => ({ status: { monitoring: 0, scheduled: 0, working: 0, waiting: 0, attention: 0, nextRunAt: NEXT, ...status }, goals: [],
+  schedules: [sched('ACTIVE')], monitors: [{ id: 'm', label: 'Build status', state: 'ACTIVE', lastCheckAt: NEXT }, { id: 'n', label: 'Docs', state: 'ACTIVE', lastCheckAt: null }], away: null });
 
 const cases = {
   empty: { snapshot: null, online: true },
@@ -23,6 +27,13 @@ const cases = {
   offline: { snapshot: { tasks: [task('a', 'Working')] }, online: false },
   // MA4-S2-T2: connected steps report what they are doing; the tooltip says so, the cell and headline rules are unchanged.
   connected: { snapshot: { tasks: [task('f', 'Working', { activity: 'Reading files' }), task('e', 'Waiting for approval', { activity: 'Waiting for permission' }), task('g', 'Working', { activity: null })] }, online: true },
+  // MA4-S2-T3: proactive facts. Monitoring and Scheduled are muted and rank below every task state; approvals outrank work.
+  monitoringOnly: { snapshot: null, online: true, proactive: pro({ monitoring: 2, scheduled: 1 }) },
+  scheduledOnly: { snapshot: { tasks: [] }, online: true, proactive: { ...pro({ scheduled: 1 }), monitors: [] } },
+  approvalOverWork: { snapshot: { tasks: [task('a', 'Working')] }, online: true, proactive: { ...pro({ waiting: 1 }), schedules: [sched('AWAITING_APPROVAL')] } },
+  workWithMonitor: { snapshot: { tasks: [task('a', 'Working')] }, online: true, proactive: pro({ monitoring: 1 }) },
+  away: { snapshot: null, online: true, proactive: { ...pro({ monitoring: 1 }), away: { since: 0, text: '2 scheduled tasks completed' } } },
+  proactiveOffline: { snapshot: null, online: false, proactive: { ...pro({ monitoring: 1 }), away: { since: 0, text: 'x' } } },
 };
 
 function run() {
@@ -34,7 +45,7 @@ function run() {
 . $Placement
 $all = Get-Content -LiteralPath $In -Raw | ConvertFrom-Json
 $result = @{}
-foreach ($p in $all.PSObject.Properties) { $result[$p.Name] = Get-BunnyTaskStrip $p.Value.snapshot ([bool]$p.Value.online) }
+foreach ($p in $all.PSObject.Properties) { $result[$p.Name] = Get-BunnyTaskStrip $p.Value.snapshot ([bool]$p.Value.online) $p.Value.proactive }
 $h = Get-BunnyPlacement -Edge 'top' -WorkArea @{ Left = 0; Top = 0; Width = 1920; Height = 1040 } -Size @{ Width = 360; Height = 76 }
 $v = Get-BunnyPlacement -Edge 'left' -WorkArea @{ Left = 0; Top = 0; Width = 1920; Height = 1040 } -Size @{ Width = 360; Height = 76 }
 $result['horizontal'] = Get-BunnyIndicatorLayout -Placement $h -AgentCount 3
@@ -65,11 +76,28 @@ test('S2-T1 notch: one cell for open tasks, urgent state first, one entry per ta
   assert.equal(f.vertical.Side, 'top'); assert.equal(f.vertical.Axis, 'column');
 });
 
+test('S2-T3 notch: monitoring and schedules are shown truthfully, never as work; approvals lead; away summary', { skip }, () => {
+  const f = run(), hhmm = new Date(NEXT).toTimeString().slice(0, 5);
+  assert.equal(f.monitoringOnly.Lead, 'Monitoring'); assert.equal(f.monitoringOnly.Headline, 'Monitoring 2'); assert.equal(f.monitoringOnly.Tone, 'BunnyMuted');
+  assert.equal(f.monitoringOnly.Count, 3); assert.deepEqual(f.monitoringOnly.Ids, [], 'no task ids for proactive lines');
+  assert.match(f.monitoringOnly.ToolTip, new RegExp(`Monitor: Build status - Monitoring, checked ${hhmm}`));
+  assert.match(f.monitoringOnly.ToolTip, new RegExp(`Schedule: Evening summary - Scheduled, next ${hhmm}`));
+  assert.equal(f.scheduledOnly.Lead, 'Scheduled'); assert.equal(f.scheduledOnly.Headline, `Next run ${hhmm}`); assert.equal(f.scheduledOnly.Tone, 'BunnyMuted');
+  assert.equal(f.approvalOverWork.Lead, 'Waiting for approval'); assert.equal(f.approvalOverWork.Tone, 'BunnyWarning');
+  assert.match(f.approvalOverWork.ToolTip, /Schedule: Evening summary - Waiting for approval/);
+  assert.equal(f.workWithMonitor.Lead, 'Working', 'real work outranks monitoring'); assert.equal(f.workWithMonitor.Headline, '1 working');
+  assert.equal(f.away.Headline, 'While you were away'); assert.match(f.away.ToolTip, /While you were away: 2 scheduled tasks completed/);
+  assert.equal(f.proactiveOffline.Headline, 'Tasks: last known'); assert.doesNotMatch(f.proactiveOffline.ToolTip, /While you were away/);
+  assert.equal(f.empty.Count, 0, 'no proactive facts, no cell');
+});
+
 test('S2-T1 notch wiring: the strip counts the task cell and the idle status line shows the task headline', () => {
   const weapons = readFileSync(join(root, 'install', 'Bunny-Island.Weapons.ps1'), 'utf8');
   const voice = readFileSync(join(root, 'install', 'Bunny-Island.Voice.ps1'), 'utf8');
   assert.match(weapons, /function Get-BunnyStripCellCount \{[\s\S]*?Get-BunnyTaskStrip \$bunnySnapshot\.persistentTasks/);
   assert.match(weapons, /if \(\$tasks\.Count -gt 0\) \{ \$items \+= Get-BunnyTaskChip \$tasks \}/);
   assert.match(voice, /if \(\$TaskHeadline -and \$Headline -in @\('Ready', 'Voice is off'\)\) \{ return \$TaskHeadline \}/);
+  // MA4-S2-T3: every strip call site passes the Host's proactive facts.
+  for (const text of [weapons, voice]) assert.equal((text.match(/Get-BunnyTaskStrip \$bunnySnapshot\.persistentTasks \(\[bool\]\$bunnyOnline\) \$bunnySnapshot\.proactive/g) ?? []).length, text === weapons ? 2 : 1);
   for (const text of [weapons, voice, readFileSync(join(root, 'install', 'Bunny-Island.Placement.ps1'), 'utf8')]) assert.equal(/[^\x00-\x7F]/.test(text), false, 'Island scripts stay ASCII for Windows PowerShell 5.1');
 });

@@ -103,34 +103,65 @@ function Get-BunnyAgentChipFacts($Agent) {
 # entry per task id (a recovered task never gets a second badge); only open tasks count; the most urgent state leads.
 # Offline, the Island never presents a cached state as current: the headline says it is the last known state.
 $script:BunnyTaskOrder = @('Needs attention', 'Waiting for approval', 'Recovering', 'Working', 'Paused', 'Queued')
-$script:BunnyTaskTone = @{ 'Needs attention' = 'BunnyWarning'; 'Waiting for approval' = 'BunnyWarning'; 'Recovering' = 'BunnyAccent'; 'Working' = 'BunnyAccent'; 'Paused' = 'BunnyMuted'; 'Queued' = 'BunnyMuted' }
-function Get-BunnyTaskStrip($Snapshot, [bool]$Online = $true) {
+# MA4-S2-T3: Monitoring and Scheduled rank below every task state and are muted: watching a source or waiting for a time
+# is not work, so it never takes the accent colour of a working agent.
+$script:BunnyTaskTone = @{ 'Needs attention' = 'BunnyWarning'; 'Waiting for approval' = 'BunnyWarning'; 'Recovering' = 'BunnyAccent'; 'Working' = 'BunnyAccent'; 'Paused' = 'BunnyMuted'; 'Queued' = 'BunnyMuted'; 'Monitoring' = 'BunnyMuted'; 'Scheduled' = 'BunnyMuted' }
+function Format-BunnyClock($Ms) {
+  if ($null -eq $Ms) { return '' }
+  return [DateTimeOffset]::FromUnixTimeMilliseconds([int64]$Ms).LocalDateTime.ToString('HH:mm')
+}
+function Get-BunnyTaskStrip($Snapshot, [bool]$Online = $true, $Proactive = $null) {
   $none = @{ Count = 0; Lead = ''; Headline = ''; Tone = 'BunnyMuted'; ToolTip = ''; Ids = @() }
-  if (-not $Snapshot) { return $none }
   $seen = @{}; $open = @()
-  foreach ($task in @($Snapshot.tasks)) {
+  foreach ($task in @($(if ($Snapshot) { $Snapshot.tasks } else { @() }))) {
     if (-not $task -or -not $task.id -or $seen.ContainsKey([string]$task.id)) { continue }
     $seen[[string]$task.id] = $true
     if ([string]$task.display -in $script:BunnyTaskOrder) { $open += $task }
   }
-  if ($open.Count -eq 0) { return $none }
+  # MA4-S2-T3: the Host's proactive facts (approved schedules and monitors, goals that need the owner).
+  $pro = @(); $proLead = ''; $status = $null
+  if ($Proactive -and $Proactive.status) {
+    $status = $Proactive.status
+    foreach ($g in @($Proactive.goals)) { if ($g -and [string]$g.state -in @('NEEDS_ATTENTION', 'AWAITING_APPROVAL', 'PROPOSED')) { $pro += ('Goal: ' + [string]$g.title + ' - ' + $(if ([string]$g.state -eq 'NEEDS_ATTENTION') { 'Needs attention' } else { 'Waiting for approval' }) + ' - ' + [string]$g.progress.met + ' of ' + [string]$g.progress.total + ' met') } }
+    foreach ($sc in @($Proactive.schedules)) {
+      if (-not $sc) { continue }
+      if ([string]$sc.state -eq 'AWAITING_APPROVAL') { $pro += ('Schedule: ' + [string]$sc.title + ' - Waiting for approval') }
+      elseif ([string]$sc.state -eq 'ACTIVE') { $pro += ('Schedule: ' + [string]$sc.title + ' - ' + $(if ($sc.runningTaskId) { 'Working' } elseif ($sc.nextAt) { 'Scheduled, next ' + (Format-BunnyClock $sc.nextAt) } else { 'Scheduled' })) }
+    }
+    foreach ($m in @($Proactive.monitors)) {
+      if (-not $m) { continue }
+      if ([string]$m.state -eq 'AWAITING_APPROVAL') { $pro += ('Monitor: ' + [string]$m.label + ' - Waiting for approval') }
+      elseif ([string]$m.state -eq 'ACTIVE') { $pro += ('Monitor: ' + [string]$m.label + ' - Monitoring' + $(if ($m.lastCheckAt) { ', checked ' + (Format-BunnyClock $m.lastCheckAt) } else { '' })) }
+    }
+    $proLead = if ([int]$status.attention -gt 0) { 'Needs attention' } elseif ([int]$status.waiting -gt 0) { 'Waiting for approval' } elseif ([int]$status.monitoring -gt 0) { 'Monitoring' } elseif ([int]$status.scheduled -gt 0) { 'Scheduled' } else { '' }
+  }
+  if ($open.Count -eq 0 -and -not $proLead) { return $none }
+  $order = @($script:BunnyTaskOrder) + @('Monitoring', 'Scheduled')
   $lead = ($script:BunnyTaskOrder | Where-Object { $state = $_; @($open | Where-Object { [string]$_.display -eq $state }).Count } | Select-Object -First 1)
+  if (-not $lead -or ($proLead -and $order.IndexOf($proLead) -lt $order.IndexOf([string]$lead))) { $lead = $proLead }
   $leadCount = @($open | Where-Object { [string]$_.display -eq $lead }).Count
   $headline = switch ($lead) {
     'Working' { [string]$leadCount + ' working' }
     'Queued' { [string]$leadCount + ' queued' }
+    'Monitoring' { 'Monitoring ' + [string]$status.monitoring }
+    'Scheduled' { if ($status.nextRunAt) { 'Next run ' + (Format-BunnyClock $status.nextRunAt) } else { [string]$status.scheduled + ' scheduled' } }
     default { $lead }
   }
-  $lines = foreach ($task in $open) {
+  $lines = @(foreach ($task in $open) {
     $line = [string]$task.title + ' - ' + [string]$task.display
     # MA4-S2-T2: a connected step's Host-reported activity ("Reading files", "Browsing", "Waiting for permission").
     if ($task.activity -and [string]$task.activity -ne [string]$task.display -and [string]$task.activity -notin @('Completed', 'Failed')) { $line += ' - ' + [string]$task.activity }
     if ($task.progress -and [int]$task.progress.total -gt 0) { $line += ' - step ' + [string]([int]$task.progress.done + [int]($task.display -eq 'Working')) + ' of ' + [string]$task.progress.total }
     $line
+  }) + $pro
+  # "While you were away": only what the Host recorded; when nothing urgent leads, the status line points to it.
+  if ($Online -and $Proactive -and $Proactive.away -and $Proactive.away.text) {
+    $lines += ('While you were away: ' + [string]$Proactive.away.text)
+    if ($lead -in @('Monitoring', 'Scheduled')) { $headline = 'While you were away' }
   }
   $tone = $script:BunnyTaskTone[$lead]
   if (-not $Online) { $headline = 'Tasks: last known'; $tone = 'BunnyMuted'; $lines = @('Host unavailable. Last known task states:') + @($lines) }
-  return @{ Count = $open.Count; Lead = $lead; Headline = $headline; Tone = $tone; ToolTip = (@($lines) -join "`n"); Ids = @($open | ForEach-Object { [string]$_.id }) }
+  return @{ Count = $open.Count + $pro.Count; Lead = $lead; Headline = $headline; Tone = $tone; ToolTip = (@($lines) -join "`n"); Ids = @($open | ForEach-Object { [string]$_.id }) }
 }
 
 # M-A-3 T13: pure geometry for drag-to-dock. Device pixels are converted to DIPs by the caller's scale (the monitor's

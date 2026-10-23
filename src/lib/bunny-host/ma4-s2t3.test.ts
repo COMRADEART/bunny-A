@@ -204,7 +204,7 @@ test("T3-S2 recurring scheduled summary: once per day, approved by the schedule,
   // The occurrence task's deadline is the run window, and the spec is otherwise exactly the approved template.
   const rec = p.rt.store.get(tasks[0].id).record;
   assert.equal(rec.spec.deadlineAt, Date.UTC(2026, 9, 24, 18, 0, 2) + HOUR, "the run window starts when the run starts");
-  assert.deepEqual({ ...rec.spec, deadlineAt: undefined }, { ...ScheduleSpecSchema.parse(schedule()).action.spec, deadlineAt: undefined } as never);
+  assert.deepEqual({ ...rec.spec, deadlineAt: undefined }, { ...(ScheduleSpecSchema.parse(schedule()).action as { spec: object }).spec, deadlineAt: undefined } as never);
 }));
 
 test("T3-S3 (adv 1) duplicate trigger after Host restart: one occurrence, one task", () => withRig(async p => {

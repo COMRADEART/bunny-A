@@ -50,6 +50,7 @@ import { isPrivateEvent } from "./motion-model";
 import { MissionsSection } from "./mission";
 import { AgentsSection } from "./agent";
 import { PersistentTasks } from "./ptasks";
+import { Proactive } from "./proactive";
 import { ActivityTimeline } from "./activity";
 
 const NAV = [
@@ -390,6 +391,7 @@ function Today({ now }: { now: number }) {
       <MissionsSection now={now} />
       <AgentsSection />
       <PersistentTasks />
+      <Proactive />
       <section className="today-section">
         <div className="section-heading">
           <h2 className="eyebrow">Active</h2>
