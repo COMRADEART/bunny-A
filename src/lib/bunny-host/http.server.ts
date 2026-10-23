@@ -3,7 +3,7 @@ import { DATA_CATEGORIES, ROUTING_MODES } from "./ma4/hybrid.ts";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { HostDatabase } from "./persistence.server.ts";
 import { TaskManager, type ManagerOptions } from "./manager.server.ts";
 import { API_KEY_SHAPE } from "./jev-secrets.server.ts";
@@ -29,6 +29,7 @@ import { PersistentTaskRuntime, type RuntimeDeps } from "./ma4/task-runtime.serv
 import { TaskStore } from "./ma4/task-store.server.ts";
 import { productionTaskDeps } from "./ma4/task-executors.server.ts";
 import { PTASK_ACTIONS, PTASK_SAFE_ACTIONS, ptaskCommand } from "./ma4/task-commands.server.ts";
+import { connectedActions, type ConnectedOptions } from "./ma4/connected-actions.server.ts";
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
 import { SLOT_IDS, clean, isUserFacingAgent, projectPersonalAgents, type SlotId } from "./personal-agents.ts";
 import { WorkerStore } from "./workers.server.ts";
@@ -325,6 +326,8 @@ type HostOptions = {
     harnessProbe?: typeof probeHarness;
     /** MA4-S2-T1 test-only task executors and model seams (recorded fakes). Never reachable from HTTP. */
     ptasks?: Partial<Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "leaseMs" | "maintenanceMs">>;
+    /** MA4-S2-T2 test-only connected-action seams (loopback synthetic sites, recorded synthetic services). Never reachable from HTTP. */
+    connected?: ConnectedOptions;
 };
 
 export async function startHost(options: HostOptions = {}) {
@@ -440,10 +443,17 @@ async function openHost(
   // MA4-S2-T1: work continues with no window open only while this Host runs, and only under the owner's policy.
   // A workstation client (Island poll or dashboard stream) seen in the last 20 s counts as an attached window.
   const workstationClients = { seen: 0, streams: 0 };
+  // MA4-S2-T2: connected actions — owner-registered folders, the controlled browser, and (tests only) synthetic services —
+  // each wrapped by the permission broker. A folder may never contain or sit inside the Host's own state.
+  const connected = connectedActions({ db, dataDirectory, protectedPaths: [dataDirectory, dirname(credentialPath), paths.diagnostics, paths.runtime], containment, ...options.connected });
+  undo.push(() => connected.close());
   const ptasks = new PersistentTaskRuntime({
     store: new TaskStore(db),
     ...productionTaskDeps(),
     ...options.ptasks,
+    executors: [...(options.ptasks?.executors ?? productionTaskDeps().executors), ...connected.executors],
+    // A task's browser session (and its profile) ends with the task.
+    onTerminal: (taskId) => void connected.browser.close(taskId).catch(() => undefined),
     instanceId: manager.instanceId,
     uiAttached: () => workstationClients.streams > 0 || Date.now() - workstationClients.seen < 20_000,
     emit: (type, detail) => manager.emit(db.event(type, null, detail)),
@@ -1254,7 +1264,7 @@ async function openHost(
           throw new CommandRefusedError("Remote approval can only answer the exact Host offer.");
         extra = await agentCommand(agents, input.action, data, actor);
       } else if (typeof input.action === "string" && PTASK_ACTIONS.has(input.action)) {
-        extra = { data: ptaskCommand(ptasks, input.action, data, actor) };
+        extra = { data: await ptaskCommand(ptasks, input.action, data, actor, connected) };
       } else if (typeof input.action === "string" && VOICE_ACTIONS.has(input.action)) {
         // Device principals never reach here: assertDeviceAction refuses every voice action (default-deny).
         if (device) throw new WorkstationRequiredError("Voice requires the workstation on the Windows Host.");
@@ -2246,6 +2256,7 @@ async function openHost(
         await voice.close().catch(() => undefined);
         // MA4-S2-T1: running task steps stop and are handed to recovery with their durable state intact.
         await ptasks.close().catch(() => undefined);
+        await connected.close().catch(() => undefined);
         await Promise.allSettled(
           [...manager.sessions.keys()].map((id) =>
             containment.health.operationalState === "draining"
@@ -2338,7 +2349,7 @@ async function openHost(
     ),
   );
   console.log(`Bunny-A Host ready on loopback (${manager.instanceId}).`);
-  return { server, manager, missions, agents, projects, ptasks, close, token, port, containment };
+  return { server, manager, missions, agents, projects, ptasks, connected, close, token, port, containment };
 }
 
 /** M-A-3 T10: maps one voice action to the session. Every branch is a workstation-only session operation. */
