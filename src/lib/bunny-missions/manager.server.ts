@@ -62,6 +62,7 @@ import {
   type TeamFaults,
 } from "./team-coordination.server.ts";
 import type { Plan } from "./planner.server.ts";
+import { applySelection, ownerDirective, SelectionSchema, type ModelSelection } from "../bunny-host/ma4/selection.ts";
 
 const TASK_END = /^task\.(completed|failed|stopped)$/;
 const STEP_LIVE: StepState[] = ["running", "verifying"];
@@ -77,6 +78,7 @@ export type MissionManagerOptions = {
   teamFaults?: TeamFaults;
 };
 export type CreateMission = { objective: string; title?: string; mode: Mode; projectId?: string | null; steps?: unknown; localOnly?: boolean; providers?: ProviderId[] | null; origin: string ;
+  modelSelection?: ModelSelection;
   /** M-A-3 T11: a multi-Agent Team Mission; identities come from AgentRuntime, requirements from the user. */
   team?: { coordinatorAgentId: string; plannerAgentId: string; requirements?: unknown; outputDir?: unknown; limits?: unknown };
 };
@@ -703,6 +705,7 @@ export class MissionManager {
         reworkRounds: 0, proposal: null, rejected: [], offerFiles: observableFiles(root, outputDir), git: existsSync(join(root, ".git")), browserFixture: null };
     }
     const mission: Mission = {
+      ...((input.modelSelection ?? ownerDirective(objective)) ? { modelSelection: SelectionSchema.parse(input.modelSelection ?? ownerDirective(objective)) } : {}),
       ...(team ? { team } : {}),
       id: crypto.randomUUID(),
       title: (input.title?.trim() || objective.split("\n")[0]).slice(0, 80),
@@ -759,7 +762,7 @@ export class MissionManager {
       `Planning with ${mission.team ? TEAM_PLANNER_ID : PLANNER_ID}.`,
     );
     try {
-      const plan = teamPlan ?? planMission({
+      const plan = applySelection(teamPlan ?? planMission({
         objective: current.objective,
         mode: current.mode,
         root: current.root,
@@ -767,7 +770,7 @@ export class MissionManager {
         available: (action) => ["available", "degraded"].includes(this.bus.availability(action)),
         limits: this.cached.limits,
         explicit,
-      });
+      }), current.modelSelection);
       const ids = new Map(plan.steps.map((step) => [step.key, crypto.randomUUID()]));
       const kept = this.store.steps(current.id).filter((step) => step.state === "completed");
       const remap = (key: string | undefined) => key === undefined ? undefined : ids.get(key) ?? (() => { throw new Error(`Team step reference ${key} is unknown.`); })();
@@ -1290,6 +1293,8 @@ export class MissionManager {
       }, "mission.completed", `Mission "${current.title}": ${summary}`,
     );
     this.workspace.releaseMission(current.id);
+    // Self-evolving: a routine the owner keeps repeating becomes a candidate skill. Learning never fails a Mission.
+    try { this.skills.learnUseCases(); } catch (error) { this.emit("skill.learn_failed", error instanceof Error ? error.message : String(error), current.id); }
     for (const batch of this.store.endMissionBatches(current.id, "mission_ended", "bunny-mission"))
       this.emit("approval.batch_ended", `Small approval batch ended with the mission (${batch.usedCount} / ${batch.maxActions} actions used).`,
         current.id,
@@ -1610,7 +1615,9 @@ export class MissionManager {
       requiresFilesystem:
         step.scope.access === "write" ||
         step.requiredCapabilities.some((cap) => cap.startsWith("filesystem.")) ||
-        !(envelope.providers.localOnly || step.preferences.local || budgetLocal),
+        !(envelope.providers.localOnly || step.preferences.local || budgetLocal) &&
+        // MA4: an explicitly selected tool-free inference step does not gain filesystem authority.
+        !(step.providerConstraints.allow?.length === 1 && step.providerConstraints.allow[0] === "openrouter" && step.requiredCapabilities.length === 0),
       localOnly:
         envelope.providers.localOnly || !!step.preferences.local || budgetLocal || undefined,
       ...(step.modelConstraint ? { modelExact: step.modelConstraint } : {}), // M-A-3 T3 §4: the mission pin routes up-front; the post-submit check below stays as defense-in-depth.

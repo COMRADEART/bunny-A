@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 import { importClosure, sourceCheck, verifyRelease, walkFiles, writeManifest } from "./bunny-release.mjs";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
+// Hosted Windows runners set TEMP to an 8.3 short path (C:\Users\RUNNER~1\...); the scripts under test compare long paths.
+const TEMP = realpathSync.native(tmpdir());
 const windows = process.platform === "win32";
 const MA1_CODE_CANDIDATE = "f1934bda6b0d33f27bef198e8967a69f6eb329ff";
 const TOOLING = ["install/Start-Bunny-Release.ps1", "install/Bunny-Release-Info.ps1", "install/Bunny-State.ps1", "install/release-pin.json", "scripts/migrate-bunny-state.ps1", "scripts/bunny-state-migration.mjs", "scripts/install-bunny-release.ps1"];
@@ -42,7 +44,7 @@ test("M-A-1D: the production release pin is the reviewed M-A-1 code candidate", 
 });
 
 test("M-A-1D: a release is built from the exact pinned commit; a dirty development tree never reaches it", { skip: !windows, timeout: 300_000 }, () => {
-  const temp = mkdtempSync(join(tmpdir(), "bunny-release-pkg-"));
+  const temp = mkdtempSync(join(TEMP, "bunny-release-pkg-"));
   try {
     const clone = join(temp, "clone");
     execFileSync("git", ["clone", "--shared", "--quiet", repo, clone]);
@@ -110,7 +112,7 @@ function sandboxRelease(root, name = "Bunny-A-Windows-v99") {
 }
 
 test("M-A-1D: the logon launcher starts the release runtime in the separate workspace and refuses a changed release", { skip: !windows, timeout: 120_000 }, async () => {
-  const temp = mkdtempSync(join(tmpdir(), "bunny-release-launch-"));
+  const temp = mkdtempSync(join(TEMP, "bunny-release-launch-"));
   let hostPid = null;
   try {
     const release = sandboxRelease(join(temp, "releases"));
@@ -153,7 +155,7 @@ test("M-A-1D: the logon launcher starts the release runtime in the separate work
 });
 
 test("M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, separates the workspace and rolls back to a pinned release", { skip: !windows, timeout: 240_000 }, async () => {
-  const temp = mkdtempSync(join(tmpdir(), "bunny-release-install-"));
+  const temp = mkdtempSync(join(TEMP, "bunny-release-install-"));
   let idleHost = null; let hostPort;
   try {
     const release = sandboxRelease(join(temp, "built"));

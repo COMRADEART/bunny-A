@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { CapabilityBus, CapabilityRequest } from "./capabilities/bus.server.ts";
@@ -19,6 +20,14 @@ export const BUILTIN_SKILLS: Skill[] = [
   builtin({ id: "app.open", name: "Open application", description: "Start an allowlisted desktop application.", requirements: ["computer.open_app"], preconditions: [{ kind: "capability_available", action: "computer.open_app" }], parameters: [{ name: "app", type: "string", required: true, description: "notepad, calculator, paint, explorer or terminal." }], steps: [{ action: "computer.open_app", params: { app: "${app}" }, label: "open app" }], validations: [{ kind: "status_succeeded", step: 0 }], cleanup: [] }),
   builtin({ id: "project.open", name: "Open project folder", description: "Open the project folder in File Explorer.", requirements: ["computer.open_app"], preconditions: [{ kind: "capability_available", action: "computer.open_app" }], parameters: [], steps: [{ action: "computer.open_app", params: { app: "explorer", target: "." }, label: "open folder" }], validations: [{ kind: "status_succeeded", step: 0 }], cleanup: [] }),
 ];
+
+/** A use case is a run sequence the owner repeated in this many different Missions. */
+export const USE_CASE_MIN_MISSIONS = 3;
+const USE_CASE_MAX_STEPS = 5;
+const isPrivate = (run: CapabilityRun) => Object.values(run.params).some((value) => typeof value === "string" && /^\[(redacted|\d+ characters)\]$/.test(value));
+const signature = (step: { action: string; params: Record<string, unknown> }) => `${step.action} ${JSON.stringify(step.params)}`;
+/** Newline-fenced so a routine matches whole steps inside a longer one, never half a step. */
+const routine = (steps: readonly { action: string; params: Record<string, unknown> }[]) => `\n${steps.map(signature).join("\n")}\n`;
 
 /** ${name} placeholders in string params (and string arrays) are filled from the skill's parameters. */
 export function fill(value: unknown, params: Record<string, string | number>): unknown {
@@ -149,10 +158,54 @@ export class SkillLibrary {
     const runs = runIds.map((runId) => this.store.run(runId));
     if (!runs.length || runs.length > 20) throw new Error("Record 1–20 capability runs.");
     if (runs.some((run) => run.status !== "succeeded")) throw new Error("Only successful runs can be recorded.");
-    if (runs.some((run) => Object.values(run.params).some((value) => typeof value === "string" && /^\[(redacted|\d+ characters)\]$/.test(value)))) throw new Error("Runs with redacted or private parameters cannot be replayed.");
+    if (runs.some(isPrivate)) throw new Error("Runs with redacted or private parameters cannot be replayed.");
     const skill: Skill = { id, version: 1, name: name.slice(0, 80), description: `Recorded from ${runs.length} capability run(s).`, requirements: [...new Set(runs.map((run) => run.action))], preconditions: [], parameters: [], steps: runs.map((run) => ({ action: run.action, params: run.params, label: run.action })), validations: runs.map((_, step) => ({ kind: "status_succeeded" as const, step })), cleanup: [], provenance: "recorded", status: "candidate", previousVersion: null, reliability: { runs: 0, successes: 0, lastSuccessAt: null, lastFailureAt: null }, createdAt: Date.now() };
     this.store.saveSkill(skill, true);
     this.emit("skill.candidate", `${id} v1 recorded from ${runs.length} run(s); it stays a candidate until a verified run.`, null);
     return skill;
+  }
+  /**
+   * Self-evolving from use cases: an action sequence (same actions, same parameters) that succeeded in
+   * USE_CASE_MIN_MISSIONS different Missions is recorded as a candidate skill. Longest routines win, a routine already
+   * covered by a skill is skipped, and like any recorded skill it never runs until a verified run promotes it.
+   */
+  learnUseCases(limit = 3): Skill[] {
+    // Each Mission splits into stretches of consecutive replayable runs; a failed or private run ends a stretch, so
+    // dropping it never joins its neighbours into a routine the owner did not run.
+    const segments: { missionId: string; runs: CapabilityRun[] }[] = [];
+    const open = new Map<string, CapabilityRun[]>();
+    for (const run of this.store.runs({ limit: 1000 }).reverse()) {
+      if (!run.missionId) continue;
+      if (run.status !== "succeeded" || isPrivate(run)) { open.delete(run.missionId); continue; }
+      let runs = open.get(run.missionId);
+      if (!runs) { runs = []; open.set(run.missionId, runs); segments.push({ missionId: run.missionId, runs }); }
+      runs.push(run);
+    }
+    const patterns = new Map<string, { missions: Set<string>; runIds: string[]; length: number; actions: string[] }>();
+    for (const { missionId, runs } of segments)
+      for (let length = 2; length <= USE_CASE_MAX_STEPS; length++)
+        for (let start = 0; start + length <= runs.length; start++) {
+          const slice = runs.slice(start, start + length);
+          const key = routine(slice);
+          const row = patterns.get(key) ?? { missions: new Set<string>(), runIds: slice.map((run) => run.id), length, actions: slice.map((run) => run.action) };
+          row.missions.add(missionId);
+          patterns.set(key, row);
+        }
+    // Every existing skill's steps, so a learned routine never duplicates (or sits inside) one Bunny already has.
+    const covered = this.store.activeSkills().map((skill) => routine(skill.steps));
+    const learned: Skill[] = [];
+    const ranked = [...patterns].filter(([, row]) => row.missions.size >= USE_CASE_MIN_MISSIONS)
+      .sort(([, a], [, b]) => b.length - a.length || b.missions.size - a.missions.size);
+    for (const [key, row] of ranked) {
+      if (learned.length >= limit) break;
+      if (covered.some((steps) => steps.includes(key))) continue;
+      const id = `learned.${createHash("sha256").update(key).digest("hex").slice(0, 10)}`;
+      if (this.store.skill(id)) continue;
+      const skill = this.record(id, `Routine: ${row.actions.join(" → ")}`, row.runIds);
+      covered.push(key);
+      learned.push(skill);
+      this.emit("skill.learned", `${id}: you ran ${row.actions.join(" → ")} in ${row.missions.size} Missions. Saved as a candidate skill; verify it once to use it.`, null);
+    }
+    return learned;
   }
 }

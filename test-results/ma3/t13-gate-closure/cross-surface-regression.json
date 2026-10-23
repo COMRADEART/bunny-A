@@ -1,0 +1,50 @@
+{
+  "sourceSha": "b23005136c48036968036475e841dcf67a38a794",
+  "executableSourceChanges": 0,
+  "automated": {
+    "fullPipeline": 0,
+    "ui": 0,
+    "typecheck": 0,
+    "build": 0,
+    "auth": 0
+  },
+  "browser": {
+    "dev": "browser/t13-gate-closure-dev.json",
+    "built": "browser/t13-gate-closure-built.json",
+    "bothViewportPairsVisuallyInspected": true,
+    "context": "workstation browser, offline development Host, no actual phone",
+    "divergesFromBaseline": false
+  },
+  "interactive": [
+    {
+      "action": "Click Tasks",
+      "observed": "Tasks h1; No tasks yet h2; focus on Tasks button",
+      "passed": true
+    },
+    {
+      "action": "From Tasks, Tab twice then Return",
+      "observed": "Agents h1; Agents are unavailable h2; focus on Agents button",
+      "passed": true
+    },
+    {
+      "action": "Click theme switch while Host offline",
+      "observed": "Reconnect to the Host before changing anything. Nothing was sent.",
+      "passed": true,
+      "limit": "offline mutation guard verified; no fresh live theme-switch claim"
+    },
+    {
+      "action": "Click Projects",
+      "observed": "Project page visible; Add project and Refresh projects disabled offline",
+      "passed": true
+    }
+  ],
+  "nativeNarrator": "Previously verified gate retained at unchanged source; no new audible Narrator trial; original limitations retained.",
+  "regressionMapping": {
+    "islandFourEdgesAndOrdering": "scripts/island-placement.test.mjs and scripts/island-team-chips.test.mjs in full pipeline",
+    "handoff": "agent-team-handoff, team-surfaces, team-lifecycle and UI tests",
+    "approvalsAndBoundaries": "remote-device, remote-remediation, cross-app and remote-authority tests",
+    "voice": "script native voice-worker and library voice tests; no new human acoustic acceptance",
+    "themes": "ui-theme, ui-theme-host, character appearance and UI tests; existing live evidence retained",
+    "providers": "routing, routing-store, routing-matrix, model-capability and DEV-01 remote-remediation tests"
+  }
+}

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CodexAdapter, ClaudeAdapter, DetectOnlyAdapter, OllamaAdapter, providerBase } from "./adapters.server.ts";
@@ -352,6 +353,9 @@ test("real task lifecycle: running → Bunny-A verifying → completed only when
     fake.launched[1].finish({ ok: true, output: "done", exitCode: 0 }); await tick(50);
     const failed = db.get(bad.id);
     assert.equal(failed.state, "failed"); assert.match(failed.error!, /Bunny-A verification failed/);
+    // MA4-S1R2 H2: both independently verified outcomes (one pass, one fail) are runtime reliability evidence.
+    assert.equal(passed.model, failed.model);
+    assert.deepEqual(host.ma4.reliability(passed.provider, passed.model, "tool-call"), { passes: 1, samples: 2 });
     const evidence = db.db.prepare("SELECT state,verification,input_tokens AS inputTokens,manual,mode FROM outcomes WHERE task_id=?").get(good.id) as Record<string, unknown>;
     assert.deepEqual({ ...evidence }, { state: "completed", verification: "passed", inputTokens: 12, manual: 0, mode: "balanced" });
     assert.equal(host.live().find((provider) => provider.id === "claude")!.observed!.tasks, 2);
@@ -371,6 +375,39 @@ test("a required working directory must be an approved project folder", async ()
     const task = host.submit({ prompt: "Edit a file", mode: "balanced", constraints: { workingDirectory: folder } });
     assert.equal(task.projectId, project.id); assert.equal(task.cwd, project.path);
   } finally { db.close(); rmSync(folder, { recursive: true, force: true }); }
+});
+
+test("MA4-S1R3-CI2: the 8.3 short spelling of an approved project folder is that folder", { skip: process.platform !== "win32" && "Windows 8.3 names only" }, async (t) => {
+  const folder = mkdtempSync(join(tmpdir(), "bunny-ci2-long-project-name-"));
+  const db = new HostDatabase(":memory:"); const fake = scriptedAdapter();
+  try {
+    const short = execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "(New-Object -ComObject Scripting.FileSystemObject).GetFolder($env:BUNNY_FOLDER).ShortPath"], { env: { ...process.env, BUNNY_FOLDER: folder }, encoding: "utf8", windowsHide: true }).trim();
+    if (!short || short.toLowerCase() === realpathSync.native(folder).toLowerCase()) return t.skip("8.3 names are disabled on this volume");
+    const host = new TaskManager(db, process.cwd(), [fake.adapter]); await host.discover();
+    const project = host.registerProject("Approved", folder);
+    const task = host.submit({ prompt: "Edit a file", mode: "balanced", constraints: { workingDirectory: short } });
+    assert.equal(task.projectId, project.id); assert.equal(task.cwd, project.path);
+  } finally { db.close(); rmSync(folder, { recursive: true, force: true }); }
+});
+
+test("MA4-S1R3-CI2: the local-only routing priority holds on a Host with no model facts (legacy fallback)", async () => {
+  const boot = async (ids: ProviderId[]) => {
+    const db = new HostDatabase(":memory:");
+    const host = new TaskManager(db, process.cwd(), ids.map((id) => scriptedAdapter(id).adapter), { modelRegistry: new ModelCapabilityRegistry(db, { availableProviders: () => [] }) });
+    await host.discover(); host.setRoutingPriority("local_only");
+    return { db, host };
+  };
+  const both = await boot(["claude", "ollama"]);
+  try {
+    const task = both.host.submit({ prompt: "Summarize the tradeoffs of two approaches", mode: "balanced" });
+    assert.equal(task.provider, "ollama", "a ready cloud provider is never chosen under local-only");
+    assert.equal(task.constraints?.localOnly, true, "the Task records the constraint it was admitted under");
+  } finally { both.db.close(); }
+  const cloud = await boot(["claude"]);
+  try {
+    assert.throws(() => cloud.host.submit({ prompt: "Summarize the tradeoffs of two approaches", mode: "balanced" }), "no local provider: refused, not sent to the cloud");
+    assert.equal(cloud.host.db.tasks().length, 0);
+  } finally { cloud.db.close(); }
 });
 
 test("process tree: descendants follow parent links and reject reused PIDs; survivors need the same start time", () => {

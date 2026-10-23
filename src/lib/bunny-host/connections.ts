@@ -586,7 +586,7 @@ export const CONNECTION_CATALOG: readonly CatalogEntry[] = [
   {
     id: "openrouter",
     name: "OpenRouter",
-    providerId: null,
+    providerId: "openrouter",
     executables: [],
     manageUrl: "https://openrouter.ai/settings/keys",
     installUrl: null,
@@ -595,15 +595,15 @@ export const CONNECTION_CATALOG: readonly CatalogEntry[] = [
     modes: [
       {
         mode: "api_key",
-        support: "detect_only",
-        dispatch: false,
+        support: "implemented",
+        dispatch: true,
         billing: "api_billed",
         vendor: "openrouter",
         label: "OpenRouter API key",
         detail:
           "Create a key on OpenRouter, then enter it here. Bunny encrypts it and can check key metadata without inference. OpenRouter browser authorization is not implemented in this release.",
         reason:
-          "Bunny has no OpenRouter chat adapter in this release, so the key cannot be used for Tasks yet.",
+          "Inference requires MA4 model/upstream approval, current catalogue facts, account consent and bounded budgets. Off by default.",
         signIn: {
           kind: "api_key",
           validateUrl: "https://openrouter.ai/api/v1/key",
@@ -670,6 +670,8 @@ export function vendorFor(
   remoteModels: readonly string[] = [],
 ): Vendor {
   switch (provider) {
+    case "openrouter":
+      return "openrouter";
     case "codex":
       return "openai";
     case "claude":
@@ -693,6 +695,7 @@ export function defaultModeFor(
 ): { catalog: CatalogId; mode: ConnectionMode } | null {
   const entry = catalogForProvider(provider);
   if (!entry) return null;
+  if (provider === "openrouter") return { catalog: "openrouter", mode: "api_key" };
   if (provider === "ollama")
     return {
       catalog: "ollama",

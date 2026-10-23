@@ -54,7 +54,8 @@ export function resolveCommand(command: string, cwd = process.cwd()): Resolved |
 export function realGit(found: string, platform = process.platform): string {
   if (platform !== "win32" || !/^cmd$/i.test(dirname(found).split(/[\\/]/).at(-1) ?? "")) return found;
   const root = dirname(dirname(found));
-  return ["mingw64", "clangarm64", "mingw32"].map((folder) => join(root, folder, "bin", "git.exe")).find((candidate) => existsSync(candidate)) ?? found;
+  // ucrt64: the x64 layout since Git for Windows 2.5x (hosted runners ship it); mingw64 is the older x64 layout.
+  return ["ucrt64", "mingw64", "clangarm64", "mingw32"].map((folder) => join(root, folder, "bin", "git.exe")).find((candidate) => existsSync(candidate)) ?? found;
 }
 
 export type RunResult = { exitCode: number | null; stdout: string; stderr: string; durationMs: number; timedOut: boolean; aborted: boolean; ownership?: OwnedProcessRecord };

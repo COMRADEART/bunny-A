@@ -1,3 +1,12 @@
+/**
+ * MA3 T13 legacy shell note. The routed workspace shell is `premium.tsx`
+ * (reached via `workspace.tsx` -> `island.tsx` -> `/`), which renders
+ * NAV_PRIMARY/NAV_ADVANCED from `nav-model.ts`. This module's `Island`
+ * shell and its local NAV table are retained only as a non-routed reference;
+ * its shared row components (`TaskRow`, `Notifications`) remain in live use
+ * via `premium.tsx`, `surfaces.tsx`, and `chat-home.tsx`. Do not route to
+ * this `Island`; extend `premium.tsx` instead.
+ */
 import { Projects } from "./projects";
 import { useEffect, useState } from "react";
 import {

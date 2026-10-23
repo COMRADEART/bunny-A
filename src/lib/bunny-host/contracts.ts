@@ -49,6 +49,8 @@ export type HostSnapshot = {
   modelCapabilities?: ModelCapabilitySnapshot;
   /** M-A-3 T2 normalized provider usage truth (derived from registry state and Bunny's own counters). Optional: older clients ignore it. */
   providerUsage?: ProviderUsageServiceSnapshot;
+  /** MA4 owner diagnostics; additive, no credentials/prompts/benchmark answers. Device projections omit it. */
+  modelIntelligence?: { version: 1; configuration: import("./ma4/registry.ts").Configuration; models: import("./ma4/registry.ts").ModelMetadata[]; cooldownUntil: number };
   /** M-A-3 T4 durable Agent runtime snapshot (agent-level continuity state). Optional: older clients ignore it. */
   agents?: AgentSnapshot;
   /** M-A-3 T13 Personal Agent slots projected onto live Host facts (presentation only). Optional: older clients ignore it. */

@@ -286,3 +286,70 @@ function ok(result: { status: number; body: Body }) {
   assert.equal(result.status, 200, JSON.stringify(result.body));
   return result.body;
 }
+
+test("Autopilot: off by default; proposes only on new verified evidence, shadows, then accepts through the same gate", () => {
+  const db = new HostDatabase(":memory:");
+  const routing = new RoutingDecisionStore(db);
+  const policy = new PolicyEngine(db);
+  try {
+    for (let n = 0; n < 6; n++) seed(db, routing, { id: `codex-${n}`, provider: "codex", verification: "failed" });
+    for (let n = 0; n < 6; n++) seed(db, null, { id: `claude-${n}`, provider: "claude", verification: "passed" });
+    assert.equal(policy.autopilot(), false);
+    assert.equal(policy.autopilotStep(PROVIDERS), null, "off means the owner decides every step");
+    assert.equal(policy.view().candidates.length, 0);
+
+    policy.setAutopilot(true);
+    assert.equal(policy.view().autopilot, true);
+    const shadowed = policy.autopilotStep(PROVIDERS)!;
+    assert.match(shadowed.detail, /shadow testing/);
+    assert.equal(shadowed.changed, false);
+    const id = policy.shadowPolicy()!.id;
+    assert.deepEqual(policy.liveWeights(), BASE, "a shadow run never changes live routing");
+    assert.equal(policy.autopilotStep(PROVIDERS), null, "the shadow waits for verified live decisions");
+
+    for (let n = 0; n < SHADOW_MIN_VERIFIED; n++) {
+      policy.recordShadow(shadowFor(policy, `live-${n}`));
+      seed(db, routing, { id: `live-${n}`, provider: "codex", verification: "failed" });
+    }
+    const accepted = policy.autopilotStep(PROVIDERS)!;
+    assert.equal(accepted.changed, true);
+    assert.equal(policy.active().id, id);
+    assert.deepEqual(policy.liveWeights(), PER_TYPE);
+    const rows = policy.view().candidates.length;
+    assert.equal(policy.autopilotStep(PROVIDERS), null, "no new verified evidence, no new proposal");
+    assert.equal(policy.view().candidates.length, rows, "the autopilot does not spam candidates");
+    policy.rollback();
+    assert.deepEqual(policy.liveWeights(), BASE, "the owner can still roll back");
+  } finally { db.close(); }
+});
+
+test("Autopilot: nothing to learn adds nothing; a shadow that risks a verified success is dropped", () => {
+  const db = new HostDatabase(":memory:");
+  const routing = new RoutingDecisionStore(db);
+  const policy = new PolicyEngine(db);
+  try {
+    policy.setAutopilot(true);
+    for (let n = 0; n < 6; n++) seed(db, routing, { id: `ok-${n}`, provider: "codex", verification: "passed" });
+    assert.equal(policy.autopilotStep(PROVIDERS), null);
+    assert.equal(policy.view().candidates.length, 0, "no improvement means no candidate row");
+
+    const fresh = new HostDatabase(":memory:");
+    const freshRouting = new RoutingDecisionStore(fresh);
+    const engine = new PolicyEngine(fresh);
+    try {
+      engine.setAutopilot(true);
+      for (let n = 0; n < 6; n++) seed(fresh, freshRouting, { id: `codex-${n}`, provider: "codex", verification: "failed" });
+      for (let n = 0; n < 6; n++) seed(fresh, null, { id: `claude-${n}`, provider: "claude", verification: "passed" });
+      assert.ok(engine.autopilotStep(PROVIDERS));
+      const id = engine.shadowPolicy()!.id;
+      engine.recordShadow(shadowFor(engine, "risky"));
+      seed(fresh, freshRouting, { id: "risky", provider: "codex", verification: "passed" });
+      const dropped = engine.autopilotStep(PROVIDERS)!;
+      assert.match(dropped.detail, /dropped/);
+      const row = engine.view().candidates.find((candidate) => candidate.id === id)!;
+      assert.equal(row.state, "rejected");
+      assert.match(row.reason ?? "", /^Autopilot: /);
+      assert.deepEqual(engine.liveWeights(), BASE, "a dropped candidate never ran");
+    } finally { fresh.close(); }
+  } finally { db.close(); }
+});

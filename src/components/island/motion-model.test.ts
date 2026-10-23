@@ -9,8 +9,16 @@ import {
   replayFrame,
   replayRecords,
   routeStrengths,
+  routingGraphIds,
   taskJourney,
 } from "./motion-model.ts";
+test("S1R routing graph handles an Ollama-only or empty Host snapshot without phantom provider nodes", () => {
+  assert.deepEqual(routingGraphIds([{ id: "ollama" }]), ["ollama"]);
+  assert.deepEqual(routingGraphIds([]), []);
+  assert.deepEqual(routingGraphIds([{ id: "ollama" }, { id: "claude" }, { id: "codex" }]), ["codex", "claude", "ollama"]);
+  const decision = { scores: [{ provider: "openrouter", score: 1 }] } as RouteDecision;
+  assert.deepEqual(routingGraphIds([{ id: "ollama" }], decision), ["ollama"], "stale score entries do not assert current provider availability");
+});
 const task = (fields: Partial<OrchTask> = {}) =>
   ({
     id: "test",

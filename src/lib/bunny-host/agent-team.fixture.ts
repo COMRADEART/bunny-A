@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HostDatabase } from "./persistence.server.ts";
@@ -106,7 +106,9 @@ export type TeamEnv = {
 };
 
 export async function teamSetup(label: string, options: { faults?: TeamFaults; responder?: Responder; dir?: string; providers?: ProviderAdapter[]; startUnknown?: boolean; startOffline?: boolean } = {}): Promise<TeamEnv> {
-  const dir = options.dir ?? mkdtempSync(join(tmpdir(), `bunny-t11-${label}-`));
+  // The long form of the temp root: Host snapshots carry native project paths, and hosted runners set an 8.3 TEMP;
+  // a short fixture path would make the device-masking positive controls look for a string the Host never writes.
+  const dir = options.dir ?? mkdtempSync(join(realpathSync.native(tmpdir()), `bunny-t11-${label}-`));
   const root = join(dir, "project");
   if (!options.dir) {
     mkdirSync(join(root, "data"), { recursive: true });
@@ -116,8 +118,15 @@ export async function teamSetup(label: string, options: { faults?: TeamFaults; r
   const db = new HostDatabase(join(dir, "host.sqlite"));
   const launched: Launch[] = [];
   const control = { responder: options.responder ?? scripted, attempts: new Map<string, number>(), hold: false, unknown: options.startUnknown === true, ...(options.startOffline ? { availability: "offline" as const } : {}) } as TeamEnv["control"];
-  const factLess = new ModelCapabilityRegistry(db, { availableProviders: () => [] });
-  const tasks = new TaskManager(db, root, [localModel(launched, control), ...(options.providers ?? [])], { modelRegistry: factLess });
+  // MA4 schema-bound team requests require current model facts. These are simulated facts for this
+  // scripted adapter, never a live Ollama probe; unknown/offline starts still have no ready catalogue.
+  const modelRegistry = new ModelCapabilityRegistry(db, {
+    availableProviders: () => ["ollama"],
+    ollamaProbe: async () => ({ up: !control.unknown && control.availability !== "offline", models: !control.unknown && control.availability !== "offline" ? ["test-local:7b"] : [], remote: [] }),
+    ollamaShow: async () => ({ capabilities: ["completion"], context_length: 32768 }),
+    ollamaPs: async () => ({ models: [] }),
+  });
+  const tasks = new TaskManager(db, root, [localModel(launched, control), ...(options.providers ?? [])], { modelRegistry });
   await tasks.discover();
   const adapters = [new FilesystemCapability(), new TerminalCapability(), new NotificationsCapability(() => undefined)];
   const missions = new MissionManager(tasks, { dataDirectory: dir, adapters, ...(options.faults ? { teamFaults: options.faults } : {}) });

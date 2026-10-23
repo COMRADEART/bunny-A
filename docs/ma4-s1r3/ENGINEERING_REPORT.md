@@ -1,0 +1,178 @@
+# BUNNY A — MA4-S1R3 ENGINEERING REPORT
+
+```text
+STARTING STATE
+  Repository:   https://github.com/COMRADEART/bunny-A
+  Base commit:  5d92fea (PR #11 head: lockfile-only dependency fix, stacked on #10 472fd61)
+  Branch:       ma4-s1r3-agent-reliability
+  Worktree:     ../bun-router-s1r3 (own node_modules, native builds and evidence; main checkout untouched)
+  Final commit: see the draft PR head (stacked on #11)
+  PR:           draft, base ma4-s1r2-deps-audit (#11)
+  CI:           run 39672749567 (at 3724349): security SUCCESS, checks SUCCESS (typecheck, MA4 incl. repair suite, routing,
+                UI, both builds); regression: see "Hosted CI" below
+
+AGENT REPAIR
+  Root cause:          S1R2 had one repair target (the Worker) and no attribution step. Invalid Tester tests, Tester
+                       import violations, zero valid tests and metadata-format errors were all "repaired" by regenerating
+                       a correct implementation (v2 t2, p2-bucket t2, s2-chunk t1; S1R2 evidence read per attempt)
+  Fault attribution:   attributeAttempt(): deterministic, from static checks per file, the independent acceptance suite
+                       and Tester tests run against the frozen reference (oracle); ambiguous without an oracle → diagnosis,
+                       no blind repair; typed FailureRecord per cause
+  Tester repair:       routed on oracle-proven invalidity (incl. latent invalid tests under the all-pass rule); the Tester
+                       sees its own failing line + exception type, never the implementation, reference values or hidden tests
+  Worker repair:       only failures proven to be the Worker's; invalid tests are never fed to it; valid tests are never
+                       rewritten to fit wrong code
+  Retry bounds:        ≤ 2 rounds per trial shared by Planner/Worker/Tester; one round may repair Worker ∥ Tester; clean stop
+  Repair success:      run 2: Worker 3/19 rounds resolved, Tester 1/7, Planner 1/1; 4 trials passed only after repair
+  Reviewer false approvals: run 2: 3 (all blocked by the deterministic gate); run 1: 0; false rejections 1 each
+
+LOCAL MODELS
+  Discovered:          qwen2.5-coder:7b, huihui_ai/qwen2.5-abliterate:7b, huihui_ai/Qwen3.8-abliterated:27b,
+                       huihui_ai/qwen3-abliterated:30b; deepseek-v4.1-flash:cloud refused (cloud)
+  Tested:              both 7B models (benchmarks, tool probes); coder 7B for G7 (pre-registered pin)
+  Best coding model:   none qualified; coder 7B ≈ abliterate 7B (bench programming 3/6 vs 4/6)
+  Best planning model: either 7B (planning 6/6) — adequate for plans, not for the workflow as a whole
+  Best test-generation model: none qualified (Tester repairs 1/7 resolved)
+  Tool-calling model:  huihui_ai/qwen2.5-abliterate:7b demonstrated 6/6 native calls on the S1R3 probe set; coder 7B 0/6
+                       (writes calls as JSON text; prose is never parsed as a tool call)
+  Resource limits:     27B and 30B BLOCKED_RESOURCE_LIMIT (need ≈ 16 GiB host RAM incl. guard; 10.7 GiB available);
+                       Ollama 0.40.6 runner grew to 12.9 GiB private during G7 run 2 → host low-memory stop, resumed
+  GPU execution:       CUDA partial offload (RTX 4050 6 GiB), ≈ 30 tok/s on 7B
+  NPU execution:       NOT TESTED (no Ollama NPU backend)
+
+G7 VALIDATION (pin qwen2.5-coder:7b on every role; frozen tasks, task hash = S1R2)
+  Original v2 trials:  3 (run 2, decisive) — also 3 in run 1
+  Original v2 passes:  0 (run 2); 0 (run 1)
+  Held-out trials:     20 (run 2) — also 20 in run 1
+  Held-out passes:     13 (run 2); 13 (run 1); S1R2 reference 15
+  Independent test results: every decision by sandboxed hidden tests + oracle-validated Tester tests; invariants 100%
+                       (pins, ordering, gate authority, cancellation) in both runs
+  Failed cases:        run 2: v2 ×3 (2 malformed Tester repairs, 1 Worker), s1-anagram t2, i1-roman t2, i2-kv ×2,
+                       d1-flatten t2, p2-bucket ×2
+  Repair attempts:     run 2: 24 rounds; run 1: 15
+  G7 FINAL STATUS:     FAIL (R3-G7 0/3 < 2/3; R3-G8 13/20 < 14/20)
+
+SANDBOX
+  Isolation:           WSL2 user/mount/pid/net/ipc/uts/cgroup namespaces, pivot_root, read-only root (unchanged)
+  Network boundary:    empty network namespace (unchanged; F4.3/F4.10 pass)
+  Filesystem boundary: no host/Windows/home mounts; noexec size-capped tmpfs; workspace discarded (F4.1/F4.5 pass)
+  Resource limits:     cgroup memory/pids, RLIMIT CPU/FSIZE/NOFILE/NPROC/CORE, wall clock, output cap (F4.6–F4.9 pass)
+  Seccomp qualification: IMPLEMENTED — unprivileged seccomp-BPF deny-list (namespaces incl. clone flags, mount APIs,
+                       ptrace, keyrings, bpf, io_uring, perf, module/kexec/clock…); foreign ABI killed; probe requires it
+  Adversarial tests:   13/13 live (12 S1R2 + F5 seccomp; F5 fails against the previous launcher)
+  Security status:     PASS, scoped to this host (WSL distro remains the trust root; deny-list, not allow-list)
+
+RELEASE
+  MA4 tests:           70 passed, 1 skipped (unauthorized cloud-live)
+  Regression tests:    npm test 2,216 passed, 0 failed, 1 skipped (450 + 1,638 + 58 + 70)
+  UI tests:            406/406
+  Typecheck:           pass
+  Desktop build:       pass
+  Mobile build:        pass (shared mobile-web)
+  Windows installed app: NOT TESTED (no approval to touch the installed app; fixture-level release tests pass)
+  Physical mobile devices: NOT TESTED
+  Hosted CI:           security SUCCESS; checks SUCCESS; regression stage 1 374/374 (7 Windows failures fixed, confirmed
+                       on hosted runners); stage 2: 1 hosted-only failure + hang → job hit its 90-min limit (see below)
+  Dependency vulnerabilities: 0 (npm audit, prod and all); lockfile unchanged from 5d92fea
+
+CLOUD
+  Candidate:           Groq — openai/gpt-oss-120b
+  Approval status:     PENDING
+  External inference calls: ZERO (all runners enforce a localhost-only fetch allowlist; 0 refused requests recorded)
+
+GATES
+  Passed:  R3-G1, G2, G3, G4, G5, G6, G9, G10, G12, G13, G14, G15
+  Failed:  R3-G7 (v2 0/3), R3-G8 (held-out 13/20)
+  Blocked: none as a gate; 27B/30B model trials BLOCKED_RESOURCE_LIMIT
+  Partial: R3-G11 (hosted CI): security + checks green; regression stage 1 374/374 green; stage 2 has one hosted-only
+           failure (T13.3 H appearance) followed by a hang to the 90-min limit
+
+FINAL STATUS: PARTIAL
+
+NEXT RECOMMENDED ACTION: qualify a stronger model on the unchanged G7 benchmark. Either free ≈ 6 GiB of RAM (close
+apps or cap the WSL2 VM memory) and run `G7_PIN=huihui_ai/qwen3-abliterated:30b G7_OUT=… node --experimental-strip-types
+scripts/ma4-s1r2/g7.mjs`, or explicitly approve the Groq gpt-oss-120b request (docs/ma4-s1r2/CLOUD_APPROVAL_REQUEST.md).
+Before that, have Tester repairs return only the replaced test methods (output budget).
+```
+
+## Gate table
+
+| Gate | Status | Evidence |
+|---|---|---|
+| R3-G1 repository and branch verified | PASS | [REPOSITORY_AUDIT](REPOSITORY_AUDIT.md) |
+| R3-G2 fault-aware repair implemented and tested | PASS | [AGENT_REPAIR_DESIGN](AGENT_REPAIR_DESIGN.md); `ma4-repair.test.ts` 10 + `ma4-workflow.test.ts` 6 (live sandbox) |
+| R3-G3 Tester failures route to the Tester | PASS | unit/live tests; G7 run 2: 7 Tester rounds, 0 Worker rounds spent on Tester faults |
+| R3-G4 Worker failures route to the Worker | PASS | unit/live tests; a valid failing test is never rewritten |
+| R3-G5 Reviewer cannot override failed tests | PASS | 3 live false approvals blocked (run 2) |
+| R3-G6 sandbox security enforced | PASS | [SANDBOX_SECURITY_REVIEW](SANDBOX_SECURITY_REVIEW.md), 13/13 + seccomp |
+| R3-G7 original G7 v2 ≥ 2/3 | **FAIL** (0/3) | [G7_REGRESSION_RESULTS](G7_REGRESSION_RESULTS.md) |
+| R3-G8 held-out ≥ 14/20 | **FAIL** (13/20) | same |
+| R3-G9 manual pins 100% | PASS | 46/46 G7 trials pin-exact; routing tests |
+| R3-G10 benchmarks reproducible | PASS | [MODEL_QUALIFICATION](MODEL_QUALIFICATION.md): identical per category |
+| R3-G11 hosted CI mandatory jobs pass | PARTIAL | [WINDOWS_CI_REMEDIATION](WINDOWS_CI_REMEDIATION.md), [RELEASE_QUALIFICATION](RELEASE_QUALIFICATION.md) |
+| R3-G12 dependency audit clear | PASS | [DEPENDENCY_SECURITY](DEPENDENCY_SECURITY.md) |
+| R3-G13 desktop and mobile builds pass | PASS | `evidence/build-*.log`, CI checks job |
+| R3-G14 PR published without modifying the existing checkout | PASS | draft PR; main checkout untouched |
+| R3-G15 external inference disabled | PASS | registry/candidates unchanged; CI check; allowlists |
+
+## New versus carried-forward evidence
+
+New in S1R3: everything under `docs/ma4-s1r3/evidence/` (two G7 runs, tool probes, benchmark re-run, CI reproductions, sandbox runs, regression, UI, builds, audits, decode-time pattern probe). Carried forward unchanged: the S1R2 frozen task set, benchmark suite, hardware inventory method, cloud shortlist and approval request. Historical evidence (`docs/ma4-s1r2/evidence/`, `test-results/ma3/`) was not modified.
+
+## Commits (logical units)
+
+`b07d6aa` CI temp canonicalization · `611c37f` fault-aware repair · `31f9919` G7 pre-registration + output path · `56553a1` MA3 evidence isolation · `dfaba3e` demonstrated tool-call capability · `eb84796` run-2 rule · `3724349` latent invalid tests / rejected structured replies · `9548eac` seccomp · `5d223d5` runner resume + unload · docs/evidence commit.
+
+## Hosted CI (PR #12, run 39684601550 at `0b8c84e`)
+
+| Job | Result |
+|---|---|
+| static security checks | **success** |
+| typecheck, MA4/routing/sandbox-contract tests, UI tests, builds | **success** |
+| full MA3/MA4 regression | **cancelled at the 90-minute job limit (hang)**: stage 1 `scripts/*.test.mjs` **374/374 passed in 2 min** (S1R2: 367/374, with ~30 min of 437 s timeouts), so the 7 Windows fixes are confirmed on hosted runners. Stage 2 reported **one failure**, `T13.3 H every weapon wears every style … survives a restart` (`character-appearance-host.test.ts`, 5.2 s), then printed nothing for 86 min until the job limit |
+
+Stage 2 had never run on hosted CI before, because earlier runs stopped at stage 1. The failure detail was not captured: Node prints failure details only when the run ends, and the run never ended. Locally the same file passes 3/3 under an 8.3 short `TEMP` and with no git identity (`evidence/appearance-*.log`), so neither of those runner differences is the cause. Stage 2 runs without `--test-force-exit`, so a handle left open after a failure can keep the run alive. Log: `evidence/ci-hosted-regression-39684601550.log`.
+
+**R3-G11 remains PARTIAL.** Exact remaining gate: a green hosted `npm test` stage 2+. Next diagnostic step (not done, because each cycle costs 90 min): run stage 2 on the hosted runner with `--test-reporter=tap`, which streams failure details inline, and with a per-test `--test-timeout`, so a hang becomes a named failure. Then fix the cause. Do not add `--test-force-exit` alone, since that would hide the hang.
+
+## MA4-S1R3-CI2 — hosted CI recovery (follow-up, branch `ma4-s1r3-ci2`)
+
+The S1R3 results above stay as recorded. This section adds what CI2 found and fixed. Details are in
+[CI_STAGE2_DIAGNOSIS](CI_STAGE2_DIAGNOSIS.md), [CI_HOST_LIFECYCLE](CI_HOST_LIFECYCLE.md) and
+[CI_RECOVERY_EVIDENCE](CI_RECOVERY_EVIDENCE.md).
+
+**Original failure (T13.3 H appearance), test defect.** The test restarts a Host in-process on the same port. The
+restarted Host's first request reused a keep-alive socket that `fetch` pooled while talking to the first Host. On
+hosted Windows that socket was still open, because the first Host's socket close is deferred, and it was reset (`read
+ECONNRESET`). This is proven by a per-socket trace on the runner (run 39702421167).
+
+**Hang, test defect.** That failure happened inside `boot()`, after `startHost()`, so nothing owned the new Host. Its
+listener (`127.0.0.1:43910`, recorded by the handle report) kept the test-file process alive, and its state files
+raised the cleanup `EPERM` that replaced the original error. `boot()` now closes a Host whose setup fails, and the Host
+harnesses use one connection per request (9 files).
+
+**Failures the hang had hidden** (37 on the first complete hosted stage 2), all fixed:
+
+* **Product:** 8.3 short paths were refused as working directories, and `within()` rejected long spellings Git reports.
+  Git for Windows' UCRT64 layout was not found by `realGit()`. The local-only routing priority was ignored on a Host
+  without model facts, and hosted decision assistance was not suppressed under it; this is a **privacy defect**. Calculator acquisition
+  launched `calc.exe` before verifying the package and left an unverified app running. Each has a regression test.
+* **Test:** three fixtures with string path comparisons, hard-coded `mingw64` Git paths, two Host tests that read the
+  PC's own Codex/Ollama (now fixture probes through a test-only `startHost({ modelProbes })` seam), and one stage 3
+  fixture whose device-masking positive control could not be met on an 8.3 temp root.
+* **Live-only:** X53 needs a real Microsoft Calculator package. It is `SKIPPED (NOT TESTED)` on hosted runners and
+  still runs locally.
+
+**Overreach corrected.** The first 8.3 fix made `canonical()` native everywhere. That broke 63 staging and
+remote-authority tests on hosted runners (the staging alias check). It was reverted and confined to the two comparison
+points.
+
+**CI hardening.** Each `npm test` stage runs under `scripts/ci/watchdog.mjs` with a budget, the TAP reporter,
+per-test timeouts and an always-uploaded diagnostics artifact. A manual diagnostic workflow
+(`ci-stage2-diagnostic.yml`) adds handle reports and HTTP socket traces. `--test-force-exit` was not added to stage 2.
+
+**Hosted CI (run 39721263206 at `b49bb7c`): all three jobs green.** Stage 1 378/378; stage 2 1,639 pass / 0 fail / 2
+skipped; stage 3 58/58; stage 4 50 pass / 0 fail / 21 skipped (WSL2 sandbox, opt-in live); security audit 0
+advisories. **R3-G11: PASS** (hosted). G7 is unchanged: **FAIL** (v2 0/3, held-out 13/20). Cloud inference is DISABLED.
+Physical devices, installed release, WSL2 adversarial sandbox and live Calculator UIA remain **NOT TESTED** on hosted
+CI.

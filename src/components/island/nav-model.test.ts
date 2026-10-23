@@ -3,37 +3,60 @@ import assert from "node:assert/strict";
 import {
   activeNavView,
   deepLinkFromSearch,
+  isAdvancedNavSheet,
   isMainNavSheet,
-  NAV_MAIN,
+  NAV_ADVANCED,
+  NAV_PRIMARY,
   NAV_SYSTEM,
   NAV_VIEWS,
   sheetForView,
   VIEW_ALIASES,
 } from "./nav-model.ts";
 
-test("T13 nav: main navigation is Chat first, then the eight destinations in spec order", () => {
+test("T13 nav: everyday navigation is Home, Tasks, Projects, Agents", () => {
   assert.deepEqual(
-    NAV_MAIN.map((item) => item.label),
-    ["Chat", "Missions", "Agents", "Projects", "Files", "Approvals", "Activity", "Settings"],
+    NAV_PRIMARY.map((item) => item.label),
+    ["Home", "Tasks", "Projects", "Agents"],
   );
-  assert.equal(NAV_MAIN[0].sheet, "chat", "Chat is the default landing");
+  assert.equal(NAV_PRIMARY[0].sheet, "chat", "Home is the default landing");
+  for (const item of NAV_PRIMARY) assert.equal(isMainNavSheet(item.sheet), true);
 });
 
-test("T13 nav: Models and Devices sit in the separate System group, not the main nav", () => {
+test("T13 nav: advanced destinations keep every previous capability off the everyday path", () => {
+  assert.deepEqual(NAV_ADVANCED.map((item) => item.label), [
+    "Missions",
+    "Agentic teams",
+    "Studio",
+    "Widgets",
+    "Characters",
+    "Files",
+    "Approvals",
+    "Activity",
+    "Telemetry",
+    "Models",
+    "Devices",
+    "Settings",
+  ]);
+  for (const item of NAV_ADVANCED) assert.equal(isMainNavSheet(item.sheet), false, `${item.label} is not an everyday destination`);
   assert.deepEqual(NAV_SYSTEM.map((item) => item.label), ["Models", "Devices"]);
-  for (const item of NAV_SYSTEM) assert.equal(isMainNavSheet(item.sheet), false, `${item.label} is not a main destination`);
+  assert.equal(isAdvancedNavSheet("studio"), true);
 });
 
 test("T13 nav: every canonical view resolves to a surface, and the design preview is never a main destination", () => {
-  assert.equal(NAV_VIEWS.length, 11);
+  assert.equal(NAV_VIEWS.length, 17);
   for (const view of NAV_VIEWS) assert.ok(sheetForView(view), `${view} resolves`);
   assert.equal(isMainNavSheet("design-preview"), false, "the design preview is deep-link only");
+  assert.equal(sheetForView("studio"), "studio");
+  assert.equal(sheetForView("agents"), "agents", "Agents is the overview; Studio has its own view");
 });
 
 test("T13 nav: every legacy ?view value keeps working", () => {
   assert.equal(sheetForView("today"), "chat");
   assert.equal(sheetForView("agentic"), "missions", "agentic is the Missions surface");
-  assert.equal(sheetForView("agents"), "agents", "agents is now the Personal Agent Studio");
+  assert.equal(sheetForView("agents"), "agents", "agents is the Personal Agent overview");
+  assert.equal(sheetForView("studio"), "studio");
+  assert.equal(sheetForView("home"), "chat");
+  assert.equal(sheetForView("telemetry"), "system");
   assert.equal(sheetForView("models"), "provider");
   assert.equal(sheetForView("projects"), "project");
   assert.equal(sheetForView("history"), "tasks");
@@ -41,7 +64,7 @@ test("T13 nav: every legacy ?view value keeps working", () => {
   assert.equal(sheetForView("system"), "system");
   assert.equal(sheetForView("compose"), "compose");
   assert.equal(sheetForView("constellation"), "constellation");
-  assert.equal(Object.keys(VIEW_ALIASES).length, 19);
+  assert.equal(Object.keys(VIEW_ALIASES).length, 26);
 });
 
 test("T13 nav: unknown or missing views resolve to nothing so the caller keeps its surface", () => {
@@ -75,13 +98,18 @@ test("T13 nav: ?companion=1 always renders the companion, never the Devices page
 });
 
 test("T13 nav: the active item follows the surface, including drill-down surfaces", () => {
-  assert.equal(activeNavView(null), "chat", "the default landing is Chat");
+  assert.equal(activeNavView(null), "chat", "the default landing is Home");
   assert.equal(activeNavView("decision"), "approvals");
-  assert.equal(activeNavView("task"), "activity");
+  assert.equal(activeNavView("task"), "tasks");
+  assert.equal(activeNavView("tasks"), "tasks");
+  assert.equal(activeNavView("activity"), "activity");
+  assert.equal(activeNavView("studio"), "studio");
+  assert.equal(activeNavView("teams"), "teams");
+  assert.equal(activeNavView("system"), "telemetry");
   assert.equal(activeNavView("provider"), "models");
   assert.equal(activeNavView("phone"), "devices");
   assert.equal(activeNavView("design-preview"), "settings");
   assert.equal(activeNavView("project"), "projects");
   assert.equal(activeNavView("agentic"), "missions", "a legacy agentic sheet is the Missions surface");
-  assert.equal(activeNavView("today"), "chat", "a legacy today sheet is the Chat landing");
+  assert.equal(activeNavView("today"), "chat", "a legacy today sheet is the Home landing");
 });

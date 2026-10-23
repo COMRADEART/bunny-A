@@ -307,7 +307,7 @@ test("T3 §27/R19/R20: exact-model pins filter; pins the provider surface cannot
 });
 // ── §10 listing truth ────────────────────────────────────────────────────────
 test("T3 §10: discovered-model candidates come only from providers with real listing probes", () => {
-  assert.deepEqual(MODEL_SOURCE_PROVIDERS, ["ollama", "codex"], "only these providers have a real model-listing probe (T1)");
+  assert.deepEqual(MODEL_SOURCE_PROVIDERS, ["ollama", "codex", "openrouter"], "only these providers have a real model-listing probe (MA4 adds the approved OpenRouter catalogue)");
   const candidates = buildCandidates(baseInput({
     providers: [live("claude"), live("codex")],
     modelSnapshot: snapshot([codexSnapshot([codexFact("gpt-5.3")])]),
@@ -604,7 +604,7 @@ test("T3 §18/R34: the safe record carries no prompt text or secrets, caps candi
 });
 // ── §34 adapter tool contracts stay the MA2-verified truth ───────────────────
 test("T3 §34: the adapter tool contract table matches the verified execution surfaces", () => {
-  assert.deepEqual(ADAPTER_TOOL_CONTRACTS, { codex: true, claude: true, ollama: false });
+  assert.deepEqual(ADAPTER_TOOL_CONTRACTS, { codex: true, claude: true, ollama: false, openrouter: false });
   assert.equal(resolveCapability("ollama", fact({ model: "qwen3:8b", toolCalling: true }), "tools").provenance, "adapter_contract", "an adapter CANNOT is terminal, even against model metadata");
   assert.equal(resolveCapability("ollama", fact({ model: "qwen3:8b", toolCalling: true }), "tools").value, false);
   assert.equal(resolveCapability("codex", null, "tools").value, true);

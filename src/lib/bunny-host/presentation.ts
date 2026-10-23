@@ -233,7 +233,9 @@ export function taskStatus(task: OrchTask): { label: string; verification: strin
     stopped: "Task stopped",
   };
   return {
-    label: task.reconciliation?.required ? UNCERTAIN_LABEL : taskInterrupted(task) ? "Interrupted · retry available" : labels[task.state],
+    label: task.reconciliation?.required ? UNCERTAIN_LABEL : taskInterrupted(task) ? "Interrupted · retry available"
+      // MA4-S1R: the Host runtime watchdog stops with this exact reason; say so instead of a generic Stop.
+      : task.state === "stopped" && /^Runtime limit reached\b/.test(task.stopReason ?? "") ? "Stopped · runtime limit reached" : labels[task.state],
     verification: task.verification
       ? task.verification.passed
         ? "Verified by Bunny"

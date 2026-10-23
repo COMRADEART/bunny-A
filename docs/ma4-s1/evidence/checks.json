@@ -1,0 +1,96 @@
+{
+  "base": "2f2c54c629d67746fb0eba34aecb69aeb8eb738b",
+  "implementationCommit": "273c59791bee7c18679196dd0b7fd934a0d0a52f",
+  "environment": {
+    "platform": "win32",
+    "node": "v24.18.0"
+  },
+  "existingRegression": {
+    "command": "npm test",
+    "scriptRevision": "2f2c54c629d67746fb0eba34aecb69aeb8eb738b",
+    "exitCode": 0,
+    "groups": [
+      450,
+      1637,
+      58
+    ],
+    "passed": 2145,
+    "failed": 0,
+    "skipped": 0
+  },
+  "ma4": {
+    "command": "npm run test:ma4",
+    "passed": 18,
+    "failed": 0,
+    "liveSkipped": 1
+  },
+  "focused": {
+    "command": "node --experimental-strip-types --test src/lib/bunny-host/ma4.test.ts src/lib/bunny-host/ma4.live.test.ts src/lib/bunny-host/t3-manager.test.ts src/lib/bunny-host/intelligence-host.test.ts src/lib/bunny-host/connections.test.ts src/lib/bunny-host/routing.test.ts src/lib/bunny-host/model-capability.test.ts src/lib/bunny-missions/scheduler.test.ts",
+    "passed": 135,
+    "failed": 0,
+    "liveSkipped": 1
+  },
+  "ui": {
+    "command": "npm run test:ui",
+    "passed": 405,
+    "failed": 0,
+    "skipped": 0
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "exitCode": 0
+  },
+  "webBuild": {
+    "command": "npm run build",
+    "exitCode": 0,
+    "databaseMigration": "skipped; DATABASE_URL unset"
+  },
+  "localProbe": {
+    "endpoint": "http://127.0.0.1:11434/api/tags",
+    "reachable": true,
+    "modelCount": 5,
+    "inferenceRun": false
+  },
+  "externalInferenceExecuted": false,
+  "liveEvaluationScoresCreated": false,
+  "preservation": {
+    "preExistingModifiedEvidencePaths": 32,
+    "ma3AcceptanceRecordsCommitted": 0,
+    "productionReleaseActivated": false
+  },
+  "desktopBuild": {
+    "command": "$env:JEV_DESKTOP_BUILD='1'; npm run build",
+    "exitCode": 0
+  },
+  "status": "PARTIAL",
+  "notes": [
+    "Full existing regression started during implementation. Final affected suites were rerun after later source changes.",
+    "No live inference or real model performance claimed.",
+    "Windows desktop build matches dev; Vercel-target preview renders but remains disconnected from the local Host."
+  ],
+  "smoke": {
+    "dev": {
+      "command": "node scripts/browser-smoke.mjs http://127.0.0.1:8080/ screenshots/ma4-dev.png",
+      "exitCode": 0
+    },
+    "desktopBuilt": {
+      "command": "node scripts/browser-smoke.mjs http://127.0.0.1:8081/ screenshots/ma4-desktop-built.png --baseline screenshots/ma4-dev.json",
+      "exitCode": 0,
+      "divergesFromBaseline": false
+    },
+    "webBuilt": {
+      "exitCode": 0,
+      "divergesFromBaseline": true,
+      "limitation": "Vercel preview does not establish local Host connection; Windows desktop build does."
+    }
+  },
+  "screenshots": {
+    "screenshots/ma4-dev.png": "a4983166109b7c5c10ac65344917daacafbf5b5bbf906e62d0a8333d224aa56a",
+    "screenshots/ma4-dev-mobile.png": "319610e721c446fb5864dedbb5f75b1f6845dbccd15e49ac1d89efeba9dd432a",
+    "screenshots/ma4-built.png": "bd7f66e1847e9999c5daacb2a8f17e17e686eccc4f8950601bfa2c82cbdfa510",
+    "screenshots/ma4-built-mobile.png": "0bfe4b604125f2debefe75a1d50e80d9b411762269d08e65d00e01d2496ac400",
+    "screenshots/ma4-desktop-built.png": "6744ad0f38347dc8fbd36d073379f8da88b8163da83ba3c83e993fdc57c27e73",
+    "screenshots/ma4-desktop-built-mobile.png": "c13c153499d8826d62c680ab3ced45c9342e0d7f44e0f8ed09aea29f292cf176"
+  },
+  "artifactNormalization": "UTF-8; ANSI terminal escapes and trailing whitespace removed; result text unchanged."
+}

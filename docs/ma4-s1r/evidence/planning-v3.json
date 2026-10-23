@@ -1,0 +1,80 @@
+{
+  "version": "bunny-ma4-s1r-local-v3",
+  "at": "2026-10-20T22:26:43.821Z",
+  "fixtureHash": "381416f2354c2c859ffb80d1749d0ab6a03a5f453273071899ae169f73e416f2",
+  "prompt": "Put these dependent steps in order: package depends on test; test depends on compile. Reply only the step names separated by commas, without spaces.",
+  "referenceAnswerChanged": false,
+  "concurrentActivity": "Existing regression tests running; latency is descriptive only",
+  "samples": [
+    {
+      "arm": "model",
+      "model": "qwen2.5-coder:7b",
+      "caseId": "planning",
+      "ok": true,
+      "correct": true,
+      "latencyMs": 6175,
+      "receipt": {
+        "model": "qwen2.5-coder:7b",
+        "doneReason": "stop",
+        "promptEvalCount": 58,
+        "evalCount": 5,
+        "totalDurationNs": 6092903200,
+        "loadDurationNs": 5771353500,
+        "promptEvalDurationNs": 164340000,
+        "evalDurationNs": 151715000,
+        "requestedAt": 1792535175390,
+        "firstTokenAt": 1792535181335,
+        "finishedAt": 1792535181489
+      },
+      "syntheticOutput": "compile,test,package",
+      "outputHash": "42a7471036d6744972fc597b6b6f09847ce1815fd0edb806b3841abff5e05691"
+    },
+    {
+      "arm": "model",
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "caseId": "planning",
+      "ok": true,
+      "correct": true,
+      "latencyMs": 8186,
+      "receipt": {
+        "model": "huihui_ai/qwen2.5-abliterate:7b",
+        "doneReason": "stop",
+        "promptEvalCount": 58,
+        "evalCount": 5,
+        "totalDurationNs": 8096422500,
+        "loadDurationNs": 7795969700,
+        "promptEvalDurationNs": 147408000,
+        "evalDurationNs": 147445000,
+        "requestedAt": 1792535181575,
+        "firstTokenAt": 1792535189536,
+        "finishedAt": 1792535189686
+      },
+      "syntheticOutput": "compile,test,package",
+      "outputHash": "42a7471036d6744972fc597b6b6f09847ce1815fd0edb806b3841abff5e05691"
+    },
+    {
+      "arm": "auto",
+      "model": "huihui_ai/qwen2.5-abliterate:7b",
+      "caseId": "planning",
+      "ok": true,
+      "correct": false,
+      "latencyMs": 7852,
+      "syntheticOutput": "compile,test包依赖于测试,测试依赖于编译.因此,按顺序为: compile,test",
+      "outputHash": "074966c4b4c2ad30e907ee83084863f5bbfbf359f3d30a66c2959a368a54f223",
+      "inputTokens": 58,
+      "outputTokens": 22
+    },
+    {
+      "arm": "fixed",
+      "model": "qwen2.5-coder:7b",
+      "caseId": "planning",
+      "ok": true,
+      "correct": true,
+      "latencyMs": 6094,
+      "syntheticOutput": "compile,test,package",
+      "outputHash": "42a7471036d6744972fc597b6b6f09847ce1815fd0edb806b3841abff5e05691",
+      "inputTokens": 58,
+      "outputTokens": 5
+    }
+  ]
+}

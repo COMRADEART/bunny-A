@@ -1,0 +1,65 @@
+✖ S1R: incomplete streams and served-model substitutions cannot certify success (22.7808ms)
+✖ S1R: nonstream substitutions, missing completion and malformed JSON fail validation (0.8944ms)
+✖ S1R: actual architecture-qualified Ollama context metadata is discovered (3.0229ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 228.0135
+
+✖ failing tests:
+
+test at src\lib\bunny-host\ma4-s1r.test.ts:7:1
+✖ S1R: incomplete streams and served-model substitutions cannot certify success (22.7808ms)
+  AssertionError [ERR_ASSERTION]: {"model":"pinned","response":"partial"}
+  
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///<workspace>/src/lib/bunny-host/ma4-s1r.test.ts:14:14)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\lib\bunny-host\ma4-s1r.test.ts:20:1
+✖ S1R: nonstream substitutions, missing completion and malformed JSON fail validation (0.8944ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///<workspace>/src/lib/bunny-host/ma4-s1r.test.ts:25:14)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at src\lib\bunny-host\ma4-s1r.test.ts:30:1
+✖ S1R: actual architecture-qualified Ollama context metadata is discovered (3.0229ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  null !== 32768
+  
+      at TestContext.<anonymous> (file:///<workspace>/src/lib/bunny-host/ma4-s1r.test.ts:37:12)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: null,
+    expected: 32768,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

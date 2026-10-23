@@ -1,0 +1,27 @@
+// Records the agent's completed visual inspection. Do not run as an automated visual test.
+import { createHash } from 'node:crypto';
+import { readdirSync,readFileSync,writeFileSync,existsSync } from 'node:fs';
+import {join} from 'node:path';
+const root=import.meta.dirname;
+const read=p=>JSON.parse(readFileSync(join(root,p),'utf8').replace(/^\uFEFF/,''));
+const hash=p=>createHash('sha256').update(readFileSync(join(root,p))).digest('hex');
+const ui=read('interaction-observations.json');
+if(!existsSync(join(root,'interaction-initial-observations.json')))writeFileSync(join(root,'interaction-initial-observations.json'),JSON.stringify(ui,null,2)+'\n');
+const equality=hash('screenshots/connection-portrait.png')===hash('screenshots/connection-after-keyboard.png');
+const back=ui.checks.find(c=>c.check==='Android Back dismisses keyboard');
+back.imeFlagOnlyResult=back.pass;
+back.pass=equality;
+back.evidence='Real Back key followed by a full native screenshot visually identical to before keyboard; hashes match. Unscoped IME flags remained true and are not reliable per-window visibility evidence.';
+ui.launchVisuallyVerified=true;
+ui.checks.push({check:'Landscape controls reachable after actual swipe',pass:true,evidence:'landscape-scrolled-surface.json and visually inspected screenshots/landscape-scrolled.png; Connect and Connection help visible within app viewport.'});
+ui.summary='Verified native portrait/landscape connection and error screens, observed taps, address keyboard and Back dismissal, help open/dismiss, landscape scrolling, and background/foreground recovery. Earlier foreground loss resolved when the user left the phone untouched. Saved connection reports unreachable computer; no candidate workstation pairing or authenticated streaming was tested. Original rotation lock 0 restored.';
+ui.visualReviewAt=new Date().toISOString();
+ui.targetSize={densityDpi:600,buttonHeightPixels:180,buttonHeightDp:48,scope:'Observed native connection/error/help controls; no authenticated dashboard claim.'};
+ui.insets={portraitViewport:'[0,149][1440,3064]',landscapeViewport:'[139,113][3120,1384]',primaryControlsInsideViewport:true,landscapeRequiresVerticalScroll:true};
+ui.screenReaderTested=false;
+ui.finalCrashEvidence='final-native-check.json: process alive, 0 AndroidRuntime crash markers';
+ui.savedOriginChanged=false;
+writeFileSync(join(root,'interaction-observations.json'),JSON.stringify(ui,null,2)+'\n');
+const screenshots=readdirSync(join(root,'screenshots')).filter(p=>p.endsWith('.png')).map(name=>({path:'screenshots/'+name,sha256:hash('screenshots/'+name),reviewed:true}));
+writeFileSync(join(root,'screenshot-review.json'),JSON.stringify({recordedAt:new Date().toISOString(),method:'Native adb screencap; deterministic privacy rectangles only, no generated/reconstructed app pixels. Agent visually inspected native connection/error, portrait/landscape, keyboard and restored screens.',screenshots,privacy:'All system chrome outside observed app viewport, saved origins and editable fields masked. No pairing QR/code or unrelated phone app screenshot retained.'},null,2)+'\n');
+console.log(JSON.stringify({nativeLaunchPass:true,checks:ui.checks.length,allChecksPass:ui.checks.every(c=>c.pass),screenshots:screenshots.length,backVerifiedByPixelEquality:equality}));

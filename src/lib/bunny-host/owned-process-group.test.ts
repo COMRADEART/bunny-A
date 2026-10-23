@@ -3,14 +3,16 @@ import test from "node:test";
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { runCommand, resolveCommand } from "../bunny-missions/capabilities/process.server.ts";
+import { dirname, join, relative, resolve } from "node:path";
+import { realGit, runCommand, resolveCommand } from "../bunny-missions/capabilities/process.server.ts";
 import { recoverOwnedGitOperations, windowsArgument, windowsEnvironment, windowsOwnershipModule } from "./owned-process-group.server.ts";
 import { stopOwnedChildren } from "./owned-processes.server.ts";
 const windows=process.platform==="win32";
 const hook=resolve("scripts/fixtures/git-hook-child.mjs");
 const launcher=windows?"C:\\Program Files\\Git\\cmd\\git.exe":"git";
-const worker=windows?"C:\\Program Files\\Git\\mingw64\\bin\\git.exe":"git";
+// The real binary next to the launcher: <Git>\ucrt64\bin on current Git for Windows, <Git>\mingw64\bin before it.
+const worker=windows?realGit(launcher):"git";
+const workerFolder=windows?relative("C:\\Program Files\\Git",dirname(worker)).replace(/\\/g,"/"):"mingw64/bin";
 const alive=(pid:number)=>{try{process.kill(pid,0);return true;}catch{return false;}};
 const delay=(ms:number)=>new Promise(done=>setTimeout(done,ms));
 function fixture(mode="normal") {
@@ -43,9 +45,9 @@ test("T4: native API rejects a foreign external and arbitrary PID authority",{sk
   assert.throws(()=>windowsOwnershipModule().close({pid:process.pid}),/live group identity/);
 });
 test("T4: absolute launchers resolve canonically and receive ownership",{skip:!windows},()=>{
-  for(const folder of ["cmd","bin","mingw64/bin"]){const file=`C:/Program Files/Git/${folder}/git.exe`;assert.ok(existsSync(file));assert.equal(resolveCommand(file)?.owned,true);}
+  for(const folder of ["cmd","bin",workerFolder]){const file=`C:/Program Files/Git/${folder}/git.exe`;assert.ok(existsSync(file));assert.equal(resolveCommand(file)?.owned,true);}
 });
-for(const folder of ["cmd","bin","mingw64/bin"]) test(`T4: ${folder} launcher normal hook is kernel owned`,{skip:!windows},async()=>{
+for(const folder of ["cmd","bin",workerFolder]) test(`T4: ${folder} launcher normal hook is kernel owned`,{skip:!windows},async()=>{
   const f=fixture();try{const r=await f.run(`C:/Program Files/Git/${folder}/git.exe`);assert.equal(r.exitCode,0);assert.equal(r.ownership?.state,"succeeded");assert.equal(r.ownership?.closed,true);assert.equal(r.ownership?.breakaway,false);assert.notEqual(f.git("rev-parse","HEAD").trim(),f.head);}finally{f.cleanup();}
 });
 for(const mode of ["sleep","wait-child","nested","output"]) test(`T4: Stop kills ${mode} hook tree and closes output pipes`,{skip:!windows},async()=>{

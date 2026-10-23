@@ -18,7 +18,8 @@ async function fixture(extraArgs = ["--output", "null", "--input-silence"]) {
     for (;;) {
       const event = events.find(predicate);
       if (event) return event;
-      if (performance.now() - start > timeout) throw new Error(`Worker event timed out: ${events.slice(-6).map(e => e.ev).join(",")}`);
+      // The tail carries each event's code/reason/turn, so a hosted failure names its cause, not only the event names.
+      if (performance.now() - start > timeout) throw new Error(`Worker event timed out: ${events.slice(-8).map(e => { const x = e as Record<string, unknown>; return [x.ev, x.turn, x.code, x.reason, x.message].filter(v => v !== undefined && v !== null).join(":"); }).join(", ")}`);
       await sleep(10);
     }
   };
@@ -52,6 +53,22 @@ test("T12 native fixture: continuous input and actual synthesis/null playback op
     const levels = h.events.filter(e => e.ev === "level").length;
     await sleep(250);
     assert.ok(h.events.filter(e => e.ev === "level").length > levels, "speech cancellation does not stop continuous input");
+  } finally { await h.close(); }
+});
+
+// MA4-S2R1 (hosted CI 39921539119): the hosted runner loaded the dictation recognizer slowly enough that the attached
+// duplex turn queue filled before its reader started; the turn died with capture.error before capture.first_audio.
+test("T12 native fixture: a slow recognizer start never overflows the attached continuous turn", { skip: !windows }, async () => {
+  const h = await fixture(["--output", "null", "--input-silence", "--fixture-recognizer-delay-ms", "6500"]);
+  try {
+    await start(h);
+    h.worker.send({ op: "capture.start", turn: "slow", gen: 7, device: -1, endpointing: "manual", maxMs: 10_000, duplex: true, session: "fixture-duplex" });
+    await h.until(e => e.ev === "capture.started" && e.turn === "slow");
+    await h.until(e => e.ev === "capture.first_audio" && e.turn === "slow");
+    assert.equal(h.events.some(e => e.ev === "capture.error"), false, "no capture error while the recognizer was loading");
+    const levels = h.events.filter(e => e.ev === "level").length;
+    await sleep(250);
+    assert.ok(h.events.filter(e => e.ev === "level").length > levels, "the turn keeps consuming continuous input");
   } finally { await h.close(); }
 });
 
@@ -147,6 +164,15 @@ test("T12 native identity: changing enumeration cannot reuse a cached render ind
     // Render-identity guard checks only; these keys claim no echo cancellation.
     assert.equal(event.results.renderIdentityInitiallyMatches, true);
     assert.equal(event.results.renderIdentityReorderRefused, true);
+  } finally { await h.close(); }
+});
+
+test("T12 native selftest: an unread continuous turn keeps its newest frames; a reader that falls behind is BUFFER_LIMIT", { skip: !windows }, async () => {
+  const h = await fixture(["--selftest"]);
+  try {
+    const event = await h.until(e => String(e.ev) === "selftest") as unknown as { results: Record<string, unknown> };
+    assert.equal(event.results.turnFramesKeepsNewestBeforeRead, true);
+    assert.equal(event.results.turnFramesOverflowAfterRead, "BUFFER_LIMIT");
   } finally { await h.close(); }
 });
 

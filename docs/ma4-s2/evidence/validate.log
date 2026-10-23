@@ -1,0 +1,121 @@
+  C tr-slug#1 Planner#0 ok
+  C tr-slug#1 Worker#0 ok
+  C tr-slug#1 Tester#0 ok
+  C tr-slug#1 attempt 0: static=true hidden=true tester=true → none
+  C tr-slug#1 Reviewer#1 ok
+C tr-slug#1: passed (Deterministic gate passed after 0 repair(s).)
+  C tr-intervals#1 Planner#0 ok
+  C tr-intervals#1 Worker#0 ok
+  C tr-intervals#1 Tester#0 ok
+  C tr-intervals#1 failure implementation_defect → worker
+  C tr-intervals#1 attempt 0: static=true hidden=false tester=true → worker
+  C tr-intervals#1 Worker#1 ok
+  C tr-intervals#1 failure implementation_defect → worker
+  C tr-intervals#1 attempt 1: static=true hidden=false tester=true → worker
+  C tr-intervals#1 Worker#2 ok
+  C tr-intervals#1 failure implementation_defect → worker
+  C tr-intervals#1 failure implementation_defect → worker
+  C tr-intervals#1 attempt 2: static=true hidden=false tester=false → worker,worker
+  C tr-intervals#1 Reviewer#3 ok
+C tr-intervals#1: failed (Deterministic gate failed after 2 repair(s): independent acceptance tests.)
+  C tr-isodate#1 Planner#0 ok
+  C tr-isodate#1 Worker#0 ok
+  C tr-isodate#1 Worker#0 ok
+  C tr-isodate#1 Worker#0 ok
+  C tr-isodate#1 Tester#0 ok
+  C tr-isodate#1 samples: 0:9/9 1:9/9 2:9/9 → 0
+  C tr-isodate#1 attempt 0: static=true hidden=true tester=true → none
+  C tr-isodate#1 Reviewer#1 ok
+C tr-isodate#1: passed (Deterministic gate passed after 0 repair(s).)
+  C tr-csvline#1 Planner#0 ok
+  C tr-csvline#1 Worker#0 ok
+  C tr-csvline#1 Worker#0 ok
+  C tr-csvline#1 Tester#0 ok
+  C tr-csvline#1 samples: 0:5/6 1:5/6 → 0
+  C tr-csvline#1 failure implementation_defect → worker
+  C tr-csvline#1 failure implementation_defect → worker
+  C tr-csvline#1 attempt 0: static=true hidden=false tester=false → worker,worker
+  C tr-csvline#1 Worker#1 ok
+  C tr-csvline#1 repair unproductive (identical artifacts); stopping
+  C tr-csvline#1 Reviewer#1 ok
+C tr-csvline#1: failed (Deterministic gate failed after 1 repair(s): independent acceptance tests.)
+  C tr-median#1 Planner#0 ok
+  C tr-median#1 Worker#0 ok
+  C tr-median#1 Tester#0 ok
+  C tr-median#1 attempt 0: static=true hidden=true tester=true → none
+  C tr-median#1 Reviewer#1 ok
+C tr-median#1: passed (Deterministic gate passed after 0 repair(s).)
+  C tr-median#1 Planner#0 ok
+  C tr-median#1 Worker#0 ok
+  C tr-median#1 Tester#0 ok
+  C tr-median#1 attempt 0: static=true hidden=true tester=true → none
+  C tr-median#1 Reviewer#1 ok
+C tr-median#1: passed (Deterministic gate passed after 0 repair(s).)
+{
+ "phase": "validate",
+ "summary": {
+  "byArm": {
+   "C": {
+    "trials": 6,
+    "passed": 4,
+    "passInterval": [
+     0.2999883213415286,
+     0.9032306674407832
+    ],
+    "firstAttempt": 4,
+    "byKind": {
+     "simple": "1/1",
+     "intermediate": "0/2",
+     "strict": "1/1",
+     "debugging": "2/2"
+    },
+    "statuses": {
+     "passed": 4,
+     "failed": 2
+    },
+    "repairsUsed": 3,
+    "passedAfterRepair": 0,
+    "modelCalls": 30,
+    "promptTokens": 22116,
+    "outputTokens": 7294,
+    "truncated": 0,
+    "modelLoads": 18,
+    "modelSwitches": 12,
+    "peakConcurrent": 1,
+    "callLatencyMs": {
+     "median": 18445,
+     "p95": 59896
+    },
+    "trialMs": {
+     "total": 760487,
+     "median": 170231
+    },
+    "failureCategories": {
+     "implementation_defect": 6
+    },
+    "reviewerFalseApprovals": 0,
+    "guidanceShown": 6,
+    "skillsUsed": 6,
+    "handoffs": 57,
+    "handoffsRefused": 0,
+    "invariants": {
+     "pinsHeld": true,
+     "gateIsAuthority": true,
+     "noHandoffRefused": true
+    }
+   }
+  },
+  "externalRequestsRefused": 0,
+  "memoryWaitSamples": 0,
+  "minFreeGiB": 8.11,
+  "ledger": {
+   "id": "s2-validate",
+   "state": "completed",
+   "persisted": true,
+   "counts": {
+    "done": 6
+   },
+   "attempts": 6
+  }
+ }
+}

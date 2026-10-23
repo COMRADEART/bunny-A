@@ -6,8 +6,9 @@ import { statSync } from "node:fs";
 import { scopedPath } from "./paths.server.ts";
 import { CommandRefusedError } from "../bunny-host/failure.server.ts";
 import { WorkstationRequiredError } from "../bunny-host/device-authority.server.ts";
+import { SelectionSchema } from "../bunny-host/ma4/selection.ts";
 
-const PROVIDERS: ProviderId[] = ["codex", "claude", "ollama", "opencode", "cline", "cursor"];
+const PROVIDERS: ProviderId[] = ["codex", "claude", "ollama", "opencode", "cline", "cursor", "openrouter"];
 const GRANTS: GrantPolicy[] = ["always_allow", "allow_for_mission", "ask_every_time", "read_only", "never_allow"];
 function text(value: unknown, max = 8000): string { if (typeof value !== "string" || !value.trim() || value.length > max) throw new CommandRefusedError("Invalid or oversized text."); return value; }
 function id(value: unknown): string { const out = text(value, 200); if (!/^[A-Za-z0-9._:-]+$/.test(out)) throw new CommandRefusedError("Invalid id."); return out; }
@@ -52,7 +53,7 @@ export async function missionCommand(missions: MissionManager, action: string, d
       let providers: ProviderId[] | null = null;
       if (data.providers !== undefined) { if (!Array.isArray(data.providers) || data.providers.some((p) => !PROVIDERS.includes(p as ProviderId))) throw new CommandRefusedError("Invalid provider list."); providers = data.providers as ProviderId[]; }
       if (data.localOnly !== undefined && typeof data.localOnly !== "boolean") throw new CommandRefusedError("localOnly must be true or false.");
-      return { mission: missions.create({ objective: text(data.objective), title: data.title === undefined ? undefined : text(data.title, 200), mode: mode as Mode, projectId: data.projectId == null ? null : id(data.projectId), steps: data.steps, localOnly: data.localOnly === true, providers, origin: access.actor }) };
+      return { mission: missions.create({ objective: text(data.objective), title: data.title === undefined ? undefined : text(data.title, 200), mode: mode as Mode, projectId: data.projectId == null ? null : id(data.projectId), steps: data.steps, localOnly: data.localOnly === true, providers, origin: access.actor, ...(data.modelSelection === undefined ? {} : { modelSelection: SelectionSchema.parse(data.modelSelection) }) }) };
     }
     case "mission.plan": case "mission.replan":
       teamRoute(missions, data.id);

@@ -1,0 +1,5590 @@
+{
+  "version": "bunny-ma4-s1r2-g7-v1",
+  "pin": "qwen2.5-coder:7b",
+  "strategy": "s1r4-v3c",
+  "pins": {
+    "Planner": "qwen2.5-coder:7b",
+    "Worker": "qwen2.5-coder:7b",
+    "Tester": "huihui_ai/qwen2.5-abliterate:7b",
+    "Reviewer": "qwen2.5-coder:7b"
+  },
+  "trials": {
+    "regression": 3,
+    "heldout": 2
+  },
+  "startedAt": "2026-10-22T21:08:37.738Z",
+  "sandbox": {
+    "available": true,
+    "backend": "wsl2-userns-pivot_root-cgroupv2",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2"
+  },
+  "taskHash": "aa5d5c19d80e611ebee8ab37f2a3bf9f86d0553aedeccf7cda5f346fa09b4cb8",
+  "preflight": [
+    {
+      "task": "g7-v2-duration",
+      "referencePasses": true
+    },
+    {
+      "task": "s1-anagram",
+      "referencePasses": true
+    },
+    {
+      "task": "s2-chunk",
+      "referencePasses": true
+    },
+    {
+      "task": "s3-title",
+      "referencePasses": true
+    },
+    {
+      "task": "i1-roman",
+      "referencePasses": true
+    },
+    {
+      "task": "i2-kv",
+      "referencePasses": true
+    },
+    {
+      "task": "i3-lru",
+      "referencePasses": true
+    },
+    {
+      "task": "d1-flatten",
+      "referencePasses": true
+    },
+    {
+      "task": "d2-moving",
+      "referencePasses": true
+    },
+    {
+      "task": "p1-inventory",
+      "referencePasses": true
+    },
+    {
+      "task": "p2-bucket",
+      "referencePasses": true
+    }
+  ],
+  "runs": [
+    {
+      "task": "g7-v2-duration",
+      "kind": "regression",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "durationMs": 100644,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 3,
+            "valid": 3,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false,
+          "durationMs": 1559,
+          "failures": [
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            }
+          ],
+          "repaired": [
+            "Worker"
+          ],
+          "workerFeedback": "An independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "An independent acceptance suite also failed (details withheld)."
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "not_retested",
+          "previousSha256": "ff68c2d0491681f52aea2167ae018298090b920221751da19b65ec856ffd6313",
+          "proposedSha256": "ff68c2d0491681f52aea2167ae018298090b920221751da19b65ec856ffd6313",
+          "proposal": "identical",
+          "remaining": 1
+        }
+      ],
+      "failures": [
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 0,
+          "failingStage": "review",
+          "failureCategory": "reviewer_false_approval",
+          "suspectedComponent": "reviewer",
+          "evidence": [
+            "Reviewer approved a result the deterministic gate rejects; approval blocked"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "block_approval",
+          "retryBudgetRemaining": 1
+        }
+      ],
+      "contractVersion": "contract:d7c8cdafe62510a7",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": true,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 22618,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703322345,
+          "endedAt": 1792703344966
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 14558,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703344968,
+          "endedAt": 1792703359526
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 31308,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792703344970,
+          "endedAt": 1792703376278
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 16777,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703376279,
+          "endedAt": 1792703393056
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 10974,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703393057,
+          "endedAt": 1792703404031
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 9526,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703411468,
+          "endedAt": 1792703420994
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 1975,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703420995,
+          "endedAt": 1792703422971
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "ff68c2d0491681f52aea2167ae018298090b920221751da19b65ec856ffd6313",
+      "finalSource": "import re\nfrom typing import Optional\n\ndef parse_duration(text: str) -> int:\n    # Regular expression to match the duration string\n    pattern = r'^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$'\n    match = re.match(pattern, text)\n    \n    if not match:\n        raise ValueError(\"Invalid duration format\")\n    \n    hours, minutes, seconds = match.groups()\n    hours = int(hours) if hours else 0\n    minutes = int(minutes) if minutes else 0\n    seconds = int(seconds) if seconds else 0\n    \n    return hours * 3600 + minutes * 60 + seconds\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 3,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "5099ff404ec742d326470a2fbc1e52c94318bedcd796c06ab37a346d42a805a9",
+          "staticOk": true,
+          "testsPassed": 0,
+          "testsTotal": 3,
+          "selected": false
+        },
+        {
+          "index": 1,
+          "sha256": "ff68c2d0491681f52aea2167ae018298090b920221751da19b65ec856ffd6313",
+          "staticOk": true,
+          "testsPassed": 3,
+          "testsTotal": 3,
+          "selected": true
+        },
+        {
+          "index": 2,
+          "sha256": "3d0316c7df33be01ea0a94ad2a8600b881c1122ece6c03e29270790db025afc0",
+          "staticOk": true,
+          "testsPassed": 3,
+          "testsTotal": 3,
+          "selected": false
+        }
+      ],
+      "toolCalls": 14,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 22618,
+          "doneReason": "stop",
+          "promptTokens": 228,
+          "outputTokens": 387,
+          "evalNs": 16151385000,
+          "loadNs": 6016610600
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14558,
+          "doneReason": "stop",
+          "promptTokens": 719,
+          "outputTokens": 324,
+          "evalNs": 13818081000,
+          "loadNs": 11364500
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 31308,
+          "doneReason": "stop",
+          "promptTokens": 758,
+          "outputTokens": 153,
+          "evalNs": 6434138000,
+          "loadNs": 24108104900
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 16777,
+          "doneReason": "stop",
+          "promptTokens": 719,
+          "outputTokens": 212,
+          "evalNs": 8998782000,
+          "loadNs": 7071686500
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10974,
+          "doneReason": "stop",
+          "promptTokens": 719,
+          "outputTokens": 254,
+          "evalNs": 10834210000,
+          "loadNs": 9311700
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9526,
+          "doneReason": "stop",
+          "promptTokens": 928,
+          "outputTokens": 211,
+          "evalNs": 8995514000,
+          "loadNs": 8309500
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 1975,
+          "doneReason": "stop",
+          "promptTokens": 942,
+          "outputTokens": 26,
+          "evalNs": 1060303000,
+          "loadNs": 11527400
+        }
+      ]
+    },
+    {
+      "task": "g7-v2-duration",
+      "kind": "regression",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 302844,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 3,
+            "valid": 3,
+            "failedValid": [
+              "test_generated.TestParseDuration.test_1h30m"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1834,
+          "failures": [
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            },
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "test_invalid",
+              "suspectedComponent": "tester",
+              "evidence": [
+                "test_generated.TestParseDuration.test_1h30m fails on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_tester",
+              "retryBudgetRemaining": 2,
+              "defect": "semantic"
+            }
+          ],
+          "repaired": [
+            "Worker",
+            "Tester"
+          ],
+          "workerFeedback": "An independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "test_generated.TestParseDuration.test_1h30m contradicts the frozen task contract at line 6: self.assertEqual(parse_duration('1h30m'), 9000) (AssertionError)",
+          "feedback": "An independent acceptance suite also failed (details withheld)."
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 3,
+            "valid": 3,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false,
+          "durationMs": 4254,
+          "failures": [
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 1,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 1
+            }
+          ],
+          "repaired": [
+            "Worker"
+          ],
+          "workerFeedback": "An independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "An independent acceptance suite also failed (details withheld)."
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 3,
+            "valid": 3,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false,
+          "durationMs": 1301,
+          "failures": [
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 2,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 0
+            }
+          ],
+          "repaired": [],
+          "workerFeedback": "An independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "An independent acceptance suite also failed (details withheld)."
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "8703c6ea40448b47facf3a0dcaf975f7c659b03419caf05a3e3d0e71b8703d23",
+          "proposedSha256": "8703c6ea40448b47facf3a0dcaf975f7c659b03419caf05a3e3d0e71b8703d23",
+          "proposal": "identical",
+          "remaining": 1
+        },
+        {
+          "round": 1,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "test_generated.TestParseDuration.test_1h30m fails on the frozen reference"
+          ],
+          "outcome": "resolved",
+          "previousSha256": "2d83f3f806bfba88140b3aac2e8d0e83ed5ed96efeecbaad4ffe82fca36df0b3",
+          "proposedSha256": "a87e5c2f4e0b3d9ccf7027aef5771ad3bc1e90c063448979e1ebabe2ee9cae91",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "8703c6ea40448b47facf3a0dcaf975f7c659b03419caf05a3e3d0e71b8703d23",
+          "proposedSha256": "3bee9d5a5e8d3147a6b7d00e8a9d3526b86e1af9fbc3e02b5623cfe623442abd",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "test_invalid",
+          "suspectedComponent": "tester",
+          "evidence": [
+            "test_generated.TestParseDuration.test_1h30m fails on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_tester",
+          "retryBudgetRemaining": 2,
+          "defect": "semantic"
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 1,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 1
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 2,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 0
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 2,
+          "failingStage": "review",
+          "failureCategory": "reviewer_false_approval",
+          "suspectedComponent": "reviewer",
+          "evidence": [
+            "Reviewer approved a result the deterministic gate rejects; approval blocked"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "block_approval",
+          "retryBudgetRemaining": 0
+        }
+      ],
+      "contractVersion": "contract:2ed59f4f6a4e0f9b",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": true,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 19849,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703423174,
+          "endedAt": 1792703443024
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 13701,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703443024,
+          "endedAt": 1792703456726
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 28238,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792703443025,
+          "endedAt": 1792703471263
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 100638,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703471263,
+          "endedAt": 1792703571901
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 91911,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703571902,
+          "endedAt": 1792703663813
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 15300,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792703670062,
+          "endedAt": 1792703685362
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 34418,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703670061,
+          "endedAt": 1792703704479
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 14018,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703708734,
+          "endedAt": 1792703722752
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 1964,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703724053,
+          "endedAt": 1792703726017
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "3bee9d5a5e8d3147a6b7d00e8a9d3526b86e1af9fbc3e02b5623cfe623442abd",
+      "finalSource": "import re\nfrom typing import Union\n\ndef parse_duration(text: str) -> int:\n    # Regular expression to match the duration string with units in the correct order\n    pattern = r'^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$'\n    match = re.match(pattern, text)\n    \n    if not match:\n        raise ValueError(\"Invalid duration format\")\n    \n    hours, minutes, seconds = match.groups()\n    \n    # Convert extracted parts to integers\n    hours = int(hours) if hours else 0\n    minutes = int(minutes) if minutes else 0\n    seconds = int(seconds) if seconds else 0\n    \n    # Check if the unit is valid and in the correct order\n    if (hours, minutes, seconds).count(None) > 1:\n        raise ValueError(\"Invalid duration format\")\n    \n    # Calculate total seconds\n    total_seconds = hours * 3600 + minutes * 60 + seconds\n    \n    return total_seconds\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 3,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "8703c6ea40448b47facf3a0dcaf975f7c659b03419caf05a3e3d0e71b8703d23",
+          "staticOk": true,
+          "testsPassed": 2,
+          "testsTotal": 3,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "e7b7a2e3e98acc5f1c09b77574c205689d46e0ff43899449e1e51ed8bdfefc8a",
+          "staticOk": false,
+          "testsPassed": 0,
+          "testsTotal": 0,
+          "selected": false
+        },
+        {
+          "index": 2,
+          "sha256": "eddf2b0ef3439209a3754deb30dcdba4b005c01b25825848e8852a0dd20dad5f",
+          "staticOk": false,
+          "testsPassed": 0,
+          "testsTotal": 0,
+          "selected": false
+        }
+      ],
+      "toolCalls": 19,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19849,
+          "doneReason": "stop",
+          "promptTokens": 228,
+          "outputTokens": 308,
+          "evalNs": 12887706000,
+          "loadNs": 6543897100
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13701,
+          "doneReason": "stop",
+          "promptTokens": 640,
+          "outputTokens": 307,
+          "evalNs": 13021799000,
+          "loadNs": 10656700
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 28238,
+          "doneReason": "stop",
+          "promptTokens": 679,
+          "outputTokens": 151,
+          "evalNs": 6313682000,
+          "loadNs": 21175900500
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 100638,
+          "doneReason": "length",
+          "promptTokens": 640,
+          "outputTokens": 2048,
+          "evalNs": 92382883000,
+          "loadNs": 7600511700
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 91911,
+          "doneReason": "length",
+          "promptTokens": 640,
+          "outputTokens": 2048,
+          "evalNs": 91700001000,
+          "loadNs": 10561800
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 15300,
+          "doneReason": "stop",
+          "promptTokens": 877,
+          "outputTokens": 163,
+          "evalNs": 6953727000,
+          "loadNs": 7437763000
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 34418,
+          "doneReason": "stop",
+          "promptTokens": 871,
+          "outputTokens": 256,
+          "evalNs": 11072594000,
+          "loadNs": 22483143300
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14018,
+          "doneReason": "stop",
+          "promptTokens": 871,
+          "outputTokens": 313,
+          "evalNs": 13471735000,
+          "loadNs": 9742300
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 1964,
+          "doneReason": "stop",
+          "promptTokens": 928,
+          "outputTokens": 26,
+          "evalNs": 1046646000,
+          "loadNs": 11504700
+        }
+      ]
+    },
+    {
+      "task": "g7-v2-duration",
+      "kind": "regression",
+      "trial": 3,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 219883,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 9,
+            "valid": 9,
+            "failedValid": [
+              "test_generated.TestParseDuration.test_empty_string",
+              "test_generated.TestParseDuration.test_invalid_format_1h30m45s",
+              "test_generated.TestParseDuration.test_invalid_format_1h30m5s"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1735,
+          "failures": [
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            },
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "test_generated.TestParseDuration.test_empty_string passes on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            },
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "test_invalid",
+              "suspectedComponent": "tester",
+              "evidence": [
+                "test_generated.TestParseDuration.test_invalid_format_1h30m45s fails on the frozen reference",
+                "test_generated.TestParseDuration.test_invalid_format_1h30m5s fails on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_tester",
+              "retryBudgetRemaining": 2,
+              "defect": "semantic"
+            }
+          ],
+          "repaired": [
+            "Worker",
+            "Tester"
+          ],
+          "workerFeedback": "test_generated.TestParseDuration.test_empty_string: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_empty_string\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n\nAn independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "test_generated.TestParseDuration.test_invalid_format_1h30m45s contradicts the frozen task contract at line 19: with self.assertRaises(ValueError): (AssertionError)\ntest_generated.TestParseDuration.test_invalid_format_1h30m5s contradicts the frozen task contract at line 31: with self.assertRaises(ValueError): (AssertionError)",
+          "feedback": "test_generated.TestParseDuration.test_empty_string: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_empty_string\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n\nAn independent acceptance suite also failed (details withheld)."
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 8,
+            "failedValid": [
+              "test_generated.TestParseDuration.test_empty_string",
+              "test_generated.TestParseDuration.test_invalid_format_1h30m45s"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 5100,
+          "failures": [
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 1,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 1
+            },
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 1,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "test_generated.TestParseDuration.test_empty_string passes on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 1
+            },
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 1,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "test_invalid",
+              "suspectedComponent": "tester",
+              "evidence": [
+                "test_generated.TestParseDuration.test_invalid_format_1h30m45s fails on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_tester",
+              "retryBudgetRemaining": 1,
+              "defect": "semantic"
+            }
+          ],
+          "repaired": [
+            "Worker",
+            "Tester"
+          ],
+          "workerFeedback": "test_generated.TestParseDuration.test_empty_string: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_empty_string\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n\nAn independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "test_generated.TestParseDuration.test_invalid_format_1h30m45s contradicts the frozen task contract at line 19: with self.assertRaises(ValueError): (AssertionError)",
+          "feedback": "test_generated.TestParseDuration.test_empty_string: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_empty_string\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n\nAn independent acceptance suite also failed (details withheld)."
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 8,
+            "failedValid": [
+              "test_generated.TestParseDuration.test_empty_string",
+              "test_generated.TestParseDuration.test_invalid_format_1h30m45s"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 5035,
+          "failures": [
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 2,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 0
+            },
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 2,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "test_generated.TestParseDuration.test_empty_string passes on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 0
+            },
+            {
+              "taskId": "g7-v2-duration",
+              "attempt": 2,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "test_invalid",
+              "suspectedComponent": "tester",
+              "evidence": [
+                "test_generated.TestParseDuration.test_invalid_format_1h30m45s fails on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_tester",
+              "retryBudgetRemaining": 0,
+              "defect": "semantic"
+            }
+          ],
+          "repaired": [],
+          "workerFeedback": "test_generated.TestParseDuration.test_empty_string: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_empty_string\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n\nAn independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "test_generated.TestParseDuration.test_invalid_format_1h30m45s contradicts the frozen task contract at line 19: with self.assertRaises(ValueError): (AssertionError)",
+          "feedback": "test_generated.TestParseDuration.test_empty_string: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_empty_string\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n\nAn independent acceptance suite also failed (details withheld)."
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestParseDuration.test_empty_string passes on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "3eb66dbf04d6cbaa39623ea08740ccc82f28be0ae871dcafac4ebd0f2ed41e49",
+          "proposedSha256": "3eb66dbf04d6cbaa39623ea08740ccc82f28be0ae871dcafac4ebd0f2ed41e49",
+          "proposal": "identical",
+          "remaining": 1
+        },
+        {
+          "round": 1,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "test_generated.TestParseDuration.test_invalid_format_1h30m45s fails on the frozen reference",
+            "test_generated.TestParseDuration.test_invalid_format_1h30m5s fails on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "637f98a79fd9e6be9436e2f238708b853cce39129421dfdba31671ecb09b31db",
+          "proposedSha256": "989091843dbdd8ee1aa6ee877cef4774da403395681478178506924125fb7a2e",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestParseDuration.test_empty_string passes on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "3eb66dbf04d6cbaa39623ea08740ccc82f28be0ae871dcafac4ebd0f2ed41e49",
+          "proposedSha256": "3eb66dbf04d6cbaa39623ea08740ccc82f28be0ae871dcafac4ebd0f2ed41e49",
+          "proposal": "identical",
+          "remaining": 0
+        },
+        {
+          "round": 2,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "test_generated.TestParseDuration.test_invalid_format_1h30m45s fails on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "989091843dbdd8ee1aa6ee877cef4774da403395681478178506924125fb7a2e",
+          "proposedSha256": "e6dcfa983531875e58186de47e63210a267443a0ca6447a790dd51439d79f8a1",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "test_generated.TestParseDuration.test_empty_string passes on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "test_invalid",
+          "suspectedComponent": "tester",
+          "evidence": [
+            "test_generated.TestParseDuration.test_invalid_format_1h30m45s fails on the frozen reference",
+            "test_generated.TestParseDuration.test_invalid_format_1h30m5s fails on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_tester",
+          "retryBudgetRemaining": 2,
+          "defect": "semantic"
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 1,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 1
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 1,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "test_generated.TestParseDuration.test_empty_string passes on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 1
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 1,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "test_invalid",
+          "suspectedComponent": "tester",
+          "evidence": [
+            "test_generated.TestParseDuration.test_invalid_format_1h30m45s fails on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_tester",
+          "retryBudgetRemaining": 1,
+          "defect": "semantic"
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 2,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 0
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 2,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "test_generated.TestParseDuration.test_empty_string passes on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 0
+        },
+        {
+          "taskId": "g7-v2-duration",
+          "attempt": 2,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "test_invalid",
+          "suspectedComponent": "tester",
+          "evidence": [
+            "test_generated.TestParseDuration.test_invalid_format_1h30m45s fails on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_tester",
+          "retryBudgetRemaining": 0,
+          "defect": "semantic"
+        }
+      ],
+      "contractVersion": "contract:3e08f58f11406392",
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.9,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 24454,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703726214,
+          "endedAt": 1792703750669
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 26661,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792703750669,
+          "endedAt": 1792703777330
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 46586,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703750669,
+          "endedAt": 1792703797255
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 26829,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703797255,
+          "endedAt": 1792703824084
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 11278,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703824084,
+          "endedAt": 1792703835362
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 12873,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703843670,
+          "endedAt": 1792703856543
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 34947,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792703843671,
+          "endedAt": 1792703878618
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 20913,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703883718,
+          "endedAt": 1792703904631
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 43523,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792703883719,
+          "endedAt": 1792703927242
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 13818,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703932278,
+          "endedAt": 1792703946096
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "3eb66dbf04d6cbaa39623ea08740ccc82f28be0ae871dcafac4ebd0f2ed41e49",
+      "finalSource": "import re\nfrom typing import Union\n\ndef parse_duration(text: str) -> int:\n    # Regular expression to match the duration string\n    pattern = r'^(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$'\n    match = re.match(pattern, text)\n    \n    if not match:\n        raise ValueError(\"Invalid duration format\")\n    \n    hours, minutes, seconds = match.groups()\n    \n    # Convert hours, minutes, and seconds to integers, default to 0 if None\n    hours = int(hours) if hours else 0\n    minutes = int(minutes) if minutes else 0\n    seconds = int(seconds) if seconds else 0\n    \n    # Calculate total duration in seconds\n    total_seconds = hours * 3600 + minutes * 60 + seconds\n    \n    return total_seconds\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 3,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "3eb66dbf04d6cbaa39623ea08740ccc82f28be0ae871dcafac4ebd0f2ed41e49",
+          "staticOk": true,
+          "testsPassed": 6,
+          "testsTotal": 9,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "9b144e0c513946a6392778f8f3cf0f16a384623fcff3c49b0565ec041987c683",
+          "staticOk": true,
+          "testsPassed": 5,
+          "testsTotal": 9,
+          "selected": false
+        },
+        {
+          "index": 2,
+          "sha256": "b904b073048521c63c0bd98fd16d57c33b5fa3957a864f18b8dcdc0fef1a28ec",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 9,
+          "selected": false
+        }
+      ],
+      "toolCalls": 24,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 24454,
+          "doneReason": "stop",
+          "promptTokens": 228,
+          "outputTokens": 386,
+          "evalNs": 17049877000,
+          "loadNs": 6989472700
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 26661,
+          "doneReason": "stop",
+          "promptTokens": 757,
+          "outputTokens": 432,
+          "evalNs": 18552638000,
+          "loadNs": 7316755700
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 46586,
+          "doneReason": "stop",
+          "promptTokens": 718,
+          "outputTokens": 277,
+          "evalNs": 11735603000,
+          "loadNs": 34069460100
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 26829,
+          "doneReason": "stop",
+          "promptTokens": 718,
+          "outputTokens": 618,
+          "evalNs": 26685417000,
+          "loadNs": 10182200
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11278,
+          "doneReason": "stop",
+          "promptTokens": 718,
+          "outputTokens": 257,
+          "evalNs": 11127430000,
+          "loadNs": 9150700
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12873,
+          "doneReason": "stop",
+          "promptTokens": 1010,
+          "outputTokens": 277,
+          "evalNs": 12192014000,
+          "loadNs": 11889200
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 34947,
+          "doneReason": "stop",
+          "promptTokens": 1169,
+          "outputTokens": 292,
+          "evalNs": 12987315000,
+          "loadNs": 20805819000
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20913,
+          "doneReason": "stop",
+          "promptTokens": 1010,
+          "outputTokens": 227,
+          "evalNs": 10996800000,
+          "loadNs": 8940553200
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 43523,
+          "doneReason": "stop",
+          "promptTokens": 1097,
+          "outputTokens": 285,
+          "evalNs": 12520521000,
+          "loadNs": 29869393500
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13818,
+          "doneReason": "stop",
+          "promptTokens": 1150,
+          "outputTokens": 95,
+          "evalNs": 4131250000,
+          "loadNs": 8590860000
+        }
+      ]
+    },
+    {
+      "task": "s1-anagram",
+      "kind": "simple",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 57165,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4567,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:64de6d2b4891faa0",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 17678,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703946297,
+          "endedAt": 1792703963976
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 6185,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703963976,
+          "endedAt": 1792703970161
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 24581,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792703963977,
+          "endedAt": 1792703988558
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 10336,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792703993125,
+          "endedAt": 1792704003461
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "51f11c7cae17a95344031438be7299914d498f6ac9c22463f31f318cb54b6ad2",
+      "finalSource": "def is_anagram(a, b):\n    if not isinstance(a, str) or not isinstance(b, str):\n        raise TypeError(\"Both arguments must be strings\")\n    \n    normalized_a = a.lower().replace(\" \", \"\")\n    normalized_b = b.lower().replace(\" \", \"\")\n    \n    return sorted(normalized_a) == sorted(normalized_b)\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17678,
+          "doneReason": "stop",
+          "promptTokens": 120,
+          "outputTokens": 242,
+          "evalNs": 9979946000,
+          "loadNs": 7369510400
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6185,
+          "doneReason": "stop",
+          "promptTokens": 459,
+          "outputTokens": 138,
+          "evalNs": 5701768000,
+          "loadNs": 8550200
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 24581,
+          "doneReason": "stop",
+          "promptTokens": 499,
+          "outputTokens": 239,
+          "evalNs": 9906490000,
+          "loadNs": 14130021300
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10336,
+          "doneReason": "stop",
+          "promptTokens": 653,
+          "outputTokens": 26,
+          "evalNs": 1050369999,
+          "loadNs": 8554095700
+        }
+      ]
+    },
+    {
+      "task": "s1-anagram",
+      "kind": "simple",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 65107,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 7,
+            "valid": 7,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4341,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:f41e339e78855544",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 21586,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704003639,
+          "endedAt": 1792704025225
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 6793,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704025225,
+          "endedAt": 1792704032018
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 28443,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704025226,
+          "endedAt": 1792704053669
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 10735,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704058010,
+          "endedAt": 1792704068745
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "b7a82944874189ac5a349c4c728f9435db4f6b7a064dc3a974f00e52da089798",
+      "finalSource": "def is_anagram(a, b):\n    if not isinstance(a, str) or not isinstance(b, str):\n        raise TypeError(\"Both arguments must be strings\")\n    \n    normalized_a = ''.join(sorted(a.lower().replace(' ', '')))\n    normalized_b = ''.join(sorted(b.lower().replace(' ', '')))\n    \n    return normalized_a == normalized_b\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 21586,
+          "doneReason": "stop",
+          "promptTokens": 120,
+          "outputTokens": 246,
+          "evalNs": 13849338000,
+          "loadNs": 7412657400
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6793,
+          "doneReason": "stop",
+          "promptTokens": 463,
+          "outputTokens": 140,
+          "evalNs": 5836357000,
+          "loadNs": 10229400
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 28443,
+          "doneReason": "stop",
+          "promptTokens": 503,
+          "outputTokens": 327,
+          "evalNs": 13688303000,
+          "loadNs": 14208668600
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10735,
+          "doneReason": "stop",
+          "promptTokens": 711,
+          "outputTokens": 26,
+          "evalNs": 1048772999,
+          "loadNs": 8930628400
+        }
+      ]
+    },
+    {
+      "task": "s2-chunk",
+      "kind": "simple",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 77285,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 5107,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:980e61523fbed705",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 26666,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704068928,
+          "endedAt": 1792704095595
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 5863,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704095596,
+          "endedAt": 1792704101459
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 34767,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704095596,
+          "endedAt": 1792704130363
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 10740,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704135472,
+          "endedAt": 1792704146212
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "e681a4c3af237504334333b635cb2c7fc2b40412159902e934238be3a4392438",
+      "finalSource": "def chunk(xs, n):\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    \n    chunks = []\n    for i in range(0, len(xs), n):\n        chunks.append(xs[i:i + n])\n    \n    return chunks\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 26666,
+          "doneReason": "stop",
+          "promptTokens": 126,
+          "outputTokens": 314,
+          "evalNs": 18977513000,
+          "loadNs": 7372272800
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5863,
+          "doneReason": "stop",
+          "promptTokens": 536,
+          "outputTokens": 129,
+          "evalNs": 5345806000,
+          "loadNs": 9566700
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 34767,
+          "doneReason": "stop",
+          "promptTokens": 575,
+          "outputTokens": 479,
+          "evalNs": 20584830000,
+          "loadNs": 13510128000
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10740,
+          "doneReason": "stop",
+          "promptTokens": 860,
+          "outputTokens": 26,
+          "evalNs": 1063771000,
+          "loadNs": 8839133800
+        }
+      ]
+    },
+    {
+      "task": "s2-chunk",
+      "kind": "simple",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 60523,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4778,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:ac56d723f5ae2156",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 17960,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704146228,
+          "endedAt": 1792704164189
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 5860,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704164190,
+          "endedAt": 1792704170050
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 28031,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704164190,
+          "endedAt": 1792704192221
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 9752,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704196999,
+          "endedAt": 1792704206751
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "e681a4c3af237504334333b635cb2c7fc2b40412159902e934238be3a4392438",
+      "finalSource": "def chunk(xs, n):\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    \n    chunks = []\n    for i in range(0, len(xs), n):\n        chunks.append(xs[i:i + n])\n    \n    return chunks\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17960,
+          "doneReason": "stop",
+          "promptTokens": 126,
+          "outputTokens": 299,
+          "evalNs": 12232286000,
+          "loadNs": 5391922000
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5860,
+          "doneReason": "stop",
+          "promptTokens": 521,
+          "outputTokens": 128,
+          "evalNs": 5354966000,
+          "loadNs": 10255400
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 28031,
+          "doneReason": "stop",
+          "promptTokens": 560,
+          "outputTokens": 327,
+          "evalNs": 13769492000,
+          "loadNs": 13596590700
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9752,
+          "doneReason": "stop",
+          "promptTokens": 771,
+          "outputTokens": 26,
+          "evalNs": 1059194000,
+          "loadNs": 7865741600
+        }
+      ]
+    },
+    {
+      "task": "s3-title",
+      "kind": "simple",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 67694,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 8,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4632,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:722cc14775229296",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 18396,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704206767,
+          "endedAt": 1792704225163
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 12821,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704225163,
+          "endedAt": 1792704237984
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 35023,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704225164,
+          "endedAt": 1792704260187
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 9642,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704264819,
+          "endedAt": 1792704274461
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "a80ece5e0ca15e593bde86ab7cc6e4d822512366867c793d7a7de466bcd6abe6",
+      "finalSource": "def title_case(s):\n    small_words = {'a', 'an', 'the', 'of', 'in'}\n    words = s.split()\n    for i, word in enumerate(words):\n        if i == 0 or word not in small_words:\n            words[i] = word.capitalize()\n        else:\n            words[i] = word.lower()\n    return ' '.join(words)\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 18396,
+          "doneReason": "stop",
+          "promptTokens": 137,
+          "outputTokens": 313,
+          "evalNs": 12885362000,
+          "loadNs": 5163718100
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12821,
+          "doneReason": "stop",
+          "promptTokens": 546,
+          "outputTokens": 289,
+          "evalNs": 12199845000,
+          "loadNs": 9595200
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 35023,
+          "doneReason": "stop",
+          "promptTokens": 585,
+          "outputTokens": 333,
+          "evalNs": 14269764000,
+          "loadNs": 20068373000
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9642,
+          "doneReason": "stop",
+          "promptTokens": 785,
+          "outputTokens": 26,
+          "evalNs": 1058938000,
+          "loadNs": 7753670400
+        }
+      ]
+    },
+    {
+      "task": "s3-title",
+      "kind": "simple",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 67240,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 5292,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:fd89d547a5b59243",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 23660,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704274641,
+          "endedAt": 1792704298301
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 18580,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704298302,
+          "endedAt": 1792704316882
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 36231,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704298302,
+          "endedAt": 1792704334533
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2055,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704339825,
+          "endedAt": 1792704341881
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "a80ece5e0ca15e593bde86ab7cc6e4d822512366867c793d7a7de466bcd6abe6",
+      "finalSource": "def title_case(s):\n    small_words = {'a', 'an', 'the', 'of', 'in'}\n    words = s.split()\n    for i, word in enumerate(words):\n        if i == 0 or word not in small_words:\n            words[i] = word.capitalize()\n        else:\n            words[i] = word.lower()\n    return ' '.join(words)\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23660,
+          "doneReason": "stop",
+          "promptTokens": 137,
+          "outputTokens": 334,
+          "evalNs": 16282419000,
+          "loadNs": 7027314500
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 18580,
+          "doneReason": "stop",
+          "promptTokens": 606,
+          "outputTokens": 212,
+          "evalNs": 8841765000,
+          "loadNs": 9057092900
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 36231,
+          "doneReason": "stop",
+          "promptTokens": 567,
+          "outputTokens": 213,
+          "evalNs": 9734900000,
+          "loadNs": 25817070700
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 2055,
+          "doneReason": "stop",
+          "promptTokens": 764,
+          "outputTokens": 26,
+          "evalNs": 1120259000,
+          "loadNs": 10574400
+        }
+      ]
+    },
+    {
+      "task": "i1-roman",
+      "kind": "intermediate",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 136792,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 2,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 16,
+            "valid": 15,
+            "failedValid": [
+              "test_generated.TestRomanToInt.test_D",
+              "test_generated.TestRomanToInt.test_L",
+              "test_generated.TestRomanToInt.test_V"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1718,
+          "failures": [
+            {
+              "taskId": "i1-roman",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            },
+            {
+              "taskId": "i1-roman",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "test_generated.TestRomanToInt.test_D passes on the frozen reference",
+                "test_generated.TestRomanToInt.test_L passes on the frozen reference",
+                "test_generated.TestRomanToInt.test_V passes on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            }
+          ],
+          "repaired": [
+            "Worker"
+          ],
+          "workerFeedback": "test_generated.TestRomanToInt.test_D: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 21, in test_D\n    self.assertEqual(roman_to_int('D'), 500)\n                     ^^^^^^^^^^^^^^^^^\n  File \"/work/roman.py\", line 14, in roman_to_int\n    raise ValueError(\"Input string contains invalid characters.\")\nValueError: Input string contains invalid characters.\n\ntest_generated.TestRomanToInt.test_L: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_L\n    self.assertEqual(roman_to_int('L'), 50)\n                     ^^^^^^^^^^^^^^^^^\n  File \"/work/roman.py\", line 14, in roman_to_int\n    raise ValueError(\"Input string contains invalid characters.\")\nValueError: Input string contains invalid characters.\n\ntest_generated.TestRomanToInt.test_V: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 9, in test_V\n    self.assertEqual(roman_to_int('V'), 5)\n                     ^^^^^^^^^^^^^^^^^\n  File \"/work/roman.py\", line 14, in roman_to_int\n    raise ValueError(\"Input string contains invalid characters.\")\nValueError: Input string contains invalid characters.\n\nAn independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "test_generated.TestRomanToInt.test_D: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 21, in test_D\n    self.assertEqual(roman_to_int('D'), 500)\n                     ^^^^^^^^^^^^^^^^^\n  File \"/work/roman.py\", line 14, in roman_to_int\n    raise ValueError(\"Input string contains invalid characters.\")\nValueError: Input string contains invalid characters.\n\ntest_generated.TestRomanToInt.test_L: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_L\n    self.assertEqual(roman_to_int('L'), 50)\n                     ^^^^^^^^^^^^^^^^^\n  File \"/work/roman.py\", line 14, in roman_to_int\n    raise ValueError(\"Input string contains invalid characters.\")\nValueError: Input string contains invalid characters.\n\ntest_generated.TestRomanToInt.test_V: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 9, in test_V\n    self.assertEqual(roman_to_int('V'), 5)\n                     ^^^^^^^^^^^^^^^^^\n  File \"/work/roman.py\", line 14, in roman_to_int\n    raise ValueError(\"Input string contains invalid characters.\")\nValueError: Input string contains invalid characters.\n\nAn independent acceptance suite also failed (details withheld)."
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 16,
+            "valid": 15,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false,
+          "durationMs": 1276,
+          "failures": [
+            {
+              "taskId": "i1-roman",
+              "attempt": 1,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 1
+            }
+          ],
+          "repaired": [
+            "Worker"
+          ],
+          "workerFeedback": "An independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "An independent acceptance suite also failed (details withheld)."
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 2,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 16,
+            "valid": 15,
+            "failedValid": [
+              "test_generated.TestRomanToInt.test_III"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 3920,
+          "failures": [
+            {
+              "taskId": "i1-roman",
+              "attempt": 2,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 0
+            },
+            {
+              "taskId": "i1-roman",
+              "attempt": 2,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "test_generated.TestRomanToInt.test_III passes on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 0
+            }
+          ],
+          "repaired": [],
+          "workerFeedback": "test_generated.TestRomanToInt.test_III: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 27, in test_III\n    self.assertEqual(roman_to_int('III'), 3)\n                     ^^^^^^^^^^^^^^^^^^^\n  File \"/work/roman.py\", line 16, in roman_to_int\n    raise ValueError(\"Input string contains non-canonical forms.\")\nValueError: Input string contains non-canonical forms.\n\nAn independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "test_generated.TestRomanToInt.test_III: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 27, in test_III\n    self.assertEqual(roman_to_int('III'), 3)\n                     ^^^^^^^^^^^^^^^^^^^\n  File \"/work/roman.py\", line 16, in roman_to_int\n    raise ValueError(\"Input string contains non-canonical forms.\")\nValueError: Input string contains non-canonical forms.\n\nAn independent acceptance suite also failed (details withheld)."
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestRomanToInt.test_D passes on the frozen reference",
+            "test_generated.TestRomanToInt.test_L passes on the frozen reference",
+            "test_generated.TestRomanToInt.test_V passes on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "5e1c1eb02eba46b02dbd0cea66d258b0274a126be4f8d0a381a88d8c870dc1cd",
+          "proposedSha256": "5ab4bda22ec4a5181c82d1f278b821e20be577c71c8fd758791500edb0caf408",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "5ab4bda22ec4a5181c82d1f278b821e20be577c71c8fd758791500edb0caf408",
+          "proposedSha256": "eb68266eae8cbfb8b689d6ebd4d5f763cc2e00a81363912fe38e51d956ee66cc",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "taskId": "i1-roman",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        },
+        {
+          "taskId": "i1-roman",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "test_generated.TestRomanToInt.test_D passes on the frozen reference",
+            "test_generated.TestRomanToInt.test_L passes on the frozen reference",
+            "test_generated.TestRomanToInt.test_V passes on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        },
+        {
+          "taskId": "i1-roman",
+          "attempt": 1,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 1
+        },
+        {
+          "taskId": "i1-roman",
+          "attempt": 2,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 0
+        },
+        {
+          "taskId": "i1-roman",
+          "attempt": 2,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "test_generated.TestRomanToInt.test_III passes on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 0
+        }
+      ],
+      "contractVersion": "contract:5ff769cdb8fce451",
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.9,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 17571,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704342089,
+          "endedAt": 1792704359661
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 15436,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704359662,
+          "endedAt": 1792704375098
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 46660,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704359662,
+          "endedAt": 1792704406322
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 23883,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704406322,
+          "endedAt": 1792704430205
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 13649,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704436905,
+          "endedAt": 1792704450554
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 16424,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704451830,
+          "endedAt": 1792704468254
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 6704,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704472175,
+          "endedAt": 1792704478879
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "eb68266eae8cbfb8b689d6ebd4d5f763cc2e00a81363912fe38e51d956ee66cc",
+      "finalSource": "import re\n\nroman_to_int_map = {\n    'I': 1, 'V': 5, 'X': 10, 'L': 50,\n    'C': 100, 'D': 500, 'M': 1000\n}\n\ndef roman_to_int(s: str) -> int:\n    if not s:\n        raise ValueError(\"Input string is empty.\")\n    if not s.isupper():\n        raise ValueError(\"Input string contains lowercase characters.\")\n    if re.search(r'[^IVXLCDM]', s):\n        raise ValueError(\"Input string contains invalid characters.\")\n    if re.search(r'^(?:(?:I{3,}|X{3,}|C{3,}|M{4})|(?:(?:I|X|C|IV|IX|XL|XC|CD|CM)(?:I|V|X|L|C|D|M)*)){3}$', s):\n        raise ValueError(\"Input string contains non-canonical forms.\")\n    \n    total = 0\n    i = 0\n    while i < len(s):\n        if i + 1 < len(s) and roman_to_int_map[s[i]] < roman_to_int_map[s[i + 1]]:\n            total += roman_to_int_map[s[i + 1]] - roman_to_int_map[s[i]]\n            i += 2\n        else:\n            total += roman_to_int_map[s[i]]\n            i += 1\n    return total\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 2,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "9299300361bae8aaa275402ba3dfa69422e5e2b195c615b4f51c9a335fad889b",
+          "staticOk": true,
+          "testsPassed": 9,
+          "testsTotal": 16,
+          "selected": false
+        },
+        {
+          "index": 1,
+          "sha256": "5e1c1eb02eba46b02dbd0cea66d258b0274a126be4f8d0a381a88d8c870dc1cd",
+          "staticOk": true,
+          "testsPassed": 12,
+          "testsTotal": 16,
+          "selected": true
+        }
+      ],
+      "toolCalls": 19,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17571,
+          "doneReason": "stop",
+          "promptTokens": 169,
+          "outputTokens": 217,
+          "evalNs": 9582709000,
+          "loadNs": 7652769900
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15436,
+          "doneReason": "stop",
+          "promptTokens": 487,
+          "outputTokens": 345,
+          "evalNs": 14874099000,
+          "loadNs": 17510500
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 46660,
+          "doneReason": "stop",
+          "promptTokens": 526,
+          "outputTokens": 522,
+          "evalNs": 22803442000,
+          "loadNs": 23126629200
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23883,
+          "doneReason": "stop",
+          "promptTokens": 487,
+          "outputTokens": 358,
+          "evalNs": 15517078000,
+          "loadNs": 7875040100
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13649,
+          "doneReason": "stop",
+          "promptTokens": 1092,
+          "outputTokens": 287,
+          "evalNs": 12810179000,
+          "loadNs": 9588600
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 16424,
+          "doneReason": "stop",
+          "promptTokens": 780,
+          "outputTokens": 364,
+          "evalNs": 16024643000,
+          "loadNs": 10793900
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6704,
+          "doneReason": "stop",
+          "promptTokens": 1141,
+          "outputTokens": 120,
+          "evalNs": 5437966000,
+          "loadNs": 7797900
+        }
+      ]
+    },
+    {
+      "task": "i1-roman",
+      "kind": "intermediate",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "durationMs": 101148,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 11,
+            "valid": 11,
+            "failedValid": [
+              "test_generated.TestRomanToInt.test_empty_string"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1589,
+          "failures": [
+            {
+              "taskId": "i1-roman",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            },
+            {
+              "taskId": "i1-roman",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "test_generated.TestRomanToInt.test_empty_string passes on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            }
+          ],
+          "repaired": [
+            "Worker"
+          ],
+          "workerFeedback": "test_generated.TestRomanToInt.test_empty_string: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 21, in test_empty_string\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n\nAn independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "test_generated.TestRomanToInt.test_empty_string: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 21, in test_empty_string\n    with self.assertRaises(ValueError):\nAssertionError: ValueError not raised\n\nAn independent acceptance suite also failed (details withheld)."
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestRomanToInt.test_empty_string passes on the frozen reference"
+          ],
+          "outcome": "not_retested",
+          "previousSha256": "933a59745c60755326cfb130b3d399d86cde1d095dbf8cb1e5eb8ca8583cac04",
+          "proposedSha256": "933a59745c60755326cfb130b3d399d86cde1d095dbf8cb1e5eb8ca8583cac04",
+          "proposal": "identical",
+          "remaining": 1
+        }
+      ],
+      "failures": [
+        {
+          "taskId": "i1-roman",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        },
+        {
+          "taskId": "i1-roman",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "test_generated.TestRomanToInt.test_empty_string passes on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        }
+      ],
+      "contractVersion": "contract:8d890c05ebce034f",
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 18431,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704478898,
+          "endedAt": 1792704497329
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 24064,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704497331,
+          "endedAt": 1792704521395
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 44571,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704497330,
+          "endedAt": 1792704541901
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 12317,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704541901,
+          "endedAt": 1792704554218
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 13252,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704561004,
+          "endedAt": 1792704574256
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 5788,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704574256,
+          "endedAt": 1792704580045
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "933a59745c60755326cfb130b3d399d86cde1d095dbf8cb1e5eb8ca8583cac04",
+      "finalSource": "import re\n\ndef roman_to_int(s):\n    if not re.match(r'^M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$', s):\n        raise ValueError(\"Invalid Roman numeral\")\n    \n    roman_map = {\n        'I': 1, 'V': 5, 'X': 10, 'L': 50,\n        'C': 100, 'D': 500, 'M': 1000,\n        'IV': 4, 'IX': 9, 'XL': 40, 'XC': 90,\n        'CD': 400, 'CM': 900\n    }\n    \n    i = 0\n    num = 0\n    while i < len(s):\n        if i + 1 < len(s) and s[i:i+2] in roman_map:\n            num += roman_map[s[i:i+2]]\n            i += 2\n        else:\n            num += roman_map[s[i]]\n            i += 1\n    return num\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 2,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "5dbadb955f33cc846210022d529f2ff5c15970834b0c7fb3cc8ffab1b6375dcd",
+          "staticOk": true,
+          "testsPassed": 8,
+          "testsTotal": 11,
+          "selected": false
+        },
+        {
+          "index": 1,
+          "sha256": "933a59745c60755326cfb130b3d399d86cde1d095dbf8cb1e5eb8ca8583cac04",
+          "staticOk": true,
+          "testsPassed": 10,
+          "testsTotal": 11,
+          "selected": true
+        }
+      ],
+      "toolCalls": 11,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 18431,
+          "doneReason": "stop",
+          "promptTokens": 169,
+          "outputTokens": 284,
+          "evalNs": 12615129000,
+          "loadNs": 5460511500
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 24064,
+          "doneReason": "stop",
+          "promptTokens": 593,
+          "outputTokens": 366,
+          "evalNs": 16050986000,
+          "loadNs": 7323366800
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 44571,
+          "doneReason": "stop",
+          "promptTokens": 554,
+          "outputTokens": 299,
+          "evalNs": 12585218000,
+          "loadNs": 31313533000
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12317,
+          "doneReason": "stop",
+          "promptTokens": 554,
+          "outputTokens": 291,
+          "evalNs": 12178991000,
+          "loadNs": 10252700
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13252,
+          "doneReason": "stop",
+          "promptTokens": 920,
+          "outputTokens": 298,
+          "evalNs": 12648610000,
+          "loadNs": 7921500
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5788,
+          "doneReason": "stop",
+          "promptTokens": 1051,
+          "outputTokens": 110,
+          "evalNs": 4924399000,
+          "loadNs": 8633300
+        }
+      ]
+    },
+    {
+      "task": "i2-kv",
+      "kind": "intermediate",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 100531,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4579,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:8b8a576e122dfec1",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 33851,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704580062,
+          "endedAt": 1792704613914
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 32056,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704613914,
+          "endedAt": 1792704645970
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 59612,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704613914,
+          "endedAt": 1792704673526
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2488,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704678105,
+          "endedAt": 1792704680593
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "701f27277b094cfd79df298a48b0a3ea3ea3bd63f0b8212895911914b8b539cc",
+      "finalSource": "import re\n\ndef parse_kv(text):\n    result = {}\n    key_pattern = re.compile(r'^[a-z_]+$')\n    \n    for pair in text.split(';'):\n        pair = pair.strip()\n        if not pair:\n            continue\n        \n        key, value = pair.split('=', 1)\n        key = key.strip()\n        value = value.strip()\n        \n        if not key_pattern.match(key):\n            raise ValueError(f\"Invalid key: {key}\")\n        if '=' not in pair:\n            raise ValueError(f\"Pair without '=': {pair}\")\n        if key in result:\n            raise ValueError(f\"Duplicate key: {key}\")\n        \n        result[key] = value\n    \n    return result\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 33851,
+          "doneReason": "stop",
+          "promptTokens": 168,
+          "outputTokens": 657,
+          "evalNs": 27362743000,
+          "loadNs": 6108981400
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 32056,
+          "doneReason": "stop",
+          "promptTokens": 971,
+          "outputTokens": 552,
+          "evalNs": 23603495000,
+          "loadNs": 7573764200
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 59612,
+          "doneReason": "stop",
+          "promptTokens": 931,
+          "outputTokens": 386,
+          "evalNs": 17588244000,
+          "loadNs": 41133594600
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 2488,
+          "doneReason": "stop",
+          "promptTokens": 1349,
+          "outputTokens": 26,
+          "evalNs": 1103542000,
+          "loadNs": 11360500
+        }
+      ]
+    },
+    {
+      "task": "i2-kv",
+      "kind": "intermediate",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 66445,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 2,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 6,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4286,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:f906415f3e00dec0",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 18703,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704680607,
+          "endedAt": 1792704699310
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 12835,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704699310,
+          "endedAt": 1792704712145
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 34415,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704699311,
+          "endedAt": 1792704733726
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 9039,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704738013,
+          "endedAt": 1792704747052
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "5a141ce5fb0b9100cfbfcdf5bff45d9e17282f9df4cd3a6ed4cd3ddebf76361e",
+      "finalSource": "import re\n\ndef parse_kv(text):\n    if not text:\n        return {}\n    \n    pairs = text.split(';')\n    result = {}\n    \n    for pair in pairs:\n        pair = pair.strip()\n        if not pair:\n            continue\n        \n        key, value = pair.split('=', 1)\n        key = key.strip()\n        value = value.strip()\n        \n        if not re.match(r'^[a-z_]+$', key):\n            raise ValueError(f\"Invalid key: {key}\")\n        if '=' not in pair:\n            raise ValueError(f\"Pair without '=': {pair}\")\n        if key in result:\n            raise ValueError(f\"Duplicate key: {key}\")\n        \n        result[key] = value\n    \n    return result\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 18703,
+          "doneReason": "stop",
+          "promptTokens": 168,
+          "outputTokens": 296,
+          "evalNs": 12310639000,
+          "loadNs": 6014392700
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 12835,
+          "doneReason": "stop",
+          "promptTokens": 570,
+          "outputTokens": 285,
+          "evalNs": 12102100000,
+          "loadNs": 11808400
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 34415,
+          "doneReason": "stop",
+          "promptTokens": 610,
+          "outputTokens": 334,
+          "evalNs": 13865531000,
+          "loadNs": 19882989400
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9039,
+          "doneReason": "stop",
+          "promptTokens": 897,
+          "outputTokens": 26,
+          "evalNs": 1036325000,
+          "loadNs": 7173639900
+        }
+      ]
+    },
+    {
+      "task": "i3-lru",
+      "kind": "intermediate",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 77957,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 6,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4701,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:af931e0ff640b092",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 25266,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704747068,
+          "endedAt": 1792704772334
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 24801,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704772335,
+          "endedAt": 1792704797136
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 45652,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704772334,
+          "endedAt": 1792704817986
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2337,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704822688,
+          "endedAt": 1792704825025
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "3fea1648183711b449c132cc32b77bdf1da6396fe9cf72417059bad5d6b62303",
+      "finalSource": "from collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity < 1:\n            raise ValueError(\"Capacity must be greater than 0\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 25266,
+          "doneReason": "stop",
+          "promptTokens": 148,
+          "outputTokens": 477,
+          "evalNs": 19827259000,
+          "loadNs": 5090513900
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 24801,
+          "doneReason": "stop",
+          "promptTokens": 767,
+          "outputTokens": 377,
+          "evalNs": 15952542000,
+          "loadNs": 8101086900
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 45652,
+          "doneReason": "stop",
+          "promptTokens": 727,
+          "outputTokens": 291,
+          "evalNs": 12192290000,
+          "loadNs": 32746489100
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 2337,
+          "doneReason": "stop",
+          "promptTokens": 1109,
+          "outputTokens": 26,
+          "evalNs": 1091205000,
+          "loadNs": 11004600
+        }
+      ]
+    },
+    {
+      "task": "i3-lru",
+      "kind": "intermediate",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 166263,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 25,
+            "valid": 24,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4595,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:85803bd87b1795c4",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 23447,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704825042,
+          "endedAt": 1792704848489
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 11726,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704848490,
+          "endedAt": 1792704860216
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 127524,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792704848490,
+          "endedAt": 1792704976014
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 10695,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704980610,
+          "endedAt": 1792704991305
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "001351fedc423c18bf97b4bbb99bcfe8e1b238a938ffcb1264537219a0a74a87",
+      "finalSource": "from collections import OrderedDict\n\nclass LRUCache:\n    def __init__(self, capacity):\n        if capacity < 1:\n            raise ValueError(\"Capacity must be greater than 0\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key):\n        if key not in self.cache:\n            return -1\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key, value):\n        if key in self.cache:\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23447,
+          "doneReason": "stop",
+          "promptTokens": 148,
+          "outputTokens": 425,
+          "evalNs": 17262572000,
+          "loadNs": 5838153900
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 11726,
+          "doneReason": "stop",
+          "promptTokens": 675,
+          "outputTokens": 269,
+          "evalNs": 11080613000,
+          "loadNs": 6713500
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 127524,
+          "doneReason": "stop",
+          "promptTokens": 715,
+          "outputTokens": 2433,
+          "evalNs": 107759831000,
+          "loadNs": 19054292100
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10695,
+          "doneReason": "stop",
+          "promptTokens": 2460,
+          "outputTokens": 26,
+          "evalNs": 1126226000,
+          "loadNs": 7647461100
+        }
+      ]
+    },
+    {
+      "task": "d1-flatten",
+      "kind": "debugging",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 71598,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [
+              "test_generated.TestFlatten.test_multiple_levels_nesting"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 4479,
+          "failures": [
+            {
+              "taskId": "d1-flatten",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            },
+            {
+              "taskId": "d1-flatten",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "test_generated.TestFlatten.test_multiple_levels_nesting passes on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            }
+          ],
+          "repaired": [
+            "Worker"
+          ],
+          "workerFeedback": "test_generated.TestFlatten.test_multiple_levels_nesting: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_multiple_levels_nesting\n    self.assertEqual(flatten([1, [2, [3, 4], 5], 6]), [1, 2, 3, 4, 5, 6])\nAssertionError: Lists differ: [1, 2, [3, 4], 5, 6] != [1, 2, 3, 4, 5, 6]\n\nFirst differing element 2:\n[3, 4]\n3\n\nSecond list contains 1 additional elements.\nFirst extra element 5:\n6\n\n- [1, 2, [3, 4], 5, 6]\n?        -    -\n\n+ [1, 2, 3, 4, 5, 6]\n\nAn independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "test_generated.TestFlatten.test_multiple_levels_nesting: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_multiple_levels_nesting\n    self.assertEqual(flatten([1, [2, [3, 4], 5], 6]), [1, 2, 3, 4, 5, 6])\nAssertionError: Lists differ: [1, 2, [3, 4], 5, 6] != [1, 2, 3, 4, 5, 6]\n\nFirst differing element 2:\n[3, 4]\n3\n\nSecond list contains 1 additional elements.\nFirst extra element 5:\n6\n\n- [1, 2, [3, 4], 5, 6]\n?        -    -\n\n+ [1, 2, 3, 4, 5, 6]\n\nAn independent acceptance suite also failed (details withheld)."
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [
+              "test_generated.TestFlatten.test_multiple_levels_nesting"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1174,
+          "failures": [
+            {
+              "taskId": "d1-flatten",
+              "attempt": 1,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 1
+            },
+            {
+              "taskId": "d1-flatten",
+              "attempt": 1,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "test_generated.TestFlatten.test_multiple_levels_nesting passes on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 1
+            }
+          ],
+          "repaired": [
+            "Worker"
+          ],
+          "workerFeedback": "test_generated.TestFlatten.test_multiple_levels_nesting: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_multiple_levels_nesting\n    self.assertEqual(flatten([1, [2, [3, 4], 5], 6]), [1, 2, 3, 4, 5, 6])\nAssertionError: Lists differ: [1, 2, [3, 4], 5, 6] != [1, 2, 3, 4, 5, 6]\n\nFirst differing element 2:\n[3, 4]\n3\n\nSecond list contains 1 additional elements.\nFirst extra element 5:\n6\n\n- [1, 2, [3, 4], 5, 6]\n?        -    -\n\n+ [1, 2, 3, 4, 5, 6]\n\nAn independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "test_generated.TestFlatten.test_multiple_levels_nesting: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_multiple_levels_nesting\n    self.assertEqual(flatten([1, [2, [3, 4], 5], 6]), [1, 2, 3, 4, 5, 6])\nAssertionError: Lists differ: [1, 2, [3, 4], 5, 6] != [1, 2, 3, 4, 5, 6]\n\nFirst differing element 2:\n[3, 4]\n3\n\nSecond list contains 1 additional elements.\nFirst extra element 5:\n6\n\n- [1, 2, [3, 4], 5, 6]\n?        -    -\n\n+ [1, 2, 3, 4, 5, 6]\n\nAn independent acceptance suite also failed (details withheld)."
+        },
+        {
+          "attempt": 2,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [
+              "test_generated.TestFlatten.test_multiple_levels_nesting"
+            ],
+            "passed": false
+          },
+          "accepted": false,
+          "durationMs": 1204,
+          "failures": [
+            {
+              "taskId": "d1-flatten",
+              "attempt": 2,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 0
+            },
+            {
+              "taskId": "d1-flatten",
+              "attempt": 2,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "test_generated.TestFlatten.test_multiple_levels_nesting passes on the frozen reference"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 0
+            }
+          ],
+          "repaired": [],
+          "workerFeedback": "test_generated.TestFlatten.test_multiple_levels_nesting: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_multiple_levels_nesting\n    self.assertEqual(flatten([1, [2, [3, 4], 5], 6]), [1, 2, 3, 4, 5, 6])\nAssertionError: Lists differ: [1, 2, [3, 4], 5, 6] != [1, 2, 3, 4, 5, 6]\n\nFirst differing element 2:\n[3, 4]\n3\n\nSecond list contains 1 additional elements.\nFirst extra element 5:\n6\n\n- [1, 2, [3, 4], 5, 6]\n?        -    -\n\n+ [1, 2, 3, 4, 5, 6]\n\nAn independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "test_generated.TestFlatten.test_multiple_levels_nesting: Traceback (most recent call last):\n  File \"/work/test_generated.py\", line 15, in test_multiple_levels_nesting\n    self.assertEqual(flatten([1, [2, [3, 4], 5], 6]), [1, 2, 3, 4, 5, 6])\nAssertionError: Lists differ: [1, 2, [3, 4], 5, 6] != [1, 2, 3, 4, 5, 6]\n\nFirst differing element 2:\n[3, 4]\n3\n\nSecond list contains 1 additional elements.\nFirst extra element 5:\n6\n\n- [1, 2, [3, 4], 5, 6]\n?        -    -\n\n+ [1, 2, 3, 4, 5, 6]\n\nAn independent acceptance suite also failed (details withheld)."
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestFlatten.test_multiple_levels_nesting passes on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "f499e2574b445588be55a1173a47f6a74728519a993aa3d83fcca6a6ecbe216b",
+          "proposedSha256": "1b9f0e3659d40b1eb9c71946d60f80aedda333361b1b4c4353381c24556c8045",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestFlatten.test_multiple_levels_nesting passes on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "1b9f0e3659d40b1eb9c71946d60f80aedda333361b1b4c4353381c24556c8045",
+          "proposedSha256": "f499e2574b445588be55a1173a47f6a74728519a993aa3d83fcca6a6ecbe216b",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "taskId": "d1-flatten",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        },
+        {
+          "taskId": "d1-flatten",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "test_generated.TestFlatten.test_multiple_levels_nesting passes on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        },
+        {
+          "taskId": "d1-flatten",
+          "attempt": 1,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 1
+        },
+        {
+          "taskId": "d1-flatten",
+          "attempt": 1,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "test_generated.TestFlatten.test_multiple_levels_nesting passes on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 1
+        },
+        {
+          "taskId": "d1-flatten",
+          "attempt": 2,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 0
+        },
+        {
+          "taskId": "d1-flatten",
+          "attempt": 2,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "test_generated.TestFlatten.test_multiple_levels_nesting passes on the frozen reference"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 0
+        }
+      ],
+      "contractVersion": "contract:72d957a34ad6d32e",
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 15123,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792704991324,
+          "endedAt": 1792705006447
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 7621,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705006448,
+          "endedAt": 1792705014069
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 27776,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792705006448,
+          "endedAt": 1792705034224
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 13508,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705038703,
+          "endedAt": 1792705052211
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 3242,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705053386,
+          "endedAt": 1792705056628
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 3,
+          "ok": true,
+          "durationMs": 5089,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705057833,
+          "endedAt": 1792705062922
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "f499e2574b445588be55a1173a47f6a74728519a993aa3d83fcca6a6ecbe216b",
+      "finalSource": "def flatten(nested):\n    out = []\n    for item in nested:\n        if isinstance(item, list):\n            out.extend(item)\n        else:\n            out.append(item)\n    return out\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 13,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15123,
+          "doneReason": "stop",
+          "promptTokens": 153,
+          "outputTokens": 237,
+          "evalNs": 9484589000,
+          "loadNs": 5298939400
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 7621,
+          "doneReason": "stop",
+          "promptTokens": 519,
+          "outputTokens": 175,
+          "evalNs": 7158278000,
+          "loadNs": 9661200
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 27776,
+          "doneReason": "stop",
+          "promptTokens": 558,
+          "outputTokens": 292,
+          "evalNs": 12151491000,
+          "loadNs": 14985811200
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13508,
+          "doneReason": "stop",
+          "promptTokens": 819,
+          "outputTokens": 107,
+          "evalNs": 4408624000,
+          "loadNs": 8334103200
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 3242,
+          "doneReason": "stop",
+          "promptTokens": 827,
+          "outputTokens": 70,
+          "evalNs": 2863833000,
+          "loadNs": 11032300
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5089,
+          "doneReason": "stop",
+          "promptTokens": 676,
+          "outputTokens": 109,
+          "evalNs": 4433869000,
+          "loadNs": 11596300
+        }
+      ]
+    },
+    {
+      "task": "d1-flatten",
+      "kind": "debugging",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "durationMs": 58803,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 1,
+            "passed": false
+          },
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false,
+          "durationMs": 4731,
+          "failures": [
+            {
+              "taskId": "d1-flatten",
+              "attempt": 0,
+              "failingStage": "sandbox_tests",
+              "failureCategory": "implementation_defect",
+              "suspectedComponent": "worker",
+              "evidence": [
+                "independent acceptance suite failed"
+              ],
+              "confidence": "verified",
+              "recommendedAction": "repair_worker",
+              "retryBudgetRemaining": 2
+            }
+          ],
+          "repaired": [
+            "Worker"
+          ],
+          "workerFeedback": "An independent acceptance suite also failed (details withheld).",
+          "testerFeedback": "",
+          "feedback": "An independent acceptance suite also failed (details withheld)."
+        },
+        {
+          "attempt": 1,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 1233,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "resolved",
+          "previousSha256": "f499e2574b445588be55a1173a47f6a74728519a993aa3d83fcca6a6ecbe216b",
+          "proposedSha256": "efd10f298251119ea2bce05265de27e6548d700045e8e1dbc797fe3f9c531e66",
+          "proposal": "valid",
+          "remaining": 1
+        }
+      ],
+      "failures": [
+        {
+          "taskId": "d1-flatten",
+          "attempt": 0,
+          "failingStage": "sandbox_tests",
+          "failureCategory": "implementation_defect",
+          "suspectedComponent": "worker",
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "confidence": "verified",
+          "recommendedAction": "repair_worker",
+          "retryBudgetRemaining": 2
+        }
+      ],
+      "contractVersion": "contract:66861753b2cbc79e",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 15458,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705062938,
+          "endedAt": 1792705078397
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 19321,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792705078397,
+          "endedAt": 1792705097718
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 31683,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705078397,
+          "endedAt": 1792705110080
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 4008,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705114811,
+          "endedAt": 1792705118819
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 2,
+          "ok": true,
+          "durationMs": 1687,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705120054,
+          "endedAt": 1792705121741
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "efd10f298251119ea2bce05265de27e6548d700045e8e1dbc797fe3f9c531e66",
+      "finalSource": "def flatten(nested):\n    out = []\n    for item in nested:\n        if isinstance(item, list):\n            out.extend(flatten(item))\n        else:\n            out.append(item)\n    return out\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 9,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15458,
+          "doneReason": "stop",
+          "promptTokens": 153,
+          "outputTokens": 248,
+          "evalNs": 9994518000,
+          "loadNs": 5116803000
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 19321,
+          "doneReason": "stop",
+          "promptTokens": 569,
+          "outputTokens": 290,
+          "evalNs": 11927611000,
+          "loadNs": 6751359200
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 31683,
+          "doneReason": "stop",
+          "promptTokens": 530,
+          "outputTokens": 98,
+          "evalNs": 4043364000,
+          "loadNs": 26938529600
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 4008,
+          "doneReason": "stop",
+          "promptTokens": 634,
+          "outputTokens": 84,
+          "evalNs": 3501933000,
+          "loadNs": 12939100
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 1687,
+          "doneReason": "stop",
+          "promptTokens": 703,
+          "outputTokens": 26,
+          "evalNs": 1014995000,
+          "loadNs": 10907000
+        }
+      ]
+    },
+    {
+      "task": "d2-moving",
+      "kind": "debugging",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 74386,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4676,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:9a7d6ef2cf168b11",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 25656,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705121912,
+          "endedAt": 1792705147568
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 6855,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705147568,
+          "endedAt": 1792705154423
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 34338,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792705147569,
+          "endedAt": 1792705181907
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 9714,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705186583,
+          "endedAt": 1792705196297
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "04b43218974a6f0e07368ff38a5e55762b1969553e821b7bb9edac592808b90e",
+      "finalSource": "def moving_average(xs, k):\n    if k < 1:\n        raise ValueError(\"k must be at least 1\")\n    if k > len(xs):\n        return []\n    return [sum(xs[i:i + k]) / k for i in range(len(xs) - k + 1)]\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 25656,
+          "doneReason": "stop",
+          "promptTokens": 175,
+          "outputTokens": 452,
+          "evalNs": 18617770000,
+          "loadNs": 6650902900
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6855,
+          "doneReason": "stop",
+          "promptTokens": 750,
+          "outputTokens": 147,
+          "evalNs": 6156785000,
+          "loadNs": 10615200
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 34338,
+          "doneReason": "stop",
+          "promptTokens": 789,
+          "outputTokens": 468,
+          "evalNs": 19607956000,
+          "loadNs": 13946927400
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 9714,
+          "doneReason": "stop",
+          "promptTokens": 1009,
+          "outputTokens": 26,
+          "evalNs": 1048165000,
+          "loadNs": 7803968000
+        }
+      ]
+    },
+    {
+      "task": "d2-moving",
+      "kind": "debugging",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 69179,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 6,
+            "valid": 6,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 4568,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:b352468fcd4c0936",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 19799,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705196464,
+          "endedAt": 1792705216263
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 6999,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705216263,
+          "endedAt": 1792705223262
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 34383,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792705216263,
+          "endedAt": 1792705250646
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 10428,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705255214,
+          "endedAt": 1792705265642
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "04b43218974a6f0e07368ff38a5e55762b1969553e821b7bb9edac592808b90e",
+      "finalSource": "def moving_average(xs, k):\n    if k < 1:\n        raise ValueError(\"k must be at least 1\")\n    if k > len(xs):\n        return []\n    return [sum(xs[i:i + k]) / k for i in range(len(xs) - k + 1)]\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 1,
+      "candidates": [],
+      "toolCalls": 5,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 19799,
+          "doneReason": "stop",
+          "promptTokens": 175,
+          "outputTokens": 333,
+          "evalNs": 13563128000,
+          "loadNs": 5859852400
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6999,
+          "doneReason": "stop",
+          "promptTokens": 631,
+          "outputTokens": 156,
+          "evalNs": 6391132000,
+          "loadNs": 8359100
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 34383,
+          "doneReason": "stop",
+          "promptTokens": 670,
+          "outputTokens": 466,
+          "evalNs": 19434077000,
+          "loadNs": 14240825300
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 10428,
+          "doneReason": "stop",
+          "promptTokens": 904,
+          "outputTokens": 26,
+          "evalNs": 1057660000,
+          "loadNs": 8559634400
+        }
+      ]
+    },
+    {
+      "task": "p1-inventory",
+      "kind": "planning",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 105585,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 7,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 1732,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:d682416612b8db30",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 23023,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705265659,
+          "endedAt": 1792705288682
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 17287,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705288682,
+          "endedAt": 1792705305969
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 43030,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792705288683,
+          "endedAt": 1792705331713
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 30567,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705331714,
+          "endedAt": 1792705362281
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2357,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705368886,
+          "endedAt": 1792705371244
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "79abe43b7a0409b36667ea1ce13b6df9a0831981d689bb2bd2203ccff668cf75",
+      "finalSource": "class Inventory:\n    def __init__(self):\n        self.items = {}\n\n    def add(self, name, qty, unit_price):\n        if qty <= 0 or unit_price < 0:\n            raise ValueError(\"Invalid quantity or unit price\")\n        if name in self.items:\n            self.items[name]['qty'] += qty\n            self.items[name]['unit_price'] = unit_price\n        else:\n            self.items[name] = {'qty': qty, 'unit_price': unit_price}\n\n    def remove(self, name, qty):\n        if name not in self.items:\n            raise KeyError(\"Item not found\")\n        if qty < 1 or qty > self.items[name]['qty']:\n            raise ValueError(\"Invalid quantity to remove\")\n        self.items[name]['qty'] -= qty\n        if self.items[name]['qty'] == 0:\n            del self.items[name]\n\n    def quantity(self, name):\n        return self.items.get(name, {'qty': 0})['qty']\n\n    def total_value(self):\n        return sum(item['qty'] * item['unit_price'] for item in self.items.values())\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 2,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "79abe43b7a0409b36667ea1ce13b6df9a0831981d689bb2bd2203ccff668cf75",
+          "staticOk": true,
+          "testsPassed": 5,
+          "testsTotal": 7,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "93c328e05105fbbf5e57887f077880da03119ef579c0d6eec465f5460d0d48d9",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 7,
+          "selected": false
+        }
+      ],
+      "toolCalls": 11,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23023,
+          "doneReason": "stop",
+          "promptTokens": 181,
+          "outputTokens": 364,
+          "evalNs": 15729358000,
+          "loadNs": 6935775400
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 17287,
+          "doneReason": "stop",
+          "promptTokens": 642,
+          "outputTokens": 377,
+          "evalNs": 16647098999,
+          "loadNs": 9684200
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 43030,
+          "doneReason": "stop",
+          "promptTokens": 681,
+          "outputTokens": 415,
+          "evalNs": 18032075000,
+          "loadNs": 24289354300
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 30567,
+          "doneReason": "stop",
+          "promptTokens": 642,
+          "outputTokens": 519,
+          "evalNs": 22479557000,
+          "loadNs": 7403140100
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 2357,
+          "doneReason": "stop",
+          "promptTokens": 1192,
+          "outputTokens": 26,
+          "evalNs": 1092501000,
+          "loadNs": 10552600
+        }
+      ]
+    },
+    {
+      "task": "p1-inventory",
+      "kind": "planning",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 116247,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 11,
+            "valid": 7,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 1722,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:ace3307d75d22f0f",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 28462,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705371434,
+          "endedAt": 1792705399896
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 34191,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792705399897,
+          "endedAt": 1792705434088
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 60561,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705399896,
+          "endedAt": 1792705460457
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 15445,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705460458,
+          "endedAt": 1792705475903
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 5024,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705482657,
+          "endedAt": 1792705487681
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "78fa0e2f7eb62d1bfa9aba89566b6366dda13868cc2ca60d64a42af55b9e9ada",
+      "finalSource": "class Inventory:\n    def __init__(self):\n        self.items = {}\n\n    def add(self, name, qty, unit_price):\n        if qty <= 0 or unit_price < 0:\n            raise ValueError(\"Quantity must be greater than 0 and unit price must be non-negative\")\n        if name in self.items:\n            self.items[name]['qty'] += qty\n            self.items[name]['unit_price'] = unit_price\n        else:\n            self.items[name] = {'qty': qty, 'unit_price': unit_price}\n\n    def remove(self, name, qty):\n        if name not in self.items:\n            raise KeyError(\"Item not found\")\n        if qty < 1 or qty > self.items[name]['qty']:\n            raise ValueError(\"Invalid quantity to remove\")\n        self.items[name]['qty'] -= qty\n        if self.items[name]['qty'] == 0:\n            del self.items[name]\n\n    def quantity(self, name):\n        return self.items.get(name, {'qty': 0})['qty']\n\n    def total_value(self):\n        return sum(item['qty'] * item['unit_price'] for item in self.items.values())\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 2,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "78fa0e2f7eb62d1bfa9aba89566b6366dda13868cc2ca60d64a42af55b9e9ada",
+          "staticOk": true,
+          "testsPassed": 7,
+          "testsTotal": 11,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "c0474e138cbcd2e730da3469513c8fadeae5eda81184b2cf487c9e065644426a",
+          "staticOk": true,
+          "testsPassed": 7,
+          "testsTotal": 11,
+          "selected": false
+        }
+      ],
+      "toolCalls": 11,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 28462,
+          "doneReason": "stop",
+          "promptTokens": 181,
+          "outputTokens": 495,
+          "evalNs": 21173991000,
+          "loadNs": 6923127600
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 34191,
+          "doneReason": "stop",
+          "promptTokens": 812,
+          "outputTokens": 593,
+          "evalNs": 26419097000,
+          "loadNs": 6985064100
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 60561,
+          "doneReason": "stop",
+          "promptTokens": 773,
+          "outputTokens": 429,
+          "evalNs": 19013895000,
+          "loadNs": 40755281100
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 15445,
+          "doneReason": "stop",
+          "promptTokens": 773,
+          "outputTokens": 366,
+          "evalNs": 15313259000,
+          "loadNs": 9666900
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 5024,
+          "doneReason": "stop",
+          "promptTokens": 1388,
+          "outputTokens": 85,
+          "evalNs": 3625080000,
+          "loadNs": 11555900
+        }
+      ]
+    },
+    {
+      "task": "p2-bucket",
+      "kind": "planning",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 99599,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 1665,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:40f6e6c695cabe25",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 0
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 20639,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705487888,
+          "endedAt": 1792705508527
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 36143,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792705508528,
+          "endedAt": 1792705544671
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 57379,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705508527,
+          "endedAt": 1792705565906
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 13076,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705565906,
+          "endedAt": 1792705578982
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 2312,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705585174,
+          "endedAt": 1792705587486
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "3a08f4248532be81878a307aa48f04f5e3972f8731c0731f13cc99ac6601c75e",
+      "finalSource": "class TokenBucket:\n    def __init__(self, capacity, refill_per_second, clock):\n        if capacity < 1 or refill_per_second < 0:\n            raise ValueError(\"Capacity must be greater than 0 and refill_per_second must be non-negative\")\n        self.capacity = capacity\n        self.refill_per_second = refill_per_second\n        self.clock = clock\n        self.tokens = capacity\n        self.last_refill_time = self.clock()\n\n    def allow(self):\n        current_time = self.clock()\n        elapsed_time = current_time - self.last_refill_time\n        self.tokens += elapsed_time * self.refill_per_second\n        self.tokens = min(self.tokens, self.capacity)\n        self.last_refill_time = current_time\n\n        if self.tokens >= 1:\n            self.tokens -= 1\n            return True\n        else:\n            return False\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 2,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "3a08f4248532be81878a307aa48f04f5e3972f8731c0731f13cc99ac6601c75e",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 8,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "45b3c19eebd4f3c84731a2913381f4f02fc2aa5b20953a8fe5af0e7d35a99255",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 8,
+          "selected": false
+        }
+      ],
+      "toolCalls": 11,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 20639,
+          "doneReason": "stop",
+          "promptTokens": 185,
+          "outputTokens": 307,
+          "evalNs": 12843608000,
+          "loadNs": 7417971600
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 36143,
+          "doneReason": "stop",
+          "promptTokens": 627,
+          "outputTokens": 647,
+          "evalNs": 27257431000,
+          "loadNs": 8216862000
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 57379,
+          "doneReason": "stop",
+          "promptTokens": 588,
+          "outputTokens": 319,
+          "evalNs": 13424027000,
+          "loadNs": 43294671200
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 13076,
+          "doneReason": "stop",
+          "promptTokens": 588,
+          "outputTokens": 309,
+          "evalNs": 12935030000,
+          "loadNs": 10214000
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 2312,
+          "doneReason": "stop",
+          "promptTokens": 1180,
+          "outputTokens": 26,
+          "evalNs": 1093142000,
+          "loadNs": 11964000
+        }
+      ]
+    },
+    {
+      "task": "p2-bucket",
+      "kind": "planning",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 108098,
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": {
+            "ok": true,
+            "errors": []
+          },
+          "hidden": {
+            "ran": true,
+            "total": 1,
+            "failed": 0,
+            "passed": true
+          },
+          "tester": {
+            "ran": true,
+            "total": 7,
+            "valid": 3,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true,
+          "durationMs": 1730,
+          "failures": [],
+          "repaired": [],
+          "workerFeedback": "",
+          "testerFeedback": "",
+          "feedback": ""
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "contractVersion": "contract:45a0b5fd0ec9bb34",
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "reviewerFalseRejection": false,
+      "workerTesterConcurrent": true,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 22931,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705587500,
+          "endedAt": 1792705610431
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 14463,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705610432,
+          "endedAt": 1792705624895
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 48802,
+          "servedModel": "huihui_ai/qwen2.5-abliterate:7b",
+          "startedAt": 1792705610432,
+          "endedAt": 1792705659234
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 0,
+          "ok": true,
+          "durationMs": 23218,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705659234,
+          "endedAt": 1792705682452
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "attempt": 1,
+          "ok": true,
+          "durationMs": 6351,
+          "servedModel": "qwen2.5-coder:7b",
+          "startedAt": 1792705689247,
+          "endedAt": 1792705695598
+        }
+      ],
+      "invariants": {
+        "pinsHeld": true,
+        "ordering": true,
+        "gateIsAuthority": true
+      },
+      "finalSourceSha256": "37b78b82dae452fc22fc2d3a9dc2beb07ca4c1d2cd080239adca878e7748d23c",
+      "finalSource": "class TokenBucket:\n    def __init__(self, capacity, refill_per_second, clock):\n        if capacity < 1:\n            raise ValueError(\"Capacity must be less than 1\")\n        if refill_per_second < 0:\n            raise ValueError(\"Refill rate must be non-negative\")\n        self.capacity = capacity\n        self.refill_per_second = refill_per_second\n        self.clock = clock\n        self.tokens = capacity\n        self.last_refill_time = self.clock()\n\n    def allow(self):\n        current_time = self.clock()\n        elapsed_time = current_time - self.last_refill_time\n        self.tokens += elapsed_time * self.refill_per_second\n        self.tokens = min(self.tokens, self.capacity)\n        self.last_refill_time = current_time\n\n        if self.tokens >= 1:\n            self.tokens -= 1\n            return True\n        else:\n            return False\n",
+      "strategy": "s1r4-v3c",
+      "workerSamples": 2,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "37b78b82dae452fc22fc2d3a9dc2beb07ca4c1d2cd080239adca878e7748d23c",
+          "staticOk": true,
+          "testsPassed": 3,
+          "testsTotal": 7,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "71a55d2195d068aa43bfd168ff5da3072dac3aa7523c9f8f0c8dc03b58344d92",
+          "staticOk": true,
+          "testsPassed": 3,
+          "testsTotal": 7,
+          "selected": false
+        }
+      ],
+      "toolCalls": 11,
+      "toolReceiptsOk": true,
+      "callReceipts": [
+        {
+          "role": "Planner",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 22931,
+          "doneReason": "stop",
+          "promptTokens": 185,
+          "outputTokens": 412,
+          "evalNs": 17145205000,
+          "loadNs": 5397598700
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 14463,
+          "doneReason": "stop",
+          "promptTokens": 693,
+          "outputTokens": 325,
+          "evalNs": 13800160000,
+          "loadNs": 11823300
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 48802,
+          "doneReason": "stop",
+          "promptTokens": 732,
+          "outputTokens": 599,
+          "evalNs": 25274681000,
+          "loadNs": 22802720500
+        },
+        {
+          "role": "Worker",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 23218,
+          "doneReason": "stop",
+          "promptTokens": 693,
+          "outputTokens": 324,
+          "evalNs": 13721945000,
+          "loadNs": 8796904200
+        },
+        {
+          "role": "Reviewer",
+          "model": "qwen2.5-coder:7b",
+          "ok": true,
+          "durationMs": 6351,
+          "doneReason": "stop",
+          "promptTokens": 1170,
+          "outputTokens": 118,
+          "evalNs": 5106695000,
+          "loadNs": 11418600
+        }
+      ]
+    }
+  ],
+  "cancellation": {
+    "status": "cancelled",
+    "sandboxRuns": 0,
+    "liveRequestsAfter": 0,
+    "calls": [
+      {
+        "role": "Planner",
+        "ok": true
+      },
+      {
+        "role": "Worker",
+        "ok": false
+      },
+      {
+        "role": "Tester",
+        "ok": false
+      }
+    ]
+  },
+  "summary": {
+    "heldout": {
+      "passed": 17,
+      "trials": 20
+    },
+    "regression": {
+      "passed": 0,
+      "trials": 3
+    },
+    "byKind": {
+      "simple": "6/6",
+      "intermediate": "4/6",
+      "debugging": "3/4",
+      "planning": "4/4"
+    },
+    "statuses": {
+      "failed": 6,
+      "passed": 17
+    },
+    "repairsUsed": 11,
+    "repairsByTarget": {
+      "Worker:not_retested": 2,
+      "Worker:unresolved": 8,
+      "Tester:resolved": 1,
+      "Tester:unresolved": 2,
+      "Worker:resolved": 1
+    },
+    "passedAfterRepair": 1,
+    "reviewerFalseApprovals": 2,
+    "reviewerFalseRejections": 0,
+    "invariants": {
+      "pinsHeld": true,
+      "ordering": true,
+      "gateIsAuthority": true,
+      "cancellation": true
+    },
+    "externalRequestsRefused": 0,
+    "memoryWaitSamples": 0
+  },
+  "g7": "FAIL",
+  "finishedAt": "2026-10-22T21:48:34.040Z"
+}

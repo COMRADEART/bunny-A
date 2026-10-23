@@ -1,0 +1,56 @@
+basic-streaming-pin: PASS
+invalid-pin: PASS
+structured-output: PASS
+cancellation: PASS
+model-timeout: PASS
+native-tool-proposal-harness-only: FAIL
+benchmark qwen2.5-coder:7b reasoning: false
+benchmark qwen2.5-coder:7b debugging: true
+benchmark qwen2.5-coder:7b math: false
+benchmark qwen2.5-coder:7b structured-json: true
+benchmark qwen2.5-coder:7b function-shape: false
+benchmark qwen2.5-coder:7b planning: true
+benchmark qwen2.5-coder:7b summarization: true
+benchmark qwen2.5-coder:7b instruction-following: true
+benchmark qwen2.5-coder:7b multi-step: false
+benchmark huihui_ai/qwen2.5-abliterate:7b reasoning: false
+benchmark huihui_ai/qwen2.5-abliterate:7b debugging: true
+benchmark huihui_ai/qwen2.5-abliterate:7b math: false
+benchmark huihui_ai/qwen2.5-abliterate:7b structured-json: true
+benchmark huihui_ai/qwen2.5-abliterate:7b function-shape: true
+benchmark huihui_ai/qwen2.5-abliterate:7b planning: true
+benchmark huihui_ai/qwen2.5-abliterate:7b summarization: true
+benchmark huihui_ai/qwen2.5-abliterate:7b instruction-following: true
+benchmark huihui_ai/qwen2.5-abliterate:7b multi-step: false
+automatic-routing-host: PASS
+sensitive-host-and-pin: PASS
+unapproved-external-before-network: PASS
+benchmark auto reasoning: false
+benchmark fixed reasoning: false
+benchmark auto debugging: true
+benchmark fixed debugging: true
+benchmark auto math: false
+benchmark fixed math: false
+benchmark auto structured-json: true
+benchmark fixed structured-json: true
+benchmark auto function-shape: false
+benchmark fixed function-shape: true
+benchmark auto planning: true
+benchmark fixed planning: true
+benchmark auto summarization: true
+benchmark fixed summarization: true
+benchmark auto instruction-following: true
+benchmark fixed instruction-following: true
+benchmark auto multi-step: false
+benchmark fixed multi-step: false
+planner-worker-reviewer: FAIL
+controlled-agent-failure: FAIL
+node : {"type":"host.operation_failed","at":1792533849522,"failureClass":"OPERATION_FAILURE","action":"CONTINUE","error
+":"Failure evidence unavailable locally."}
+At line:2 char:1
++ node --experimental-strip-types scripts/ma4-s1r/qualify.mjs *> docs/m ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ({"type":"host.o...able locally."}:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+mission-cancellation-resource-release: PASS

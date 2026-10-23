@@ -21,6 +21,7 @@ export type ReasoningComplexity = "LOW" | "MEDIUM" | "HIGH" | "MAX";
 export type PrivacyRequirement = "none" | "local_only" | "unknown";
 
 export type TaskRequirements = {
+  model_intelligence?: import("../bunny-host/ma4/analyzer.ts").TaskAnalysis;
   task_class: RoutingTaskClass;
   needs_tools: boolean;
   needs_vision: boolean;
@@ -100,7 +101,7 @@ export function classifyRequirements(input: { prompt: string; mode?: Mode | null
   const needs_local = constraints.localOnly === true || constraints.offlineOnly === true;
   const needs_cloud = constraints.cloudOnly === true;
 
-  const privacy_re = PRIVACY.test(prompt);
+  const privacy_re = PRIVACY.test(prompt) || constraints.sensitive === true || /\b(?:social security number|patient record|private key|api[_ -]?key|password|confidential|sensitive data)\b/i.test(prompt);
   const privacy_requirement: PrivacyRequirement = constraints.privacyLocal === true || constraints.localOnly === true ? "local_only"
     : privacy_re ? "local_only"
     : constraints.cloudOnly === true ? "none"

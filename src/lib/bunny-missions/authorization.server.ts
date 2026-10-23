@@ -273,7 +273,7 @@ export function isRemoteEnvelope(envelope: Pick<AuthorizationEnvelope, "grantedB
  */
 export function providerSessionAuthority(provider: unknown, access: unknown): SessionAuthority | null {
   if (access !== "read" && access !== "write") return null;
-  if (provider === "ollama") return "tool_free";
+  if (provider === "ollama" || provider === "openrouter") return "tool_free";
   // Claude read: --restricted --tools Read; Write/Edit/Bash/PowerShell disallowed. Claude write: Bash and PowerShell.
   if (provider === "claude") return access === "read" ? "read_tools" : "shell";
   // Codex runs commands in both read-only and workspace-write sandboxes.

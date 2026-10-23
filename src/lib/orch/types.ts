@@ -2,7 +2,7 @@ import type { CodexCompatibilityProfile } from "./compatibility.ts";
 
 export type Mode = "fast" | "balanced" | "deep";
 
-export type ProviderId = "codex" | "claude" | "ollama" | "opencode" | "cline" | "cursor";
+export type ProviderId = "codex" | "claude" | "ollama" | "opencode" | "cline" | "cursor" | "openrouter";
 
 export type TaskType = "coding" | "debug" | "research" | "writing" | "ops" | "general";
 
@@ -215,6 +215,8 @@ export type Reconciliation = {
 };
 
 export type OrchTask = {
+  /** Host policy binding: changing approved MA4 downstream hosts invalidates queued inference. */
+  inferencePolicy?: string;
   connectionRoute?: import("../bunny-host/connections.ts").ApprovedRoute | null;
   proposedRoute?: import("../bunny-host/connections.ts").ApprovedRoute | null;
   id: string;
@@ -294,10 +296,19 @@ export type VerifySpec =
   | { kind: "python"; name: string; expected: string };
 
 export type TaskConstraints = {
+  /** MA4 hard routing constraints, scoped to this task only. */
+  sensitive?: boolean;
+  language?: string;
+  requiresAudio?: boolean;
+  maxCostUsd?: number;
   /** Host-owned Mission authority. Not accepted as a user-supplied HTTP constraint. */
   missionAccess?: ProviderExecutionScope["access"];
   localOnly?: boolean;
   offlineOnly?: boolean;
+  /** MA4-S1R2 routing mode; modes only add restrictions (see bunny-host/ma4/hybrid.ts). */
+  routingMode?: import("../bunny-host/ma4/hybrid.ts").RoutingMode;
+  /** MA4-S1R2 data category an external approval must explicitly cover; absent means "unclassified". */
+  dataCategory?: import("../bunny-host/ma4/hybrid.ts").DataCategory;
   /** M-A-3 T3 user routing constraints (§27). Hard filters, never silent overrides. */
   /** Run only on this exact model id; no substitution when it is unavailable. */
   modelExact?: string;
@@ -357,6 +368,8 @@ export type ExecRequest = {
   /** M-A-3 T11: Ollama num_ctx; absent leaves the request body unchanged. */
   numCtx?: number;
   numPredict?: number;
+  /** MA4-S1R4: Ollama sampling temperature; absent leaves the model's default. */
+  temperature?: number;
   /** M-A-3 T11: Ollama structured-output JSON schema; absent leaves the request body unchanged. */
   format?: { [key: string]: SchemaJson };
   /** Provider-native effort/reasoning override Bunny selected; null when the provider does not expose one. */

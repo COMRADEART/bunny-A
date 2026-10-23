@@ -4,9 +4,9 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { runCommand } from "../bunny-missions/capabilities/process.server.ts";
+import { realGit, runCommand } from "../bunny-missions/capabilities/process.server.ts";
 const windows=process.platform==="win32";
-const git="C:\\Program Files\\Git\\mingw64\\bin\\git.exe";
+const git=realGit("C:\\Program Files\\Git\\cmd\\git.exe");
 const child=resolve("scripts/fixtures/git-hook-child.mjs");
 function fixture(){
   const root=mkdtempSync(join(tmpdir(),"bunny-t4-helper-")),repo=join(root,"repo"),log=join(root,"children.jsonl"),helper=join(root,"helper.sh");mkdirSync(repo);

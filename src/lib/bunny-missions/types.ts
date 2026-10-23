@@ -402,6 +402,8 @@ export type MissionAccounting = {
 };
 
 export type Mission = {
+  /** MA4 task/agent pins persist with this mission, never as a global model preference. */
+  modelSelection?: import("../bunny-host/ma4/selection.ts").ModelSelection;
   /** M-A-3 T9R-F01: the paired device that started or resumed this Mission (its changes are reviewed as such). */
   deviceDriven?: string;
   /** M-A-3 T11: present on a multi-Agent Team Mission. */

@@ -54,7 +54,7 @@ test("execution delivers model output and releases its task controller", async (
       prompt: "Test",
       stream: false,
     });
-    return new Response(JSON.stringify({ response: "ROUTER_TEST_OK" }));
+    return new Response(JSON.stringify({ model: "test-model", response: "ROUTER_TEST_OK", done: true }));
   };
   const result = await execute(request);
   assert.equal(result.ok, true);
@@ -86,7 +86,7 @@ test("duplicate launch is refused and cancellation aborts only its task", async 
 
 test("Host streaming preserves genuine Ollama output and cancellation during discovery prevents generation",async()=>{
   const chunks:string[]=[];
-  globalThis.fetch=async(_url,options)=>!options?.method ? tags() : new Response('{"response":"BUNNY"}\n{"response":"_A_OK","done":true}\n');
+  globalThis.fetch=async(_url,options)=>!options?.method ? tags() : new Response('{"model":"test-model","response":"BUNNY"}\n{"model":"test-model","response":"_A_OK","done":true}\n');
   const result=await execute({...request,taskId:"streaming"},{stream:text=>chunks.push(text)});
   assert.equal(result.output,"BUNNY_A_OK");assert.deepEqual(chunks,["BUNNY","_A_OK"]);
   const controller=new AbortController();let generationCalled=false;
@@ -97,7 +97,7 @@ test("Host streaming preserves genuine Ollama output and cancellation during dis
 test("V16 T10: a local-only task (every voice turn) is refused at launch when the fresh probe reports its tag hosted", async () => {
   let generated = false;
   globalThis.fetch = async (_url, options) => {
-    if (options?.method) { generated = true; return new Response(JSON.stringify({ response: "x" })); }
+    if (options?.method) { generated = true; return new Response(JSON.stringify({ model: "became-hosted", response: "x", done: true })); }
     return new Response(JSON.stringify({ models: [{ name: "became-hosted", remote_host: "https://example.invalid" }, { name: "deepseek-v4.1-flash:cloud" }] }));
   };
   for (const model of ["became-hosted", "deepseek-v4.1-flash:cloud"]) {

@@ -13,7 +13,7 @@ export type RegistryTiming = {
   usageMs: number;
 };
 export const DEFAULT_TIMING: RegistryTiming = { fullMs: 10 * 60_000, detectOnlyFullMs: 30 * 60_000, usageMs: 5 * 60_000 };
-const ORDER: ProviderId[] = ["ollama", "codex", "claude", "opencode", "cline", "cursor"];
+const ORDER: ProviderId[] = ["ollama", "codex", "claude", "opencode", "cline", "cursor", "openrouter"];
 export const SESSION_USAGE = "Reported by the provider during a Bunny-A session";
 
 /** Fields whose change is a real status change. Usage percentages and probe timestamps are not. */

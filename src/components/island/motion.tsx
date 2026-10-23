@@ -21,6 +21,7 @@ import {
   replayFrame,
   replayRecords,
   routeStrengths,
+  routingGraphIds,
   taskJourney,
   type OrbState,
 } from "./motion-model";
@@ -67,7 +68,6 @@ export function TaskJourney({ task }: { task: Parameters<typeof taskJourney>[0] 
   );
 }
 
-const PRIMARY: ProviderId[] = ["codex", "claude", "ollama"];
 export function RoutingGraph({
   decision,
   selected,
@@ -81,7 +81,7 @@ export function RoutingGraph({
   const providers = liveProviders(store);
   const strengths = routeStrengths(decision);
   const chosen = selected ?? decision?.recommended_provider;
-  const ids = [...new Set([...PRIMARY, ...strengths.map((s) => s.provider)])].slice(0, 6);
+  const ids = routingGraphIds(providers, decision);
   return (
     <div
       className="routing-graph"

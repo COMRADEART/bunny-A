@@ -646,6 +646,27 @@ test("deterministic steps use zero model calls and verification is Bunny's own",
     assert.ok(done.mission.steps.every((s) => s.accounting.deterministic));
   } finally { await env.cleanup(); }
 });
+test("self-evolving: the same routine completed in three Missions becomes a candidate skill, never an active one", async () => {
+  const env = await setup();
+  try {
+    const node = (code: string) => ({ kind: "capability" as const, action: "terminal.exec", params: { command: "node", args: ["-e", code] } });
+    for (let n = 0; n < 3; n++) {
+      assert.equal(env.missions.skills.list().filter((skill) => skill.id.startsWith("learned.")).length, 0, "nothing is learned before the third Mission");
+      const view = env.missions.create({ objective: `Routine ${n}`, mode: "fast", origin: "workstation", steps: [
+        { role: "Lint", objective: "lint", executor: node("console.log('lint')") },
+        { role: "Test", objective: "test", dependsOn: [0], executor: node("console.log('test')") },
+      ] });
+      env.missions.approve(view.id, "workstation");
+      await until(() => ["completed", "failed", "waiting_for_user"].includes(env.missions.mission(view.id).state), `routine mission ${n}`, 20_000);
+      assert.equal(env.missions.mission(view.id).state, "completed");
+    }
+    const learned = env.missions.skills.list().filter((skill) => skill.id.startsWith("learned."));
+    assert.equal(learned.length, 1);
+    assert.equal(learned[0].status, "candidate");
+    assert.deepEqual(learned[0].steps.map((step) => step.params.args), [["-e", "console.log('lint')"], ["-e", "console.log('test')"]]);
+    assert.ok(env.db.events().some((event) => event.type === "skill.learned"));
+  } finally { await env.cleanup(); }
+});
 test("a deterministic skill mission carries its own commands in the envelope and runs without extra prompts", async () => {
   const env = await setup();
   try {

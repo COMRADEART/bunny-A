@@ -1,3 +1,4 @@
+import { applyRoutingMode, approvalExclusion, reliabilityCategory } from "./ma4/hybrid.ts";
 import { EventEmitter } from "node:events";
 import { appendFileSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
@@ -5,7 +6,7 @@ import { canTransition } from "../orch/machine.ts";
 import type { Mode, OrchTask, Project, ProviderId, ProviderLive, TaskState, HostSample, TaskProgress, TokenUsage, ProcessInfo, ProviderExecutionScope, TaskConstraints, RouteDecision ,
 } from "../orch/types.ts";
 import { HostDatabase } from "./persistence.server.ts";
-import { MODEL_SOURCE_PROVIDERS, ModelCapabilityRegistry } from "./model-capability.server.ts";
+import { MODEL_SOURCE_PROVIDERS, ModelCapabilityRegistry, type ModelCapabilityOptions } from "./model-capability.server.ts";
 import { bunnyRoute, eligibility, inferredConstraints, runsLocally } from "./router.ts";
 import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask ,
@@ -37,6 +38,11 @@ import { ConnectionRegistry, type ConnectionSeams } from "./connections.server.t
 import { SessionLedger } from "./session-ledger.server.ts";
 import { locate, systemContext } from "./discovery.server.ts";
 import { consentedVendorsFor, vendorFor, type ApprovedRoute } from "./connections.ts";
+import { IntelligenceStore } from "./ma4/store.server.ts";
+import { OpenRouterAdapter } from "./ma4/adapter.server.ts";
+import { EvaluationEngine } from "./ma4/evaluation.server.ts";
+import { analyzeModelTask } from "./ma4/analyzer.ts";
+import { ownerDirective, ModelApprovalRequired } from "./ma4/selection.ts";
 
 export type TaskOutputEvent = { text: string } | { done: true; state: string };
 
@@ -59,6 +65,7 @@ function possiblyAlive(expected: ProcessInfo, rows: ProcessInfo[]): boolean {
   return !known(expected.createdAt) || !known(current.createdAt) || current.createdAt === expected.createdAt;
 }
 export type ManagerOptions = {
+  ma4Fetch?: typeof fetch;
   connections?: ConnectionSeams;
   workspaceRoot?: string;
   /** Folder for raw provider transcripts (one JSONL file per task); null disables them. */
@@ -69,6 +76,8 @@ export type ManagerOptions = {
   containment?: HostContainment;
   /** M-A-3 T3: test/fixture injection point for the T1 model registry; production builds the real one. */
   modelRegistry?: ModelCapabilityRegistry;
+  /** MA4-S1R3-CI2 test-only model probes for the Host-built registry, so a Host test does not read the PC's own Ollama/Codex. */
+  modelProbes?: Pick<ModelCapabilityOptions, "ollamaProbe" | "ollamaShow" | "ollamaPs" | "codexLaunch" | "codexCatalog">;
   /** M-A-3 T9R-F04: Host state folder; provider-session job records live in runtime/provider-sessions. */
   dataDirectory?: string | null;
   /** M-A-3 T13.1 test seams for intelligence services; production uses Ollama, real fetch and Windows DPAPI. */
@@ -84,10 +93,19 @@ export class TaskManager {
     this.db.db.prepare("INSERT INTO settings(key,value) VALUES('routing_priority',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(priority);
     this.routingPriority = priority;
   }
+  /** A Task's constraints with the owner's routing priority applied, so every route (legacy fallback included) and the
+   *  hosted-advice gate see local-only (MA4-S1R3-CI2: a fact-less Host used to route a local-only Task to the cloud). */
+  private taskConstraints(routingText: string, constraints: TaskConstraints | undefined): TaskConstraints {
+    const inferred = inferredConstraints(routingText, constraints);
+    return this.routingPriority === "local_only" ? { ...inferred, localOnly: true } : inferred;
+  }
   projects: ProjectRegistry;
   workspaceRootConfigured: boolean;
   db: HostDatabase;
   adapters: ProviderAdapter[];
+  ma4: IntelligenceStore;
+  ma4Adapter: OpenRouterAdapter;
+  evaluations: EvaluationEngine;
   registry: ProviderRegistry;
   /** M-A-3 T1: per-model capability facts. Additive; routing still reads only the provider registry. */
   modelCapabilities: ModelCapabilityRegistry;
@@ -166,13 +184,21 @@ export class TaskManager {
       });
     this.instanceId = this.containment.instanceId;
     this.policy = new PolicyEngine(db);
-    this.adapters = adapters ?? defaultAdapters(() => this.providerPaths());
+    this.ma4 = new IntelligenceStore(db);
+    this.evaluations = new EvaluationEngine(this.ma4);
+    this.ma4Adapter = new OpenRouterAdapter(this.ma4,
+      () => { const id = this.connections.snapshot().policy.selected.openrouter ?? "openrouter:api_key:default"; return this.connections.inferenceKey(id); },
+      () => this.connections?.views().some(row => row.catalog === "openrouter" && row.session === "signed_in" && row.lifecycle === "active") ?? false,
+      options.ma4Fetch);
+    this.adapters = adapters ?? [...defaultAdapters(() => this.providerPaths()), this.ma4Adapter];
     this.registry = new ProviderRegistry(this.adapters, db, options.timing ?? DEFAULT_TIMING);
     this.modelCapabilities =
       options.modelRegistry ??
       new ModelCapabilityRegistry(db, {
+        inferenceModels: () => this.ma4Adapter.modelRecords(),
         providerPaths: () => this.providerPaths(),
         availableProviders: () => this.adapters.map((adapter) => adapter.id),
+        ...options.modelProbes,
       });
     this.providerUsage = new ProviderUsageService({
       providers: () => this.registry.list(),
@@ -252,6 +278,44 @@ export class TaskManager {
   /** Set at Host shutdown: restart/unreadable/job watchers stop instead of touching a closed database. */
   disposed = false;
   dispose() { this.disposed = true; this.connections.close(); }
+  configureMA4(raw: unknown) {
+    if (this.sessions.size) throw new Error("Stop active tasks before changing model/upstream policy.");
+    this.ma4.configure(raw);
+    this.emit(this.db.event("model.configuration_changed", null, "Owner updated MA4 model/upstream allowlists and bounded budgets."));
+  }
+  async discoverMA4() {
+    await this.ma4Adapter.discover();
+    await this.modelCapabilities.refresh({ force: true });
+    await this.registry.refresh({ force: true });
+    this.emit(this.db.event("model.discovered", null, "Public model metadata refreshed; unapproved models remain disabled."));
+  }
+  /** Explicit owner invocation only. Every synthetic case is an ordinary approved MA3 task with normal budgets/Stop. */
+  async evaluateMA4(model: string, signal: AbortSignal) {
+    return this.evaluations.run(model, async (prompt, evaluationSignal) => {
+      const task = this.submit({ prompt, mode: "fast", override: "openrouter", modelOverride: model, executionScope: { access: "read" }, constraints: { maxRuntimeMs: 30000, outputTokens: 256 } });
+      const stopped = () => this.stopInBackground(task.id, "Evaluation cancelled.");
+      evaluationSignal.addEventListener("abort", stopped, { once: true });
+      let unsubscribe = () => {};
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        evaluationSignal.throwIfAborted();
+        const ended = new Promise<void>((resolve, reject) => {
+          unsubscribe = this.onTaskOutput(task.id, event => { if ("done" in event) resolve(); });
+          timer = setTimeout(() => { stopped(); reject(new Error("Evaluation timeout.")); }, 35000);
+        });
+        // Attach rejection handling before approval can throw synchronously.
+        void ended.catch(() => undefined);
+        this.approve(task.id);
+        await ended;
+        const result = this.db.get(task.id);
+        if (result.state !== "completed") throw new Error(result.error ?? "Evaluation case failed.");
+        return { text: result.output, inputTokens: result.usage?.inputTokens ?? null, outputTokens: result.usage?.outputTokens ?? null };
+      } finally {
+        unsubscribe(); if (timer) clearTimeout(timer); evaluationSignal.removeEventListener("abort", stopped);
+        if (!TERMINAL.includes(this.db.get(task.id).state)) await this.stop(task.id, "Evaluation case ended without a terminal result.");
+      }
+    }, signal);
+  }
   /** Restart holds by Mission/Task: a new provider session for the same work waits while a prior one may survive. */
   restartSurvivorMission = new Map<string, { missionId: string | null; taskId: string | null }>();
   /** Why a provider launch for this task must wait for an interrupted earlier session, or null (review round 1, RESTART-04). */
@@ -373,6 +437,16 @@ export class TaskManager {
           }),
         );
       }
+    }
+    if (/^task\.(completed|failed|stopped)$/.test(event.type)) this.learn();
+  }
+  /** Routing autopilot (owner opt-in, off by default). A failure here is reported and never reaches the run that ended. */
+  learn() {
+    try {
+      const step = this.policy.autopilotStep(this.live());
+      if (step) this.emit(this.db.event(step.changed ? "policy.changed" : "policy.evaluated", null, step.detail));
+    } catch (error) {
+      this.emit(this.db.event("policy.autopilot_failed", null, error instanceof Error ? error.message : String(error)));
     }
   }
   /** For timers and thermal policy: a stop that fails (e.g. the task already ended) is reported, never an unhandled rejection. */
@@ -552,6 +626,7 @@ export class TaskManager {
       thermal: this.thermal,
       modelCapabilities: this.modelCapabilities.snapshot(),
       providerUsage: this.providerUsage.snapshot(),
+      modelIntelligence: { version: 1, configuration: this.ma4.configuration(), models: this.ma4.models(), cooldownUntil: this.ma4.cooldownUntil() },
       intelligence: this.intelligenceSnapshot(),
       connections: this.connections.snapshot(),
     };
@@ -719,10 +794,11 @@ export class TaskManager {
    */
   async assistDecision(input: SubmitTask, signal?: AbortSignal): Promise<DecisionAdvice | null> {
     if (!this.jev.usable()) return null;
-    if ((input.override && input.override !== "auto") || input.modelOverride) return null;
+    if ((input.override && input.override !== "auto") || input.modelOverride || input.constraints?.modelExact || ownerDirective(input.prompt)) return null;
     try {
       const routingText = input.routingPrompt ?? input.prompt;
-      const constraints = inferredConstraints(routingText, input.constraints);
+      const constraints = this.taskConstraints(routingText, input.constraints);
+      if (constraints.localOnly || constraints.offlineOnly || constraints.privacyLocal || constraints.sensitive) return null;
       const pipeline = this.routingPipeline({ projectId:input.projectId??null, routingText, mode: input.mode, providers: this.live(), constraints, override: input.override, modelOverride: input.modelOverride });
       const eligibleKeys = pipeline.selection.order.map((candidate) => candidateKey(candidate.provider_id, candidate.model_id));
       if (eligibleKeys.length < 2) return null;
@@ -748,11 +824,14 @@ export class TaskManager {
     taskType?: string;
     projectId?: string | null;
   }) {
-    const requirements = classifyRequirements({
+    // MA4-S1R2: a routing mode only adds hard restrictions; MODEL_PINNED without a model refuses here.
+    input = { ...input, constraints: applyRoutingMode(input.constraints) };
+    const analyzed = analyzeModelTask({
       prompt: input.routingText,
       mode: input.mode,
       constraints: input.constraints,
     });
+    const requirements = { ...analyzed.legacy, model_intelligence: analyzed.analysis };
     const modelSnapshot = this.modelCapabilities.snapshot();
     const usage = this.providerUsage.snapshot();
     const learning = { taskType: input.taskType ?? "general", mode: input.mode, weights: this.policy.liveWeights(), signal: this.policy.learningSignal() };
@@ -767,8 +846,23 @@ export class TaskManager {
       modelOverride: input.modelOverride,
       mode: input.mode,
       empirical: (provider) => learning.signal(provider, learning.taskType, learning.mode, learning.weights),
+      evaluated: (provider, model) => provider === "openrouter" && model ? this.evaluations.score(model) : null,
+      reliability: (provider, model, category) => this.ma4.reliability(provider, model, category),
       layaGate: (model, taskClass) => (!isLayaModel(model) ? null : !this.laya.enabled ? `Laya routing is turned off in Settings; ${model} is not eligible.` : layaExclusion(model, taskClass, this.laya.benchmarks(model))),
-      connectionGate: (provider,model)=>{ const gate=this.connections.evaluate({kind:"advice",provider,model,projectId:input.projectId??null,origin:"workstation",route:null});return gate.ok?null:gate.reason; },
+      connectionGate: (provider,model)=>{
+        if (provider === "openrouter" && model) {
+          const reason = this.ma4Adapter.exclusion(model, { contextTokens: Math.max(input.constraints.contextTokens ?? 0, new TextEncoder().encode(input.routingText).length + 256), outputTokens: input.constraints.outputTokens ?? this.ma4.configuration().maxOutputTokens,
+            structured: !!input.constraints.responseFormat, tools: requirements.needs_tools, input: requirements.needs_vision ? ["image"] : ["text"], language: input.constraints.language ?? null,
+            sensitive: !!input.constraints.sensitive || requirements.privacy_requirement === "local_only" }, input.constraints.maxCostUsd);
+          if (reason) return reason;
+          // MA4-S1R2 B4: a scoped, owner-issued approval for this exact model, purpose and data category.
+          const approval = this.ma4.approvals().find(a => a.provider_id === provider && a.model_id === model);
+          const blocked = approvalExclusion(this.ma4.approvals(), { provider, model, purpose: analyzed.analysis.category, dataCategory: input.constraints.dataCategory ?? "unclassified",
+            estimatedUsd: 0, spentUsd: approval ? this.ma4.spentUsd(model, approval.issued_at) : 0 });
+          if (blocked) return blocked;
+        }
+        const gate=this.connections.evaluate({kind:"advice",provider,model,projectId:input.projectId??null,origin:"workstation",route:null});return gate.ok?null:gate.reason;
+      },
     });
     const selection = selectRoutingCandidate({ candidates, requirements });
     return { requirements, candidates, selection, modelSnapshot, usage, learning };
@@ -1000,13 +1094,23 @@ export class TaskManager {
     },
   ): OrchTask {
     this.containment.assertAccepting("tasks");
+    if (!delegated) {
+      const directive = ownerDirective(input.prompt);
+      if (directive && !directive.task && Object.keys(directive.agents).length) throw new Error("Agent-level model instructions require a bounded Mission with those roles; no model was selected.");
+      const pin = directive?.task;
+      if (pin) {
+        if (input.override && input.override !== "auto" && input.override !== pin.provider) throw new ModelApprovalRequired();
+        if (input.modelOverride && pin.model && input.modelOverride !== pin.model) throw new ModelApprovalRequired();
+        input = { ...input, override: pin.provider, modelOverride: pin.model ?? input.modelOverride };
+      }
+    }
     const scope = delegated?.executionScope ?? input.executionScope;
     if ((delegated && !scope) || (scope && !["read", "write"].includes(scope.access)))
       throw new Error("Invalid or missing provider execution scope.");
     const executionScope = scope ? { access: scope.access } : undefined;
     // A mission child is routed on its step objective; Bunny's own agent-prompt wording must not add requirements.
     const routingText = input.routingPrompt ?? input.prompt;
-    const constraints = inferredConstraints(routingText, input.constraints);
+    const constraints = this.taskConstraints(routingText, input.constraints);
     let project = input.projectId ? this.projects.forExecution(input.projectId) : null;
     if (input.projectId && !project) throw new Error("Project is not registered on this Host.");
     if (constraints.workingDirectory) {
@@ -1017,10 +1121,14 @@ export class TaskManager {
       } catch {
         throw new Error("The required working directory does not exist.");
       }
-      const owner = this.db.projects().find((p) => p.path === folder) ?? null;
+      // Project roots are registered in native long form (project-paths inspectRoot), while realpathSync keeps 8.3 short
+      // names; the same folder spelled short must still match its registration (MA4-S1R3-CI2).
+      const identity = realpathSync.native(folder);
+      const isFolder = (path: string) => path === folder || path === identity;
+      const owner = this.db.projects().find((p) => isFolder(p.path)) ?? null;
       if (!owner && folder !== this.defaultRoot)
         throw new Error("The required working directory is not an approved project folder.");
-      if (project && project.path !== folder)
+      if (project && !isFolder(project.path))
         throw new Error("The required working directory differs from the selected project.");
       project = owner ? this.projects.forExecution(owner.id) : null;
       constraints.workingDirectory = folder;
@@ -1058,7 +1166,8 @@ export class TaskManager {
     }
     const live = this.live();
     const policy = this.policy.active();
-    const decision = bunnyRoute({
+    let decision: RouteDecision;
+    try { decision = bunnyRoute({
       ...input,
       prompt: routingText,
       providers: live,
@@ -1071,11 +1180,17 @@ export class TaskManager {
           input.mode,
           policy,
         ),
-    });
+    }); } catch (error) {
+      if ((input.override && input.override !== "auto") || input.modelOverride || constraints.modelExact) {
+        this.emit(this.db.event("model.approval_required", null, "Selected model unavailable or ineligible; owner approval is required before any alternative."));
+        throw new ModelApprovalRequired(error instanceof Error ? error.message : undefined);
+      }
+      throw error;
+    }
     // M-A-3 T3: the dynamic model router extends this decision for THIS Task (§1/§2: no second
     // router; same eligibility). Facts are read-only inputs. A MANUAL selection outranks routing
     // (§5) and impossible manual selections fail clearly (§27) — never a silent substitution.
-    const manual = (!!input.override && input.override !== "auto") || !!input.modelOverride;
+    const manual = (!!input.override && input.override !== "auto") || !!input.modelOverride || !!constraints.modelExact;
     const routingMode: "auto" | "manual" = manual ? "manual" : "auto";
     const pipeline = this.routingPipeline({
       routingText,
@@ -1117,10 +1232,14 @@ export class TaskManager {
       // exist, registry absence is UNKNOWN, not an empty world (§8): the legacy BunnyRouter
       // provider decision stands byte-for-byte — also for a manual PROVIDER override (pre-T3
       // parity; MA0R2 reaches launch-time refusal tests through it) — no effort knob (§11).
-      if (this.modelSnapshotHasFacts(pipeline.modelSnapshot))
-        throw new Error(
-          `No eligible model candidate for this Task. ${this.pipelineFailure(pipeline)}`,
-        );
+      if (this.modelSnapshotHasFacts(pipeline.modelSnapshot) || input.modelOverride || constraints.modelExact || constraints.modelAllowlist?.length || constraints.language || constraints.requiresAudio || constraints.responseFormat || constraints.maxCostUsd !== undefined) {
+        const reason = `No eligible model candidate for this Task. ${this.pipelineFailure(pipeline)}`;
+        if (manual) {
+          this.emit(this.db.event("model.approval_required", null, "Exact model pin could not be honored; no fallback selected."));
+          throw new ModelApprovalRequired(reason);
+        }
+        throw new Error(reason);
+      }
       // Fact-less Host: no effort knob either — effort engages with routing facts; the saved
       // record below documents the fallback (§5).
       routed = {
@@ -1177,6 +1296,7 @@ export class TaskManager {
       cwd,
       state: "queued",
       provider: routed.provider,
+      ...(routed.provider === "openrouter" ? { inferencePolicy: this.ma4.fingerprint() } : {}),
       model: routed.model,
       decision,
       manual,
@@ -1293,11 +1413,11 @@ export class TaskManager {
       decision.reroutes = decision.reroutes ?? 0;
       decision.selection_reason = pipeline.selection.reason;
       decision.candidates = this.pipelineCandidates(pipeline);
-    } else if (!this.modelSnapshotHasFacts(pipeline.modelSnapshot)) {
+    } else if (!this.modelSnapshotHasFacts(pipeline.modelSnapshot) && !modelOverride && !task.constraints?.modelExact && !task.constraints?.modelAllowlist?.length && !task.constraints?.language && !task.constraints?.requiresAudio && !task.constraints?.responseFormat && task.constraints?.maxCostUsd === undefined) {
       // Fact-less Host: the explicit provider stands with the legacy model surface (UNKNOWN, not emptiness).
       routed = { model: decision.recommended_model, effort: null };
     } else {
-      throw new Error(
+      throw new ModelApprovalRequired(
         `No eligible model candidate on ${provider}.${modelOverride ? ` The exact model ${modelOverride} could not be honored.` : ""} ${this.pipelineFailure(pipeline)}`,
       );
     }
@@ -1318,6 +1438,7 @@ export class TaskManager {
       {
         provider,
         model: routed.model,
+        ...(provider === "openrouter" ? { inferencePolicy: this.ma4.fingerprint() } : {}),
         proposedRoute: this.connections.bind(provider,routed.model,"workstation",task.projectId,task.mission?task.constraints?.providerAllowlist??[]:[]),
         ...(routed.effort ? { effort: routed.effort } : { effort: null }),
         decision,
@@ -1808,6 +1929,7 @@ export class TaskManager {
             ...(current.state === "verifying" ? { state: "running" } : {}),
             provider: target.provider,
             model: target.model,
+            ...(target.provider === "openrouter" && current.provider !== "openrouter" ? { inferencePolicy: this.ma4.fingerprint() } : {}),
             connectionRoute:current.connectionRoute?{...current.connectionRoute,provider:target.provider,vendor:gate.vendor,connectionId:gate.connectionId,mode:gate.mode,accountFingerprint:gate.accountFingerprint,connectionEpoch:gate.epoch,consentRevision:gate.consentRevision}:null,
             ...(target.effort ? { effort: target.effort } : { effort: null }),
             ...(rerouting
@@ -1980,6 +2102,10 @@ export class TaskManager {
               "verification.completed",
               verification.detail,
             );
+            // MA4-S1R2 H2: an independently verified outcome becomes runtime reliability evidence for this model and category.
+            const verified = this.db.get(id);
+            const category = held || !verified.model ? null : reliabilityCategory(analyzeModelTask({ prompt: verified.routingPrompt ?? verified.prompt, mode: verified.mode, constraints: verified.constraints }).analysis);
+            if (category) try { this.ma4.recordOutcome(verified.provider, verified.model, category, verification.passed); } catch { /* evidence is advisory; never blocks the task */ }
             if (!verification.passed) {
               state = "failed";
               error = `Bunny-A verification failed: ${verification.detail}`;

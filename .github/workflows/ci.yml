@@ -1,0 +1,128 @@
+# Deterministic checks only. Live-model, hardware (GPU/NPU), WSL2-sandbox adversarial, installed-release and
+# physical-device qualification run locally and are reported separately; they never gate or fake a CI pass.
+# No provider API keys are used or required.
+name: ci
+
+on:
+  push:
+    branches: [main, "ma4-**", "ma3-**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: typecheck, MA4/routing/sandbox-contract tests, UI tests, builds
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # MA4 suite: routing modes, approvals, reliability, tool calling, workflow gate, offline cloud adapters.
+      # Without WSL2 user namespaces the adversarial sandbox fixtures report SKIPPED (never passed).
+      - run: npm run test:ma4
+      - name: Routing policy tests
+        run: node --experimental-strip-types --test --test-concurrency=1 src/lib/bunny-host/routing.test.ts src/lib/bunny-host/routing-matrix.test.ts src/lib/bunny-host/routing-learning.test.ts
+      - run: npm run test:ui
+      - name: Shared mobile-web build
+        run: npm run build
+      - name: Desktop build
+        run: npm run build
+        env:
+          JEV_DESKTOP_BUILD: "1"
+
+  regression:
+    name: full MA3/MA4 regression (npm test)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # release-pin tests resolve historical commits
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      # The Windows process-ownership module is compiled from reviewed source with MinGW; nothing prebuilt is downloaded.
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc
+          location: C:\msys64-ci
+      - run: npm ci
+      - run: npm run pretest
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+      # The exact `npm test` command minus scripts/voice-worker.test.mjs: those tests need the operator-staged,
+      # hash-pinned whisper runtime and a working Windows speech recognizer, which hosted runners lack.
+      # They remain a LOCAL gate (docs/ma4-s1r2/CI_VALIDATION.md); excluded here, never counted as passed.
+      # Each `npm test` stage runs unchanged (files, order, concurrency) except for the TAP reporter, which streams a
+      # failure as it happens, and a per-test timeout. A watchdog bounds each stage: on overrun it records the process
+      # tree and listening ports, stops the tree and fails with the stage named, instead of hanging to the job limit.
+      - name: npm test stage 1 (scripts, without hardware voice tests)
+        shell: bash
+        run: |
+          [ "$(node scripts/ci/test-stage.mjs count)" = 4 ] || { echo "::error::npm test no longer has 4 stages; update ci.yml"; exit 1; }
+          node scripts/ci/watchdog.mjs --label stage1 --budget-s 900 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 0 $TEST_FLAGS)"
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+          TEST_FLAGS: --test-reporter=tap --test-timeout=300000
+      - name: npm test stage 2 (MA3 Host and Mission suites)
+        shell: bash
+        run: node scripts/ci/watchdog.mjs --label stage2 --budget-s 2400 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 1 $TEST_FLAGS)"
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+          TEST_FLAGS: --test-reporter=tap --test-timeout=300000
+      - name: npm test stage 3 (agent runtime and teams)
+        shell: bash
+        run: node scripts/ci/watchdog.mjs --label stage3 --budget-s 900 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 2 $TEST_FLAGS)"
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+          TEST_FLAGS: --test-reporter=tap --test-timeout=300000
+      - name: npm test stage 4 (npm run test:ma4)
+        shell: bash
+        run: node scripts/ci/watchdog.mjs --label stage4 --budget-s 600 --out ci-diag -- bash -c "$(node scripts/ci/test-stage.mjs 3)"
+        env:
+          BUNNY_NATIVE_CC: C:\msys64-ci\msys64\ucrt64\bin\gcc.exe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regression-diagnostics
+          path: ci-diag
+          retention-days: 14
+
+  security:
+    name: static security checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Dependency audit (production, high+)
+        run: npm audit --omit=dev --audit-level=high
+      - name: No committed secrets or env files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)\.env($|\.)' ; then echo "committed .env file"; exit 1; fi
+          if git grep -nE '(sk-[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' -- ':!*.test.*' ':!docs/**' ; then echo "possible secret"; exit 1; fi
+      - name: External inference stays disabled by default
+        shell: bash
+        run: |
+          grep -q 'enabled: false, models: \[\]' src/lib/bunny-host/ma4/registry.ts
+          ! grep -nE 'enabled: true' src/lib/bunny-host/ma4/cloud-candidates.ts

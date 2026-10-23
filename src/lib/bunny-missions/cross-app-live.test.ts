@@ -4,13 +4,14 @@ import { fork, execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { createServer as allocate } from "node:net";
 import { join, resolve } from "node:path";
+import { evidenceDir } from "../bunny-host/test-evidence.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { canonical, within } from "./paths.server.ts";
 import type { AgentSnapshot } from "../bunny-host/agent-types.ts";
 import { sha256 } from "./artifacts.server.ts";
-const evidence = resolve("test-results/ma3/t6");
+const evidence = evidenceDir("ma3/t6");
 const save = (name: string, value: unknown) => { mkdirSync(evidence, { recursive: true }); writeFileSync(join(evidence, name), JSON.stringify(value, null, 2)); };
 async function until<T>(fn: () => Promise<T | null>, detail: string): Promise<T> { const end = Date.now() + 100_000; while (Date.now() < end) { const value = await fn(); if (value) return value; await new Promise(r => setTimeout(r, 50)); } throw new Error(`Timeout: ${detail}`); }
 async function start(dir: string, root: string) {
@@ -27,7 +28,11 @@ const check = (action: string, params: Record<string, unknown>, field: string, e
 const calc = (value: string) => ({ kind: "capability", action: "computer.read_calculator", params: { title: "Calculator" }, expect: { field: "result", contains: value } });
 const op = (role: string, action: string, params: Record<string, unknown>, index: number, verification: unknown[], crossApp: unknown = true) => ({ role, objective: role, access: action === "filesystem.write" ? "write" : "read", executor: { kind: "capability", action, params }, crossApp, dependsOn: typeof crossApp === "object" ? [index - 1, 0] : index ? [index - 1] : [], verification });
 
-test("T6 X53 DISPOSABLE LIVE VERIFIED: filesystem → Git → owned terminal → fresh Host → isolated browser → real Windows UIA → verified artifact", { timeout: 180_000 }, async () => {
+// X53 drives the real Microsoft Calculator. Where the verified package is not installed (hosted Windows Server runners), it
+// is NOT TESTED, never passed: the Computer Runtime refuses an unverified Calculator, so there is nothing real to drive.
+const calculatorInstalled = process.platform !== "win32" || execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "@(Get-AppxPackage -Name Microsoft.WindowsCalculator | Where-Object { $_.PublisherId -eq '8wekyb3d8bbwe' -and $_.SignatureKind -in @('Store','System') }).Count"], { encoding: "utf8", windowsHide: true }).trim() !== "0";
+
+test("T6 X53 DISPOSABLE LIVE VERIFIED: filesystem → Git → owned terminal → fresh Host → isolated browser → real Windows UIA → verified artifact", { timeout: 180_000, skip: !calculatorInstalled && "NOT TESTED: no verified Microsoft Calculator package on this PC (X53 stays a local gate)" }, async () => {
   assert.equal(process.platform, "win32", "This acceptance requires real Windows UIA, never simulated OS success.");
   mkdirSync(evidence, { recursive: true }); const parent = canonical(tmpdir()); const dir = mkdtempSync(join(parent, "bunny-t6-disposable-")); const root = join(dir, "project"); mkdirSync(root);
   writeFileSync(join(root, "instruction.txt"), "T6 approved result\n"); writeFileSync(join(root, "result.txt"), "before\n");

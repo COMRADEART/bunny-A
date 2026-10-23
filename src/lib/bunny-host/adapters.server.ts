@@ -19,7 +19,7 @@ import { systemTool } from "./system-tools.server.ts";
 
 const exec = promisify(execFile);
 export const normalizedTool = toolType;
-const NAMES: Record<ProviderId, string> = { codex: "Codex", claude: "Claude Code", ollama: "Ollama", opencode: "OpenCode", cline: "Cline", cursor: "Cursor Agent" };
+const NAMES: Record<ProviderId, string> = { codex: "Codex", claude: "Claude Code", ollama: "Ollama", opencode: "OpenCode", cline: "Cline", cursor: "Cursor Agent", openrouter: "OpenRouter" };
 
 /** Compatibility helper: the resolved launch target for a provider id, or null. */
 export function resolveExecutable(name: string): string | null {
@@ -30,6 +30,14 @@ function unsupported(note: string) { return { supported: false, note }; }
 function supported(note: string) { return { supported: true, note }; }
 const HEADLESS = "Headless session owned by Bunny-A Host: there is no console window or TTY to attach to.";
 export const FEATURES: Record<ProviderId, ProviderFeatures> = {
+  openrouter: {
+    launch: supported("Bounded tool-free chat completions through explicitly approved models and upstreams."),
+    stop: supported("Aborts the owned HTTP request and queued admission."),
+    sendInput: unsupported("Single request."), approval: unsupported("Host approval before dispatch."),
+    resume: unsupported("No session resume."), modelSelection: supported("Owner-approved model catalogue."),
+    terminalAttachment: unsupported("No tools or terminal."), usageQuota: unsupported("Provider quotas may be lower than local conservative reservations."),
+    projectAwareness: unsupported("Only explicitly supplied prompt context."),
+  },
   codex: {
     launch: supported("codex exec --json in the approved project folder (workspace-write sandbox)."),
     stop: supported("Ends the owned codex.exe process tree and verifies no recorded process remains."),

@@ -1,0 +1,55 @@
+{
+  "recordedAt": "2026-10-18T01:45:53.5448357Z",
+  "package": "com.routeragent.jev",
+  "candidateApkSha256": "c2345d32af1b157fdad137bd64a038ac93ea0616b6695b9060cfa3717fb8c168",
+  "installedApkSha256": "c2345d32af1b157fdad137bd64a038ac93ea0616b6695b9060cfa3717fb8c168",
+  "installedCandidateMatch": true,
+  "dataCleared": false,
+  "uninstalled": false,
+  "downgraded": false,
+  "upgradePerformed": false,
+  "launch": [
+    "Status: ok",
+    "LaunchState: COLD",
+    "Activity: com.routeragent.jev/.MainActivity",
+    "TotalTime: 161",
+    "WaitTime: 166",
+    "Complete"
+  ],
+  "commands": [
+    {
+      "command": "adb shell pm path com.routeragent.jev",
+      "exitCode": 0,
+      "recordedAt": "2026-10-18T01:45:53.6259588Z"
+    },
+    {
+      "command": "adb pull <installed-base-apk> <ignored-local-scratch>",
+      "exitCode": 0,
+      "recordedAt": "2026-10-18T01:45:53.7020889Z"
+    },
+    {
+      "command": "adb shell am start -W -n com.routeragent.jev/.MainActivity",
+      "exitCode": 0,
+      "recordedAt": "2026-10-18T01:45:53.9401244Z"
+    },
+    {
+      "command": "adb shell pidof com.routeragent.jev",
+      "exitCode": 0,
+      "recordedAt": "2026-10-18T01:45:57.0483777Z"
+    },
+    {
+      "command": "adb shell dumpsys activity activities (only foreground match retained)",
+      "exitCode": 0,
+      "recordedAt": "2026-10-18T01:45:57.1312737Z"
+    },
+    {
+      "command": "adb logcat -d --pid=<app-pid> -t 300 AndroidRuntime:E *:S (crash markers only)",
+      "exitCode": 0,
+      "recordedAt": "2026-10-18T01:45:57.3160351Z"
+    }
+  ],
+  "pairingAttempted": false,
+  "pid": "10928",
+  "foreground": false,
+  "crashMarkers": []
+}

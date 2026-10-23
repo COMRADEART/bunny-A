@@ -878,20 +878,25 @@ test("R17 [SIMULATED] decision uncertainty triggers the documented fallback", ()
 });
 
 test("R18 [SIMULATED] selection results record actual provenance", async () => {
-  // Recommend the eligible candidate the router did NOT pick, choosing local over hosted so the switch narrows nothing.
+  // Public metadata sharing is explicitly enabled in this fixture; execution stays within two local models.
   let routerKey = "";
   const pick = (keys: string[]) => keys.filter((key) => key !== routerKey).sort((a, b) => Number(b.startsWith("ollama::")) - Number(a.startsWith("ollama::")))[0];
   const env = await managerFixture({ ollamaTags: ["qwen3:8b", "laya:7b"], handler: (call) => decisionReply(call.body, pick, 0.92) });
   try {
     await enableJev(env);
     await env.tasks.benchmarkLaya("laya:7b");
-    const plain = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints: { localOnly: true } });
+    const before = env.net.decisions().length;
+    assert.equal(await env.tasks.assistDecision({ prompt: GENERAL, mode: "balanced", constraints: { localOnly: true } }), null,
+      "S1 local-only privacy includes decision metadata, not only final inference");
+    assert.equal(env.net.decisions().length, before, "local-only advice is refused before transmission");
+    const constraints = { providerAllowlist: ["ollama"] as ProviderId[] };
+    const plain = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints });
     assert.equal(env.routing.decision(plain.routingDecisionId!)!.assistance, undefined, "no hosted advice: no assistance field at all");
     routerKey = candidateKey(plain.provider, plain.model);
-    const advised = await env.tasks.assistDecision({ prompt: GENERAL, mode: "balanced", constraints: { localOnly: true } });
+    const advised = await env.tasks.assistDecision({ prompt: GENERAL, mode: "balanced", constraints });
     assert.ok(advised);
     assert.notEqual(advised.recommendedKey, routerKey);
-    const task = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints: { localOnly: true }, decisionAssistance: advised });
+    const task = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints, decisionAssistance: advised });
     const record = env.routing.decision(task.routingDecisionId!)!;
     assert.equal(record.assistance?.source, "jev");
     assert.equal(record.assistance?.answeredBy, "jev-1.13.0");
@@ -903,7 +908,7 @@ test("R18 [SIMULATED] selection results record actual provenance", async () => {
     assert.equal(candidateKey(record.assistance!.adopted!.provider_id, record.assistance!.adopted!.model_id), advised.recommendedKey, "the record names what actually launched");
     assert.equal(task.decision.decision_assistance?.changed, true);
     assert.equal(task.decision.decision_assistance?.action, "accept");
-    const unchanged = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints: { localOnly: true }, decisionAssistance: advice({ recommendedKey: routerKey, generation: jevOf(env).generation }) });
+    const unchanged = env.tasks.submit({ prompt: GENERAL, mode: "balanced", constraints, decisionAssistance: advice({ recommendedKey: routerKey, generation: jevOf(env).generation }) });
     assert.equal(unchanged.decision.decision_assistance?.changed, false, "agreeing with the router is not a switch");
     assert.equal(env.routing.decision(unchanged.routingDecisionId!)!.assistance?.adopted, undefined);
     assert.match(task.decision.selection_reason ?? "", /BunnyRouter validated and adopted it/);

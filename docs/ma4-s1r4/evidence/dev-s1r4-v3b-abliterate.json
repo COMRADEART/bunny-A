@@ -1,0 +1,3485 @@
+{
+  "version": "bunny-ma4-s1r4-dev-v1",
+  "strategy": {
+    "id": "s1r4-v3b",
+    "transport": "fenced",
+    "workerSamples": "adaptive",
+    "sampling": {
+      "Planner": {
+        "temperature": 0.2
+      },
+      "Worker": {
+        "temperature": 0.2,
+        "numPredict": 2048
+      },
+      "WorkerSample": {
+        "temperature": 0.8,
+        "numPredict": 2048
+      },
+      "Tester": {
+        "temperature": 0.2,
+        "numPredict": 3072
+      },
+      "Repair": {
+        "temperature": 0.6,
+        "numPredict": 3072
+      },
+      "Reviewer": {
+        "temperature": 0.2
+      }
+    },
+    "maxToolCalls": 60
+  },
+  "pins": {
+    "Planner": "huihui_ai/qwen2.5-abliterate:7b",
+    "Worker": "huihui_ai/qwen2.5-abliterate:7b",
+    "Tester": "huihui_ai/qwen2.5-abliterate:7b",
+    "Reviewer": "huihui_ai/qwen2.5-abliterate:7b"
+  },
+  "trials": 2,
+  "taskHash": "66484a4f4a8099560ca1edd9273412f71a10878577d30a18096b79926061afcd",
+  "sandbox": {
+    "available": true,
+    "backend": "wsl2-userns-pivot_root-cgroupv2",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2"
+  },
+  "startedAt": "2026-10-22T19:34:43.985Z",
+  "runs": [
+    {
+      "task": "dv-size",
+      "kind": "strict",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 92552,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 30746,
+          "doneReason": "stop",
+          "promptTokens": 224,
+          "outputTokens": 325,
+          "evalTokPerS": 19.6,
+          "loadMs": 13704
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 9803,
+          "doneReason": "stop",
+          "promptTokens": 668,
+          "outputTokens": 183,
+          "evalTokPerS": 20.1,
+          "loadMs": 11
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 24400,
+          "doneReason": "stop",
+          "promptTokens": 650,
+          "outputTokens": 313,
+          "evalTokPerS": 22.3,
+          "loadMs": 8
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11188,
+          "doneReason": "stop",
+          "promptTokens": 650,
+          "outputTokens": 250,
+          "evalTokPerS": 22.6,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11760,
+          "doneReason": "stop",
+          "promptTokens": 650,
+          "outputTokens": 245,
+          "evalTokPerS": 21.1,
+          "loadMs": 7
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6535,
+          "doneReason": "stop",
+          "promptTokens": 883,
+          "outputTokens": 117,
+          "evalTokPerS": 21.6,
+          "loadMs": 6
+        }
+      ],
+      "modelCalls": 6,
+      "outputTokens": 1433,
+      "truncated": 0,
+      "toolCalls": 14,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "eac498925ec1f6e6953ebb6af6943a27daa7dd32c2f306c0169c16a100e24742",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 4,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "6543220907f4234dfe6c6409bed1edda67bf57f7d62d4b3999fb0d51cd19bdbc",
+          "staticOk": true,
+          "testsPassed": 1,
+          "testsTotal": 4,
+          "selected": false
+        },
+        {
+          "index": 2,
+          "sha256": "2d6b28d330e6d29ac19b0082e843b7ce23d64f6b03c62bb022d4b4ba85f1e263",
+          "staticOk": true,
+          "testsPassed": 3,
+          "testsTotal": 4,
+          "selected": false
+        }
+      ],
+      "repairs": [],
+      "failures": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "high",
+        "errorConditions": 2
+      },
+      "workerSamples": 3,
+      "finalSource": "import re\n\nB = 1\nKB = 1024\nMB = 1024 ** 2\nGB = 1024 ** 3\n\ndef parse_size(text):\n    if re.fullmatch(r'\\d+B', text):\n        return int(text[:-1]) * B\n    if re.fullmatch(r'\\d+KB', text):\n        return int(text[:-2]) * KB\n    if re.fullmatch(r'\\d+MB', text):\n        return int(text[:-2]) * MB\n    if re.fullmatch(r'\\d+GB', text):\n        return int(text[:-2]) * GB\n    raise ValueError\n",
+      "finalTests": "import unittest\nfrom sizes import parse_size\n\nclass TestParseSize(unittest.TestCase):\n    def test_512B(self):\n        self.assertEqual(parse_size('512B'), 512)\n\n    def test_2KB(self):\n        self.assertEqual(parse_size('2KB'), 2048)\n\n    def test_1MB(self):\n        self.assertEqual(parse_size('1MB'), 1048576)\n\n    def test_0GB(self):\n        self.assertEqual(parse_size('0GB'), 0)\n"
+    },
+    {
+      "task": "dv-size",
+      "kind": "strict",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): tester tests.",
+      "repairsUsed": 2,
+      "durationMs": 178235,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 26805,
+          "doneReason": "stop",
+          "promptTokens": 224,
+          "outputTokens": 348,
+          "evalTokPerS": 21.4,
+          "loadMs": 10180
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 15791,
+          "doneReason": "stop",
+          "promptTokens": 673,
+          "outputTokens": 316,
+          "evalTokPerS": 20.9,
+          "loadMs": 10
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 42096,
+          "doneReason": "stop",
+          "promptTokens": 691,
+          "outputTokens": 529,
+          "evalTokPerS": 20.6,
+          "loadMs": 12
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 15309,
+          "doneReason": "stop",
+          "promptTokens": 673,
+          "outputTokens": 326,
+          "evalTokPerS": 21.6,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 8480,
+          "doneReason": "stop",
+          "promptTokens": 673,
+          "outputTokens": 187,
+          "evalTokPerS": 22.4,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 22126,
+          "doneReason": "stop",
+          "promptTokens": 1245,
+          "outputTokens": 474,
+          "evalTokPerS": 22.4,
+          "loadMs": 14
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 24032,
+          "doneReason": "stop",
+          "promptTokens": 1271,
+          "outputTokens": 397,
+          "evalTokPerS": 17.2,
+          "loadMs": 9
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 8531,
+          "doneReason": "stop",
+          "promptTokens": 1210,
+          "outputTokens": 161,
+          "evalTokPerS": 22.4,
+          "loadMs": 17
+        }
+      ],
+      "modelCalls": 8,
+      "outputTokens": 2738,
+      "truncated": 0,
+      "toolCalls": 23,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "8e3b1fceeacfb7ac722f9928b5536400e8bc5a69adcfd90315e6bd999713d195",
+          "staticOk": true,
+          "testsPassed": 8,
+          "testsTotal": 12,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "69f21137be4f47c4936185a514ce203d060eedf1e39bf2f376a6ea1995cc2056",
+          "staticOk": true,
+          "testsPassed": 8,
+          "testsTotal": 12,
+          "selected": false
+        },
+        {
+          "index": 2,
+          "sha256": "78bfd37ae7b51edf32dc15884e7014427650eda1fb9714d85cfcdb1af140f64d",
+          "staticOk": true,
+          "testsPassed": 8,
+          "testsTotal": 12,
+          "selected": false
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "test_generated.TestParseSize.test_parse_size_1000B fails on the frozen reference",
+            "test_generated.TestParseSize.test_parse_size_1000GB fails on the frozen reference",
+            "test_generated.TestParseSize.test_parse_size_1000KB fails on the frozen reference",
+            "test_generated.TestParseSize.test_parse_size_1000MB fails on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "9022346df5ab186cb2aaf6cbe024b79daf129af17bce7f1f5cf919cfe96365b3",
+          "proposedSha256": "c3ab9f851773d6245144cc048407f1f1d90a1746aad5884c2d79e84791869e22",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "test_generated.TestParseSize.test_parse_size_1000B fails on the frozen reference",
+            "test_generated.TestParseSize.test_parse_size_1000GB fails on the frozen reference",
+            "test_generated.TestParseSize.test_parse_size_1000KB fails on the frozen reference",
+            "test_generated.TestParseSize.test_parse_size_1000MB fails on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "c3ab9f851773d6245144cc048407f1f1d90a1746aad5884c2d79e84791869e22",
+          "proposedSha256": "9022346df5ab186cb2aaf6cbe024b79daf129af17bce7f1f5cf919cfe96365b3",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "semantic"
+        },
+        {
+          "attempt": 1,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "semantic"
+        },
+        {
+          "attempt": 2,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "semantic"
+        },
+        {
+          "attempt": 2,
+          "category": "reviewer_false_approval",
+          "component": "reviewer",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 12,
+            "valid": 12,
+            "failedValid": [
+              "test_generated.TestParseSize.test_parse_size_1000B",
+              "test_generated.TestParseSize.test_parse_size_1000GB",
+              "test_generated.TestParseSize.test_parse_size_1000KB",
+              "test_generated.TestParseSize.test_parse_size_1000MB"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 12,
+            "valid": 12,
+            "failedValid": [
+              "test_generated.TestParseSize.test_parse_size_1000B",
+              "test_generated.TestParseSize.test_parse_size_1000GB",
+              "test_generated.TestParseSize.test_parse_size_1000KB",
+              "test_generated.TestParseSize.test_parse_size_1000MB"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 12,
+            "valid": 12,
+            "failedValid": [
+              "test_generated.TestParseSize.test_parse_size_1000B",
+              "test_generated.TestParseSize.test_parse_size_1000GB",
+              "test_generated.TestParseSize.test_parse_size_1000KB",
+              "test_generated.TestParseSize.test_parse_size_1000MB"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "profile": {
+        "complexity": "high",
+        "errorConditions": 2
+      },
+      "workerSamples": 3,
+      "finalSource": "import re\n\nB = 1\nKB = 1024\nMB = 1024 ** 2\nGB = 1024 ** 3\n\ndef parse_size(text):\n    match = re.fullmatch(r'(\\d+)(B|KB|MB|GB)', text)\n    if not match:\n        raise ValueError\n    number, unit = match.groups()\n    if unit == 'B':\n        return int(number)\n    if unit == 'KB':\n        return int(number) * KB\n    if unit == 'MB':\n        return int(number) * MB\n    if unit == 'GB':\n        return int(number) * GB\n",
+      "finalTests": "import unittest\nfrom sizes import parse_size\n\nclass TestParseSize(unittest.TestCase):\n    def test_parse_size_512B(self):\n        self.assertEqual(parse_size('512B'), 512)\n\n    def test_parse_size_2KB(self):\n        self.assertEqual(parse_size('2KB'), 2048)\n\n    def test_parse_size_1MB(self):\n        self.assertEqual(parse_size('1MB'), 1048576)\n\n    def test_parse_size_0GB(self):\n        self.assertEqual(parse_size('0GB'), 0)\n\n    def test_parse_size_1000B(self):\n        with self.assertRaises(ValueError):\n            parse_size('1000B')\n\n    def test_parse_size_1000KB(self):\n        with self.assertRaises(ValueError):\n            parse_size('1000KB')\n\n    def test_parse_size_1000MB(self):\n        with self.assertRaises(ValueError):\n            parse_size('1000MB')\n\n    def test_parse_size_1000GB(self):\n        with self.assertRaises(ValueError):\n            parse_size('1000GB')\n\n    def test_parse_size_1000(self):\n        with self.assertRaises(ValueError):\n            parse_size('1000')\n\n    def test_parse_size_1000_B(self):\n        with self.assertRaises(ValueError):\n            parse_size('1000 B')\n\n    def test_parse_size_1000_B_(self):\n        with self.assertRaises(ValueError):\n            parse_size('1000 B ')\n\n    def test_parse_size_1000_B_comma(self):\n        with self.assertRaises(ValueError):\n            parse_size('1000 B,')\n"
+    },
+    {
+      "task": "dv-semver",
+      "kind": "strict",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 150522,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 22293,
+          "doneReason": "stop",
+          "promptTokens": 196,
+          "outputTokens": 296,
+          "evalTokPerS": 23.8,
+          "loadMs": 9389
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 19350,
+          "doneReason": "stop",
+          "promptTokens": 613,
+          "outputTokens": 403,
+          "evalTokPerS": 21.5,
+          "loadMs": 8
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 32550,
+          "doneReason": "stop",
+          "promptTokens": 594,
+          "outputTokens": 270,
+          "evalTokPerS": 21.3,
+          "loadMs": 8
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 12758,
+          "doneReason": "stop",
+          "promptTokens": 594,
+          "outputTokens": 274,
+          "evalTokPerS": 21.7,
+          "loadMs": 11
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 9116,
+          "doneReason": "stop",
+          "promptTokens": 594,
+          "outputTokens": 196,
+          "evalTokPerS": 21.9,
+          "loadMs": 19
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13821,
+          "doneReason": "stop",
+          "promptTokens": 946,
+          "outputTokens": 281,
+          "evalTokPerS": 21.4,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 28382,
+          "doneReason": "stop",
+          "promptTokens": 846,
+          "outputTokens": 307,
+          "evalTokPerS": 21.6,
+          "loadMs": 11
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 10234,
+          "doneReason": "stop",
+          "promptTokens": 956,
+          "outputTokens": 219,
+          "evalTokPerS": 23,
+          "loadMs": 6
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 22641,
+          "doneReason": "stop",
+          "promptTokens": 903,
+          "outputTokens": 286,
+          "evalTokPerS": 23.7,
+          "loadMs": 12
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5838,
+          "doneReason": "stop",
+          "promptTokens": 1008,
+          "outputTokens": 110,
+          "evalTokPerS": 22.9,
+          "loadMs": 10
+        }
+      ],
+      "modelCalls": 10,
+      "outputTokens": 2642,
+      "truncated": 0,
+      "toolCalls": 24,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "e86342903abfb5956eb948c39182d70216d6c28c461002650cd254ec10da057b",
+          "staticOk": true,
+          "testsPassed": 0,
+          "testsTotal": 1,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "4881816566c565c118396450708cf7d6d46a05a88a9b84e0e29d689c1c88630d",
+          "staticOk": true,
+          "testsPassed": 0,
+          "testsTotal": 1,
+          "selected": false
+        },
+        {
+          "index": 2,
+          "sha256": "80b0be4b1a1602c1ac4eb7514d39d99e2496c0977383dd0931bc5c6c511f9ec7",
+          "staticOk": true,
+          "testsPassed": 0,
+          "testsTotal": 1,
+          "selected": false
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "e86342903abfb5956eb948c39182d70216d6c28c461002650cd254ec10da057b",
+          "proposedSha256": "9bbf4f5fdbcffaa3e90956ae0b1c1af90e33db1ae97abe74dc0097e4f98ff3d5",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 1,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "test_generated.TestVersionComparison.test_compare_versions fails on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "c5d9ad6efc6ce80bd41a3ce76fc852095b35b2b323125316c42b80c1533761b7",
+          "proposedSha256": "8a21eb884c56c5524f3c584deea5131894355a8becd090f0f68e3cbf699296d2",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "9bbf4f5fdbcffaa3e90956ae0b1c1af90e33db1ae97abe74dc0097e4f98ff3d5",
+          "proposedSha256": "9bbf4f5fdbcffaa3e90956ae0b1c1af90e33db1ae97abe74dc0097e4f98ff3d5",
+          "proposal": "identical",
+          "remaining": 0
+        },
+        {
+          "round": 2,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "test_generated.TestVersionComparison.test_compare_versions fails on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "8a21eb884c56c5524f3c584deea5131894355a8becd090f0f68e3cbf699296d2",
+          "proposedSha256": "015504452e1a4934d2e92639f861122cd9099e88104cb5bd74230883f2989919",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "semantic"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 1,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "semantic"
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "semantic"
+        },
+        {
+          "attempt": 2,
+          "category": "reviewer_false_approval",
+          "component": "reviewer",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 1,
+            "valid": 1,
+            "failedValid": [
+              "test_generated.TestVersionComparison.test_compare_versions"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 1,
+            "valid": 1,
+            "failedValid": [
+              "test_generated.TestVersionComparison.test_compare_versions"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 1,
+            "valid": 1,
+            "failedValid": [
+              "test_generated.TestVersionComparison.test_compare_versions"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "profile": {
+        "complexity": "high",
+        "errorConditions": 2
+      },
+      "workerSamples": 3,
+      "finalSource": "import re\n\ndef compare_versions(a, b):\n    version_pattern = re.compile(r'(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)')\n    match_a = version_pattern.match(a)\n    match_b = version_pattern.match(b)\n    if not match_a or not match_b:\n        raise ValueError(f\"Invalid version string: {a} or {b}\")\n    major_a, minor_a, patch_a = map(int, match_a.groups())\n    major_b, minor_b, patch_b = map(int, match_b.groups())\n    if len(a.split('.')) != len(b.split('.')):  # Check if the number of parts is the same\n        # If not, one of the versions is malformed.\n        raise ValueError(f\"Invalid version string: {a} or {b}\")\n    if major_a != major_b:\n        return -1 if major_a < major_b else 1\n    if minor_a != minor_b:\n        return -1 if minor_a < minor_b else 1\n    if patch_a != patch_b:\n        return -1 if patch_a < patch_b else 1\n    return 0\n",
+      "finalTests": "import unittest\nfrom semver import compare_versions\n\nclass TestVersionComparison(unittest.TestCase):\n    def test_compare_versions(self):\n        self.assertEqual(-1, compare_versions('1.10.0', '1.9.9'))\n        self.assertEqual(0, compare_versions('2.3.4', '2.3.4'))\n        self.assertEqual(1, compare_versions('3.2.1', '3.2.0'))\n        self.assertEqual(-1, compare_versions('0.1.2', '0.1.3'))\n        self.assertEqual(1, compare_versions('1.2.3', '1.2.0'))\n        self.assertEqual(-1, compare_versions('1.0.0', '1.0.1'))\n        self.assertEqual(0, compare_versions('2.0.0', '2.0.0'))\n"
+    },
+    {
+      "task": "dv-semver",
+      "kind": "strict",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 134808,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 21738,
+          "doneReason": "stop",
+          "promptTokens": 196,
+          "outputTokens": 292,
+          "evalTokPerS": 22.9,
+          "loadMs": 8486
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11632,
+          "doneReason": "stop",
+          "promptTokens": 590,
+          "outputTokens": 260,
+          "evalTokPerS": 24,
+          "loadMs": 10
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 29167,
+          "doneReason": "stop",
+          "promptTokens": 609,
+          "outputTokens": 418,
+          "evalTokPerS": 24.6,
+          "loadMs": 11
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 17735,
+          "doneReason": "stop",
+          "promptTokens": 590,
+          "outputTokens": 435,
+          "evalTokPerS": 24.7,
+          "loadMs": 7
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13708,
+          "doneReason": "stop",
+          "promptTokens": 590,
+          "outputTokens": 319,
+          "evalTokPerS": 23.5,
+          "loadMs": 6
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13106,
+          "doneReason": "stop",
+          "promptTokens": 889,
+          "outputTokens": 289,
+          "evalTokPerS": 23.2,
+          "loadMs": 11
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 14133,
+          "doneReason": "stop",
+          "promptTokens": 1495,
+          "outputTokens": 314,
+          "evalTokPerS": 23.6,
+          "loadMs": 10
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 10152,
+          "doneReason": "stop",
+          "promptTokens": 1388,
+          "outputTokens": 209,
+          "evalTokPerS": 23.2,
+          "loadMs": 12
+        }
+      ],
+      "modelCalls": 8,
+      "outputTokens": 2536,
+      "truncated": 0,
+      "toolCalls": 22,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "38c23bdf0e3178fc3b86102512c2c01a6dbada3856bc60c13f8714ee0f6344ca",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 8,
+          "selected": false
+        },
+        {
+          "index": 1,
+          "sha256": "6cb6b9419b07615e3ff74bdd9de64cb65351e224583411141baa2a8dc476bfb5",
+          "staticOk": true,
+          "testsPassed": 2,
+          "testsTotal": 8,
+          "selected": false
+        },
+        {
+          "index": 2,
+          "sha256": "7b77ea32dec219a7902ccac3462f93d6fa9ded8a64c3c3dd0b2443eae9c6d0ec",
+          "staticOk": true,
+          "testsPassed": 8,
+          "testsTotal": 8,
+          "selected": true
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "7b77ea32dec219a7902ccac3462f93d6fa9ded8a64c3c3dd0b2443eae9c6d0ec",
+          "proposedSha256": "c7b293476ab6e7a4933a70cc0651b36cd7874b4c7ed5c668e8f6f4bb7385083f",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestVersionComparison.test_version_comparison_0_0_0_and_0_0_1 passes on the frozen reference",
+            "test_generated.TestVersionComparison.test_version_comparison_0_0_1_and_0_0_0 passes on the frozen reference",
+            "test_generated.TestVersionComparison.test_version_comparison_1_0_0_and_1_0_0 passes on the frozen reference",
+            "test_generated.TestVersionComparison.test_version_comparison_1_0_0_and_1_0_1 passes on the frozen reference",
+            "test_generated.TestVersionComparison.test_version_comparison_1_0_1_and_1_0_0 passes on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "c7b293476ab6e7a4933a70cc0651b36cd7874b4c7ed5c668e8f6f4bb7385083f",
+          "proposedSha256": "6bdf236dd4daffcfbcfa6a041cd57fb104d2d3021488c23b349bbbc8f8681a48",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 8,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 8,
+            "failedValid": [
+              "test_generated.TestVersionComparison.test_version_comparison_0_0_0_and_0_0_1",
+              "test_generated.TestVersionComparison.test_version_comparison_0_0_1_and_0_0_0",
+              "test_generated.TestVersionComparison.test_version_comparison_1_0_0_and_1_0_0",
+              "test_generated.TestVersionComparison.test_version_comparison_1_0_0_and_1_0_1",
+              "test_generated.TestVersionComparison.test_version_comparison_1_0_1_and_1_0_0",
+              "test_generated.TestVersionComparison.test_version_comparison_1_1_0_and_1_1_0"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 8,
+            "failedValid": [
+              "test_generated.TestVersionComparison.test_version_comparison_0_0_0_and_0_0_1",
+              "test_generated.TestVersionComparison.test_version_comparison_0_0_1_and_0_0_0",
+              "test_generated.TestVersionComparison.test_version_comparison_1_0_0_and_1_0_0",
+              "test_generated.TestVersionComparison.test_version_comparison_1_0_0_and_1_0_1",
+              "test_generated.TestVersionComparison.test_version_comparison_1_0_1_and_1_0_0",
+              "test_generated.TestVersionComparison.test_version_comparison_1_1_0_and_1_1_0"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.75,
+        "findings": 2
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "high",
+        "errorConditions": 2
+      },
+      "workerSamples": 3,
+      "finalSource": "import re\n\ndef compare_versions(a, b):\n    version_regex = re.compile(r'^([0-9]+)(\\.[0-9]+)*$')\n    \n    match_a = version_regex.match(a)\n    match_b = version_regex.match(b)\n    \n    if not match_a or not match_b:\n        raise ValueError\n    \n    a_parts = match_a.groups()\n    b_parts = match_b.groups()\n    \n    a_major = int(a_parts[0])\n    b_major = int(b_parts[0])\n    \n    if a_major < b_major:\n        return -1\n    elif a_major > b_major:\n        return 1\n    else:\n        for a, b in zip(a_parts[1:], b_parts[1:]):\n            a_minor, a_patch = a.split('.')\n            b_minor, b_patch = b.split('.')\n            a_minor = int(a_minor)\n            b_minor = int(b_minor)\n            if a_minor < b_minor:\n                return -1\n            elif a_minor > b_minor:\n                return 1\n            else:\n                a_patch = int(a_patch)\n                b_patch = int(b_patch)\n                if a_patch < b_patch:\n                    return -1\n                elif a_patch > b_patch:\n                    return 1\n                else:\n                    return 0\n",
+      "finalTests": "-1\n0\n1\n-1\n0\n1\n-1\nValueError\n-1\nValueError\nimport unittest\nfrom semver import *\n\nclass TestVersionComparison(unittest.TestCase):\n    def test_version_comparison_1_0_0_and_1_0_1(self):\n        self.assertEqual(compare_versions('1.0.0', '1.0.1'), -1)\n\n    def test_version_comparison_1_0_1_and_1_0_0(self):\n        self.assertEqual(compare_versions('1.0.1', '1.0.0'), 1)\n\n    def test_version_comparison_1_1_0_and_1_1_0(self):\n        self.assertEqual(compare_versions('1.1.0', '1.1.0'), 0)\n\n    def test_version_comparison_1_0_0_and_1_0_0(self):\n        self.assertEqual(compare_versions('1.0.0', '1.0.0'), 0)\n\n    def test_version_comparison_1_0_1_and_1_0_0(self):\n        self.assertEqual(compare_versions('1.0.1', '1.0.0'), 1)\n\n    def test_version_comparison_0_0_1_and_0_0_0(self):\n        self.assertEqual(compare_versions('0.0.1', '0.0.0'), 1)\n\n    def test_version_comparison_0_0_0_and_0_0_1(self):\n        self.assertEqual(compare_versions('0.0.0', '0.0.1'), -1)\n\n    def test_version_comparison_1_0_0_and_invalid_version(self):\n        with self.assertRaises(ValueError):\n            compare_versions('1.0.0', '1.0.0.0')\n\n    def test_version_comparison_invalid_version_and_1_0_0(self):\n        with self.assertRaises(ValueError):\n            compare_versions('1.0.0.0', '1.0.0')\n"
+    },
+    {
+      "task": "dv-rle",
+      "kind": "simple",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 34204,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13598,
+          "doneReason": "stop",
+          "promptTokens": 139,
+          "outputTokens": 143,
+          "evalTokPerS": 24.6,
+          "loadMs": 7446
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6377,
+          "doneReason": "stop",
+          "promptTokens": 382,
+          "outputTokens": 147,
+          "evalTokPerS": 24.6,
+          "loadMs": 10
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11173,
+          "doneReason": "stop",
+          "promptTokens": 401,
+          "outputTokens": 113,
+          "evalTokPerS": 25.2,
+          "loadMs": 20
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 4998,
+          "doneReason": "stop",
+          "promptTokens": 540,
+          "outputTokens": 102,
+          "evalTokPerS": 23.6,
+          "loadMs": 10
+        }
+      ],
+      "modelCalls": 4,
+      "outputTokens": 505,
+      "truncated": 0,
+      "toolCalls": 5,
+      "candidates": [],
+      "repairs": [],
+      "failures": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 2,
+            "valid": 2,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 1
+      },
+      "workerSamples": 1,
+      "finalSource": "def rle_encode(s):\n    if not isinstance(s, str):\n        raise TypeError\n    \n    if s == '':\n        return ''\n    \n    encoded = []\n    count = 1\n    for i in range(1, len(s) + 1):\n        if i == len(s) or s[i] != s[i - 1]:\n            encoded.append(s[i - 1])\n            encoded.append(str(count))\n            count = 1\n        else:\n            count += 1\n    \n    return ''.join(encoded)\n",
+      "finalTests": "import unittest\nfrom rle import rle_encode\n\nclass TestRLEEncoding(unittest.TestCase):\n    def test_rle_encode_with_example_string(self):\n        self.assertEqual(rle_encode('aaabcc'), 'a3b1c2')\n\n    def test_rle_encode_with_empty_string(self):\n        self.assertEqual(rle_encode(''), '')\n"
+    },
+    {
+      "task": "dv-rle",
+      "kind": "simple",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 33382,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11534,
+          "doneReason": "stop",
+          "promptTokens": 139,
+          "outputTokens": 146,
+          "evalTokPerS": 25.3,
+          "loadMs": 5464
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6129,
+          "doneReason": "stop",
+          "promptTokens": 385,
+          "outputTokens": 147,
+          "evalTokPerS": 25.5,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 12510,
+          "doneReason": "stop",
+          "promptTokens": 404,
+          "outputTokens": 154,
+          "evalTokPerS": 25.4,
+          "loadMs": 9
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5724,
+          "doneReason": "stop",
+          "promptTokens": 558,
+          "outputTokens": 119,
+          "evalTokPerS": 24.7,
+          "loadMs": 12
+        }
+      ],
+      "modelCalls": 4,
+      "outputTokens": 566,
+      "truncated": 0,
+      "toolCalls": 5,
+      "candidates": [],
+      "repairs": [],
+      "failures": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 3,
+            "valid": 2,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 1
+      },
+      "workerSamples": 1,
+      "finalSource": "def rle_encode(s):\n    if not isinstance(s, str):\n        raise TypeError\n    result = []\n    count = 1\n    for i in range(1, len(s) + 1):\n        if i == len(s) or s[i] != s[i - 1]:\n            result.append(s[i - 1])\n            result.append(str(count))\n            count = 1\n        else:\n            count += 1\n    return ''.join(result)\n",
+      "finalTests": "import unittest\nfrom rle import rle_encode\n\nclass TestRle(unittest.TestCase):\n    def test_rle_encode_empty_string(self):\n        self.assertEqual(rle_encode(''), '')\n\n    def test_rle_encode_aabccc(self):\n        self.assertEqual(rle_encode('aabccc'), 'a1b1c3')\n\n    def test_rle_encode_123(self):\n        with self.assertRaises(TypeError):\n            rle_encode(123)\n"
+    },
+    {
+      "task": "dv-dedupe",
+      "kind": "simple",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 33844,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11331,
+          "doneReason": "stop",
+          "promptTokens": 125,
+          "outputTokens": 162,
+          "evalTokPerS": 25.5,
+          "loadMs": 4647
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 8547,
+          "doneReason": "stop",
+          "promptTokens": 403,
+          "outputTokens": 205,
+          "evalTokPerS": 25.1,
+          "loadMs": 7
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13203,
+          "doneReason": "stop",
+          "promptTokens": 384,
+          "outputTokens": 111,
+          "evalTokPerS": 25.4,
+          "loadMs": 10
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5703,
+          "doneReason": "stop",
+          "promptTokens": 533,
+          "outputTokens": 123,
+          "evalTokPerS": 24.3,
+          "loadMs": 11
+        }
+      ],
+      "modelCalls": 4,
+      "outputTokens": 601,
+      "truncated": 0,
+      "toolCalls": 5,
+      "candidates": [],
+      "repairs": [],
+      "failures": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 1,
+            "valid": 1,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 0
+      },
+      "workerSamples": 1,
+      "finalSource": "def dedupe(xs):\n    seen = set()\n    deduped_list = []\n    for item in xs:\n        if item not in seen:\n            seen.add(item)\n            deduped_list.append(item)\n    return deduped_list\n",
+      "finalTests": "import unittest\nfrom dedupe import dedupe\n\nclass TestDedupe(unittest.TestCase):\n    def test_dedupe(self):\n        self.assertEqual(dedupe([1, 2, 3, 1, 2, 4]), [1, 2, 3, 4])\n        self.assertEqual(dedupe([1, 2, 3]), [1, 2, 3])\n        self.assertEqual(dedupe([]), [])\n        self.assertEqual(dedupe([1, 1, 1, 1]), [1])\n"
+    },
+    {
+      "task": "dv-dedupe",
+      "kind": "simple",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 31144,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11254,
+          "doneReason": "stop",
+          "promptTokens": 125,
+          "outputTokens": 161,
+          "evalTokPerS": 25.6,
+          "loadMs": 4670
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6638,
+          "doneReason": "stop",
+          "promptTokens": 402,
+          "outputTokens": 159,
+          "evalTokPerS": 25.4,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11413,
+          "doneReason": "stop",
+          "promptTokens": 383,
+          "outputTokens": 114,
+          "evalTokPerS": 25.5,
+          "loadMs": null
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5089,
+          "doneReason": "stop",
+          "promptTokens": 502,
+          "outputTokens": 109,
+          "evalTokPerS": 24.5,
+          "loadMs": 9
+        }
+      ],
+      "modelCalls": 4,
+      "outputTokens": 543,
+      "truncated": 0,
+      "toolCalls": 5,
+      "candidates": [],
+      "repairs": [],
+      "failures": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 1,
+            "valid": 1,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 0
+      },
+      "workerSamples": 1,
+      "finalSource": "def dedupe(xs):\n    seen = set()\n    result = []\n    for x in xs:\n        if x not in seen:\n            result.append(x)\n            seen.add(x)\n    return result\n",
+      "finalTests": "import unittest\nfrom dedupe import dedupe\n\nclass TestDedupe(unittest.TestCase):\n    def test_dedupe(self):\n        self.assertEqual(dedupe([1, 2, 3, 1, 2, 5]), [1, 2, 3, 5])\n        self.assertEqual(dedupe([1, 2, 3]), [1, 2, 3])\n        self.assertEqual(dedupe([]), [])\n"
+    },
+    {
+      "task": "dv-brackets",
+      "kind": "intermediate",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 40362,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13210,
+          "doneReason": "stop",
+          "promptTokens": 126,
+          "outputTokens": 209,
+          "evalTokPerS": 25.6,
+          "loadMs": 4708
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 7049,
+          "doneReason": "stop",
+          "promptTokens": 434,
+          "outputTokens": 168,
+          "evalTokPerS": 25.4,
+          "loadMs": 7
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 17325,
+          "doneReason": "stop",
+          "promptTokens": 452,
+          "outputTokens": 250,
+          "evalTokPerS": 25.2,
+          "loadMs": 8
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6222,
+          "doneReason": "stop",
+          "promptTokens": 644,
+          "outputTokens": 130,
+          "evalTokPerS": 24.4,
+          "loadMs": 11
+        }
+      ],
+      "modelCalls": 4,
+      "outputTokens": 757,
+      "truncated": 0,
+      "toolCalls": 5,
+      "candidates": [],
+      "repairs": [],
+      "failures": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 7,
+            "valid": 7,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 0
+      },
+      "workerSamples": 1,
+      "finalSource": "def is_balanced(s):\n    stack = []\n    bracket_map = {')': '(', ']': '[', '}': '{'}\n    \n    for char in s:\n        if char in bracket_map.values():\n            stack.append(char)\n        elif char in bracket_map:\n            if stack == [] or bracket_map[char] != stack.pop():\n                return False\n    return stack == []\n",
+      "finalTests": "import unittest\nfrom brackets import is_balanced\n\nclass TestBrackets(unittest.TestCase):\n    def test_empty_string(self):\n        self.assertTrue(is_balanced(''))\n\n    def test_single_round_bracket(self):\n        self.assertTrue(is_balanced('()'))\n\n    def test_single_square_bracket(self):\n        self.assertTrue(is_balanced('[]'))\n\n    def test_single_curly_bracket(self):\n        self.assertTrue(is_balanced('{}'))\n\n    def test_nested_round_brackets(self):\n        self.assertTrue(is_balanced('([{}])'))\n\n    def test_mismatched_round_brackets(self):\n        self.assertFalse(is_balanced('([)]'))\n\n    def test_mismatched_curly_brackets(self):\n        self.assertFalse(is_balanced('{[})'))\n"
+    },
+    {
+      "task": "dv-brackets",
+      "kind": "intermediate",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 35557,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11925,
+          "doneReason": "stop",
+          "promptTokens": 126,
+          "outputTokens": 172,
+          "evalTokPerS": 25.3,
+          "loadMs": 4851
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5314,
+          "doneReason": "stop",
+          "promptTokens": 397,
+          "outputTokens": 125,
+          "evalTokPerS": 25.4,
+          "loadMs": 7
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13847,
+          "doneReason": "stop",
+          "promptTokens": 415,
+          "outputTokens": 206,
+          "evalTokPerS": 25.1,
+          "loadMs": 12
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6118,
+          "doneReason": "stop",
+          "promptTokens": 585,
+          "outputTokens": 129,
+          "evalTokPerS": 24.4,
+          "loadMs": 10
+        }
+      ],
+      "modelCalls": 4,
+      "outputTokens": 632,
+      "truncated": 0,
+      "toolCalls": 5,
+      "candidates": [],
+      "repairs": [],
+      "failures": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 6,
+            "valid": 6,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 0
+      },
+      "workerSamples": 1,
+      "finalSource": "def is_balanced(s):\n    stack = []\n    bracket_map = {')': '(', ']': '[', '}': '{'}\n    \n    for char in s:\n        if char in bracket_map.values():\n            stack.append(char)\n        elif char in bracket_map:\n            if stack == [] or bracket_map[char] != stack.pop():\n                return False\n    return stack == []\n",
+      "finalTests": "import unittest\nfrom brackets import is_balanced\n\nclass TestBrackets(unittest.TestCase):\n    def test_empty_string(self):\n        self.assertTrue(is_balanced(\"\"))\n\n    def test_single_parenthesis(self):\n        self.assertTrue(is_balanced(\"()\"))\n\n    def test_single_square_bracket(self):\n        self.assertTrue(is_balanced(\"[]\"))\n\n    def test_single_curly_bracket(self):\n        self.assertTrue(is_balanced(\"{}\"))\n\n    def test_unbalanced_parenthesis(self):\n        self.assertFalse(is_balanced(\"(]\"))\n\n    def test_nested_and_mixed_brackets(self):\n        self.assertTrue(is_balanced(\"({[]})\"))\n"
+    },
+    {
+      "task": "dv-minstack",
+      "kind": "intermediate",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 64208,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 15691,
+          "doneReason": "stop",
+          "promptTokens": 145,
+          "outputTokens": 274,
+          "evalTokPerS": 25.6,
+          "loadMs": 4694
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 26175,
+          "doneReason": "stop",
+          "promptTokens": 535,
+          "outputTokens": 638,
+          "evalTokPerS": 24.8,
+          "loadMs": 7
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 38237,
+          "doneReason": "stop",
+          "promptTokens": 516,
+          "outputTokens": 293,
+          "evalTokPerS": 25.1,
+          "loadMs": 10
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6590,
+          "doneReason": "stop",
+          "promptTokens": 1131,
+          "outputTokens": 128,
+          "evalTokPerS": 23.8,
+          "loadMs": 8
+        }
+      ],
+      "modelCalls": 4,
+      "outputTokens": 1333,
+      "truncated": 0,
+      "toolCalls": 5,
+      "candidates": [],
+      "repairs": [],
+      "failures": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 12,
+            "valid": 9,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 1
+      },
+      "workerSamples": 1,
+      "finalSource": "class MinStack:\n    def __init__(self):\n        self.stack = []\n        self.min_stack = []\n\n    def push(self, x):\n        self.stack.append(x)\n        if not self.min_stack or x <= self.min_stack[-1]:\n            self.min_stack.append(x)\n\n    def pop(self):\n        if not self.stack:\n            raise IndexError(\"pop from an empty stack\")\n        value = self.stack.pop()\n        if value == self.min_stack[-1]:\n            self.min_stack.pop()\n        return value\n\n    def top(self):\n        if not self.stack:\n            raise IndexError(\"top from an empty stack\")\n        return self.stack[-1]\n\n    def get_min(self):\n        if not self.min_stack:\n            raise IndexError(\"get_min from an empty stack\")\n        return self.min_stack[-1]\n",
+      "finalTests": "import unittest\nfrom minstack import MinStack\n\nclass TestMinStackMethods(unittest.TestCase):\n    def test_push_minimum_value(self):\n        stack = MinStack()\n        stack.push(1)\n        self.assertEqual(stack.get_min(), 1)\n\n    def test_push_value_not_minimum(self):\n        stack = MinStack()\n        stack.push(2)\n        self.assertEqual(stack.get_min(), 1)\n\n    def test_push_value_becomes_minimum(self):\n        stack = MinStack()\n        stack.push(3)\n        self.assertEqual(stack.get_min(), 1)\n\n    def test_push_new_minimum(self):\n        stack = MinStack()\n        stack.push(0)\n        self.assertEqual(stack.get_min(), 0)\n\n    def test_push_value_above_minimum(self):\n        stack = MinStack()\n        stack.push(4)\n        self.assertEqual(stack.get_min(), 0)\n\n    def test_pop_minimum_value(self):\n        stack = MinStack()\n        stack.push(4)\n        stack.push(0)\n        self.assertEqual(stack.pop(), 0)\n        self.assertEqual(stack.get_min(), 4)\n\n    def test_pop_value_not_minimum(self):\n        stack = MinStack()\n        stack.push(1)\n        stack.push(2)\n        self.assertEqual(stack.pop(), 2)\n        self.assertEqual(stack.get_min(), 1)\n\n    def test_pop_value_becomes_minimum(self):\n        stack = MinStack()\n        stack.push(1)\n        stack.push(3)\n        stack.pop()\n        self.assertEqual(stack.get_min(), 1)\n\n    def test_pop_value_not_minimum(self):\n        stack = MinStack()\n        stack.push(1)\n        stack.push(2)\n        stack.pop()\n        self.assertEqual(stack.get_min(), 1)\n\n    def test_pop_from_empty_stack(self):\n        stack = MinStack()\n        with self.assertRaises(IndexError):\n            stack.pop()\n\n    def test_top_value(self):\n        stack = MinStack()\n        stack.push(1)\n        self.assertEqual(stack.top(), 1)\n\n    def test_top_value_after_pop(self):\n        stack = MinStack()\n        stack.push(1)\n        stack.pop()\n        with self.assertRaises(IndexError):\n            stack.top()\n\n    def test_get_min_from_empty_stack(self):\n        stack = MinStack()\n        with self.assertRaises(IndexError):\n            stack.get_min()\n"
+    },
+    {
+      "task": "dv-minstack",
+      "kind": "intermediate",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 0 repair(s).",
+      "repairsUsed": 0,
+      "durationMs": 83146,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 16619,
+          "doneReason": "stop",
+          "promptTokens": 145,
+          "outputTokens": 255,
+          "evalTokPerS": 24.4,
+          "loadMs": 5866
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 10573,
+          "doneReason": "stop",
+          "promptTokens": 497,
+          "outputTokens": 245,
+          "evalTokPerS": 24.3,
+          "loadMs": 10
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 56608,
+          "doneReason": "stop",
+          "promptTokens": 516,
+          "outputTokens": 1078,
+          "evalTokPerS": 23.6,
+          "loadMs": 10
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6046,
+          "doneReason": "stop",
+          "promptTokens": 990,
+          "outputTokens": 117,
+          "evalTokPerS": 23.1,
+          "loadMs": 8
+        }
+      ],
+      "modelCalls": 4,
+      "outputTokens": 1695,
+      "truncated": 0,
+      "toolCalls": 5,
+      "candidates": [],
+      "repairs": [],
+      "failures": [],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 3,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 1
+      },
+      "workerSamples": 1,
+      "finalSource": "class MinStack:\n    def __init__(self):\n        self.stack = []\n        self.min_stack = []\n    \n    def push(self, x):\n        self.stack.append(x)\n        if not self.min_stack or x <= self.min_stack[-1]:\n            self.min_stack.append(x)\n    \n    def pop(self):\n        if not self.stack:\n            raise IndexError(\"pop from an empty stack\")\n        value = self.stack.pop()\n        if value == self.min_stack[-1]:\n            self.min_stack.pop()\n        return value\n    \n    def top(self):\n        if not self.stack:\n            raise IndexError(\"top from an empty stack\")\n        return self.stack[-1]\n    \n    def get_min(self):\n        if not self.min_stack:\n            raise IndexError(\"get_min from an empty stack\")\n        return self.min_stack[-1]\n",
+      "finalTests": "import unittest\nfrom minstack import *\n\nclass TestMinStackMethods(unittest.TestCase):\n    def test_push(self):\n        min_stack = MinStack()\n        min_stack.push(3)\n        min_stack.push(5)\n        min_stack.push(1)\n        min_stack.push(6)\n\n    def test_get_min(self):\n        min_stack = MinStack()\n        min_stack.push(3)\n        min_stack.push(5)\n        min_stack.push(1)\n        min_stack.push(6)\n        self.assertEqual(min_stack.get_min(), 1)\n\n    def test_top(self):\n        min_stack = MinStack()\n        min_stack.push(3)\n        min_stack.push(5)\n        min_stack.push(1)\n        min_stack.push(6)\n        self.assertEqual(min_stack.top(), 6)\n\n    def test_pop(self):\n        min_stack = MinStack()\n        min_stack.push(3)\n        min_stack.push(5)\n        min_stack.push(1)\n        min_stack.push(6)\n        self.assertEqual(min_stack.pop(), 6)\n        self.assertEqual(min_stack.top(), 5)\n        self.assertEqual(min_stack.get_min(), 5)\n        self.assertEqual(min_stack.pop(), 5)\n        self.assertEqual(min_stack.top(), 1)\n        self.assertEqual(min_stack.get_min(), 1)\n        self.assertEqual(min_stack.pop(), 1)\n        self.assertEqual(min_stack.top(), 3)\n        self.assertEqual(min_stack.get_min(), 3)\n        self.assertEqual(min_stack.pop(), 3)\n        with self.assertRaises(IndexError):\n            min_stack.top()\n        with self.assertRaises(IndexError):\n            min_stack.get_min()\n        with self.assertRaises(IndexError):\n            min_stack.pop()\n"
+    },
+    {
+      "task": "dv-bsearch",
+      "kind": "debugging",
+      "trial": 1,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "durationMs": 49769,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11286,
+          "doneReason": "stop",
+          "promptTokens": 207,
+          "outputTokens": 147,
+          "evalTokPerS": 24.5,
+          "loadMs": 4955
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5949,
+          "doneReason": "stop",
+          "promptTokens": 481,
+          "outputTokens": 134,
+          "evalTokPerS": 24.4,
+          "loadMs": 6
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 15092,
+          "doneReason": "stop",
+          "promptTokens": 500,
+          "outputTokens": 214,
+          "evalTokPerS": 24.4,
+          "loadMs": 5
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5077,
+          "doneReason": "stop",
+          "promptTokens": 481,
+          "outputTokens": 120,
+          "evalTokPerS": 24.4,
+          "loadMs": 7
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6938,
+          "doneReason": "stop",
+          "promptTokens": 756,
+          "outputTokens": 151,
+          "evalTokPerS": 23.8,
+          "loadMs": 8
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5309,
+          "doneReason": "stop",
+          "promptTokens": 676,
+          "outputTokens": 111,
+          "evalTokPerS": 23.6,
+          "loadMs": 7
+        }
+      ],
+      "modelCalls": 6,
+      "outputTokens": 877,
+      "truncated": 0,
+      "toolCalls": 15,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "60d809da3bb8eea9ba803af360979a73541b7fb0a6eecf6c9d090b44fc43b96b",
+          "staticOk": true,
+          "testsPassed": 2,
+          "testsTotal": 4,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "60d809da3bb8eea9ba803af360979a73541b7fb0a6eecf6c9d090b44fc43b96b",
+          "staticOk": true,
+          "testsPassed": 2,
+          "testsTotal": 4,
+          "selected": false
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestBinarySearch.test_last_element passes on the frozen reference",
+            "test_generated.TestBinarySearch.test_single_element_list passes on the frozen reference"
+          ],
+          "outcome": "resolved",
+          "previousSha256": "60d809da3bb8eea9ba803af360979a73541b7fb0a6eecf6c9d090b44fc43b96b",
+          "proposedSha256": "b1acf7fbe351cbb4232a59851091f45e769e0e2349ed82587bf9a5b1fc080ce8",
+          "proposal": "valid",
+          "remaining": 1
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [
+              "test_generated.TestBinarySearch.test_last_element",
+              "test_generated.TestBinarySearch.test_single_element_list"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "medium",
+        "errorConditions": 0
+      },
+      "workerSamples": 2,
+      "finalSource": "def binary_search(xs, target):\n    lo, hi = 0, len(xs) - 1\n    while lo <= hi:  # Change the condition to include the case when lo equals hi.\n        mid = (lo + hi) // 2\n        if xs[mid] == target:\n            return mid\n        if xs[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid - 1  # This line should be hi = mid - 1 when xs[mid] > target.\n    return -1\n",
+      "finalTests": "import unittest\nfrom bsearch import binary_search\n\nclass TestBinarySearch(unittest.TestCase):\n    def test_last_element(self):\n        self.assertEqual(binary_search([1, 2, 3, 4, 5], 5), 4)\n    \n    def test_empty_list(self):\n        self.assertEqual(binary_search([], 1), -1)\n    \n    def test_single_element_list(self):\n        self.assertEqual(binary_search([1], 1), 0)\n    \n    def test_middle_element(self):\n        self.assertEqual(binary_search([1, 3, 5], 2), -1)\n"
+    },
+    {
+      "task": "dv-bsearch",
+      "kind": "debugging",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 1 repair(s).",
+      "repairsUsed": 1,
+      "durationMs": 56839,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 12020,
+          "doneReason": "stop",
+          "promptTokens": 207,
+          "outputTokens": 164,
+          "evalTokPerS": 24.7,
+          "loadMs": 5024
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 11777,
+          "doneReason": "stop",
+          "promptTokens": 517,
+          "outputTokens": 276,
+          "evalTokPerS": 24.4,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 18381,
+          "doneReason": "stop",
+          "promptTokens": 498,
+          "outputTokens": 147,
+          "evalTokPerS": 23.6,
+          "loadMs": 12
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6176,
+          "doneReason": "stop",
+          "promptTokens": 498,
+          "outputTokens": 147,
+          "evalTokPerS": 24.3,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 6273,
+          "doneReason": "stop",
+          "promptTokens": 717,
+          "outputTokens": 137,
+          "evalTokPerS": 23.9,
+          "loadMs": 12
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 7204,
+          "doneReason": "stop",
+          "promptTokens": 715,
+          "outputTokens": 157,
+          "evalTokPerS": 24,
+          "loadMs": 9
+        }
+      ],
+      "modelCalls": 6,
+      "outputTokens": 1028,
+      "truncated": 0,
+      "toolCalls": 15,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "36d75bdd0e5d172b888ea5715a86f4db57cbdeaa3d96020f4da2078b06c9fb74",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 5,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "36d75bdd0e5d172b888ea5715a86f4db57cbdeaa3d96020f4da2078b06c9fb74",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 5,
+          "selected": false
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestBinarySearch.test_empty_list passes on the frozen reference"
+          ],
+          "outcome": "resolved",
+          "previousSha256": "36d75bdd0e5d172b888ea5715a86f4db57cbdeaa3d96020f4da2078b06c9fb74",
+          "proposedSha256": "92abf1e2a499e7ee3120cd4e8930474f5d4243d097dfeb19de622eaad80f5276",
+          "proposal": "valid",
+          "remaining": 1
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 5,
+            "failedValid": [
+              "test_generated.TestBinarySearch.test_empty_list"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 5,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 1,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "medium",
+        "errorConditions": 0
+      },
+      "workerSamples": 2,
+      "finalSource": "def binary_search(xs, target):\n    if not xs:\n        return -1\n    lo, hi = 0, len(xs) - 1\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if xs[mid] == target:\n            return mid\n        if xs[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid\n    if lo == hi and xs[lo] != target:\n        return -1\n    return lo\n",
+      "finalTests": "import unittest\nfrom bsearch import binary_search\n\nclass TestBinarySearch(unittest.TestCase):\n    def test_search_in_middle(self):\n        self.assertEqual(binary_search([1, 2, 3, 4, 5], 3), 2)\n\n    def test_search_not_present(self):\n        self.assertEqual(binary_search([1, 2, 3, 4, 5], 6), -1)\n\n    def test_empty_list(self):\n        self.assertEqual(binary_search([], 1), -1)\n\n    def test_single_element_list(self):\n        self.assertEqual(binary_search([1], 1), 0)\n\n    def test_search_at_end(self):\n        self.assertEqual(binary_search([1, 3], 3), 1)\n"
+    },
+    {
+      "task": "dv-wordcount",
+      "kind": "debugging",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 51307,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 12937,
+          "doneReason": "stop",
+          "promptTokens": 177,
+          "outputTokens": 206,
+          "evalTokPerS": 25.4,
+          "loadMs": 4492
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 9444,
+          "doneReason": "stop",
+          "promptTokens": 533,
+          "outputTokens": 226,
+          "evalTokPerS": 25.1,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 14519,
+          "doneReason": "stop",
+          "promptTokens": 514,
+          "outputTokens": 119,
+          "evalTokPerS": 25.3,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 4634,
+          "doneReason": "stop",
+          "promptTokens": 514,
+          "outputTokens": 114,
+          "evalTokPerS": 25.3,
+          "loadMs": 7
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 3090,
+          "doneReason": "stop",
+          "promptTokens": 630,
+          "outputTokens": 65,
+          "evalTokPerS": 24.7,
+          "loadMs": 11
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 3595,
+          "doneReason": "stop",
+          "promptTokens": 982,
+          "outputTokens": 78,
+          "evalTokPerS": 24.8,
+          "loadMs": 11
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5665,
+          "doneReason": "stop",
+          "promptTokens": 656,
+          "outputTokens": 127,
+          "evalTokPerS": 25,
+          "loadMs": 10
+        }
+      ],
+      "modelCalls": 7,
+      "outputTokens": 935,
+      "truncated": 0,
+      "toolCalls": 17,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "f67de082c7d0157b805fd35e59611250a832b6713f6400a983c9bf62143ff35a",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 4,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "5ccf076b78a4c3d96c824ea2df50e3be99c89280ab3efc12d26e46fe354a8130",
+          "staticOk": false,
+          "testsPassed": 0,
+          "testsTotal": 0,
+          "selected": false
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "f67de082c7d0157b805fd35e59611250a832b6713f6400a983c9bf62143ff35a",
+          "proposedSha256": "fc97942c350abb25cc1bd3f63a33bf4df4178a556d1b906179b5909594fa0da1",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestWordCount.test_three_words_two_identical passes on the frozen reference",
+            "test_generated.TestWordCount.test_three_words_two_identical_third_repeated passes on the frozen reference",
+            "test_generated.TestWordCount.test_two_identical_words passes on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "fc97942c350abb25cc1bd3f63a33bf4df4178a556d1b906179b5909594fa0da1",
+          "proposedSha256": "27cf164bec8dc19d5616254cdaf4c8983238bc168e056d2b9e88861e7e26a9b8",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "reviewer_false_approval",
+          "component": "reviewer",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [
+              "test_generated.TestWordCount.test_three_words_two_identical",
+              "test_generated.TestWordCount.test_three_words_two_identical_third_repeated",
+              "test_generated.TestWordCount.test_two_identical_words"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "profile": {
+        "complexity": "medium",
+        "errorConditions": 0
+      },
+      "workerSamples": 2,
+      "finalSource": "import re\n\ndef word_count(text):\n    counts = {}\n    for w in re.findall(r'\\b\\w+\\b', text):\n        counts[w] = counts.get(w, 0) + 1\n    return counts\n",
+      "finalTests": "import unittest\nfrom wordcount import *\n\nclass TestWordCount(unittest.TestCase):\n    def test_single_word(self):\n        self.assertEqual(word_count(\"hello\"), {\"hello\": 1})\n\n    def test_two_identical_words(self):\n        self.assertEqual(word_count(\"hello, hello\"), {\"hello\": 2})\n\n    def test_three_words_two_identical(self):\n        self.assertEqual(word_count(\"hello, hello, world\"), {\"hello\": 2, \"world\": 1})\n\n    def test_three_words_two_identical_third_repeated(self):\n        self.assertEqual(word_count(\"hello, hello, world, world, world\"), {\"hello\": 2, \"world\": 3})\n"
+    },
+    {
+      "task": "dv-wordcount",
+      "kind": "debugging",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 49194,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13058,
+          "doneReason": "stop",
+          "promptTokens": 177,
+          "outputTokens": 203,
+          "evalTokPerS": 25.6,
+          "loadMs": 4746
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 4677,
+          "doneReason": "stop",
+          "promptTokens": 511,
+          "outputTokens": 106,
+          "evalTokPerS": 25.1,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 14028,
+          "doneReason": "stop",
+          "promptTokens": 530,
+          "outputTokens": 226,
+          "evalTokPerS": 25.2,
+          "loadMs": 7
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 4030,
+          "doneReason": "stop",
+          "promptTokens": 511,
+          "outputTokens": 98,
+          "evalTokPerS": 25.2,
+          "loadMs": 7
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 3746,
+          "doneReason": "stop",
+          "promptTokens": 621,
+          "outputTokens": 83,
+          "evalTokPerS": 25,
+          "loadMs": 12
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 2867,
+          "doneReason": "stop",
+          "promptTokens": 627,
+          "outputTokens": 66,
+          "evalTokPerS": 25.6,
+          "loadMs": 11
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 4715,
+          "doneReason": "stop",
+          "promptTokens": 678,
+          "outputTokens": 101,
+          "evalTokPerS": 24.9,
+          "loadMs": 21
+        }
+      ],
+      "modelCalls": 7,
+      "outputTokens": 883,
+      "truncated": 0,
+      "toolCalls": 17,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "049af6814c20b4649a36707a8b41d8294ee47c819d6f6452121e8140cde99286",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 4,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "5ccf076b78a4c3d96c824ea2df50e3be99c89280ab3efc12d26e46fe354a8130",
+          "staticOk": false,
+          "testsPassed": 0,
+          "testsTotal": 0,
+          "selected": false
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "049af6814c20b4649a36707a8b41d8294ee47c819d6f6452121e8140cde99286",
+          "proposedSha256": "f67de082c7d0157b805fd35e59611250a832b6713f6400a983c9bf62143ff35a",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "f67de082c7d0157b805fd35e59611250a832b6713f6400a983c9bf62143ff35a",
+          "proposedSha256": "fc97942c350abb25cc1bd3f63a33bf4df4178a556d1b906179b5909594fa0da1",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 4,
+            "failedValid": [
+              "test_generated.TestWordCount.test_three_words_two_identical",
+              "test_generated.TestWordCount.test_three_words_two_identical_third_repeated",
+              "test_generated.TestWordCount.test_two_identical_words"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "reject",
+        "confidence": 0.8,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "medium",
+        "errorConditions": 0
+      },
+      "workerSamples": 2,
+      "finalSource": "def word_count(text):\n    counts = {}\n    for w in text.split():\n        counts[w] = counts.get(w, 0) + 1\n    return counts\n",
+      "finalTests": "import unittest\nfrom wordcount import *\n\nclass TestWordCount(unittest.TestCase):\n    def test_single_word(self):\n        self.assertEqual(word_count(\"hello\"), {\"hello\": 1})\n\n    def test_two_identical_words(self):\n        self.assertEqual(word_count(\"hello, hello\"), {\"hello\": 2})\n\n    def test_three_words_two_identical(self):\n        self.assertEqual(word_count(\"hello, hello, world\"), {\"hello\": 2, \"world\": 1})\n\n    def test_three_words_two_identical_third_repeated(self):\n        self.assertEqual(word_count(\"hello, hello, world, world, world\"), {\"hello\": 2, \"world\": 3})\n"
+    },
+    {
+      "task": "dv-bank",
+      "kind": "planning",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 111803,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 17925,
+          "doneReason": "stop",
+          "promptTokens": 189,
+          "outputTokens": 327,
+          "evalTokPerS": 25.5,
+          "loadMs": 4750
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 14847,
+          "doneReason": "stop",
+          "promptTokens": 613,
+          "outputTokens": 356,
+          "evalTokPerS": 25,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 39675,
+          "doneReason": "stop",
+          "promptTokens": 631,
+          "outputTokens": 603,
+          "evalTokPerS": 24.8,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 14380,
+          "doneReason": "stop",
+          "promptTokens": 613,
+          "outputTokens": 357,
+          "evalTokPerS": 25.1,
+          "loadMs": 10
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 13221,
+          "doneReason": "stop",
+          "promptTokens": 1093,
+          "outputTokens": 305,
+          "evalTokPerS": 24.6,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 14219,
+          "doneReason": "stop",
+          "promptTokens": 1154,
+          "outputTokens": 333,
+          "evalTokPerS": 24.5,
+          "loadMs": 12
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5180,
+          "doneReason": "stop",
+          "promptTokens": 1202,
+          "outputTokens": 101,
+          "evalTokPerS": 24.3,
+          "loadMs": 12
+        }
+      ],
+      "modelCalls": 7,
+      "outputTokens": 2382,
+      "truncated": 0,
+      "toolCalls": 19,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "340168ed13bd94605c117881eb26634c5a8dcf785ef33d56ca214f73556379d6",
+          "staticOk": true,
+          "testsPassed": 6,
+          "testsTotal": 8,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "7df0ef719941b948e4422c8eddf25d1c5ae0abc657a7a04ee75e3f65611cb8b0",
+          "staticOk": true,
+          "testsPassed": 6,
+          "testsTotal": 8,
+          "selected": false
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestAccountMethods.test_history_after_transfer passes on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "340168ed13bd94605c117881eb26634c5a8dcf785ef33d56ca214f73556379d6",
+          "proposedSha256": "2851de2607d019edc01d651ae4da56b94e175706352558d03f57709c82f4b9cf",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed",
+            "test_generated.TestAccountMethods.test_history_after_transfer passes on the frozen reference",
+            "test_generated.TestAccountMethods.test_transfer_exceeds_balance passes on the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "2851de2607d019edc01d651ae4da56b94e175706352558d03f57709c82f4b9cf",
+          "proposedSha256": "5a147eafff7bf6cdeb538aaac2af8163f82d49436c3428c913ab07aa3769f6a9",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 2,
+          "category": "reviewer_false_approval",
+          "component": "reviewer",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 7,
+            "failedValid": [
+              "test_generated.TestAccountMethods.test_history_after_transfer"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 7,
+            "failedValid": [
+              "test_generated.TestAccountMethods.test_history_after_transfer",
+              "test_generated.TestAccountMethods.test_transfer_exceeds_balance"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 8,
+            "valid": 7,
+            "failedValid": [
+              "test_generated.TestAccountMethods.test_transfer_exceeds_balance"
+            ],
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "profile": {
+        "complexity": "medium",
+        "errorConditions": 2
+      },
+      "workerSamples": 2,
+      "finalSource": "class Account:\n    def __init__(self, owner, balance=0):\n        if balance < 0:\n            raise ValueError(\"Initial balance cannot be negative.\")\n        self._balance = balance\n        self._history = []\n\n    @property\n    def balance(self):\n        return self._balance\n\n    def deposit(self, amount):\n        if amount <= 0:\n            raise ValueError(\"Deposit amount must be greater than 0.\")\n        self._balance += amount\n        self._history.append((\"deposit\", amount))\n\n    def withdraw(self, amount):\n        if amount <= 0:\n            raise ValueError(\"Withdrawal amount must be greater than 0.\")\n        if amount > self._balance:\n            raise ValueError(\"Withdrawal amount exceeds balance.\")\n        self._balance -= amount\n        self._history.append((\"withdraw\", amount))\n\n    def transfer(self, other, amount):\n        if amount <= 0:\n            raise ValueError(\"Transfer amount must be greater than 0.\")\n        self._balance -= amount\n        other._balance += amount\n        if self is other:\n            self._history.append((\"transfer_out\", amount))\n        else:\n            self._history.append((\"transfer_out\", amount))\n            other._history.append((\"transfer_in\", amount))\n\n    def history(self):\n        return self._history\n",
+      "finalTests": "import unittest\nfrom bank import *\n\nclass TestAccountMethods(unittest.TestCase):\n    def test_initial_balance(self):\n        self.assertEqual(Account('Alice').balance, 0)\n\n    def test_balance_after_deposit(self):\n        a = Account('Alice')\n        a.deposit(5)\n        self.assertEqual(a.balance, 5)\n\n    def test_balance_after_deposit_and_withdrawal(self):\n        a = Account('Alice')\n        a.deposit(5)\n        a.withdraw(3)\n        self.assertEqual(a.balance, 2)\n\n    def test_withdrawal_exceeds_balance(self):\n        a = Account('Alice')\n        a.deposit(5)\n        with self.assertRaises(ValueError):\n            a.withdraw(7)\n\n    def test_transfer_exceeds_balance(self):\n        a = Account('Alice')\n        a.deposit(5)\n        with self.assertRaises(ValueError):\n            a.transfer(Account('Bob'), 7)\n\n    def test_transfer(self):\n        a = Account('Alice')\n        a.deposit(5)\n        a.transfer(Account('Bob'), 3)\n        self.assertEqual(a.balance, 2)\n\n    def test_history_after_transfer(self):\n        a = Account('Alice')\n        a.deposit(5)\n        a.transfer(Account('Bob'), 3)\n        self.assertEqual(a.history(), [('deposit', 5), ('transfer_out', 3)])\n\n    def test_history_for_recipient_after_transfer(self):\n        a = Account('Alice')\n        a.deposit(5)\n        a.transfer(Account('Bob'), 3)\n        b = Account('Bob')\n        self.assertEqual(b.history(), [('transfer_in', 3)])\n"
+    },
+    {
+      "task": "dv-bank",
+      "kind": "planning",
+      "trial": 2,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 1 repair(s): independent acceptance tests.",
+      "repairsUsed": 1,
+      "durationMs": 96658,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 18591,
+          "doneReason": "stop",
+          "promptTokens": 189,
+          "outputTokens": 339,
+          "evalTokPerS": 25,
+          "loadMs": 4685
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 21513,
+          "doneReason": "stop",
+          "promptTokens": 643,
+          "outputTokens": 494,
+          "evalTokPerS": 23.6,
+          "loadMs": 6
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 38223,
+          "doneReason": "stop",
+          "promptTokens": 625,
+          "outputTokens": 387,
+          "evalTokPerS": 24,
+          "loadMs": 5
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 16647,
+          "doneReason": "stop",
+          "promptTokens": 625,
+          "outputTokens": 396,
+          "evalTokPerS": 24,
+          "loadMs": 8
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 12097,
+          "doneReason": "stop",
+          "promptTokens": 930,
+          "outputTokens": 272,
+          "evalTokPerS": 23.7,
+          "loadMs": 7
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5804,
+          "doneReason": "stop",
+          "promptTokens": 1160,
+          "outputTokens": 111,
+          "evalTokPerS": 23.3,
+          "loadMs": 7
+        }
+      ],
+      "modelCalls": 6,
+      "outputTokens": 1999,
+      "truncated": 0,
+      "toolCalls": 11,
+      "candidates": [
+        {
+          "index": 0,
+          "sha256": "74c2db2aeb9d79453ddf4ca030bc909213c3bdff46da76a55efb4cad3a922bd6",
+          "staticOk": true,
+          "testsPassed": 5,
+          "testsTotal": 7,
+          "selected": true
+        },
+        {
+          "index": 1,
+          "sha256": "a49ea5e0d6952c9de453520a73d686d6b2bc6539d5035acde12594a1902a4538",
+          "staticOk": true,
+          "testsPassed": 4,
+          "testsTotal": 7,
+          "selected": false
+        }
+      ],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "not_retested",
+          "previousSha256": "74c2db2aeb9d79453ddf4ca030bc909213c3bdff46da76a55efb4cad3a922bd6",
+          "proposedSha256": "74c2db2aeb9d79453ddf4ca030bc909213c3bdff46da76a55efb4cad3a922bd6",
+          "proposal": "identical",
+          "remaining": 1
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 0,
+          "category": "reviewer_false_approval",
+          "component": "reviewer",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 7,
+            "valid": 5,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "profile": {
+        "complexity": "medium",
+        "errorConditions": 2
+      },
+      "workerSamples": 2,
+      "finalSource": "class Account:\n    def __init__(self, owner, balance=0):\n        if balance < 0:\n            raise ValueError(\"Initial balance must be non-negative.\")\n        self._balance = balance\n        self._history = []\n\n    @property\n    def balance(self):\n        return self._balance\n\n    def deposit(self, amount):\n        if amount <= 0:\n            raise ValueError(\"Amount must be greater than 0.\")\n        self._balance += amount\n        self._history.append((\"deposit\", amount))\n\n    def withdraw(self, amount):\n        if amount <= 0:\n            raise ValueError(\"Amount must be greater than 0.\")\n        if amount > self._balance:\n            raise ValueError(\"Insufficient balance for withdrawal.\")\n        self._balance -= amount\n        self._history.append((\"withdraw\", amount))\n\n    def transfer(self, other, amount):\n        if amount <= 0:\n            raise ValueError(\"Amount must be greater than 0.\")\n        self._balance -= amount\n        other.deposit(amount)\n        self._history.append((\"transfer_out\", amount))\n        other._history.append((\"transfer_in\", amount))\n\n    def history(self):\n        return self._history\n",
+      "finalTests": "import unittest\nfrom bank import *\n\nclass TestAccountMethods(unittest.TestCase):\n    def test_initial_balance(self):\n        account = Account('Test Owner')\n        self.assertEqual(account.balance, 0)\n\n    def test_deposit(self):\n        account = Account('Test Owner')\n        account.deposit(10)\n        self.assertEqual(account.balance, 10)\n\n    def test_withdraw(self):\n        account = Account('Test Owner')\n        account.deposit(10)\n        account.withdraw(5)\n        self.assertEqual(account.balance, 5)\n\n    def test_transfer(self):\n        account1 = Account('Account 1')\n        account2 = Account('Account 2')\n        account1.deposit(15)\n        account1.transfer(7, account2)\n        self.assertEqual(account1.balance, 8)\n        self.assertEqual(account2.balance, 7)\n\n    def test_deposit_history(self):\n        account = Account('Test Owner')\n        account.deposit(10)\n        self.assertEqual(account.history(), [('deposit', 10)])\n\n    def test_withdraw_history(self):\n        account = Account('Test Owner')\n        account.deposit(10)\n        account.withdraw(5)\n        self.assertEqual(account.history(), [('deposit', 10), ('withdraw', 5)])\n\n    def test_transfer_history(self):\n        account = Account('Test Owner')\n        account.deposit(10)\n        account.transfer(5, None)\n        self.assertEqual(account.history(), [('deposit', 10), ('transfer_out', 5)])\n"
+    },
+    {
+      "task": "dv-pqueue",
+      "kind": "planning",
+      "trial": 1,
+      "status": "failed",
+      "reason": "Deterministic gate failed after 2 repair(s): independent acceptance tests.",
+      "repairsUsed": 2,
+      "durationMs": 136060,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 16723,
+          "doneReason": "stop",
+          "promptTokens": 157,
+          "outputTokens": 276,
+          "evalTokPerS": 24.4,
+          "loadMs": 5070
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 9962,
+          "doneReason": "stop",
+          "promptTokens": 536,
+          "outputTokens": 229,
+          "evalTokPerS": 24.2,
+          "loadMs": 8
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 43997,
+          "doneReason": "stop",
+          "promptTokens": 555,
+          "outputTokens": 791,
+          "evalTokPerS": 23.6,
+          "loadMs": 9
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 22793,
+          "doneReason": "stop",
+          "promptTokens": 1099,
+          "outputTokens": 498,
+          "evalTokPerS": 22.7,
+          "loadMs": 9
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 30704,
+          "doneReason": "stop",
+          "promptTokens": 752,
+          "outputTokens": 179,
+          "evalTokPerS": 23.6,
+          "loadMs": 12
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 8083,
+          "doneReason": "stop",
+          "promptTokens": 756,
+          "outputTokens": 176,
+          "evalTokPerS": 23.6,
+          "loadMs": 5
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 30042,
+          "doneReason": "stop",
+          "promptTokens": 1099,
+          "outputTokens": 494,
+          "evalTokPerS": 23.1,
+          "loadMs": 6
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 7263,
+          "doneReason": "stop",
+          "promptTokens": 1132,
+          "outputTokens": 144,
+          "evalTokPerS": 23.2,
+          "loadMs": 8
+        }
+      ],
+      "modelCalls": 8,
+      "outputTokens": 2787,
+      "truncated": 0,
+      "toolCalls": 10,
+      "candidates": [],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "27f3194c7fd2f70eca5323f9afd235d4af18a380815c4be40479097e7d29123d",
+          "proposedSha256": "70b53d798d1d1a6c10792e1294bd5c53df329fec99c78e85c3b04389a7c4309e",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 1,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "no generated test is consistent with the frozen reference"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "51de6edc5f08f0bdfdc72812e8b5c47820a64680edbae1cc904030a761b1572e",
+          "proposedSha256": "c2458c63017fb614e184e30feb1caf1d2e133dbf14b14ebef6f8b032adc976fa",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Worker",
+          "categories": [
+            "implementation_defect"
+          ],
+          "evidence": [
+            "independent acceptance suite failed"
+          ],
+          "outcome": "not_retested",
+          "previousSha256": "70b53d798d1d1a6c10792e1294bd5c53df329fec99c78e85c3b04389a7c4309e",
+          "proposedSha256": "70b53d798d1d1a6c10792e1294bd5c53df329fec99c78e85c3b04389a7c4309e",
+          "proposal": "identical",
+          "remaining": 0
+        },
+        {
+          "round": 2,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "no generated test is consistent with the frozen reference"
+          ],
+          "outcome": "not_retested",
+          "previousSha256": "c2458c63017fb614e184e30feb1caf1d2e133dbf14b14ebef6f8b032adc976fa",
+          "proposedSha256": "c2458c63017fb614e184e30feb1caf1d2e133dbf14b14ebef6f8b032adc976fa",
+          "proposal": "identical",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "semantic"
+        },
+        {
+          "attempt": 1,
+          "category": "implementation_defect",
+          "component": "worker",
+          "defect": null
+        },
+        {
+          "attempt": 1,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "semantic"
+        },
+        {
+          "attempt": 1,
+          "category": "reviewer_false_approval",
+          "component": "reviewer",
+          "defect": null
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": true,
+          "hidden": false,
+          "tester": {
+            "ran": true,
+            "total": 4,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.9,
+        "findings": 1
+      },
+      "reviewerFalseApproval": true,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 1
+      },
+      "workerSamples": 1,
+      "finalSource": "import heapq\n\nclass TaskQueue:\n    def __init__(self):\n        self._queue = []\n        self._count = 0\n\n    def add(self, name, priority):\n        if (name, priority) in [(item[2], item[1]) for item in self._queue]:\n            raise ValueError(f\"Name {name} is already in the queue with the same priority.\")\n        heapq.heappush(self._queue, (priority, self._count, name))\n        self._count += 1\n\n    def pop(self):\n        if not self._queue:\n            raise IndexError(\"pop from an empty TaskQueue\")\n        return heapq.heappop(self._queue)[-1]\n\n    def __len__(self):\n        return len(self._queue)\n",
+      "finalTests": "import unittest\nfrom pqueue import TaskQueue\n\nclass TestTaskQueue(unittest.TestCase):\n    def test_add_method(self):\n        q = TaskQueue()\n        q.add('task1', 1)\n        q.add('task2', 2)\n        q.add('task3', 1)\n        q.add('task4', 1)\n        q.add('task5', 3)\n        q.add('task6', 2)\n        q.add('task7', 1)\n        with self.assertRaises(ValueError):\n            q.add('task8', 1)\n\n    def test_pop_method(self):\n        q = TaskQueue().add('task1', 1)\n        self.assertEqual(q.pop(), 'task1')\n        q = q.add('task2', 1)\n        self.assertEqual(q.pop(), 'task2')\n        q = q.add('task3', 1)\n        self.assertEqual(q.pop(), 'task3')\n        q = q.add('task4', 3)\n        self.assertEqual(q.pop(), 'task4')\n        q = q.add('task5', 2)\n        self.assertEqual(q.pop(), 'task5')\n        q = q.add('task6', 2)\n        self.assertEqual(q.pop(), 'task6')\n        q = q.add('task7', 1)\n        self.assertEqual(q.pop(), 'task7')\n\n    def test_len_method(self):\n        q = TaskQueue()\n        self.assertEqual(len(q), 0)\n        q = q.add('task1', 1)\n        self.assertEqual(len(q), 1)\n        q = q.add('task2', 2)\n        self.assertEqual(len(q), 2)\n        q = q.add('task3', 1)\n        self.assertEqual(len(q), 2)\n        q = q.add('task4', 1)\n        self.assertEqual(len(q), 2)\n\n    def test_value_error(self):\n        q = TaskQueue().add('task1', 1)\n        q = q.add('task2', 2)\n        q = q.add('task3', 1)\n        q = q.add('task4', 1)\n        with self.assertRaises(ValueError):\n            q.add('task1', 1)\n"
+    },
+    {
+      "task": "dv-pqueue",
+      "kind": "planning",
+      "trial": 2,
+      "status": "passed",
+      "reason": "Deterministic gate passed after 2 repair(s).",
+      "repairsUsed": 2,
+      "durationMs": 361216,
+      "calls": [
+        {
+          "role": "Planner",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 17343,
+          "doneReason": "stop",
+          "promptTokens": 157,
+          "outputTokens": 299,
+          "evalTokPerS": 24.6,
+          "loadMs": 4837
+        },
+        {
+          "role": "Worker",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 10438,
+          "doneReason": "stop",
+          "promptTokens": 559,
+          "outputTokens": 235,
+          "evalTokPerS": 24.2,
+          "loadMs": 10
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 150468,
+          "doneReason": "length",
+          "promptTokens": 578,
+          "outputTokens": 3072,
+          "evalTokPerS": 22,
+          "loadMs": 12
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 160757,
+          "doneReason": "length",
+          "promptTokens": 2622,
+          "outputTokens": 3072,
+          "evalTokPerS": 19.4,
+          "loadMs": 11
+        },
+        {
+          "role": "Tester",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 15588,
+          "doneReason": "stop",
+          "promptTokens": 2573,
+          "outputTokens": 277,
+          "evalTokPerS": 20.6,
+          "loadMs": 11
+        },
+        {
+          "role": "Reviewer",
+          "model": "huihui_ai/qwen2.5-abliterate:7b",
+          "ok": true,
+          "durationMs": 5744,
+          "doneReason": "stop",
+          "promptTokens": 882,
+          "outputTokens": 104,
+          "evalTokPerS": 22.7,
+          "loadMs": 15
+        }
+      ],
+      "modelCalls": 6,
+      "outputTokens": 7059,
+      "truncated": 2,
+      "toolCalls": 11,
+      "candidates": [],
+      "repairs": [
+        {
+          "round": 1,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "tests: syntax error line 160: unterminated string literal (detected at line 160)"
+          ],
+          "outcome": "unresolved",
+          "previousSha256": "180e7fc3351de2baa28854ff0abdd3cd38cb2d9924fd6aa4495752dba3da5b5e",
+          "proposedSha256": "da246624da952b33fd8e442bbc6d3228b23295ce98887dff3444439c769c9410",
+          "proposal": "valid",
+          "remaining": 1
+        },
+        {
+          "round": 2,
+          "target": "Tester",
+          "categories": [
+            "test_invalid"
+          ],
+          "evidence": [
+            "tests: syntax error line 1: invalid syntax"
+          ],
+          "outcome": "resolved",
+          "previousSha256": "da246624da952b33fd8e442bbc6d3228b23295ce98887dff3444439c769c9410",
+          "proposedSha256": "99cae949b1389b36d165c698c11e3ea9f3bc614b05aad3eee6a926c87dff6966",
+          "proposal": "valid",
+          "remaining": 0
+        }
+      ],
+      "failures": [
+        {
+          "attempt": 0,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "syntax"
+        },
+        {
+          "attempt": 1,
+          "category": "test_invalid",
+          "component": "tester",
+          "defect": "syntax"
+        }
+      ],
+      "attempts": [
+        {
+          "attempt": 0,
+          "static": false,
+          "hidden": true,
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 1,
+          "static": false,
+          "hidden": true,
+          "tester": {
+            "ran": false,
+            "total": 0,
+            "valid": 0,
+            "failedValid": [],
+            "passed": false
+          },
+          "accepted": false
+        },
+        {
+          "attempt": 2,
+          "static": true,
+          "hidden": true,
+          "tester": {
+            "ran": true,
+            "total": 3,
+            "valid": 3,
+            "failedValid": [],
+            "passed": true
+          },
+          "accepted": true
+        }
+      ],
+      "reviewer": {
+        "verdict": "approve",
+        "confidence": 0.95,
+        "findings": 1
+      },
+      "reviewerFalseApproval": false,
+      "profile": {
+        "complexity": "low",
+        "errorConditions": 1
+      },
+      "workerSamples": 1,
+      "finalSource": "import heapq\n\nclass TaskQueue:\n    def __init__(self):\n        self.queue = []\n    \n    def add(self, name, priority):\n        if name in [item[2] for item in self.queue]:\n            raise ValueError(f\"{name} is already in the queue.\")\n        heapq.heappush(self.queue, (priority, len(self.queue), name))\n    \n    def pop(self):\n        if not self.queue:\n            raise IndexError(\"pop from an empty TaskQueue\")\n        return heapq.heappop(self.queue)[2]\n    \n    def __len__(self):\n        return len(self.queue)\n",
+      "finalTests": "import unittest\nfrom pqueue import TaskQueue\n\nclass TestTaskQueue(unittest.TestCase):\n    def test_add(self):\n        task_queue = TaskQueue()\n        task_queue.add('task1', 1)\n        task_queue.add('task2', 2)\n        task_queue.add('task3', 1)\n        self.assertEqual(len(task_queue), 3)\n\n    def test_pop(self):\n        task_queue = TaskQueue()\n        task_queue.add('task1', 1)\n        task_queue.add('task2', 2)\n        task_queue.add('task3', 1)\n        self.assertEqual(task_queue.pop(), 'task1')\n        self.assertEqual(task_queue.pop(), 'task3')\n        self.assertEqual(task_queue.pop(), 'task2')\n        self.assertEqual(len(task_queue), 0)\n\n    def test_len(self):\n        task_queue = TaskQueue()\n        task_queue.add('task1', 1)\n        task_queue.add('task2', 2)\n        task_queue.add('task3', 1)\n        self.assertEqual(len(task_queue), 3)\n"
+    }
+  ],
+  "finishedAt": "2026-10-22T20:28:06.216Z",
+  "resumes": [
+    {
+      "at": "2026-10-22T19:48:00.320Z",
+      "replaced": [
+        "dv-size#1",
+        "dv-size#2",
+        "dv-semver#1",
+        "dv-semver#2",
+        "dv-rle#1",
+        "dv-rle#2",
+        "dv-dedupe#1",
+        "dv-dedupe#2",
+        "dv-brackets#1",
+        "dv-brackets#2",
+        "dv-minstack#1",
+        "dv-minstack#2",
+        "dv-bsearch#1",
+        "dv-bsearch#2",
+        "dv-wordcount#1",
+        "dv-wordcount#2",
+        "dv-bank#1",
+        "dv-bank#2",
+        "dv-pqueue#1",
+        "dv-pqueue#2"
+      ]
+    },
+    {
+      "at": "2026-10-22T19:57:41.149Z",
+      "replaced": [
+        "dv-size#1",
+        "dv-size#2",
+        "dv-semver#1",
+        "dv-semver#2",
+        "dv-rle#1",
+        "dv-rle#2",
+        "dv-dedupe#1",
+        "dv-dedupe#2",
+        "dv-brackets#1",
+        "dv-brackets#2",
+        "dv-minstack#1",
+        "dv-minstack#2",
+        "dv-bsearch#1",
+        "dv-bsearch#2",
+        "dv-wordcount#1",
+        "dv-wordcount#2",
+        "dv-bank#1",
+        "dv-bank#2",
+        "dv-pqueue#1",
+        "dv-pqueue#2"
+      ]
+    }
+  ],
+  "summary": {
+    "passed": 12,
+    "trials": 20,
+    "byKind": {
+      "strict": "1/4",
+      "simple": "4/4",
+      "intermediate": "4/4",
+      "debugging": "2/4",
+      "planning": "1/4"
+    },
+    "byTask": {
+      "dv-size": "1/2",
+      "dv-semver": "0/2",
+      "dv-rle": "2/2",
+      "dv-dedupe": "2/2",
+      "dv-brackets": "2/2",
+      "dv-minstack": "2/2",
+      "dv-bsearch": "2/2",
+      "dv-wordcount": "0/2",
+      "dv-bank": "0/2",
+      "dv-pqueue": "1/2"
+    },
+    "statuses": {
+      "passed": 12,
+      "failed": 8
+    },
+    "firstAttemptPasses": 9,
+    "modelCalls": 117,
+    "outputTokens": 33931,
+    "truncatedReplies": 2,
+    "callLatencyMs": {
+      "median": 12020,
+      "p95": 39675
+    },
+    "trialMs": {
+      "total": 1824810
+    },
+    "reviewerFalseApprovals": 6,
+    "externalRequestsRefused": 0,
+    "memoryWaitSamples": 4
+  }
+}

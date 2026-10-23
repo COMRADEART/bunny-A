@@ -1,4 +1,5 @@
 import { redactReviewListing } from "../bunny-missions/authorization.server.ts";
+import { DATA_CATEGORIES, ROUTING_MODES } from "./ma4/hybrid.ts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomBytes, createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -9,6 +10,7 @@ import { API_KEY_SHAPE } from "./jev-secrets.server.ts";
 import { sampleHost } from "../orch/telemetry.server.ts";
 import { validateVerifySpec, verifyTask } from "./verification.server.ts";
 import type { Mode, OrchTask, Project, ProviderId, TaskConstraints } from "../orch/types.ts";
+import { ModelApprovalRequired } from "./ma4/selection.ts";
 import type { AgentSession, HostSnapshot } from "./contracts.ts";
 import { MissionManager, type MissionManagerOptions } from "../bunny-missions/manager.server.ts";
 import { MISSION_ACTIONS, missionCommand } from "../bunny-missions/commands.server.ts";
@@ -95,16 +97,22 @@ function voiceMissionFact(mission: { id: string; title: string; state: string; u
   return { id: mission.id, title: mission.title, status: mission.state, updatedAt: mission.updatedAt, origin: mission.origin, steps: [] };
 }
 
-const PROVIDERS: ProviderId[]=["codex","claude","ollama","opencode","cline","cursor"];
+const PROVIDERS: ProviderId[]=["codex","claude","ollama","opencode","cline","cursor","openrouter"];
 function record(value: unknown): Record<string,unknown> {if(!value || typeof value!=="object" || Array.isArray(value)) throw new Error("Expected an object.");return value as Record<string,unknown>;}
 function text(value: unknown,max=100000): string {if(typeof value!=="string" || !value.trim() || value.length>max) throw new Error("Invalid or oversized text.");return value;}
 function provider(value: unknown): ProviderId {if(!PROVIDERS.includes(value as ProviderId)) throw new Error("Unknown provider.");return value as ProviderId;}
 export function validateConstraints(value: unknown): TaskConstraints {
   if(value===undefined) return {};
   const input=record(value);const output:TaskConstraints={};
-  for(const key of ["localOnly","offlineOnly","requiresFilesystem","requiresTerminal","requiresGit","requiresGPU","cloudOnly","privacyLocal",
+  for(const key of ["localOnly","offlineOnly","requiresFilesystem","requiresTerminal","requiresGit","requiresGPU","cloudOnly","privacyLocal","sensitive","requiresAudio",
   ] as const) if(input[key]!==undefined) {if(typeof input[key]!=="boolean") throw new Error("Invalid constraint.");output[key]=input[key];}
   if(input.workingDirectory!==undefined) output.workingDirectory=text(input.workingDirectory,2000);
+  if(input.routingMode!==undefined) {if(!ROUTING_MODES.includes(input.routingMode as never)) throw new Error("Unknown routing mode.");output.routingMode=input.routingMode as TaskConstraints["routingMode"];}
+  if(input.dataCategory!==undefined) {if(!DATA_CATEGORIES.includes(input.dataCategory as never)) throw new Error("Unknown data category.");output.dataCategory=input.dataCategory as TaskConstraints["dataCategory"];}
+  if(input.language!==undefined) output.language=text(input.language,40);
+  if (input.maxCostUsd !== undefined) { if (typeof input.maxCostUsd !== "number" || !Number.isFinite(input.maxCostUsd) || input.maxCostUsd < 0 || input.maxCostUsd > 10) throw new Error("Invalid task cost budget."); output.maxCostUsd = input.maxCostUsd; }
+  for (const key of ["contextTokens", "outputTokens"] as const) if (input[key] !== undefined) { if (!Number.isSafeInteger(input[key]) || Number(input[key]) < 1 || Number(input[key]) > 1000000) throw new Error("Invalid token budget."); output[key] = Number(input[key]); }
+  if (input.responseFormat !== undefined) { if (input.responseFormat !== "json") throw new Error("Only JSON response format is supported through this API."); output.responseFormat = { type: "object" }; }
   for(const key of ["providerAllowlist","providerDenylist"] as const) if(input[key]!==undefined) {if(!Array.isArray(input[key]) || input[key].length>6) throw new Error("Invalid provider constraint.");output[key]=input[key].map(provider);}
   // M-A-3 T3 §27 model-level user constraints; exact pins are honored only where a real model surface exists (§9).
   if(input.modelExact!==undefined) output.modelExact=text(input.modelExact,200);
@@ -307,6 +315,9 @@ export async function startHost(
     /** M-A-3 T13.1 test-only intelligence seams (fake transport/protector). Never reachable from HTTP. */
     intelligence?: ManagerOptions["intelligence"];
     connections?: ManagerOptions["connections"];
+    /** MA4-S1R3-CI2 test-only model probes (fixture Ollama/Codex catalogs). Never reachable from HTTP. */
+    modelProbes?: ManagerOptions["modelProbes"];
+    ma4Fetch?: typeof fetch;
     /** M-A-3 T13.3 Gate E test-only harness `--version` probe. Never reachable from HTTP. */
     harnessProbe?: typeof probeHarness;
   } = {},
@@ -355,6 +366,8 @@ export async function startHost(
     workspaceRoot,
     ...(options.intelligence ? { intelligence: options.intelligence } : {}),
     ...(options.connections ? { connections:options.connections } : {}),
+    ...(options.modelProbes ? { modelProbes: options.modelProbes } : {}),
+    ...(options.ma4Fetch ? { ma4Fetch: options.ma4Fetch } : {}),
   });
   containment.options.persist = (type, detail, owner) =>
     manager.emit(db.event(type, owner.taskId ?? null, detail, owner.missionId ?? null));
@@ -1225,6 +1238,23 @@ export async function startHost(
             task = manager.submit({ ...submitted, decisionAssistance });
             break;
           }
+          case "ma4.configure":
+            if (!local) throw new WorkstationRequiredError("Model activation requires the Windows owner.");
+            manager.configureMA4(data.configuration);
+            break;
+          case "ma4.discover":
+            if (!local) throw new WorkstationRequiredError("Provider discovery requires the Windows owner.");
+            await manager.discoverMA4();
+            break;
+          case "ma4.evaluate": {
+            if (!local) throw new WorkstationRequiredError("Model evaluation requires the Windows owner.");
+            if (data.confirm !== true) throw new Error("Confirm bounded synthetic model evaluation explicitly.");
+            const controller = new AbortController();
+            const close = () => controller.abort(); res.on("close", close);
+            try { extra = { data: await manager.evaluateMA4(text(data.model, 180), controller.signal) }; }
+            finally { res.off("close", close); }
+            break;
+          }
           case "intelligence.configure":
             if (!local) throw new WorkstationRequiredError("AI & Models settings can only be changed on the workstation (Windows Host).");
             manager.configureIntelligence(data.policy);
@@ -1787,6 +1817,7 @@ export async function startHost(
               verification.detail,
             );
             db.outcome(task);
+            manager.learn();
             break;
           }
           case "policy.candidate": {
@@ -1809,6 +1840,7 @@ export async function startHost(
           case "routing.learning.shadow":
           case "routing.learning.accept":
           case "routing.learning.reject":
+          case "routing.learning.autopilot":
           case "routing.learning.rollback": {
             // T13.3 Gate G: OBSERVE → EVALUATE → PROPOSE → SHADOW → ACCEPT/REJECT → VERSION/ROLLBACK, owner-decided on the workstation.
             if (!local) throw new WorkstationRequiredError("Routing improvement is decided only on the workstation (Windows Host).");
@@ -1825,6 +1857,10 @@ export async function startHost(
                 detail = `Routing policy ${manager.policy.startShadow(id()).id} is being shadow tested; it never changes which model runs.`;
               } else if (input.action === "routing.learning.accept") {
                 detail = `Routing policy ${manager.policy.accept(id(), manager.live()).id} accepted.`;
+              } else if (input.action === "routing.learning.autopilot") {
+                if (typeof data.enabled !== "boolean") throw new Error("enabled must be true or false.");
+                manager.policy.setAutopilot(data.enabled);
+                detail = data.enabled ? "Routing autopilot on: Bunny proposes, shadow tests and accepts policies through the same gates." : "Routing autopilot off: every step waits for the owner.";
               } else if (input.action === "routing.learning.reject") {
                 manager.policy.reject(id());
                 detail = `Routing policy ${id()} rejected.`;
@@ -1991,6 +2027,8 @@ export async function startHost(
           ? "HOST_UNAVAILABLE"
           : error instanceof WorkstationRequiredError
             ? "WORKSTATION_REQUIRED"
+            : error instanceof ModelApprovalRequired
+              ? "MODEL_APPROVAL_REQUIRED"
             : error instanceof CodedRefusal
               ? error.code
               : error instanceof CommandRefusedError
