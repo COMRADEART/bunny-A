@@ -66,3 +66,32 @@ strategy `s1r4-v3c`; sandbox `wsl2-userns-pivot_root-cgroupv2`.
 frozen 2-repair budget (the gate attributed them to Worker and Tester), but the owner-chosen strict cap of 4 requests
 per trial leaves no budget for any repair, because the frozen strategy spends all 4 on attempt 0. This run does not show
 whether gpt-oss-120b would pass with repairs, and it says nothing about local-model capability.
+
+---
+
+# G7C-2 — repair-enabled rerun (separate result; G7C-1 above stays on record unchanged)
+
+## Pre-registration (committed before any G7C-2 cloud request)
+
+* **Owner decision (2026-10-23, after G7C-1):** rerun the same three frozen G7 v2 trials with caps of **≤ 8 requests per
+  trial, ≤ 24 total**; report as a separate G7C-2 result beside G7C-1. Everything else in the G7C authorization is
+  unchanged: Groq `openai/gpt-oss-120b` only, Worker and Tester only, synthetic G7 specs only, $0, 7-day approval,
+  no fallback provider, no project files, memories, credentials, hidden tests or references sent.
+* **Why 8:** under the frozen `s1r4-v3c` strategy a trial makes at most 4 cloud calls on attempt 0 (3 Worker samples +
+  Tester) plus at most 2 repair rounds × (1 Worker + 1 Tester) = **8**. The cap therefore can no longer end a trial;
+  only the frozen 2-repair budget, the gate and the stop conditions can.
+* **The only code change** is `CAPS` in `scripts/ma4-s1r4/g7c-cloud.mjs` (12/4 → 24/8), pinned by
+  `ma4-g7c.test.ts`. Tasks, hidden tests, references, task hash `aa5d5c19…4cb8`, strategy, prompts, repair budget,
+  threshold (≥ 2/3), stop conditions and security controls are unchanged. G7C-1 failures are not given to any model.
+* **Owner step:** the G7C-1 approval is revoked and its credential deleted, so the owner issues a fresh approval in
+  their own terminal: `node --experimental-strip-types scripts/ma4-s1r4/g7c-cloud.mjs issue` (it shows the new caps).
+  A new Groq key is recommended if the G7C-1 key was deleted in the console.
+* **Run (one decisive run, no resume, no retries):**
+  `G7_STRATEGY=s1r4 G7_CLOUD=groq G7_OUT=docs/ma4-s1r4/evidence/g7c2-groq.json node --experimental-strip-types scripts/ma4-s1r2/g7.mjs`
+  The harness revokes the approval and deletes the credential when the run finishes or stops.
+* **Reporting:** ≥ 2/3 → "cloud-assisted G7 v2 qualification (G7C-2)", never local-only qualification. < 2/3 → R4-G7
+  stays FAIL. Either way G7C-1 (1/3 under the strict cap) is reported alongside.
+
+## G7C-2 results
+
+PENDING — waiting for the owner to issue the G7C-2 approval.
