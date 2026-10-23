@@ -64,6 +64,13 @@ export const DEVICE_RIGHTS: Readonly<Record<string, DeviceRight>> = {
   "project.get": "read",
   "project.artifact": "read",
   "operation.status": "read",
+  // MA4-S2-T1: a phone sees and supervises persistent tasks; creating, approving and resolving them stay on the PC.
+  "ptask.list": "read",
+  "ptask.get": "read",
+  "ptask.pause": "supervise",
+  "ptask.resume": "supervise",
+  "ptask.cancel": "supervise",
+  "ptask.notification.ack": "supervise",
   "agent.pause": "supervise",
   "agent.resume": "supervise",
   "agent.stop": "supervise",
