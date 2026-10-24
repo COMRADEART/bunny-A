@@ -9,6 +9,7 @@ import { actionContext, ptaskCommand } from "./ma4/task-commands.server.ts";
 import { WorkstationRequiredError } from "./device-authority.server.ts";
 import { ProactiveEngine } from "./ma4/proactive.server.ts";
 import { ProactiveStore } from "./ma4/proactive-store.server.ts";
+import { localModelCall } from "./ma4/task-executors.server.ts";
 import { create, rig, workspace } from "./ma4-s2t2-fixtures.ts";
 import { DAY, envelope, goal, HOUR, MIN, MODEL, monitor, PHONE, prig, schedule, summaryAction, T0, WS, type PRig } from "./ma4-s2t3-fixtures.ts";
 
@@ -180,3 +181,20 @@ test("T3R-T5 a start date holds back every run until it arrives; preview and the
   assert.equal(p.tasks().length, 1);
   assert.equal(ScheduleSpecSchema.safeParse(schedule({ startsAt: T0 + 400 * DAY, expiresAt: T0 + 30 * DAY })).success, false, "must start before it ends");
 }));
+
+test("T3R-H1 the production model call sends the Reviewer's schema and temperature to Ollama (found by the real-model smoke)", async () => {
+  const sent: Record<string, unknown>[] = [], real = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).endsWith("/api/tags")) return new Response(JSON.stringify({ models: [{ name: "pin:7b" }] }));
+    sent.push(JSON.parse(String(init?.body)));
+    return new Response(JSON.stringify({ model: "pin:7b", response: '{"approved":true,"issues":[]}', done: true, done_reason: "stop" }));
+  }) as typeof fetch;
+  try {
+    const schema = { type: "object", properties: { approved: { type: "boolean" } }, required: ["approved"] };
+    const r = await localModelCall({ role: "Reviewer", model: "pin:7b", prompt: "check", schema, signal: new AbortController().signal, attempt: 1, options: { temperature: 0, numPredict: 512 } });
+    assert.ok(r.ok);
+    assert.deepEqual(sent[0].format, schema); assert.deepEqual(sent[0].options, { num_ctx: 8192, num_predict: 512, temperature: 0 });
+    await localModelCall({ role: "Worker", model: "pin:7b", prompt: "write", schema: null, signal: new AbortController().signal, attempt: 1 });
+    assert.equal(sent[1].format, undefined, "free text stays free text");
+  } finally { globalThis.fetch = real; }
+});

@@ -2,6 +2,7 @@ import { freemem } from "node:os";
 import { execute, probeOllama } from "../../orch/exec.server.ts";
 import { killProcess, processTable, sameProcessIdentity } from "../process-tree.server.ts";
 import type { ModelCall } from "./coding-workflow.server.ts";
+import type { ExecRequest } from "../../orch/types.ts";
 import type { Executor, RuntimeDeps } from "./task-runtime.server.ts";
 import { localReview, sourceMaterial } from "./connected-workflow.server.ts";
 
@@ -14,9 +15,12 @@ import { localReview, sourceMaterial } from "./connected-workflow.server.ts";
 export const MEMORY_FLOOR_BYTES = 4 * 1024 ** 3;
 
 /** Local-only model call through the existing Ollama path: a hosted tag is refused, a missing model is never replaced. */
-export const localModelCall: ModelCall = async ({ model, prompt, signal, options, attempt }) => {
+export const localModelCall: ModelCall = async ({ model, prompt, schema, signal, options, attempt }) => {
   const started = Date.now();
-  const r = await execute({ taskId: `ptask-${model}-${started}-${attempt}`, provider: "ollama", model, prompt, localOnly: true, numCtx: 8192, numPredict: options?.numPredict ?? 1024 }, { signal, timeoutMs: 300_000 });
+  // MA4-S2-T3R: the Reviewer's and Planner's schema reaches Ollama as structured output; without it a real model answers
+  // in free text (often fenced JSON) and every verdict is refused.
+  const r = await execute({ taskId: `ptask-${model}-${started}-${attempt}`, provider: "ollama", model, prompt, localOnly: true, numCtx: 8192, numPredict: options?.numPredict ?? 1024,
+    ...(schema ? { format: schema as ExecRequest["format"] } : {}), ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}) }, { signal, timeoutMs: 300_000 });
   const durationMs = Date.now() - started;
   return r.ok ? { ok: true, text: r.output ?? "", servedModel: r.receipt?.model ?? "", durationMs } : { ok: false, error: r.error ?? "Local generation failed.", stopped: !!r.stopped, durationMs };
 };
