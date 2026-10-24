@@ -47,6 +47,28 @@ Pass for the gate: fixed arm accepted ≥ 4/5 and correct ≥ 4/5, completed ≥
 Pass for the gate: 8/8 security outcomes as expected (X5 may be NOT INDUCED, reported as such, and is then covered only by
 the recorded-fake unit test T2-X11/T3R1-P2 parse path).
 
+### 1b. Amendment after run 1 (frozen before run 2; the §1 criteria are unchanged)
+
+Run 1 (fix v1 `61673e2`, evidence `evidence/model-qualify-run1-fixed-dev.json`) **failed the functional gate**: accepted 3/5,
+correct 2/5, completed 2/5; security 8/8. Every proposal carried the right pins. The failures were input typing (F3, F4:
+the free-form `input` let the model write `maxChars: null`, which the connector refuses) and step choice (F1, F5: an
+unrequested review step; F5 had no generate step). Run 1 stands as recorded.
+
+Fix v2 gives each granted action its own input schema (the connector's zod contract as JSON Schema; optional fields may be
+left out, never null) and tells the Planner to add a review step only when the owner asks for a check. Because F1–F5 were
+used to develop v2, they become the **development set** (re-run and reported, not gating). The gate is judged on five new
+**held-out** requests, written before run 2 and not run against any build before it:
+
+| # | Request (abridged) | Files | Review? | Grounding term |
+|---|---|---|---|---|
+| H1 | What changed in version 0.9 (CHANGELOG.md) | CHANGELOG.md | no | `pairing` |
+| H2 | Two sentences on the biggest risk (RISKS.md), then verify them against the file | RISKS.md | yes | `login|rollback|certificate` |
+| H3 | Does the changelog mention the release candidate (CHANGELOG.md vs STATUS.md) | CHANGELOG.md, STATUS.md | no | `RC3|release candidate` |
+| H4 | Three-bullet summary of CHANGELOG.md, double-checked against the file | CHANGELOG.md | yes | `background` |
+| H5 | One-paragraph beta-readiness note from STATUS.md and RISKS.md | STATUS.md, RISKS.md | no | `beta` |
+
+Gate (same thresholds as §1): held-out accepted ≥ 4/5, correct ≥ 4/5, completed ≥ 3/5, and the security set 8/8 again on v2.
+
 ## 2. Result
 
 _Filled from `docs/ma4-s2-t3r1/evidence/model-qualify.json` after the run._

@@ -8,18 +8,24 @@ import type { ModelCall } from "./ma4/coding-workflow.server.ts";
 
 const envelope = (over: Record<string, unknown> = {}) => ({ capabilities: ["file.read", "local.generate", "local.review"], providers: ["ollama"] as ["ollama"], localOnly: true as const, models: [MODEL], projectScopes: ["p1"], sideEffects: false, background: false,
   budgets: { maxModelCalls: 5, maxWallMs: 60_000 }, expiresAt: Date.now() + 3_600_000, grants: { files: [{ root: "proj", access: "read" as const }], origins: [], services: [] }, ...over });
-type Branch = { properties: { kind: { enum: string[] }; model: { enum?: string[]; type?: string } }; required: string[] };
+type Branch = { properties: { kind: { enum: string[] }; model: { enum?: string[]; type?: string }; input: { properties?: Record<string, { type?: string }>; required?: string[]; additionalProperties?: boolean } }; required: string[] };
 const branches = (s: Record<string, any>): Branch[] => s.properties.steps.items.anyOf ?? [s.properties.steps.items];
+const byKind = (s: Record<string, any>) => Object.fromEntries(branches(s).map(b => [b.properties.kind.enum[0], b]));
 
-test("T3R1-P1 the Planner's format allows only granted actions, and only the envelope's pins on model steps", async () => {
+test("T3R1-P1 the Planner's format allows only granted actions with their own inputs, and only the envelope's pins on model steps", async () => {
   const r = await rig();
   try {
     const facts = r.rt.executorFacts(), catalog = r.connected.catalog;
-    const [plain, model] = branches(planSchema(catalog, facts, envelope())!);
-    assert.deepEqual(plain.properties.kind.enum, ["file.read"]); assert.equal(plain.properties.model.type, "null");
-    assert.deepEqual(model.properties.kind.enum.sort(), ["local.generate", "local.review"]); assert.deepEqual(model.properties.model.enum, [MODEL]);
-    for (const b of [plain, model]) assert.ok(b.required.includes("model"), "model is always stated, never left out");
-    assert.deepEqual(branches(planSchema(catalog, facts, envelope({ capabilities: ["file.read"] }))!).flatMap(b => b.properties.kind.enum), ["file.read"], "an ungranted action is not offered");
+    const k = byKind(planSchema(catalog, facts, envelope())!);
+    assert.deepEqual(Object.keys(k).sort(), ["file.read", "local.generate", "local.review"]);
+    assert.equal(k["file.read"].properties.model.type, "null");
+    for (const kind of ["local.generate", "local.review"]) assert.deepEqual(k[kind].properties.model.enum, [MODEL]);
+    for (const b of Object.values(k)) assert.ok(b.required.includes("model"), "model is always stated, never left out");
+    // The connector's own contract: maxChars is an optional integer (left out, never null); unknown fields are not allowed.
+    const read = k["file.read"].properties.input;
+    assert.equal(read.properties!.maxChars.type, "integer"); assert.deepEqual(read.required, ["root", "path"]); assert.equal(read.additionalProperties, false);
+    assert.deepEqual(k["local.review"].properties.input.required, ["criteria", "subjectFrom"]);
+    assert.deepEqual(Object.keys(byKind(planSchema(catalog, facts, envelope({ capabilities: ["file.read"] }))!)), ["file.read"], "an ungranted action is not offered");
     const noModels = branches(planSchema(catalog, facts, envelope({ models: [] }))!);
     assert.deepEqual(noModels.flatMap(b => b.properties.kind.enum), ["file.read"], "no pin, no model step offered");
     assert.equal(planSchema(catalog, facts, envelope({ capabilities: ["bank.transfer"] })), null);
