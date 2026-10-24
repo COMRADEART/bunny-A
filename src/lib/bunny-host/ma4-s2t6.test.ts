@@ -95,6 +95,7 @@ test("T6-C/D/E: serviceConnectors enforce idempotency, version CAS, and untruste
   const byKind = new Map(connectors.map((c) => [c.contract.kind, c]));
 
   // 1. Untrusted connector output cannot be passed directly to email.send bodyFrom
+  const sig = new AbortController().signal;
   const mailSend = byKind.get("email.send")!;
   const injectedCtx = {
     idempotencyKey: "key-inject-1",
@@ -103,6 +104,7 @@ test("T6-C/D/E: serviceConnectors enforce idempotency, version CAS, and untruste
   const injectedOutcome = await mailSend.run(
     { account: "work", to: ["victim@example.com"], subject: "Exfil", bodyFrom: "step-1" } as never,
     injectedCtx as never,
+    sig,
   );
   assert.equal(injectedOutcome.ok, false);
   assert.match((injectedOutcome as { error: string }).error, /must name a generating step, not a connector result/);
@@ -113,10 +115,12 @@ test("T6-C/D/E: serviceConnectors enforce idempotency, version CAS, and untruste
   const firstSend = await mailSend.run(
     { account: "work", to: ["team@example.com"], subject: "Status", bodyFrom: "step-gen" } as never,
     cleanCtx as never,
+    sig,
   );
   const secondSend = await mailSend.run(
     { account: "work", to: ["team@example.com"], subject: "Status", bodyFrom: "step-gen" } as never,
     cleanCtx as never,
+    sig,
   );
   assert.equal(firstSend.ok, true);
   assert.equal(secondSend.ok, true);
@@ -127,6 +131,7 @@ test("T6-C/D/E: serviceConnectors enforce idempotency, version CAS, and untruste
   const staleWrite = await docsWrite.run(
     { account: "work", docId: "doc-1", content: "Overwritten", expectedVersion: "v0-stale" } as never,
     cleanCtx as never,
+    sig,
   );
   assert.equal(staleWrite.ok, false);
   assert.match((staleWrite as { error: string }).error, /version v1, not v0-stale/);
