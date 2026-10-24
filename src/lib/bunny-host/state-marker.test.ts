@@ -122,6 +122,8 @@ test("T9: a damaged or wrong-version installed database is refused, never repair
 });
 test('T3R: real installed Host includes presentation stores in its marker and boots twice', { timeout: 30_000 }, async () => {
   const { startHost } = await import('./http.server.ts');
+  const { createServer } = await import('node:net');
+  const freePort = () => new Promise<number>((resolve,reject)=>{const server=createServer();server.on('error',reject);server.listen(0,'127.0.0.1',()=>{const address=server.address();if(!address||typeof address!=='object')throw Error('No address');server.close(()=>resolve(address.port));});});
   const root = mkdtempSync(join(tmpdir(), 'bunny-installed-restart-'));
   const workspace = mkdtempSync(join(tmpdir(), 'bunny-installed-workspace-'));
   const initial = new HostDatabase(join(root, 'host.sqlite'));
@@ -133,7 +135,7 @@ test('T3R: real installed Host includes presentation stores in its marker and bo
   const sample = async () => ({ at:Date.now(), cpu:{utilization:null,clockMhz:null,temperatureC:null},memory:{usedBytes:0,availableBytes:1,totalBytes:1},gpus:[],notes:[] });
   try {
     for(let boot=0;boot<2;boot++) {
-      host = await startHost({dataDirectory:root,root,workspaceRoot:workspace,port:0,adapters:[],sample});
+      host = await startHost({dataDirectory:root,root,workspaceRoot:workspace,port:await freePort(),adapters:[],sample});
       assert.doesNotThrow(()=>hostStatePaths(root,{BUNNY_STATE_LAYOUT:'2'}), `boot ${boot+1} preserves the final schema marker`);
       const address = host.server.address();
       assert.ok(address && typeof address === 'object');
