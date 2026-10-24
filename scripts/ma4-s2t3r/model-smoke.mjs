@@ -2,7 +2,7 @@
 // Ollama call with the served-model receipt check) on an isolated data directory and port; provider CLI probes off.
 // The workspace is a synthetic project folder. Model outputs are not stored: only lengths, hashes and grounding checks.
 //   node --experimental-strip-types scripts/ma4-s2t3r/model-smoke.mjs
-// Output: docs/ma4-s2t3r/evidence/model-smoke.json
+// Output: docs/ma4-s2-t3r/evidence/model-smoke.json
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -93,8 +93,8 @@ try {
   await host?.close().catch(() => undefined);
   rmSync(data, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); rmSync(project, { recursive: true, force: true, maxRetries: 10 });
   const failed = evidence.checks.filter(c => !c.pass).length;
-  mkdirSync(join(repo, 'docs/ma4-s2t3r/evidence'), { recursive: true });
-  writeFileSync(join(repo, 'docs/ma4-s2t3r/evidence/model-smoke.json'), JSON.stringify({ at: new Date().toISOString(), ...evidence, failed }, null, 2) + '\n');
+  mkdirSync(join(repo, 'docs/ma4-s2-t3r/evidence'), { recursive: true });
+  writeFileSync(join(repo, 'docs/ma4-s2-t3r/evidence/model-smoke.json'), JSON.stringify({ at: new Date().toISOString(), ...evidence, failed }, null, 2) + '\n');
   console.log(JSON.stringify({ checks: evidence.checks.length, failed, error: evidence.error ?? null }));
   process.exitCode = failed || evidence.error ? 1 : 0;
 }

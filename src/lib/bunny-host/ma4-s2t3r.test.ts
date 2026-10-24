@@ -1,5 +1,5 @@
 // MA4-S2-T3R: Host behaviour behind the creation UIs and the Approval Center, and the milestone's adversarial cases
-// (docs/ma4-s2t3r/SECURITY_VALIDATION.md). Same rigs as S2-T2/S2-T3: real stores, runtime, broker and engine on SQLite
+// (docs/ma4-s2-t3r/SECURITY_VALIDATION.md). Same rigs as S2-T2/S2-T3: real stores, runtime, broker and engine on SQLite
 // files, a fake clock, a recorded fake model and the recorded synthetic workspace. Nothing external is reached.
 import test from "node:test";
 import assert from "node:assert/strict";

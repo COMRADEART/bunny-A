@@ -1,4 +1,4 @@
-// MA4-S2-T3R soak analysis against the pre-registered criteria (docs/ma4-s2t3r/REAL_CLOCK_SOAK.md). Read-only: the
+// MA4-S2-T3R soak analysis against the pre-registered criteria (docs/ma4-s2-t3r/REAL_CLOCK_SOAK.md). Read-only: the
 // soak Host's SQLite file is opened read-only (WAL readers do not disturb the running Host). Safe to run mid-soak.
 //   node scripts/ma4-s2t3r/soak-report.mjs --dir <soakDir> [--out summary.json]
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

@@ -53,3 +53,13 @@ is mostly unavailable is reported as such, not as PASS.
 ## 3. Result
 
 _Filled from `soak-report.mjs` output; interim reports are labelled IN PROGRESS._
+
+**Status: IN PROGRESS — gate T3R-G10 not decided.** Started 2026-10-24 01:32:17 UTC from frozen commit `e6b6645`
+(worktree `bun-router-soak`, Host port 43190, data `%LOCALAPPDATA%\Bunny-S2T3R-Soak`); the 24 h window ends
+2026-10-25 ~01:32 UTC. Final verdict command:
+`node scripts/ma4-s2t3r/soak-report.mjs --dir "%LOCALAPPDATA%\Bunny-S2T3R-Soak"`.
+
+Interim at 2.4 h (03:55 UTC): 16 occurrences (4 daily runs, 10 condition runs, 1 reminder), 0 duplicates, 0 missed while
+available, 0 unavailable minutes, 0 permission violations, 0 host or driver errors; S1–S4, S6–S9, S11, S12 hold so far.
+S5 (memory) currently reads FAIL on 0.4 h of post-warm-up data (82 → 92 MB) and S10 (recovery) has no data until the
+first planned restart at 6 h — neither is a verdict yet.

@@ -3,7 +3,7 @@
 // model behind a fixture Ollama listing (one local model, one cloud tag that must never be offered), the recorded
 // synthetic workspace for the connected action, a temporary project folder.
 //   node --experimental-strip-types scripts/ma4-s2t3r/ui-evidence.mjs
-// Output: docs/ma4-s2t3r/evidence/ui/
+// Output: docs/ma4-s2-t3r/evidence/ui/
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
@@ -16,7 +16,7 @@ import { localReview } from '../../src/lib/bunny-host/ma4/connected-workflow.ser
 import { fakeModel, MODEL, TEST_BASE, workspace } from '../../src/lib/bunny-host/ma4-s2t2-fixtures.ts';
 
 const root = resolve(import.meta.dirname, '../..');
-const out = join(root, 'docs/ma4-s2t3r/evidence/ui');
+const out = join(root, 'docs/ma4-s2-t3r/evidence/ui');
 mkdirSync(out, { recursive: true }); mkdirSync(TEST_BASE, { recursive: true });
 const free = () => new Promise(r => { const s = createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
 const DAY = 86_400_000, CLOUD = 'deepseek-v4.1-flash:cloud', ME = 'me@example.test';

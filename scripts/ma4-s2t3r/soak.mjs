@@ -1,4 +1,4 @@
-// MA4-S2-T3R real-clock soak driver (docs/ma4-s2t3r/REAL_CLOCK_SOAK.md). Real time only: nothing here moves a clock.
+// MA4-S2-T3R real-clock soak driver (docs/ma4-s2-t3r/REAL_CLOCK_SOAK.md). Real time only: nothing here moves a clock.
 //   node --experimental-strip-types scripts/ma4-s2t3r/soak.mjs --hours 24 --dir <soakDir> --project <folder> --port 43190
 // It owns one Host process (soak-host.mjs), configures a permission-safe workload through the Host's own commands,
 // drives file changes, reminders, cancellations, restarts, a crash, an offline window and a background-policy change on a
