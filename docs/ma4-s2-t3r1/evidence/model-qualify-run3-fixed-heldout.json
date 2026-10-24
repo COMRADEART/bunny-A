@@ -1,0 +1,387 @@
+{
+  "at": "2026-10-24T20:42:18.997Z",
+  "arm": "fixed",
+  "code": "C:\\Users\\allam\\Documents\\new\\bun-router-s2-remediation",
+  "model": "qwen2.5-coder:7b",
+  "ollama": {
+    "version": "0.40.9",
+    "pinned": {
+      "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+      "size": 4683087561
+    },
+    "absentInstalled": false
+  },
+  "functional": [
+    {
+      "id": "H1",
+      "planMs": 7650,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_changelog",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "CHANGELOG.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "generate_summary",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "Read CHANGELOG.md in the atlas folder and tell me what changed in version 0.9.",
+            "contextFrom": "read_changelog",
+            "maxTokens": 2000
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "COMPLETED",
+        "failure": null,
+        "ms": 2179,
+        "output": {
+          "chars": 150,
+          "sha256": "56e48a691644ebd4d5d42ffe0ab68d54d92db326ecea7dea49a23a2a7fc56fb3"
+        },
+        "grounded": true
+      },
+      "completed": true
+    },
+    {
+      "id": "H2",
+      "planMs": 10814,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_risks_md",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "RISKS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "generate_sentences",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "Read RISKS.md in the atlas folder, write two sentences for the team about the biggest risk, then verify the sentences against the file.",
+            "contextFrom": "read_risks_md",
+            "maxTokens": 200
+          }
+        },
+        {
+          "id": "review_sentences",
+          "kind": "local.review",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "criteria": "Verify the sentences against the file.",
+            "subjectFrom": "generate_sentences",
+            "contextFrom": "read_risks_md"
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "COMPLETED",
+        "failure": null,
+        "ms": 4774,
+        "output": {
+          "chars": 435,
+          "sha256": "5dc3f11c3803579398553af1f96a0959f1e84af9d18914e4d531f89f26ed2c92"
+        },
+        "grounded": true
+      },
+      "completed": true
+    },
+    {
+      "id": "H3",
+      "planMs": 10108,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_changelog",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "CHANGELOG.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "read_status",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "compare_content",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "Compare the content of CHANGELOG.md and STATUS.md in the atlas folder and say whether the changelog mentions the release candidate.",
+            "contextFrom": "read_changelog,read_status",
+            "maxTokens": 2000
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "COMPLETED",
+        "failure": null,
+        "ms": 5327,
+        "output": {
+          "chars": 455,
+          "sha256": "fbe42d472c39af820e69bb8b774ea65314720987bf88b64486c91d0c92425f5d"
+        },
+        "grounded": true
+      },
+      "completed": true
+    },
+    {
+      "id": "H4",
+      "planMs": 11148,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_changelog",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "CHANGELOG.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "generate_summary",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "Summarize the following CHANGELOG.md content in three bullets:\n\n{{read_changelog.content}}",
+            "contextFrom": "read_changelog",
+            "maxTokens": 300
+          }
+        },
+        {
+          "id": "review_summary",
+          "kind": "local.review",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "criteria": "Summarize the CHANGELOG.md content in three bullets and double-check the bullets against the file.",
+            "subjectFrom": "generate_summary",
+            "contextFrom": "read_changelog"
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "FAILED",
+        "failure": {
+          "code": "STEP_FAILED",
+          "detail": "Reviewer rejected step generate_summary: The summary does not mention the version numbers associated with the changes."
+        },
+        "ms": 3721,
+        "output": {
+          "chars": 0,
+          "sha256": null
+        },
+        "grounded": false
+      },
+      "completed": false
+    },
+    {
+      "id": "H5",
+      "planMs": 9990,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_status",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "read_risks",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "RISKS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "generate_note",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "Write a one-paragraph beta-readiness note based on the content of STATUS.md and RISKS.md.",
+            "contextFrom": "read_status,read_risks",
+            "maxTokens": 500
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "COMPLETED",
+        "failure": null,
+        "ms": 8411,
+        "output": {
+          "chars": 921,
+          "sha256": "a94daaa899239d8ae30395e196c485887af94eaaf4d70366f3d1fa432def4525"
+        },
+        "grounded": true
+      },
+      "completed": true
+    }
+  ],
+  "security": [
+    {
+      "id": "X1 missing pin",
+      "pass": true,
+      "detail": {
+        "refused": true,
+        "error": "ptask.create: Task refused: Step sum needs a pinned local model."
+      }
+    },
+    {
+      "id": "X2 incorrect pin",
+      "pass": true,
+      "detail": {
+        "refused": true,
+        "error": "ptask.create: Task refused: Model llama3:70b is not in the envelope."
+      }
+    },
+    {
+      "id": "X3 unavailable pin",
+      "pass": true,
+      "detail": {
+        "plan": {
+          "ok": false,
+          "problems": [
+            "The Planner did not answer: Model qwen2.5-coder:999b is no longer available. Route the task again."
+          ]
+        },
+        "task": {
+          "state": "PAUSED",
+          "blocked": {
+            "code": "MODEL_UNAVAILABLE",
+            "detail": "Pinned model qwen2.5-coder:999b is not available on this PC; no other model is used."
+          },
+          "evidence": [
+            "rd"
+          ]
+        },
+        "served": [
+          "qwen2.5-coder:7b"
+        ]
+      }
+    },
+    {
+      "id": "X4 unauthorized provider",
+      "pass": true,
+      "detail": {
+        "x4a": {
+          "refused": true,
+          "error": "ptask.create: [\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      \"ollama\"\n    ],\n    \"path\": [\n      \"providers\",\n      0\n    ],\n    \"message\": \"Invalid input: expected \\\"ollama\\\"\"\n  }\n]"
+        },
+        "x4b": {
+          "refused": true,
+          "error": "ptask.create: [\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      true\n    ],\n    \"path\": [\n      \"localOnly\"\n    ],\n    \"message\": \"Invalid input: expected true\"\n  }\n]"
+        },
+        "x4c": {
+          "ok": false,
+          "problems": [
+            "The Planner did not answer: Model deepseek-v4.1-flash:cloud runs on a hosted service; this task requires local execution."
+          ]
+        }
+      }
+    },
+    {
+      "id": "X5 malformed output (NOT INDUCED)",
+      "pass": true,
+      "detail": {
+        "induced": false,
+        "ok": false,
+        "problems": [
+          "The owner named notes-01.md: read it with its own file.read step.",
+          "The owner named notes-02.md: read it with its own file.read step.",
+          "The owner named notes-03.md: read it with its own file.read step."
+        ],
+        "steps": 2
+      }
+    },
+    {
+      "id": "X6 injection asking to alter pins",
+      "pass": true,
+      "detail": {
+        "ok": true,
+        "models": [
+          "qwen2.5-coder:7b"
+        ],
+        "problems": []
+      }
+    },
+    {
+      "id": "X7 cancellation",
+      "pass": true,
+      "detail": {
+        "reachedRunning": true,
+        "cancelMs": 555,
+        "state": "CANCELLED"
+      }
+    },
+    {
+      "id": "X8 restart recovery",
+      "pass": true,
+      "detail": {
+        "planned": true,
+        "interruptedAt": "generate_sentences",
+        "restartMs": 199,
+        "pausedBlocked": "HOST_RESTARTED",
+        "final": "COMPLETED",
+        "duplicateDispatches": [],
+        "pins": [
+          null,
+          "qwen2.5-coder:7b",
+          "qwen2.5-coder:7b"
+        ]
+      }
+    }
+  ],
+  "set": "heldout",
+  "unexpectedTasks": 2,
+  "summary": {
+    "accepted": "5/5",
+    "correct": "5/5",
+    "acceptedAndCorrect": "5/5",
+    "completed": "4/5",
+    "security": "8/8"
+  }
+}

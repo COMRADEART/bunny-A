@@ -164,7 +164,7 @@ process.stdin.resume(); process.stdin.on('end',()=>{
   await tasks.discover();
   const missions = new MissionManager(tasks, { dataDirectory: directory, adapters: [] });
   missions.configure({ enabled: true }, "test");
-  const cleanup = async () => { await missions.close(); db.close(); rmSync(directory, { recursive: true, force: true }); };
+  const cleanup = async () => { await missions.close(); tasks.dispose(); db.close(); rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); };
   return { db, tasks, missions, launches, cleanup, disableClaude: async () => { claudeAvailable = false; await tasks.discover(); } };
 }
 
@@ -228,6 +228,45 @@ test("MA0R2: read replan revokes old approval and new approval spawns the same C
     assert.equal(env.launches.length, 2);
     assert.notEqual(env.launches[0].task.mission?.stepId, env.launches[1].task.mission?.stepId);
     for (const { args } of env.launches) assertReadIsolation(args);
+  } finally { await env.cleanup(); }
+});
+
+test("MA0R2: stale approval from before replan cannot authorize old or new step execution", async () => {
+  const env = await missionFixture(1);
+  try {
+    const mission = env.missions.create({ objective: "Inspect", mode: "fast", origin: "workstation", steps: [readStep("Research")] });
+    const initialStepId = mission.steps[0].id;
+    const approved = env.missions.approve(mission.id, "workstation");
+    const oldAuthorizationId = approved.authorizationId!;
+    await until(() => env.missions.mission(mission.id).state === "failed", "initial failure");
+    assert.equal(env.launches.length, 1);
+
+    // A child bound to the pre-replan step cannot be launched after replan revokes the old authorization.
+    const staleChild = env.tasks.submit({ prompt: "Stale step child", mode: "fast", override: "codex" }, { missionId: mission.id, stepId: initialStepId, executionScope: { access: "read" } });
+    const replanned = await env.missions.replan(mission.id, "workstation", [readStep("CustomAgent")]);
+    const newStepId = replanned.steps[0].id;
+    assert.notEqual(newStepId, initialStepId);
+    assert.ok(env.missions.store.authorization(oldAuthorizationId)?.revokedAt, "old approval envelope is revoked on replan");
+
+    // 1. Direct approval while mission has no active envelope fails closed.
+    const newChild = env.tasks.submit({ prompt: "Replanned step child", mode: "fast", override: "codex" }, { missionId: mission.id, stepId: newStepId, executionScope: { access: "read" } });
+    assert.throws(() => env.tasks.approve(newChild.id), /no approved mission envelope/);
+    assert.equal(env.launches.length, 1);
+
+    // 2. Re-attaching the revoked envelope ID onto the mission still refuses launch because revokedAt is set.
+    const storedMission = env.missions.store.mission(mission.id);
+    env.missions.store.saveMission({ ...storedMission, authorizationId: oldAuthorizationId });
+    assert.throws(() => env.tasks.approve(newChild.id), /authorization revoked/);
+    assert.throws(() => env.tasks.approveDelegated(newChild.id, { missionId: mission.id, stepId: newStepId, authorizationId: oldAuthorizationId, check: () => null }), /authorization revoked/);
+    env.missions.store.saveMission(storedMission);
+    assert.equal(env.launches.length, 1);
+
+    // 3. Even after a new approval is granted, the old authorizationId and old step child remain permanently rejected.
+    const reapproved = env.missions.approve(mission.id, "workstation", false);
+    assert.notEqual(reapproved.authorizationId, oldAuthorizationId);
+    assert.throws(() => env.tasks.approve(staleChild.id), /step replaced by replan/);
+    assert.throws(() => env.tasks.approveDelegated(newChild.id, { missionId: mission.id, stepId: newStepId, authorizationId: oldAuthorizationId, check: () => null }), /stale mission authorization/);
+    assert.equal(env.launches.length, 1, "no provider process started under stale approval");
   } finally { await env.cleanup(); }
 });
 

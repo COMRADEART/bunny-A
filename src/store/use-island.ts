@@ -35,6 +35,12 @@ import type { SessionLedgerView } from "@/lib/bunny-host/session-ledger";
 import type { SchedulerView } from "@/lib/bunny-host/fairness";
 import type { RoutingLearningView } from "@/lib/bunny-host/routing-feedback";
 import { notificationAllowed, type VoicePersonalizationView } from "@/lib/bunny-host/voice/voice-personalization";
+import {
+  DEFAULT_NATIVE_NOTIFICATION_PREFS,
+  evaluateNativeNotification,
+  type NativeNotificationCategory,
+  type NativeNotificationPrefs,
+} from "@/lib/bunny-host/ma4/native-notifications";
 import type { CharacterAppearanceView } from "@/lib/bunny-host/character-style";
 import {
   resolveVariant,
@@ -575,15 +581,56 @@ function newOperationId(): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-/** Android Chrome throws for the page Notification constructor; a notification never breaks Host truth. */
-function notify(body: string, tag: string) {
+/** Session-scoped dedup for evaluateNativeNotification (MA4-S3-T0). Not durable across reloads — Host ledgers remain authoritative. */
+const deliveredNativeKeys = new Set<string>();
+const NATIVE_PREFS_KEY = "bunny-a.native-notifications.v1";
+function readNativePrefs(): NativeNotificationPrefs {
   try {
-    if (
-      typeof window !== "undefined" &&
-      "Notification" in window &&
-      Notification.permission === "granted"
-    )
-      new Notification("Bunny-A", { body, tag });
+    if (typeof localStorage === "undefined") return DEFAULT_NATIVE_NOTIFICATION_PREFS;
+    const raw = JSON.parse(localStorage.getItem(NATIVE_PREFS_KEY) ?? "null") as Partial<NativeNotificationPrefs> | null;
+    if (!raw || typeof raw !== "object") return DEFAULT_NATIVE_NOTIFICATION_PREFS;
+    return {
+      ...DEFAULT_NATIVE_NOTIFICATION_PREFS,
+      ...raw,
+      categories: { ...DEFAULT_NATIVE_NOTIFICATION_PREFS.categories, ...(raw.categories ?? {}) },
+      quietHours: { ...DEFAULT_NATIVE_NOTIFICATION_PREFS.quietHours, ...(raw.quietHours ?? {}) },
+    };
+  } catch {
+    return DEFAULT_NATIVE_NOTIFICATION_PREFS;
+  }
+}
+function mapEventToNativeCategory(type: string): NativeNotificationCategory | null {
+  if (type === "approval.required" || type === "mission.approval_required" || type === "mission.permission_required" || type === "agent.waiting_for_approval") return "approval_needed";
+  if (type === "task.completed" || type === "mission.completed" || type === "ptask.notification") return "task_completed";
+  if (type === "task.failed" || type === "mission.failed") return "task_failed";
+  if (type === "proactive.notification") return "schedule_triggered";
+  if (type === "agent.waiting_for_input") return "recovery_needed";
+  return null;
+}
+/**
+ * Session browser Notification delivery gated by evaluateNativeNotification.
+ * OS tray/toast and Android push remain NOT IMPLEMENTED — this never claims otherwise.
+ * Android WebView throws for Notification; in-app badges still surface Host evidence.
+ */
+function notify(body: string, tag: string, type: string) {
+  try {
+    const category = mapEventToNativeCategory(type);
+    if (!category) return;
+    const stored = readNativePrefs();
+    // Browser Notification.permission remains the session opt-in (settings UI). Stored prefs add quiet hours / categories / explicit disable.
+    const permissionGranted =
+      typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
+    const prefs: NativeNotificationPrefs = {
+      ...stored,
+      enabled: stored.enabled || permissionGranted,
+    };
+    const decision = evaluateNativeNotification(
+      { category, sourceId: tag.slice(0, 80), revision: 1, title: "Bunny-A", detail: body, localHour: new Date().getHours() },
+      prefs,
+      deliveredNativeKeys,
+    );
+    if (!decision.deliver || !permissionGranted) return;
+    new Notification(decision.bannerTitle, { body: decision.bannerBody, tag: decision.dedupKey });
   } catch {
     /* Unsupported constructor (mobile): the in-app attention badge still shows it. */
   }
@@ -905,12 +952,16 @@ export const useIsland = create<Island>((set, get) => {
           "mission.permission_required",
           "mission.completed",
           "mission.failed",
+          "ptask.notification",
+          "proactive.notification",
         ].includes(event.type)
       ) {
         if (event.type === "thermal.warning") get().note(event.detail);
+        if (event.type === "thermal.warning") continue;
         if (notificationAllowed(event.type, get().voicePersonalization?.preferences.notificationFrequency ?? "all")) notify(
-          event.type === "thermal.warning" ? event.detail : event.type.replaceAll(".", " "),
+          event.detail?.slice?.(0, 140) || event.type.replaceAll(".", " "),
           event.taskId ?? event.missionId ?? event.type,
+          event.type,
         );
       }
   };

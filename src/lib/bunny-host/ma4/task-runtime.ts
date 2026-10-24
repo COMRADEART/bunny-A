@@ -20,7 +20,8 @@ export const TASK_NEXT: Readonly<Record<TaskState, readonly TaskState[]>> = {
   RUNNING: ["PAUSED", "RESUMING", "COMPLETED", "FAILED", "CANCELLED", "UNCERTAIN", "AWAITING_APPROVAL"],
   PAUSED: ["RESUMING", "FAILED", "CANCELLED"],
   RESUMING: ["RUNNING", "PAUSED", "AWAITING_APPROVAL", "FAILED", "CANCELLED", "UNCERTAIN"],
-  UNCERTAIN: ["QUEUED", "FAILED", "CANCELLED"],
+  // CANCELLED removed in MA4-S3-T0: UNCERTAIN exits only via reconcile (QUEUED / FAILED). Phone cancel is refused.
+  UNCERTAIN: ["QUEUED", "FAILED"],
   COMPLETED: [], FAILED: [], CANCELLED: [],
 };
 export const TERMINAL_TASK_STATES: readonly TaskState[] = ["COMPLETED", "FAILED", "CANCELLED"];
@@ -30,7 +31,8 @@ export function taskCanTransition(from: TaskState, to: TaskState): boolean { ret
 export const OPERATION_CATEGORIES = ["read_only", "idempotent", "irreversible"] as const;
 export type OperationCategory = (typeof OPERATION_CATEGORIES)[number];
 
-const id = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/);
+export const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/;
+const id = z.string().regex(ID_PATTERN);
 const scalar = z.union([z.string().max(8_000), z.number().finite(), z.boolean(), z.null()]);
 export const StepSpecSchema = z.object({
   id,

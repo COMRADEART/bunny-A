@@ -29,7 +29,8 @@ function controlsFor(task: TaskView, workstation: boolean): PtaskControl[] {
   if (task.state === "PAUSED") c.push("resume");
   if (workstation && task.state === "AWAITING_APPROVAL") c.push(...(task.pendingAction ? ["approve_action", "deny_action", "inspect"] as const : ["approve"] as const));
   if (workstation && task.state === "UNCERTAIN") c.push("reconcile");
-  if (OPEN.has(task.display)) c.push("cancel");
+  // MA4-S3-T0: UNCERTAIN must not offer cancel (phone or PC) — only reconcile on the workstation.
+  if (OPEN.has(task.display) && task.state !== "UNCERTAIN") c.push("cancel");
   return c;
 }
 function progressText(task: TaskView): string | null {

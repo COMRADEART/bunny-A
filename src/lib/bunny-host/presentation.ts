@@ -644,7 +644,11 @@ export function publicTeamView(view: NonNullable<MissionView["teamView"]>): NonN
  */
 const DASHBOARD_DATA_ACTIONS = ["action.inspect", "action.receipts", "connector.roots.list", "ptask.plan", "ptask.output",
   // MA4-S2-T3R: the creation forms show the Host's preview and continue with the created record's id and version.
-  "goal.preview", "schedule.preview", "monitor.preview", "goal.create", "schedule.create", "monitor.create", "goal.approve", "schedule.approve", "monitor.approve"];
+  "goal.preview", "schedule.preview", "monitor.preview", "goal.create", "schedule.create", "monitor.create", "goal.approve", "schedule.approve", "monitor.approve",
+  // MA4-S2-T3R1: the folder list returns the Host-checked folders it stored.
+  "connector.roots.set",
+  // MA4-S3-T0: local-only beta feedback commands return their payload to the dashboard.
+  "feedback.opt_in", "feedback.opt_out", "feedback.status", "feedback.preview", "feedback.submit", "feedback.list", "feedback.export", "feedback.clear"];
 /** Only the fields used by the dashboard cross its command boundary. Private session/capability data stays local. */
 export function dashboardCommand<
   T extends { snapshot?: HostSnapshot; task?: OrchTask; mission?: MissionView; pairCode?: string ;

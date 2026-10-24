@@ -24,6 +24,7 @@ export function Proactive({ phone = false }: { phone?: boolean }) {
   const notices = live ? noticeRows(snapshot) : [];
   if (!snapshot || (!workstation && !rows.length && !notices.length && !snapshot.away)) return null;
   const headline = proactiveHeadline(snapshot, view);
+  const latestNoticeAnnouncement = notices[0] ? `${notices[0].category}: ${notices[0].title} — ${notices[0].text}` : "";
   const act = (control: ProactiveControl, row: ProactiveRow) => {
     const action = control === "reject" ? (row.kind === "monitor" ? "disable" : "cancel") : control;
     void store.ptaskCommand(`${row.kind}.${action}`, control === "approve" ? { id: row.id, version: row.version } : { id: row.id });
@@ -34,8 +35,13 @@ export function Proactive({ phone = false }: { phone?: boolean }) {
     <section className={phone ? "pc-section" : "today-section agents-section"} data-testid="proactive" aria-labelledby="proactive-heading">
       <div className={phone ? "pc-section-head" : "section-heading"}>
         <h2 id="proactive-heading" className={phone ? "pc-h2" : "eyebrow"}>Goals, schedules and monitors</h2>
-        {headline ? <span className="caption">{headline}</span> : null}
+        {headline ? <span className="caption" role="status" aria-live="polite" aria-atomic="true">{headline}</span> : null}
       </div>
+      {latestNoticeAnnouncement ? (
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {latestNoticeAnnouncement}
+        </div>
+      ) : null}
       {workstation ? <ProactiveCreate /> : null}
       {snapshot.away && live ? (
         <p className="caption" role="status">
@@ -51,8 +57,8 @@ export function Proactive({ phone = false }: { phone?: boolean }) {
               <div className="agent-run-title"><strong>{n.title}</strong><small>{n.category} · {clockText(n.at)}</small></div>
               <p className="caption">{n.text}</p>
               <div className="actions">
-                <button type="button" className={btn(true)} onClick={() => void store.ptaskCommand("proactive.notification.snooze", { key: n.key, minutes: 60 })}>Snooze 1 h</button>
-                <button type="button" className={btn(true)} onClick={() => void store.ptaskCommand("proactive.notification.dismiss", { key: n.key })}>Dismiss</button>
+                <button type="button" className={btn(true)} aria-label={`Snooze 1 h: ${n.title}`} onClick={() => void store.ptaskCommand("proactive.notification.snooze", { key: n.key, minutes: 60 })}>Snooze 1 h</button>
+                <button type="button" className={btn(true)} aria-label={`Dismiss: ${n.title}`} onClick={() => void store.ptaskCommand("proactive.notification.dismiss", { key: n.key })}>Dismiss</button>
               </div>
             </li>
           ))}
@@ -72,7 +78,17 @@ export function Proactive({ phone = false }: { phone?: boolean }) {
               {!workstation && live && row.label === "Waiting for approval" ? <p className="caption">Approve this on your PC.</p> : null}
               {row.controls.length ? (
                 <div className="actions">
-                  {row.controls.map(c => <button key={c} type="button" className={btn(c === "cancel" || c === "disable" || c === "reject")} onClick={() => act(c, row)}>{LABEL[c]}</button>)}
+                  {row.controls.map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={btn(c === "cancel" || c === "disable" || c === "reject")}
+                      aria-label={`${LABEL[c]} ${KIND[row.kind].toLowerCase()}: ${row.title}`}
+                      onClick={() => act(c, row)}
+                    >
+                      {LABEL[c]}
+                    </button>
+                  ))}
                 </div>
               ) : null}
             </li>
