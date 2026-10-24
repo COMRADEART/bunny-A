@@ -120,3 +120,33 @@ test("T9: a damaged or wrong-version installed database is refused, never repair
     rmSync(root, { recursive: true, force: true });
   }
 });
+test('T3R: real installed Host includes presentation stores in its marker and boots twice', { timeout: 30_000 }, async () => {
+  const { startHost } = await import('./http.server.ts');
+  const root = mkdtempSync(join(tmpdir(), 'bunny-installed-restart-'));
+  const workspace = mkdtempSync(join(tmpdir(), 'bunny-installed-workspace-'));
+  const initial = new HostDatabase(join(root, 'host.sqlite'));
+  installedTree(root, { schema:'bunny-state/2', stateRoot:root, databaseUserVersion:3, databaseSchemaSha256:schemaSha256(initial) });
+  initial.close();
+  const saved = process.env.BUNNY_STATE_LAYOUT;
+  process.env.BUNNY_STATE_LAYOUT = '2';
+  let host: Awaited<ReturnType<typeof startHost>> | undefined;
+  const sample = async () => ({ at:Date.now(), cpu:{utilization:null,clockMhz:null,temperatureC:null},memory:{usedBytes:0,availableBytes:1,totalBytes:1},gpus:[],notes:[] });
+  try {
+    for(let boot=0;boot<2;boot++) {
+      host = await startHost({dataDirectory:root,root,workspaceRoot:workspace,port:0,adapters:[],sample});
+      assert.doesNotThrow(()=>hostStatePaths(root,{BUNNY_STATE_LAYOUT:'2'}), `boot ${boot+1} preserves the final schema marker`);
+      const address = host.server.address();
+      assert.ok(address && typeof address === 'object');
+      const response = await fetch(`http://127.0.0.1:${address.port}/state`,{headers:{authorization:`Bearer ${host.token}`}});
+      assert.equal(response.status,200);
+      const state = await response.json();
+      assert.ok(state.uiTheme && state.widgets && state.proactive, 'real presentation stores are initialized');
+      await host.close(); host=undefined;
+    }
+  } finally {
+    await host?.close();
+    if(saved===undefined) delete process.env.BUNNY_STATE_LAYOUT; else process.env.BUNNY_STATE_LAYOUT=saved;
+    rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});
+    rmSync(workspace,{recursive:true,force:true,maxRetries:10,retryDelay:100});
+  }
+});

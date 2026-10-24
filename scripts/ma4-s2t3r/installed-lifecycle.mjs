@@ -1,0 +1,62 @@
+// Installed artifact lifecycle checks, against a dedicated TEST install only. No models or external services.
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { execFileSync, spawn } from 'node:child_process';
+const [installArg, outputArg] = process.argv.slice(2);
+if (!installArg || !outputArg) throw new Error('usage: installed-lifecycle.mjs <TEST install> <evidence.json>');
+const install = resolve(installArg), config = JSON.parse(readFileSync(join(install, 'install.json'), 'utf8'));
+if (!config.currentRelease.name.endsWith('-TEST') || config.hostPort !== 43191 || !install.includes('Bunny-S2T3R-Install')) throw new Error('Not the dedicated test installation.');
+const credentials = () => JSON.parse(readFileSync(join(config.stateRoot, 'credentials/credentials.json'), 'utf8'));
+const base = `http://127.0.0.1:${config.hostPort}`;
+const cmd = async (action, data = {}) => {
+  const r = await fetch(base + '/command', { method:'POST', headers:{authorization:`Bearer ${credentials().token}`,'content-type':'application/json',connection:'close'}, body:JSON.stringify({action,data}) });
+  const b = await r.json(); if (!r.ok) throw Error(`${action}: ${b.error}`); return b.data;
+};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const checks = [], check = (name, pass, detail = null) => { checks.push({ name, pass:!!pass, detail }); console.log(JSON.stringify(checks.at(-1))); };
+const until = async (fn, ms=30_000) => { const end=Date.now()+ms; while(Date.now()<end){const v=await fn();if(v)return v;await sleep(100);}return null; };
+const view = id => cmd('ptask.get', {id});
+const envelope = background => ({capabilities:['file.stat'],providers:['ollama'],models:[],projectScopes:['personal'],localOnly:true,sideEffects:false,background,budgets:{maxModelCalls:0,maxWallMs:60_000},expiresAt:Date.now()+3_600_000,grants:{files:[{root:'atlas',access:'read'}]}});
+const create = async title => cmd('ptask.create', {spec:{title,projectId:'personal',steps:[{id:'check',kind:'file.stat',input:{root:'atlas',path:'STATUS.md'}}],acceptance:{requiredSteps:['check']}},envelope:envelope(true)});
+try {
+  await until(async()=>!(await cmd('ptask.list')).uiAttached,45_000);
+  check('windows closed: Host reports no workstation UI',!(await cmd('ptask.list')).uiAttached);
+  const policy=(await cmd('ptask.list')).policy;
+  check('background and automatic restart off by default',!policy.background&&!policy.resumeOnStart);
+  const off=await create('Installed background-off fixture'); await cmd('ptask.approve',{id:off.id});
+  await sleep(2_000);
+  const paused=await view(off.id);
+  check('closed UI and background off blocks execution',['QUEUED','PAUSED'].includes(paused.state)&&!paused.evidence.length&&!(await cmd('ptask.list')).uiAttached,{state:paused.state,receipts:paused.evidence.length});
+  await cmd('ptask.policy',{policy:{...policy,background:true,resumeOnStart:false}});
+  if(paused.state==='PAUSED') await cmd('ptask.resume',{id:off.id});
+  const done=await until(async()=>{const t=await view(off.id);return ['COMPLETED','FAILED'].includes(t.state)&&t;});
+  check('explicit background opt-in completes authorized file task with no UI',done?.state==='COMPLETED'&&done.evidence.length===1,{state:done?.state,receipts:done?.evidence.length});
+  const held=await create('Installed durable pending fixture');
+  check('unapproved background task waits for owner',held.state==='AWAITING_APPROVAL',{state:held.state});
+  const old=credentials(), health=await (await fetch(base+'/health')).json();
+  if(health.pid!==old.pid||health.instanceId!==old.instanceId)throw Error('Host identity mismatch');
+  const ps=`$p=Get-CimInstance Win32_Process -Filter 'ProcessId=${old.pid}'; if($p){[pscustomobject]@{path=$p.ExecutablePath;line=$p.CommandLine}|ConvertTo-Json -Compress}`;
+  const identity=JSON.parse(execFileSync('powershell.exe',['-NoProfile','-Command',ps],{encoding:'utf8'}));
+  if(identity.path.toLowerCase()!==join(config.currentRelease.folder,'runtime/node.exe').replaceAll('/','\\').toLowerCase()||!identity.line.includes('Bunny-Host.mjs'))throw Error('Installed process mismatch');
+  process.kill(old.pid); const down=await until(async()=>{try{await fetch(base+'/health',{signal:AbortSignal.timeout(500)});return false;}catch{return true;}});
+  check('only the identified test Host stops',!!down);
+  const t0=Date.now();
+  const launcher=spawn(join(process.env.WINDIR,'System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-ExecutionPolicy','Bypass','-File',join(config.currentRelease.folder,'Start-Bunny-Release.ps1'),'-InstallConfig',join(install,'install.json'),'-NoIsland','-NoRemote'],{stdio:'ignore',windowsHide:true,env:{...process.env,PSModulePath:join(process.env.WINDIR,'System32/WindowsPowerShell/v1.0/Modules'),USERPROFILE:join(install,'../isolated-user'),APPDATA:join(install,'../isolated-user/Roaming'),LOCALAPPDATA:join(install,'../isolated-user/Local'),PATH:process.env.WINDIR+'\\System32;'+join(config.currentRelease.folder,'runtime')}});
+  let launchError = null; launcher.on("error", e => { launchError = e; }); launcher.unref();
+  const ready=await until(async()=>{try{const h=await(await fetch(base+'/health')).json();return h.pid!==old.pid&&h;}catch{return false;}},120_000);
+  check('installed launcher recovers Host with a new PID',!!ready,{ms:Date.now()-t0,error:launchError?.message??null});
+  if(!ready) throw Error('Installed Host restart failed.');
+  const after=await view(held.id), prior=await view(off.id);
+  check('pending authority is preserved, never silently approved',after.state==='AWAITING_APPROVAL',{state:after.state});
+  check('completed task and its receipt survive restart without replay',prior.state==='COMPLETED'&&prior.evidence.length===1,{state:prior.state,receipts:prior.evidence.length});
+  await cmd('ptask.cancel',{id:held.id});
+  check('cancellation of held task persists',(await view(held.id)).state==='CANCELLED');
+  const proactive=await cmd('proactive.list');
+  check('UI-created goal, schedule and monitor survive Host restart',proactive.goals.some(g=>g.title==='Installed qualification goal')&&proactive.schedules.some(s=>s.title==='Installed one-time reminder')&&proactive.monitors.some(m=>m.title==='Installed build watch'));
+  await cmd('ptask.policy',{policy});
+  check('background and startup opt-ins returned to defaults',!(await cmd('ptask.list')).policy.background&&!(await cmd('ptask.list')).policy.resumeOnStart);
+} catch(e){check('lifecycle driver completed',false,String(e.message));}
+finally { try { await cmd('ptask.policy',{policy:{background:false,resumeOnStart:false}}); } catch {} }
+mkdirSync(join(resolve(outputArg),'..'),{recursive:true});
+writeFileSync(outputArg,JSON.stringify({at:new Date().toISOString(),sourceCommit:config.currentRelease.sourceCommit,package:config.currentRelease.name,checks,failed:checks.filter(c=>!c.pass).length,note:'Installed production entry, real SQLite/Host, bounded synthetic file.stat task. Running-model cancellation and physical UI drag are separate checks.'},null,2)+'\n');
+process.exitCode=checks.some(c=>!c.pass)?1:0;
