@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildGoal, buildMonitor, buildSchedule, endOfDay, templateSteps, type GoalDraft, type MonitorDraft, type ScheduleDraft } from "./proactive-forms.ts";
+import { buildGoal, buildMonitor, buildSchedule, endOfDay, folderId, templateSteps, type GoalDraft, type MonitorDraft, type ScheduleDraft } from "./proactive-forms.ts";
 import { GoalSpecSchema, MonitorSpecSchema, ScheduleSpecSchema } from "../../lib/bunny-host/ma4/proactive.ts";
 
 const NOW = new Date(2026, 9, 24, 12, 0).getTime();
@@ -30,7 +30,7 @@ test("S2-T3R forms: a valid goal, schedule and monitor become specs the Host sch
   }
 });
 
-test("S2-T3R forms: the summarize template is the smallest team — reads, Worker, optional Reviewer — and grants only that folder", () => {
+test("S2-T3R forms: the summarize template is the smallest team â€” reads, Worker, optional Reviewer â€” and grants only that folder", () => {
   assert.deepEqual(templateSteps(sched).map(s => s.kind), ["file.read", "file.read", "local.generate", "local.review"]);
   assert.deepEqual(templateSteps({ ...sched, review: false }).map(s => s.kind), ["file.read", "file.read", "local.generate"]);
   assert.deepEqual(templateSteps({ ...sched, task: "check" }).map(s => s.kind), ["file.stat", "file.stat"]);
@@ -56,4 +56,13 @@ test("S2-T3R forms: field messages instead of a request for missing, impossible 
   assert.equal(m.ok, false);
   if (!m.ok) assert.deepEqual(Object.keys(m.errors).sort(), ["everyMinutes", "field", "label"]);
   assert.equal(endOfDay("2026-02-29"), null); assert.notEqual(endOfDay("2028-02-29"), null);
+});
+
+test("T3R1-U1 a folder name becomes a Host-valid, unique folder id", () => {
+  const valid = /^[a-z][a-z0-9-]{0,39}$/;
+  for (const [label, want] of [["Atlas project", "atlas-project"], ["2026 Reports", "f-2026-reports"], ["  ### ", "folder"], ["ÃœnÃ¯code Dir", "n-code-dir"]] as const) {
+    assert.equal(folderId(label, []), want); assert.match(folderId(label, []), valid);
+  }
+  assert.equal(folderId("Atlas", ["atlas", "atlas-2"]), "atlas-3");
+  assert.match(folderId("x".repeat(80), []), valid);
 });
