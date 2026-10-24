@@ -2,7 +2,7 @@ import { z } from "zod";
 import { composeTeam } from "./coordinator.ts";
 import type { ModelCall } from "./coding-workflow.server.ts";
 import { RESULT_SCHEMA } from "./action-broker.server.ts";
-import { TaskSpecSchema, validateTask, type Envelope, type ExecutorFacts, type TaskSpec } from "./task-runtime.ts";
+import { ID_PATTERN, TaskSpecSchema, validateTask, type Envelope, type ExecutorFacts, type TaskSpec } from "./task-runtime.ts";
 import type { Executor, StepContext } from "./task-runtime.server.ts";
 
 /**
@@ -60,7 +60,7 @@ export type Plan = { ok: true; spec: TaskSpec; team: string[]; problems: [] } | 
  */
 export function planSchema(catalog: readonly CatalogEntry[], facts: ReadonlyMap<string, ExecutorFacts>, envelope: Envelope): Record<string, unknown> | null {
   const branches = catalog.filter(c => envelope.capabilities.includes(c.kind) && (!facts.get(c.kind)?.gpu || envelope.models.length)).map(c => ({ type: "object",
-    properties: { id: { type: "string" }, kind: { enum: [c.kind] }, input: c.input ?? { type: "object" }, model: facts.get(c.kind)?.gpu ? { enum: [...envelope.models] } : { type: "null" } },
+    properties: { id: { type: "string", pattern: ID_PATTERN.source }, kind: { enum: [c.kind] }, input: c.input ?? { type: "object" }, model: facts.get(c.kind)?.gpu ? { enum: [...envelope.models] } : { type: "null" } },
     required: ["id", "kind", "input", "model"] }));
   if (!branches.length) return null;
   return { type: "object", properties: { title: { type: "string" }, steps: { type: "array", items: branches.length === 1 ? branches[0] : { anyOf: branches } } }, required: ["title", "steps"] };

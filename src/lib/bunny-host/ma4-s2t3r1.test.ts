@@ -21,7 +21,10 @@ test("T3R1-P1 the Planner's format allows only granted actions with their own in
     assert.deepEqual(Object.keys(k).sort(), ["file.read", "local.generate", "local.review"]);
     assert.equal(k["file.read"].properties.model.type, "null");
     for (const kind of ["local.generate", "local.review"]) assert.deepEqual(k[kind].properties.model.enum, [MODEL]);
-    for (const b of Object.values(k)) assert.ok(b.required.includes("model"), "model is always stated, never left out");
+    for (const b of Object.values(k)) {
+      assert.ok(b.required.includes("model"), "model is always stated, never left out");
+      assert.equal((b.properties as unknown as { id: { pattern: string } }).id.pattern, "^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$", "step ids follow the Host's id rule");
+    }
     // The connector's own contract: maxChars is an optional integer (left out, never null); unknown fields are not allowed.
     const read = k["file.read"].properties.input;
     assert.equal(read.properties!.maxChars.type, "integer"); assert.deepEqual(read.required, ["root", "path"]); assert.equal(read.additionalProperties, false);
