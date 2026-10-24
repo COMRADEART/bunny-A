@@ -218,6 +218,13 @@ export const READ_ACTIONS = new Set([
   "goal.preview",
   "schedule.preview",
   "monitor.preview",
+  "feedback.status",
+  "feedback.preview",
+  "feedback.list",
+  "feedback.export",
+  "onboarding.get",
+  "notification.decide",
+  "diagnostics.health",
 ]);
 export const isMutating = (action: string) => !READ_ACTIONS.has(action);
 

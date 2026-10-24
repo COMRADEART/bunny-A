@@ -177,6 +177,7 @@ public final class MainActivity extends Activity {
         progress.setMax(100);
         root.addView(progress, new LinearLayout.LayoutParams(-1, dp(4)));
         web = new WebView(this);
+        web.addJavascriptInterface(new BunnyNotifications(this, url, web), "BunnyNotify");
         web.setBackgroundColor(BG);
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);

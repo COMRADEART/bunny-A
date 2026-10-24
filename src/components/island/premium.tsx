@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { deviceStatusPresentation, projectDeviceDiagnostics } from "@/lib/bunny-host/ma4/native-notifications";
 import { useRouterState } from "@tanstack/react-router";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ThemedDialogContent, useAmbient, useDocumentTheme, useThemeScope } from "./theme";
@@ -811,16 +812,29 @@ function DevicesWorkspace() {
           {store.devices.length ? (
             <section className="t8-surface paired-devices">
               <h2>Paired devices</h2>
-              {store.devices.map((device) => (
+              {store.devices.map((device) => {
+                const diag = projectDeviceDiagnostics({ ...device, revoked: device.revoked === true }, Date.now());
+                const status = deviceStatusPresentation(diag);
+                const guidance = status.label === "Revoked"
+                  ? "This phone can no longer supervise tasks. Pairing again needs a new code."
+                  : status.label === "Pairing expired"
+                    ? "The pairing lifetime ended. Create a new code on this PC."
+                    : status.label === "Offline"
+                      ? "Bunny-A has not heard from this phone recently. Open the app while this computer is reachable."
+                      : status.label === "Reconnecting"
+                        ? "The phone is trying to reach this Host again."
+                        : "The phone can supervise tasks the Host allows.";
+                return (
                 <div className="paired-device-row" key={device.id}>
                   <Smartphone size={16} />
                   <span>
-                    <strong className="wrap-anywhere">{device.name}</strong>
+                    <strong className="wrap-anywhere">{diag.name}</strong>
                     <small>
-                      Paired {when(device.createdAt)} · last seen {when(device.lastSeenAt)} · expires{" "}
-                      {when(device.expiresAt)}
+                      {status.label} · authority {status.authority} · observed {status.observed} · last seen {when(diag.lastSeenAt)} · pairing ends {when(diag.expiresAt)}
                     </small>
+                    <small>{guidance}</small>
                   </span>
+                  {status.label === "Revoked" ? <span className="caption">Revoked</span> : (
                   <button
                     className="btn quiet danger-text"
                     disabled={!store.canAct()}
@@ -831,8 +845,10 @@ function DevicesWorkspace() {
                   >
                     Revoke access
                   </button>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </section>
           ) : null}
         </>

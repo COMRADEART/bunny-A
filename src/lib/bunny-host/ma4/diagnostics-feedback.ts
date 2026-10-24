@@ -354,6 +354,15 @@ export class LocalBetaFeedbackStore {
     this.persist();
   }
 
+  /** Removes one saved entry. Returns false when the id is unknown. Opt-in is not required to delete. */
+  deleteEntry(id: string): boolean {
+    const next = this.entries.filter((entry) => entry.id !== id);
+    if (next.length === this.entries.length) return false;
+    this.entries = next;
+    this.persist();
+    return true;
+  }
+
   private load(): void {
     if (!this.filePath || !existsSync(this.filePath)) return;
     try {

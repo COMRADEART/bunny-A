@@ -35,12 +35,7 @@ import type { SessionLedgerView } from "@/lib/bunny-host/session-ledger";
 import type { SchedulerView } from "@/lib/bunny-host/fairness";
 import type { RoutingLearningView } from "@/lib/bunny-host/routing-feedback";
 import { notificationAllowed, type VoicePersonalizationView } from "@/lib/bunny-host/voice/voice-personalization";
-import {
-  DEFAULT_NATIVE_NOTIFICATION_PREFS,
-  evaluateNativeNotification,
-  type NativeNotificationCategory,
-  type NativeNotificationPrefs,
-} from "@/lib/bunny-host/ma4/native-notifications";
+import { mapEventToNativeCategory, parseAndroidBridgeMessage } from "@/lib/bunny-host/ma4/native-notifications";
 import type { CharacterAppearanceView } from "@/lib/bunny-host/character-style";
 import {
   resolveVariant,
@@ -230,6 +225,7 @@ type Island = Preferences & {
     createdAt: number;
     expiresAt?: number;
     lastSeenAt?: number | null;
+    revoked?: boolean;
   }[];
   revokeDevice: (id: string) => void;
   pairCode: string | null;
@@ -262,6 +258,8 @@ type Island = Preferences & {
   persistentTasks: NonNullable<HostSnapshot["persistentTasks"]> | null;
   /** One `ptask.*` command; the Host's answer or null when refused. */
   ptaskCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** Workstation commands for onboarding, feedback, diagnostics and notification policy. */
+  ownerCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
   /** MA4-S2-T3 goals, schedules, monitors and proactive notifications (null until a Host that knows them answers). */
   proactive: NonNullable<HostSnapshot["proactive"]> | null;
   /** M-A-3 T13.3 Gate G: routing-improvement evidence and policy lifecycle (workstation only; null on devices). */
@@ -581,61 +579,8 @@ function newOperationId(): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-/** Session-scoped dedup for evaluateNativeNotification (MA4-S3-T0). Not durable across reloads — Host ledgers remain authoritative. */
-const deliveredNativeKeys = new Set<string>();
-const NATIVE_PREFS_KEY = "bunny-a.native-notifications.v1";
-function readNativePrefs(): NativeNotificationPrefs {
-  try {
-    if (typeof localStorage === "undefined") return DEFAULT_NATIVE_NOTIFICATION_PREFS;
-    const raw = JSON.parse(localStorage.getItem(NATIVE_PREFS_KEY) ?? "null") as Partial<NativeNotificationPrefs> | null;
-    if (!raw || typeof raw !== "object") return DEFAULT_NATIVE_NOTIFICATION_PREFS;
-    return {
-      ...DEFAULT_NATIVE_NOTIFICATION_PREFS,
-      ...raw,
-      categories: { ...DEFAULT_NATIVE_NOTIFICATION_PREFS.categories, ...(raw.categories ?? {}) },
-      quietHours: { ...DEFAULT_NATIVE_NOTIFICATION_PREFS.quietHours, ...(raw.quietHours ?? {}) },
-    };
-  } catch {
-    return DEFAULT_NATIVE_NOTIFICATION_PREFS;
-  }
-}
-function mapEventToNativeCategory(type: string): NativeNotificationCategory | null {
-  if (type === "approval.required" || type === "mission.approval_required" || type === "mission.permission_required" || type === "agent.waiting_for_approval") return "approval_needed";
-  if (type === "task.completed" || type === "mission.completed" || type === "ptask.notification") return "task_completed";
-  if (type === "task.failed" || type === "mission.failed") return "task_failed";
-  if (type === "proactive.notification") return "schedule_triggered";
-  if (type === "agent.waiting_for_input") return "recovery_needed";
-  return null;
-}
-/**
- * Session browser Notification delivery gated by evaluateNativeNotification.
- * OS tray/toast and Android push remain NOT IMPLEMENTED — this never claims otherwise.
- * Android WebView throws for Notification; in-app badges still surface Host evidence.
- */
-function notify(body: string, tag: string, type: string) {
-  try {
-    const category = mapEventToNativeCategory(type);
-    if (!category) return;
-    const stored = readNativePrefs();
-    // Browser Notification.permission remains the session opt-in (settings UI). Stored prefs add quiet hours / categories / explicit disable.
-    const permissionGranted =
-      typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
-    const prefs: NativeNotificationPrefs = {
-      ...stored,
-      enabled: stored.enabled || permissionGranted,
-    };
-    const decision = evaluateNativeNotification(
-      { category, sourceId: tag.slice(0, 80), revision: 1, title: "Bunny-A", detail: body, localHour: new Date().getHours() },
-      prefs,
-      deliveredNativeKeys,
-    );
-    if (!decision.deliver || !permissionGranted) return;
-    new Notification(decision.bannerTitle, { body: decision.bannerBody, tag: decision.dedupKey });
-  } catch {
-    /* Unsupported constructor (mobile): the in-app attention badge still shows it. */
-  }
-}
 export const useIsland = create<Island>((set, get) => {
+  let deliverNative: (event: HostEvent) => void = () => {};
   let requestOrder = 0,
     appliedOrder = 0,
     disconnected = false;
@@ -958,11 +903,7 @@ export const useIsland = create<Island>((set, get) => {
       ) {
         if (event.type === "thermal.warning") get().note(event.detail);
         if (event.type === "thermal.warning") continue;
-        if (notificationAllowed(event.type, get().voicePersonalization?.preferences.notificationFrequency ?? "all")) notify(
-          event.detail?.slice?.(0, 140) || event.type.replaceAll(".", " "),
-          event.taskId ?? event.missionId ?? event.type,
-          event.type,
-        );
+        if (notificationAllowed(event.type, get().voicePersonalization?.preferences.notificationFrequency ?? "all")) deliverNative(event);
       }
   };
   /** Revoked, expired or unpaired: stop retrying and drop every protected projection from memory. */
@@ -1157,6 +1098,25 @@ export const useIsland = create<Island>((set, get) => {
     if (result.code === "HOST_EPOCH_CHANGED" || result.code === "HOST_IDENTITY_CHANGED")
       void get().refreshOllama();
     return null;
+  };
+  deliverNative = (event) => {
+    if (!mapEventToNativeCategory(event.type)) return;
+    const bridge = typeof window === "undefined" ? undefined : (window as Window & { BunnyNotify?: { post: (json: string) => void } }).BunnyNotify;
+    const browserOk = typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
+    if (!bridge?.post && !browserOk) return;
+    void (async () => {
+      const answer = await command("notification.decide", { sequence: event.sequence }, null);
+      const payload = answer?.data as { decision?: { deliver?: boolean; dedupKey?: string; bannerTitle?: string; bannerBody?: string }; category?: string } | null;
+      const decision = payload?.decision;
+      if (!decision?.deliver || !decision.dedupKey || !decision.bannerTitle || !payload?.category) return;
+      const message = { id: decision.dedupKey, title: decision.bannerTitle, body: decision.bannerBody ?? "", category: payload.category };
+      if (bridge?.post) {
+        const parsed = parseAndroidBridgeMessage(message, true);
+        if (parsed.ok) bridge.post(JSON.stringify({ id: parsed.id, title: parsed.title, body: parsed.body, category: parsed.category }));
+        return;
+      }
+      try { new Notification(decision.bannerTitle, { body: decision.bannerBody, tag: decision.dedupKey }); } catch { /* the in-app notice still shows the Host event */ }
+    })();
   };
   const agentRevision = (id: string) =>
     get().agents?.agents.find((agent) => agent.id === id)?.authorization?.revision;
@@ -1389,6 +1349,7 @@ export const useIsland = create<Island>((set, get) => {
     persistentTasks: null,
     proactive: null,
     ptaskCommand: (action, data, onRefused) => command(action, data, typeof data.id === "string" ? data.id : "ptask", onRefused),
+    ownerCommand: (action, data, onRefused) => command(action, data, null, onRefused),
     personalAgents: null,
     personalAgentContext: null,
     personalAgentCommand: (action, data, onRefused) => command(action, data, "personal-agent", onRefused),
