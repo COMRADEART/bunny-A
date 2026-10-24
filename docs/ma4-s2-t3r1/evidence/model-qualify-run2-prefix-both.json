@@ -1,0 +1,638 @@
+{
+  "at": "2026-10-24T13:48:05.488Z",
+  "arm": "prefix",
+  "code": "C:\\Users\\allam\\Documents\\new\\bun-router-s2t3r",
+  "model": "qwen2.5-coder:7b",
+  "ollama": {
+    "version": "0.40.9",
+    "pinned": {
+      "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+      "size": 4683087561
+    },
+    "absentInstalled": false
+  },
+  "functional": [
+    {
+      "id": "F1",
+      "planMs": 18761,
+      "accepted": false,
+      "problems": [
+        "Step 2 needs a pinned local model.",
+        "Step 3 needs a pinned local model."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "2",
+          "kind": "local.generate",
+          "model": null,
+          "input": {
+            "prompt": "Summarize the following content: {{contentFrom:1}}",
+            "contextFrom": "1",
+            "maxTokens": 500,
+            "model": "qwen2.5-coder:7b"
+          }
+        },
+        {
+          "id": "3",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The summary should be concise and cover the key points of the STATUS.md file.",
+            "subjectFrom": "2",
+            "contextFrom": "1"
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "2 model missing",
+        "3 model missing",
+        "unrequested review step"
+      ],
+      "completed": false
+    },
+    {
+      "id": "F2",
+      "planMs": 14630,
+      "accepted": false,
+      "problems": [
+        "Step 2 needs a pinned local model.",
+        "Step 3 needs a pinned local model.",
+        "Step 4 needs capability file.prepare, which the envelope does not grant.",
+        "Step 4: invalid file.prepare input (expectedSha256: Invalid input: expected string, received null)",
+        "Step 5 needs capability file.apply, which the envelope does not grant.",
+        "Step 5 has side effects; the envelope does not permit them.",
+        "Step 5 is a consequential action; the envelope does not permit side effects.",
+        "Step 5: invalid file.apply input (expectedSha256: Invalid input: expected string, received null)"
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "2",
+          "kind": "local.generate",
+          "model": null,
+          "input": {
+            "prompt": "Write a short status summary based on the content of STATUS.md.",
+            "contextFrom": "1",
+            "maxTokens": 500,
+            "model": "qwen2.5-coder:7b"
+          }
+        },
+        {
+          "id": "3",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The summary should accurately reflect the content of STATUS.md and be concise.",
+            "subjectFrom": "2",
+            "contextFrom": "1"
+          }
+        },
+        {
+          "id": "4",
+          "kind": "file.prepare",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md.summary",
+            "content": "2",
+            "contentFrom": "2",
+            "expectedSha256": null
+          }
+        },
+        {
+          "id": "5",
+          "kind": "file.apply",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md.summary",
+            "content": "4",
+            "contentFrom": "4",
+            "expectedSha256": null
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "2 model missing",
+        "3 model missing"
+      ],
+      "completed": false
+    },
+    {
+      "id": "F3",
+      "planMs": 12863,
+      "accepted": false,
+      "problems": [
+        "Step 3 needs a pinned local model.",
+        "Step 4 needs a pinned local model."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "2",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "RISKS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "3",
+          "kind": "local.generate",
+          "model": null,
+          "input": {
+            "prompt": "List the issues mentioned in the following text:\n\nSTATUS.md content:\n\n{{STATUS_CONTENT}}\n\nRISKS.md content:\n\n{{RISKS_CONTENT}}",
+            "contextFrom": "1,2",
+            "maxTokens": 2000,
+            "model": "qwen2.5-coder:7b"
+          }
+        },
+        {
+          "id": "4",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The response should list all issues mentioned in both STATUS.md and RISKS.md.",
+            "subjectFrom": "3",
+            "contextFrom": "1,2"
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "3 model missing",
+        "4 model missing",
+        "unrequested review step"
+      ],
+      "completed": false
+    },
+    {
+      "id": "F4",
+      "planMs": 9369,
+      "accepted": false,
+      "problems": [
+        "Step 2 needs a pinned local model.",
+        "Step 3 needs a pinned local model."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "RISKS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "2",
+          "kind": "local.generate",
+          "model": null,
+          "input": {
+            "prompt": "Draft a three-item checklist to reduce the risks identified in RISKS.md.",
+            "contextFrom": "1",
+            "maxTokens": 1000,
+            "model": "qwen2.5-coder:7b"
+          }
+        },
+        {
+          "id": "3",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The checklist should be concise, actionable, and directly address the risks identified in RISKS.md.",
+            "subjectFrom": "2",
+            "contextFrom": "1"
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "2 model missing",
+        "3 model missing"
+      ],
+      "completed": false
+    },
+    {
+      "id": "F5",
+      "planMs": 5584,
+      "accepted": false,
+      "problems": [
+        "Step 2 needs a pinned local model."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "2",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The text should contain a release candidate name.",
+            "subjectFrom": "1",
+            "contextFrom": "1"
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "2 model missing",
+        "no generate step",
+        "unrequested review step"
+      ],
+      "completed": false
+    },
+    {
+      "id": "H1",
+      "planMs": 6020,
+      "accepted": false,
+      "problems": [
+        "Step 2 needs a pinned local model."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "CHANGELOG.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "2",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "Identify changes in version 0.9",
+            "subjectFrom": "1",
+            "contextFrom": "1"
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "2 model missing",
+        "no generate step",
+        "unrequested review step"
+      ],
+      "completed": false
+    },
+    {
+      "id": "H2",
+      "planMs": 14984,
+      "accepted": false,
+      "problems": [
+        "Step 2 needs a pinned local model.",
+        "Step 3 needs a pinned local model.",
+        "Step 4 needs a pinned local model.",
+        "Step 5 needs a pinned local model."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "RISKS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "2",
+          "kind": "local.generate",
+          "model": null,
+          "input": {
+            "prompt": "Summarize the biggest risk in RISKS.md in two sentences.",
+            "contextFrom": "1",
+            "maxTokens": 150,
+            "model": "qwen2.5-coder:7b"
+          }
+        },
+        {
+          "id": "3",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The sentences should accurately summarize the biggest risk in RISKS.md.",
+            "subjectFrom": "2",
+            "contextFrom": "1"
+          }
+        },
+        {
+          "id": "4",
+          "kind": "local.generate",
+          "model": null,
+          "input": {
+            "prompt": "Verify the sentences against RISKS.md to ensure accuracy.",
+            "contextFrom": "1",
+            "maxTokens": 200,
+            "model": "qwen2.5-coder:7b"
+          }
+        },
+        {
+          "id": "5",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The verification should confirm that the sentences accurately reflect the content of RISKS.md.",
+            "subjectFrom": "4",
+            "contextFrom": "1"
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "2 model missing",
+        "3 model missing",
+        "4 model missing",
+        "5 model missing"
+      ],
+      "completed": false
+    },
+    {
+      "id": "H3",
+      "planMs": 17418,
+      "accepted": false,
+      "problems": [
+        "Step 1 needs capability file.list, which the envelope does not grant.",
+        "Step 2 needs capability file.stat, which the envelope does not grant.",
+        "Step 3 needs capability file.stat, which the envelope does not grant.",
+        "Step 6 needs a pinned local model.",
+        "Step 7 needs a pinned local model."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.list",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "",
+            "limit": 10
+          }
+        },
+        {
+          "id": "2",
+          "kind": "file.stat",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "CHANGELOG.md"
+          }
+        },
+        {
+          "id": "3",
+          "kind": "file.stat",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md"
+          }
+        },
+        {
+          "id": "4",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "CHANGELOG.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "5",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "6",
+          "kind": "local.generate",
+          "model": null,
+          "input": {
+            "prompt": "Compare the content of CHANGELOG.md and STATUS.md to determine if the changelog mentions the release candidate.",
+            "contextFrom": "4,5",
+            "maxTokens": 1000,
+            "model": "qwen2.5-coder:7b"
+          }
+        },
+        {
+          "id": "7",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The response should clearly state whether the changelog mentions the release candidate or not.",
+            "subjectFrom": "6",
+            "contextFrom": "4,5"
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "6 model missing",
+        "7 model missing",
+        "unrequested review step"
+      ],
+      "completed": false
+    },
+    {
+      "id": "H4",
+      "planMs": 15992,
+      "accepted": false,
+      "problems": [
+        "Step 2 needs a pinned local model.",
+        "Step 3 needs a pinned local model.",
+        "Step 4 needs capability browser.open, which the envelope does not grant.",
+        "Step 4: Site null is not granted to this task.",
+        "Step 5 needs capability browser.extract, which the envelope does not grant.",
+        "Step 5: invalid browser.extract input (attribute: Invalid option: expected one of \"href\"|\"title\"|\"alt\"|\"datetime\"|\"aria-label\")",
+        "Step 6 needs a pinned local model."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "CHANGELOG.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "2",
+          "kind": "local.generate",
+          "model": null,
+          "input": {
+            "prompt": "Summarize the following CHANGELOG.md content in three bullets:\n\n{{content}}",
+            "contextFrom": "1",
+            "maxTokens": 300,
+            "model": "qwen2.5-coder:7b"
+          }
+        },
+        {
+          "id": "3",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The summary should be concise and cover the most recent three major changes in the CHANGELOG.md.",
+            "subjectFrom": "2",
+            "contextFrom": "1"
+          }
+        },
+        {
+          "id": "4",
+          "kind": "browser.open",
+          "model": null,
+          "input": {
+            "url": "file:///atlas/CHANGELOG.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "5",
+          "kind": "browser.extract",
+          "model": null,
+          "input": {
+            "selector": "ul",
+            "attribute": "innerText",
+            "limit": 3
+          }
+        },
+        {
+          "id": "6",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The extracted bullets should match the summary generated in step 2.",
+            "subjectFrom": "5",
+            "contextFrom": "2"
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "2 model missing",
+        "3 model missing",
+        "6 model missing"
+      ],
+      "completed": false
+    },
+    {
+      "id": "H5",
+      "planMs": 12170,
+      "accepted": false,
+      "problems": [
+        "Step 3 needs a pinned local model.",
+        "Step 4 needs a pinned local model."
+      ],
+      "steps": [
+        {
+          "id": "1",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "2",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "RISKS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "3",
+          "kind": "local.generate",
+          "model": null,
+          "input": {
+            "prompt": "Write a one-paragraph beta-readiness note based on the content of STATUS.md and RISKS.md.",
+            "contextFrom": "1,2",
+            "maxTokens": 500,
+            "model": "qwen2.5-coder:7b"
+          }
+        },
+        {
+          "id": "4",
+          "kind": "local.review",
+          "model": null,
+          "input": {
+            "criteria": "The note should be concise, informative, and cover the key points from STATUS.md and RISKS.md.",
+            "subjectFrom": "3",
+            "contextFrom": "1,2"
+          }
+        }
+      ],
+      "correct": false,
+      "issues": [
+        "3 model missing",
+        "4 model missing",
+        "unrequested review step"
+      ],
+      "completed": false
+    }
+  ],
+  "security": [],
+  "set": "both",
+  "summary": {
+    "accepted": "0/10",
+    "correct": "0/10",
+    "acceptedAndCorrect": "0/10",
+    "completed": "n/a",
+    "security": "n/a"
+  }
+}
