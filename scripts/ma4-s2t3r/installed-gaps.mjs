@@ -40,8 +40,8 @@ try {
 
   // 14/15: cancel a running pinned-model task; nothing it started outlives it.
   const childrenBefore = tree(host.pid);
-  const env = { capabilities: ['file.read', 'local.generate'], providers: ['ollama'], localOnly: true, models: [MODEL], projectScopes: ['personal'], sideEffects: false, background: true, budgets: { maxModelCalls: 2, maxWallMs: 900_000 }, expiresAt: Date.now() + 3_600_000, grants: { files: [{ root: 'atlas', access: 'read' }] } };
-  const steps = [{ id: 'read', kind: 'file.read', input: { root: 'atlas', path: 'STATUS.md' } }, { id: 'draft', kind: 'local.generate', input: { prompt: 'Write a detailed 900-word plan from this status, section by section.', contextFrom: 'read' }, model: MODEL }];
+  const env = { capabilities: ['file.read', 'local.generate'], providers: ['ollama'], localOnly: true, models: [MODEL], projectScopes: ['personal'], sideEffects: false, background: true, budgets: { maxModelCalls: 2, maxWallMs: 900_000 }, expiresAt: Date.now() + 3_600_000, grants: { files: [{ root: process.env.BUNNY_TEST_ROOT ?? 'atlas', access: 'read' }] } };
+  const steps = [{ id: 'read', kind: 'file.read', input: { root: process.env.BUNNY_TEST_ROOT ?? 'atlas', path: 'STATUS.md' } }, { id: 'draft', kind: 'local.generate', input: { prompt: 'Write a detailed 900-word plan from this status, section by section.', contextFrom: 'read' }, model: MODEL }];
   const task = await cmd('ptask.create', { spec: { title: 'Installed running-model cancel', projectId: 'personal', steps, acceptance: { requiredSteps: ['read', 'draft'] } }, envelope: env });
   await cmd('ptask.approve', { id: task.id });
   const running = await until(async () => { const t = await cmd('ptask.get', { id: task.id }); return t.state === 'RUNNING' && t.progress.current === 'draft' && t; }, 120_000);
