@@ -1281,7 +1281,7 @@ async function openHost(
           throw new CommandRefusedError("Remote approval can only answer the exact Host offer.");
         extra = await agentCommand(agents, input.action, data, actor);
       } else if (typeof input.action === "string" && PTASK_ACTIONS.has(input.action)) {
-        extra = { data: await ptaskCommand(ptasks, input.action, data, actor, connected) };
+        extra = { data: await ptaskCommand(ptasks, input.action, data, actor, connected, proactive) };
       } else if (typeof input.action === "string" && PROACTIVE_ACTIONS.has(input.action)) {
         extra = { data: await proactiveCommand(proactive, input.action, data, actor) };
       } else if (typeof input.action === "string" && VOICE_ACTIONS.has(input.action)) {

@@ -174,6 +174,7 @@ export class ProactiveStore {
 
   // ── occurrences ───────────────────────────────────────────────────────────────────────────────────────────────────
   occurrence(key: string): Occurrence | null { const r = this.db.prepare("SELECT * FROM ma4_occurrences WHERE key=?").get(key) as OccRow | undefined; return r ? occ(r) : null; }
+  occurrenceOfTask(taskId: string): Occurrence | null { const r = this.db.prepare("SELECT * FROM ma4_occurrences WHERE task_id=? LIMIT 1").get(taskId) as OccRow | undefined; return r ? occ(r) : null; }
   occurrences(scheduleId: string, limit = 20): Occurrence[] { return (this.db.prepare("SELECT * FROM ma4_occurrences WHERE schedule_id=? ORDER BY at DESC,key LIMIT ?").all(scheduleId, limit) as OccRow[]).map(occ); }
   openOccurrences(): Occurrence[] { return (this.db.prepare("SELECT * FROM ma4_occurrences WHERE settled=0 ORDER BY at,key").all() as OccRow[]).map(occ); }
   occurrencesSince(since: number): Occurrence[] { return (this.db.prepare("SELECT * FROM ma4_occurrences WHERE at>=? ORDER BY at,key").all(since) as OccRow[]).map(occ); }
