@@ -3,7 +3,9 @@
 **Product:** Bunny A by LOKAM  
 **Milestone:** MA4-S3-T0 Unified Product Foundation  
 **Branch:** `ma4-s3-t0-unified-foundation`  
-**Integration merge:** `5e6c7e956a9c8271939bd93722b2d59107d4e9c9` (main + T8 + local remediation `e7d3bf2`)
+**Integration merge:** `5e6c7e956a9c8271939bd93722b2d59107d4e9c9` (main + T8 + local remediation `e7d3bf2`)  
+**Candidate tip:** `f5577389a0eaffb8520399e0a1104822f1987cdc`  
+**Pull request:** https://github.com/COMRADEART/bunny-A/pull/35
 
 ## What we did
 
@@ -24,6 +26,12 @@
 - Did not replace 7-step onboarding with 10-stage UI in this pass
 - Did not force-merge/deploy, did not kill soaks, did not change model pins
 - Did not claim Layer 4 hardware PASS
+
+## Verification this turn
+
+- `tsc --noEmit`: pass  
+- Targeted suites (37): pass  
+- `npm run test:ma4`: **252 pass, 0 fail, 2 skipped**, 33.2s on tip  
 
 ## Recommended readiness
 

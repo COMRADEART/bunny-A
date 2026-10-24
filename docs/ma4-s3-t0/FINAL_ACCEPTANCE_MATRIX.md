@@ -15,9 +15,9 @@
 | S3T0-G11 | Performance budgets | **NOT TESTED** | |
 | S3T0-G12 | Test teardown audit | **PASS (root cause)** | `TEST_LIFECYCLE_AUDIT.md`; unref applied; force-exit retained |
 | S3T0-G13 | Three golden journeys | **NOT TESTED** | |
-| S3T0-G14 | No auth/integrity regression | **PARTIAL** | Targeted tests; full suite pending |
-| S3T0-G15 | Full local regression | **PENDING** | |
-| S3T0-G16 | Hosted CI on candidate SHA | **PENDING** | |
+| S3T0-G14 | No auth/integrity regression | **PARTIAL** | Targeted + `test:ma4` green; adversarial Layer 3/4 pending |
+| S3T0-G15 | Full local regression | **PARTIAL** | `npm run test:ma4` → 252 pass / 0 fail / 2 skip on `f557738` (~33s). Full `npm test` (agent-team lane) not re-sealed this turn |
+| S3T0-G16 | Hosted CI on candidate SHA | **PENDING** | PR #35 opened; await Actions on `f557738` |
 | S3T0-G17 | Release artifacts/provenance | **BLOCKED** / NOT TESTED | Signing |
 | S3T0-G18 | Beta readiness decision | **CONDITIONAL** | See ENGINEERING_REPORT |
 
