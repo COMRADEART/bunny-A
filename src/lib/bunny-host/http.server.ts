@@ -30,6 +30,9 @@ import { TaskStore } from "./ma4/task-store.server.ts";
 import { productionTaskDeps } from "./ma4/task-executors.server.ts";
 import { PTASK_ACTIONS, PTASK_SAFE_ACTIONS, ptaskCommand } from "./ma4/task-commands.server.ts";
 import { connectedActions, type ConnectedOptions } from "./ma4/connected-actions.server.ts";
+import { ProactiveStore } from "./ma4/proactive-store.server.ts";
+import { ProactiveEngine, type ProactiveDeps } from "./ma4/proactive.server.ts";
+import { PROACTIVE_ACTIONS, PROACTIVE_SAFE_ACTIONS, proactiveCommand } from "./ma4/proactive-commands.server.ts";
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
 import { SLOT_IDS, clean, isUserFacingAgent, projectPersonalAgents, type SlotId } from "./personal-agents.ts";
 import { WorkerStore } from "./workers.server.ts";
@@ -325,9 +328,11 @@ type HostOptions = {
     /** M-A-3 T13.3 Gate E test-only harness `--version` probe. Never reachable from HTTP. */
     harnessProbe?: typeof probeHarness;
     /** MA4-S2-T1 test-only task executors and model seams (recorded fakes). Never reachable from HTTP. */
-    ptasks?: Partial<Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "leaseMs" | "maintenanceMs">>;
+    ptasks?: Partial<Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "leaseMs" | "maintenanceMs" | "now">>;
     /** MA4-S2-T2 test-only connected-action seams (loopback synthetic sites, recorded synthetic services). Never reachable from HTTP. */
     connected?: ConnectedOptions;
+    /** MA4-S2-T3 test-only proactive seams (recorded synthetic sources, a fake clock, a short idle sleep). Never reachable from HTTP. */
+    proactive?: Partial<Pick<ProactiveDeps, "sources" | "now" | "maxSleepMs">>;
 };
 
 export async function startHost(options: HostOptions = {}) {
@@ -456,9 +461,19 @@ async function openHost(
     onTerminal: (taskId) => void connected.browser.close(taskId).catch(() => undefined),
     instanceId: manager.instanceId,
     uiAttached: () => workstationClients.streams > 0 || Date.now() - workstationClients.seen < 20_000,
-    emit: (type, detail) => manager.emit(db.event(type, null, detail)),
+    // MA4-S2-T3: a task change wakes the proactive engine (settling scheduled runs, goal progress) without polling.
+    emit: (type, detail) => { manager.emit(db.event(type, null, detail)); if (type === "ptask.changed") proactive?.wake(); },
     // Started only after this Host holds its port (below), so a lease left by any other instance is a dead Host's.
     exclusive: true,
+  });
+  // MA4-S2-T3: owner-approved goals, schedules and monitors. It only creates S2-T1 tasks; it executes nothing itself.
+  const proactive: ProactiveEngine = new ProactiveEngine({
+    store: new ProactiveStore(db), runtime: ptasks, roots: connected.roots,
+    sources: options.proactive?.sources ?? null,
+    modelAvailable: options.ptasks?.modelAvailable ?? productionTaskDeps().modelAvailable,
+    uiAttached: () => workstationClients.streams > 0 || Date.now() - workstationClients.seen < 20_000,
+    emit: (type, detail) => manager.emit(db.event(type, null, detail)),
+    now: options.proactive?.now, maxSleepMs: options.proactive?.maxSleepMs,
   });
   const projects = new ProjectService(missions, agents);
   // M-A-3 T13.3: Personal Agent ownership, profiles and conversations. Context only; it owns no execution.
@@ -775,6 +790,7 @@ async function openHost(
       missions: missions.snapshot(),
       agents: agents.snapshot(),
       persistentTasks: ptasks.snapshot(),
+      proactive: proactive.snapshot(),
     };
     const retainedFrom = Number(
       (db.db.prepare("SELECT COALESCE(MIN(sequence),0) n FROM events").get() as { n: number }).n,
@@ -1251,6 +1267,7 @@ async function openHost(
         // M-A-3 T10: stopping audio, releasing devices and cancelling a proposal never wait for a degraded Host.
         ...VOICE_SAFE_ACTIONS,
         ...PTASK_SAFE_ACTIONS,
+        ...PROACTIVE_SAFE_ACTIONS,
       ]);
       if (!safeActions.has(action)) containment.assertAccepting("http");
       if (typeof input.action === "string" && AGENT_ACTIONS.has(input.action)) {
@@ -1265,6 +1282,8 @@ async function openHost(
         extra = await agentCommand(agents, input.action, data, actor);
       } else if (typeof input.action === "string" && PTASK_ACTIONS.has(input.action)) {
         extra = { data: await ptaskCommand(ptasks, input.action, data, actor, connected) };
+      } else if (typeof input.action === "string" && PROACTIVE_ACTIONS.has(input.action)) {
+        extra = { data: await proactiveCommand(proactive, input.action, data, actor) };
       } else if (typeof input.action === "string" && VOICE_ACTIONS.has(input.action)) {
         // Device principals never reach here: assertDeviceAction refuses every voice action (default-deny).
         if (device) throw new WorkstationRequiredError("Voice requires the workstation on the Windows Host.");
@@ -2241,6 +2260,8 @@ async function openHost(
   );
   undo.push(() => ptasks.close());
   await ptasks.start();
+  undo.push(() => proactive.close());
+  await proactive.start();
   let closing = false;
   let closed: Promise<void> | null = null;
   const loops: { stop: () => void }[] = [];
@@ -2255,6 +2276,7 @@ async function openHost(
         // M-A-3 T10: release the microphone and speaker before anything else stops.
         await voice.close().catch(() => undefined);
         // MA4-S2-T1: running task steps stop and are handed to recovery with their durable state intact.
+        await proactive.close().catch(() => undefined);
         await ptasks.close().catch(() => undefined);
         await connected.close().catch(() => undefined);
         await Promise.allSettled(
@@ -2349,7 +2371,7 @@ async function openHost(
     ),
   );
   console.log(`Bunny-A Host ready on loopback (${manager.instanceId}).`);
-  return { server, manager, missions, agents, projects, ptasks, connected, close, token, port, containment };
+  return { server, manager, missions, agents, projects, ptasks, proactive, connected, close, token, port, containment };
 }
 
 /** M-A-3 T10: maps one voice action to the session. Every branch is a workstation-only session operation. */

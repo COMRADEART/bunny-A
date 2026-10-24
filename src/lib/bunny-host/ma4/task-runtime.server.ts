@@ -176,6 +176,18 @@ export class PersistentTaskRuntime {
     return taskView(result.record, result.version);
   }
   /**
+   * MA4-S2-T3, Host-internal (no command reaches it): the proactive engine approves one occurrence of an owner-approved
+   * schedule. The schedule verified that this task's spec and envelope are exactly the ones the owner approved; this
+   * binds the same hashes, logs the schedule as the approver, and never covers a consequential action's own approval.
+   */
+  approveScheduled(id: string, scheduleId: string, ttlMs: number): TaskView {
+    const now = this.now(), ttl = Math.min(Math.max(ttlMs, 60_000), 7 * 24 * 3_600_000);
+    const result = this.write(id, { actor: `schedule:${scheduleId}`.slice(0, 80), reason: "approved by the owner's schedule", now, from: ["AWAITING_APPROVAL"], to: "QUEUED",
+      mutate: r => { if (r.pendingAction) throw new TaskConflictError("A connected action is waiting for the owner; a schedule cannot approve it."); r.approval = { by: "workstation", at: now, expiresAt: Math.min(now + ttl, r.envelope.expiresAt), specSha256: r.specSha256, envelopeSha256: r.envelopeSha256, round: (r.approval?.round ?? 0) + 1 }; } });
+    this.wake();
+    return taskView(result.record, result.version);
+  }
+  /**
    * MA4-S2-T2, workstation-only: approves exactly one proposed action. The owner names the payload hash they reviewed; a
    * different hash (the action changed, or the request is forged) is refused. The approval is spent when the step succeeds.
    */

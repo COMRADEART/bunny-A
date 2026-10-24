@@ -212,6 +212,8 @@ export const READ_ACTIONS = new Set([
   "action.inspect",
   "action.receipts",
   "connector.roots.list",
+  // MA4-S2-T3: reading goals, schedules and monitors changes nothing.
+  "proactive.list",
 ]);
 export const isMutating = (action: string) => !READ_ACTIONS.has(action);
 

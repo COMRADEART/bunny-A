@@ -69,6 +69,7 @@ import {
 } from "./phone-model.ts";
 import { pairingCodeFromLocation } from "./journey-model";
 import { PersistentTasks } from "./ptasks";
+import { Proactive } from "./proactive";
 import "./phone.css";
 import { useShownTheme, useThemeScope } from "./theme";
 import { UI_THEMES, UI_THEME_IDS, type UiThemeId, type UiThemePreference } from "@/lib/bunny-host/ui-theme";
@@ -279,6 +280,7 @@ function HomeView({ view }: { view: View }) {
       </section>
       <PhoneWidgets go={go} />
       <PersistentTasks phone />
+      <Proactive phone />
 
       <section className="pc-section" aria-labelledby="pc-slots-heading">
         <div className="pc-section-head">

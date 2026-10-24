@@ -3,6 +3,7 @@ import { liveProviders, useIsland } from "@/store/use-island";
 import { NAMES, Empty } from "./ui";
 import { TaskRow } from "./desktop";
 import { PersistentTasks } from "./ptasks";
+import { Proactive } from "./proactive";
 import { Studio } from "./studio";
 import { TeamsSection } from "./agent";
 import { teamPanels } from "./team-model";
@@ -206,6 +207,7 @@ export function TasksHome({ now }: { now: number }) {
       </div>
       {/* MA4-S2-T2: background tasks and the Approval Center on the routed shell (S2-T1 mounted them only in the legacy one). */}
       <PersistentTasks />
+      <Proactive />
     </>
   );
 }
