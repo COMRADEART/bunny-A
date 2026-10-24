@@ -1,0 +1,310 @@
+{
+  "checks": [
+    {
+      "name": "w1280 empty form: focus on first invalid field, message attached",
+      "pass": true,
+      "detail": {
+        "label": "Name",
+        "described": [
+          "Name the schedule."
+        ]
+      }
+    },
+    {
+      "name": "w1280 error summary is an alert",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w1280 schedule form: every control labelled",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "w1280 only local models are offered",
+      "pass": true,
+      "detail": [
+        "qwen3:8b-fixture"
+      ]
+    },
+    {
+      "name": "w1280 no horizontal overflow (errors)",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w1280 preview: next runs, actions, reads, model, approvals, expiry",
+      "pass": true,
+      "detail": "When\nDaily 18:00 (America/New_York)\nNext runs\nSat, Oct 24, 2026, 06:00 PM\nSun, Oct 25, 2026, 06:00 PM\nMon, Oct 26, 2026, 06:00 PM\nWhat Bunny-A will do\nRead STATUS.md in folder \"Atlas project\"\nWrite text with the local model qwen3:8b-fixture (Worker)\nCheck that result with the local model qwen3:8b-fixture (Reviewer)\nInformation it reads\nFolder \"Atlas project\" (read)\nLocal model\nYes: qwen3:8b-fixtur"
+    },
+    {
+      "name": "w1280 preview does not create",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w1280 no horizontal overflow (preview)",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w1280 approve creates an ACTIVE schedule",
+      "pass": true,
+      "detail": {
+        "state": "ACTIVE",
+        "trigger": "Daily 18:00 (America/New_York)"
+      }
+    },
+    {
+      "name": "DST: preview explains the repeated local time",
+      "pass": true,
+      "detail": "When\nOnce at 2026-11-01 01:30 (America/New_York)\nNext runs\nSun, Nov 1, 2026, 01:30 AM — 01:30 happens twice on 2026-11-01 (clocks move back); it runs once, at the first.\nWhat Bunny-A will do\nShow the reminder: \"Daylight-saving check\"\nInformation it reads\nNothing beyond the reminder text\nLocal model\n"
+    },
+    {
+      "name": "Back keeps what was typed",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "monitor form: every control labelled",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "keyboard: Tab visits the monitor form controls in reading order",
+      "pass": true,
+      "detail": {
+        "tab": [
+          "Name",
+          "Short label (shown on the phone and notch; no paths)",
+          "Project",
+          "A status field in a JSON file",
+          "A file's first line",
+          "One of my tasks",
+          "Folder",
+          "File inside that folder",
+          "Field",
+          "It changes from one value to another",
+          "It becomes a value",
+          "It changes at all",
+          "From (optional)",
+          "To",
+          "Check every (minutes)",
+          "Checks per hour (at most)",
+          "Ends on",
+          " Notify me when it happens",
+          "Low",
+          "Normal",
+          "High",
+          "Review"
+        ],
+        "dom": [
+          "Name",
+          "Short label (shown on the phone and notch; no paths)",
+          "Project",
+          "A status field in a JSON file",
+          "A file's first line",
+          "One of my tasks",
+          "Folder",
+          "File inside that folder",
+          "Field",
+          "It changes from one value to another",
+          "It becomes a value",
+          "It changes at all",
+          "From (optional)",
+          "To",
+          "Check every (minutes)",
+          "Checks per hour (at most)",
+          "Ends on",
+          " Notify me when it happens",
+          "Low",
+          "Normal",
+          "High",
+          "Review"
+        ]
+      }
+    },
+    {
+      "name": "monitor preview: no model, check rate, first check",
+      "pass": true,
+      "detail": "Reads\nthe \"status\" field of build/status.json in folder \"Atlas project\"\nActs\nwhen it changes from \"PASS\" to \"FAIL\"\nChecks\nEvery 5 min, at most 12 per hour\nLocal model\nNo model runs for checks\nNotifies\nYes, once per change\nFirst check\nThe first check after approval only records the current value.\nEnd"
+    },
+    {
+      "name": "monitor row: last check, last change and next check shown",
+      "pass": true,
+      "detail": "Release check\nMonitor · Monitoring\n\nBuild status · checked Fri 09:51 PM (expected change) · no change seen yet · next check Fri 09:56 PM\n\nPause\nTurn off"
+    },
+    {
+      "name": "monitoring is not animated as work",
+      "pass": true,
+      "detail": {
+        "animations": 0
+      }
+    },
+    {
+      "name": "goal preview: criteria, progress rule, activation",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "saved goal waits; offers Approve and Reject",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "Reject cancels the suggested goal at the Host",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "reduced motion: no running animations in the panel",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "forced colours: errors still say what is wrong in text",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "Approval Center: requester, task, operation, effect, scope, outcome, recovery, expiry",
+      "pass": true,
+      "detail": "Requested by\nWorker agent, send (step 3 of 3)\nTask\nAtlas status email\nStarted by\nyou\nOperation\nemail.send\nKind of effect\nidempotent, consequential, cannot be undone\nExact scope\nFolder atlas (read); email account me@example.test (send; only to lead@example.test)\nExpected outcome\nDelivers an email to 1 recipient. It cannot be unsent.\nIf it goes wrong\nIf Bunny-A stops while this runs, it first checks (by this action's key) whether it was already applied, and only then tries once more.\nThis approval expires\n10:06 PM\n\nEmail · me@example.test · expires 10:06 PM\n\nReads or sends: Sends the subject and"
+    },
+    {
+      "name": "Approval Center: no local path shown",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "Approval Center: approve exact, deny, cancel task offered",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "Cancel task ends it; the stale action is no longer offered",
+      "pass": true,
+      "detail": {
+        "state": "CANCELLED"
+      }
+    },
+    {
+      "name": "w767 empty form: focus on first invalid field, message attached",
+      "pass": true,
+      "detail": {
+        "label": "Name",
+        "described": [
+          "Name the schedule."
+        ]
+      }
+    },
+    {
+      "name": "w767 error summary is an alert",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w767 schedule form: every control labelled",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "w767 only local models are offered",
+      "pass": true,
+      "detail": [
+        "qwen3:8b-fixture"
+      ]
+    },
+    {
+      "name": "w767 no horizontal overflow (errors)",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w767 preview: next runs, actions, reads, model, approvals, expiry",
+      "pass": true,
+      "detail": "When\nDaily 18:00 (America/New_York)\nNext runs\nSat, Oct 24, 2026, 06:00 PM\nSun, Oct 25, 2026, 06:00 PM\nMon, Oct 26, 2026, 06:00 PM\nWhat Bunny-A will do\nRead STATUS.md in folder \"Atlas project\"\nWrite text with the local model qwen3:8b-fixture (Worker)\nCheck that result with the local model qwen3:8b-fixture (Reviewer)\nInformation it reads\nFolder \"Atlas project\" (read)\nLocal model\nYes: qwen3:8b-fixtur"
+    },
+    {
+      "name": "w767 preview does not create",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w767 no horizontal overflow (preview)",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w767 approve creates an ACTIVE schedule",
+      "pass": true,
+      "detail": {
+        "state": "ACTIVE",
+        "trigger": "Daily 18:00 (America/New_York)"
+      }
+    },
+    {
+      "name": "w390 empty form: focus on first invalid field, message attached",
+      "pass": true,
+      "detail": {
+        "label": "Name",
+        "described": [
+          "Name the schedule."
+        ]
+      }
+    },
+    {
+      "name": "w390 error summary is an alert",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w390 schedule form: every control labelled",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "w390 only local models are offered",
+      "pass": true,
+      "detail": [
+        "qwen3:8b-fixture"
+      ]
+    },
+    {
+      "name": "w390 no horizontal overflow (errors)",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w390 preview: next runs, actions, reads, model, approvals, expiry",
+      "pass": true,
+      "detail": "When\nDaily 18:00 (America/New_York)\nNext runs\nSat, Oct 24, 2026, 06:00 PM\nSun, Oct 25, 2026, 06:00 PM\nMon, Oct 26, 2026, 06:00 PM\nWhat Bunny-A will do\nRead STATUS.md in folder \"Atlas project\"\nWrite text with the local model qwen3:8b-fixture (Worker)\nCheck that result with the local model qwen3:8b-fixture (Reviewer)\nInformation it reads\nFolder \"Atlas project\" (read)\nLocal model\nYes: qwen3:8b-fixtur"
+    },
+    {
+      "name": "w390 preview does not create",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w390 no horizontal overflow (preview)",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "w390 approve creates an ACTIVE schedule",
+      "pass": true,
+      "detail": {
+        "state": "ACTIVE",
+        "trigger": "Daily 18:00 (America/New_York)"
+      }
+    },
+    {
+      "name": "reflow at 320 px (400 % zoom): no horizontal overflow",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "console": [],
+  "failed": 0,
+  "note": "Real dashboard (Vite dev + Host bridge) in headless Chromium; isolated Host; recorded fake model; fixture Ollama listing; synthetic workspace. Screen readers not exercised: labels, roles and focus checked through the DOM."
+}

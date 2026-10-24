@@ -13,8 +13,9 @@ export const PROACTIVE_ACTIONS = new Set([
   "goal.create", "goal.approve", "goal.pause", "goal.resume", "goal.cancel", "goal.link",
   "schedule.create", "schedule.approve", "schedule.update", "schedule.pause", "schedule.resume", "schedule.cancel",
   "monitor.create", "monitor.approve", "monitor.pause", "monitor.resume", "monitor.disable",
+  "goal.preview", "schedule.preview", "monitor.preview",
 ]);
-const WORKSTATION_ONLY = new Set(["goal.create", "goal.approve", "goal.link", "schedule.create", "schedule.approve", "schedule.update", "monitor.create", "monitor.approve", "proactive.prefs", "proactive.policy"]);
+const WORKSTATION_ONLY = new Set(["goal.preview", "schedule.preview", "monitor.preview", "goal.create", "goal.approve", "goal.link", "schedule.create", "schedule.approve", "schedule.update", "monitor.create", "monitor.approve", "proactive.prefs", "proactive.policy"]);
 /** Reading and stopping never wait on a healthy Host. */
 export const PROACTIVE_SAFE_ACTIONS = ["proactive.list", "proactive.notification.dismiss", "proactive.notification.snooze", "proactive.away.ack", "goal.pause", "goal.cancel", "schedule.pause", "schedule.cancel", "monitor.pause", "monitor.disable"];
 
@@ -31,6 +32,9 @@ export async function proactiveCommand(engine: ProactiveEngine, action: string, 
       case "proactive.prefs": return engine.setPrefs(data.prefs, actor);
       case "proactive.policy": return engine.setPolicy(data.policy, actor);
       case "proactive.away.ack": return engine.awayAck();
+      case "goal.preview": return engine.previewGoal(data.spec, actor);
+      case "schedule.preview": return engine.previewSchedule(data.spec, actor);
+      case "monitor.preview": return engine.previewMonitor(data.spec, actor);
       case "goal.create": return engine.goalCreate({ spec: data.spec, suggested: data.suggested === true }, actor);
       case "goal.approve": return engine.goalApprove(id(data.id), actor, { expectVersion: version(data.version) });
       case "goal.pause": case "goal.resume": case "goal.cancel": return engine.goalControl(id(data.id), action.slice(5) as "pause" | "resume" | "cancel", actor);

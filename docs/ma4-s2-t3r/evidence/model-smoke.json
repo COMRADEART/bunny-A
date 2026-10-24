@@ -1,0 +1,172 @@
+{
+  "at": "2026-10-24T02:00:04.558Z",
+  "model": "qwen2.5-coder:7b",
+  "ollama": {
+    "version": "0.40.9",
+    "pinned": {
+      "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+      "size": 4683087561
+    }
+  },
+  "steps": [
+    {
+      "step": "plan",
+      "ms": 22691,
+      "kinds": [
+        "file.read",
+        "local.generate",
+        "local.review"
+      ],
+      "problems": [
+        "Step 2 needs a pinned local model.",
+        "Step 3 needs a pinned local model."
+      ],
+      "error": null
+    },
+    {
+      "step": "worker+reviewer",
+      "ms": 5807,
+      "state": "COMPLETED",
+      "failure": null,
+      "progress": {
+        "done": 3,
+        "total": 3,
+        "current": null
+      },
+      "evidence": [
+        "read",
+        "summary",
+        "review"
+      ],
+      "loadedModels": [
+        "qwen2.5-coder:7b"
+      ],
+      "summary": {
+        "chars": 444,
+        "sha256": "2ea6fabdb9b2b03a1f77905923dffacb87746546a312c89e4add4110a6076542"
+      }
+    },
+    {
+      "step": "cloud",
+      "created": "ptask-f883937c-55f4-4a9c-bc58-ffcc1b6bb363",
+      "state": "PAUSED",
+      "failure": null,
+      "blocked": {
+        "code": "MODEL_UNAVAILABLE",
+        "detail": "Pinned model deepseek-v4.1-flash:cloud is not available on this PC; no other model is used."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "name": "suggested goal is not active",
+      "pass": true,
+      "detail": {
+        "state": "AWAITING_APPROVAL"
+      }
+    },
+    {
+      "name": "goal active after owner approval",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "planner returns a validated proposal or explicit problems (no task created)",
+      "pass": true,
+      "detail": {
+        "step": "plan",
+        "ms": 22691,
+        "kinds": [
+          "file.read",
+          "local.generate",
+          "local.review"
+        ],
+        "problems": [
+          "Step 2 needs a pinned local model.",
+          "Step 3 needs a pinned local model."
+        ],
+        "error": null
+      }
+    },
+    {
+      "name": "pinned-model task completes through Worker and Reviewer",
+      "pass": true,
+      "detail": {
+        "step": "worker+reviewer",
+        "ms": 5807,
+        "state": "COMPLETED",
+        "failure": null,
+        "progress": {
+          "done": 3,
+          "total": 3,
+          "current": null
+        },
+        "evidence": [
+          "read",
+          "summary",
+          "review"
+        ],
+        "loadedModels": [
+          "qwen2.5-coder:7b"
+        ],
+        "summary": {
+          "chars": 444,
+          "sha256": "2ea6fabdb9b2b03a1f77905923dffacb87746546a312c89e4add4110a6076542"
+        }
+      }
+    },
+    {
+      "name": "the pinned model actually served (loaded in Ollama)",
+      "pass": true,
+      "detail": [
+        "qwen2.5-coder:7b"
+      ]
+    },
+    {
+      "name": "summary is grounded in the file (mentions the login timeout and RC3)",
+      "pass": true,
+      "detail": {
+        "chars": 444
+      }
+    },
+    {
+      "name": "goal progress counts only the completed, verified task",
+      "pass": true,
+      "detail": {
+        "met": 1,
+        "total": 1
+      }
+    },
+    {
+      "name": "pause during generation stops the run",
+      "pass": true,
+      "detail": {
+        "reachedRunning": true,
+        "ms": 41564,
+        "state": "PAUSED"
+      }
+    },
+    {
+      "name": "cancel ends it",
+      "pass": true,
+      "detail": {
+        "state": "CANCELLED"
+      }
+    },
+    {
+      "name": "a cloud model tag is refused or never runs",
+      "pass": true,
+      "detail": {
+        "step": "cloud",
+        "created": "ptask-f883937c-55f4-4a9c-bc58-ffcc1b6bb363",
+        "state": "PAUSED",
+        "failure": null,
+        "blocked": {
+          "code": "MODEL_UNAVAILABLE",
+          "detail": "Pinned model deepseek-v4.1-flash:cloud is not available on this PC; no other model is used."
+        }
+      }
+    }
+  ],
+  "failed": 0
+}

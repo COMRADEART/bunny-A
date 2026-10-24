@@ -7,7 +7,7 @@ import type { HostSnapshot } from "../../lib/bunny-host/contracts.ts";
  */
 export type ProactiveSnapshot = NonNullable<HostSnapshot["proactive"]>;
 export type ProactiveTone = "ok" | "warn" | "danger" | "neutral" | "active";
-export type ProactiveControl = "approve" | "pause" | "resume" | "cancel" | "disable";
+export type ProactiveControl = "approve" | "pause" | "resume" | "cancel" | "disable" | "reject";
 export type ProactiveRow = { kind: "goal" | "schedule" | "monitor"; id: string; version: number; title: string; label: string; tone: ProactiveTone; detail: string | null; meta: string | null; controls: ProactiveControl[] };
 export type NoticeRow = { key: string; title: string; text: string; category: string; priority: "low" | "normal" | "high"; at: number };
 type View = { live: boolean; snapshotAt: number | null; workstation: boolean; format: (at: number) => string };
@@ -27,7 +27,9 @@ function controls(kind: ProactiveRow["kind"], state: string, workstation: boolea
   if (workstation && (state === "AWAITING_APPROVAL" || state === "PROPOSED")) c.push("approve");
   if (state === "ACTIVE" || (kind === "goal" && state === "NEEDS_ATTENTION")) c.push("pause");
   if (state === "PAUSED") c.push("resume");
-  if (OPEN.includes(state)) c.push(kind === "monitor" ? "disable" : "cancel");
+  // Turning down something not yet approved reads as a rejection; the Host action is the same cancel/disable.
+  if (state === "PROPOSED" || state === "AWAITING_APPROVAL") c.push("reject");
+  else if (OPEN.includes(state)) c.push(kind === "monitor" ? "disable" : "cancel");
   return c;
 }
 
@@ -52,9 +54,12 @@ export function proactiveRows(snapshot: ProactiveSnapshot | null | undefined, vi
     }),
     ...snapshot.monitors.map(m => {
       const [text, tone] = STATE[m.state] ?? [m.state, "neutral"];
-      const label = m.state === "ACTIVE" ? "Monitoring" : text;
+      // Three or more failed reads is its own state: the owner must not mistake an unreadable source for "no change".
+      const unreadable = m.state === "ACTIVE" && m.errors >= 3;
+      const label = unreadable ? "Cannot read source" : m.state === "ACTIVE" ? "Monitoring" : text;
       const checked = m.lastCheckAt ? `checked ${view.format(m.lastCheckAt)}${m.lastClass ? ` (${CLASS[m.lastClass] ?? m.lastClass})` : ""}` : "not checked yet";
-      return finish({ kind: "monitor", id: m.id, version: m.version, title: m.title, detail: m.errors >= 3 ? `${m.label} could not be read ${m.errors} times in a row.` : null, meta: `${m.label} · ${checked}` }, m.state, label, m.state === "ACTIVE" ? "neutral" : tone);
+      const meta = [m.label, checked, m.lastChangeAt ? `last change ${view.format(m.lastChangeAt)}` : "no change seen yet", m.nextCheckAt ? `next check ${view.format(m.nextCheckAt)}` : null].filter(Boolean).join(" · ");
+      return finish({ kind: "monitor", id: m.id, version: m.version, title: m.title, detail: m.errors >= 3 ? `${m.label} could not be read ${m.errors} times in a row.` : null, meta }, m.state, label, unreadable ? "danger" : m.state === "ACTIVE" ? "neutral" : tone);
     }),
   ];
   return rows.sort((a, b) => a.rank - b.rank).map(({ rank: _rank, ...row }) => row);

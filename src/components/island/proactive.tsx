@@ -1,11 +1,12 @@
 import { useIsland } from "@/store/use-island";
 import { isDevice } from "./remote-view-model";
+import { ProactiveCreate } from "./proactive-create";
 import { noticeRows, proactiveHeadline, proactiveRows, type ProactiveControl, type ProactiveRow, type ProactiveTone } from "./proactive-model";
 
 const clockText = (at: number) => new Date(at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
 // Reuses the agent rows' existing state colours (mission.css) instead of adding styles.
-const STATE_STYLE: Record<ProactiveTone, string> = { ok: "COMPLETED", warn: "WAITING_FOR_USER", danger: "FAILED", neutral: "PAUSED", active: "RUNNING" };
-const LABEL: Record<ProactiveControl, string> = { approve: "Approve", pause: "Pause", resume: "Resume", cancel: "Cancel", disable: "Turn off" };
+const STATE_STYLE: Record<ProactiveTone, string> = { ok: "COMPLETED", warn: "WAITING_FOR_USER", danger: "FAILED", neutral: "IDLE", active: "RUNNING" };
+const LABEL: Record<ProactiveControl, string> = { approve: "Approve", pause: "Pause", resume: "Resume", cancel: "Cancel", disable: "Turn off", reject: "Reject" };
 const KIND: Record<ProactiveRow["kind"], string> = { goal: "Goal", schedule: "Schedule", monitor: "Monitor" };
 
 /**
@@ -21,10 +22,12 @@ export function Proactive({ phone = false }: { phone?: boolean }) {
   const view = { live, snapshotAt: store.connection.snapshotAt, workstation, format: clockText };
   const rows = proactiveRows(snapshot, view);
   const notices = live ? noticeRows(snapshot) : [];
-  if (!snapshot || (!rows.length && !notices.length && !snapshot.away)) return null;
+  if (!snapshot || (!workstation && !rows.length && !notices.length && !snapshot.away)) return null;
   const headline = proactiveHeadline(snapshot, view);
-  const act = (control: ProactiveControl, row: ProactiveRow) =>
-    void store.ptaskCommand(`${row.kind}.${control}`, control === "approve" ? { id: row.id, version: row.version } : { id: row.id });
+  const act = (control: ProactiveControl, row: ProactiveRow) => {
+    const action = control === "reject" ? (row.kind === "monitor" ? "disable" : "cancel") : control;
+    void store.ptaskCommand(`${row.kind}.${action}`, control === "approve" ? { id: row.id, version: row.version } : { id: row.id });
+  };
   const quiet = snapshot.prefs.quietHours;
   const btn = (quietStyle = false) => phone ? "pc-btn" : quietStyle ? "btn quiet" : "btn secondary";
   return (
@@ -33,6 +36,7 @@ export function Proactive({ phone = false }: { phone?: boolean }) {
         <h2 id="proactive-heading" className={phone ? "pc-h2" : "eyebrow"}>Goals, schedules and monitors</h2>
         {headline ? <span className="caption">{headline}</span> : null}
       </div>
+      {workstation ? <ProactiveCreate /> : null}
       {snapshot.away && live ? (
         <p className="caption" role="status">
           While you were away: {snapshot.away.text}.{" "}
@@ -68,7 +72,7 @@ export function Proactive({ phone = false }: { phone?: boolean }) {
               {!workstation && live && row.label === "Waiting for approval" ? <p className="caption">Approve this on your PC.</p> : null}
               {row.controls.length ? (
                 <div className="actions">
-                  {row.controls.map(c => <button key={c} type="button" className={btn(c === "cancel" || c === "disable")} onClick={() => act(c, row)}>{LABEL[c]}</button>)}
+                  {row.controls.map(c => <button key={c} type="button" className={btn(c === "cancel" || c === "disable" || c === "reject")} onClick={() => act(c, row)}>{LABEL[c]}</button>)}
                 </div>
               ) : null}
             </li>

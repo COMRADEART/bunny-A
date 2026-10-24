@@ -7,7 +7,8 @@ const clockText = (at: number) => new Date(at).toLocaleTimeString([], { hour: "2
 // Reuses the agent rows' existing state colours (mission.css) instead of adding styles.
 const STATE_STYLE: Record<PtaskTone, string> = { ok: "COMPLETED", warn: "WAITING_FOR_USER", danger: "FAILED", neutral: "PAUSED", active: "RUNNING" };
 const CONTROL_LABEL: Record<Exclude<PtaskControl, "reconcile">, string> = { pause: "Pause", resume: "Resume", cancel: "Cancel", approve: "Approve", approve_action: "Approve this action", deny_action: "Deny", inspect: "Inspect details" };
-type Inspected = { id: string; action: { preview: string; data: string[]; changes: string[]; target: string; expiresAt: number } | null; receipts: { seq: number; at: number; kind: string; event: string; detail: string }[] };
+type Context = { task: string; step: string; role: string; operation: string; sideEffect: string; scope: string[]; expected: string; recovery: string; approvalExpiresAt: number | null; taskExpiresAt: number; schedule: string | null; goal: string | null };
+type Inspected = { id: string; action: { preview: string; data: string[]; changes: string[]; target: string; expiresAt: number } | null; context?: Context | null; receipts: { seq: number; at: number; kind: string; event: string; detail: string }[] };
 
 /**
  * MA4-S2-T1 background tasks: what the Host is doing now (or last did, labelled with its time when the view is not live),
@@ -75,6 +76,17 @@ export function PersistentTasks({ phone = false }: { phone?: boolean }) {
                 ) : null}
                 {inspected?.id === row.id ? (
                   <div className="caption" role="region" aria-label="Action details">
+                    {inspected.action && inspected.context ? (
+                      // MA4-S2-T3R: who asks, for what, touching what, and what recovery looks like — before the decision.
+                      <dl className="proactive-preview">
+                        {([["Requested by", `${inspected.context.role} agent, ${inspected.context.step}`], ["Task", inspected.context.task],
+                          ["Started by", [inspected.context.schedule && `schedule “${inspected.context.schedule}”`, inspected.context.goal && `goal “${inspected.context.goal}”`].filter(Boolean).join(" for ") || "you"],
+                          ["Operation", inspected.context.operation], ["Kind of effect", inspected.context.sideEffect], ["Exact scope", inspected.context.scope.join("; ") || "none"],
+                          ["Expected outcome", inspected.context.expected], ["If it goes wrong", inspected.context.recovery],
+                          ["This approval expires", inspected.context.approvalExpiresAt ? clockText(inspected.context.approvalExpiresAt) : "when the task ends"]] as [string, string][])
+                          .map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
+                      </dl>
+                    ) : null}
                     {inspected.action ? (
                       <>
                         <p><strong>{inspected.action.target}</strong> · expires {clockText(inspected.action.expiresAt)}</p>
@@ -83,6 +95,9 @@ export function PersistentTasks({ phone = false }: { phone?: boolean }) {
                         <pre className="glass" style={{ whiteSpace: "pre-wrap", maxHeight: 240, overflow: "auto" }}>{inspected.action.preview}</pre>
                       </>
                     ) : <p>No action is waiting.</p>}
+                    {inspected.action && row.controls.includes("cancel") ? (
+                      <div className="actions"><button type="button" className={phone ? "pc-btn" : "btn quiet"} onClick={() => { setInspected(null); void store.ptaskCommand("ptask.cancel", { id: row.id }); }}>Cancel the whole task</button></div>
+                    ) : null}
                     {inspected.receipts.length ? (
                       <ol aria-label="Action history">
                         {inspected.receipts.slice(-8).map(r => <li key={r.seq}>{clockText(r.at)} · {r.kind} · {r.event}{r.detail ? ` — ${r.detail}` : ""}</li>)}

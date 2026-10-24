@@ -642,7 +642,9 @@ export function publicTeamView(view: NonNullable<MissionView["teamView"]>): NonN
  * MA4-S2-T2: Approval Center reads whose answer the dashboard shows (the waiting action's preview, receipts, registered
  * folders, a Planner proposal, a step's output). The Host answers them for the workstation owner only.
  */
-const DASHBOARD_DATA_ACTIONS = ["action.inspect", "action.receipts", "connector.roots.list", "ptask.plan", "ptask.output"];
+const DASHBOARD_DATA_ACTIONS = ["action.inspect", "action.receipts", "connector.roots.list", "ptask.plan", "ptask.output",
+  // MA4-S2-T3R: the creation forms show the Host's preview and continue with the created record's id and version.
+  "goal.preview", "schedule.preview", "monitor.preview", "goal.create", "schedule.create", "monitor.create", "goal.approve", "schedule.approve", "monitor.approve"];
 /** Only the fields used by the dashboard cross its command boundary. Private session/capability data stays local. */
 export function dashboardCommand<
   T extends { snapshot?: HostSnapshot; task?: OrchTask; mission?: MissionView; pairCode?: string ;

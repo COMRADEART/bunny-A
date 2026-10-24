@@ -57,10 +57,15 @@ export function localToUtc(tz: string, w: Wall): { utc: number; resolution: Reso
 // ── schedules ──────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+/** 2026-02-30 is refused, not silently moved to 2 March. */
+function realDate(at: string): boolean {
+  const [y, m, d] = at.slice(0, 10).split("-").map(Number), t = new Date(Date.UTC(y, m - 1, d));
+  return y >= 2000 && y <= 2100 && t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === d;
+}
 const tz = z.string().min(1).max(64).refine(validTimeZone, "Use a named IANA time zone, such as Europe/London.");
 export const TriggerSchema = z.discriminatedUnion("type", [
   /** One local wall time, once. */
-  z.object({ type: z.literal("once"), at: z.string().regex(/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/), timeZone: tz }).strict(),
+  z.object({ type: z.literal("once"), at: z.string().regex(/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/).refine(realDate, "That date does not exist."), timeZone: tz }).strict(),
   /** Every day (or the listed weekdays, 0 = Sunday) at a local wall time. */
   z.object({ type: z.literal("daily"), time: hhmm, timeZone: tz, days: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional() }).strict(),
   /** When an approved monitor in the same project reports a meaningful change. */
@@ -88,8 +93,11 @@ export const ScheduleSpecSchema = z.object({
   /** Condition triggers: the least time between two runs. */
   minGapMs: z.number().int().min(MINUTE).max(7 * DAY).default(15 * MINUTE),
   expiresAt: z.number().int().positive(),
+  /** MA4-S2-T3R: no slot before this instant (part of the approved hash). */
+  startsAt: z.number().int().positive().nullable().default(null),
   notify: z.object({ completed: z.boolean().default(true), failed: z.boolean().default(true) }).strict().default({ completed: true, failed: true }),
 }).strict().superRefine((s, ctx) => {
+  if (s.startsAt !== null && s.startsAt >= s.expiresAt) ctx.addIssue({ code: "custom", message: "The schedule must start before it ends." });
   if (s.action.type === "task") {
     if (s.action.spec.projectId !== s.projectId) ctx.addIssue({ code: "custom", message: "The task template belongs to another project." });
     if (!s.action.envelope.projectScopes.includes(s.projectId)) ctx.addIssue({ code: "custom", message: "The envelope does not cover this project." });
@@ -116,6 +124,14 @@ export function nextSlot(trigger: Trigger, after: number): number | null {
     if (slot > after) return slot;
   }
   return null;
+}
+/** Why a slot's instant differs from the wall time asked for (DST), or null when it is exact. */
+export function slotNote(trigger: Trigger, slot: number): string | null {
+  if (trigger.type === "condition") return null;
+  const tz = trigger.timeZone, time = trigger.type === "once" ? trigger.at.slice(11) : trigger.time, w = wallOf(tz, slot);
+  const [h, mi] = time.split(":").map(Number);
+  if (w.h !== h || w.mi !== mi) return `${time} does not exist on ${w.y}-${String(w.m).padStart(2, "0")}-${String(w.d).padStart(2, "0")} (clocks move forward); it runs at ${String(w.h).padStart(2, "0")}:${String(w.mi).padStart(2, "0")}.`;
+  return localToUtc(tz, { y: w.y, m: w.m, d: w.d, h, mi }).resolution === "ambiguous" ? `${time} happens twice on ${w.y}-${String(w.m).padStart(2, "0")}-${String(w.d).padStart(2, "0")} (clocks move back); it runs once, at the first.` : null;
 }
 /** Every slot in (after, until], oldest first, bounded so a clock jumping years ahead cannot loop. */
 export function slotsBetween(trigger: Trigger, after: number, until: number, max = 400): number[] {
