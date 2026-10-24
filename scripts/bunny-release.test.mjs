@@ -248,3 +248,25 @@ test("MA4-S2-T3R: a quoted \"from\" in an exported type is not an import (closur
     assert.ok(closure.files.includes("b.ts") && closure.ok, JSON.stringify(closure));
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });
+
+test('MA4 Host runtime: closure requires the shipped Zod ESM graph, never a developer dependency', async () => {
+  const { packageHostRuntime } = await import('./package-host-runtime.mjs');
+  const temp = mkdtempSync(join(TEMP, 'bunny-host-runtime-'));
+  try {
+    mkdirSync(join(temp, 'scripts'));
+    writeFileSync(join(temp, 'Bunny-Host.mjs'), 'import { z } from "zod";\n');
+    writeFileSync(join(temp, 'scripts/bunny-tunnel.mjs'), '');
+    assert.equal(importClosure(temp).ok, false);
+    const result = packageHostRuntime(repo, repo, temp);
+    assert.equal(result.packages[0].name, 'zod');
+    assert.ok(result.packages[0].integrity);
+    const closure = importClosure(temp);
+    assert.ok(closure.ok, JSON.stringify(closure));
+    assert.ok(closure.files.includes('node_modules/zod/index.js'));
+    assert.ok(closure.files.length > 10, 'walks transitive runtime modules');
+    rmSync(join(temp, 'node_modules/zod/v4/classic/external.js'));
+    assert.equal(importClosure(temp).ok, false, 'missing transitive runtime module rejected');
+    writeFileSync(join(temp, 'package-lock.json'), JSON.stringify({ packages: { 'node_modules/zod': { version: '0.0.0', integrity: 'wrong' } } }));
+    assert.throws(() => packageHostRuntime(temp, repo, temp), /pinned lockfile/);
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});
