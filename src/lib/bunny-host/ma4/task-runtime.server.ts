@@ -75,6 +75,7 @@ export type RuntimeDeps = {
 };
 type Active = { lease: Lease; abort: AbortController; done: Promise<void>; children: Set<ChildProcess> };
 const WORKSTATION = "workstation";
+export const PRUNE_EVERY_MS = 3_600_000;
 const shortError = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 200);
 
 export class PersistentTaskRuntime {
@@ -88,6 +89,7 @@ export class PersistentTaskRuntime {
   private timer: ReturnType<typeof setInterval> | null = null;
   private pending: ReturnType<typeof setImmediate> | null = null;
   private lastBeat = 0;
+  private lastPrune = 0;
   private dead = false;
   private closed = false;
   /** Storage failed its integrity check: views only, nothing executes. */
@@ -312,7 +314,7 @@ export class PersistentTaskRuntime {
     if (!integrity.ok) { this.readOnly = `Task storage failed its integrity check (${integrity.detail.slice(0, 120)}); tasks are shown but nothing runs.`; this.emit("ptask.storage_refused", this.readOnly, null); return; }
     await this.recover(true);
     this.store.prune(this.now());
-    this.lastBeat = this.now();
+    this.lastBeat = this.lastPrune = this.now();
     this.timer = setInterval(() => void this.maintain(), this.deps.maintenanceMs ?? 5_000);
     this.timer.unref?.();
     this.wake();
@@ -358,6 +360,8 @@ export class PersistentTaskRuntime {
       } catch { /* the worker's own commit reports the problem */ }
     }
     await this.recover(false);
+    // Retention also holds for a Host that runs for weeks, not only at its next start (MA4-S2-T3R1 soak analysis).
+    if (now - this.lastPrune >= PRUNE_EVERY_MS) { this.lastPrune = now; this.store.prune(now); }
     this.wake();
   }
 

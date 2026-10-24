@@ -127,3 +127,12 @@ export function buildMonitor(d: MonitorDraft, now: number, minMinutes = 1): Buil
   return { ok: true, spec: { title: d.title.trim(), label: d.label.trim(), projectId: d.projectId, source, predicate, intervalMs: Math.round(d.everyMinutes * 60_000), maxChecksPerHour: d.maxChecksPerHour,
     dedupMs: Math.round(d.dedupMinutes * 60_000), expiresAt, notify: d.notify, priority: d.priority } };
 }
+
+/** MA4-S2-T3R1: a registered folder's id from its name — the Host's rule (lowercase, starts with a letter, ≤ 40), unique. */
+export function folderId(label: string, taken: readonly string[]): string {
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 36).replace(/^-+|-+$/g, "");
+  const base = !slug ? "folder" : /^[a-z]/.test(slug) ? slug : `f-${slug}`;
+  let id = base;
+  for (let n = 2; taken.includes(id); n++) id = `${base}-${n}`;
+  return id;
+}

@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 const [installArg, outputArg, keep] = process.argv.slice(2);
 if (!installArg || !outputArg) throw new Error('usage: installed-gaps.mjs <TEST install> <evidence.json> [--keep]');
 const install = resolve(installArg), config = JSON.parse(readFileSync(join(install, 'install.json'), 'utf8').replace(/^﻿/, ''));
-if (!config.currentRelease.name.endsWith('-TEST') || config.hostPort !== 43191 || !install.includes('Bunny-S2T3R-Install')) throw new Error('Not the dedicated test installation.');
+if (!config.currentRelease.name.endsWith('-TEST') || ![43191, 43193].includes(config.hostPort) || !install.includes('Bunny-S2T3R-Install')) throw new Error('Not the dedicated test installation.');
 const MODEL = 'qwen2.5-coder:7b', base = `http://127.0.0.1:${config.hostPort}`;
 const credentials = () => JSON.parse(readFileSync(join(config.stateRoot, 'credentials/credentials.json'), 'utf8'));
 const cmd = async (action, data = {}) => {
@@ -40,8 +40,8 @@ try {
 
   // 14/15: cancel a running pinned-model task; nothing it started outlives it.
   const childrenBefore = tree(host.pid);
-  const env = { capabilities: ['file.read', 'local.generate'], providers: ['ollama'], localOnly: true, models: [MODEL], projectScopes: ['personal'], sideEffects: false, background: true, budgets: { maxModelCalls: 2, maxWallMs: 900_000 }, expiresAt: Date.now() + 3_600_000, grants: { files: [{ root: 'atlas', access: 'read' }] } };
-  const steps = [{ id: 'read', kind: 'file.read', input: { root: 'atlas', path: 'STATUS.md' } }, { id: 'draft', kind: 'local.generate', input: { prompt: 'Write a detailed 900-word plan from this status, section by section.', contextFrom: 'read' }, model: MODEL }];
+  const env = { capabilities: ['file.read', 'local.generate'], providers: ['ollama'], localOnly: true, models: [MODEL], projectScopes: ['personal'], sideEffects: false, background: true, budgets: { maxModelCalls: 2, maxWallMs: 900_000 }, expiresAt: Date.now() + 3_600_000, grants: { files: [{ root: process.env.BUNNY_TEST_ROOT ?? 'atlas', access: 'read' }] } };
+  const steps = [{ id: 'read', kind: 'file.read', input: { root: process.env.BUNNY_TEST_ROOT ?? 'atlas', path: 'STATUS.md' } }, { id: 'draft', kind: 'local.generate', input: { prompt: 'Write a detailed 900-word plan from this status, section by section.', contextFrom: 'read' }, model: MODEL }];
   const task = await cmd('ptask.create', { spec: { title: 'Installed running-model cancel', projectId: 'personal', steps, acceptance: { requiredSteps: ['read', 'draft'] } }, envelope: env });
   await cmd('ptask.approve', { id: task.id });
   const running = await until(async () => { const t = await cmd('ptask.get', { id: task.id }); return t.state === 'RUNNING' && t.progress.current === 'draft' && t; }, 120_000);

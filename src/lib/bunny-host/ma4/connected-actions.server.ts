@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { ZodObject, ZodRawShape } from "zod";
+import { z, type ZodObject, type ZodRawShape } from "zod";
 import type { HostDatabase } from "../persistence.server.ts";
 import type { HostContainment } from "../failure.server.ts";
 import { ActionLedger, brokered, type Connector } from "./action-broker.server.ts";
@@ -29,6 +29,11 @@ const inputsOf = (c: Connector<never>["contract"]) => {
   const shape = schema.shape ?? schema._def?.schema?.shape; // a refined object keeps its shape one level down
   return shape ? Object.keys(shape) : [];
 };
+/** The contract's own input schema as JSON Schema, for the Planner's structured output (optional fields may be left out, never null). */
+const inputSchemaOf = (c: Connector<never>["contract"]) => {
+  try { const { $schema: _, ...schema } = z.toJSONSchema(c.input, { io: "input", unrepresentable: "any" }) as Record<string, unknown>; return schema; }
+  catch { return undefined; }
+};
 
 export function connectedActions(deps: { db: HostDatabase; dataDirectory: string; protectedPaths: string[]; containment?: HostContainment } & ConnectedOptions) {
   const ledger = new ActionLedger(deps.db);
@@ -41,9 +46,11 @@ export function connectedActions(deps: { db: HostDatabase; dataDirectory: string
   ];
   const executors: Executor[] = connectors.map(c => brokered(c, ledger));
   const catalog: CatalogEntry[] = [
-    { kind: "local.generate", summary: "write text with a pinned local model (Worker)", inputs: ["prompt", "contextFrom", "maxTokens"], consequential: false },
-    { kind: "local.review", summary: "check a step's result against criteria (Reviewer)", inputs: ["criteria", "subjectFrom", "contextFrom"], consequential: false },
-    ...connectors.map(c => ({ kind: c.contract.kind, summary: summaryOf(c.contract), inputs: inputsOf(c.contract), consequential: c.contract.consequential })),
+    { kind: "local.generate", summary: "write text with a pinned local model (Worker)", inputs: ["prompt", "contextFrom", "maxTokens"], consequential: false,
+      input: { type: "object", properties: { prompt: { type: "string" }, contextFrom: { type: "string" }, maxTokens: { type: "integer", minimum: 16, maximum: 2048 } }, required: ["prompt"], additionalProperties: false } },
+    { kind: "local.review", summary: "check a step's result against criteria (Reviewer)", inputs: ["criteria", "subjectFrom", "contextFrom"], consequential: false,
+      input: { type: "object", properties: { criteria: { type: "string" }, subjectFrom: { type: "string" }, contextFrom: { type: "string" } }, required: ["criteria", "subjectFrom"], additionalProperties: false } },
+    ...connectors.map(c => ({ kind: c.contract.kind, summary: summaryOf(c.contract), inputs: inputsOf(c.contract), consequential: c.contract.consequential, input: inputSchemaOf(c.contract) })),
   ];
   return { ledger, roots, browser, connectors, executors, catalog, close: () => browser.closeAll() };
 }

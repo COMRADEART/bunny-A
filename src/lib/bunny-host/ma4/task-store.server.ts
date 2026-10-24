@@ -159,6 +159,9 @@ export class TaskStore {
       this.db.prepare("UPDATE ma4_tasks SET state=?,version=?,fence=?,lease_holder=?,lease_expires=?,updated_at=?,record=?,record_sha256=? WHERE id=?")
         .run(record.state, version, fence, holder, expires, change.now, json, sha256(json), id);
       this.db.prepare("INSERT INTO ma4_task_transitions(task_id,from_state,to_state,version,fence,actor,reason,at) VALUES(?,?,?,?,?,?,?,?)").run(id, from, record.state, version, fence, change.actor.slice(0, 80), change.reason.slice(0, 240), change.now);
+      // Leaving AWAITING_APPROVAL answers the request: its "needs your approval" notice is no longer pending (T3R1: a
+      // schedule's own approval left a stale notice on every scheduled run).
+      if (from === "AWAITING_APPROVAL" && record.state !== from) this.db.prepare("UPDATE ma4_task_notifications SET acknowledged=1 WHERE task_id=? AND kind='approval_required'").run(id);
       if (change.operation) this.writeOperation(id, change.operation, fence, change.now);
       if (change.checkpoint) {
         const json = JSON.stringify({ ...change.checkpoint, fence, version });
