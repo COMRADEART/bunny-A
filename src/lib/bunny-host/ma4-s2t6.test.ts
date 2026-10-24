@@ -95,7 +95,7 @@ test("T6-C/D/E: serviceConnectors enforce idempotency, version CAS, and untruste
   const byKind = new Map(connectors.map((c) => [c.contract.kind, c]));
 
   // 1. Untrusted connector output cannot be passed directly to email.send bodyFrom
-  const sig = new AbortController().signal;
+  const sig = {} as never;
   const mailSend = byKind.get("email.send")!;
   const injectedCtx = {
     idempotencyKey: "key-inject-1",
