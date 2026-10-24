@@ -36,7 +36,7 @@ test("T3R1-P2 the format is sent with the call; missing, wrong or unauthorized p
   const r = await rig();
   try {
     r.root("proj", { "notes.md": "x" });
-    let sent: Record<string, unknown> | undefined;
+    let sent: Record<string, unknown> | null | undefined;
     const plan = async (steps: unknown[]) => planConnectedTask({ request: "Summarize notes.md and check it.", projectId: "p1", envelope: envelope(), model: MODEL, catalog: r.connected.catalog, facts: r.rt.executorFacts(), signal: AbortSignal.timeout(5_000), now: Date.now(),
       call: (async ({ model, schema }) => { sent = schema; return { ok: true, text: JSON.stringify({ title: "Plan", steps }), servedModel: model, durationMs: 1 }; }) as ModelCall });
     const read = { id: "rd", kind: "file.read", input: { root: "proj", path: "notes.md" }, model: null };
