@@ -236,20 +236,44 @@ function GoalForm({ projects, models, onDone }: { projects: { id: string; name: 
 function ScheduleForm({ projects, models, roots, onDone }: { projects: { id: string; name: string }[]; models: string[]; roots: { id: string; label: string }[]; onDone: () => void }) {
   const store = useIsland();
   const monitors = (store.proactive?.monitors ?? []).filter(m => m.state === "ACTIVE" || m.state === "AWAITING_APPROVAL");
+  const goals = (store.proactive?.goals ?? []).filter(g => ["ACTIVE", "AWAITING_APPROVAL", "PROPOSED", "NEEDS_ATTENTION"].includes(g.state));
   const [d, setD] = useState<ScheduleDraft>({ title: "", projectId: projects[0]?.id ?? "", when: "daily", date: today(1), time: "18:00", timeZone: ZONES[0], days: [1, 2, 3, 4, 5], monitorId: "", starts: "", expires: today(30),
-    task: "summarize", text: "", root: roots[0]?.id ?? "", paths: "", model: models[0] ?? "", review: true, missedPolicy: "skip", background: false, maxModelCalls: 4, maxMinutes: 30, maxRunsPerDay: 2, notifyCompleted: true, notifyFailed: true });
+    task: "summarize", text: "", root: roots[0]?.id ?? "", paths: "", model: models[0] ?? "", review: true, missedPolicy: "skip", background: false, maxModelCalls: 4, maxMinutes: 30, maxRunsPerDay: 2, notifyCompleted: true, notifyFailed: true, goalId: "", criterionId: "" });
   useEffect(() => { if (!d.root && roots[0]) setD(x => ({ ...x, root: roots[0].id })); }, [roots]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (patch: Partial<ScheduleDraft>) => setD({ ...d, ...patch });
+  const selectedGoal = goals.find(g => g.id === d.goalId);
   return (
     <Flow kind="schedule" title="New schedule" onDone={onDone} build={() => buildSchedule(d, Date.now())}>{errors => (
       <>
         <Field label="Name" name="title" errors={errors}>{a => <input {...a} maxLength={120} value={d.title} onChange={e => set({ title: e.target.value })} />}</Field>
         <Field label="Project" name="projectId" errors={errors}>{a => <select {...a} value={d.projectId} onChange={e => set({ projectId: e.target.value })}>{projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}</Field>
-        <Choice label="What Bunny-A does" value={d.task} options={[["remind", "Remind me"], ["check", "Check files (no model)"], ["summarize", "Summarize files"]]} onChange={task => set({ task })} />
+        <Choice label="What Bunny-A does" value={d.task} options={[["remind", "Remind me"], ["check", "Check files (no model)"], ["summarize", "Summarize files"]]} onChange={task => set({ task, ...(task === "remind" ? { goalId: "", criterionId: "" } : {}) })} />
         {d.task === "remind" ? (
           <Field label="Reminder" name="text" errors={errors}>{a => <input {...a} maxLength={200} value={d.text} onChange={e => set({ text: e.target.value })} />}</Field>
         ) : (
           <>
+            {goals.length ? (
+              <div className="proactive-row">
+                <Field label="Serves goal (optional)" name="goalId" errors={errors}>
+                  {a => (
+                    <select {...a} value={d.goalId ?? ""} onChange={e => set({ goalId: e.target.value, criterionId: "" })}>
+                      <option value="">None</option>
+                      {goals.filter(g => g.projectId === d.projectId).map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+                    </select>
+                  )}
+                </Field>
+                {selectedGoal ? (
+                  <Field label="Goal criterion" name="criterionId" errors={errors}>
+                    {a => (
+                      <select {...a} value={d.criterionId ?? ""} onChange={e => set({ criterionId: e.target.value })}>
+                        <option value="">Choose…</option>
+                        {selectedGoal.criteria.map(c => <option key={c.id} value={c.id}>{c.description}</option>)}
+                      </select>
+                    )}
+                  </Field>
+                ) : null}
+              </div>
+            ) : null}
             <Field label="Folder" name="root" errors={errors} hint={roots.length ? undefined : "Add a folder above first; Bunny-A reads only folders you add."}>{a => <select {...a} value={d.root} onChange={e => set({ root: e.target.value })}>{roots.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}</select>}</Field>
             <Field label="Files in that folder (up to 4, comma or line separated)" name="paths" errors={errors}>{a => <textarea {...a} value={d.paths} onChange={e => set({ paths: e.target.value })} />}</Field>
             {d.task === "summarize" ? (
@@ -326,7 +350,7 @@ function MonitorForm({ projects, roots, onDone }: { projects: { id: string; name
         {d.condition === "transition" ? (
           <div className="proactive-row">
             <Field label="From (optional)" name="from" errors={errors}>{a => <input {...a} value={d.from} onChange={e => set({ from: e.target.value })} />}</Field>
-            <Field label="To" name="to" errors={errors}>{a => <input {...a} value={d.to} onChange={e => set({ to: e.target.value })} />}</Field>
+            <Field label="To" name="to" errors={errors}>{a => <input {...a} type="text" value={d.to} onChange={e => set({ to: e.target.value })} />}</Field>
           </div>
         ) : d.condition === "equals" ? <Field label="Value" name="value" errors={errors}>{a => <input {...a} value={d.value} onChange={e => set({ value: e.target.value })} />}</Field> : null}
         <div className="proactive-row">

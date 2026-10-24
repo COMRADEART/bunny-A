@@ -24,6 +24,7 @@ export function PersistentTasks({ phone = false }: { phone?: boolean }) {
   const rows = ptaskRows(snapshot, { live, snapshotAt: store.connection.snapshotAt, workstation, format: clockText });
   if (!snapshot || (!rows.length && !workstation)) return null;
   const notices = workstation ? snapshot.notifications.filter(n => n.delivered && !n.acknowledged).slice(0, 3) : [];
+  const liveSummary = rows[0] ? `${rows[0].title}: ${rows[0].label}${rows[0].progress ? ` (${rows[0].progress})` : ""}` : "";
   const act = (control: PtaskControl, row: PtaskRow, version?: number) => {
     const id = row.id, pending = row.pending;
     // MA4-S2-T2 Approval Center: the decision names the exact action and the payload hash that was shown.
@@ -44,11 +45,16 @@ export function PersistentTasks({ phone = false }: { phone?: boolean }) {
         <h2 id="ptask-heading" className={phone ? "pc-h2" : "eyebrow"}>Background tasks</h2>
         <span className="caption">{rows.length}</span>
       </div>
+      {liveSummary ? (
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {liveSummary}
+        </div>
+      ) : null}
       {snapshot.readOnly ? <p className="caption" role="alert">{snapshot.readOnly}</p> : null}
       {notices.map(n => (
-        <p key={n.key} className="caption" role="status">
+        <p key={n.key} className="caption" role="status" aria-live="polite" aria-atomic="true">
           {n.text}{" "}
-          <button type="button" className={phone ? "pc-link" : "btn quiet"} disabled={!live} onClick={() => void store.ptaskCommand("ptask.notification.ack", { key: n.key })}>Dismiss</button>
+          <button type="button" className={phone ? "pc-link" : "btn quiet"} aria-label={`Dismiss notification: ${n.text}`} disabled={!live} onClick={() => void store.ptaskCommand("ptask.notification.ack", { key: n.key })}>Dismiss</button>
         </p>
       ))}
       {rows.length ? (
@@ -68,9 +74,17 @@ export function PersistentTasks({ phone = false }: { phone?: boolean }) {
                 {row.controls.length ? (
                   <div className="actions">
                     {row.controls.map(control => control === "reconcile" ? (
-                      <button key={control} type="button" className={phone ? "pc-btn" : "btn secondary"} onClick={() => setReconciling(reconciling === row.id ? null : row.id)}>Resolve…</button>
+                      <button key={control} type="button" className={phone ? "pc-btn" : "btn secondary"} aria-label={`Resolve: ${row.title}`} onClick={() => setReconciling(reconciling === row.id ? null : row.id)}>Resolve…</button>
                     ) : (
-                      <button key={control} type="button" className={phone ? "pc-btn" : control === "cancel" || control === "deny_action" ? "btn quiet" : "btn secondary"} onClick={() => act(control, row, version)}>{CONTROL_LABEL[control]}</button>
+                      <button
+                        key={control}
+                        type="button"
+                        className={phone ? "pc-btn" : control === "cancel" || control === "deny_action" ? "btn quiet" : "btn secondary"}
+                        aria-label={`${CONTROL_LABEL[control]}: ${row.title}`}
+                        onClick={() => act(control, row, version)}
+                      >
+                        {CONTROL_LABEL[control]}
+                      </button>
                     ))}
                   </div>
                 ) : null}
