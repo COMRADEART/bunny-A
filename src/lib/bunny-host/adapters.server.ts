@@ -304,16 +304,20 @@ function containedSession(id: "codex" | "claude", launch: Launchable, args: stri
     output: (text) => { output = (output + text + "\n").slice(-2_000_000); hooks.output(text + "\n"); },
     event: (type, detail) => { if (type === "agent.error") providerError = detail; hooks.event(type, detail); },
   };
+  const flushStdoutLine = (rawLine: string) => {
+    const line = rawLine.replace(/\r$/, "");
+    if (!line.trim()) return;
+    hooks.raw?.("stdout", line);
+    let parsed: Record<string, unknown> | null = null;
+    try { parsed = JSON.parse(line) as Record<string, unknown>; } catch { parsed = null; }
+    if (parsed) parseAgentEvent(id, parsed, capture, normalizer); else capture.output(line.slice(0, 4000));
+  };
   const onStdout = (chunk: Buffer) => boundary(() => {
     if (providerError) return;
     buffer += chunk.toString(); let index: number;
     while ((index = buffer.indexOf("\n")) >= 0) {
-      const line = buffer.slice(0, index).replace(/\r$/, ""); buffer = buffer.slice(index + 1);
-      if (!line.trim()) continue;
-      hooks.raw?.("stdout", line);
-      let parsed: Record<string, unknown> | null = null;
-      try { parsed = JSON.parse(line) as Record<string, unknown>; } catch { parsed = null; }
-      if (parsed) parseAgentEvent(id, parsed, capture, normalizer); else capture.output(line.slice(0, 4000));
+      const line = buffer.slice(0, index); buffer = buffer.slice(index + 1);
+      flushStdoutLine(line);
     }
     if (buffer.length > 2_000_000) { fail(new Error("Provider event exceeds the log limit.")); buffer = ""; }
   });
@@ -425,6 +429,11 @@ function containedSession(id: "codex" | "claude", launch: Launchable, args: stri
     await emptied;
     exitCode ??= group.inspectHistory().exitCode;
     await closePipes();
+    if (!providerError && buffer.trim()) {
+      const trailing = buffer;
+      buffer = "";
+      boundary(() => flushStdoutLine(trailing));
+    }
     return { ok: exitCode === 0 && !stopped && !providerError, output, error: stopped ? "Stopped." : providerError ?? (exitCode === 0 ? undefined : safeError(firstLine(stderr) || `Process exited ${exitCode}`).message), stopped, exitCode };
   })();
   const stop = async () => {
@@ -509,12 +518,14 @@ export class CodexAdapter extends CliBase implements ProviderAdapter {
     const current = locate(this.ctx(), this.id).launch;
     if (!current || current.path !== launch.path || current.command !== launch.command || JSON.stringify(current.args) !== JSON.stringify(launch.args)) throw new Error("Codex excluded: resolved executable changed before Mission launch; refresh providers.");
     let owned: RunningSession | null = null; let stopped = false;
+    let preLaunchState: "launching" | "empty" | "refused" = "launching";
+    let preLaunchDetail = "Checking Codex Mission compatibility before launch.";
     const done = (async (): Promise<AdapterResult> => {
       // Re-probe version and controls, then hash again immediately before spawn. No model has started here.
       const profile = await this.security.inspect(current, this.ctx(), true);
       this.compatibilityDirty = JSON.stringify([profile.compatibilityClass, profile.executable, profile.reason]) !== JSON.stringify([this.detected?.securityCompatibility?.compatibilityClass, this.detected?.securityCompatibility?.executable, this.detected?.securityCompatibility?.reason]);
       this.detected = { ...this.detected!, securityCompatibility: profile };
-      if (stopped) return { ok: false, stopped: true, output: "", error: "Stopped before Codex Mission launch." };
+      if (stopped) { preLaunchState = "empty"; preLaunchDetail = "Stopped before Codex Mission launch."; return { ok: false, stopped: true, output: "", error: "Stopped before Codex Mission launch.", dispatched: false }; }
       const reason = codexMissionExclusion({ id: "codex", securityCompatibility: profile }, access);
       if (reason) throw new Error(reason);
       // Re-resolve after async probes so an alias or provider setting change cannot redirect spawn.
@@ -526,10 +537,33 @@ export class CodexAdapter extends CliBase implements ProviderAdapter {
     })().catch((error: unknown): AdapterResult => {
       this.compatibilityDirty = true;
       const reason = error instanceof Error ? error.message : "Codex Mission compatibility check failed.";
+      preLaunchState = "refused";
+      preLaunchDetail = reason;
       hooks.event("provider.compatibility_rejected", reason);
-      return { ok: false, output: "", error: reason };
+      return { ok: false, output: "", error: reason, dispatched: false };
     });
-    return { done, stop: async () => { stopped = true; await owned?.stop(); }, pid: () => owned?.pid?.() ?? null };
+    return {
+      done,
+      stop: async () => { stopped = true; if (!owned) { preLaunchState = "empty"; preLaunchDetail = "Stopped before Codex Mission launch."; } await owned?.stop(); },
+      pid: () => owned?.pid?.() ?? null,
+      ...(process.platform === "win32"
+        ? {
+            containment: (): SessionContainment =>
+              owned?.containment?.() ?? {
+                mechanism: "windows-job-object",
+                state: preLaunchState,
+                admitted: false,
+                operationId: null,
+                rootPid: null,
+                rootCreatedAt: null,
+                activeProcesses: 0,
+                totalProcesses: 0,
+                terminatedAtEnd: null,
+                detail: preLaunchDetail,
+              },
+          }
+        : {}),
+    };
   }
 }
 

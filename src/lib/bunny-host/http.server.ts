@@ -2296,6 +2296,7 @@ async function openHost(
         await missions.close();
       } finally {
         await ownedCleanup;
+        await stopOwnedChildren();
         // M-A-3 T9R-F04: a Stop already in flight (user, Mission, runtime limit) finishes its job accounting first.
         await manager.settleStops();
         manager.dispose();

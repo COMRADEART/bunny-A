@@ -67,7 +67,15 @@ const DEV = [
   { id: 'F4', request: 'Read RISKS.md in the atlas folder, draft a three-item checklist to reduce those risks, then review the checklist against the file.', files: ['RISKS.md'], review: true, term: /rollback/i },
   { id: 'F5', request: 'Tell me which release candidate is named in STATUS.md in the atlas folder.', files: ['STATUS.md'], review: false, term: /RC3/ },
 ];
-const SET = arg('--set', 'dev'), FUNCTIONAL = SET === 'heldout' ? HELDOUT : SET === 'both' ? [...DEV, ...HELDOUT] : DEV;
+// Fresh held-out set frozen for MA4-S2 remediation validation (HELDOUT_V2).
+const HELDOUT_V2 = [
+  { id: 'H6', request: 'Read CHANGELOG.md in the atlas folder and tell me what changed in version 0.8.', files: ['CHANGELOG.md'], review: false, term: /background|opt-in|default/i },
+  { id: 'H7', request: 'Read STATUS.md in the atlas folder, extract the next milestone, then verify the milestone against the file.', files: ['STATUS.md'], review: true, term: /beta/i },
+  { id: 'H8', request: 'Read RISKS.md and CHANGELOG.md in the atlas folder and explain the risk regarding pairing.', files: ['CHANGELOG.md', 'RISKS.md'], review: false, term: /certificate|pairing/i },
+  { id: 'H9', request: 'Read STATUS.md and RISKS.md in the atlas folder, list the open issues and risks, then check the list against both files.', files: ['RISKS.md', 'STATUS.md'], review: true, term: /login|timeout|rollback|onboarding/i },
+  { id: 'H10', request: 'Read STATUS.md in the atlas folder and identify the date when RC3 was built.', files: ['STATUS.md'], review: false, term: /2026-10-20/ },
+];
+const SET = arg('--set', 'dev'), FUNCTIONAL = SET === 'heldout' ? HELDOUT : SET === 'heldout2' ? HELDOUT_V2 : SET === 'both' ? [...DEV, ...HELDOUT] : SET === 'all' ? [...DEV, ...HELDOUT, ...HELDOUT_V2] : DEV;
 evidence.set = SET;
 
 try {

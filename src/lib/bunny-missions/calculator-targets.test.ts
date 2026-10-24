@@ -152,3 +152,15 @@ test("MA4-S1R3-CI2: Calculator acquisition verifies the installed package before
   assert.ok(verify > 0 && launch > 0, "the acquire script both verifies and launches");
   assert.ok(verify < launch, "the package is verified before Start-Process");
 });
+
+test("MA4-S2-FIX-C: Calculator discovery and launch refuse before any launch when the Host is not on the input desktop", () => {
+  // UIA and EnumWindows only see the caller's desktop. On a private desktop a launch lands where it can never be observed,
+  // which previously surfaced as an 8 s "launch outcome uncertain" with an orphaned Calculator process.
+  for (const script of [CALCULATOR_SCRIPTS.existing, CALCULATOR_SCRIPTS.acquire]) {
+    const gate = script.indexOf("[BunnyWin]::OnInputDesktop()"), enumerate = script.indexOf("Calculator-Frames"), launch = script.indexOf("Start-Process");
+    assert.ok(gate >= 0, "the script checks the input desktop");
+    assert.ok(gate < enumerate, "the desktop gate precedes window enumeration");
+    if (launch >= 0) assert.ok(gate < launch, "the desktop gate precedes Start-Process");
+    assert.match(script.slice(gate, enumerate), /throw '.*Nothing was launched\.'/, "the refusal is definite: nothing launched");
+  }
+});

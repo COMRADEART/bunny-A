@@ -90,6 +90,8 @@ export class CapabilityBus {
   emit: (type: string, detail: string, missionId: string | null) => void;
   inFlight = new Map<string, AbortController>();
   settling = new Map<string, Promise<void>>();
+  refreshingHealth: Promise<void> | null = null;
+  closed = false;
   cancelledMissions = new Set<string>(); cancelledSteps = new Set<string>();
   containment: HostContainment;
   /** T5 adjuncts are installed by MissionManager; neither comes from request parameters. */
@@ -140,13 +142,18 @@ export class CapabilityBus {
     return adapter && manifest ? { adapter, manifest } : null;
   }
   async refreshHealth(): Promise<void> {
+    if (this.closed) return;
+    const run = (async () => {
     await Promise.all([...this.adapters.values()].map(async (adapter) => {
       const platformOk = adapter.manifest.platforms === "any" || adapter.manifest.platforms.includes(process.platform);
       let result:{availability:CapabilityAvailability;detail:string};
       try { result=platformOk ? await adapter.health() : {availability:"unsupported",detail:`Not supported on ${process.platform}.`}; }
       catch(error) {result={availability:"unavailable",detail:`Health check failed: ${safeError(error).message}`};}
-      this.health.set(adapter.manifest.id, { ...result, checkedAt: Date.now() });
+      if (!this.closed) this.health.set(adapter.manifest.id, { ...result, checkedAt: Date.now() });
     }));
+    })();
+    this.refreshingHealth = run;
+    try { await run; } finally { if (this.refreshingHealth === run) this.refreshingHealth = null; }
   }
   list(): CapabilityStatus[] {
     return [...this.adapters.values()].map((adapter) => {
@@ -439,5 +446,7 @@ export class CapabilityBus {
     for (const controller of this.inFlight.values()) controller.abort(new Error("Bunny Capability Bus closed."));
     await Promise.all(this.settling.values());
     for (const adapter of this.adapters.values()) await adapter.close?.().catch(() => {});
+    this.closed = true;
+    await this.refreshingHealth?.catch(() => {});
   }
 }

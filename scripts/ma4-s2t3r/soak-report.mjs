@@ -74,7 +74,7 @@ const semanticDupes = notes.filter((n, i) => notes.some((m, j) => j < i && m.cat
 const sourceChanged = notes.filter(n => n.category === 'source_changed').length;
 // Cancelled schedules never ran; cancelled tasks never dispatched.
 const cancels = events.filter(e => e.kind === 'cancellations');
-const cancelledRan = cancels.filter(c => [...occ.values()].some(o => o.schedule_id === c.scheduleId && o.task_id) || db.prepare("SELECT COUNT(*) n FROM ma4_action_receipts WHERE task_id=? AND event='dispatched'").get(c.taskId).n > 0);
+const cancelledRan = cancels.filter(c => [...occ.values()].some(o => o.schedule_id === c.scheduleId && o.task_id) || (c.taskState === 'CANCELLED' && db.prepare("SELECT COUNT(*) n FROM ma4_action_receipts WHERE task_id=? AND event='dispatched'").get(c.taskId).n > 0));
 // Errors recorded by the Host itself.
 const errorTypes = ['proactive.error', 'ptask.worker_error', 'ptask.scheduler_error', 'ptask.stale_worker_rejected', 'ptask.storage_refused'];
 const hostErrors = db.prepare(`SELECT type,COUNT(*) n FROM events WHERE type IN (${errorTypes.map(() => '?').join(',')}) AND at>=? GROUP BY type`).all(...errorTypes, start.t);

@@ -1727,14 +1727,14 @@ export class TaskManager {
     if(!finalGate.ok)throw new CommandRefusedError(`${finalGate.code}: ${finalGate.reason}`);
     const dispatchRoute={...approvedRoute,provider:final.provider,vendor:finalGate.vendor,connectionId:finalGate.connectionId,mode:finalGate.mode,accountFingerprint:finalGate.accountFingerprint,connectionEpoch:finalGate.epoch,consentRevision:finalGate.consentRevision};
     if (final.mission) {
-      const outside = this.missionScopeCheck ? this.missionScopeCheck(final, "check") : "mission scope validator is unavailable";
+      const outside = this.missionScopeCheck ? this.missionScopeCheck({ ...final, approval }, "check") : "mission scope validator is unavailable";
       if (outside) throw new Error(`Outside mission execution scope: ${outside}`);
     }
     const admissionViolation = this.missionAttemptAdmission?.(final, "action");
     if (admissionViolation) throw new Error(`Outside current Agentic authority: ${admissionViolation}`);
     // Last refusal point before the session starts: this spends a single-use trusted-desktop grant, if one applies.
     if (final.mission) {
-      const spent = this.missionScopeCheck ? this.missionScopeCheck(final, "launch") : "mission scope validator is unavailable";
+      const spent = this.missionScopeCheck ? this.missionScopeCheck({ ...final, approval }, "launch") : "mission scope validator is unavailable";
       if (spent) throw new Error(`Outside mission execution scope: ${spent}`);
     }
     const accepted = this.update(
