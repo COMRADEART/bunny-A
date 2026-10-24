@@ -47,7 +47,7 @@ test("T3R-T3 schedule preview: next runs, what it does and reads, model use, app
   assert.equal(p.engine.store.list("schedule").length, before, "a preview stores nothing");
   // DST note in the preview, and problems instead of a preview for an invalid or unauthorized schedule.
   const ny = p.engine.previewSchedule(schedule({ trigger: { type: "once", at: "2026-11-01T01:30", timeZone: "America/New_York" } }), WS);
-  if (!("next" in ny)) throw new Error("no preview");
+  if (!("next" in ny) || !ny.next) throw new Error("no preview");
   assert.match(ny.next[0].note!, /happens twice/);
   const bad = p.engine.previewSchedule(schedule({ trigger: once("2026-02-30T09:00") }), WS);
   assert.equal(bad.ok, false); assert.match(bad.problems.join(), /does not exist/);
@@ -162,4 +162,17 @@ test("T3R-A6 duplicate scheduling after restart and two engines stays at one tas
   assert.equal(p.tasks().length, 1);
   await second.close();
   void HOUR; void MIN; void envelope;
+}));
+
+test("T3R-T5 a start date holds back every run until it arrives; preview and the schedule agree", () => withRig(async p => {
+  const startsAt = Date.UTC(2026, 9, 27, 0, 0), spec = schedule({ startsAt });
+  const v = p.engine.previewSchedule(spec, WS);
+  if (!("next" in v) || !v.next) throw new Error("no preview");
+  assert.equal(v.next[0].at, Date.UTC(2026, 9, 27, 18, 0), "first run is on the start day, not today");
+  approved(p, spec);
+  await p.at(Date.UTC(2026, 9, 26, 18, 5));
+  assert.equal(p.tasks().length, 0, "no run before the start date");
+  await p.at(Date.UTC(2026, 9, 27, 18, 3));
+  assert.equal(p.tasks().length, 1);
+  assert.equal(ScheduleSpecSchema.safeParse(schedule({ startsAt: T0 + 400 * DAY, expiresAt: T0 + 30 * DAY })).success, false, "must start before it ends");
 }));

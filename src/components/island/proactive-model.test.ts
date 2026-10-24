@@ -19,15 +19,20 @@ test("S2-T3 proactive rows: attention first; monitoring is never shown as work; 
   assert.equal(rows[0].label, "Needs attention"); assert.equal(rows[0].meta, "1 of 3 criteria met by completed work"); assert.deepEqual(rows[0].controls, ["pause", "cancel"]);
   assert.equal(rows[1].label, "Scheduled · next t5000"); assert.equal(rows[1].tone, "ok");
   assert.equal(rows[2].label, "Monitoring"); assert.equal(rows[2].tone, "neutral", "an idle monitor is not active work");
-  assert.equal(rows[2].meta, "Build status · checked t4000 (no change)"); assert.deepEqual(rows[2].controls, ["pause", "disable"]);
+  assert.equal(rows[2].meta, "Build status · checked t4000 (no change) · no change seen yet · next check t6000"); assert.deepEqual(rows[2].controls, ["pause", "disable"]);
+  // S2-T3R: last meaningful change shown; a source that keeps failing is its own state, not "Monitoring".
+  const changed = proactiveRows(snap({ goals: [], schedules: [], monitors: [{ ...mon, lastChangeAt: 3000 }] }), live)[0];
+  assert.match(changed.meta!, /last change t3000/);
+  const broken = proactiveRows(snap({ goals: [], schedules: [], monitors: [{ ...mon, errors: 3, lastClass: "source_unavailable" }] }), live)[0];
+  assert.equal(broken.label, "Cannot read source"); assert.equal(broken.tone, "danger"); assert.match(broken.detail!, /could not be read 3 times/);
   const working = proactiveRows(snap({ schedules: [{ ...sched, runningTaskId: "ptask-1" }] }), live).find(r => r.id === "s")!;
   assert.equal(working.label, "Working"); assert.equal(working.tone, "active");
 });
 
 test("S2-T3 proactive rows: approval only on the workstation; a stale view is labelled and has no controls", () => {
   const waiting = snap({ schedules: [{ ...sched, state: "AWAITING_APPROVAL" }], goals: [], monitors: [] });
-  assert.deepEqual(proactiveRows(waiting, live)[0].controls, ["approve", "cancel"]);
-  assert.deepEqual(proactiveRows(waiting, { ...live, workstation: false })[0].controls, ["cancel"]);
+  assert.deepEqual(proactiveRows(waiting, live)[0].controls, ["approve", "reject"]);
+  assert.deepEqual(proactiveRows(waiting, { ...live, workstation: false })[0].controls, ["reject"], "the phone may turn it down, never approve it");
   const [stale] = proactiveRows(snap({ goals: [], monitors: [] }), { ...live, live: false });
   assert.equal(stale.label, "Last known: Scheduled · next t5000 (t1000)"); assert.deepEqual(stale.controls, []); assert.equal(stale.tone, "neutral");
   const missed = proactiveRows(snap({ goals: [], monitors: [], schedules: [{ ...sched, lastAttempt: { at: 77, outcome: "missed", reason: "Missed while Bunny-A was not running." } }] }), live)[0];

@@ -93,8 +93,11 @@ export const ScheduleSpecSchema = z.object({
   /** Condition triggers: the least time between two runs. */
   minGapMs: z.number().int().min(MINUTE).max(7 * DAY).default(15 * MINUTE),
   expiresAt: z.number().int().positive(),
+  /** MA4-S2-T3R: no slot before this instant (part of the approved hash). */
+  startsAt: z.number().int().positive().nullable().default(null),
   notify: z.object({ completed: z.boolean().default(true), failed: z.boolean().default(true) }).strict().default({ completed: true, failed: true }),
 }).strict().superRefine((s, ctx) => {
+  if (s.startsAt !== null && s.startsAt >= s.expiresAt) ctx.addIssue({ code: "custom", message: "The schedule must start before it ends." });
   if (s.action.type === "task") {
     if (s.action.spec.projectId !== s.projectId) ctx.addIssue({ code: "custom", message: "The task template belongs to another project." });
     if (!s.action.envelope.projectScopes.includes(s.projectId)) ctx.addIssue({ code: "custom", message: "The envelope does not cover this project." });

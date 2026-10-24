@@ -47,6 +47,8 @@ export type MonitorRecord = {
   last: { value: string; sha256: string; at: number } | null;
   lastClass: ChangeClass | null; lastCheckAt: number | null; nextCheckAt: number; errors: number;
   lastNotifiedAt: number | null; changeSeq: number;
+  /** MA4-S2-T3R: when the last meaningful change was seen (absent on S2-T3 records). */
+  lastChangeAt?: number | null;
   createdAt: number; updatedAt: number;
 };
 type RecordOf<K extends Kind> = K extends "goal" ? GoalRecord : K extends "schedule" ? ScheduleRecord : MonitorRecord;

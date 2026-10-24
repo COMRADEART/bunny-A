@@ -147,7 +147,7 @@ export class ProactiveEngine {
     if (problems.length) throw new Error(`Schedule refused: ${problems.join(" ")}`);
     const id = raw.id ?? `sch-${randomUUID()}`;
     const record: ScheduleRecord = { schema: "ma4.schedule.v1", id, projectId: spec.projectId, spec, specSha256: specHash(spec), state: "AWAITING_APPROVAL", approval: null,
-      cursor: now, nextAt: nextSlot(spec.trigger, now), retryAt: null, lastAttempt: null, lastFiredAt: null, createdAt: now, updatedAt: now };
+      cursor: Math.max(now, spec.startsAt ?? 0), nextAt: nextSlot(spec.trigger, Math.max(now, spec.startsAt ?? 0)), retryAt: null, lastAttempt: null, lastFiredAt: null, createdAt: now, updatedAt: now };
     const r = this.store.insert("schedule", record, WORKSTATION, now, [this.note("approval_required", "schedule", id, spec.title, "Approve this schedule before it can run.", "AWAITING_APPROVAL", "approve", `${id}:approval:${record.specSha256.slice(0, 12)}`)]);
     this.changed(`Schedule proposed: ${spec.title}`);
     return this.scheduleView(r.record, r.version);
@@ -161,7 +161,7 @@ export class ProactiveEngine {
         const problems = this.validateSchedule(s.spec, now);
         if (problems.length) throw new ProactiveConflictError(`Not approved: ${problems.join(" ")}`);
         s.approval = { by: "workstation", at: now, expiresAt: Math.min(now + ttl, s.spec.expiresAt), specSha256: s.specSha256 };
-        s.cursor = Math.max(s.cursor, now); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null;
+        s.cursor = Math.max(s.cursor, now, s.spec.startsAt ?? 0); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null;
       } });
     this.store.dismissApprovals(id);
     this.changed(`Schedule approved: ${r.record.spec.title}`);
@@ -173,7 +173,7 @@ export class ProactiveEngine {
     const spec = ScheduleSpecSchema.parse(rawSpec), now = this.now(), problems = this.validateSchedule(spec, now);
     if (problems.length) throw new Error(`Schedule change refused: ${problems.join(" ")}`);
     const r = this.store.update("schedule", id, { actor: WORKSTATION, reason: "changed by owner; approval needed again", now, from: ["AWAITING_APPROVAL", "ACTIVE", "PAUSED"], to: "AWAITING_APPROVAL", expectVersion: o.expectVersion,
-      mutate: s => { if (spec.projectId !== s.projectId) throw new ProactiveConflictError("A schedule cannot move to another project."); s.spec = spec; s.nextAt = nextSlot(spec.trigger, Math.max(s.cursor, now)); },
+      mutate: s => { if (spec.projectId !== s.projectId) throw new ProactiveConflictError("A schedule cannot move to another project."); s.spec = spec; s.cursor = Math.max(s.cursor, spec.startsAt ?? 0); s.nextAt = nextSlot(spec.trigger, Math.max(s.cursor, now)); },
       notify: [this.note("approval_required", "schedule", id, spec.title, "The schedule changed; approve it again before it runs.", "AWAITING_APPROVAL", "approve", `${id}:approval:${specHash(spec).slice(0, 12)}`)] });
     this.changed(`Schedule changed: ${spec.title}`);
     return this.scheduleView(r.record, r.version);
@@ -187,7 +187,7 @@ export class ProactiveEngine {
           const { record, version } = this.store.get("schedule", id);
           const live = !!record.approval && record.approval.expiresAt > now && record.approval.specSha256 === record.specSha256;
           return this.store.update("schedule", id, { actor, reason: live ? "resumed" : "resumed; its approval lapsed, so it waits for the owner", now, from: ["PAUSED"], expectVersion: version, to: live ? "ACTIVE" : "AWAITING_APPROVAL",
-            mutate: s => { s.cursor = Math.max(s.cursor, now); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null; } });
+            mutate: s => { s.cursor = Math.max(s.cursor, now, s.spec.startsAt ?? 0); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null; } });
         })();
     // Cancelling a schedule also stops the run it started (its processes are killed by the runtime); nothing new starts.
     if (control === "cancel") this.store.dismissApprovals(id);
@@ -280,7 +280,7 @@ export class ProactiveEngine {
     const parsed = ScheduleSpecSchema.safeParse(raw), now = this.now();
     if (!parsed.success) return { ok: false as const, problems: this.issues(parsed.error, "schedule") };
     const spec = parsed.data, problems = this.validateSchedule(spec, now), next: { at: number; note: string | null }[] = [];
-    for (let t = nextSlot(spec.trigger, now); t !== null && next.length < 3 && t <= spec.expiresAt; t = nextSlot(spec.trigger, t)) next.push({ at: t, note: slotNote(spec.trigger, t) });
+    for (let t = nextSlot(spec.trigger, Math.max(now, spec.startsAt ?? 0)); t !== null && next.length < 3 && t <= spec.expiresAt; t = nextSlot(spec.trigger, t)) next.push({ at: t, note: slotNote(spec.trigger, t) });
     const facts = this.deps.runtime.executorFacts(), task = spec.action.type === "task" ? spec.action : null;
     const steps = task?.spec.steps ?? [], gpu = steps.filter(x => facts.get(x.kind)?.gpu), consequential = steps.filter(x => facts.get(x.kind)?.consequential);
     return {
@@ -643,7 +643,7 @@ export class ProactiveEngine {
             // Exponential backoff after source errors, capped at an hour.
             x.nextCheckAt = at + (errored ? Math.min(interval * 2 ** Math.min(errors, 6), HOUR) : interval);
             if (obs.ok) { x.last = { value: obs.value, sha256: obs.sha256, at }; x.baseline ??= { value: obs.value, sha256: obs.sha256, at }; }
-            if (cls === "meaningful") { x.changeSeq += 1; if (notify.some(n => n.category === "source_changed")) x.lastNotifiedAt = at; }
+            if (cls === "meaningful") { x.changeSeq += 1; x.lastChangeAt = at; if (notify.some(n => n.category === "source_changed")) x.lastNotifiedAt = at; }
           } });
       } catch (e) { if (e instanceof ProactiveConflictError) continue; throw e; }
       if (cls !== "meaningful") continue;
@@ -708,11 +708,11 @@ export class ProactiveEngine {
     return { id: s.id, title: sanitize(s.spec.title, 120), projectId: s.projectId, state: s.state, version, trigger: this.triggerText(s.spec.trigger), action: s.spec.action.type,
       nextAt: s.state === "ACTIVE" ? (s.retryAt ?? s.nextAt) : null, lastAttempt: s.lastAttempt ? { at: s.lastAttempt.at, outcome: s.lastAttempt.outcome, reason: sanitize(s.lastAttempt.reason, 160) } : null,
       approvedUntil: s.approval && s.approval.specSha256 === s.specSha256 ? s.approval.expiresAt : null, goalId: s.spec.goal?.id ?? null, missedPolicy: s.spec.missedPolicy,
-      runningTaskId: active, expiresAt: s.spec.expiresAt, updatedAt: s.updatedAt };
+      runningTaskId: active, expiresAt: s.spec.expiresAt, startsAt: s.spec.startsAt, updatedAt: s.updatedAt };
   }
   monitorView(m: MonitorRecord, version: number) {
     return { id: m.id, title: sanitize(m.spec.title, 120), label: sanitize(m.spec.label, 60), projectId: m.projectId, state: m.state, version, source: m.spec.source.kind,
-      lastCheckAt: m.lastCheckAt, lastClass: m.lastClass, nextCheckAt: m.state === "ACTIVE" ? m.nextCheckAt : null, errors: m.errors, changes: m.changeSeq,
+      lastCheckAt: m.lastCheckAt, lastClass: m.lastClass, nextCheckAt: m.state === "ACTIVE" ? m.nextCheckAt : null, errors: m.errors, changes: m.changeSeq, lastChangeAt: m.lastChangeAt ?? null,
       checksLastHour: this.store.checksSince(m.id, this.now() - HOUR), intervalMs: Math.max(m.spec.intervalMs, this.store.policy().minIntervalMs),
       approvedUntil: m.approval && m.approval.specSha256 === m.specSha256 ? m.approval.expiresAt : null, expiresAt: m.spec.expiresAt, updatedAt: m.updatedAt };
   }
