@@ -53,7 +53,20 @@ export const localReview: Executor = {
 
 export type CatalogEntry = { kind: string; summary: string; inputs: string[]; consequential: boolean };
 export type Plan = { ok: true; spec: TaskSpec; team: string[]; problems: [] } | { ok: false; spec: TaskSpec | null; team: string[]; problems: string[] };
-const PLAN_SCHEMA = { type: "object", properties: { title: { type: "string" }, steps: { type: "array", items: { type: "object", properties: { id: { type: "string" }, kind: { type: "string" }, input: { type: "object" }, model: { type: ["string", "null"] } }, required: ["id", "kind", "input"] } } }, required: ["title", "steps"] } as const;
+/**
+ * The Planner's structured-output format, built from Host facts: only granted catalog actions, and a model step must name
+ * one of the envelope's pinned models (a non-model step names none). This steers the model; validateTask stays the
+ * authority, so a model that ignores the format is still refused, never repaired.
+ */
+export function planSchema(catalog: readonly CatalogEntry[], facts: ReadonlyMap<string, ExecutorFacts>, envelope: Envelope): Record<string, unknown> | null {
+  const kinds = catalog.map(c => c.kind).filter(k => envelope.capabilities.includes(k));
+  const modelKinds = envelope.models.length ? kinds.filter(k => facts.get(k)?.gpu) : [];
+  const plainKinds = kinds.filter(k => !facts.get(k)?.gpu);
+  const step = (kind: string[], model: Record<string, unknown>) => ({ type: "object", properties: { id: { type: "string" }, kind: { enum: kind }, input: { type: "object" }, model }, required: ["id", "kind", "input", "model"] });
+  const branches = [...plainKinds.length ? [step(plainKinds, { type: "null" })] : [], ...modelKinds.length ? [step(modelKinds, { enum: [...envelope.models] })] : []];
+  if (!branches.length) return null;
+  return { type: "object", properties: { title: { type: "string" }, steps: { type: "array", items: branches.length === 1 ? branches[0] : { anyOf: branches } } }, required: ["title", "steps"] };
+}
 
 /**
  * Planner. The owner's request is the only instruction; grants and the action catalog are Host facts. The answer is a
@@ -70,8 +83,10 @@ export async function planConnectedTask(o: { request: string; projectId: string;
   ].join("\n");
   const catalog = o.catalog.map(c => `- ${c.kind}: ${c.summary}. Inputs: ${c.inputs.join(", ") || "none"}.${c.consequential ? " Needs the owner's approval when it runs." : ""}`).join("\n");
   const prompt = `You are the Planner. Propose ONE task as JSON {"title", "steps": [{"id", "kind", "input", "model"}]} that fulfils the owner's request using only these actions and resources. ` +
-    `Model steps (local.generate, local.review) need "model" set to a pinned model. Use contextFrom/bodyFrom to pass results between steps. Do not invent actions or resources.\n\nActions:\n${catalog}\n\n${facts}\n\nOwner's request: ${o.request.slice(0, 2_000)}`;
-  const r = await o.call({ role: "Planner", model: o.model, prompt, schema: PLAN_SCHEMA as unknown as Record<string, unknown>, signal: o.signal, attempt: 1, options: { numPredict: 1_024, temperature: 0 } });
+    `Model steps (local.generate, local.review) need "model" set to a pinned model; other steps set "model" to null. Use contextFrom/bodyFrom to pass results between steps. Do not invent actions or resources.\n\nActions:\n${catalog}\n\n${facts}\n\nOwner's request: ${o.request.slice(0, 2_000)}`;
+  const schema = planSchema(o.catalog, o.facts, o.envelope);
+  if (!schema) return { ok: false, spec: null, team, problems: ["The envelope grants none of the available actions."] };
+  const r = await o.call({ role: "Planner", model: o.model, prompt, schema, signal: o.signal, attempt: 1, options: { numPredict: 1_024, temperature: 0 } });
   if (!r.ok) return { ok: false, spec: null, team, problems: [`The Planner did not answer: ${r.error}`] };
   if (r.servedModel !== o.model) return { ok: false, spec: null, team, problems: [`The plan came from ${r.servedModel || "an unknown model"}, not the pinned ${o.model}.`] };
   let raw: { title?: unknown; steps?: unknown };
