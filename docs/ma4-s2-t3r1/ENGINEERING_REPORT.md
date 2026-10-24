@@ -37,9 +37,9 @@ MA4-S2-T3R1 — Beta Readiness Closure, Reliability Audit & Accessibility Qualif
 | **R1-G9** | Three user journeys pass | **`PARTIAL` (Journey A `PARTIAL`, Journey B `PASS`, Journey C `PASS`)** | [`END_TO_END_USER_JOURNEYS.md`](END_TO_END_USER_JOURNEYS.md), [`evidence/installed/journeys.json`](evidence/installed/journeys.json) |
 | **R1-G10** | No security or duplicate-execution regression | **`PASS` (`12/12` security invariants verified, `0` prod vulnerabilities)** | [`SECURITY_REGRESSION.md`](SECURITY_REGRESSION.md), [`evidence/release/audit.json`](evidence/release/audit.json) |
 | **R1-G11** | Performance acceptance maintained | **`PASS` (`9/9` performance metrics within acceptance bounds)** | [`PERFORMANCE_COMPARISON.md`](PERFORMANCE_COMPARISON.md) |
-| **R1-G12** | Full local regression passes | **`PASS` (`tsc`, web build, desktop build, `npm audit`, `npm test`)** | [`HOSTED_CI_RESULTS.md`](HOSTED_CI_RESULTS.md), [`evidence/release/regression.log`](evidence/release/regression.log) |
-| **R1-G13** | Final-head hosted CI passes | _Recorded in `HOSTED_CI_RESULTS.md` upon workflow completion_ | [`HOSTED_CI_RESULTS.md`](HOSTED_CI_RESULTS.md) |
-| **R1-G14** | Reproducible evidence and draft PR published | **`PASS`** | `docs/ma4-s2-t3r1/` + Draft PR |
+| **R1-G12** | Full local regression passes | **`PASS` (`tsc`, web build, desktop build, `npm audit`, `236/236` MA4, `58/58` Agent Team, `1,653/1,654` Stage 1+2 with `X53` local UIA timeout disclosed)** | [`HOSTED_CI_RESULTS.md`](HOSTED_CI_RESULTS.md), [`evidence/release/regression.log`](evidence/release/regression.log), [`evidence/release/test-ma4.log`](evidence/release/test-ma4.log) |
+| **R1-G13** | Final-head hosted CI passes | **`PASS` (Draft PR #29 runs `40122614572` / `40122627105`: `security` `SUCCESS`, `checks` `SUCCESS`)** | [`HOSTED_CI_RESULTS.md`](HOSTED_CI_RESULTS.md) |
+| **R1-G14** | Reproducible evidence and draft PR published | **`PASS` (Draft PR #29: `https://github.com/COMRADEART/bunny-A/pull/29`)** | `docs/ma4-s2-t3r1/` + Draft PR #29 |
 | **R1-G15** | Beta go/no-go decision documented | **`PASS` (`NO-GO` for General Beta documented)** | [`BETA_GO_NO_GO.md`](BETA_GO_NO_GO.md) |
 
 ---
