@@ -3,7 +3,7 @@ import { isTrustedLocalActor } from "../../bunny-missions/authorization.server.t
 import { CHECKPOINT_SECRET_PATTERNS } from "../agent-checkpoint.server.ts";
 import { FileScopeError, readText, relativeSegments, walk, type FileRootRegistry } from "./connectors/files.server.ts";
 import {
-  classify, decide, GoalSpecSchema, MAX_APPROVAL_MS, MonitorSpecSchema, nextSlot, observation, sanitize, ScheduleSpecSchema, slotsBetween, specHash,
+  classify, decide, GoalSpecSchema, MAX_APPROVAL_MS, MonitorSpecSchema, nextSlot, observation, sanitize, ScheduleSpecSchema, slotNote, slotsBetween, specHash,
   type Approval, type ChangeClass, type DecisionFacts, type MonitorSpec, type NotificationCategory, type Observation, type Outcome, type ScheduleSpec, type Trigger,
 } from "./proactive.ts";
 import { ProactiveConflictError, type GoalRecord, type Kind, type MonitorRecord, type NewNotification, type Occurrence, type ProactiveStore, type ScheduleRecord } from "./proactive-store.server.ts";
@@ -147,7 +147,7 @@ export class ProactiveEngine {
     if (problems.length) throw new Error(`Schedule refused: ${problems.join(" ")}`);
     const id = raw.id ?? `sch-${randomUUID()}`;
     const record: ScheduleRecord = { schema: "ma4.schedule.v1", id, projectId: spec.projectId, spec, specSha256: specHash(spec), state: "AWAITING_APPROVAL", approval: null,
-      cursor: now, nextAt: nextSlot(spec.trigger, now), retryAt: null, lastAttempt: null, lastFiredAt: null, createdAt: now, updatedAt: now };
+      cursor: Math.max(now, spec.startsAt ?? 0), nextAt: nextSlot(spec.trigger, Math.max(now, spec.startsAt ?? 0)), retryAt: null, lastAttempt: null, lastFiredAt: null, createdAt: now, updatedAt: now };
     const r = this.store.insert("schedule", record, WORKSTATION, now, [this.note("approval_required", "schedule", id, spec.title, "Approve this schedule before it can run.", "AWAITING_APPROVAL", "approve", `${id}:approval:${record.specSha256.slice(0, 12)}`)]);
     this.changed(`Schedule proposed: ${spec.title}`);
     return this.scheduleView(r.record, r.version);
@@ -161,7 +161,7 @@ export class ProactiveEngine {
         const problems = this.validateSchedule(s.spec, now);
         if (problems.length) throw new ProactiveConflictError(`Not approved: ${problems.join(" ")}`);
         s.approval = { by: "workstation", at: now, expiresAt: Math.min(now + ttl, s.spec.expiresAt), specSha256: s.specSha256 };
-        s.cursor = Math.max(s.cursor, now); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null;
+        s.cursor = Math.max(s.cursor, now, s.spec.startsAt ?? 0); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null;
       } });
     this.store.dismissApprovals(id);
     this.changed(`Schedule approved: ${r.record.spec.title}`);
@@ -173,7 +173,7 @@ export class ProactiveEngine {
     const spec = ScheduleSpecSchema.parse(rawSpec), now = this.now(), problems = this.validateSchedule(spec, now);
     if (problems.length) throw new Error(`Schedule change refused: ${problems.join(" ")}`);
     const r = this.store.update("schedule", id, { actor: WORKSTATION, reason: "changed by owner; approval needed again", now, from: ["AWAITING_APPROVAL", "ACTIVE", "PAUSED"], to: "AWAITING_APPROVAL", expectVersion: o.expectVersion,
-      mutate: s => { if (spec.projectId !== s.projectId) throw new ProactiveConflictError("A schedule cannot move to another project."); s.spec = spec; s.nextAt = nextSlot(spec.trigger, Math.max(s.cursor, now)); },
+      mutate: s => { if (spec.projectId !== s.projectId) throw new ProactiveConflictError("A schedule cannot move to another project."); s.spec = spec; s.cursor = Math.max(s.cursor, spec.startsAt ?? 0); s.nextAt = nextSlot(spec.trigger, Math.max(s.cursor, now)); },
       notify: [this.note("approval_required", "schedule", id, spec.title, "The schedule changed; approve it again before it runs.", "AWAITING_APPROVAL", "approve", `${id}:approval:${specHash(spec).slice(0, 12)}`)] });
     this.changed(`Schedule changed: ${spec.title}`);
     return this.scheduleView(r.record, r.version);
@@ -187,7 +187,7 @@ export class ProactiveEngine {
           const { record, version } = this.store.get("schedule", id);
           const live = !!record.approval && record.approval.expiresAt > now && record.approval.specSha256 === record.specSha256;
           return this.store.update("schedule", id, { actor, reason: live ? "resumed" : "resumed; its approval lapsed, so it waits for the owner", now, from: ["PAUSED"], expectVersion: version, to: live ? "ACTIVE" : "AWAITING_APPROVAL",
-            mutate: s => { s.cursor = Math.max(s.cursor, now); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null; } });
+            mutate: s => { s.cursor = Math.max(s.cursor, now, s.spec.startsAt ?? 0); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null; } });
         })();
     // Cancelling a schedule also stops the run it started (its processes are killed by the runtime); nothing new starts.
     if (control === "cancel") this.store.dismissApprovals(id);
@@ -255,6 +255,73 @@ export class ProactiveEngine {
     if (control === "disable") this.store.dismissApprovals(id);
     this.changed(`Monitor ${control}: ${r.record.spec.title}`);
     return this.monitorView(r.record, r.version);
+  }
+
+  // ── previews (MA4-S2-T3R): what the owner is about to approve, from the same validation the Host enforces ──────────
+
+  /** One plain sentence per step, from the Host's own facts (registered folders, pins), never from the model. */
+  private describeStep(step: { kind: string; input: Record<string, string | number | boolean | null>; model: string | null }) {
+    const root = typeof step.input.root === "string" ? this.deps.roots?.get(step.input.root)?.label ?? step.input.root : null, path = typeof step.input.path === "string" ? step.input.path : null;
+    const where = root ? `${path ? `${path} in ` : ""}folder "${root}"` : "";
+    const facts = this.deps.runtime.executorFacts().get(step.kind);
+    if (step.kind === "file.read") return `Read ${where}`;
+    if (step.kind === "file.stat") return `Check the size and date of ${where}`;
+    if (step.kind.startsWith("file.")) return `${step.kind.slice(5)} files in ${where}`;
+    if (step.kind === "local.generate") return `Write text with the local model ${step.model} (Worker)`;
+    if (step.kind === "local.review") return `Check that result with the local model ${step.model} (Reviewer)`;
+    return `${step.kind}${facts?.consequential ? " (needs your approval each time)" : ""}`;
+  }
+  private issues(error: { issues: { path: PropertyKey[]; message: string }[] }, what: string) {
+    return error.issues.map(i => `${i.path.map(String).join(".") || what}: ${i.message}`).slice(0, 8);
+  }
+  /** Workstation-only, changes nothing: the next runs, what each run does and reads, model use, approvals, expiry. */
+  previewSchedule(raw: unknown, actor: unknown) {
+    owner(actor, "Previewing a schedule");
+    const parsed = ScheduleSpecSchema.safeParse(raw), now = this.now();
+    if (!parsed.success) return { ok: false as const, problems: this.issues(parsed.error, "schedule") };
+    const spec = parsed.data, problems = this.validateSchedule(spec, now), next: { at: number; note: string | null }[] = [];
+    for (let t = nextSlot(spec.trigger, Math.max(now, spec.startsAt ?? 0)); t !== null && next.length < 3 && t <= spec.expiresAt; t = nextSlot(spec.trigger, t)) next.push({ at: t, note: slotNote(spec.trigger, t) });
+    const facts = this.deps.runtime.executorFacts(), task = spec.action.type === "task" ? spec.action : null;
+    const steps = task?.spec.steps ?? [], gpu = steps.filter(x => facts.get(x.kind)?.gpu), consequential = steps.filter(x => facts.get(x.kind)?.consequential);
+    return {
+      ok: problems.length === 0, problems, trigger: this.triggerText(spec.trigger), next,
+      willDo: task ? steps.map(x => this.describeStep(x)) : [`Show the reminder: "${sanitize(spec.action.type === "remind" ? spec.action.text : "", 200)}"`],
+      reads: (task?.envelope.grants?.files ?? []).map(f => `Folder "${this.deps.roots?.get(f.root)?.label ?? f.root}" (${f.access})`),
+      model: { runs: gpu.length > 0, calls: gpu.length, models: [...new Set(gpu.flatMap(x => x.model ? [x.model] : []))] },
+      approvals: consequential.map(x => `${this.describeStep(x)}: each time, in the Approval Center`),
+      background: task ? task.envelope.background : false, missedPolicy: spec.missedPolicy, graceMs: spec.graceMs, maxRunsPerDay: spec.maxRunsPerDay,
+      budget: task ? task.envelope.budgets : null, expiresAt: spec.expiresAt, approvalUntil: Math.min(now + MAX_APPROVAL_MS, spec.expiresAt),
+    };
+  }
+  previewMonitor(raw: unknown, actor: unknown) {
+    owner(actor, "Previewing a monitor");
+    const parsed = MonitorSpecSchema.safeParse(raw), now = this.now();
+    if (!parsed.success) return { ok: false as const, problems: this.issues(parsed.error, "monitor") };
+    const spec = parsed.data, problems = this.validateMonitor(spec, now), src = spec.source, p = spec.predicate;
+    const reads = src.kind === "file" ? `${src.field ? `the "${src.field}" field of ` : "the first line of "}${src.path} in folder "${this.deps.roots?.get(src.root)?.label ?? src.root}"` : src.kind === "task" ? "the state of one of your tasks" : `the registered source "${src.name}"`;
+    const condition = p.type === "changed" ? "whenever it changes" : p.type === "equals" ? `when it becomes "${p.value}"` : `when it changes${p.from !== undefined ? ` from "${p.from}"` : ""} to "${p.to}"`;
+    const interval = Math.max(spec.intervalMs, this.store.policy().minIntervalMs);
+    return { ok: problems.length === 0, problems, reads, condition, everyMs: interval, checksPerHour: Math.min(spec.maxChecksPerHour, Math.floor(3_600_000 / interval)), model: { runs: false },
+      notify: spec.notify, dedupMs: spec.dedupMs, expiresAt: spec.expiresAt, approvalUntil: Math.min(now + MAX_APPROVAL_MS, spec.expiresAt), baseline: "The first check after approval only records the current value." };
+  }
+  previewGoal(raw: unknown, actor: unknown) {
+    owner(actor, "Previewing a goal");
+    const parsed = GoalSpecSchema.safeParse(raw), now = this.now();
+    if (!parsed.success) return { ok: false as const, problems: this.issues(parsed.error, "goal") };
+    const spec = parsed.data, problems: string[] = [];
+    if (spec.expiresAt <= now) problems.push("The goal's end date is already past.");
+    if (spec.deadlineAt !== null && spec.deadlineAt > spec.expiresAt) problems.push("The deadline lies beyond the goal's end date.");
+    if ([spec.title, spec.description, ...spec.successCriteria.map(c => c.description)].some(containsSecret)) problems.push("The goal text looks like it contains a credential.");
+    return { ok: problems.length === 0, problems, criteria: spec.successCriteria.length, permittedActions: spec.permittedActions, maxTasks: spec.budget.maxTasks, deadlineAt: spec.deadlineAt, expiresAt: spec.expiresAt,
+      progressRule: "A criterion counts as met only when a linked task completes with verified step receipts.", activation: "Nothing happens until you approve it; it then only tracks work you link or schedule." };
+  }
+  /** The schedule and goal a task belongs to, for the Approval Center (titles only). */
+  taskContext(taskId: string): { schedule: string | null; goal: string | null } {
+    const o = this.store.occurrenceOfTask(taskId);
+    let schedule: string | null = null, goal: string | null = null;
+    if (o) try { const s = this.store.get("schedule", o.scheduleId).record; schedule = sanitize(s.spec.title, 120); if (s.spec.goal) goal = sanitize(this.store.get("goal", s.spec.goal.id).record.spec.title, 120); } catch { /* unreadable: no context */ }
+    if (!goal) for (const g of this.store.list("goal")) if (g.ok && g.record.links.some(l => l.taskId === taskId)) { goal = sanitize(g.record.spec.title, 120); break; }
+    return { schedule, goal };
   }
 
   // ── notifications, preferences and policy ─────────────────────────────────────────────────────────────────────────
@@ -576,7 +643,7 @@ export class ProactiveEngine {
             // Exponential backoff after source errors, capped at an hour.
             x.nextCheckAt = at + (errored ? Math.min(interval * 2 ** Math.min(errors, 6), HOUR) : interval);
             if (obs.ok) { x.last = { value: obs.value, sha256: obs.sha256, at }; x.baseline ??= { value: obs.value, sha256: obs.sha256, at }; }
-            if (cls === "meaningful") { x.changeSeq += 1; if (notify.some(n => n.category === "source_changed")) x.lastNotifiedAt = at; }
+            if (cls === "meaningful") { x.changeSeq += 1; x.lastChangeAt = at; if (notify.some(n => n.category === "source_changed")) x.lastNotifiedAt = at; }
           } });
       } catch (e) { if (e instanceof ProactiveConflictError) continue; throw e; }
       if (cls !== "meaningful") continue;
@@ -641,11 +708,11 @@ export class ProactiveEngine {
     return { id: s.id, title: sanitize(s.spec.title, 120), projectId: s.projectId, state: s.state, version, trigger: this.triggerText(s.spec.trigger), action: s.spec.action.type,
       nextAt: s.state === "ACTIVE" ? (s.retryAt ?? s.nextAt) : null, lastAttempt: s.lastAttempt ? { at: s.lastAttempt.at, outcome: s.lastAttempt.outcome, reason: sanitize(s.lastAttempt.reason, 160) } : null,
       approvedUntil: s.approval && s.approval.specSha256 === s.specSha256 ? s.approval.expiresAt : null, goalId: s.spec.goal?.id ?? null, missedPolicy: s.spec.missedPolicy,
-      runningTaskId: active, expiresAt: s.spec.expiresAt, updatedAt: s.updatedAt };
+      runningTaskId: active, expiresAt: s.spec.expiresAt, startsAt: s.spec.startsAt, updatedAt: s.updatedAt };
   }
   monitorView(m: MonitorRecord, version: number) {
     return { id: m.id, title: sanitize(m.spec.title, 120), label: sanitize(m.spec.label, 60), projectId: m.projectId, state: m.state, version, source: m.spec.source.kind,
-      lastCheckAt: m.lastCheckAt, lastClass: m.lastClass, nextCheckAt: m.state === "ACTIVE" ? m.nextCheckAt : null, errors: m.errors, changes: m.changeSeq,
+      lastCheckAt: m.lastCheckAt, lastClass: m.lastClass, nextCheckAt: m.state === "ACTIVE" ? m.nextCheckAt : null, errors: m.errors, changes: m.changeSeq, lastChangeAt: m.lastChangeAt ?? null,
       checksLastHour: this.store.checksSince(m.id, this.now() - HOUR), intervalMs: Math.max(m.spec.intervalMs, this.store.policy().minIntervalMs),
       approvedUntil: m.approval && m.approval.specSha256 === m.specSha256 ? m.approval.expiresAt : null, expiresAt: m.spec.expiresAt, updatedAt: m.updatedAt };
   }
@@ -665,7 +732,7 @@ export class ProactiveEngine {
     if (done) parts.push(`${done} scheduled task${done === 1 ? "" : "s"} completed`);
     if (failed) parts.push(`${failed} failed`);
     if (reminders) parts.push(`${reminders} reminder${reminders === 1 ? "" : "s"}`);
-    if (checks) parts.push(changes ? `${changes} change${changes === 1 ? "" : "s"} found in ${checks} checks` : `${checks} checks, no changes`);
+    if (checks) parts.push(changes ? `${changes} change${changes === 1 ? "" : "s"} found in ${checks} check${checks === 1 ? "" : "s"}` : `${checks} check${checks === 1 ? "" : "s"}, no changes`);
     if (missed) parts.push(`${missed} run${missed === 1 ? "" : "s"} missed or skipped`);
     for (const g of gaps) parts.push(`Bunny-A was ${g.kind === "off" ? "not running" : "asleep"} for ${duration(g.to - Math.max(g.from, since))}; nothing ran then`);
     return parts.length ? { since, text: parts.join(" · ") } : null;

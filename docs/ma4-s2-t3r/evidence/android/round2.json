@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-24T03:54Z",
+  "runner": "Claude (after the Codex session was stopped by the owner)",
+  "device": "SM-S948U (R3GL1025V4J), Android 17, app com.routeragent.jev 2.1 (3)",
+  "host": "installed Bunny-A-Windows-S2T3R4-TEST (source 8802e0c), test port 43191, isolated profile",
+  "transport": "owner-authorized temporary Cloudflare quick tunnel to the test gateway only; first (http2) tunnel dropped edge connections and served empty assets, replaced by a QUIC quick tunnel; stopped 03:54:18Z and remote.json removed",
+  "method": "adb UI automation of the real app (uiautomator dump, taps, typing) plus Host transition records; no emulator, no desktop browser",
+  "checks": [
+    { "name": "unpaired caller refused over the public address", "pass": true, "detail": "events 401 without cookie and with a forged cookie; pairing with a wrong code 403" },
+    { "name": "wrong code refused on the phone", "pass": true, "detail": "app showed 'Invalid or expired pairing code.'" },
+    { "name": "pair with a one-time code; authenticated live session", "pass": true, "detail": "app shows 'Live from your PC'" },
+    { "name": "phone offers no Approve for a waiting schedule or task", "pass": true, "detail": "'Approve this on your PC.' + Reject only; 'Approve or resolve this on your PC.' + Cancel only (r2-no-approve-on-phone.png)" },
+    { "name": "pause then resume a schedule from the phone", "pass": true, "detail": "Host transitions ACTIVE->PAUSED 03:40:08Z and PAUSED->ACTIVE 03:40:15Z by device:f88e17ac; supersedes the round-1 harness false negative" },
+    { "name": "Host outage: last known with timestamp, controls disabled", "pass": true, "detail": "'Showing last known state from 11:41 PM. Controls are paused.' (Host stopped 03:41:12Z); 0 mutating controls" },
+    { "name": "Host restart: phone reconnects without user action", "pass": true, "detail": "Host up 03:46:56Z (new pid), phone Live 03:47:21Z; schedule state matched the Host" },
+    { "name": "revoked pairing ends access", "pass": true, "detail": "revoked 03:47:52Z; phone back to the pairing form 03:47:58Z with 0 controls" },
+    { "name": "background/foreground", "pass": true, "detail": "home 30 s, reopened, Live again within ~4 s" }
+  ],
+  "notTested": ["TalkBack screen reader", "battery saver", "cellular-only network switch"],
+  "finding": "Host files a malformed JSON command body as an internal 'Host command failed' (host-failures.jsonl) instead of a 400 refusal; caused by the test helper, low severity"
+}

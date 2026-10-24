@@ -19,9 +19,34 @@ export const PTASK_SAFE_ACTIONS = ["ptask.list", "ptask.get", "ptask.pause", "pt
 
 const id = (value: unknown) => { if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(value)) throw new CommandRefusedError("Invalid task id."); return value; };
 const hash = (value: unknown) => { if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) throw new CommandRefusedError("Name the exact payload hash you reviewed."); return value; };
+/**
+ * MA4-S2-T3R Approval Center context: who asks, for which task (and schedule or goal), what kind of effect, under which
+ * exact grants, what should happen, and what recovery does if the Host stops mid-action. Host facts only; workstation-only.
+ */
+export function actionContext(rt: PersistentTaskRuntime, id: string, owners?: { taskContext(taskId: string): { schedule: string | null; goal: string | null } }) {
+  const { record } = rt.store.get(id), p = record.pendingAction;
+  if (!p) return null;
+  const facts = rt.executorFacts().get(p.kind), category = facts?.category ?? "irreversible", index = record.spec.steps.findIndex(s => s.id === p.stepId);
+  const g = record.envelope.grants;
+  const scope = [
+    ...(g?.files ?? []).map(f => `Folder ${f.root} (${f.access})`),
+    ...(g?.origins ?? []).map(o => `Website ${o} (read)`),
+    ...(g?.services ?? []).map(s => `${s.connector} account ${s.account} (${s.access}${s.recipients.length ? `; only to ${s.recipients.join(", ")}` : ""})`),
+  ];
+  const recovery = category === "irreversible"
+    ? "If Bunny-A stops while this runs, it is never sent again on its own: you will be asked whether it happened."
+    : category === "idempotent"
+      ? "If Bunny-A stops while this runs, it first checks (by this action's key) whether it was already applied, and only then tries once more."
+      : "Read-only: repeating it changes nothing.";
+  return {
+    task: record.spec.title, taskId: id, step: `${p.stepId} (step ${index + 1} of ${record.spec.steps.length})`, role: p.kind === "local.review" ? "Reviewer" : "Worker",
+    operation: p.kind, sideEffect: `${category.replace("_", "-")}${facts?.consequential ? ", consequential" : ""}${p.reversible ? ", reversible" : ", cannot be undone"}`,
+    scope, expected: p.effects.join(" "), recovery, approvalExpiresAt: p.expiresAt, taskExpiresAt: record.envelope.expiresAt, ...(owners?.taskContext(id) ?? { schedule: null, goal: null }),
+  };
+}
 const actionId = (value: unknown) => { if (typeof value !== "string" || !/^act-[a-f0-9-]{36}$/.test(value)) throw new CommandRefusedError("Invalid action id."); return value; };
 
-export async function ptaskCommand(rt: PersistentTaskRuntime, action: string, data: Record<string, unknown>, actor: string, connected?: ConnectedActions): Promise<unknown> {
+export async function ptaskCommand(rt: PersistentTaskRuntime, action: string, data: Record<string, unknown>, actor: string, connected?: ConnectedActions, owners?: Parameters<typeof actionContext>[2]): Promise<unknown> {
   if (WORKSTATION_ONLY.has(action) && !isTrustedLocalActor(actor)) throw new WorkstationRequiredError("Creating, approving and resolving persistent tasks happens on the Windows workstation.");
   try {
     switch (action) {
@@ -42,7 +67,7 @@ export async function ptaskCommand(rt: PersistentTaskRuntime, action: string, da
       case "ptask.output": return rt.store.output(id(data.id), id(data.stepId));
       case "action.approve": return rt.approveAction(id(data.id), actionId(data.actionId), hash(data.payloadSha256), actor, { ttlMs: typeof data.ttlMs === "number" ? data.ttlMs : undefined });
       case "action.deny": return rt.denyAction(id(data.id), actionId(data.actionId), actor);
-      case "action.inspect": return { action: rt.pendingAction(id(data.id), actor), receipts: connected?.ledger.list(id(data.id), 50) ?? [] };
+      case "action.inspect": { const action = rt.pendingAction(id(data.id), actor); return { action, context: action ? actionContext(rt, id(data.id), owners) : null, receipts: connected?.ledger.list(id(data.id), 50) ?? [] }; }
       case "action.receipts": return { receipts: connected?.ledger.list(id(data.id)) ?? [], chain: connected?.ledger.verify() ?? null };
       case "connector.roots.list": return { roots: connected?.roots.list() ?? [] };
       case "connector.roots.set": { if (!connected) throw new CommandRefusedError("Connected actions are not available."); return { roots: connected.roots.set(data.roots) }; }

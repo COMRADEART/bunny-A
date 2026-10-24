@@ -779,9 +779,6 @@ async function openHost(
   const deviceCommands = new WindowLimiter(60, 60_000);
   const deviceReads = new WindowLimiter(300, 60_000);
   const deviceStreamOpens = new WindowLimiter(30, 60_000);
-  // M-A-2 T9: this Host just applied its own additive schema; reconcile the installed-state marker
-  // with the applied schema so the next boot validates a healthy database instead of refusing it.
-  refreshStateMarker({ installed: paths.installed, data: paths.data, database: paths.database });
   let presentationRevision = 0;
   const installedIdentity = releaseIdentity();
   const snapshot = (after: number): HostSnapshot => {
@@ -1281,7 +1278,7 @@ async function openHost(
           throw new CommandRefusedError("Remote approval can only answer the exact Host offer.");
         extra = await agentCommand(agents, input.action, data, actor);
       } else if (typeof input.action === "string" && PTASK_ACTIONS.has(input.action)) {
-        extra = { data: await ptaskCommand(ptasks, input.action, data, actor, connected) };
+        extra = { data: await ptaskCommand(ptasks, input.action, data, actor, connected, proactive) };
       } else if (typeof input.action === "string" && PROACTIVE_ACTIONS.has(input.action)) {
         extra = { data: await proactiveCommand(proactive, input.action, data, actor) };
       } else if (typeof input.action === "string" && VOICE_ACTIONS.has(input.action)) {
@@ -2226,6 +2223,11 @@ async function openHost(
     if (cause === "revocation") await missions.endDeviceDriven(deviceActor);
     return { answers, staged, batches, delegations, approvals, unstopped };
   };
+  // Record the final boot schema only after every store has initialized. Presentation
+  // stores (voice preferences, appearance, theme and widgets) also add tables; recording
+  // before them makes the next installed launch reject this healthy database.
+  // Boot validation still runs before any store opens, so unknown/corrupt state is refused.
+  refreshStateMarker({ installed: paths.installed, data: paths.data, database: paths.database });
   attach((req, res) => {
     const requestId = randomUUID();
     res.on("error", () => {
