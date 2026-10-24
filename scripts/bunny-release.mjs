@@ -76,8 +76,9 @@ export function verifyRelease(release) {
 }
 
 // Statement-anchored so strings such as `"legacy.import": {` are not read as imports. `import type` / `export type`
-// lines are erased by --experimental-strip-types and never resolved at runtime.
-const STATIC_FROM = /^\s*(?:import|export)\s+(type\s+)?[^;]*?\bfrom\s*["']([^"'\n]+)["']/gm;
+// lines are erased by --experimental-strip-types and never resolved at runtime. A quoted "from" (a type such as
+// `Pick<T, "from" | "to">` on an export line) is not the keyword.
+const STATIC_FROM = /^\s*(?:import|export)\s+(type\s+)?[^;]*?(?<!["'])\bfrom\s*["']([^"'\n]+)["']/gm;
 const SIDE_EFFECT = /^\s*import\s*["']([^"'\n]+)["']/gm;
 const DYNAMIC = /\bimport\(\s*["']([^"'\n]+)["']\s*\)/g;
 /** Packages the Host loads only through a guarded dynamic import; absent, the capability reports itself unavailable. */

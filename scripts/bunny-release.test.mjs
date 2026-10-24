@@ -234,3 +234,17 @@ test("M-A-1D/M-A-2: install pins startup outside Git, requires canonical state, 
     rmSync(temp, { recursive: true, force: true, maxRetries: 40, retryDelay: 500 });
   }
 });
+
+test("MA4-S2-T3R: a quoted \"from\" in an exported type is not an import (closure false positive)", () => {
+  const temp = mkdtempSync(join(TEMP, "bunny-closure-"));
+  try {
+    mkdirSync(join(temp, "scripts"));
+    writeFileSync(join(temp, "Bunny-Host.mjs"), 'import { f } from "./a.ts";\n');
+    writeFileSync(join(temp, "scripts/bunny-tunnel.mjs"), "");
+    writeFileSync(join(temp, "a.ts"), 'export function f(m: Pick<H, "from" | "trust" | "content">): string { return ""; }\nexport { g } from "./b.ts";\n');
+    writeFileSync(join(temp, "b.ts"), "export const g = 1;\n");
+    const closure = importClosure(temp);
+    assert.deepEqual(closure.packages, []);
+    assert.ok(closure.files.includes("b.ts") && closure.ok, JSON.stringify(closure));
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});
