@@ -37,9 +37,12 @@ try {
   if(health.pid!==old.pid||health.instanceId!==old.instanceId)throw Error('Host identity mismatch');
   const ps=`$p=Get-CimInstance Win32_Process -Filter 'ProcessId=${old.pid}'; if($p){[pscustomobject]@{path=$p.ExecutablePath;line=$p.CommandLine}|ConvertTo-Json -Compress}`;
   const identity=JSON.parse(execFileSync('powershell.exe',['-NoProfile','-Command',ps],{encoding:'utf8'}));
-  if(identity.path.toLowerCase()!==join(config.currentRelease.folder,'runtime/node.exe').replaceAll('/','\\').toLowerCase()||!identity.line.includes('Bunny-Host.mjs'))throw Error('Installed process mismatch');
+  if(resolve(identity.path).toLowerCase()!==resolve(config.currentRelease.folder,'runtime/node.exe').toLowerCase()||!identity.line.includes('Bunny-Host.mjs'))throw Error('Installed process mismatch');
   process.kill(old.pid); const down=await until(async()=>{try{await fetch(base+'/health',{signal:AbortSignal.timeout(500)});return false;}catch{return true;}});
   check('only the identified test Host stops',!!down);
+  const offlineMs=Number(process.argv[4]??0);
+  if(!Number.isFinite(offlineMs)||offlineMs<0||offlineMs>60_000)throw Error('Offline window must be 0..60000 ms.');
+  if(offlineMs) await sleep(offlineMs);
   const t0=Date.now();
   const launcher=spawn(join(process.env.WINDIR,'System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-ExecutionPolicy','Bypass','-File',join(config.currentRelease.folder,'Start-Bunny-Release.ps1'),'-InstallConfig',join(install,'install.json'),'-NoIsland','-NoRemote'],{stdio:'ignore',windowsHide:true,env:{...process.env,PSModulePath:join(process.env.WINDIR,'System32/WindowsPowerShell/v1.0/Modules'),USERPROFILE:join(install,'../isolated-user'),APPDATA:join(install,'../isolated-user/Roaming'),LOCALAPPDATA:join(install,'../isolated-user/Local'),PATH:process.env.WINDIR+'\\System32;'+join(config.currentRelease.folder,'runtime')}});
   let launchError = null; launcher.on("error", e => { launchError = e; }); launcher.unref();
