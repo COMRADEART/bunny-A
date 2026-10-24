@@ -4,7 +4,10 @@
  * - T7-B: Privacy & telemetry governance (optional telemetry OFF by default; prompts, file contents, tokens never collected).
  * - T7-C: Crash, hang, sleep/wake & corruption fail-closed recovery verification.
  * - T7-E: Local-first beta feedback store with full user preview, redaction, and history clearing.
+ * MA4-S3-T0: optional durable file backing so opt-in feedback survives Host restart (no remote upload).
  */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 export type OperationalHealthSummary = {
   schema: "bunny-operational-health/1";
@@ -262,9 +265,24 @@ export type BetaFeedbackEntry = {
   remoteUploadDispatched: false;
 };
 
+type DurableFeedbackFile = {
+  schema: "bunny-beta-feedback/1";
+  optIn: boolean;
+  entries: BetaFeedbackEntry[];
+};
+
 export class LocalBetaFeedbackStore {
   private entries: BetaFeedbackEntry[] = [];
   private optIn = false;
+  private readonly filePath: string | null;
+  private readonly maxEntries: number;
+
+  /** When `filePath` is set, opt-in and entries survive process restart. Default remains in-memory (tests). */
+  constructor(options?: { filePath?: string | null; maxEntries?: number }) {
+    this.filePath = options?.filePath ?? null;
+    this.maxEntries = options?.maxEntries ?? 200;
+    this.load();
+  }
 
   isOptedIn(): boolean {
     return this.optIn;
@@ -272,6 +290,7 @@ export class LocalBetaFeedbackStore {
 
   setOptIn(enabled: boolean): void {
     this.optIn = Boolean(enabled);
+    this.persist();
   }
 
   previewEntry(input: {
@@ -304,6 +323,8 @@ export class LocalBetaFeedbackStore {
     }
     const entry = this.previewEntry(input);
     this.entries.push(entry);
+    if (this.entries.length > this.maxEntries) this.entries = this.entries.slice(-this.maxEntries);
+    this.persist();
     return entry;
   }
 
@@ -311,7 +332,47 @@ export class LocalBetaFeedbackStore {
     return [...this.entries];
   }
 
+  /** Local export only — never uploads. Returns a sanitized JSON document the owner can copy. */
+  exportLocal(): DurableFeedbackFile {
+    return {
+      schema: "bunny-beta-feedback/1",
+      optIn: this.optIn,
+      entries: this.entries.map((e) => ({
+        ...e,
+        summary: redactDiagnosticString(e.summary),
+        details: redactDiagnosticString(e.details),
+        attachedSupportBundle: e.attachedSupportBundle
+          ? (scrubDiagnosticValue(e.attachedSupportBundle) as SanitizedSupportBundle)
+          : null,
+        remoteUploadDispatched: false as const,
+      })),
+    };
+  }
+
   clearHistory(): void {
     this.entries = [];
+    this.persist();
+  }
+
+  private load(): void {
+    if (!this.filePath || !existsSync(this.filePath)) return;
+    try {
+      const raw = JSON.parse(readFileSync(this.filePath, "utf8")) as DurableFeedbackFile;
+      if (raw?.schema !== "bunny-beta-feedback/1") return;
+      this.optIn = Boolean(raw.optIn);
+      this.entries = Array.isArray(raw.entries) ? raw.entries.slice(-this.maxEntries) : [];
+    } catch {
+      /* Corrupt file: start empty; never throw during Host boot. */
+    }
+  }
+
+  private persist(): void {
+    if (!this.filePath) return;
+    try {
+      mkdirSync(dirname(this.filePath), { recursive: true });
+      writeFileSync(this.filePath, JSON.stringify(this.exportLocal(), null, 2), "utf8");
+    } catch {
+      /* Persistence failure must not break submit/list in memory for this session. */
+    }
   }
 }

@@ -112,7 +112,7 @@ const state = (e: Env, id: string) => e.store.get(id).record.state;
 test("T1 state machine: explicit table, terminal states never exit, UNCERTAIN leaves only by reconciliation targets", () => {
   for (const from of TASK_STATES) for (const to of TASK_STATES) assert.equal(taskCanTransition(from, to), TASK_NEXT[from].includes(to), `${from}→${to}`);
   for (const terminal of ["COMPLETED", "FAILED", "CANCELLED"] as TaskState[]) assert.deepEqual(TASK_NEXT[terminal], []);
-  assert.deepEqual([...TASK_NEXT.UNCERTAIN].sort(), ["CANCELLED", "FAILED", "QUEUED"]);
+  assert.deepEqual([...TASK_NEXT.UNCERTAIN].sort(), ["FAILED", "QUEUED"]);
   assert.equal(taskCanTransition("UNCERTAIN", "COMPLETED"), false, "an uncertain action is never turned into success without evidence");
   assert.equal(taskCanTransition("QUEUED", "COMPLETED"), false);
   assert.equal(displayState({ state: "RESUMING", blocked: null }), "Recovering");
@@ -341,6 +341,12 @@ test("T1-5 cancelling during an irreversible send after dispatch yields UNCERTAI
     assert.equal(state(e, t.id), "UNCERTAIN"); assert.equal(e.world.sent.length, 1);
     await settle(e);
     assert.equal(e.world.sent.length, 1);
+    // MA4-S3-T0: UNCERTAIN cannot be cancelled (phone or PC) — only reconciled on the workstation.
+    assert.throws(() => e.rt.cancel(t.id, "phone:device-1"), /reconciled on the Windows workstation/);
+    assert.throws(() => e.rt.cancel(t.id, "workstation"), /reconciled on the Windows workstation/);
+    assert.equal(state(e, t.id), "UNCERTAIN");
+    e.rt.reconcile(t.id, "abandon", "workstation");
+    assert.equal(state(e, t.id), "FAILED");
   } finally { cleanup(e); }
 });
 

@@ -14,7 +14,7 @@ test("S2-T1 task rows: Host facts only, urgent first, real step counts and evide
     { ...base, id: "c", state: "COMPLETED", display: "Completed", progress: { done: 3, total: 3, current: null }, evidence: [{ stepId: "a", outputSha256: "abcdef0123456789" }] }]), live);
   assert.deepEqual(rows.map(r => r.id), ["u", "t", "c"]);
   assert.equal(rows[1].progress, "Step 2 of 3"); assert.equal(rows[1].tone, "active"); assert.deepEqual(rows[1].controls, ["pause", "cancel"]);
-  assert.deepEqual(rows[0].controls, ["reconcile", "cancel"]); assert.match(rows[0].detail!, /may or may not have happened/);
+  assert.deepEqual(rows[0].controls, ["reconcile"]); assert.match(rows[0].detail!, /may or may not have happened/);
   assert.equal(rows[2].progress, "All 3 steps completed"); assert.equal(rows[2].evidence, "1 step receipt · abcdef01"); assert.deepEqual(rows[2].controls, []);
 });
 

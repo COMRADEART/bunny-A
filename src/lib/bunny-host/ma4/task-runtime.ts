@@ -20,7 +20,8 @@ export const TASK_NEXT: Readonly<Record<TaskState, readonly TaskState[]>> = {
   RUNNING: ["PAUSED", "RESUMING", "COMPLETED", "FAILED", "CANCELLED", "UNCERTAIN", "AWAITING_APPROVAL"],
   PAUSED: ["RESUMING", "FAILED", "CANCELLED"],
   RESUMING: ["RUNNING", "PAUSED", "AWAITING_APPROVAL", "FAILED", "CANCELLED", "UNCERTAIN"],
-  UNCERTAIN: ["QUEUED", "FAILED", "CANCELLED"],
+  // CANCELLED removed in MA4-S3-T0: UNCERTAIN exits only via reconcile (QUEUED / FAILED). Phone cancel is refused.
+  UNCERTAIN: ["QUEUED", "FAILED"],
   COMPLETED: [], FAILED: [], CANCELLED: [],
 };
 export const TERMINAL_TASK_STATES: readonly TaskState[] = ["COMPLETED", "FAILED", "CANCELLED"];

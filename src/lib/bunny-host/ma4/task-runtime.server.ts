@@ -255,6 +255,10 @@ export class PersistentTaskRuntime {
   cancel(id: string, actor: string): TaskView {
     const now = this.now(), { record } = this.store.get(id);
     if (TERMINAL_TASK_STATES.includes(record.state)) throw new TaskConflictError(`The task is already ${record.state}.`);
+    // MA4-S3-T0: UNCERTAIN leaves only through owner reconciliation — never via phone cancel (no blind settle).
+    if (record.state === "UNCERTAIN") {
+      throw new TaskConflictError("An uncertain action must be reconciled on the Windows workstation (happened, not_happened, or abandon).");
+    }
     const running = this.active.get(id);
     if (record.state === "RUNNING") {
       // The holder (here, or another Host instance at its next lease check) stops the work and records the outcome.

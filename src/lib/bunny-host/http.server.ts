@@ -33,6 +33,8 @@ import { connectedActions, type ConnectedOptions } from "./ma4/connected-actions
 import { ProactiveStore } from "./ma4/proactive-store.server.ts";
 import { ProactiveEngine, type ProactiveDeps } from "./ma4/proactive.server.ts";
 import { PROACTIVE_ACTIONS, PROACTIVE_SAFE_ACTIONS, proactiveCommand } from "./ma4/proactive-commands.server.ts";
+import { LocalBetaFeedbackStore, type BetaFeedbackCategory } from "./ma4/diagnostics-feedback.ts";
+import { isTrustedLocalActor } from "../bunny-missions/authorization.server.ts";
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
 import { SLOT_IDS, clean, isUserFacingAgent, projectPersonalAgents, type SlotId } from "./personal-agents.ts";
 import { WorkerStore } from "./workers.server.ts";
@@ -452,6 +454,9 @@ async function openHost(
   // each wrapped by the permission broker. A folder may never contain or sit inside the Host's own state.
   const connected = connectedActions({ db, dataDirectory, protectedPaths: [dataDirectory, dirname(credentialPath), paths.diagnostics, paths.runtime], containment, ...options.connected });
   undo.push(() => connected.close());
+  // MA4-S3-T0: durable local-only beta feedback (opt-in, no remote upload). Survives Host restart via diagnostics dir.
+  const betaFeedback = new LocalBetaFeedbackStore({ filePath: join(paths.diagnostics, "beta-feedback.json") });
+  const FEEDBACK_ACTIONS = new Set(["feedback.opt_in", "feedback.opt_out", "feedback.status", "feedback.preview", "feedback.submit", "feedback.list", "feedback.export", "feedback.clear"]);
   const ptasks = new PersistentTaskRuntime({
     store: new TaskStore(db),
     ...productionTaskDeps(),
@@ -462,7 +467,8 @@ async function openHost(
     instanceId: manager.instanceId,
     uiAttached: () => workstationClients.streams > 0 || Date.now() - workstationClients.seen < 20_000,
     // MA4-S2-T3: a task change wakes the proactive engine (settling scheduled runs, goal progress) without polling.
-    emit: (type, detail) => { manager.emit(db.event(type, null, detail)); if (type === "ptask.changed") proactive?.wake(); },
+    // MA4-S3-T0: preserve taskId so /events?task= and UI projections can follow ptask.* evidence.
+    emit: (type, detail, taskId) => { manager.emit(db.event(type, taskId ?? null, detail)); if (type === "ptask.changed") proactive?.wake(); },
     // Started only after this Host holds its port (below), so a lease left by any other instance is a dead Host's.
     exclusive: true,
   });
@@ -1279,6 +1285,17 @@ async function openHost(
         extra = await agentCommand(agents, input.action, data, actor);
       } else if (typeof input.action === "string" && PTASK_ACTIONS.has(input.action)) {
         extra = { data: await ptaskCommand(ptasks, input.action, data, actor, connected, proactive) };
+      } else if (typeof input.action === "string" && FEEDBACK_ACTIONS.has(input.action)) {
+        if (!isTrustedLocalActor(actor)) throw new WorkstationRequiredError("Beta feedback stays on the Windows workstation.");
+        const cat = data.category as BetaFeedbackCategory;
+        if (input.action === "feedback.opt_in") { betaFeedback.setOptIn(true); extra = { data: { optedIn: true } }; }
+        else if (input.action === "feedback.opt_out") { betaFeedback.setOptIn(false); extra = { data: { optedIn: false } }; }
+        else if (input.action === "feedback.status") extra = { data: { optedIn: betaFeedback.isOptedIn(), count: betaFeedback.list().length } };
+        else if (input.action === "feedback.preview") extra = { data: betaFeedback.previewEntry({ now: Date.now(), category: cat, summary: String(data.summary ?? ""), details: String(data.details ?? "") }) };
+        else if (input.action === "feedback.submit") extra = { data: betaFeedback.submit({ now: Date.now(), category: cat, summary: String(data.summary ?? ""), details: String(data.details ?? "") }) };
+        else if (input.action === "feedback.list") extra = { data: { entries: betaFeedback.list() } };
+        else if (input.action === "feedback.export") extra = { data: betaFeedback.exportLocal() };
+        else if (input.action === "feedback.clear") { betaFeedback.clearHistory(); extra = { data: { cleared: true } }; }
       } else if (typeof input.action === "string" && PROACTIVE_ACTIONS.has(input.action)) {
         extra = { data: await proactiveCommand(proactive, input.action, data, actor) };
       } else if (typeof input.action === "string" && VOICE_ACTIONS.has(input.action)) {

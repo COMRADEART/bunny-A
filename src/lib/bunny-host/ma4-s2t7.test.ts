@@ -122,7 +122,30 @@ test("T7-E: LocalBetaFeedbackStore requires opt-in, redacts details on preview/s
   assert.equal(entry.details.includes("tester@example.org"), false);
   assert.equal(entry.details.includes("gsk_1234567890"), false);
   assert.equal(store.list().length, 1);
+  const exported = store.exportLocal();
+  assert.equal(exported.schema, "bunny-beta-feedback/1");
+  assert.equal(exported.entries.length, 1);
+  assert.equal(exported.optIn, true);
 
   store.clearHistory();
   assert.equal(store.list().length, 0);
+});
+
+test("S3-T0: LocalBetaFeedbackStore with filePath survives a new instance (Host restart)", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const dir = mkdtempSync(join(tmpdir(), "bunny-fb-"));
+  const filePath = join(dir, "beta-feedback.json");
+  try {
+    const first = new LocalBetaFeedbackStore({ filePath });
+    first.setOptIn(true);
+    first.submit({ now: 1_700_000_000_100, category: "bug", summary: "Restart check", details: "must persist" });
+    const second = new LocalBetaFeedbackStore({ filePath });
+    assert.equal(second.isOptedIn(), true);
+    assert.equal(second.list().length, 1);
+    assert.equal(second.list()[0]?.summary, "Restart check");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -1957,6 +1957,8 @@ export class TaskManager {
             this.missionAttemptRuntimeLimit?.(retried) ?? Infinity,
           ),
         );
+        // MA4-S3-T0: safety timer must not pin the event loop after test/Host teardown.
+        runtimeTimer.unref?.();
         // Adapters receive a detached, immutable authority snapshot, never the persisted task object.
         const adapterTask = structuredClone(retried);
         delete adapterTask.connectionRoute; delete adapterTask.proposedRoute;
@@ -2029,6 +2031,8 @@ export class TaskManager {
       () => this.stopInBackground(id, "Runtime limit reached."),
       Math.min(task.maxRuntimeMs ?? 120000, this.missionAttemptRuntimeLimit?.(task) ?? Infinity),
     );
+    // MA4-S3-T0: do not keep the Node event loop alive solely for this safety timer (agent-team test teardown).
+    runtimeTimer.unref?.();
     this.containment.background({ subsystem: "tasks", taskId: id, ...task.mission }, async () => {
       try {
         // M-A-3 T3 §22/§23/§24: bounded, taxonomy-driven recovery around the SAME state machine.
