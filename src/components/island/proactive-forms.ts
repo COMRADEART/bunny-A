@@ -48,6 +48,7 @@ export type ScheduleDraft = {
   task: "remind" | "check" | "summarize"; text: string; root: string; paths: string; model: string; review: boolean;
   missedPolicy: "skip" | "run_once"; background: boolean; maxModelCalls: number; maxMinutes: number; maxRunsPerDay: number;
   notifyCompleted: boolean; notifyFailed: boolean;
+  goalId?: string; criterionId?: string;
 };
 /** The steps a template produces; consumers show them, the Host re-validates them. */
 export function templateSteps(d: Pick<ScheduleDraft, "task" | "root" | "paths" | "model" | "review">) {
@@ -84,6 +85,8 @@ export function buildSchedule(d: ScheduleDraft, now: number): Built<Record<strin
     if (!Number.isInteger(d.maxMinutes) || d.maxMinutes < 1 || d.maxMinutes > 24 * 60) errors.maxMinutes = "Between 1 minute and 24 hours.";
   }
   if (!Number.isInteger(d.maxRunsPerDay) || d.maxRunsPerDay < 1 || d.maxRunsPerDay > 48) errors.maxRunsPerDay = "Between 1 and 48.";
+  if (d.goalId && !d.criterionId) errors.criterionId = "Choose the goal criterion this schedule serves.";
+  if (d.goalId && d.task === "remind") errors.goalId = "Only a task schedule can advance a goal criterion.";
   if (Object.keys(errors).length) return { ok: false, errors };
   const trigger = d.when === "once" ? { type: "once", at: `${d.date}T${d.time}`, timeZone: d.timeZone }
     : d.when === "condition" ? { type: "condition", monitorId: d.monitorId }
@@ -95,7 +98,7 @@ export function buildSchedule(d: ScheduleDraft, now: number): Built<Record<strin
     envelope: { capabilities: [...new Set(steps.map(s => s.kind))], providers: ["ollama"], localOnly: true, models: d.task === "summarize" ? [d.model] : [], projectScopes: [d.projectId],
       sideEffects: false, background: d.background, budgets: { maxModelCalls: d.maxModelCalls, maxWallMs: d.maxMinutes * 60_000 }, expiresAt: expiresAt! + DAY, grants: { files: [{ root: d.root, access: "read" }] } },
   };
-  return { ok: true, spec: { title: d.title.trim(), projectId: d.projectId, trigger, action, missedPolicy: d.missedPolicy, maxRunsPerDay: d.maxRunsPerDay, expiresAt, startsAt, notify: { completed: d.notifyCompleted, failed: d.notifyFailed } } };
+  return { ok: true, spec: { title: d.title.trim(), projectId: d.projectId, ...(d.goalId && d.criterionId ? { goal: { id: d.goalId, criterionId: d.criterionId } } : {}), trigger, action, missedPolicy: d.missedPolicy, maxRunsPerDay: d.maxRunsPerDay, expiresAt, startsAt, notify: { completed: d.notifyCompleted, failed: d.notifyFailed } } };
 }
 
 // ── monitor ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -126,4 +129,13 @@ export function buildMonitor(d: MonitorDraft, now: number, minMinutes = 1): Buil
   const predicate = d.condition === "changed" ? { type: "changed" } : d.condition === "equals" ? { type: "equals", value: d.value.trim() } : { type: "transition", to: d.to.trim(), ...(d.from.trim() ? { from: d.from.trim() } : {}) };
   return { ok: true, spec: { title: d.title.trim(), label: d.label.trim(), projectId: d.projectId, source, predicate, intervalMs: Math.round(d.everyMinutes * 60_000), maxChecksPerHour: d.maxChecksPerHour,
     dedupMs: Math.round(d.dedupMinutes * 60_000), expiresAt, notify: d.notify, priority: d.priority } };
+}
+
+/** MA4-S2-T3R1: a registered folder's id from its name — the Host's rule (lowercase, starts with a letter, ≤ 40), unique. */
+export function folderId(label: string, taken: readonly string[]): string {
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 36).replace(/^-+|-+$/g, "");
+  const base = !slug ? "folder" : /^[a-z]/.test(slug) ? slug : `f-${slug}`;
+  let id = base;
+  for (let n = 2; taken.includes(id); n++) id = `${base}-${n}`;
+  return id;
 }

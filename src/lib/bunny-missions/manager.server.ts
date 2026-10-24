@@ -183,6 +183,10 @@ export class MissionManager {
       const envelope = mission.authorizationId ? this.store.authorization(mission.authorizationId) : null;
       if (!envelope) return "no approved mission envelope";
       if (envelope.revokedAt) return "authorization revoked";
+      if (task.approval?.kind === "mission" && task.approval.authorizationId !== envelope.id)
+        return "stale mission authorization";
+      if (!this.store.steps(mission.id).some((item) => item.id === task.mission!.stepId))
+        return "step replaced by replan";
       // T13.3 N-C: no child of a step whose outcome is uncertain launches (an older child approved directly included)
       // until the owner reconciles it.
       const owner = this.store.step(task.mission!.stepId);
@@ -1791,6 +1795,18 @@ export class MissionManager {
     }
     this.countModelCall(mission.id, local);
     this.markRunning(step, task.id, task.provider, workspace);
+    if (["completed", "failed", "stopped"].includes(this.tasks.db.get(task.id).state)) {
+      setImmediate(() =>
+        this.tasks.containment.background(
+          { subsystem: "missions", missionId: mission.id, stepId: step.id, taskId: task.id },
+          async () => {
+            if (this.closed || this.stopping.has(mission.id) || this.containing.has(mission.id)) return;
+            await this.finishModelStep(step.id, task.id);
+          },
+          (error) => this.containMission(mission.id, error),
+        ),
+      );
+    }
     return true;
   }
   /**
@@ -1863,6 +1879,18 @@ export class MissionManager {
     }
     this.countModelCall(mission.id, local);
     this.markRunning(step, task.id, task.provider, workspace);
+    if (["completed", "failed", "stopped"].includes(this.tasks.db.get(task.id).state)) {
+      setImmediate(() =>
+        this.tasks.containment.background(
+          { subsystem: "missions", missionId: mission.id, stepId: step.id, taskId: task.id },
+          async () => {
+            if (this.closed || this.stopping.has(mission.id) || this.containing.has(mission.id)) return;
+            await this.finishModelStep(step.id, task.id);
+          },
+          (error) => this.containMission(mission.id, error),
+        ),
+      );
+    }
     return true;
   }
   /**

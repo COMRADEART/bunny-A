@@ -9,7 +9,7 @@ import {
 import { ProactiveConflictError, type GoalRecord, type Kind, type MonitorRecord, type NewNotification, type Occurrence, type ProactiveStore, type ScheduleRecord } from "./proactive-store.server.ts";
 import { TERMINAL_TASK_STATES, validateTask, type TaskView } from "./task-runtime.ts";
 import { TaskConflictError } from "./task-store.server.ts";
-import type { PersistentTaskRuntime } from "./task-runtime.server.ts";
+import { PRUNE_EVERY_MS, type PersistentTaskRuntime } from "./task-runtime.server.ts";
 
 /**
  * MA4-S2-T3 proactive engine. It turns owner-approved schedules and monitors into ordinary S2-T1 tasks, at the right
@@ -49,8 +49,10 @@ export class ProactiveEngine {
   private again = false;
   private closed = false;
   private lastTick = 0;
-  /** Scheduler lateness of every fired time slot (ms after its due instant), for the performance report. */
+  private lastPrune = 0;
+  /** Scheduler lateness of the most recent fired time slots (ms after their due instant), for the performance report. */
   readonly lateness: number[] = [];
+  private late(ms: number) { this.lateness.push(ms); if (this.lateness.length > 1_000) this.lateness.shift(); }
 
   constructor(deps: ProactiveDeps) { this.deps = deps; this.store = deps.store; }
   private now() { return this.deps.now?.() ?? Date.now(); }
@@ -350,7 +352,7 @@ export class ProactiveEngine {
     if (beat !== null && now - beat > 3 * this.maxSleep) { this.store.gap(beat, now, "off"); this.emit("proactive.host_gap", `Bunny-A was not running for ${duration(now - beat)}; nothing ran during that time.`); }
     if (this.store.awayMarker() === null) this.store.setAwayMarker(now);
     this.store.prune(now);
-    this.lastTick = now;
+    this.lastTick = this.lastPrune = now;
     await this.tick();
   }
   async close() {
@@ -397,6 +399,8 @@ export class ProactiveEngine {
     this.lastTick = now;
     this.store.beat(now);
     if (this.deps.runtime.readOnly) return;
+    // Retention also holds for a Host that runs for weeks, not only at its next start (MA4-S2-T3R1 soak analysis).
+    if (now - this.lastPrune >= PRUNE_EVERY_MS) { this.lastPrune = now; this.store.prune(now); }
     for (const step of [() => this.settleOccurrences(now), () => this.trackGoals(now), () => this.runSchedules(now), () => this.checkMonitors(now)]) {
       try { await step(); } catch (e) { if (!(e instanceof ProactiveConflictError)) this.emit("proactive.error", short(e)); }
     }
@@ -498,14 +502,14 @@ export class ProactiveEngine {
     };
     switch (d.outcome) {
       case "execute": case "queue": {
-        if (time) this.lateness.push(now - slot);
+        if (time) this.late(now - slot);
         record(d.outcome, { fired: true });
         if (this.deps.faults) try { this.deps.faults("after-decision", key); } catch (e) { this.closed = true; throw e; }
         await this.dispatch(this.store.occurrence(key)!, s, now);
         return;
       }
       case "notify": {
-        if (time) this.lateness.push(now - slot);
+        if (time) this.late(now - slot);
         const text = s.spec.action.type === "remind" ? s.spec.action.text : s.spec.title;
         record("notify", { fired: true }, [this.note("reminder_due", "schedule", s.id, s.spec.title, text, "DUE", "open", key, "high")]);
         return;

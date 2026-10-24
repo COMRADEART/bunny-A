@@ -11,6 +11,8 @@ const input = (name: string, type: ActionManifest["inputs"][number]["type"], req
  * read-only `gh` queries in an approved repository folder. Mutations are declared but not implemented.
  */
 export class GitHubCapability implements CapabilityAdapter {
+  private healthControllers = new Set<AbortController>();
+  async close() { for (const controller of this.healthControllers) controller.abort(new Error("GitHub capability closed.")); this.healthControllers.clear(); }
   manifest = {
     id: "github", version: "1.0.0", description: "Read-only GitHub queries through the locally signed-in gh CLI.", locality: "remote" as const, platforms: "any" as const,
     events: ["capability.completed", "capability.failed"], cost: { kind: "external_service" as const, note: "GitHub API calls under the user's gh session; no model tokens." }, adapter: "gh CLI",
@@ -25,7 +27,9 @@ export class GitHubCapability implements CapabilityAdapter {
   async health(): Promise<{ availability: CapabilityAvailability; detail: string }> {
     const gh = resolveCommand("gh");
     if (!gh) return { availability: "unavailable", detail: "GitHub CLI (gh) is not installed." };
-    const status = await runCommand("gh", ["auth", "status", "--hostname", "github.com"], { cwd: process.cwd(), signal: new AbortController().signal, timeoutMs: 15_000, owned: true, owner: { action: "github.auth-status" } }).catch(() => null);
+    const controller = new AbortController();
+    this.healthControllers.add(controller);
+    const status = await runCommand("gh", ["auth", "status", "--hostname", "github.com"], { cwd: process.cwd(), signal: controller.signal, timeoutMs: 15_000, owned: true, owner: { action: "github.auth-status" } }).catch(() => null).finally(() => { this.healthControllers.delete(controller); });
     if (!status) return { availability: "unavailable", detail: "gh could not be run." };
     // gh prints account details; only the verdict is kept, never the token line.
     return status.exitCode === 0 ? { availability: "available", detail: "gh is signed in to github.com (token stays in gh's own store)." } : { availability: "unconfigured", detail: "gh is installed but not signed in. Run `gh auth login` yourself; Bunny does not sign in for you." };

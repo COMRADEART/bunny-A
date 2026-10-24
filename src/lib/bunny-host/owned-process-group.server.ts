@@ -135,13 +135,34 @@ export function reconcileProviderSession(dataDirectory: string, operationId: str
   const record=JSON.parse(readFileSync(path,"utf8")) as OwnedProcessRecord;
   record.containment="absent_after_restart";record.closed=true;persist(path,record);
 }
+const spawnedPipes=new Set<string>();
 export async function outputPipe(append: (chunk: Buffer) => void) {
   const name=`\\\\.\\pipe\\bunny-owned-${randomUUID()}`;
   const sockets=new Set<Socket>();
-  const server=createServer(socket=>{sockets.add(socket);socket.on("data",append);socket.on("error",()=>{});socket.once("close",()=>sockets.delete(socket));});
+  let connected=false;
+  let onDrained: (() => void) | null=null;
+  const server=createServer(socket=>{
+    connected=true;
+    sockets.add(socket);
+    socket.on("data",append);
+    socket.on("error",()=>{});
+    socket.once("close",()=>{
+      sockets.delete(socket);
+      if(sockets.size===0) onDrained?.();
+    });
+  });
   await new Promise<void>((done,reject)=>{server.once("error",reject);server.listen(name,done);});
   return {name,close:async()=>{
-    // Kill-on-close ends pipe writers first. Bound draining even for broken I/O.
+    const wasSpawned=spawnedPipes.delete(name);
+    // Kill-on-close ends pipe writers first. When native launch opened the pipe client via CreateFileW,
+    // wait for libuv's IOCP poll phase to accept the client socket and drain to EOF before closing server.
+    if(wasSpawned&&(!connected||sockets.size>0)) {
+      await new Promise<void>(done=>{
+        const timer=setTimeout(()=>{for(const socket of sockets) socket.destroy();done();},1500);
+        onDrained=()=>{if(connected&&sockets.size===0){clearTimeout(timer);done();}};
+        if(connected&&sockets.size===0){clearTimeout(timer);done();}
+      });
+    }
     await new Promise<void>(done=>{
       const timer=setTimeout(()=>{for(const socket of sockets) socket.destroy();done();},1500);
       server.close(()=>{clearTimeout(timer);done();});
@@ -173,6 +194,7 @@ export class OwnedProcessGroup {
     const line=[file,...args].map(windowsArgument).join(" ");
     try {
       this.handle=input===undefined ? this.native.launch(file,line,cwd,windowsEnvironment(env),out,err) : this.native.launch(file,line,cwd,windowsEnvironment(env),out,err,input);
+      spawnedPipes.add(out);spawnedPipes.add(err);
     } catch(error) {
       // Native launch failures all precede the root's first instruction (T9R-F04 review round 2, L4).
       if(this.record.containment){this.record.containment="refused";this.record.activeProcesses=0;}

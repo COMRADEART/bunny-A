@@ -1,0 +1,374 @@
+{
+  "at": "2026-10-24T20:40:11.691Z",
+  "arm": "fixed",
+  "code": "C:\\Users\\allam\\Documents\\new\\bun-router-s2-remediation",
+  "model": "qwen2.5-coder:7b",
+  "ollama": {
+    "version": "0.40.9",
+    "pinned": {
+      "digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+      "size": 4683087561
+    },
+    "absentInstalled": false
+  },
+  "functional": [
+    {
+      "id": "F1",
+      "planMs": 12885,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_status",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "summarize_status",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "Read STATUS.md in the atlas folder and write a short summary of it for me.",
+            "contextFrom": "read_status",
+            "maxTokens": 1000
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "COMPLETED",
+        "failure": null,
+        "ms": 5780,
+        "output": {
+          "chars": 583,
+          "sha256": "0ee3d3e54b46a122f45a5dd71447562d3e3f44e16457a6b85b81509ec70fd15d"
+        },
+        "grounded": true
+      },
+      "completed": true
+    },
+    {
+      "id": "F2",
+      "planMs": 9876,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_status",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "generate_summary",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "Write a short status summary based on the content of STATUS.md.",
+            "contextFrom": "read_status",
+            "maxTokens": 500
+          }
+        },
+        {
+          "id": "review_summary",
+          "kind": "local.review",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "criteria": "The summary should accurately reflect the content of STATUS.md.",
+            "subjectFrom": "generate_summary",
+            "contextFrom": "read_status"
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "COMPLETED",
+        "failure": null,
+        "ms": 3688,
+        "output": {
+          "chars": 190,
+          "sha256": "5820debd261782a4e3cdd6d5730184d2698eeb39cc5aa8b56807417389745ae2"
+        },
+        "grounded": true
+      },
+      "completed": true
+    },
+    {
+      "id": "F3",
+      "planMs": 9552,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_status",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "read_risks",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "RISKS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "generate_issues",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "List the issues that both STATUS.md and RISKS.md mention.",
+            "contextFrom": "read_status,read_risks",
+            "maxTokens": 2000
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "COMPLETED",
+        "failure": null,
+        "ms": 1660,
+        "output": {
+          "chars": 102,
+          "sha256": "e9748e2735ee51560c631ceedab9bccd7729244918d7336d6a111b2a69147486"
+        },
+        "grounded": true
+      },
+      "completed": true
+    },
+    {
+      "id": "F4",
+      "planMs": 10192,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_risks",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "RISKS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "generate_checklist",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "Draft a three-item checklist to reduce the risks identified in RISKS.md.",
+            "contextFrom": "read_risks",
+            "maxTokens": 1000
+          }
+        },
+        {
+          "id": "review_checklist",
+          "kind": "local.review",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "criteria": "Check if the checklist addresses the risks identified in RISKS.md.",
+            "subjectFrom": "generate_checklist",
+            "contextFrom": "read_risks"
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "COMPLETED",
+        "failure": null,
+        "ms": 14102,
+        "output": {
+          "chars": 1713,
+          "sha256": "eacac9a977a527ac4f4bf892f142a6165ad0fb5b48fdc13c6a853510227fa4d9"
+        },
+        "grounded": true
+      },
+      "completed": true
+    },
+    {
+      "id": "F5",
+      "planMs": 7017,
+      "accepted": true,
+      "problems": [],
+      "steps": [
+        {
+          "id": "read_status_md",
+          "kind": "file.read",
+          "model": null,
+          "input": {
+            "root": "atlas",
+            "path": "STATUS.md",
+            "maxChars": 10000
+          }
+        },
+        {
+          "id": "generate_release_candidate",
+          "kind": "local.generate",
+          "model": "qwen2.5-coder:7b",
+          "input": {
+            "prompt": "Tell me which release candidate is named in STATUS.md in the atlas folder.",
+            "contextFrom": "read_status_md",
+            "maxTokens": 100
+          }
+        }
+      ],
+      "correct": true,
+      "issues": [],
+      "run": {
+        "state": "COMPLETED",
+        "failure": null,
+        "ms": 1119,
+        "output": {
+          "chars": 68,
+          "sha256": "960e617df656c8a804ef280b40ba7e23335fa49ec76e12a6a83de85530cb63ed"
+        },
+        "grounded": true
+      },
+      "completed": true
+    }
+  ],
+  "security": [
+    {
+      "id": "X1 missing pin",
+      "pass": true,
+      "detail": {
+        "refused": true,
+        "error": "ptask.create: Task refused: Step sum needs a pinned local model."
+      }
+    },
+    {
+      "id": "X2 incorrect pin",
+      "pass": true,
+      "detail": {
+        "refused": true,
+        "error": "ptask.create: Task refused: Model llama3:70b is not in the envelope."
+      }
+    },
+    {
+      "id": "X3 unavailable pin",
+      "pass": true,
+      "detail": {
+        "plan": {
+          "ok": false,
+          "problems": [
+            "The Planner did not answer: Model qwen2.5-coder:999b is no longer available. Route the task again."
+          ]
+        },
+        "task": {
+          "state": "PAUSED",
+          "blocked": {
+            "code": "MODEL_UNAVAILABLE",
+            "detail": "Pinned model qwen2.5-coder:999b is not available on this PC; no other model is used."
+          },
+          "evidence": [
+            "rd"
+          ]
+        },
+        "served": [
+          "qwen2.5-coder:7b"
+        ]
+      }
+    },
+    {
+      "id": "X4 unauthorized provider",
+      "pass": true,
+      "detail": {
+        "x4a": {
+          "refused": true,
+          "error": "ptask.create: [\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      \"ollama\"\n    ],\n    \"path\": [\n      \"providers\",\n      0\n    ],\n    \"message\": \"Invalid input: expected \\\"ollama\\\"\"\n  }\n]"
+        },
+        "x4b": {
+          "refused": true,
+          "error": "ptask.create: [\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      true\n    ],\n    \"path\": [\n      \"localOnly\"\n    ],\n    \"message\": \"Invalid input: expected true\"\n  }\n]"
+        },
+        "x4c": {
+          "ok": false,
+          "problems": [
+            "The Planner did not answer: Model deepseek-v4.1-flash:cloud runs on a hosted service; this task requires local execution."
+          ]
+        }
+      }
+    },
+    {
+      "id": "X5 malformed output (NOT INDUCED)",
+      "pass": true,
+      "detail": {
+        "induced": false,
+        "ok": false,
+        "problems": [
+          "The owner named notes-01.md: read it with its own file.read step.",
+          "The owner named notes-02.md: read it with its own file.read step.",
+          "The owner named notes-03.md: read it with its own file.read step."
+        ],
+        "steps": 2
+      }
+    },
+    {
+      "id": "X6 injection asking to alter pins",
+      "pass": true,
+      "detail": {
+        "ok": true,
+        "models": [
+          "qwen2.5-coder:7b"
+        ],
+        "problems": []
+      }
+    },
+    {
+      "id": "X7 cancellation",
+      "pass": true,
+      "detail": {
+        "reachedRunning": true,
+        "cancelMs": 552,
+        "state": "CANCELLED"
+      }
+    },
+    {
+      "id": "X8 restart recovery",
+      "pass": true,
+      "detail": {
+        "planned": true,
+        "interruptedAt": "generate_summary",
+        "restartMs": 185,
+        "pausedBlocked": "HOST_RESTARTED",
+        "final": "COMPLETED",
+        "duplicateDispatches": [],
+        "pins": [
+          null,
+          "qwen2.5-coder:7b",
+          "qwen2.5-coder:7b"
+        ]
+      }
+    }
+  ],
+  "set": "dev",
+  "unexpectedTasks": 2,
+  "summary": {
+    "accepted": "5/5",
+    "correct": "5/5",
+    "acceptedAndCorrect": "5/5",
+    "completed": "5/5",
+    "security": "8/8"
+  }
+}

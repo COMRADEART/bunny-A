@@ -30,7 +30,8 @@ export function taskCanTransition(from: TaskState, to: TaskState): boolean { ret
 export const OPERATION_CATEGORIES = ["read_only", "idempotent", "irreversible"] as const;
 export type OperationCategory = (typeof OPERATION_CATEGORIES)[number];
 
-const id = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/);
+export const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/;
+const id = z.string().regex(ID_PATTERN);
 const scalar = z.union([z.string().max(8_000), z.number().finite(), z.boolean(), z.null()]);
 export const StepSpecSchema = z.object({
   id,

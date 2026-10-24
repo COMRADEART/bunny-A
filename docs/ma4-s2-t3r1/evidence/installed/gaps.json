@@ -1,0 +1,55 @@
+{
+  "at": "2026-10-24T15:05:43.710Z",
+  "sourceCommit": "448ca6b6fb7252e2ea7af00e02ed9e078b5d1610",
+  "package": "Bunny-A-Windows-S2T3R1-6-TEST",
+  "checks": [
+    {
+      "name": "cancel stops a running pinned-model task",
+      "pass": true,
+      "detail": {
+        "reachedRunning": true,
+        "ms": 2647,
+        "state": "CANCELLED",
+        "evidence": [
+          "read"
+        ]
+      }
+    },
+    {
+      "name": "no process started for the task outlives it",
+      "pass": true,
+      "detail": {
+        "before": [
+          "conhost.exe"
+        ],
+        "running": [
+          "conhost.exe"
+        ],
+        "after": [
+          "conhost.exe"
+        ]
+      }
+    },
+    {
+      "name": "Host still healthy after cancel",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "no occurrence started two tasks",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "no task created twice",
+      "pass": true,
+      "detail": []
+    },
+    {
+      "name": "no semantic duplicate notification",
+      "pass": true,
+      "detail": []
+    }
+  ],
+  "failed": 0
+}

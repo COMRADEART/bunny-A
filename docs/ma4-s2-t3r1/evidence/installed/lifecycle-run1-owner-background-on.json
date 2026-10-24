@@ -1,0 +1,85 @@
+{
+  "at": "2026-10-24T15:05:10.647Z",
+  "sourceCommit": "448ca6b6fb7252e2ea7af00e02ed9e078b5d1610",
+  "package": "Bunny-A-Windows-S2T3R1-6-TEST",
+  "checks": [
+    {
+      "name": "windows closed: Host reports no workstation UI",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "background and automatic restart off by default",
+      "pass": false,
+      "detail": null
+    },
+    {
+      "name": "closed UI and background off blocks execution",
+      "pass": false,
+      "detail": {
+        "state": "COMPLETED",
+        "receipts": 1
+      }
+    },
+    {
+      "name": "explicit background opt-in completes authorized file task with no UI",
+      "pass": true,
+      "detail": {
+        "state": "COMPLETED",
+        "receipts": 1
+      }
+    },
+    {
+      "name": "unapproved background task waits for owner",
+      "pass": true,
+      "detail": {
+        "state": "AWAITING_APPROVAL"
+      }
+    },
+    {
+      "name": "only the identified test Host stops",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "installed launcher recovers Host with a new PID",
+      "pass": true,
+      "detail": {
+        "ms": 5256,
+        "error": null
+      }
+    },
+    {
+      "name": "pending authority is preserved, never silently approved",
+      "pass": true,
+      "detail": {
+        "state": "AWAITING_APPROVAL"
+      }
+    },
+    {
+      "name": "completed task and its receipt survive restart without replay",
+      "pass": true,
+      "detail": {
+        "state": "COMPLETED",
+        "receipts": 1
+      }
+    },
+    {
+      "name": "cancellation of held task persists",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "UI-created goal, schedule and monitor survive Host restart",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "background and startup opt-ins returned to defaults",
+      "pass": false,
+      "detail": null
+    }
+  ],
+  "failed": 3,
+  "note": "Installed production entry, real SQLite/Host, bounded synthetic file.stat task. Running-model cancellation and physical UI drag are separate checks."
+}

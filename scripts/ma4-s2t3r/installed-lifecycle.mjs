@@ -5,7 +5,7 @@ import { execFileSync, spawn } from 'node:child_process';
 const [installArg, outputArg] = process.argv.slice(2);
 if (!installArg || !outputArg) throw new Error('usage: installed-lifecycle.mjs <TEST install> <evidence.json>');
 const install = resolve(installArg), config = JSON.parse(readFileSync(join(install, 'install.json'), 'utf8'));
-if (!config.currentRelease.name.endsWith('-TEST') || config.hostPort !== 43191 || !install.includes('Bunny-S2T3R-Install')) throw new Error('Not the dedicated test installation.');
+if (!config.currentRelease.name.endsWith('-TEST') || ![43191, 43193].includes(config.hostPort) || !install.includes('Bunny-S2T3R-Install')) throw new Error('Not the dedicated test installation.');
 const credentials = () => JSON.parse(readFileSync(join(config.stateRoot, 'credentials/credentials.json'), 'utf8'));
 const base = `http://127.0.0.1:${config.hostPort}`;
 const cmd = async (action, data = {}) => {
@@ -16,8 +16,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const checks = [], check = (name, pass, detail = null) => { checks.push({ name, pass:!!pass, detail }); console.log(JSON.stringify(checks.at(-1))); };
 const until = async (fn, ms=30_000) => { const end=Date.now()+ms; while(Date.now()<end){const v=await fn();if(v)return v;await sleep(100);}return null; };
 const view = id => cmd('ptask.get', {id});
-const envelope = background => ({capabilities:['file.stat'],providers:['ollama'],models:[],projectScopes:['personal'],localOnly:true,sideEffects:false,background,budgets:{maxModelCalls:0,maxWallMs:60_000},expiresAt:Date.now()+3_600_000,grants:{files:[{root:'atlas',access:'read'}]}});
-const create = async title => cmd('ptask.create', {spec:{title,projectId:'personal',steps:[{id:'check',kind:'file.stat',input:{root:'atlas',path:'STATUS.md'}}],acceptance:{requiredSteps:['check']}},envelope:envelope(true)});
+const envelope = background => ({capabilities:['file.stat'],providers:['ollama'],models:[],projectScopes:['personal'],localOnly:true,sideEffects:false,background,budgets:{maxModelCalls:0,maxWallMs:60_000},expiresAt:Date.now()+3_600_000,grants:{files:[{root:process.env.BUNNY_TEST_ROOT??'atlas',access:'read'}]}});
+const create = async title => cmd('ptask.create', {spec:{title,projectId:'personal',steps:[{id:'check',kind:'file.stat',input:{root:process.env.BUNNY_TEST_ROOT??'atlas',path:'STATUS.md'}}],acceptance:{requiredSteps:['check']}},envelope:envelope(true)});
 try {
   await until(async()=>!(await cmd('ptask.list')).uiAttached,45_000);
   check('windows closed: Host reports no workstation UI',!(await cmd('ptask.list')).uiAttached);
@@ -55,7 +55,7 @@ try {
   await cmd('ptask.cancel',{id:held.id});
   check('cancellation of held task persists',(await view(held.id)).state==='CANCELLED');
   const proactive=await cmd('proactive.list');
-  check('UI-created goal, schedule and monitor survive Host restart',proactive.goals.some(g=>g.title==='Installed qualification goal')&&proactive.schedules.some(s=>s.title==='Installed one-time reminder')&&proactive.monitors.some(m=>m.title==='Installed build watch'));
+  check('UI-created goal, schedule and monitor survive Host restart',proactive.goals.some(g=>g.title===(process.env.BUNNY_TEST_GOAL??'Installed qualification goal'))&&proactive.schedules.some(s=>s.title===(process.env.BUNNY_TEST_SCHEDULE??'Installed one-time reminder'))&&proactive.monitors.some(m=>m.title===(process.env.BUNNY_TEST_MONITOR??'Installed build watch')));
   await cmd('ptask.policy',{policy});
   check('background and startup opt-ins returned to defaults',!(await cmd('ptask.list')).policy.background&&!(await cmd('ptask.list')).policy.resumeOnStart);
 } catch(e){check('lifecycle driver completed',false,String(e.message));}

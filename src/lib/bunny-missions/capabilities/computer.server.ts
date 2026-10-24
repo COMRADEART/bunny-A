@@ -42,6 +42,20 @@ public static class BunnyWin {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
   [DllImport("shell32.dll")] static extern int SHGetPropertyStoreForWindow(IntPtr h, ref Guid iid, out BunnyPropertyStore store);
   [DllImport("ole32.dll")] static extern int PropVariantClear(ref BunnyPropertyVariant value);
+  [DllImport("user32.dll", SetLastError=true)] static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
+  [DllImport("user32.dll")] static extern IntPtr GetThreadDesktop(uint thread);
+  [DllImport("user32.dll")] static extern bool CloseDesktop(IntPtr h);
+  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern bool GetUserObjectInformation(IntPtr h, int index, StringBuilder buffer, int length, out int needed);
+  static string DesktopName(IntPtr h) { var s = new StringBuilder(256); int n; return GetUserObjectInformation(h, 2, s, 512, out n) ? s.ToString() : null; }
+  // MA4-S2-FIX-C: UIA and window enumeration only see the calling thread's desktop. A Host started on a private or
+  // service desktop sees no application windows, so a launch there could never be observed. Fail closed (no launch).
+  public static bool OnInputDesktop() {
+    var input = OpenInputDesktop(0, false, 0x0001);
+    if (input == IntPtr.Zero) return false;
+    try { var mine = DesktopName(GetThreadDesktop(GetCurrentThreadId())); return mine != null && string.Equals(mine, DesktopName(input), StringComparison.OrdinalIgnoreCase); }
+    finally { CloseDesktop(input); }
+  }
   public static string Title(IntPtr h) { var s = new StringBuilder(512); GetWindowText(h, s, 512); return s.ToString(); }
   public static string Class(IntPtr h) { var s = new StringBuilder(256); GetClassName(h, s, 256); return s.ToString(); }
   public static string AppId(IntPtr h) {
@@ -246,7 +260,7 @@ function Calculator-Windows {
 `;
 
 export const CALCULATOR_SCRIPTS = {
-  existing: String.raw`
+  existing: String.raw`if (-not [BunnyWin]::OnInputDesktop()) { throw 'Interactive desktop unavailable: Bunny is not running on the active input desktop, so no Calculator window can be observed. Nothing was launched.' }
 $windows = @(Calculator-Frames)
 if ($windows.Count -gt 1) { throw 'Several verified Calculator windows exist; no arbitrary target or additional launch selected.' }
 $identity = $null
@@ -274,7 +288,7 @@ if ($valid) {
   }
 }
 @{ valid = $valid; needsReadiness = ($valid -and ($needsReadiness -or [BunnyWin]::IsIconic($h))); readiness = $prepared.readiness } | ConvertTo-Json -Depth 4 -Compress`,
-  acquire: String.raw`
+  acquire: String.raw`if (-not [BunnyWin]::OnInputDesktop()) { throw 'Interactive desktop unavailable: Bunny is not running on the active input desktop, so no Calculator window can be observed. Nothing was launched.' }
 Assert-BatchClock
 $windows = @(Calculator-Frames)
 if ($windows.Count -gt 1) { throw 'Several verified Calculator windows exist; no additional launch selected.' }

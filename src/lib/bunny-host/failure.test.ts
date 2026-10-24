@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -36,6 +36,10 @@ async function until(check: () => boolean) {
     await wait(10);
   }
   assert.ok(check(), "bounded condition did not arrive");
+}
+function cleanDirectory(directory: string) {
+  rmSync(directory, { recursive: true, force: true, maxRetries: 25, retryDelay: 100 });
+  assert.equal(existsSync(directory), false, `Temporary directory was not removed: ${directory}`);
 }
 function harness() {
   const directory = mkdtempSync(join(tmpdir(), "bunny-t3-test-"));
@@ -77,8 +81,10 @@ function harness() {
   });
   const cleanup = async () => {
     await missions.close();
+    tasks.dispose();
     db.close();
-    rmSync(directory, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true, maxRetries: 25, retryDelay: 100 });
+    assert.equal(existsSync(directory), false, `Temporary directory was not removed: ${directory}`);
   };
   return {
     directory,
@@ -755,7 +761,8 @@ test("T3: diagnostic persistence failure falls back once and refuses execution g
     assert.ok(!evidence.includes("private-value"));
     assert.equal(JSON.parse(evidence).type, "host.operation_failed");
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true, maxRetries: 25, retryDelay: 100 });
+    assert.equal(existsSync(directory), false, `Temporary directory was not removed: ${directory}`);
   }
 });
 test("T3: SSE write and serialization failure clean up client resources while Host remains healthy", () => {
@@ -849,7 +856,8 @@ test("T3: HTTP unexpected command failure returns safe text and telemetry failur
     );
   } finally {
     await host.close();
-    rmSync(directory, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true, maxRetries: 25, retryDelay: 100 });
+    assert.equal(existsSync(directory), false, `Temporary directory was not removed: ${directory}`);
   }
 });
 test("T3: fatal transition is single-winner, refuses new work and has a hard shutdown deadline", async () => {
@@ -888,7 +896,8 @@ test("T3: fatal transition is single-winner, refuses new work and has a hard shu
     assert.ok(restarted.health.lastFatal);
     assert.equal(restarted.health.operationalState, "healthy");
   } finally {
-    rmSync(directory, { recursive: true, force: true });
+    rmSync(directory, { recursive: true, force: true, maxRetries: 25, retryDelay: 100 });
+    assert.equal(existsSync(directory), false, `Temporary directory was not removed: ${directory}`);
   }
 });
 test(
@@ -915,7 +924,7 @@ test(
             fail(new Error("fatal process did not exit"));
           }, 10000);
           child.once("error", fail);
-          child.once("exit", (code) => {
+          child.once("close", (code) => {
             clearTimeout(timer);
             done(code);
           });
@@ -929,7 +938,7 @@ test(
         );
         assert.ok(readdirSync(join(directory, "logs")).includes("host-failures.jsonl"));
       } finally {
-        rmSync(directory, { recursive: true, force: true });
+        cleanDirectory(directory);
       }
     }
   },
