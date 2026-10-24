@@ -29,4 +29,25 @@ declared here, before the run, rather than estimated afterwards.
 
 ## 2. Decisive run
 
-_Recorded after the pre-registration commit; see §2 below once filled._
+Pre-registration commit `a96acd8`; decisive run on the same code (no tuning in between), same command,
+`evidence/bench-decisive.json`. Nothing else heavy ran at the same time (the full regression started afterwards).
+
+| # | Result | Target | Verdict |
+|---|---|---|---|
+| P1 | lateness n = 10: p50 5 ms, p95 20 ms, max 20 ms (raw 3, 7, 11, 5, 15, 3, 9, 2, 3, 20) | p95 ≤ 1,000, max ≤ 2,000 | **met** |
+| P2 | Host start 30 ms, state served 38 ms; 21 schedules, 8 monitors; 0 duplicate, 0 unexpected tasks | ≤ 2,000 ms, 0 | **met** |
+| P3 | 0.130 % of one core with the load (idle Host alone: 0.287 % in this window — both are noise-level) | ≤ 1.0 % | **met** |
+| P4 | heap 28.9 MB vs 25.9 MB idle → +3.0 MB | ≤ 20 MB | **met** |
+| P5 | 8 checks in 60 s (one per monitor) | ≤ 16 | **met** |
+| P6 | 0 model calls during monitoring | 0 | **met** |
+| P7 | scheduled summary: 2 model calls (Worker, Reviewer), 3 step receipts, slot → COMPLETED 1,084 ms (fake model) | = 2 | **met** |
+| P8 | 0 duplicate consequential executions: T3-A9 (`sent.length` 1 across a mid-action Host death and the next day's slot), T3-A3, T3-S3, T3-S7, E2E-D (`w.sent` 1 across approve/deny/expire/cancel/restart) | 0 | **met** |
+| P9 | 0 duplicate notifications: T3-A4 (unique keys across 3 restarts), T3-M1, E2E-A/B/C/D | 0 | **met** |
+| P10 | 0 unauthorized actions: T3-A1, T3-M3, T3-M4, E2E-D (phone approve/deny refused; nothing sent without the owner) | 0 | **met** |
+| P11 | 0 resumed after revoked/expired authority: T3-S5, T3-A1 (phone resume of a lapsed schedule → AWAITING_APPROVAL), T3-M2, T3-M3 | 0 | **met** |
+| P12 | idle wake = 60 s (T3-R1 asserts `nextDue - now = 60 s` with a 10-minute monitor) | no high-frequency polling | **met** |
+
+RSS includes the Host's other services and V8 reservations; heap is the comparable figure. The lateness here is the
+engine's own `setTimeout` on an awake laptop; it says nothing about sleep, which is reported as a gap, not as lateness.
+Not measured: energy/battery (declared in §1), real-model inference time (the bench uses the recorded fake model; the
+one-GPU-call gate and pins are unchanged from S2-T1/S2-T2).
