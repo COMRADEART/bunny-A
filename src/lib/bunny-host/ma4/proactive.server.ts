@@ -82,6 +82,7 @@ export class ProactiveEngine {
     const now = this.now();
     const r = this.store.update("goal", id, { actor: WORKSTATION, reason: "approved by owner", now, from: ["AWAITING_APPROVAL"], to: "ACTIVE", expectVersion: o.expectVersion,
       mutate: g => { if (g.spec.expiresAt <= now) throw new ProactiveConflictError("This goal has already ended."); g.approval = { by: "workstation", at: now, expiresAt: g.spec.expiresAt, specSha256: g.specSha256 }; } });
+    this.store.dismissApprovals(id);
     this.changed(`Goal approved: ${r.record.spec.title}`);
     return this.goalView(r.record, r.version);
   }
@@ -90,6 +91,7 @@ export class ProactiveEngine {
     const r = control === "pause" ? this.store.update("goal", id, { actor, reason: "paused", now, from: ["ACTIVE", "NEEDS_ATTENTION"], to: "PAUSED" })
       : control === "resume" ? this.store.update("goal", id, { actor, reason: "resumed", now, from: ["PAUSED"], to: "ACTIVE", mutate: g => { if (!g.approval || g.approval.specSha256 !== g.specSha256 || g.spec.expiresAt <= now) throw new ProactiveConflictError("This goal's approval no longer holds."); } })
       : this.store.update("goal", id, { actor, reason: "cancelled", now, from: ["PROPOSED", "AWAITING_APPROVAL", "ACTIVE", "PAUSED", "NEEDS_ATTENTION"], to: "CANCELLED" });
+    if (control === "cancel") this.store.dismissApprovals(id);
     this.changed(`Goal ${control}: ${r.record.spec.title}`);
     return this.goalView(r.record, r.version);
   }
@@ -161,6 +163,7 @@ export class ProactiveEngine {
         s.approval = { by: "workstation", at: now, expiresAt: Math.min(now + ttl, s.spec.expiresAt), specSha256: s.specSha256 };
         s.cursor = Math.max(s.cursor, now); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null;
       } });
+    this.store.dismissApprovals(id);
     this.changed(`Schedule approved: ${r.record.spec.title}`);
     return this.scheduleView(r.record, r.version);
   }
@@ -187,6 +190,7 @@ export class ProactiveEngine {
             mutate: s => { s.cursor = Math.max(s.cursor, now); s.nextAt = nextSlot(s.spec.trigger, s.cursor); s.retryAt = null; } });
         })();
     // Cancelling a schedule also stops the run it started (its processes are killed by the runtime); nothing new starts.
+    if (control === "cancel") this.store.dismissApprovals(id);
     if (control === "cancel") for (const taskId of this.activeTaskIds(id)) try { this.deps.runtime.cancel(taskId, actor); } catch (e) { if (!(e instanceof TaskConflictError)) throw e; }
     this.changed(`Schedule ${control}: ${r.record.spec.title}`);
     return this.scheduleView(r.record, r.version);
@@ -234,6 +238,7 @@ export class ProactiveEngine {
         // The first check after approval records the baseline; it is never announced as news.
         m.baseline = null; m.last = null; m.nextCheckAt = now; m.errors = 0;
       } });
+    this.store.dismissApprovals(id);
     this.changed(`Monitor approved: ${r.record.spec.title}`);
     return this.monitorView(r.record, r.version);
   }
@@ -247,6 +252,7 @@ export class ProactiveEngine {
           const live = !!record.approval && record.approval.expiresAt > now && record.approval.specSha256 === record.specSha256;
           return this.store.update("monitor", id, { actor, reason: live ? "resumed" : "resumed; its approval lapsed, so it waits for the owner", now, from: ["PAUSED"], expectVersion: version, to: live ? "ACTIVE" : "AWAITING_APPROVAL", mutate: m => { m.nextCheckAt = now; } });
         })();
+    if (control === "disable") this.store.dismissApprovals(id);
     this.changed(`Monitor ${control}: ${r.record.spec.title}`);
     return this.monitorView(r.record, r.version);
   }
@@ -365,7 +371,7 @@ export class ProactiveEngine {
     await this.fire(this.store.get("schedule", s.id).record, v, latest, `${s.id}:${latest}`, "meaningful", now);
   }
   private missed(s: ScheduleRecord, version: number, now: number, slot: number, count: number, why: string, outcome: "missed" | "defer" = "missed"): number {
-    const r = this.store.update("schedule", s.id, { actor: "proactive", reason: `${count} run(s) missed`, now, expectVersion: version,
+    const r = this.store.update("schedule", s.id, { actor: "proactive", reason: `${count} run(s) missed`, now, expectVersion: version, to: nextSlot(s.spec.trigger, slot) === null ? "COMPLETED" : undefined,
       mutate: x => { x.cursor = slot; x.nextAt = nextSlot(x.spec.trigger, slot); x.retryAt = null; x.lastAttempt = { at: now, slot, outcome, reason: `Missed ${why}.`, taskId: null }; },
       occurrence: { key: `${s.id}:${slot}`, scheduleId: s.id, slot, outcome, reason: `${count} run(s) missed ${why}`, taskId: null, modelSteps: 0 },
       notify: [this.note("schedule_missed", "schedule", s.id, s.spec.title, `${count === 1 ? "A run was" : `${count} runs were`} missed ${why}. Nothing ran for ${count === 1 ? "it" : "them"}.`, "MISSED", "open", `${s.id}:${slot}`)] });
@@ -413,7 +419,9 @@ export class ProactiveEngine {
     // One transaction: the schedule's cursor, the occurrence (the duplicate guard) and its notification.
     const record = (outcome: Outcome, o: { to?: string; fired?: boolean } = {}, notify: NewNotification[] = []) => {
       const created = outcome === "execute" || outcome === "queue";
-      this.store.update("schedule", s.id, { actor: "proactive", reason: `${outcome}: ${d.reason}`, now, expectVersion: version, to: o.to, notify,
+      // A one-time schedule is done the moment its only slot is decided.
+      const done = time && nextSlot(s.spec.trigger, slot) === null ? "COMPLETED" : undefined;
+      this.store.update("schedule", s.id, { actor: "proactive", reason: `${outcome}: ${d.reason}`, now, expectVersion: version, to: o.to ?? done, notify,
         mutate: x => {
           if (time) { x.cursor = slot; x.nextAt = nextSlot(x.spec.trigger, slot); }
           if (o.fired) x.lastFiredAt = now;

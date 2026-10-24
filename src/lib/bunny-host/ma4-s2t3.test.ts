@@ -187,6 +187,9 @@ test("T3-S1 one-time reminder fires once, honours quiet hours, snooze and dismis
 test("T3-S2 recurring scheduled summary: once per day, approved by the schedule, real receipts, one completion notice each", () => withRig(async p => {
   const s = approved(p, schedule());
   assert.equal(s.state, "ACTIVE");
+  await p.tick();
+  assert.equal(p.engine.snapshot().notifications.filter(n => n.category === "approval_required").length, 0, "an answered approval request is not shown");
+  assert.equal(p.notes("approval_required")[0].dismissed, true, "but it stays in the history");
   assert.equal(iso(s.nextAt), "2026-10-24T18:00:00.000Z");
   for (let day = 0; day < 3; day++) {
     await p.at(Date.UTC(2026, 9, 24 + day, 18, 0, 2));

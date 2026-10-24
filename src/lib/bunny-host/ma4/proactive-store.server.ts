@@ -226,6 +226,8 @@ export class ProactiveStore {
     const r = this.db.prepare("SELECT MIN(MAX(deliver_at,COALESCE(snoozed_until,0))) t FROM ma4_proactive_notifications WHERE delivered=0 AND dismissed=0 AND suppressed=0").get() as { t: number | null };
     return r.t === null ? null : Math.max(r.t, now);
   }
+  /** A request that has been answered is no longer news: its approval notices are dismissed. */
+  dismissApprovals(sourceId: string): number { return this.db.prepare("UPDATE ma4_proactive_notifications SET dismissed=1 WHERE source_id=? AND category='approval_required' AND dismissed=0").run(sourceId).changes as number; }
   dismiss(key: string): boolean { return this.db.prepare("UPDATE ma4_proactive_notifications SET dismissed=1 WHERE key=? AND dismissed=0").run(key).changes === 1; }
   /** A snoozed notification is shown again (re-delivered) when the snooze ends. */
   snooze(key: string, until: number): boolean { return this.db.prepare("UPDATE ma4_proactive_notifications SET snoozed_until=?,delivered=0 WHERE key=? AND dismissed=0").run(until, key).changes === 1; }
