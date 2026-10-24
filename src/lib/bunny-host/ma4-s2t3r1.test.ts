@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { MODEL, rig } from "./ma4-s2t2-fixtures.ts";
 import { planConnectedTask, planSchema } from "./ma4/connected-workflow.server.ts";
 import type { ModelCall } from "./ma4/coding-workflow.server.ts";
-import { DAY, envelope as penvelope, HOUR, prig, schedule, WS } from "./ma4-s2t3-fixtures.ts";
+import { DAY, envelope as penvelope, HOUR, MIN, prig, schedule, T0, WS } from "./ma4-s2t3-fixtures.ts";
 
 const envelope = (over: Record<string, unknown> = {}) => ({ capabilities: ["file.read", "local.generate", "local.review"], providers: ["ollama"] as ["ollama"], localOnly: true as const, models: [MODEL], projectScopes: ["p1"], sideEffects: false, background: false,
   budgets: { maxModelCalls: 5, maxWallMs: 60_000 }, expiresAt: Date.now() + 3_600_000, grants: { files: [{ root: "proj", access: "read" as const }], origins: [], services: [] }, ...over });
@@ -79,5 +79,24 @@ test("T3R1-R1 retention holds while the Host keeps running: settled tasks and sc
     assert.equal(p.rt.views().some(v => v.id === fresh.id), true);
     for (let i = 0; i < 1_200; i++) (p.engine as unknown as { late(ms: number): void }).late(i);
     assert.equal(p.engine.lateness.length, 1_000, "lateness keeps only the most recent slots");
+  } finally { await p.close(); }
+});
+
+test("T3R1-N1 a schedule's own approval leaves no 'needs your approval' notice; an owner's approval clears it too", async () => {
+  const p = await prig();
+  try {
+    p.root("atlas", { "STATUS.md": "Atlas status.\n" });
+    const s = p.engine.scheduleCreate({ spec: schedule() }, WS);
+    p.engine.scheduleApprove(s.id, WS);
+    await p.at(T0 + 6 * HOUR + 1_000);
+    const run = p.tasks()[0];
+    assert.ok(run, "the scheduled run created its task");
+    const pending = (id: string) => p.rt.store.notifications(500).filter(n => n.taskId === id && n.kind === "approval_required" && !n.acknowledged);
+    assert.deepEqual(pending(run!.id), [], "no open approval notice for a run the schedule approved");
+    const owner = p.rt.create({ spec: { title: "Owner check", projectId: "p1", steps: [{ id: "read", kind: "file.read", input: { root: "atlas", path: "STATUS.md" } }, { id: "sum", kind: "local.generate", input: { prompt: "Summarize.", contextFrom: "read" }, model: MODEL }], acceptance: { requiredSteps: ["read", "sum"] } },
+      envelope: penvelope(["file.read", "local.generate"], { files: [{ root: "atlas", access: "read" }] }, { background: true }) }, WS);
+    assert.equal(owner.state, "AWAITING_APPROVAL"); assert.equal(pending(owner.id).length, 1, "the owner is asked");
+    p.rt.approve(owner.id, WS);
+    assert.deepEqual(pending(owner.id), [], "answered by the owner's approval");
   } finally { await p.close(); }
 });
