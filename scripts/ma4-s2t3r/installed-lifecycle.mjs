@@ -5,7 +5,7 @@ import { execFileSync, spawn } from 'node:child_process';
 const [installArg, outputArg] = process.argv.slice(2);
 if (!installArg || !outputArg) throw new Error('usage: installed-lifecycle.mjs <TEST install> <evidence.json>');
 const install = resolve(installArg), config = JSON.parse(readFileSync(join(install, 'install.json'), 'utf8'));
-if (!config.currentRelease.name.endsWith('-TEST') || config.hostPort !== 43191 || !install.includes('Bunny-S2T3R-Install')) throw new Error('Not the dedicated test installation.');
+if (!config.currentRelease.name.endsWith('-TEST') || ![43191, 43193].includes(config.hostPort) || !install.includes('Bunny-S2T3R-Install')) throw new Error('Not the dedicated test installation.');
 const credentials = () => JSON.parse(readFileSync(join(config.stateRoot, 'credentials/credentials.json'), 'utf8'));
 const base = `http://127.0.0.1:${config.hostPort}`;
 const cmd = async (action, data = {}) => {

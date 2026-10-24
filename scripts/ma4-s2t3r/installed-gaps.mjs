@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 const [installArg, outputArg, keep] = process.argv.slice(2);
 if (!installArg || !outputArg) throw new Error('usage: installed-gaps.mjs <TEST install> <evidence.json> [--keep]');
 const install = resolve(installArg), config = JSON.parse(readFileSync(join(install, 'install.json'), 'utf8').replace(/^﻿/, ''));
-if (!config.currentRelease.name.endsWith('-TEST') || config.hostPort !== 43191 || !install.includes('Bunny-S2T3R-Install')) throw new Error('Not the dedicated test installation.');
+if (!config.currentRelease.name.endsWith('-TEST') || ![43191, 43193].includes(config.hostPort) || !install.includes('Bunny-S2T3R-Install')) throw new Error('Not the dedicated test installation.');
 const MODEL = 'qwen2.5-coder:7b', base = `http://127.0.0.1:${config.hostPort}`;
 const credentials = () => JSON.parse(readFileSync(join(config.stateRoot, 'credentials/credentials.json'), 'utf8'));
 const cmd = async (action, data = {}) => {
