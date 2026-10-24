@@ -5,7 +5,7 @@ import { noticeRows, proactiveHeadline, proactiveRows, type ProactiveControl, ty
 
 const clockText = (at: number) => new Date(at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
 // Reuses the agent rows' existing state colours (mission.css) instead of adding styles.
-const STATE_STYLE: Record<ProactiveTone, string> = { ok: "COMPLETED", warn: "WAITING_FOR_USER", danger: "FAILED", neutral: "PAUSED", active: "RUNNING" };
+const STATE_STYLE: Record<ProactiveTone, string> = { ok: "COMPLETED", warn: "WAITING_FOR_USER", danger: "FAILED", neutral: "IDLE", active: "RUNNING" };
 const LABEL: Record<ProactiveControl, string> = { approve: "Approve", pause: "Pause", resume: "Resume", cancel: "Cancel", disable: "Turn off", reject: "Reject" };
 const KIND: Record<ProactiveRow["kind"], string> = { goal: "Goal", schedule: "Schedule", monitor: "Monitor" };
 

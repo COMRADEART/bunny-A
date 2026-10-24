@@ -140,6 +140,7 @@ test("T3R-A5 Approval Center context names the task, schedule, role, effect clas
     assert.match(ctx.sideEffect, /consequential, cannot be undone/);
     assert.deepEqual(ctx.scope, ["Folder atlas (read)", "email account me@example.test (send; only to lead@example.test)"]);
     assert.match(ctx.recovery, /checks .* whether it was already applied/);
+    assert.match(ctx.expected, /\. \S/, "outcome sentences are separated");
     assert.equal(ctx.schedule, "Daily status reply"); assert.equal(ctx.goal, "Beta");
     // The command returns it to the workstation only; a phone gets WORKSTATION_REQUIRED and the stale-payload approval does nothing.
     const inspected = await ptaskCommand(r.rt, "action.inspect", { id: t.id }, WS, r.connected) as { context: { scope: string[] } };
@@ -150,6 +151,9 @@ test("T3R-A5 Approval Center context names the task, schedule, role, effect clas
     // Cancel associated task from the Approval Center: nothing is sent.
     await ptaskCommand(r.rt, "ptask.cancel", { id: t.id }, WS, r.connected);
     assert.equal(w.sent.length, 0);
+    const cancelled = r.rt.view(t.id) as import("./ma4/task-runtime.ts").TaskView;
+    assert.equal(cancelled.state, "CANCELLED"); assert.equal(cancelled.pendingAction, null, "a cancelled task offers no action to approve");
+    await assert.rejects(ptaskCommand(r.rt, "action.approve", { id: t.id, actionId: waiting.pendingAction!.actionId, payloadSha256: waiting.pendingAction!.payloadSha256 }, WS, r.connected));
   } finally { await r.close(); }
 });
 

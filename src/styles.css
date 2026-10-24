@@ -507,8 +507,11 @@ html:has(.router-workspace[data-theme="light"]) body { background: #f2f2f7; }
 .proactive-form .task-filters { flex-wrap: wrap; }
 .proactive-form [aria-invalid="true"] { outline: 2px solid var(--negative); outline-offset: 1px; }
 .proactive-form .field-error { color: var(--negative); font-weight: 500; }
-.proactive-check { display: flex; gap: 8px; align-items: flex-start; }
-.proactive-preview { display: grid; gap: 10px; margin: 0; }
+/* Work in progress reads as work (accent); monitoring and paused stay muted, waiting is amber, failure red. */
+[data-testid="proactive"] li[data-state="RUNNING"] small { color: var(--accent); }
+.proactive-check { display: flex; gap: 8px; align-items: center; }
+.proactive-check input { margin: 0; flex: none; }
+.proactive-preview { display: grid; gap: 10px; margin: 0 0 12px; }
 .proactive-preview > div { display: grid; grid-template-columns: minmax(120px, 34%) 1fr; gap: 12px; }
 .proactive-preview dt { color: var(--muted); font-size: 0.8125rem; }
 .proactive-preview dd { margin: 0; overflow-wrap: anywhere; }

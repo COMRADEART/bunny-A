@@ -41,7 +41,7 @@ export function actionContext(rt: PersistentTaskRuntime, id: string, owners?: { 
   return {
     task: record.spec.title, taskId: id, step: `${p.stepId} (step ${index + 1} of ${record.spec.steps.length})`, role: p.kind === "local.review" ? "Reviewer" : "Worker",
     operation: p.kind, sideEffect: `${category.replace("_", "-")}${facts?.consequential ? ", consequential" : ""}${p.reversible ? ", reversible" : ", cannot be undone"}`,
-    scope, expected: p.effects, recovery, approvalExpiresAt: p.expiresAt, taskExpiresAt: record.envelope.expiresAt, ...(owners?.taskContext(id) ?? { schedule: null, goal: null }),
+    scope, expected: p.effects.join(" "), recovery, approvalExpiresAt: p.expiresAt, taskExpiresAt: record.envelope.expiresAt, ...(owners?.taskContext(id) ?? { schedule: null, goal: null }),
   };
 }
 const actionId = (value: unknown) => { if (typeof value !== "string" || !/^act-[a-f0-9-]{36}$/.test(value)) throw new CommandRefusedError("Invalid action id."); return value; };

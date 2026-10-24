@@ -260,7 +260,8 @@ export class PersistentTaskRuntime {
       running?.abort.abort("cancelled");
       return this.view(id) as TaskView;
     }
-    const result = this.write(id, { actor, reason: "cancelled", now, to: "CANCELLED", leaseOp: { kind: "fence" }, mutate: r => { r.controls.cancelRequested = true; } });
+    // A proposal waiting for permission dies with the task, as on deny, so no view keeps offering it.
+    const result = this.write(id, { actor, reason: "cancelled", now, to: "CANCELLED", leaseOp: { kind: "fence" }, mutate: r => { r.controls.cancelRequested = true; r.pendingAction = null; } });
     return taskView(result.record, result.version);
   }
   /**

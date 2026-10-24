@@ -732,7 +732,7 @@ export class ProactiveEngine {
     if (done) parts.push(`${done} scheduled task${done === 1 ? "" : "s"} completed`);
     if (failed) parts.push(`${failed} failed`);
     if (reminders) parts.push(`${reminders} reminder${reminders === 1 ? "" : "s"}`);
-    if (checks) parts.push(changes ? `${changes} change${changes === 1 ? "" : "s"} found in ${checks} checks` : `${checks} checks, no changes`);
+    if (checks) parts.push(changes ? `${changes} change${changes === 1 ? "" : "s"} found in ${checks} check${checks === 1 ? "" : "s"}` : `${checks} check${checks === 1 ? "" : "s"}, no changes`);
     if (missed) parts.push(`${missed} run${missed === 1 ? "" : "s"} missed or skipped`);
     for (const g of gaps) parts.push(`Bunny-A was ${g.kind === "off" ? "not running" : "asleep"} for ${duration(g.to - Math.max(g.from, since))}; nothing ran then`);
     return parts.length ? { since, text: parts.join(" · ") } : null;
