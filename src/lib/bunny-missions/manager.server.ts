@@ -5467,6 +5467,7 @@ export class MissionManager {
     this.tasks.bus.off("event", this.listener);
     for (const handle of this.pending.values()) clearImmediate(handle);
     this.pending.clear();
+    await this.tasks.shutdown();
     await this.bus.close();
   }
 }

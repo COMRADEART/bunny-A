@@ -17,31 +17,28 @@ import { approvalCount, pendingApprovalItems } from "./approvals-model";
 import { elapsed } from "./ui-model";
 import { WidgetSurface, type WidgetOpeners } from "./widgets";
 import type { SlotId } from "@/lib/bunny-host/personal-agents";
+import { islandPresence, providerSetupLine } from "./journey-model";
 import {
-  islandPresence,
-  onboardingRecord,
-  ONBOARDING_STEPS,
-  providerSetupLine,
-  type OnboardingRecord,
-} from "./journey-model";
+  evaluateLocalModelReadiness,
+  GUIDED_ONBOARDING_STAGE_IDS,
+  migrateLegacyOnboarding,
+  resolveGuidedOnboardingState,
+  type GuidedOnboardingState,
+} from "@/lib/bunny-host/ma4/native-notifications";
 
-const ONBOARDING_KEY = "bunny-a.onboarding.v1";
-
-function readOnboarding(): OnboardingRecord {
-  try {
-    return onboardingRecord(JSON.parse(localStorage.getItem(ONBOARDING_KEY) || "null"));
-  } catch {
-    return { status: "active", step: 0 };
-  }
-}
-
-function writeOnboarding(record: OnboardingRecord) {
-  try {
-    localStorage.setItem(ONBOARDING_KEY, JSON.stringify(record));
-  } catch {
-    /* Private mode can refuse storage. The flow still works for this visit. */
-  }
-}
+const ONBOARDING_CACHE = "bunny-a.onboarding.v2";
+const STAGE_COPY: Record<(typeof GUIDED_ONBOARDING_STAGE_IDS)[number], { title: string; body: string }> = {
+  welcome: { title: "Welcome to Bunny-A", body: "Bunny-A is your personal companion. You ask, Bunny recommends, and work starts only when you allow it." },
+  "local-architecture": { title: "It runs on this computer", body: "The Host on this Windows PC is the authority. A phone can watch. It is not a second workstation, and nothing here turns on cloud inference." },
+  preferences: { title: "What should Bunny call you?", body: "A name and language are optional. They stay on this Host." },
+  "local-model-readiness": { title: "Local model", body: "Bunny only offers a local model this Host can see right now. A name from an old setup is not enough." },
+  "model-selection": { title: "Choose a local model", body: "Pick one model from the list the Host reported. You can change it later in Models." },
+  "permissions-boundary": { title: "You stay in control", body: "Ordinary requests that policy already allows can run with one confirmation. Consequential actions wait for an explicit approval. This step grants nothing by itself." },
+  "background-execution-opt-in": { title: "Background execution", body: "Leave this off unless you want approved work to continue while the window is closed. Skipping setup leaves it off." },
+  "phone-pairing-optional": { title: "Phone pairing", body: "Pairing is optional. It uses a one-time code from this PC. The phone still has to submit that code, and the Host checks it." },
+  "voice-check-optional": { title: "Voice", body: "Voice is optional. You can try it later from the Island. Skipping does not open the microphone." },
+  "first-safe-workflow": { title: "A first task", body: "When you are ready, describe one task on Home. Bunny will show the recommendation before anything runs." },
+};
 
 /** Compact Island status for the workspace top bar. Every word comes from islandPresence. */
 export function IslandStatus({ now }: { now: number }) {
@@ -111,69 +108,88 @@ export function IslandStatus({ now }: { now: number }) {
   );
 }
 
-/** First-run guide. Skip and resume are stored on this device. Steps never start work. */
+/** First-run guide. The Host record is authoritative; this browser only caches it. Skipping grants nothing. */
 export function Onboarding({ onOpenDevices }: { onOpenDevices: () => void }) {
   const store = useIsland();
-  const [record, setRecord] = useState<OnboardingRecord | null>(null);
+  const [record, setRecord] = useState<GuidedOnboardingState | null>(null);
+  const [name, setName] = useState("");
   useEffect(() => {
-    setRecord(readOnboarding());
+    let cancel = false;
+    void (async () => {
+      const saved = await useIsland.getState().ownerCommand("onboarding.get", {});
+      if (cancel) return;
+      const host = saved?.data as GuidedOnboardingState | null;
+      if (host && typeof host === "object" && "stageId" in host) {
+        setRecord(host);
+        setName(host.preferences.preferredName);
+        return;
+      }
+      let legacy: unknown = null;
+      try { legacy = JSON.parse(localStorage.getItem(ONBOARDING_CACHE) || localStorage.getItem("bunny-a.onboarding.v1") || "null"); } catch { legacy = null; }
+      const next = legacy && typeof legacy === "object" && "stageId" in legacy ? resolveGuidedOnboardingState(legacy as never) : migrateLegacyOnboarding(legacy);
+      setRecord(next);
+      setName(next.preferences.preferredName);
+    })();
+    return () => { cancel = true; };
   }, []);
   if (!record || record.status !== "active") return null;
-  const step = ONBOARDING_STEPS[record.step] ?? ONBOARDING_STEPS[0];
+  const copy = STAGE_COPY[record.stageId];
+  const ollama = liveProviders(store).find((row) => row.id === "ollama");
+  const readiness = evaluateLocalModelReadiness({
+    ollamaAvailable: ollama?.availability === "ready" || ollama?.availability === "busy",
+    models: ollama?.models?.length ? ollama.models : ollama?.current_model ? [ollama.current_model] : [],
+    remoteModels: ollama?.remoteModels ?? [],
+  });
   const providers = liveProviders(store)
     .filter((row) => !row.extension || row.installed)
     .map((row) => ({ name: NAMES[row.id] ?? row.id, availability: row.availability }));
-  const save = (next: OnboardingRecord) => {
+  const save = async (next: GuidedOnboardingState) => {
     setRecord(next);
-    writeOnboarding(next);
+    try { localStorage.setItem(ONBOARDING_CACHE, JSON.stringify(next)); } catch { /* private mode */ }
+    const answer = await useIsland.getState().ownerCommand("onboarding.save", {
+      state: { status: next.status, stageIndex: next.stageIndex, preferences: next.preferences },
+    });
+    const host = answer?.data as GuidedOnboardingState | null;
+    if (host && typeof host === "object" && "stageId" in host) setRecord(host);
   };
-  const go = (stepIndex: number) => save({ status: "active", step: stepIndex });
+  const go = (stageIndex: number) => void save(resolveGuidedOnboardingState({
+    status: "active",
+    stageIndex,
+    preferences: { ...record.preferences, preferredName: name },
+  }));
   return (
     <section className="onboarding t8-surface" aria-labelledby="onboarding-title">
-      <p className="eyebrow">
-        Setup {record.step + 1} of {ONBOARDING_STEPS.length}
-      </p>
-      <h2 id="onboarding-title">{step.title}</h2>
-      <p>{step.body}</p>
-      {step.id === "providers" ? <p className="caption">{providerSetupLine(providers)}</p> : null}
-      {step.id === "execution" && store.hostIdentity ? (
-        <p className="caption">This window is talking to Host {store.hostIdentity.hostId.slice(0, 8)}.</p>
+      <p className="eyebrow">Setup {record.stageIndex + 1} of {GUIDED_ONBOARDING_STAGE_IDS.length}</p>
+      <h2 id="onboarding-title">{copy.title}</h2>
+      <p>{copy.body}</p>
+      {record.stageId === "local-architecture" ? <p className="caption">{providerSetupLine(providers)}{store.hostIdentity ? ` · Host ${store.hostIdentity.hostId.slice(0, 8)}` : ""}</p> : null}
+      {record.stageId === "preferences" ? (
+        <label className="caption">Name
+          <input aria-label="Preferred name" value={name} maxLength={60} onChange={(event) => setName(event.target.value)} />
+        </label>
+      ) : null}
+      {record.stageId === "local-model-readiness" || record.stageId === "model-selection" ? <p className="caption">{readiness.userGuidance}</p> : null}
+      {record.stageId === "model-selection" ? readiness.runnableLocalModels.map((model) => (
+        <button key={model} type="button" className={record.preferences.selectedLocalModel === model ? "btn primary" : "btn secondary"} onClick={() => setRecord({ ...record, preferences: { ...record.preferences, selectedLocalModel: model } })}>{model}</button>
+      )) : null}
+      {record.stageId === "background-execution-opt-in" ? (
+        <label className="caption">
+          <input type="checkbox" checked={record.preferences.backgroundExecutionOptIn} onChange={(event) => setRecord({ ...record, preferences: { ...record.preferences, backgroundExecutionOptIn: event.target.checked } })} />
+          Continue approved work while the window is closed
+        </label>
       ) : null}
       <div className="onboarding-actions">
-        {record.step > 0 ? (
-          <button type="button" className="btn secondary" onClick={() => go(record.step - 1)}>
-            Back
-          </button>
-        ) : null}
-        {record.step < ONBOARDING_STEPS.length - 1 ? (
-          <button type="button" className="btn primary" onClick={() => go(record.step + 1)}>
-            Continue
-          </button>
+        {record.stageIndex > 0 ? <button type="button" className="btn secondary" onClick={() => go(record.stageIndex - 1)}>Back</button> : null}
+        {record.stageIndex < GUIDED_ONBOARDING_STAGE_IDS.length - 1 ? (
+          <button type="button" className="btn primary" onClick={() => go(record.stageIndex + 1)}>Continue</button>
         ) : (
-          <button type="button" className="btn primary" onClick={() => save({ status: "done", step: record.step })}>
-            Finish
-          </button>
+          <button type="button" className="btn primary" onClick={() => void save(resolveGuidedOnboardingState({ status: "done", stageIndex: record.stageIndex, preferences: { ...record.preferences, preferredName: name } }))}>Finish</button>
         )}
-        {step.id === "first-task" ? (
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={() => {
-              store.setSheet("chat");
-              document.getElementById("task-prompt")?.focus();
-            }}
-          >
-            Write a task
-          </button>
+        {record.stageId === "first-safe-workflow" ? (
+          <button type="button" className="btn secondary" onClick={() => { store.setSheet("chat"); document.getElementById("task-prompt")?.focus(); }}>Write a task</button>
         ) : null}
-        {step.id === "phone" ? (
-          <button type="button" className="btn secondary" onClick={onOpenDevices}>
-            Open pairing
-          </button>
-        ) : null}
-        <button type="button" className="btn quiet" onClick={() => save({ status: "skipped", step: record.step })}>
-          Skip
-        </button>
+        {record.stageId === "phone-pairing-optional" ? <button type="button" className="btn secondary" onClick={onOpenDevices}>Open pairing</button> : null}
+        <button type="button" className="btn quiet" onClick={() => void save(resolveGuidedOnboardingState({ status: "skipped", stageIndex: record.stageIndex, preferences: record.preferences }))}>Skip</button>
       </div>
     </section>
   );

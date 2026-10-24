@@ -136,6 +136,10 @@ export class TaskManager {
   hotSensors = new Set<string>();
   flushers = new Map<string, () => void>();
   treeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Deadline timers for live provider sessions. Cleared on task end and on Host shutdown. */
+  runtimeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  shutdownState: "open" | "closing" | "complete" = "open";
+  private shutdownGate: Promise<{ stopped: string[]; detached: string[]; timersCleared: number }> | null = null;
   /**
    * M-A-3 T9R-F01: sessions whose root process ended but whose descendants may still run ("checking" until the
    * first process-table read). Fail-closed liveness for the paired-device mid-run hold.
@@ -277,7 +281,71 @@ export class TaskManager {
    */
   /** Set at Host shutdown: restart/unreadable/job watchers stop instead of touching a closed database. */
   disposed = false;
-  dispose() { this.disposed = true; this.connections.close(); }
+  /** Sync entry used by existing callers. Timer ownership ends here; session stop finishes in `shutdown()`. */
+  dispose() { this.beginShutdown(); }
+  /** Marks the manager closing, refuses new dispatches, stops owned sessions, and clears deadline timers. */
+  shutdown() {
+    this.beginShutdown();
+    return this.shutdownGate ?? Promise.resolve({ stopped: [] as string[], detached: [] as string[], timersCleared: 0 });
+  }
+  private beginShutdown() {
+    if (this.shutdownGate) return;
+    this.shutdownState = "closing";
+    this.disposed = true;
+    const timersCleared = this.runtimeTimers.size + this.treeTimers.size;
+    for (const id of [...this.runtimeTimers.keys()]) this.clearRuntimeLimit(id);
+    for (const [id, timer] of [...this.treeTimers]) {
+      clearTimeout(timer);
+      this.treeTimers.delete(id);
+    }
+    try { this.connections.close(); } catch { /* already closed */ }
+    const ids = [...this.sessions.keys()];
+    this.shutdownGate = this.finishShutdown(ids, timersCleared);
+  }
+  private async finishShutdown(ids: string[], timersCleared: number) {
+    const stopped: string[] = [];
+    const detached: string[] = [];
+    await Promise.all(ids.map(async (id) => {
+      // Settle the adapter and its child process, but do not write "stopped". A Host shutdown is an
+      // interruption: the next process's restart walk records it. A user Stop is a different transition.
+      const session = this.sessions.get(id);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const bound = new Promise<"bound">((resolve) => {
+        timer = setTimeout(() => resolve("bound"), 5_000);
+        timer.unref?.();
+      });
+      const result = await Promise.race([
+        (session ? session.stop().then(() => "settled" as const, () => "settled" as const) : Promise.resolve("settled" as const)),
+        bound,
+      ]);
+      if (timer) clearTimeout(timer);
+      this.clearRuntimeLimit(id);
+      this.sessions.delete(id);
+      detached.push(id);
+      void result;
+    }));
+    this.shutdownState = "complete";
+    return { stopped, detached, timersCleared };
+  }
+  /** Arms the per-attempt runtime deadline. `.unref` does not replace this registration. */
+  private armRuntimeLimit(id: string, ms: number) {
+    this.clearRuntimeLimit(id);
+    if (this.shutdownState !== "open") return;
+    // shortcut: a non-finite budget uses Node's max timeout instead of firing immediately, upgrade if a mission needs an explicit longer cap
+    const delay = Number.isFinite(ms) && ms >= 0 ? ms : 2_147_483_647;
+    const timer = setTimeout(() => {
+      this.runtimeTimers.delete(id);
+      if (this.shutdownState !== "open") return;
+      this.stopInBackground(id, "Runtime limit reached.");
+    }, delay);
+    timer.unref?.();
+    this.runtimeTimers.set(id, timer);
+  }
+  private clearRuntimeLimit(id: string) {
+    const timer = this.runtimeTimers.get(id);
+    if (timer) clearTimeout(timer);
+    this.runtimeTimers.delete(id);
+  }
   configureMA4(raw: unknown) {
     if (this.sessions.size) throw new Error("Stop active tasks before changing model/upstream policy.");
     this.ma4.configure(raw);
@@ -621,8 +689,8 @@ export class TaskManager {
       remoteConfigured: this.remoteConfigured,
       remoteUrl: this.remoteUrl,
       devices: this.db.db
-        .prepare("SELECT id,name,created_at AS createdAt FROM devices WHERE revoked_at IS NULL")
-        .all() as { id: string; name: string; createdAt: number }[],
+        .prepare("SELECT id,name,created_at AS createdAt,revoked_at AS revokedAt FROM devices ORDER BY created_at")
+        .all() as { id: string; name: string; createdAt: number; revokedAt: number | null }[],
       thermal: this.thermal,
       modelCapabilities: this.modelCapabilities.snapshot(),
       providerUsage: this.providerUsage.snapshot(),
@@ -1093,6 +1161,7 @@ export class TaskManager {
       executionScope: ProviderExecutionScope;
     },
   ): OrchTask {
+    if (this.shutdownState !== "open") throw new Error("Host is shutting down; new tasks are refused.");
     this.containment.assertAccepting("tasks");
     if (!delegated) {
       const directive = ownerDirective(input.prompt);
@@ -1879,7 +1948,6 @@ export class TaskManager {
       },
       raw: (stream, text) => record?.write(stream, text),
     };
-    let runtimeTimer: ReturnType<typeof setTimeout> | null = null;
     /** T3 §22/§24: one bounded relaunch — fresh authority snapshot, same hooks, per-attempt runtime budget. Returns null when the target cannot honor the same envelope. */
     let connectionReservation:number|null=null;
     const startSession = (
@@ -1889,7 +1957,7 @@ export class TaskManager {
       try {
         const current = this.db.get(id);
         if (current.projectId) this.projects.forExecution(current.projectId);
-        if (TERMINAL.includes(current.state) || this.stopping.has(id)) return null;
+        if (TERMINAL.includes(current.state) || this.stopping.has(id) || this.shutdownState !== "open") return null;
         const targetProvider = this.live().find((p) => p.id === target.provider);
         if (!targetProvider) return null;
         const targetBlocked = eligibility(targetProvider, current.constraints ?? {});
@@ -1949,16 +2017,10 @@ export class TaskManager {
           options.detail,
         );
         if (options.bumpReroutes) this.bumpReroutes(retried, options.detail);
-        if (runtimeTimer) clearTimeout(runtimeTimer);
-        runtimeTimer = setTimeout(
-          () => this.stopInBackground(id, "Runtime limit reached."),
-          Math.min(
-            retried.maxRuntimeMs ?? 120000,
-            this.missionAttemptRuntimeLimit?.(retried) ?? Infinity,
-          ),
+        this.armRuntimeLimit(
+          id,
+          Math.min(retried.maxRuntimeMs ?? 120000, this.missionAttemptRuntimeLimit?.(retried) ?? Infinity),
         );
-        // MA4-S3-T0: safety timer must not pin the event loop after test/Host teardown.
-        runtimeTimer.unref?.();
         // Adapters receive a detached, immutable authority snapshot, never the persisted task object.
         const adapterTask = structuredClone(retried);
         delete adapterTask.connectionRoute; delete adapterTask.proposedRoute;
@@ -2027,12 +2089,10 @@ export class TaskManager {
       "executor.starting",
       "Execution active. Progress indeterminate until the provider publishes a plan.",
     );
-    runtimeTimer = setTimeout(
-      () => this.stopInBackground(id, "Runtime limit reached."),
+    this.armRuntimeLimit(
+      id,
       Math.min(task.maxRuntimeMs ?? 120000, this.missionAttemptRuntimeLimit?.(task) ?? Infinity),
     );
-    // MA4-S3-T0: do not keep the Node event loop alive solely for this safety timer (agent-team test teardown).
-    runtimeTimer.unref?.();
     this.containment.background({ subsystem: "tasks", taskId: id, ...task.mission }, async () => {
       try {
         // M-A-3 T3 §22/§23/§24: bounded, taxonomy-driven recovery around the SAME state machine.
@@ -2060,7 +2120,7 @@ export class TaskManager {
           this.stopTree(id);
           // M-A-3 T9R-F01: this attempt's descendants stay tracked even if a retry or reroute replaces the session.
           this.watchSurvivors(id, session.pid?.() ?? this.db.get(id).pid ?? undefined, session);
-          if (this.stopping.has(id)) return;
+          if (this.stopping.has(id) || this.shutdownState !== "open") return;
           const current = this.db.get(id);
           if (TERMINAL.includes(current.state)) return;
           if (["draining", "fatal"].includes(this.containment.health.operationalState)) {
@@ -2116,7 +2176,7 @@ export class TaskManager {
             }
           }
           const latest = this.db.get(id);
-          if (TERMINAL.includes(latest.state) || this.stopping.has(id)) return;
+          if (TERMINAL.includes(latest.state) || this.stopping.has(id) || this.shutdownState !== "open") return;
           if (["draining", "fatal"].includes(this.containment.health.operationalState)) {
             await this.failOperation(id, {
               name: "HostFatal",
@@ -2304,7 +2364,7 @@ export class TaskManager {
           fail: (error) => this.failOperation(id, error),
         });
       } finally {
-        if (runtimeTimer) clearTimeout(runtimeTimer);
+        this.clearRuntimeLimit(id);
         if (flushTimer) clearTimeout(flushTimer);
         this.stopTree(id);
         this.flushers.delete(id);
