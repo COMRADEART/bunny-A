@@ -167,6 +167,13 @@ try {
     if($LASTEXITCODE -ne 0) {throw 'Pinned browser runtime export failed.'}
     foreach($item in $browserRuntime.origins) {[void]$origins.Add($item)}
   }
+  # MA4 schemas execute in the standalone Host, outside the bundled dashboard.
+  $hostRuntime=$null
+  if(Test-Path -LiteralPath (Join-Path $bunnyBuild 'src/lib/bunny-host/ma4/registry.ts')) {
+    $hostRuntime=(& node (Join-Path $bunnyBuild 'scripts/package-host-runtime.mjs') $bunnyBuild $bunnyWorkspace $bunnyPackage) | ConvertFrom-Json
+    if($LASTEXITCODE -ne 0) {throw 'Pinned Host runtime export failed.'}
+    foreach($item in $hostRuntime.origins) {[void]$origins.Add($item)}
+  }
   # Type-stripped Host files are ESM. Runtime dependencies are shipped; no npm install is required.
   '{"type":"module"}' | Set-Content -LiteralPath (Join-Path $bunnyPackage 'package.json') -Encoding ascii
   New-Item -ItemType Directory -Path (Join-Path $bunnyPackage 'runtime') -Force | Out-Null
@@ -185,6 +192,7 @@ try {
     dashboardBuild=(-not $SkipDashboardBuild)
     packageLockSha256=if(Test-Path -LiteralPath $lock) {(Get-FileHash -LiteralPath $lock -Algorithm SHA256).Hash.ToLower()} else {$null}
     dashboardDependencies='node_modules of the build machine workspace (not reinstalled)'
+    hostRuntime=if($hostRuntime) {$hostRuntime.packages} else {$null}
     browserRuntime=if($browserRuntime) {$browserRuntime.packages} else {$null}
     browserExecutable=if($browserRuntime) {$browserRuntime.browserExecutable} else {$null}
   }

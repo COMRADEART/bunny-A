@@ -461,7 +461,7 @@ function Update-BunnyVoiceView {
   }
   $bunnyControls.VoiceMeter.Width = [Math]::Round($maxWidth * $rms, 1)
   # The Notch shows the same truth in a short form, and its bars move only with that real level (flat when there is none).
-  $bunnyControls.NotchStatus.Text = Get-BunnyNotchStatus $headline (Get-BunnyTaskStrip $bunnySnapshot.persistentTasks ([bool]$bunnyOnline)).Headline
+  $bunnyControls.NotchStatus.Text = Get-BunnyNotchStatus $headline (Get-BunnyTaskStrip $bunnySnapshot.persistentTasks ([bool]$bunnyOnline) $bunnySnapshot.proactive).Headline
   Update-BunnyNotchBars $rms ([bool]($open -and $fresh -and $snap.capturing))
 
   $device = Get-BunnyVoiceDeviceLine $snap

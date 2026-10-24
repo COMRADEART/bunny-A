@@ -1,0 +1,56 @@
+{
+  "schema": "bunny-a.ma4-s2t2.bench/1",
+  "at": "2026-10-23T21:45:50.737Z",
+  "node": "v24.18.0",
+  "platform": "win32 x64",
+  "budgets": {
+    "fileReadStepP95Ms": 50,
+    "search500FilesMs": 1000,
+    "ledgerVerify1000Ms": 200,
+    "browserFirstOpenMs": 10000,
+    "browserOpenP95Ms": 3000,
+    "refusedStartMs": 100,
+    "heapGrowth100TasksMb": 50
+  },
+  "results": {
+    "fileReadStep": {
+      "n": 60,
+      "p50": 39.1,
+      "p95": 47,
+      "budgetP95": 50
+    },
+    "search500Files": {
+      "ms": 379,
+      "budget": 1000
+    },
+    "heapGrowth100Tasks": {
+      "mb": -12.8,
+      "budget": 50,
+      "gcExposed": true
+    },
+    "ledgerVerify": {
+      "entries": 1000,
+      "ms": 5,
+      "budget": 200
+    },
+    "browserOpen": {
+      "firstMs": 532,
+      "laterP95": 431.3,
+      "note": "each task starts its own isolated browser",
+      "budgetFirst": 10000,
+      "budgetP95": 3000
+    },
+    "refusedStart": {
+      "ms": 1,
+      "budget": 100
+    }
+  },
+  "met": {
+    "fileReadStep": true,
+    "search500Files": true,
+    "ledgerVerify": true,
+    "heapGrowth100Tasks": true,
+    "browserOpen": true,
+    "refusedStart": true
+  }
+}

@@ -16,7 +16,7 @@ $script:bunnyWeaponTaskMs = @{ planning = 2400; researching = 1800; coding = 140
 
 function Get-BunnyStripCellCount {
   $view = Get-BunnyPersonalAgentStrip $bunnySnapshot.personalAgents
-  $tasks = Get-BunnyTaskStrip $bunnySnapshot.persistentTasks ([bool]$bunnyOnline)
+  $tasks = Get-BunnyTaskStrip $bunnySnapshot.persistentTasks ([bool]$bunnyOnline) $bunnySnapshot.proactive
   return (@($view.Slots).Count + $(if ($view.Unslotted -gt 0) { 1 } else { 0 }) + $(if ($tasks.Count -gt 0) { 1 } else { 0 }))
 }
 
@@ -289,7 +289,7 @@ function Update-BunnyAgentStrip {
   } else { $script:bunnyHappyUntil = 0.0 }
   if (@($transitions | Where-Object { $_.Kind -eq 'verified' }).Count) { $script:bunnyHappyUntil = [double](Get-BunnyNowMs) + $script:bunnyHappyMs }
   $slots = @($view.Slots)
-  $tasks = Get-BunnyTaskStrip $bunnySnapshot.persistentTasks ([bool]$bunnyOnline)
+  $tasks = Get-BunnyTaskStrip $bunnySnapshot.persistentTasks ([bool]$bunnyOnline) $bunnySnapshot.proactive
   $cells = $slots.Count + $(if ($view.Unslotted -gt 0) { 1 } else { 0 }) + $(if ($tasks.Count -gt 0) { 1 } else { 0 })
   $strip.Children.Clear()
   if ($cells -eq 0) { Stop-BunnyWeaponStrip; $strip.Visibility = 'Collapsed'; $bunnyControls.StripCapsule.Visibility = 'Collapsed'; Set-BunnyJoin; return }

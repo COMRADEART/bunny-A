@@ -1,9 +1,9 @@
 import { redactReviewListing } from "../bunny-missions/authorization.server.ts";
 import { DATA_CATEGORIES, ROUTING_MODES } from "./ma4/hybrid.ts";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, createHash, timingSafeEqual, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { HostDatabase } from "./persistence.server.ts";
 import { TaskManager, type ManagerOptions } from "./manager.server.ts";
 import { API_KEY_SHAPE } from "./jev-secrets.server.ts";
@@ -29,6 +29,10 @@ import { PersistentTaskRuntime, type RuntimeDeps } from "./ma4/task-runtime.serv
 import { TaskStore } from "./ma4/task-store.server.ts";
 import { productionTaskDeps } from "./ma4/task-executors.server.ts";
 import { PTASK_ACTIONS, PTASK_SAFE_ACTIONS, ptaskCommand } from "./ma4/task-commands.server.ts";
+import { connectedActions, type ConnectedOptions } from "./ma4/connected-actions.server.ts";
+import { ProactiveStore } from "./ma4/proactive-store.server.ts";
+import { ProactiveEngine, type ProactiveDeps } from "./ma4/proactive.server.ts";
+import { PROACTIVE_ACTIONS, PROACTIVE_SAFE_ACTIONS, proactiveCommand } from "./ma4/proactive-commands.server.ts";
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
 import { SLOT_IDS, clean, isUserFacingAgent, projectPersonalAgents, type SlotId } from "./personal-agents.ts";
 import { WorkerStore } from "./workers.server.ts";
@@ -303,8 +307,7 @@ export function streamSse(
   return close;
 }
 
-export async function startHost(
-  options: {
+type HostOptions = {
     dataDirectory?: string;
     root?: string;
     workspaceRoot?: string;
@@ -325,8 +328,57 @@ export async function startHost(
     /** M-A-3 T13.3 Gate E test-only harness `--version` probe. Never reachable from HTTP. */
     harnessProbe?: typeof probeHarness;
     /** MA4-S2-T1 test-only task executors and model seams (recorded fakes). Never reachable from HTTP. */
-    ptasks?: Partial<Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "leaseMs" | "maintenanceMs">>;
-  } = {},
+    ptasks?: Partial<Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "leaseMs" | "maintenanceMs" | "now">>;
+    /** MA4-S2-T2 test-only connected-action seams (loopback synthetic sites, recorded synthetic services). Never reachable from HTTP. */
+    connected?: ConnectedOptions;
+    /** MA4-S2-T3 test-only proactive seams (recorded synthetic sources, a fake clock, a short idle sleep). Never reachable from HTTP. */
+    proactive?: Partial<Pick<ProactiveDeps, "sources" | "now" | "maxSleepMs">>;
+};
+
+export async function startHost(options: HostOptions = {}) {
+  const port = options.port ?? Number(process.env.BUNNY_HOST_PORT ?? 43119);
+  // MA4-S2-T2 (F-CI1-1): the port is the single-Host guard, so it is held before any state is opened or recovered. A
+  // refused Host never opens or changes a running Host's data; a start that fails later releases everything it opened.
+  let serve: ((req: IncomingMessage, res: ServerResponse) => void) | null = null;
+  const server = createServer((req, res) => {
+    if (serve) return serve(req, res);
+    res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "1", Connection: "close" });
+    res.end(JSON.stringify({ error: "The Host is starting." }));
+  });
+  await new Promise<void>((resolveListen, reject) => {
+    const refused = (error: Error) => {
+      // A refused listen() still holds its socket handle until the server is closed.
+      server.close(() => reject(error));
+    };
+    server.once("error", refused);
+    server.listen(port, "127.0.0.1", () => {
+      server.off("error", refused);
+      resolveListen();
+    });
+  });
+  const undo: (() => unknown)[] = [];
+  try {
+    return await openHost(options, port, server, (handler) => { serve = handler; }, undo);
+  } catch (error) {
+    for (const release of undo.reverse()) {
+      try {
+        await release();
+      } catch {
+        // Keep releasing the rest; the original failure is the one reported.
+      }
+    }
+    server.closeAllConnections();
+    await new Promise<void>((r) => server.close(() => r()));
+    throw error;
+  }
+}
+
+async function openHost(
+  options: HostOptions,
+  port: number,
+  server: Server,
+  attach: (handler: (req: IncomingMessage, res: ServerResponse) => void) => void,
+  undo: (() => unknown)[],
 ) {
   const paths = hostStatePaths(options.dataDirectory);
   const dataDirectory = paths.data;
@@ -344,8 +396,8 @@ export async function startHost(
     });
   containment.options.secrets = [...(containment.options.secrets ?? []), token];
   registerDiagnosticSecret(token);
-  const port = options.port ?? Number(process.env.BUNNY_HOST_PORT ?? 43119);
   const db = new HostDatabase(paths.database);
+  undo.push(() => db.close());
   // M-A-3 T9: additive device tables exist before the state marker is reconciled below; never on a request path.
   ensureDeviceSchema(db.db);
   containment.options.persist = (type, detail, owner) => {
@@ -375,6 +427,7 @@ export async function startHost(
     ...(options.modelProbes ? { modelProbes: options.modelProbes } : {}),
     ...(options.ma4Fetch ? { ma4Fetch: options.ma4Fetch } : {}),
   });
+  undo.push(() => manager.dispose());
   containment.options.persist = (type, detail, owner) =>
     manager.emit(db.event(type, owner.taskId ?? null, detail, owner.missionId ?? null));
   db.onFailure = (error, rollbackFailed) => {
@@ -387,21 +440,40 @@ export async function startHost(
   };
   // M-A-0 mission layer: additive tables are created, but nothing runs unless missions are enabled.
   const missions = new MissionManager(manager, { dataDirectory, ...options.missions });
+  undo.push(() => missions.close());
   // M-A-3 T4: the durable Agent runtime sits above Missions — it owns continuity only, and construction
   // runs the recovery walk after MissionManager.recover() has reconciled the mission rows.
   const agents = new AgentRuntime(db, missions);
+  undo.push(() => agents.close());
   // MA4-S2-T1: work continues with no window open only while this Host runs, and only under the owner's policy.
   // A workstation client (Island poll or dashboard stream) seen in the last 20 s counts as an attached window.
   const workstationClients = { seen: 0, streams: 0 };
+  // MA4-S2-T2: connected actions — owner-registered folders, the controlled browser, and (tests only) synthetic services —
+  // each wrapped by the permission broker. A folder may never contain or sit inside the Host's own state.
+  const connected = connectedActions({ db, dataDirectory, protectedPaths: [dataDirectory, dirname(credentialPath), paths.diagnostics, paths.runtime], containment, ...options.connected });
+  undo.push(() => connected.close());
   const ptasks = new PersistentTaskRuntime({
     store: new TaskStore(db),
     ...productionTaskDeps(),
     ...options.ptasks,
+    executors: [...(options.ptasks?.executors ?? productionTaskDeps().executors), ...connected.executors],
+    // A task's browser session (and its profile) ends with the task.
+    onTerminal: (taskId) => void connected.browser.close(taskId).catch(() => undefined),
     instanceId: manager.instanceId,
     uiAttached: () => workstationClients.streams > 0 || Date.now() - workstationClients.seen < 20_000,
-    emit: (type, detail) => manager.emit(db.event(type, null, detail)),
+    // MA4-S2-T3: a task change wakes the proactive engine (settling scheduled runs, goal progress) without polling.
+    emit: (type, detail) => { manager.emit(db.event(type, null, detail)); if (type === "ptask.changed") proactive?.wake(); },
     // Started only after this Host holds its port (below), so a lease left by any other instance is a dead Host's.
     exclusive: true,
+  });
+  // MA4-S2-T3: owner-approved goals, schedules and monitors. It only creates S2-T1 tasks; it executes nothing itself.
+  const proactive: ProactiveEngine = new ProactiveEngine({
+    store: new ProactiveStore(db), runtime: ptasks, roots: connected.roots,
+    sources: options.proactive?.sources ?? null,
+    modelAvailable: options.ptasks?.modelAvailable ?? productionTaskDeps().modelAvailable,
+    uiAttached: () => workstationClients.streams > 0 || Date.now() - workstationClients.seen < 20_000,
+    emit: (type, detail) => manager.emit(db.event(type, null, detail)),
+    now: options.proactive?.now, maxSleepMs: options.proactive?.maxSleepMs,
   });
   const projects = new ProjectService(missions, agents);
   // M-A-3 T13.3: Personal Agent ownership, profiles and conversations. Context only; it owns no execution.
@@ -707,9 +779,6 @@ export async function startHost(
   const deviceCommands = new WindowLimiter(60, 60_000);
   const deviceReads = new WindowLimiter(300, 60_000);
   const deviceStreamOpens = new WindowLimiter(30, 60_000);
-  // M-A-2 T9: this Host just applied its own additive schema; reconcile the installed-state marker
-  // with the applied schema so the next boot validates a healthy database instead of refusing it.
-  refreshStateMarker({ installed: paths.installed, data: paths.data, database: paths.database });
   let presentationRevision = 0;
   const installedIdentity = releaseIdentity();
   const snapshot = (after: number): HostSnapshot => {
@@ -718,6 +787,7 @@ export async function startHost(
       missions: missions.snapshot(),
       agents: agents.snapshot(),
       persistentTasks: ptasks.snapshot(),
+      proactive: proactive.snapshot(),
     };
     const retainedFrom = Number(
       (db.db.prepare("SELECT COALESCE(MIN(sequence),0) n FROM events").get() as { n: number }).n,
@@ -1194,6 +1264,7 @@ export async function startHost(
         // M-A-3 T10: stopping audio, releasing devices and cancelling a proposal never wait for a degraded Host.
         ...VOICE_SAFE_ACTIONS,
         ...PTASK_SAFE_ACTIONS,
+        ...PROACTIVE_SAFE_ACTIONS,
       ]);
       if (!safeActions.has(action)) containment.assertAccepting("http");
       if (typeof input.action === "string" && AGENT_ACTIONS.has(input.action)) {
@@ -1207,7 +1278,9 @@ export async function startHost(
           throw new CommandRefusedError("Remote approval can only answer the exact Host offer.");
         extra = await agentCommand(agents, input.action, data, actor);
       } else if (typeof input.action === "string" && PTASK_ACTIONS.has(input.action)) {
-        extra = { data: ptaskCommand(ptasks, input.action, data, actor) };
+        extra = { data: await ptaskCommand(ptasks, input.action, data, actor, connected, proactive) };
+      } else if (typeof input.action === "string" && PROACTIVE_ACTIONS.has(input.action)) {
+        extra = { data: await proactiveCommand(proactive, input.action, data, actor) };
       } else if (typeof input.action === "string" && VOICE_ACTIONS.has(input.action)) {
         // Device principals never reach here: assertDeviceAction refuses every voice action (default-deny).
         if (device) throw new WorkstationRequiredError("Voice requires the workstation on the Windows Host.");
@@ -2150,7 +2223,12 @@ export async function startHost(
     if (cause === "revocation") await missions.endDeviceDriven(deviceActor);
     return { answers, staged, batches, delegations, approvals, unstopped };
   };
-  const server = createServer((req, res) => {
+  // Record the final boot schema only after every store has initialized. Presentation
+  // stores (voice preferences, appearance, theme and widgets) also add tables; recording
+  // before them makes the next installed launch reject this healthy database.
+  // Boot validation still runs before any store opens, so unknown/corrupt state is refused.
+  refreshStateMarker({ installed: paths.installed, data: paths.data, database: paths.database });
+  attach((req, res) => {
     const requestId = randomUUID();
     res.on("error", () => {
       try {
@@ -2177,16 +2255,15 @@ export async function startHost(
       },
     );
   });
-  await new Promise<void>((resolveListen, reject) => {
-    server.once("error", reject);
-    server.listen(port, "127.0.0.1", resolveListen);
-  });
   writeFileSync(
     credentialPath,
     JSON.stringify({ token, port, pid: process.pid, instanceId: manager.instanceId }),
     { mode: 0o600 },
   );
+  undo.push(() => ptasks.close());
   await ptasks.start();
+  undo.push(() => proactive.close());
+  await proactive.start();
   let closing = false;
   let closed: Promise<void> | null = null;
   const loops: { stop: () => void }[] = [];
@@ -2201,7 +2278,9 @@ export async function startHost(
         // M-A-3 T10: release the microphone and speaker before anything else stops.
         await voice.close().catch(() => undefined);
         // MA4-S2-T1: running task steps stop and are handed to recovery with their durable state intact.
+        await proactive.close().catch(() => undefined);
         await ptasks.close().catch(() => undefined);
+        await connected.close().catch(() => undefined);
         await Promise.allSettled(
           [...manager.sessions.keys()].map((id) =>
             containment.health.operationalState === "draining"
@@ -2233,6 +2312,8 @@ export async function startHost(
     return closed;
   };
   containment.options.shutdown = close;
+  // From here a failed start releases everything through the Host's own shutdown.
+  undo.splice(0, undo.length, close);
   const signalClose = () =>
     containment.background(
       { subsystem: "shutdown" },
@@ -2292,7 +2373,7 @@ export async function startHost(
     ),
   );
   console.log(`Bunny-A Host ready on loopback (${manager.instanceId}).`);
-  return { server, manager, missions, agents, projects, ptasks, close, token, port, containment };
+  return { server, manager, missions, agents, projects, ptasks, proactive, connected, close, token, port, containment };
 }
 
 /** M-A-3 T10: maps one voice action to the session. Every branch is a workstation-only session operation. */

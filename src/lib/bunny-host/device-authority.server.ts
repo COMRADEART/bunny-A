@@ -71,6 +71,21 @@ export const DEVICE_RIGHTS: Readonly<Record<string, DeviceRight>> = {
   "ptask.resume": "supervise",
   "ptask.cancel": "supervise",
   "ptask.notification.ack": "supervise",
+  // MA4-S2-T3: a phone sees goals, schedules and monitors and may pause, resume (re-checked by the Host), cancel, disable a
+  // monitor and dismiss or snooze notifications. Creating, approving, changing and linking stay on the PC.
+  "proactive.list": "read",
+  "goal.pause": "supervise",
+  "goal.resume": "supervise",
+  "goal.cancel": "supervise",
+  "schedule.pause": "supervise",
+  "schedule.resume": "supervise",
+  "schedule.cancel": "supervise",
+  "monitor.pause": "supervise",
+  "monitor.resume": "supervise",
+  "monitor.disable": "supervise",
+  "proactive.notification.dismiss": "supervise",
+  "proactive.notification.snooze": "supervise",
+  "proactive.away.ack": "supervise",
   "agent.pause": "supervise",
   "agent.resume": "supervise",
   "agent.stop": "supervise",
@@ -426,7 +441,9 @@ export function deviceSnapshot(snapshot: HostSnapshot, principal: DevicePrincipa
           readOnly: snapshot.persistentTasks.readOnly ? "Task storage needs review on the Windows Host." : null,
           tasks: snapshot.persistentTasks.tasks.map((task) => task.corrupt
             ? { ...task, detail: "Review this task on the Windows Host." }
-            : { ...task, failure: task.failure ? { code: task.failure.code, detail: "Details are retained on the Windows Host." } : null }),
+            : { ...task, failure: task.failure ? { code: task.failure.code, detail: "Details are retained on the Windows Host." } : null,
+                // MA4-S2-T2: the phone learns that an action waits and what kind it is; names, paths and subjects stay on the PC.
+                pendingAction: task.pendingAction ? { ...task.pendingAction, target: task.pendingAction.connector, summary: `A ${task.pendingAction.connector} action is waiting for your permission on the PC.` } : null }),
         }
       : snapshot.persistentTasks,
     // M-A-3 T13.1: credential state, provider limits and usage are workstation-owner settings.

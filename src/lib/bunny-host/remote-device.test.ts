@@ -473,17 +473,21 @@ test("T9 F19/F20/F23: always-ask risks stay on the Windows Host; remote Deny per
     assert.ok(denied);
     assert.equal(readFileSync(join(f.root, "seed.txt"), "utf8"), "seed", "F20: the denied effect never happened");
     // F23: Stop from the device on a second, running Agent blocks every later admission.
-    const second = await f.api("agent.create", { name: "Stop me", objective: "Read twice", steps: [op("One", "filesystem.read", { path: "seed.txt" }), op("Two", "filesystem.read", { path: "seed.txt" }, [0])] });
+    // MA4-S2-T3R: the second step waits on the workstation (an always-ask delete), so the Agent is reliably still in
+    // progress when the device's Stop arrives; two instant reads could finish first on a fast runner (hosted CI race).
+    const second = await f.api("agent.create", { name: "Stop me", objective: "Read then delete", steps: [op("One", "filesystem.read", { path: "seed.txt" }), op("Two", "filesystem.delete", { path: "seed.txt" }, [0])] });
     assert.equal(second.status, 200, second.body.error);
     const secondId = second.body.agents!.agents.find((a) => a.name === "Stop me")!.id;
     const offer = (await f.api("agent.authorization.propose", { id: secondId })).body.agents!.agents.find((a) => a.id === secondId)!.authorization!;
     assert.equal((await f.api("agent.authorization.approve", { id: secondId, revision: offer.revision })).status, 200);
+    await until(async () => (await f.state(device.token)).body.agents.agents.find((a) => a.id === secondId && a.authorization?.pending.length), "second Agent waiting on the workstation");
     const stop = await f.api("agent.stop", { id: secondId }, device.token);
     assert.equal(stop.status, 200, stop.body.error);
     const stopped = (await f.state()).body.agents.agents.find((a) => a.id === secondId)!;
     assert.equal(stopped.state, "STOPPED");
     const resumeAfterStop = await f.api("agent.resume", { id: secondId, revision: stopped.authorization?.revision ?? 0 }, device.token);
     assert.equal(resumeAfterStop.status, 400, "a stopped Agent is never resurrected");
+    assert.equal(readFileSync(join(f.root, "seed.txt"), "utf8"), "seed", "the stopped Agent's delete never ran");
   } finally {
     await f.close();
   }

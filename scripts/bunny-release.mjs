@@ -6,7 +6,7 @@
 //   node scripts/bunny-release.mjs source-check <repo> <release>  source/tooling files equal their git blobs
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -76,8 +76,9 @@ export function verifyRelease(release) {
 }
 
 // Statement-anchored so strings such as `"legacy.import": {` are not read as imports. `import type` / `export type`
-// lines are erased by --experimental-strip-types and never resolved at runtime.
-const STATIC_FROM = /^\s*(?:import|export)\s+(type\s+)?[^;]*?\bfrom\s*["']([^"'\n]+)["']/gm;
+// lines are erased by --experimental-strip-types and never resolved at runtime. A quoted "from" (a type such as
+// `Pick<T, "from" | "to">` on an export line) is not the keyword.
+const STATIC_FROM = /^\s*(?:import|export)\s+(type\s+)?[^;]*?(?<!["'])\bfrom\s*["']([^"'\n]+)["']/gm;
 const SIDE_EFFECT = /^\s*import\s*["']([^"'\n]+)["']/gm;
 const DYNAMIC = /\bimport\(\s*["']([^"'\n]+)["']\s*\)/g;
 /** Packages the Host loads only through a guarded dynamic import; absent, the capability reports itself unavailable. */
@@ -100,7 +101,26 @@ export function importClosure(release) {
     ];
     for (const { spec, dynamic } of specifiers) {
       if (spec.startsWith("node:")) continue;
-      if (!spec.startsWith(".")) { (dynamic && OPTIONAL_PACKAGES.includes(spec) ? optional : packages).add(spec); continue; }
+      if (!spec.startsWith(".")) {
+        // The standalone Host's sole required package. Resolve only inside this release,
+        // then walk its imports too; missing/transitive packages still fail closed.
+        if (spec === "zod") {
+          const folder = join(root, "node_modules/zod"), metadataFile = join(folder, "package.json");
+          if (!existsSync(metadataFile) || lstatSync(folder).isSymbolicLink() || relative(root, realpathSync(folder)).startsWith("..")) {
+            missing.push("node_modules/zod/package.json (local runtime required)"); continue;
+          }
+          const metadata = JSON.parse(readFileSync(metadataFile, "utf8"));
+          const entry = metadata.exports?.["."]?.import;
+          if (metadata.name !== "zod" || typeof entry !== "string" || !entry.startsWith("./")) {
+            missing.push("node_modules/zod/package.json (invalid ESM entry)"); continue;
+          }
+          const target = resolve(folder, entry);
+          if (relative(folder, target).startsWith("..")) outside.push(`zod -> ${entry}`);
+          else queue.push(target);
+          continue;
+        }
+        (dynamic && OPTIONAL_PACKAGES.includes(spec) ? optional : packages).add(spec); continue;
+      }
       const target = resolve(dirname(file), spec);
       if (relative(root, target).startsWith("..")) outside.push(`${relative(root, file)} -> ${spec}`); else queue.push(target);
     }

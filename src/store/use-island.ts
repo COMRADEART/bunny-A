@@ -256,6 +256,8 @@ type Island = Preferences & {
   persistentTasks: NonNullable<HostSnapshot["persistentTasks"]> | null;
   /** One `ptask.*` command; the Host's answer or null when refused. */
   ptaskCommand: (action: string, data: Record<string, unknown>, onRefused?: (caption: string) => void) => Promise<HostCommandOk | null>;
+  /** MA4-S2-T3 goals, schedules, monitors and proactive notifications (null until a Host that knows them answers). */
+  proactive: NonNullable<HostSnapshot["proactive"]> | null;
   /** M-A-3 T13.3 Gate G: routing-improvement evidence and policy lifecycle (workstation only; null on devices). */
   routingLearning: RoutingLearningView | null;
   /** One `routing.learning.*` command; the Host's answer or null when refused. */
@@ -856,6 +858,7 @@ export const useIsland = create<Island>((set, get) => {
       missions: snapshot.missions ?? null,
       agents: snapshot.agents ?? null,
       persistentTasks: snapshot.persistentTasks ?? null,
+      proactive: snapshot.proactive ?? null,
       personalAgents: snapshot.personalAgents ?? null,
       personalAgentContext: snapshot.personalAgentContext ?? null,
       harnesses: snapshot.harnesses?.harnesses ?? null,
@@ -926,6 +929,7 @@ export const useIsland = create<Island>((set, get) => {
       pairingRequired: true,
       agents: null,
       persistentTasks: null,
+      proactive: null,
       personalAgents: null,
       personalAgentContext: null,
       harnesses: null,
@@ -1332,6 +1336,7 @@ export const useIsland = create<Island>((set, get) => {
     missions: null,
     agents: null,
     persistentTasks: null,
+    proactive: null,
     ptaskCommand: (action, data, onRefused) => command(action, data, typeof data.id === "string" ? data.id : "ptask", onRefused),
     personalAgents: null,
     personalAgentContext: null,

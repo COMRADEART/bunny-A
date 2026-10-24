@@ -208,6 +208,16 @@ export const READ_ACTIONS = new Set([
   "ptask.list",
   "ptask.get",
   "ptask.output",
+  // MA4-S2-T2: inspecting a waiting action, its receipts and the registered folders changes nothing.
+  "action.inspect",
+  "action.receipts",
+  "connector.roots.list",
+  // MA4-S2-T3: reading goals, schedules and monitors changes nothing.
+  "proactive.list",
+  // MA4-S2-T3R: previews validate and describe; they change nothing.
+  "goal.preview",
+  "schedule.preview",
+  "monitor.preview",
 ]);
 export const isMutating = (action: string) => !READ_ACTIONS.has(action);
 

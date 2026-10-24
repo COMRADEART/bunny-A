@@ -1,0 +1,36 @@
+Bunny-A Host ready on loopback (706ffb6f-74c8-4cc0-bbc4-084e209a6c76).
+✖ T3R: real installed Host includes presentation stores in its marker and boots twice (1240.8901ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1359.5596
+
+✖ failing tests:
+
+test at src\lib\bunny-host\state-marker.test.ts:123:1
+✖ T3R: real installed Host includes presentation stores in its marker and boots twice (1240.8901ms)
+  AssertionError [ERR_ASSERTION]: Got unwanted exception: boot 1 preserves the final schema marker
+  Actual message: "Installed Bunny database is damaged or has an unexpected schema. Restore a verified backup."
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s2t3r/src/lib/bunny-host/state-marker.test.ts:137:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1332:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: Error: Installed Bunny database is damaged or has an unexpected schema. Restore a verified backup.
+        at hostStatePaths (file:///C:/Users/allam/Documents/new/bun-router-s2t3r/src/lib/bunny-host/state-paths.server.ts:53:189)
+        at file:///C:/Users/allam/Documents/new/bun-router-s2t3r/src/lib/bunny-host/state-marker.test.ts:137:31
+        at getActual (node:assert:611:5)
+        at strict.doesNotThrow (node:assert:779:32)
+        at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s2t3r/src/lib/bunny-host/state-marker.test.ts:137:14)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async Test.run (node:internal/test_runner/test:1332:7)
+        at async startSubtestAfterBootstrap (node:internal/test_runner/harness:385:3),
+    expected: undefined,
+    operator: 'doesNotThrow',
+    diff: 'simple'
+  }
