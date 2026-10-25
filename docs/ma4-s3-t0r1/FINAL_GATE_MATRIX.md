@@ -4,7 +4,7 @@ Candidate SHA for the installed product: `97d188e86ba733dcb94525ac08a5a2639012d8
 Zip SHA-256: `d53679f5d4458db6c6cb52071ea7b1aa8d0ddca8bba07ff1c4835e6a4f284961` (183109673 bytes).
 Manifest SHA-256: `42ebbfd08abb6c817e32a008fd5977cdd24c9ffb5a38bb22356f8f6fef8bdbe3`.
 Merge CI: https://github.com/COMRADEART/bunny-A/actions/runs/40142924080 conclusion **failure**.
-Closure-head hosted CI: **BLOCKED** until this branch is pushed and a run exists.
+Closure-head hosted CI: https://github.com/COMRADEART/bunny-A/actions/runs/40151412133 for `27e10aa`, queued at 2026-10-25T01:38:13Z. Conclusion **BLOCKED** until that run finishes.
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Closure-head hosted CI: **BLOCKED** until this branch is pushed and a run exists
 | Merge-commit hosted CI, typecheck / MA4 / UI / builds | PASS | job success on run 40142924080 |
 | Merge-commit hosted CI, static security | PASS | job success on the same run |
 | Merge-commit hosted CI, full regression | FAIL | `T4-ANDROID-1` expected true, actual false |
-| Closure-head hosted CI | BLOCKED | branch not on the host yet |
+| Closure-head hosted CI | BLOCKED | run 40151412133 queued for `27e10aa`; conclusion not observed |
 | Local natural-exit chain | PASS | stages 0–3 exit 0; 387, 1656, 58, 260 pass; 1 opt-in skip |
 | `scripts/voice-worker.test.mjs` | NOT TESTED | omitted from the CI-shaped stage 0 list |
 | Eight agent suites without `--test-force-exit` | PASS | stage 2 58/58 plus `agent-store` inside stage 1; dedicated log 67/67 |

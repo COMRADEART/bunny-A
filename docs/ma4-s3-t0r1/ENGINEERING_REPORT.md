@@ -40,6 +40,6 @@ These replace older engineering claims that this qualification contradicted.
 
 Public beta is **NO-GO**.
 
-Signing is `UNSIGNED` or `TEST_SIGNED`, and `productionReleaseGate` is `BLOCKED`. Android hardware, device revocation, and a real window-closed Windows toast are not evidenced. Merge-commit CI is red on `T4-ANDROID-1`. The closure branch fixes that assertion and still needs its own hosted run.
+Signing is `UNSIGNED` or `TEST_SIGNED`, and `productionReleaseGate` is `BLOCKED`. Android hardware, device revocation, and a real window-closed Windows toast are not evidenced. Merge-commit CI is red on `T4-ANDROID-1`. The closure branch fixes that assertion. Hosted CI for `27e10aa` is queued at https://github.com/COMRADEART/bunny-A/actions/runs/40151412133 and was not finished when this report was written.
 
 MA4-S3-T1 was not started.

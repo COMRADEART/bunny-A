@@ -35,7 +35,7 @@ Runner notes on that run (not product failures): actions targeting Node.js 20 we
 
 ## Closure-head hosted CI
 
-Not started at the time this file was first written. The closure commit is local until the branch is pushed. The gate stays **BLOCKED** until a hosted run exists for the closure head. A push run URL, when one exists, belongs in `FINAL_GATE_MATRIX.md`.
+Push of `27e10aa` queued run https://github.com/COMRADEART/bunny-A/actions/runs/40151412133 at 2026-10-25T01:38:13Z. The run had not finished when this record was written. Conclusion: **BLOCKED** (queued, not observed). A later conclusion replaces this sentence; a queued run is not a pass.
 
 ## Local builds on the closure tree
 
