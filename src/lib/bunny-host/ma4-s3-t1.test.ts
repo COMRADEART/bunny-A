@@ -200,6 +200,7 @@ test("the Host applies a saved onboarding preference on a local task", async () 
 
 const development: [string, ComplexityClass][] = [
   ["Explain quicksort.", "C0"],
+  ["What HTTP status code means Not Found?", "C0"],
   ["Summarize the paragraph about queues.", "C0"],
   ["What is a hard pin?", "C0"],
   ["Define idempotent.", "C0"],

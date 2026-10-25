@@ -984,7 +984,7 @@ test("whisper: the staged runtime and model match native/voice/whisper-pin.json 
   const record = JSON.parse(readFileSync(recordPath, "utf8"));
   assert.ok(record.whisperShim, `build record has no whisperShim: ${STAGE_HINT}`);
   assert.equal(record.whisperShim.binarySha256, sha(shimPath), "shim binary differs from the build record");
-  assert.equal(record.whisperShim.sourceSha256, sha(join(root, "native/voice/whisper-shim.c")), "shim source differs from the build record");
+  assert.equal(record.whisperShim.sourceSha256, shaSource(join(root, "native/voice/whisper-shim.c")), "shim source differs from the build record");
   assert.equal(record.whisperShim.linkedAgainst["whisper.dll"], pin.runtimeFiles["whisper.dll"]);
 });
 

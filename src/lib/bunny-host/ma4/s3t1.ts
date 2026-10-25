@@ -21,7 +21,7 @@ export type TaskClassification = {
 
 const CONSEQUENTIAL = /\b(deploy|production|delete|drop\s+table|force[\s-]push|migrate|irreversible|wipe|format\s+the\s+disk|push\s+to\s+remote)\b/i;
 const MULTI = /\b(several|multiple|and then|propose a patch|build problem|across files|multi-file|refactor)\b/i;
-const SINGLE_TOOL = /\b(read|open|status|list|check|inspect)\b/i;
+const SINGLE_TOOL = /\b(read|open|list|check|inspect)\b|\bstatus\b(?!\s+code)/i;
 const DIRECT = /\b(explain|summarize|summarise|what is|what's|define|translate)\b/i;
 
 /** Deterministic baseline. Ambiguous text stays a direct answer with no tools. */
