@@ -33,7 +33,7 @@ export function LocalPerformance() {
     <div className="setting-row" aria-label="Local performance">
       <div>
         <strong>Local performance</strong>
-        <p>Measured on this Host. Unavailable means the sensor or the task fact was not observed.</p>
+        <p>Measured on this Host. Unavailable means the sensor or the task fact was not observed. A preference is used only while it is eligible. Alternate local models stay a choice, and a hard pin stays on its id and digest.</p>
         <ul className="caption">
           {view.rows.map((row) => (
             <li key={row.label}>

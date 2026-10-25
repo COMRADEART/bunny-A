@@ -53,6 +53,18 @@ function usageNote(provider: ProviderLive): string | null {
   if (!windows.length) return null;
   return `${provider.name} provider-reported usage: ${windows.map((window) => `${window.label} ${window.usedPercent}% used`).join(", ")}.`;
 }
+function authorizedLocalModels(pool: readonly ProviderLive[]): string[] {
+  const ids = new Set<string>();
+  for (const provider of pool) for (const model of provider.models ?? []) if (runsLocally(provider, model)) ids.add(model);
+  return [...ids].sort();
+}
+
+/** An unavailable preference lists local models and selects none of them. */
+export function preferenceUnavailable(preference: string, pool: readonly ProviderLive[]): string {
+  const choices = authorizedLocalModels(pool);
+  return `Preferred local model ${preference} is unavailable. Choose another authorized local model: ${choices.join(", ") || "none installed"}. No authorized alternate was selected.`;
+}
+
 export function bunnyRoute(input: { prompt: string; mode: Mode; providers: ProviderLive[]; override?: ProviderId | "auto"; constraints?: TaskConstraints; learned?: (provider: ProviderId, type: string) => number; policyId?: string }): RouteDecision {
   const constraints = inferredConstraints(input.prompt,input.constraints);
   let pool = input.providers.filter(provider => !eligibility(provider,constraints));
@@ -62,7 +74,7 @@ export function bunnyRoute(input: { prompt: string; mode: Mode; providers: Provi
   const requestedLocal = exactLocal ?? preference;
   if (requestedLocal && (constraints.localOnly || constraints.offlineOnly)) {
     const holders = pool.filter((provider) => (provider.models ?? []).includes(requestedLocal) && runsLocally(provider, requestedLocal));
-    if (!holders.length) throw new Error(exactLocal ? `Hard-pinned local model ${exactLocal} is unavailable. No substitute was selected.` : `Preferred local model ${preference} is unavailable. No authorized alternate was selected.`);
+    if (!holders.length) throw new Error(exactLocal ? `Hard-pinned local model ${exactLocal} is unavailable. No substitute was selected.` : preferenceUnavailable(preference!, pool));
     pool = holders;
   }
   if (input.override && input.override !== "auto" && !pool.some(provider=>provider.id===input.override)) throw new Error(`Selected executor is not eligible for this task. ${input.providers.find(provider => provider.id === input.override) ? eligibility(input.providers.find(provider => provider.id === input.override)!, constraints) : "Provider was not found."}`);
@@ -76,7 +88,7 @@ export function bunnyRoute(input: { prompt: string; mode: Mode; providers: Provi
   // A local-only task never inherits a cloud-hosted default model from a local service.
   const local = constraints.localOnly || constraints.offlineOnly ? localModel(chosenLive, requestedLocal) : null;
   if (requestedLocal && (constraints.localOnly || constraints.offlineOnly) && local !== requestedLocal) {
-    throw new Error(exactLocal ? `Hard-pinned local model ${exactLocal} is unavailable. No substitute was selected.` : `Preferred local model ${preference} is unavailable. No authorized alternate was selected.`);
+    throw new Error(exactLocal ? `Hard-pinned local model ${exactLocal} is unavailable. No substitute was selected.` : preferenceUnavailable(preference!, pool));
   }
   const substituted = local && local!==decision.recommended_model ? decision.recommended_model : null;
   if (local) decision.recommended_model = local;

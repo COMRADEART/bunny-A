@@ -35,6 +35,11 @@ function sha256(path: string): string {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+function sourceSha256(path: string): string {
+  const text = readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+  return createHash("sha256").update(text).digest("hex");
+}
+
 /**
  * Refuses to launch unless the exe matches its build record. A release manifest, when present, must list the same hash.
  * Throws VoiceWorkerError("WORKER_INTEGRITY") and never starts a process.
@@ -52,9 +57,9 @@ export function verifyWorkerIntegrity(root: string = repoRoot): { exePath: strin
   }
   const actual = sha256(exePath);
   if (typeof record.binarySha256 !== "string" || record.binarySha256.toLowerCase() !== actual) throw refuse("binary hash differs from build record");
-  // containment#3: the build record must also name the source it was built from, and that source must still match.
+  // The record binds the LF source blob. A Windows checkout may rewrite it as CRLF.
   const sourcePath = join(root, WORKER_SOURCE_RELATIVE);
-  if (typeof record.sourceSha256 !== "string" || !existsSync(sourcePath) || record.sourceSha256.toLowerCase() !== sha256(sourcePath)) {
+  if (typeof record.sourceSha256 !== "string" || !existsSync(sourcePath) || record.sourceSha256.toLowerCase() !== sourceSha256(sourcePath)) {
     throw refuse("worker source differs from build record");
   }
   // containment#0: a release folder carries release-manifest.json next to the Host root, and then the manifest entry is

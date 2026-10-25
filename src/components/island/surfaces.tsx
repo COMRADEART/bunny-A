@@ -169,6 +169,7 @@ export function Onboarding({ onOpenDevices }: { onOpenDevices: () => void }) {
         </label>
       ) : null}
       {record.stageId === "local-model-readiness" || record.stageId === "model-selection" ? <p className="caption">{readiness.userGuidance}</p> : null}
+      {record.stageId === "model-selection" ? <p className="caption">This saves a preference, not a hard pin. If that model is unavailable, pick another local model from this list. Bunny will not substitute one.</p> : null}
       {record.stageId === "model-selection" ? readiness.runnableLocalModels.map((model) => (
         <button key={model} type="button" className={record.preferences.selectedLocalModel === model ? "btn primary" : "btn secondary"} onClick={() => setRecord({ ...record, preferences: { ...record.preferences, selectedLocalModel: model } })}>{model}</button>
       )) : null}

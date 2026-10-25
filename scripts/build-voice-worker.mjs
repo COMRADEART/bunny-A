@@ -8,6 +8,7 @@ const frameworkRoot = "C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319";
 const speechRoot = "C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System.Speech";
 
 const sha = p => createHash("sha256").update(readFileSync(p)).digest("hex");
+const shaSource = p => createHash("sha256").update(readFileSync(p, "utf8").replace(/\r\n/g, "\n")).digest("hex");
 
 function resolveSpeech() {
   if (!existsSync(speechRoot)) throw new Error("System.Speech is not installed (GAC_MSIL\\System.Speech missing). The voice worker needs the Windows Speech platform.");
@@ -37,7 +38,7 @@ export function buildWhisperShim(root, prior) {
   if (!existsSync(compiler)) return { status: "skipped", reason: `gcc not found at ${compiler} (set BUNNY_NATIVE_CC)` };
 
   const source = resolve(root, "native/voice/whisper-shim.c");
-  const sourceSha256 = sha(source);
+  const sourceSha256 = shaSource(source);
   const output = join(runtime, "bunny-whisper-shim.dll");
   const linkedAgainst = { "whisper.dll": sha(whisperDll), "ggml.dll": sha(ggmlDll), "ggml-base.dll": sha(ggmlBaseDll) };
   if (prior && prior.sourceSha256 === sourceSha256 && existsSync(output) && prior.binarySha256 === sha(output) &&
@@ -81,7 +82,7 @@ export function buildVoiceWorker(root = resolve(dirname(fileURLToPath(import.met
   const speechDll = resolveSpeech();
   const source = resolve(root, "native/voice/BunnyVoiceWorker.cs");
   if (!existsSync(source)) throw new Error(`Voice worker source missing: ${source}`);
-  const sourceSha256 = sha(source);
+  const sourceSha256 = shaSource(source);
   const recordPath = output.replace(/\.exe$/, ".json");
 
   let prior = null;
@@ -129,7 +130,7 @@ export function buildVoiceWorker(root = resolve(dirname(fileURLToPath(import.met
   const shim = buildWhisperShim(resolve(root), prior && prior.whisperShim);
   if (shim.status === "skipped") {
     console.log(`build:whisper-shim skipped: ${shim.reason}`);
-    delete record.whisperShim;
+    if (prior?.whisperShim) record.whisperShim = prior.whisperShim;
   } else if (shim.status === "up-to-date") {
     console.log("build:whisper-shim up to date");
     record.whisperShim = shim.record;

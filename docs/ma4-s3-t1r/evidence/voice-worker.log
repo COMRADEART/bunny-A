@@ -1,0 +1,247 @@
+Γ£ö build record matches the source and the compiled worker (5.688ms)
+Γ£ö ready event reports local SAPI engines and the worker protocol (179.3096ms)
+Γ£ö devices event is a read-only real enumeration with structure only (193.6244ms)
+Γ£ö V07 V08 V09 synthesized speech yields partials then a final bound to its turn, endpointed by VAD (2525.5308ms)
+Γ£ö manual endpointing finalizes only on capture.end (2459.8749ms)
+Γ£ö V11 silence never becomes a command: stt.none no_speech, no final (1676.5702ms)
+Γ£ö V12 noise-only input fails safely: vad noise_only and no final (1108.8586ms)
+Γ£ö V06 total capture is bounded by maxMs and reports the buffered peak (361.1586ms)
+Γ£ö V05 a second capture.start while capturing is refused with DEVICE_BUSY (163.1631ms)
+Γ£ö V28 capture during playback is refused with BUSY_PLAYBACK (half duplex) (165.684ms)
+Γ£ö V19 V22 LIVE-B03 push-to-talk barge-in: speak.cancel immediately followed by capture.start opens the capture (no BUSY_PLAYBACK) (242.3285ms)
+Γ£ö V24 mute aborts an active capture and refuses capture.start until unmuted (166.1266ms)
+Γ£ö V18 speech chunks play strictly in seq order on the null sink (1799.6758ms)
+Γ£ö V19 V20 speak.cancel stops audible playback and nothing from that gen starts afterwards (976.8042ms)
+Γ£ö V21 a late speak with an old gen after cancel never plays (895.441ms)
+Γ£ö V22 rapid cancel and speak cycles keep turn state and gen monotonic (211.6076ms)
+Γ£ö V25 shutdown with an active capture releases everything and exits 0 within 2 s (165.4817ms)
+Γ£ö unknown op is answered with UNKNOWN_OP and malformed JSON keeps the process alive (99.3034ms)
+Γ£ö BUFFER_LIMIT rejects oversized speech text (76.7336ms)
+Γ£ö V52 stdout carries only bounded JSON events with no audio-looking payload (2696.9438ms)
+Γ£ö a command line over 64 KiB is rejected and the worker stays alive (108.8347ms)
+Γ£ö T10 endpointing: recognizer evidence keeps no_speech from firing and bounds the turn end (7905.3621ms)
+Γ£ö T10 Part-B endpointing: room noise above the calibrated floor still ends the turn; one loud click does not (7935.1797ms)
+Γ£ö T10 stop decision: rejected-only recognizer text is stt.none rejected, never a final (7924.6396ms)
+Γ£ö T10 AGC: the gained audio never changes the reported levels, and gain stays in 1x..24x (7925.0544ms)
+Γ£ö T10 levels: reported rms and peak equal the raw fixture samples window by window (AGC cannot change them) (503.4596ms)
+Γ£ö T10 staleDropped: speak commands at or below the highest cancelled gen are counted per cancel receipt (74.9858ms)
+Γ£ö native#0 a stalled playback driver never holds the command loop: cancel, enqueue and shutdown stay bounded (7940.3908ms)
+Γ£ö T12 closeout: cancelling while the driver opens never submits the cancelled chunk when Open returns (0.24ms)
+Γ£ö native#0 live: a healthy speak.cancel applies the reset within the bounded wait and reports no resetPending (159.1896ms)
+Γ£ö native#2 abandoned recognizers: raw audio is zeroed and released, and the ledger refuses past its bound (0.2422ms)
+Γ£ö native#3 speak.cancel receipts share one meter worker, and a full queue starts no thread (0.0812ms)
+Γ£ö native#4 device index is range-checked: out of range is DEVICE_UNAVAILABLE and never wraps to another device (472.4794ms)
+Γ£ö native#5 a worker thread fault is contained: the guard runs its handler and the body never escapes (0.2315ms)
+Γ£ö native#6 the finalize decision reads the onset state published during capture, not a value set at thread exit (0.0748ms)
+Γ£ö R2-native#0 a recognizer whose start throws is disposed before the error propagates, so the turn holds no engine (0.8499ms)
+Γ£ö R2-native#1 the capture thread body is guarded: a protocol write that fails on a closed pipe ends the turn, not the process (1.2723ms)
+Γ£ö R2-native#2 a playback chunk whose header never completes is released after the reset, and its device handle is closed (0.7749ms)
+Γ£ö R2-native#3 raw microphone buffers are zeroed before they are freed, and capture frames are cleared when the turn ends (0.7892ms)
+Γ£ö T12-native VT-01 a short duplex burst (200 ms) ends its speech turn: onset, then speech_end within 1.2 s, flagged short (0.0991ms)
+Γ£ö T12-native VT-02 stationary ambient never counts as speech: no onset in 10 s and the floor learns the level (0.0599ms)
+Γ£ö T12-native VT-03 speech over a calibrated noise floor starts and ends about 900 ms after it stops (0.054ms)
+Γ£ö T12-native VT-G3 a loud click does not permanently suppress soft speech that follows it (0.0445ms)
+Γ£ö T12-native VT-05 output-aware onset: our own residual at 0.003 never starts a turn, but user speech over it does (0.0899ms)
+Γ£ö T12-native AEC-01/06 echo after quiet first frames, a pause and a gap is never an onset (the residual is floored and held) (0.0634ms)
+Γ£ö T12-native AEC-01 the learned residual is not decayed by a paused (silent) window (0.058ms)
+Γ£ö T12-native AEC-05 user speech at 0.008 over 0.003 echo starts a turn, and never lifts the residual above the echo cap (0.0529ms)
+Γ£ö T12-native round-2 AEC-01/05 a steady echo at 0.0045 or 0.005, or a loud echo after a quiet start, is no onset while output is audible (0.0564ms)
+Γ£ö T12-native live calibration: the measured device residual never starts a turn and 0.003 speech over it does within 120 ms (0.0497ms)
+Γ£ö T12-native review round 3: a seed taken while the user talked over the first reply is lowered by the next reply and never raised later (0.0539ms)
+Γ£ö T12-native endpointing ignores whisper's trailing full stop and waits longer after a word that cannot end a sentence (0.0373ms)
+Γ£ö T12-native AEC-02 a pre-roll replay never carries frames captured while our output was audible or in its reverb tail (0.044ms)
+Γ£ö T12-native PRIV-03 a capture loop that ends because the microphone is muted reports 'mute', and the lifetime bound reports 'lifetime' (0.04ms)
+Γ£ö T12-native AEC-02 round-2 user speech at 0.03 captured during our output is kept in the pre-roll for the next turn (0.036ms)
+Γ£ö T12-native RC-02 a playback.error for a generation releases its pause: the next chunk of that gen is not paused (0.0392ms)
+Γ£ö T12-native VT-01 stationary loud ambient in a duplex turn ends after the silence clock, not at the cap (0.044ms)
+Γ£ö T12-native N-02 behaviour: on the playback thread a pause precedes the reset, and no restart happens before it (0.0399ms)
+Γ£ö T12-native VT-09 soft speech with no frame above the onset threshold for 4 s ends the turn, even with evidence held fresh (0.0437ms)
+Γ£ö T12-native N-07 the render-identity checks are labelled as guards, and claim no echo cancellation (0.661ms)
+Γ£ö T12-native N-03 the stdout queue is 2048 lines / 1 MiB and the stall watchdog is 10 s, both bounded (0.9592ms)
+Γ£ö T12-native N-01 duplex open honors stop and mute before, during and after the device open (1.048ms)
+Γ£ö T12-native N-02 a pending reset is applied before any pause decision, and a cancelled chunk never restarts the device (0.8687ms)
+Γ£ö T12-native N-06 speak.pause emits a measured receipt off the playback thread, bounded to 1.5 s (0.9702ms)
+Γ£ö T12-native N-04 AEC output is drained while INCOMPLETE is set, into a bounded one-second pending buffer (0.9641ms)
+Γ£ö T12-native N-05 three rotating silence buffers keep the render endpoint fed (0.6218ms)
+Γ£ö T12-native N-10 timeBeginPeriod(1) is paired with timeEndPeriod(1) on every path of a duplex session (0.6353ms)
+Γ£ö T12-native VT-09 the finalizing turns stay abortable through a bounded list, so a new capture can attach (1.163ms)
+Γ£ö T12-native AUD-04 capture.abort with a turn id matches turn AND gen exactly (1.7536ms)
+Γ£ö T12-native VT-01 duplex speech_end always reports speechMs and short, and short bursts skip the decode (0.9423ms)
+Γ£û whisper: the staged runtime and model match native/voice/whisper-pin.json and the build record (1.0001ms)
+Γ£û whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error (0.6265ms)
+Γ£û whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final (0.6346ms)
+Γ£û whisper: silence never becomes a final (no VAD onset, so stt.none no_speech) (0.4567ms)
+Γ£û whisper: noise-only input never becomes a final with words (0.4964ms)
+Γ£û whisper: capture.abort that lands during the final decode never emits a final (0.4575ms)
+Γ£û whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently (0.4226ms)
+Γä╣ tests 76
+Γä╣ suites 0
+Γä╣ pass 69
+Γä╣ fail 7
+Γä╣ cancelled 0
+Γä╣ skipped 0
+Γä╣ todo 0
+Γä╣ duration_ms 62249.0598
+
+Γ£û failing tests:
+
+test at scripts\voice-worker.test.mjs:975:1
+Γ£û whisper: the staged runtime and model match native/voice/whisper-pin.json and the build record (1.0001ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:972:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:976:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:991:1
+Γ£û whisper: ready reports whisper.cpp v1.9.4 running locally on ggml-base.en with no fallback error (0.6265ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:972:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:992:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1013:1
+Γ£û whisper: synthesized phrases give a final with the key words and confidence above 0.5, and no partial follows the final (0.6346ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:972:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:1014:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1040:1
+Γ£û whisper: silence never becomes a final (no VAD onset, so stt.none no_speech) (0.4567ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:972:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:1041:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1058:1
+Γ£û whisper: noise-only input never becomes a final with words (0.4964ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:972:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:1059:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1072:1
+Γ£û whisper: capture.abort that lands during the final decode never emits a final (0.4575ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:972:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:1073:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts\voice-worker.test.mjs:1091:1
+Γ£û whisper: a missing model falls back to Windows SAPI with an STT_UNAVAILABLE error, never silently (0.4226ms)
+  AssertionError [ERR_ASSERTION]: whisper runtime is not staged: run node scripts/stage-whisper.mjs, then node scripts/build-voice-worker.mjs. Missing: native\voice\vendor\runtime\whisper.dll, native\voice\vendor\runtime\ggml.dll, native\voice\vendor\runtime\ggml-base.dll, native\voice\vendor\runtime\bunny-whisper-shim.dll, native\voice\vendor\runtime\models\ggml-base.en.bin
+  
+  5 !== 0
+  
+      at requireWhisperRuntime (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:972:10)
+      at TestContext.<anonymous> (file:///C:/Users/allam/Documents/new/bun-router-s3t1/scripts/voice-worker.test.mjs:1092:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1325:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:911:18)
+      at Test.postRun (node:internal/test_runner/test:1465:19)
+      at Test.run (node:internal/test_runner/test:1390:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:911:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

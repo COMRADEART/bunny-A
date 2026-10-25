@@ -9,7 +9,7 @@ import type { Mode, OrchTask, Project, ProviderId, ProviderLive, TaskState, Host
 } from "../orch/types.ts";
 import { HostDatabase } from "./persistence.server.ts";
 import { MODEL_SOURCE_PROVIDERS, ModelCapabilityRegistry, type ModelCapabilityOptions } from "./model-capability.server.ts";
-import { bunnyRoute, eligibility, inferredConstraints, runsLocally } from "./router.ts";
+import { bunnyRoute, eligibility, inferredConstraints, preferenceUnavailable, runsLocally } from "./router.ts";
 import { defaultAdapters } from "./adapters.server.ts";
 import type { AgentSession, AdapterHooks, HostEvent, HostSnapshot, ProviderAdapter, RunningSession, SubmitTask ,
 } from "./contracts.ts";
@@ -1382,7 +1382,7 @@ export class TaskManager {
         const chosen = preferEligibleLocal(pipeline.selection.order, preference);
         if (!chosen) {
           this.emit(this.db.event("model.approval_required", null, "Preferred local model is unavailable; no alternate was selected."));
-          throw new ModelApprovalRequired(`Preferred local model ${preference} is not eligible. No authorized alternate was selected.`);
+          throw new ModelApprovalRequired(preferenceUnavailable(preference, live));
         }
         if (routed.model !== chosen.model) {
           routed = { provider: chosen.provider, model: chosen.model, effort: chosen.effort };
@@ -1393,7 +1393,7 @@ export class TaskManager {
         }
       } else if (routed.model !== preference) {
         this.emit(this.db.event("model.approval_required", null, "Preferred local model is unavailable; no alternate was selected."));
-        throw new ModelApprovalRequired(`Preferred local model ${preference} is unavailable. No authorized alternate was selected.`);
+        throw new ModelApprovalRequired(preferenceUnavailable(preference, live));
       }
     }
     const task: OrchTask = {

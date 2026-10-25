@@ -1,0 +1,47 @@
+{
+  "commit": "bc1c82df8f765e39b1bbb64191a08f3e09f00d95",
+  "preferenceMessage": "Preferred local model missing:7b is unavailable. Choose another authorized local model: huihui_ai/Qwen3.8-abliterated:27b, huihui_ai/qwen2.5-abliterate:7b, huihui_ai/qwen3-abliterated:30b, qwen2.5-coder:7b. No authorized alternate was selected.",
+  "localModels": [
+    "huihui_ai/qwen2.5-abliterate:7b",
+    "huihui_ai/Qwen3.8-abliterated:27b",
+    "huihui_ai/qwen3-abliterated:30b",
+    "qwen2.5-coder:7b"
+  ],
+  "sample": [
+    {
+      "id": "installed-preference",
+      "preference": "huihui_ai/qwen2.5-abliterate:7b",
+      "t1": {
+        "model": "huihui_ai/qwen2.5-abliterate:7b",
+        "provider": "ollama"
+      },
+      "baseline": {
+        "model": "huihui_ai/qwen2.5-abliterate:7b",
+        "provider": "ollama"
+      }
+    },
+    {
+      "id": "other-installed-preference",
+      "preference": "qwen2.5-coder:7b",
+      "t1": {
+        "model": "qwen2.5-coder:7b",
+        "provider": "ollama"
+      },
+      "baseline": {
+        "model": "huihui_ai/qwen2.5-abliterate:7b",
+        "provider": "ollama"
+      }
+    },
+    {
+      "id": "missing-preference",
+      "preference": "not-installed:7b",
+      "t1": {
+        "error": "Preferred local model not-installed:7b is unavailable. Choose another authorized local model: huihui_ai/Qwen3.8-abliterated:27b, huihui_ai/qwen2.5-abliterate:7b, huihui_ai/qwen3-abliterated:30b, qwen2.5-coder:7b. No authorized alternate was selected."
+      },
+      "baseline": {
+        "model": "huihui_ai/qwen2.5-abliterate:7b",
+        "provider": "ollama"
+      }
+    }
+  ]
+}

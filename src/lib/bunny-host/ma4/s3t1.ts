@@ -96,12 +96,20 @@ export type ModelSelectionRecord = {
   disclosedAlternate: boolean;
 };
 
+export type ModelChoice = { id: string; digest: string | null };
+
 export type ModelSelectionResult =
   | { ok: true; record: ModelSelectionRecord }
-  | { ok: false; reason: string };
+  | { ok: false; reason: string; choices: ModelChoice[] };
 
 function localAuthorized(pool: readonly ModelIdentity[], id: string): ModelIdentity | null {
   return pool.find((model) => model.id === id && model.local && model.authorized && model.provider === "ollama") ?? null;
+}
+
+function localChoices(pool: readonly ModelIdentity[], except: string | null): ModelChoice[] {
+  return pool
+    .filter((model) => model.local && model.authorized && model.provider === "ollama" && model.id !== except)
+    .map((model) => ({ id: model.id, digest: model.digest }));
 }
 
 /** Host policy. Cloud models, missing pins, and digest mismatches fail closed. Nothing here downloads a model. */
@@ -110,38 +118,47 @@ export function selectExecutionModel(input: {
   preference?: { id: string; digest?: string | null } | null;
   pin?: { id: string; digest: string } | null;
   pool: readonly ModelIdentity[];
+  /** When true, an unavailable preference returns local choices. It never selects one. */
   allowAuthorizedAlternate?: boolean;
+  /** Set only after the owner picks a listed choice. */
+  acceptedAlternateId?: string | null;
 }): ModelSelectionResult {
+  const refuse = (reason: string, choices: ModelChoice[] = []): ModelSelectionResult => ({ ok: false, reason, choices });
   if (input.pool.length > 0 && input.pool.every((model) => !model.local)) {
-    return { ok: false, reason: "Cloud inference is disabled. No local model was selected." };
+    return refuse("Cloud inference is disabled. No local model was selected.");
   }
   if (input.mode === "HARD_PIN") {
-    if (!input.pin?.id || !input.pin.digest) return { ok: false, reason: "A hard pin needs an exact model id and digest." };
+    if (!input.pin?.id || !input.pin.digest) return refuse("A hard pin needs an exact model id and digest.");
     const found = input.pool.find((model) => model.id === input.pin!.id);
-    if (!found) return { ok: false, reason: `Hard-pinned model ${input.pin.id} is not installed. No substitute was selected.` };
-    if (!found.local || !found.authorized) return { ok: false, reason: "The hard-pinned model is not an authorized local model." };
-    if (found.digest !== input.pin.digest) return { ok: false, reason: "Hard pin digest does not match the installed model. No substitute was selected." };
+    if (!found) return refuse(`Hard-pinned model ${input.pin.id} is not installed. No substitute was selected.`);
+    if (!found.local || !found.authorized) return refuse("The hard-pinned model is not an authorized local model.");
+    if (found.digest !== input.pin.digest) return refuse("Hard pin digest does not match the installed model. No substitute was selected.");
     return { ok: true, record: { mode: "HARD_PIN", provider: "ollama", id: found.id, digest: found.digest, reason: "Exact id and digest match.", authorization: "hard-pin", disclosedAlternate: false } };
   }
   if (input.mode === "PREFERRED") {
     const preference = input.preference?.id ?? null;
-    if (!preference) return { ok: false, reason: "Preferred routing needs a configured model. No model was guessed." };
+    if (!preference) return refuse("Preferred routing needs a configured model. No model was guessed.");
     const found = localAuthorized(input.pool, preference);
     if (found) {
       if (input.preference?.digest && found.digest && found.digest !== input.preference.digest) {
-        return { ok: false, reason: "Preferred model digest changed. No substitute was selected." };
+        return refuse("Preferred model digest changed. No substitute was selected.");
       }
+      if (!found.digest) return refuse("Preferred model digest is missing. No substitute was selected.");
       return { ok: true, record: { mode: "PREFERRED", provider: "ollama", id: found.id, digest: found.digest, reason: "Onboarding preference is eligible. This is not a hard pin.", authorization: "owner-preference", disclosedAlternate: false } };
     }
-    if (!input.allowAuthorizedAlternate) return { ok: false, reason: `Preferred model ${preference} is unavailable. No authorized alternate was selected.` };
-    const alternate = input.pool.find((model) => model.local && model.authorized && model.id !== preference);
-    if (!alternate) return { ok: false, reason: `Preferred model ${preference} is unavailable and the authorized pool has no alternate.` };
-    return { ok: true, record: { mode: "PREFERRED", provider: "ollama", id: alternate.id, digest: alternate.digest, reason: `Preferred model ${preference} is unavailable. Authorized alternate ${alternate.id} is disclosed.`, authorization: "authorized-alternate", disclosedAlternate: true } };
+    const choices = input.allowAuthorizedAlternate ? localChoices(input.pool, preference) : [];
+    const picked = input.acceptedAlternateId ? localAuthorized(input.pool, input.acceptedAlternateId) : null;
+    if (!input.allowAuthorizedAlternate || !picked) {
+      return refuse(`Preferred model ${preference} is unavailable. Choose another authorized local model. No authorized alternate was selected.`, choices);
+    }
+    if (!picked.digest) return refuse("The chosen local model has no digest. No substitute was selected.", choices);
+    return { ok: true, record: { mode: "PREFERRED", provider: "ollama", id: picked.id, digest: picked.digest, reason: `Owner chose authorized local model ${picked.id} after ${preference} was unavailable.`, authorization: "authorized-alternate", disclosedAlternate: true } };
   }
   const locals = input.pool.filter((model) => model.local && model.authorized);
-  if (!locals.length) return { ok: false, reason: "AUTO_LOCAL found no authorized local model." };
+  if (!locals.length) return refuse("AUTO_LOCAL found no authorized local model.");
   const ranked = [...locals].sort((a, b) => (a.workingMemoryBytes ?? Number.MAX_SAFE_INTEGER) - (b.workingMemoryBytes ?? Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id));
   const chosen = ranked[0]!;
+  if (!chosen.digest) return refuse("AUTO_LOCAL refused a model with no digest. No substitute was selected.");
   return { ok: true, record: { mode: "AUTO_LOCAL", provider: "ollama", id: chosen.id, digest: chosen.digest, reason: "Smallest measured authorized local model. Unmeasured memory sorts last.", authorization: "authorized-local-pool", disclosedAlternate: false } };
 }
 
