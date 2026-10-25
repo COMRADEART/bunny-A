@@ -742,8 +742,9 @@ test("feature flag off: mission commands refused, snapshot reports disabled, dir
     env.launched[0].finish({ ok: true, output: "done" });
     await until(() => env.db.get(task.id).state === "completed", "direct completion");
     // M-A-3 T3 adds routing.classified/selected (submit-time) and routing.revalidated (launch
-    // gate) to the direct-task flow; the approval → executor → completion shape is unchanged.
-    assert.deepEqual(env.db.events().slice(before).map((e) => e.type).filter((t) => !t.startsWith("agent.") && t !== "session.recorded"), ["task.created", "routing.classified", "routing.selected", "routing.started", "approval.required", "routing.revalidated", "approval.accepted", "executor.starting", "task.completed"]);
+    // gate) to the direct-task flow. MA4-S3-T1R3 records execution.classified beside task.created.
+    // The approval → executor → completion shape is unchanged.
+    assert.deepEqual(env.db.events().slice(before).map((e) => e.type).filter((t) => !t.startsWith("agent.") && t !== "session.recorded"), ["task.created", "execution.classified", "routing.classified", "routing.selected", "routing.started", "approval.required", "routing.revalidated", "approval.accepted", "executor.starting", "task.completed"]);
     assert.equal(env.missions.inbox.recent().length, 0, "no inbox writes while disabled");
   } finally { await env.cleanup(); }
 });
