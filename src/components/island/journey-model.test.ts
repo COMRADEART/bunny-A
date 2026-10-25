@@ -55,6 +55,19 @@ test("T13 island: an approval outranks listening, work, and a completed task", (
   assert.match(presence.detail, /Gada/);
 });
 
+test("T2 notch: a confirmed voice phase is named, and approval still outranks it", () => {
+  assert.equal(islandPresence(base({ voicePhase: "speaking" })).title, "Speaking");
+  assert.equal(islandPresence(base({ voicePhase: "speaking", voiceListening: true })).title, "Listening and speaking");
+  assert.equal(islandPresence(base({ voicePhase: "processing" })).state, "processing");
+  assert.equal(islandPresence(base({ voicePhase: "interrupted" })).title, "Interrupted");
+  assert.equal(islandPresence(base({ voicePhase: "error" })).title, "Error");
+  assert.match(islandPresence(base({ voicePhase: "listening", workingAgents: 2 })).detail, /2 agents working/);
+  assert.equal(islandPresence(base({ voicePhase: "speaking", pendingApprovals: 1 })).state, "approval");
+  assert.equal(islandPresence(base({ voicePhase: "speaking", pendingApprovals: 1 })).title, "Approval required");
+  assert.equal(islandPresence(base({ workingAgents: 2 })).title, "Multi-agent work");
+  assert.equal(islandPresence(base({ live: false, voicePhase: "listening" })).state, "offline");
+});
+
 test("T13 island: listening, planning, several agents, handoff, streaming, and failure follow Host facts", () => {
   assert.equal(islandPresence(base({ voiceListening: true })).state, "listening");
   assert.equal(islandPresence(base({ planningAgents: 1, agentName: "Chakra", elapsed: "00:12" })).state, "planning");

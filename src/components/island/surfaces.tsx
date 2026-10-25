@@ -12,7 +12,7 @@ import { appearanceFor, isWorking } from "./character-style-model";
 import { displayState, hostLive } from "./character-model";
 import { CharacterAppearancePanel } from "./character-appearance";
 import { studioMode } from "./studio-model";
-import { voiceListening } from "./voice-model";
+import { notchVoicePhase, voiceListening } from "./voice-model";
 import { approvalCount, pendingApprovalItems } from "./approvals-model";
 import { elapsed } from "./ui-model";
 import { WidgetSurface, type WidgetOpeners } from "./widgets";
@@ -86,6 +86,7 @@ export function IslandStatus({ now }: { now: number }) {
     live,
     disconnectTitle,
     voiceListening: voiceListening(store.voice, store.voiceReceivedAt, now || Date.now()),
+    voicePhase: notchVoicePhase(store.voice, store.voiceReceivedAt, now || Date.now()),
     pendingApprovals: approvals,
     workingAgents: working.length,
     planningAgents: planning.length,

@@ -84,6 +84,22 @@ export function voiceSpeaking(snapshot: VoiceSnapshot | null, receivedAt: number
   return !!snapshot && snapshot.playing && now - receivedAt < VOICE_FRESH_MS;
 }
 
+export type NotchVoicePhase = "listening" | "processing" | "speaking" | "interrupted" | "error";
+
+/**
+ * The notch voice word, from a fresh snapshot only. A stale poll, a closed session, or an idle open session
+ * returns null so the notch can show task facts instead of implying capture.
+ */
+export function notchVoicePhase(snapshot: VoiceSnapshot | null, receivedAt: number, now: number): NotchVoicePhase | null {
+  if (!snapshot || !snapshot.open || now - receivedAt >= VOICE_FRESH_MS || now < receivedAt) return null;
+  if (snapshot.error || snapshot.state === "ERROR" || snapshot.state === "DEVICE_UNAVAILABLE") return "error";
+  if (voiceSpeaking(snapshot, receivedAt, now)) return "speaking";
+  if (snapshot.state === "INTERRUPTED") return "interrupted";
+  if (snapshot.state === "PROCESSING" || snapshot.state === "TRANSCRIBING") return "processing";
+  if (voiceListening(snapshot, receivedAt, now)) return "listening";
+  return null;
+}
+
 /**
  * One status line for the whole panel. `supported` false means the Host predates voice; `workstation` false means a
  * paired device, which never runs voice. Order matters: a stale or errored session must not read as "Ready".

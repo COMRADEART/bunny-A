@@ -196,7 +196,14 @@ const CONFIRM = /^(?:yes|yeah|yep|yup|confirm|confirmed|do it|go ahead|sure|affi
 const CONFIRM_LEAD = /^(?:yes|yeah|yep|yup|confirm|confirmed|do it|go ahead|sure)\b/;
 /** What may follow a confirm lead-in and still be a confirmation: filler, or the pending pause repeated. Anything else is not. */
 const CONFIRM_TAIL = /^(?:(?:it|that|this|please|now|thanks|thank you|okay|ok|sure|yes|yeah|go|ahead|do it|then|pause|halt)\b[\s,.!?]*)*$/;
-const CANCEL = /^(?:cancel(?:\s+(?:it|that|this|please|now|the (?:(?:pending|current|active|last) )?(?:proposal|pause|confirmation)))*\s*$|(?:never mind|nevermind|forget it|forget that|no|nope|no thanks|don't|do not)(?=$|[\s,.!?;:]))/;
+/**
+ * A cancel is the whole utterance. A leading "no" or "don't" with more words ("No, I meant the other file") is a
+ * correction, not a cancel. With a proposal pending, a leading no/nope is still a cancel (see NEGATION_LEAD).
+ */
+const CANCEL = /^(?:cancel(?:\s+(?:it|that|this|please|now|the (?:(?:pending|current|active|last) )?(?:proposal|pause|confirmation)))*\s*$|(?:never mind(?: that)?|nevermind|forget it|forget that|no|nope|no thanks|don't|do not)(?:[\s,.!?;:]*(?:please|thanks|thank you))*[\s.!?,;:]*$)/;
+
+/** A spoken correction of the previous turn. It stays chat; the session tells the model it corrects that turn. */
+const SPOKEN_CORRECTION = /\b(?:i meant|i mean)\b|^(?:no|nope|actually|sorry)\b[\s,.!?:]+(?:not|the other|that)\b/;
 
 const CONTROL = /^(pause|resume|continue|stop|halt|unpause)\b\s*(.*)$/;
 /** T12-AUTH-04: a pause or resume whose object is a Mission ("pause the mission", "resume the mission alpha"). */
@@ -204,7 +211,7 @@ const MISSION_PAUSE = /^(pause|resume|continue|unpause|halt)\b.*\bmissions?\b/;
 const LEAD_YES = /^(?:yes|yeah|yep|sure|ok|okay)[ ,]+(?=(?:pause|resume|continue|stop|halt|unpause)\b)/;
 
 const STATUS: RegExp[] = [
-  /\bwhat (is|are|am|'s) (my |the |your |its |this )?(agent|bunny|you|it|task|mission|current task|current step|work)\b.{0,20}\b(doing|working on|up to|currently|running)\b/,
+  /\bwhat(?:'s| is| are| am) (my |the |your |its |this )?(agent|bunny|you|it|task|mission|current task|current step|work)\b.{0,20}\b(doing|working on|up to|currently|running)\b/,
   /\bwhat are you (working on|doing|up to)\b/,
   /\bwhat('s| is) (the )?(current|active) (task|step|status|work|job)\b/,
   /\b(is|are) (my |the )?(agent|agents|bunny|you|mission|task)s?\b.{0,12}\b(paused|running|stopped|done|finished|idle|working|complete|completed|blocked|waiting)\b/,
@@ -218,6 +225,7 @@ const STATUS: RegExp[] = [
   /\b(?:whether|if|where) (?:the |my |that |this )?(?:tasks?|missions?|agents?|work|job) (?:is|are|has|have)\b.{0,12}\b(?:done|finished|complete|completed|over|running|working)\b/,
 ];
 const VERIFY = [
+  /\b(?:is|has|did) (?:the |my |that )?(?:builds?|typecheck|suite|tests?) (?:finished|done|complete|completed)\b/,
   /\b(did|do|does|have|has|were|was|are|is)\b.{0,30}\b(tests?|checks?|verification|builds?|typecheck|lint|suite|specs?)\b.{0,30}\b(pass|passed|passing|fail|failed|failing|green|red|succeed|succeeded)\b/,
   /\b(any|are there|is there|were there)\b.{0,20}\b(tests?|checks?|failures?|failing tests?)\b.{0,20}\b(fail|failed|failing|failures?|pass)\b/,
   /\bverification (results?|status|outcome|report)\b/,
@@ -561,6 +569,11 @@ function followUp(normalized: string): FollowUp | null {
   const named = NAME_FOLLOW.exec(normalized);
   if (named && !NOT_A_NAME.test(named[1])) return { focus: followUpFocus(normalized), ordinal: null, name: named[1] };
   return null;
+}
+
+export function isSpokenCorrection(text: string): boolean {
+  const raw = text.toLowerCase().replace(/[’`]/g, "'").replace(/\s+/g, " ").trim();
+  return SPOKEN_CORRECTION.test(raw);
 }
 
 export function classifyTranscript(

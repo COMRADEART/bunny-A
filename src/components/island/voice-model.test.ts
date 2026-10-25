@@ -27,6 +27,7 @@ import {
   typedFallbackText,
   uiTargetFor,
   voiceControls,
+  notchVoicePhase,
   voiceErrorMessage,
   voiceStatus,
   VOICE_FRESH_MS,
@@ -792,6 +793,18 @@ test("T13 revision order: a new Host epoch wins regardless of revision, and miss
   assert.equal(acceptVoiceSnapshot(held, snap({ hostEpoch: "e2", updatedAt: NOW - 5, revision: 1 } as Partial<VoiceSnapshot>)), true, "a restarted Host numbers from 1 again");
   assert.equal(acceptVoiceSnapshot(snap({ updatedAt: NOW + 10 }), snap({ updatedAt: NOW, revision: 3 } as Partial<VoiceSnapshot>)), false, "one side without a revision uses updatedAt");
   assert.equal(acceptVoiceSnapshot(snap({ updatedAt: NOW }), snap({ updatedAt: NOW + 1 })), true);
+});
+
+test("T2 notch phase comes only from a fresh confirmed snapshot", () => {
+  assert.equal(notchVoicePhase(null, NOW, NOW), null);
+  assert.equal(notchVoicePhase(snap({ open: false, capturing: true }), NOW, NOW), null);
+  assert.equal(notchVoicePhase(snap({ capturing: true, state: "LISTENING" }), NOW - 5_000, NOW), null);
+  assert.equal(notchVoicePhase(snap({ capturing: true, state: "LISTENING" }), NOW, NOW), "listening");
+  assert.equal(notchVoicePhase(snap({ playing: true, capturing: true, state: "SPEAKING" }), NOW, NOW), "speaking");
+  assert.equal(notchVoicePhase(snap({ state: "PROCESSING" }), NOW, NOW), "processing");
+  assert.equal(notchVoicePhase(snap({ state: "INTERRUPTED" }), NOW, NOW), "interrupted");
+  assert.equal(notchVoicePhase(snap({ state: "ERROR", error: { code: "DEVICE_LOST", message: "gone" } }), NOW, NOW), "error");
+  assert.equal(notchVoicePhase(snap({ open: true, state: "IDLE" }), NOW, NOW), null);
 });
 
 test("T13 companion view: the voice-model export is the Host companion expression for the snapshot", () => {

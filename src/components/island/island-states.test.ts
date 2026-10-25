@@ -26,6 +26,9 @@ const base = (over: Partial<IslandFacts> = {}): IslandFacts => ({
 const STATE_FACTS: Record<IslandState, Partial<IslandFacts>> = {
   idle: {},
   listening: { voiceListening: true },
+  processing: { voicePhase: "processing" },
+  speaking: { voicePhase: "speaking" },
+  interrupted: { voicePhase: "interrupted" },
   thinking: { taskState: "routing" },
   planning: { planningAgents: 1 },
   working: { workingAgents: 1, taskName: "Edit notes" },
@@ -41,11 +44,12 @@ const STATE_FACTS: Record<IslandState, Partial<IslandFacts>> = {
   },
   completed: { taskState: "completed", taskName: "Build site" },
   failed: { taskState: "failed", taskName: "Build site" },
+  error: { voicePhase: "error" },
   offline: { live: false, disconnectTitle: "Reconnecting", workingAgents: 2, taskState: "running" },
 };
 
-test("T13 island matrix: all twelve states derive from runtime facts", () => {
-  assert.equal(ISLAND_STATES.length, 12);
+test("T2 island matrix: every notch state derives from runtime facts", () => {
+  assert.equal(ISLAND_STATES.length, 16);
   for (const state of ISLAND_STATES) {
     const presence = islandPresence(base(STATE_FACTS[state]));
     assert.equal(presence.state, state, `${state} is reachable from Host facts`);

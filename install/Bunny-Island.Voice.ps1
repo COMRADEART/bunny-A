@@ -406,7 +406,9 @@ function Get-BunnyNotchStatus([string]$Headline, [string]$TaskHeadline = '') {
     'Listening - tap to finish' { return 'Listening' + $ellipsis }
     'Speaking' { return 'Speaking' + $ellipsis }
     'Listening and speaking' { return 'Listening and speaking' }
-    'Processing' { return 'Thinking' + $ellipsis }
+    'Processing' { return 'Processing' + $ellipsis }
+    'Interrupted' { return 'Interrupted' }
+    'Voice needs attention' { return 'Error' }
     'Microphone muted' { return 'Muted' }
     'Ready' { return 'Ready' }
     default { if ($Headline.StartsWith('Needs approval')) { return 'Needs approval' }; return $Headline }
