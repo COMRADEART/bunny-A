@@ -24,6 +24,6 @@ An isolated package of this SHA started a Host on port 43991 and was stopped. It
 
 ## Decision
 
-Acoustic gates G4, G5, G6, G7, G9, and G12 are BLOCKED. G2 and G8 and G11 are PARTIAL. G10 and this branch's own CI are not tested yet. Public beta stays NO-GO. Do not merge on these results.
+Acoustic gates G4, G5, G6, G7, G9, and G12 are BLOCKED. G2, G8, and G11 are PARTIAL. G10 was not run as a live session. Hosted CI on `70b579e` passed: https://github.com/COMRADEART/bunny-A/actions/runs/40242544117. Public beta stays NO-GO. Do not merge on these results.
 
 The microphone can be tested only after it is unmuted by hand and the acoustic run is explicitly authorized. This qualification will not unmute it.

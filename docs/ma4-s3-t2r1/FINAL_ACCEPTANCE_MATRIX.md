@@ -16,7 +16,7 @@ Public beta: **NO-GO**. Acoustic gates are not passed by fixtures or by the dupl
 | T2R1-G10 Background agent coexistence demonstrated | NOT TESTED | No live agent and no spoken Host-status questions. Classifier tests passed with the library stage. |
 | T2R1-G11 Host permission and privacy controls preserved | PARTIAL | Consent was read and not changed. The mic was not opened and did not reopen. Physical revocation and unplug were not done. |
 | T2R1-G12 Installed Windows voice journey completed | BLOCKED | Isolated candidate host started and stopped. Existing install untouched. Voice journey on that UI was not walked. |
-| T2R1-G13 Full final-head hosted CI passed | NOT TESTED | This branch's CI runs after the evidence push. Predecessor CI is G1, not this gate. |
+| T2R1-G13 Full final-head hosted CI passed | PASS | Push run https://github.com/COMRADEART/bunny-A/actions/runs/40242544117 conclusion success on evidence commit `70b579e9dba88f5097f806e74444069d413df50c`. Jobs: fast checks, full `npm test`, static security. |
 | T2R1-G14 Evidence and limitations published | PASS | This directory. |
 
 No voice architecture was replaced. No second engine was added.
