@@ -6,6 +6,9 @@
 export const ISLAND_STATES = [
   "idle",
   "listening",
+  "processing",
+  "speaking",
+  "interrupted",
   "thinking",
   "planning",
   "working",
@@ -15,8 +18,12 @@ export const ISLAND_STATES = [
   "streaming",
   "completed",
   "failed",
+  "error",
   "offline",
 ] as const;
+
+/** Confirmed voice phases the notch may show. Absent means the snapshot does not prove one. */
+export type NotchVoicePhase = "listening" | "processing" | "speaking" | "interrupted" | "error";
 
 export type IslandState = (typeof ISLAND_STATES)[number];
 
@@ -33,6 +40,8 @@ export type IslandFacts = {
   /** Shown when the view is not live. The caller names the real connection, never a guessed cause. */
   disconnectTitle: string;
   voiceListening: boolean;
+  /** Confirmed voice phase from a fresh Host snapshot. Omitted when the caller has no voice facts. */
+  voicePhase?: NotchVoicePhase | null;
   pendingApprovals: number;
   /** Personal Agents the Host currently reports as doing work, excluding planning. */
   workingAgents: number;
@@ -87,10 +96,15 @@ export function islandPresence(facts: IslandFacts): IslandPresence {
   const newest = newestIslandEvent(facts.events);
   const running = facts.taskState === "running" || facts.workingAgents > 0;
 
+  const phase = facts.voicePhase ?? null;
   let state: IslandState = "idle";
   if (!facts.live) state = "offline";
   else if (facts.pendingApprovals > 0 || facts.taskState === "approval") state = "approval";
-  else if (facts.voiceListening) state = "listening";
+  else if (phase === "error") state = "error";
+  else if (phase === "interrupted") state = "interrupted";
+  else if (phase === "speaking") state = "speaking";
+  else if (phase === "processing") state = "processing";
+  else if (phase === "listening" || facts.voiceListening) state = "listening";
   else if (newest && HANDOFF.has(newest.type)) state = "handoff";
   else if (newest?.type === "agent.output" && running) state = "streaming";
   else if (facts.workingAgents > 1) state = "multi";
@@ -100,7 +114,12 @@ export function islandPresence(facts: IslandFacts): IslandPresence {
   else if (facts.taskState === "failed") state = "failed";
   else if (facts.taskState === "completed") state = "completed";
 
-  const title = state === "offline" ? facts.disconnectTitle || "Offline" : ISLAND_TITLE[state];
+  const title =
+    state === "offline"
+      ? facts.disconnectTitle || "Offline"
+      : state === "speaking" && facts.voiceListening
+        ? "Listening and speaking"
+        : ISLAND_TITLE[state];
   const parts: string[] = [`Status: ${title}`];
   if (agent) parts.push(agent);
   if (task) parts.push(task);
@@ -110,21 +129,28 @@ export function islandPresence(facts: IslandFacts): IslandPresence {
   }
   if (state === "handoff" && newest?.detail) parts.push(newest.detail);
   if (state === "multi") parts.push(`${facts.workingAgents} agents working`);
+  if ((state === "listening" || state === "speaking" || state === "processing" || state === "interrupted") && facts.workingAgents > 0) {
+    parts.push(facts.workingAgents === 1 ? "Agent working" : `${facts.workingAgents} agents working`);
+  }
   return { state, title, detail: parts.join(" · ") };
 }
 
 const ISLAND_TITLE: Record<Exclude<IslandState, "offline">, string> = {
   idle: "Idle",
   listening: "Listening",
+  processing: "Processing",
+  speaking: "Speaking",
+  interrupted: "Interrupted",
   thinking: "Thinking",
   planning: "Planning",
   working: "Agent working",
-  multi: "Multiple agents working",
+  multi: "Multi-agent work",
   handoff: "Agent handoff",
-  approval: "Approval requested",
+  approval: "Approval required",
   streaming: "Streaming results",
   completed: "Completed",
   failed: "Failed",
+  error: "Error",
 };
 
 export const ONBOARDING_IDS = ["welcome", "providers", "execution", "permissions", "island", "first-task", "phone"] as const;

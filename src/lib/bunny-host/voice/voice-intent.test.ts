@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classifyTranscript, normalizeTranscript, controlAction, claimsAction } from "./voice-intent.ts";
+import { classifyTranscript, normalizeTranscript, controlAction, claimsAction, isSpokenCorrection } from "./voice-intent.ts";
 
 const kind = (text: string, proposalPending = false) => classifyTranscript(text, { proposalPending }).kind;
 
@@ -346,6 +346,11 @@ test("T10 R4 D2 with a proposal pending, a turn opening with no/nope still cance
   assert.equal(kind("No", true), "cancel");
   // Without a pending proposal the question is answered (the barge-in lead rule).
   assert.equal(kind("No, what is the agent doing?"), "agent_status");
+  assert.equal(kind("No, I meant the other file"), "chat");
+  assert.equal(isSpokenCorrection("No, I meant the other file"), true);
+  assert.equal(kind("no"), "cancel");
+  assert.equal(kind("no thanks"), "cancel");
+  assert.equal(kind("No, I meant the other file", true), "cancel");
   // "now" and "nobody" are not refusals.
   assert.notEqual(kind("Now what is the agent doing?", true), "cancel");
   // Sensitive phrasing is still refused first.

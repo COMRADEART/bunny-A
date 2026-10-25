@@ -86,6 +86,15 @@ test('V46: Listening requires worker capture AND a fresh poll; otherwise the pan
   assert.match(fn, /Reconnecting/);
 });
 
+test('T2 notch words match the confirmed headline', () => {
+  const voice = read(voicePath);
+  const fn = voice.slice(voice.indexOf('function Get-BunnyNotchStatus'), voice.indexOf('function Update-BunnyNotchBars'));
+  assert.match(fn, /'Processing' \{ return 'Processing'/);
+  assert.doesNotMatch(fn, /return 'Thinking'/);
+  assert.match(fn, /'Interrupted' \{ return 'Interrupted' \}/);
+  assert.match(fn, /'Voice needs attention' \{ return 'Error' \}/);
+});
+
 test('V46: Speaking is shown only from snapshot.playing, and only one branch produces it', () => {
   const voice = read(voicePath);
   // Scoped to the headline function: the Notch's short status (Get-BunnyNotchStatus) maps the same headline, and is not a second source.

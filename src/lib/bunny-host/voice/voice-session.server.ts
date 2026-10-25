@@ -25,7 +25,7 @@ import {
 import { canTransition, createFsm, hasSpeechInFlight, tryTransition, type VoiceFsm } from "./voice-fsm.ts";
 import { companionState } from "./voice-companion.ts";
 import { VoiceChunker, chunkAnswer, type SpokenChunk } from "./voice-chunker.ts";
-import { claimsAction, classifyTranscript, controlAction, type VoiceIntent } from "./voice-intent.ts";
+import { claimsAction, classifyTranscript, controlAction, isSpokenCorrection, type VoiceIntent } from "./voice-intent.ts";
 import { VoiceTurnTaking, echoMatch, echoTokens, type TurnDecision } from "./voice-turn-taking.ts";
 import { answerApprovals, answerFollowUp, answerTeam, answerLastMission, answerModel, answerStatus, answerVerification, humanState, isTerminalAgent, missionLabel, MISSION_OVER, type AgentFact, type ApprovalFact, type FollowUpSubject, type MissionFact } from "./voice-answers.server.ts";
 import { RECENT_ANSWERS_MAX, type RecentAnswer, type SpeakerId } from "./voice-personalization.ts";
@@ -68,7 +68,7 @@ const MIN_RECOGNIZED_SPEECH_MS = 250;
 /** T12 live re-check: how long an unfinished sentence waits for the user to start speaking again, and its hard bound. */
 const FRAGMENT_WAIT_MS = 2500;
 const FRAGMENT_MAX_MS = 9000;
-const UNFINISHED_LAST_WORD = /\b(?:and|but|or|because|if|a|an|the|my|your|our|their|to|for|of|about|with|from|into|um|uh|er|erm)$/;
+const UNFINISHED_LAST_WORD = /\b(?:and|but|or|because|if|a|an|the|my|your|our|their|to|for|of|about|with|from|into|that|which|who|um|uh|er|erm)$/;
 /**
  * T12 live re-check: a duplex final that would reach the chat model or draft a Mission, and ends on a word that cannot end
  * a sentence (or on whisper's trailing ellipsis), is unfinished (review round 6: "Prepare a plan for the" is a draft whose
@@ -79,7 +79,7 @@ function isCutOffObjective(objective: string): boolean {
   const t = objective.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
   return !t || UNFINISHED_LAST_WORD.test(t) || /^(?:it|this|that|them|something|stuff|things?)$/.test(t);
 }
-function isUnfinishedChat(text: string, proposalPending: boolean): boolean {
+export function isUnfinishedChat(text: string, proposalPending: boolean): boolean {
   const kind = classifyTranscript(text, { proposalPending }).kind;
   if (kind !== "chat" && kind !== "mission_draft") return false;
   const trimmed = text.trim();
@@ -1520,9 +1520,13 @@ export class VoiceSessionManager {
       .map((item) => `User: ${item.user}\n${item.host ? "Assistant (Host facts, not a model answer)" : "Assistant"}: ${item.assistant}`)
       .join("\n");
     const persona = this.persona();
+    const correction = isSpokenCorrection(transcript)
+      ? "This turn corrects the previous turn in the conversation above. Answer that correction. Do not claim a file was read, a test ran, or any action was taken."
+      : "";
     const prompt = [
       persona?.instruction ?? SPOKEN_CHAT_INSTRUCTION,
       history,
+      correction,
       `User: ${transcript}`,
     ].filter(Boolean).join("\n\n");
     // T12 RES-04 (round 2): a repeat of a question that already waits for review adds no row; the same refusal is spoken.
@@ -1636,7 +1640,7 @@ export class VoiceSessionManager {
       this.cancelInferenceTimer = null;
       if (this.inference === current) {
         this.bargeIn("timeout", "inference_timeout");
-        this.speakAnswer("That took too long, so I stopped it.", "refusal", this.newTurn("ctl"));
+        this.speakAnswer("That took too long, so I stopped waiting. I asked it to stop, and I can't confirm that it has.", "refusal", this.newTurn("ctl"));
       }
     }, VOICE_LIMITS.inferenceTimeoutMs);
   }
