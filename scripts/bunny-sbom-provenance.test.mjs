@@ -35,7 +35,13 @@ test("T4-ANDROID-1: inspectAndroidReleaseArtifact verifies AndroidManifest harde
   assert.equal(android.targetSdkVersion, 35);
   assert.equal(android.securityHardening.allowBackup, false);
   assert.equal(android.securityHardening.usesCleartextTraffic, false);
-  assert.equal(android.securityHardening.leastPrivilegeInternetOnly, true);
+  assert.deepEqual([...android.securityHardening.permissions].sort(), [
+    "android.permission.INTERNET",
+    "android.permission.POST_NOTIFICATIONS",
+  ]);
+  // Errata: the MA2/T4 internet-only claim is false after the notification permission was declared.
+  assert.equal(android.securityHardening.leastPrivilegeInternetOnly, false);
+  assert.equal(android.securityHardening.matchesDeclaredAllowlist, true);
   assert.equal(android.signing.productionReleaseGate, "BLOCKED");
   assert.ok(["UNSIGNED", "TEST_SIGNED"].includes(android.signing.status));
 });
