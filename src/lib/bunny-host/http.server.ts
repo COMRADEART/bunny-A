@@ -33,7 +33,8 @@ import { connectedActions, type ConnectedOptions } from "./ma4/connected-actions
 import { ProactiveStore } from "./ma4/proactive-store.server.ts";
 import { ProactiveEngine, type ProactiveDeps } from "./ma4/proactive.server.ts";
 import { PROACTIVE_ACTIONS, PROACTIVE_SAFE_ACTIONS, proactiveCommand } from "./ma4/proactive-commands.server.ts";
-import { LocalBetaFeedbackStore, type BetaFeedbackCategory } from "./ma4/diagnostics-feedback.ts";
+import { LocalBetaFeedbackStore, buildOperationalHealthSummary, type BetaFeedbackCategory } from "./ma4/diagnostics-feedback.ts";
+import { decideStoredNotification, readOnboarding, saveNotificationPrefs, saveOnboarding } from "./ma4/owner-product.server.ts";
 import { isTrustedLocalActor } from "../bunny-missions/authorization.server.ts";
 import { VOICE_ACTIONS, VOICE_SAFE_ACTIONS, type VoiceSnapshot } from "./voice/voice-protocol.ts";
 import { SLOT_IDS, clean, isUserFacingAgent, projectPersonalAgents, type SlotId } from "./personal-agents.ts";
@@ -456,7 +457,7 @@ async function openHost(
   undo.push(() => connected.close());
   // MA4-S3-T0: durable local-only beta feedback (opt-in, no remote upload). Survives Host restart via diagnostics dir.
   const betaFeedback = new LocalBetaFeedbackStore({ filePath: join(paths.diagnostics, "beta-feedback.json") });
-  const FEEDBACK_ACTIONS = new Set(["feedback.opt_in", "feedback.opt_out", "feedback.status", "feedback.preview", "feedback.submit", "feedback.list", "feedback.export", "feedback.clear"]);
+  const FEEDBACK_ACTIONS = new Set(["feedback.opt_in", "feedback.opt_out", "feedback.status", "feedback.preview", "feedback.submit", "feedback.list", "feedback.export", "feedback.clear", "feedback.delete", "onboarding.get", "onboarding.save", "notification.decide", "notification.prefs", "diagnostics.health"]);
   const ptasks = new PersistentTaskRuntime({
     store: new TaskStore(db),
     ...productionTaskDeps(),
@@ -1099,7 +1100,9 @@ async function openHost(
         : base.agents,
       devices: (base.devices ?? []).map((row) => {
         const lastSeenAt = presence.lastSeen(row.id);
-        return { ...row, lastSeenAt, expiresAt: deviceExpiresAt(row.createdAt, lastSeenAt) };
+        const revokedAt = "revokedAt" in row ? (row as { revokedAt?: number | null }).revokedAt : null;
+        const { revokedAt: _hidden, ...rest } = row as typeof row & { revokedAt?: number | null };
+        return { ...rest, revoked: revokedAt != null, lastSeenAt, expiresAt: deviceExpiresAt(row.createdAt, lastSeenAt) };
       }),
     };
     // Voice is workstation-only: a device projection never carries it.
@@ -1271,6 +1274,20 @@ async function openHost(
         ...VOICE_SAFE_ACTIONS,
         ...PTASK_SAFE_ACTIONS,
         ...PROACTIVE_SAFE_ACTIONS,
+        "feedback.status",
+        "feedback.preview",
+        "feedback.list",
+        "feedback.export",
+        "feedback.submit",
+        "feedback.delete",
+        "feedback.clear",
+        "feedback.opt_in",
+        "feedback.opt_out",
+        "onboarding.get",
+        "onboarding.save",
+        "notification.decide",
+        "notification.prefs",
+        "diagnostics.health",
       ]);
       if (!safeActions.has(action)) containment.assertAccepting("http");
       if (typeof input.action === "string" && AGENT_ACTIONS.has(input.action)) {
@@ -1286,7 +1303,7 @@ async function openHost(
       } else if (typeof input.action === "string" && PTASK_ACTIONS.has(input.action)) {
         extra = { data: await ptaskCommand(ptasks, input.action, data, actor, connected, proactive) };
       } else if (typeof input.action === "string" && FEEDBACK_ACTIONS.has(input.action)) {
-        if (!isTrustedLocalActor(actor)) throw new WorkstationRequiredError("Beta feedback stays on the Windows workstation.");
+        if (input.action !== "notification.decide" && !isTrustedLocalActor(actor)) throw new WorkstationRequiredError("Beta feedback, onboarding and diagnostics stay on the Windows workstation.");
         const cat = data.category as BetaFeedbackCategory;
         if (input.action === "feedback.opt_in") { betaFeedback.setOptIn(true); extra = { data: { optedIn: true } }; }
         else if (input.action === "feedback.opt_out") { betaFeedback.setOptIn(false); extra = { data: { optedIn: false } }; }
@@ -1295,7 +1312,55 @@ async function openHost(
         else if (input.action === "feedback.submit") extra = { data: betaFeedback.submit({ now: Date.now(), category: cat, summary: String(data.summary ?? ""), details: String(data.details ?? "") }) };
         else if (input.action === "feedback.list") extra = { data: { entries: betaFeedback.list() } };
         else if (input.action === "feedback.export") extra = { data: betaFeedback.exportLocal() };
+        else if (input.action === "feedback.delete") extra = { data: { deleted: betaFeedback.deleteEntry(String(data.id ?? "").slice(0, 80)) } };
         else if (input.action === "feedback.clear") { betaFeedback.clearHistory(); extra = { data: { cleared: true } }; }
+        else if (input.action === "onboarding.get") extra = { data: readOnboarding(db.db) };
+        else if (input.action === "onboarding.save") {
+          const ollama = manager.live().find((provider) => provider.id === "ollama");
+          extra = { data: saveOnboarding(db.db, data.state ?? data, { available: ollama?.availability === "ready" || ollama?.availability === "busy", models: ollama?.models ?? [], remoteModels: ollama?.remoteModels ?? [] }) };
+        }
+        else if (input.action === "notification.prefs") extra = { data: saveNotificationPrefs(db.db, data.prefs ?? data) };
+        else if (input.action === "notification.decide") {
+          const sequence = Number(data.sequence);
+          const audience = local ? "workstation" : `device:${device?.id ?? "unknown"}`;
+          extra = { data: decideStoredNotification(db.db, { sequence, audience, localHour: new Date().getHours(), deviceContext: local ? undefined : { isPairedDevice: true, revoked: false, connected: true } }) };
+        }
+        else if (input.action === "diagnostics.health") {
+          const tasks = manager.db.tasks();
+          const terminal = new Set(["completed", "failed", "stopped"]);
+          const snap = proactive.snapshot();
+          const ollama = manager.live().find((provider) => provider.id === "ollama");
+          const deviceRows = db.db.prepare("SELECT id, revoked_at AS revokedAt FROM devices").all() as { id: string; revokedAt: number | null }[];
+          const activeDevices = deviceRows.filter((item) => item.revokedAt == null);
+          const connectedDevices = activeDevices.filter((item) => {
+            const seen = presence.lastSeen(item.id);
+            return seen !== null && Date.now() - seen <= 120_000;
+          }).length;
+          const mem = process.memoryUsage();
+          extra = { data: buildOperationalHealthSummary({
+            now: Date.now(),
+            ollamaReachable: ollama?.availability === "ready" || ollama?.availability === "busy",
+            localModels: (ollama?.models ?? []).filter((model) => !(ollama?.remoteModels ?? []).includes(model)),
+            activeTaskCount: tasks.filter((task) => !terminal.has(task.state)).length,
+            taskFailureCount: tasks.filter((task) => task.state === "failed").length,
+            activeSchedules: snap.status.scheduled,
+            missedSchedules: 0,
+            activeMonitors: snap.status.monitoring,
+            unreadableMonitors: snap.corrupt.filter((row) => row.kind === "monitor").length,
+            localFoldersCount: connected.roots.list().length,
+            pairedDevices: activeDevices.length,
+            connectedDevices,
+            rssMB: mem.rss / 1_000_000,
+            heapUsedMB: mem.heapUsed / 1_000_000,
+            cpuMedianPct: 0,
+            backgroundEnabled: readOnboarding(db.db)?.preferences.backgroundExecutionOptIn === true,
+            resumeOnStartEnabled: false,
+            lastRecoveryAt: null,
+            recoveredTasks: 0,
+            reconciliationWaiting: tasks.filter((task) => task.reconciliation?.required).length,
+            corruptRecordCount: snap.corrupt.length,
+          }) };
+        }
       } else if (typeof input.action === "string" && PROACTIVE_ACTIONS.has(input.action)) {
         extra = { data: await proactiveCommand(proactive, input.action, data, actor) };
       } else if (typeof input.action === "string" && VOICE_ACTIONS.has(input.action)) {

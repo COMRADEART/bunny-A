@@ -391,3 +391,146 @@ export function projectDeviceDiagnostics(
     exposedSecretsOrTokens: 0,
   };
 }
+
+const LEGACY_ONBOARDING_STAGE = [0, 3, 1, 5, 2, 9, 7] as const;
+
+/**
+ * Moves a browser-local 7-step record onto the 10-stage contract.
+ * Legacy blobs cannot carry background execution, notification opt-in, or a model name.
+ */
+export function migrateLegacyOnboarding(raw: unknown): GuidedOnboardingState {
+  if (!raw || typeof raw !== "object") return resolveGuidedOnboardingState(null);
+  const record = raw as { status?: unknown; step?: unknown; stageIndex?: unknown; preferences?: unknown };
+  if (typeof record.stageIndex === "number") return resolveGuidedOnboardingState(record as never);
+  const status = record.status === "done" || record.status === "skipped" ? record.status : "active";
+  const step = typeof record.step === "number" && Number.isInteger(record.step) ? Math.max(0, Math.min(6, record.step)) : 0;
+  return resolveGuidedOnboardingState({
+    status,
+    stageIndex: status === "done" ? GUIDED_ONBOARDING_STAGE_IDS.length - 1 : LEGACY_ONBOARDING_STAGE[step] ?? 0,
+    preferences: {
+      backgroundExecutionOptIn: false,
+      nativeNotificationsOptIn: false,
+      selectedLocalModel: null,
+    },
+  });
+}
+
+export function mapEventToNativeCategory(type: string): NativeNotificationCategory | null {
+  if (type === "approval.required" || type === "mission.approval_required" || type === "mission.permission_required" || type === "agent.waiting_for_approval") return "approval_needed";
+  if (type === "task.completed" || type === "mission.completed" || type === "ptask.notification") return "task_completed";
+  if (type === "task.failed" || type === "mission.failed") return "task_failed";
+  if (type === "proactive.notification") return "schedule_triggered";
+  if (type === "agent.waiting_for_input") return "recovery_needed";
+  return null;
+}
+
+const SOURCE_ID = /^[A-Za-z0-9_.:-]{1,80}$/;
+
+/** Builds a notification event from a Host journal row. Client-supplied titles are ignored. */
+export function hostNotificationEvent(input: {
+  type: string;
+  sequence: number;
+  taskId: string | null;
+  missionId?: string | null;
+  detail: string;
+  localHour: number;
+}): { ok: true; event: NativeNotificationEvent } | { ok: false; reason: string } {
+  if (!Number.isInteger(input.sequence) || input.sequence < 1) return { ok: false, reason: "forged_sequence" };
+  const category = mapEventToNativeCategory(input.type);
+  if (!category) return { ok: false, reason: "unsupported_type" };
+  const sourceId = `${input.type}:${input.taskId ?? input.missionId ?? "host"}`.replace(/[^A-Za-z0-9_.:-]/g, "").slice(0, 80);
+  if (!SOURCE_ID.test(sourceId)) return { ok: false, reason: "forged_source" };
+  if (!Number.isInteger(input.localHour) || input.localHour < 0 || input.localHour > 23) return { ok: false, reason: "bad_hour" };
+  return {
+    ok: true,
+    event: {
+      category,
+      sourceId,
+      revision: input.sequence,
+      title: "Bunny-A",
+      detail: typeof input.detail === "string" ? input.detail : "",
+      localHour: input.localHour,
+    },
+  };
+}
+
+export function claimNativeNotification(
+  event: NativeNotificationEvent,
+  prefs: NativeNotificationPrefs,
+  deliveredKeys: readonly string[],
+  deviceContext?: { isPairedDevice: boolean; revoked: boolean; connected: boolean },
+): { decision: NativeNotificationDecision; deliveredKeys: string[] } {
+  const keys = new Set(deliveredKeys);
+  const decision = evaluateNativeNotification(event, prefs, keys, deviceContext);
+  return { decision, deliveredKeys: [...keys] };
+}
+
+export function normalizeNotificationPrefs(raw: unknown): NativeNotificationPrefs {
+  const record: Partial<NativeNotificationPrefs> = raw && typeof raw === "object" ? raw as Partial<NativeNotificationPrefs> : {};
+  const categories: Partial<NativeNotificationPrefs["categories"]> = record.categories ?? {};
+  const quiet: Partial<NativeNotificationPrefs["quietHours"]> = record.quietHours ?? {};
+  const hour = (value: unknown, fallback: number) => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 23 ? value : fallback;
+  return {
+    enabled: record.enabled === true,
+    categories: {
+      approval_needed: categories.approval_needed !== false,
+      task_completed: categories.task_completed !== false,
+      task_failed: categories.task_failed !== false,
+      schedule_triggered: categories.schedule_triggered === true,
+      source_changed: categories.source_changed !== false,
+      recovery_needed: categories.recovery_needed !== false,
+    },
+    quietHours: {
+      enabled: quiet.enabled === true,
+      startHour: hour(quiet.startHour, 22),
+      endHour: hour(quiet.endHour, 7),
+    },
+  };
+}
+
+/** This packaged shell has no Windows AppUserModelID, so closing the window ends OS delivery. */
+export const WINDOWS_NOTIFICATION_CAPABILITY = {
+  osToast: false as const,
+  foregroundBrowser: true as const,
+  windowClosedDelivery: false as const,
+  limitation:
+    "This desktop build has no registered Windows toast activator. A banner is the browser Notification API while this window is open and notification permission is granted. Closing the window stops operating-system delivery. The in-app notice stays on the Host either way.",
+};
+
+const ANDROID_FIELDS = new Set(["id", "title", "body", "category"]);
+
+/** The only payload the Android bridge may accept. Extra fields are a rejected command, not a notification. */
+export function parseAndroidBridgeMessage(
+  raw: unknown,
+  trustedOrigin: boolean,
+): { ok: true; id: string; title: string; body: string; category: NativeNotificationCategory } | { ok: false; reason: string } {
+  if (!trustedOrigin) return { ok: false, reason: "untrusted_origin" };
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ok: false, reason: "bad_schema" };
+  const record = raw as Record<string, unknown>;
+  if (Object.keys(record).some((key) => !ANDROID_FIELDS.has(key))) return { ok: false, reason: "unexpected_field" };
+  if (typeof record.id !== "string" || !/^[A-Za-z0-9_.:-]{1,160}$/.test(record.id)) return { ok: false, reason: "bad_id" };
+  if (typeof record.title !== "string" || typeof record.body !== "string") return { ok: false, reason: "bad_text" };
+  if (typeof record.category !== "string" || !NATIVE_NOTIFICATION_CATEGORIES.includes(record.category as NativeNotificationCategory))
+    return { ok: false, reason: "bad_category" };
+  return {
+    ok: true,
+    id: record.id,
+    title: sanitizeNotificationText(record.title, 80),
+    body: sanitizeNotificationText(record.body, 140),
+    category: record.category as NativeNotificationCategory,
+  };
+}
+
+export type DeviceStatusLabel = "Connected" | "Reconnecting" | "Offline" | "Pairing expired" | "Revoked";
+
+/** Authority comes from the Host row. Reconnecting is only shown when a caller has a live transport signal. */
+export function deviceStatusPresentation(
+  diag: DeviceDiagnosticsView,
+  transport?: "reconnecting" | null,
+): { authority: "active" | "expired" | "revoked"; observed: "connected" | "offline" | "reconnecting"; label: DeviceStatusLabel } {
+  if (diag.connectionStatus === "revoked") return { authority: "revoked", observed: "offline", label: "Revoked" };
+  if (diag.connectionStatus === "expired") return { authority: "expired", observed: "offline", label: "Pairing expired" };
+  if (transport === "reconnecting") return { authority: "active", observed: "reconnecting", label: "Reconnecting" };
+  if (diag.connectionStatus === "connected") return { authority: "active", observed: "connected", label: "Connected" };
+  return { authority: "active", observed: "offline", label: "Offline" };
+}

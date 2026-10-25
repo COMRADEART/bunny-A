@@ -137,16 +137,15 @@ export function Settings() {
               <NotificationFrequencySetting />
               <Setting
                 label="Browser notifications"
-                detail="Foreground session events; background phone push is unavailable."
+                detail="Foreground banners while this window is open. Closing the window stops operating-system delivery. There is no background Windows toast in this build."
               >
                 <button
                   className="btn secondary"
                   onClick={async () => {
-                    if (!("Notification" in window)) {
-                      setNotification("Unavailable in this browser.");
-                      return;
-                    }
-                    setNotification(`Permission: ${await Notification.requestPermission()}`);
+                    let permission = "unsupported";
+                    if ("Notification" in window) permission = await Notification.requestPermission();
+                    const saved = await store.ownerCommand("notification.prefs", { prefs: { enabled: permission === "granted" } });
+                    setNotification(saved ? `Permission: ${permission}. Host notifications ${permission === "granted" ? "on" : "stay off"}.` : "The Host did not save notification preferences.");
                   }}
                 >
                   <Bell size={14} />
@@ -203,6 +202,7 @@ export function Settings() {
               >
                 <span className="caption">Off</span>
               </Setting>
+              <HostCare />
             </>
           ) : (
             <>
@@ -260,6 +260,67 @@ export function Settings() {
           )}
         </section>
       </div>
+    </>
+  );
+}
+
+function HostCare() {
+  const command = useIsland((state) => state.ownerCommand);
+  const [health, setHealth] = useState("Not loaded.");
+  const [summary, setSummary] = useState("");
+  const [details, setDetails] = useState("");
+  const [preview, setPreview] = useState("");
+  const [entries, setEntries] = useState<{ id: string; summary: string }[]>([]);
+  const refresh = async () => {
+    const status = await command("diagnostics.health", {});
+    const body = status?.data as { hostHealth?: string; activeTaskCount?: number; taskFailureCount?: number; connectedModelStatus?: { ollamaReachable?: boolean }; deviceConnectivity?: { pairedDevices?: number; connectedDevices?: number }; warnings?: string[] } | undefined;
+    setHealth(body ? `${body.hostHealth} · tasks ${body.activeTaskCount} · failed ${body.taskFailureCount} · Ollama ${body.connectedModelStatus?.ollamaReachable ? "up" : "down"} · devices ${body.deviceConnectivity?.connectedDevices}/${body.deviceConnectivity?.pairedDevices}${body.warnings?.[0] ? ` · ${body.warnings[0]}` : ""}` : "Host health is unavailable.");
+    const list = await command("feedback.list", {});
+    setEntries(((list?.data as { entries?: { id: string; summary: string }[] } | undefined)?.entries) ?? []);
+  };
+  return (
+    <>
+      <Setting label="Host health" detail="Counts from this Host. Export is a separate button and never uploads.">
+        <button type="button" className="btn secondary" onClick={() => void refresh()}>Refresh</button>
+      </Setting>
+      <p className="caption" role="status">{health}</p>
+      <Setting label="Feedback" detail="Opt in before a note is saved. Preview is redacted. Nothing is uploaded.">
+        <button type="button" className="btn secondary" onClick={() => void command("feedback.opt_in", {})}>Opt in</button>
+      </Setting>
+      <label className="caption">Summary
+        <input aria-label="Feedback summary" value={summary} maxLength={200} onChange={(event) => setSummary(event.target.value)} />
+      </label>
+      <label className="caption">Details
+        <textarea aria-label="Feedback details" value={details} maxLength={2000} onChange={(event) => setDetails(event.target.value)} />
+      </label>
+      <div className="onboarding-actions">
+        <button type="button" className="btn secondary" onClick={async () => {
+          const row = await command("feedback.preview", { category: "general", summary, details });
+          const entry = row?.data as { summary?: string; details?: string } | undefined;
+          setPreview(entry ? `${entry.summary ?? ""} — ${entry.details ?? ""}` : "Preview unavailable.");
+        }}>Preview</button>
+        <button type="button" className="btn primary" onClick={async () => { await command("feedback.submit", { category: "general", summary, details }); await refresh(); }}>Save</button>
+        <button type="button" className="btn secondary" onClick={async () => {
+          const row = await command("feedback.export", {});
+          if (!row?.data) return;
+          const url = URL.createObjectURL(new Blob([JSON.stringify(row.data, null, 2)], { type: "application/json" }));
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "bunny-feedback.json";
+          link.click();
+          URL.revokeObjectURL(url);
+        }}>Export</button>
+        <button type="button" className="btn quiet" onClick={async () => { await command("feedback.clear", {}); await refresh(); }}>Clear history</button>
+      </div>
+      {preview ? <p className="caption">Preview: {preview}</p> : null}
+      <ul>
+        {entries.map((entry) => (
+          <li key={entry.id}>
+            {entry.summary}{" "}
+            <button type="button" className="btn quiet" onClick={async () => { await command("feedback.delete", { id: entry.id }); await refresh(); }}>Delete</button>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }

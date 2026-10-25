@@ -37,7 +37,7 @@ export type HostSnapshot = {
   performance: PerformanceProfile[];
   remoteConfigured: boolean;
   remoteUrl?: string | null;
-  devices?: {id:string;name:string;createdAt:number;expiresAt?:number;lastSeenAt?:number|null}[];
+  devices?: {id:string;name:string;createdAt:number;expiresAt?:number;lastSeenAt?:number|null;revoked?:boolean}[];
   /** M-A-3 T9: stable installation identity plus the per-boot epoch (the instanceId). Optional: older clients ignore it. */
   hostIdentity?: HostIdentity;
   /** M-A-3 T9: who this snapshot was projected for. Never carries a credential or its hash. */
