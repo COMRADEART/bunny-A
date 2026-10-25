@@ -1,6 +1,17 @@
 import { applyRoutingMode, approvalExclusion, reliabilityCategory } from "./ma4/hybrid.ts";
 import { readOnboarding } from "./ma4/owner-product.server.ts";
-import { preferEligibleLocal } from "./ma4/s3t1.ts";
+import { hostExecutionPlan, preferEligibleLocal } from "./ma4/s3t1.ts";
+
+function servedFromReceipt(detail: string): { name: string; digest: string | null } | null {
+  try {
+    const parsed = JSON.parse(detail) as { model?: unknown; digest?: unknown };
+    if (typeof parsed.model !== "string" || !parsed.model) return null;
+    return { name: parsed.model.slice(0, 200), digest: typeof parsed.digest === "string" && parsed.digest ? parsed.digest : null };
+  } catch {
+    return null;
+  }
+}
+import { composeTeam } from "./ma4/coordinator.ts";
 import { EventEmitter } from "node:events";
 import { appendFileSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
@@ -110,6 +121,21 @@ export class TaskManager {
     } catch {
       return withPriority;
     }
+  }
+  /** Host baseline for a direct chat submit. Mission children keep the mission's own delegation. */
+  private executionPlanFor(text: string): NonNullable<OrchTask["executionPlan"]> {
+    const plan = hostExecutionPlan(text);
+    const team = plan.teamCapabilities ? composeTeam({ capabilities: plan.teamCapabilities, memory: false }).modelRoles : null;
+    return {
+      complexity: plan.complexity,
+      roles: plan.roles,
+      verification: plan.verification,
+      modelCalls: plan.modelCalls,
+      toolCalls: plan.toolCalls,
+      team,
+      escalation: plan.escalation,
+      source: "host-baseline",
+    };
   }
   projects: ProjectRegistry;
   workspaceRootConfigured: boolean;
@@ -1396,6 +1422,7 @@ export class TaskManager {
         throw new ModelApprovalRequired(preferenceUnavailable(preference, live));
       }
     }
+    const executionPlan = delegated ? undefined : this.executionPlanFor(routingText);
     const task: OrchTask = {
       id: crypto.randomUUID(),
       ...(delegated
@@ -1434,10 +1461,15 @@ export class TaskManager {
       routingMode,
       routingRerouted: false,
       routingDecisionId,
+      ...(executionPlan ? { executionPlan } : {}),
     };
     if (executionScope) task.executionScope = executionScope;
     if (input.routingPrompt !== undefined) task.routingPrompt = input.routingPrompt;
     this.emit(this.db.write(task, "task.created", "Task created on Bunny-A Host."));
+    if (task.executionPlan) {
+      const team = task.executionPlan.team?.join(", ") || "none";
+      this.emit(this.db.event("execution.classified", task.id, `Host class ${task.executionPlan.complexity}; roles ${task.executionPlan.roles.join(", ")}; team ${team}.`));
+    }
     this.routingStore.saveDecision(
       this.recordDecision({
         id: routingDecisionId,
@@ -1933,12 +1965,14 @@ export class TaskManager {
         const progress = pendingProgress;
         pendingProgress = null;
         const visible = type.startsWith("agent.");
+        const served = type === "provider.receipt" ? servedFromReceipt(detail) : null;
         this.update(
           current,
           {
             activity: activityLabel(type),
             ...(visible ? { latestEvent: this.activity(current, type, detail) } : {}),
             ...(progress ? { progress } : {}),
+            ...(served ? { servedModel: served } : {}),
           },
           type,
           detail,

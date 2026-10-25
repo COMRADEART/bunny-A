@@ -280,6 +280,22 @@ export type OrchTask = {
   routingDecisionId?: string;
   /** True when Bunny-A re-routed this Task at least once (pre-launch revalidation or recovery). */
   routingRerouted?: boolean;
+  /**
+   * MA4-S3-T1R3: Host baseline class for this direct submit. It bounds delegation.
+   * It does not grant a tool or open a team.
+   */
+  executionPlan?: {
+    complexity: "C0" | "C1" | "C2" | "C3";
+    roles: string[];
+    verification: "none" | "deterministic" | "deterministic-and-semantic";
+    modelCalls: number;
+    toolCalls: number;
+    team: string[] | null;
+    escalation: string | null;
+    source: "host-baseline";
+  };
+  /** Model name and digest observed from the local runtime after the served name matched. Null digest means the name was not matched to a runtime digest. */
+  servedModel?: { name: string; digest: string | null };
 };
 
 /** Determinate only when the provider published a finite plan; otherwise indeterminate. Never time-based. */
@@ -405,4 +421,6 @@ export type OllamaReceipt = {
   requestedAt: number;
   firstTokenAt: number | null;
   finishedAt: number;
+  /** Digest from the local runtime's tag list for the served name, or null when that name was not observed there. */
+  digest: string | null;
 };

@@ -49,7 +49,25 @@ function receiptOf(part: DonePart, requested: string, requestedAt: number, first
     totalDurationNs: count(part.total_duration), loadDurationNs: count(part.load_duration),
     promptEvalDurationNs: count(part.prompt_eval_duration), evalDurationNs: count(part.eval_duration),
     requestedAt, firstTokenAt, finishedAt: Date.now(),
+    digest: null,
   };
+}
+
+/** The runtime digest for this exact tag name. Two matches, or none, stay unobserved. */
+export function digestFromTags(models: readonly { name?: unknown; digest?: unknown }[], name: string): string | null {
+  const hits = models.filter((model) => model.name === name && typeof model.digest === "string" && model.digest);
+  return hits.length === 1 && typeof hits[0]?.digest === "string" ? hits[0].digest : null;
+}
+
+async function observedDigest(name: string): Promise<string | null> {
+  try {
+    const response = await fetch("http://127.0.0.1:11434/api/tags", { signal: AbortSignal.timeout(3000) });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { models?: { name?: unknown; digest?: unknown }[] };
+    return digestFromTags(body.models ?? [], name);
+  } catch {
+    return null;
+  }
 }
 
 export async function stopTask(taskId: string) {
@@ -115,11 +133,14 @@ export async function execute(request: ExecRequest, options: { stream?: (text: s
       finally {await reader.cancel().catch(()=>{});}
       validateCompletion(done, model, output, request.format);
       const receipt=done?receiptOf(done,model,requestedAt,firstTokenAt):null;
+      if (receipt) receipt.digest = await observedDigest(receipt.model);
       return {ok:true,output,log:`Ollama ${model} finished.`,...(receipt?{receipt}:{})};
     }
     const body = (await response.json()) as { response?: string } & DonePart;
     validateCompletion(body, model, body.response ?? "", request.format);
-    return { ok: true, output: body.response ?? "", log: `Ollama ${model} finished.`, ...(body.done === true ? { receipt: receiptOf(body, model, requestedAt, null) } : {}) };
+    const receipt = body.done === true ? receiptOf(body, model, requestedAt, null) : null;
+    if (receipt) receipt.digest = await observedDigest(receipt.model);
+    return { ok: true, output: body.response ?? "", log: `Ollama ${model} finished.`, ...(receipt ? { receipt } : {}) };
   } catch (error) {
     if (controller.signal.reason === "interrupted") return { ok: false, error: "The local model stream was interrupted before it finished.", log: "Stream interrupted." };
     if (controller.signal.reason === "timeout") return { ok: false, error: `The model did not finish within ${formatDuration(timeoutMs)}. Try a shorter task or a faster model.`, log: "Execution timed out." };

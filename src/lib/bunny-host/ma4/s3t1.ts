@@ -55,6 +55,32 @@ function plan(
   return { complexity, capabilities, roles, expectedSteps, verification, resource: { modelCalls, toolCalls }, escalation, source: "host-baseline" };
 }
 
+/**
+ * The plan the live Host submit path stores. A model proposal is accepted only when it matches
+ * this baseline. Chat does not receive a tool or a team from the class alone.
+ */
+export function hostExecutionPlan(text: string, proposed?: unknown): {
+  complexity: ComplexityClass;
+  roles: ExecutionRole[];
+  verification: TaskClassification["verification"];
+  modelCalls: number;
+  toolCalls: number;
+  teamCapabilities: ReturnType<typeof boundedTeamCapabilities>;
+  escalation: string | null;
+} {
+  const baseline = classifyTask(text);
+  const classification = proposed === undefined ? baseline : acceptClassification(baseline, proposed);
+  return {
+    complexity: classification.complexity,
+    roles: classification.roles,
+    verification: classification.verification,
+    modelCalls: classification.resource.modelCalls,
+    toolCalls: classification.resource.toolCalls,
+    teamCapabilities: boundedTeamCapabilities(classification),
+    escalation: classification.escalation,
+  };
+}
+
 /** C0 and C1 do not open a team. C2 is Planner plus Worker. C3 adds Reviewer. */
 export function boundedTeamCapabilities(classification: TaskClassification): ("planning" | "code-generation" | "review")[] | null {
   if (classification.complexity === "C0" || classification.complexity === "C1") return null;
@@ -379,6 +405,8 @@ export type PerformanceRow = { label: string; value: string; measured: boolean }
 
 export function projectLocalPerformance(input: {
   model?: string | null;
+  /** Observed runtime digest. A model name alone is not a digest. */
+  digest?: string | null;
   mode?: ModelRouteMode | null;
   agents?: readonly string[] | null;
   taskState?: string | null;
@@ -396,6 +424,7 @@ export function projectLocalPerformance(input: {
   return {
     rows: [
       show("Active local model", input.model ?? null, true),
+      show("Served digest", input.digest ?? null, !!input.digest),
       show("Model selection mode", input.mode ?? null, true),
       show("Active agents", input.agents ? input.agents.join(", ") : null, !!input.agents),
       show("Task state", input.taskState ?? null, true),
