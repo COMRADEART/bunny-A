@@ -312,6 +312,13 @@ export type TaskConstraints = {
   /** M-A-3 T3 user routing constraints (§27). Hard filters, never silent overrides. */
   /** Run only on this exact model id; no substitution when it is unavailable. */
   modelExact?: string;
+  /**
+   * MA4-S3-T1: onboarding or owner preference. The Host sets this. It is not a hard pin and
+   * it is not accepted from the public constraint parser. Unavailable means fail, not a silent swap.
+   */
+  preferredLocalModel?: string;
+  /** Exact digest required together with modelExact. A name match with a different digest is a pin failure. */
+  modelDigest?: string;
   /** Run only on one of these model ids (provider-qualified where ambiguous is the caller's duty). */
   modelAllowlist?: string[];
   /** Require cloud-hosted execution; local providers are excluded. */

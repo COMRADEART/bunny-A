@@ -1,4 +1,6 @@
 import { applyRoutingMode, approvalExclusion, reliabilityCategory } from "./ma4/hybrid.ts";
+import { readOnboarding } from "./ma4/owner-product.server.ts";
+import { preferEligibleLocal } from "./ma4/s3t1.ts";
 import { EventEmitter } from "node:events";
 import { appendFileSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
@@ -97,7 +99,17 @@ export class TaskManager {
    *  hosted-advice gate see local-only (MA4-S1R3-CI2: a fact-less Host used to route a local-only Task to the cloud). */
   private taskConstraints(routingText: string, constraints: TaskConstraints | undefined): TaskConstraints {
     const inferred = inferredConstraints(routingText, constraints);
-    return this.routingPriority === "local_only" ? { ...inferred, localOnly: true } : inferred;
+    const withPriority = this.routingPriority === "local_only" ? { ...inferred, localOnly: true } : inferred;
+    if (withPriority.modelExact || withPriority.modelDigest) return withPriority;
+    if (withPriority.preferredLocalModel) return withPriority;
+    if (!(withPriority.localOnly || withPriority.offlineOnly || withPriority.privacyLocal)) return withPriority;
+    try {
+      const preferred = readOnboarding(this.db.db)?.preferences.selectedLocalModel ?? null;
+      if (!preferred || /:cloud$/i.test(preferred)) return withPriority;
+      return { ...withPriority, preferredLocalModel: preferred };
+    } catch {
+      return withPriority;
+    }
   }
   projects: ProjectRegistry;
   workspaceRootConfigured: boolean;
@@ -1043,6 +1055,17 @@ export class TaskManager {
       Date.now(),
     );
     if (!check.ok) return check;
+    const pin = task.constraints?.modelExact;
+    const digest = task.constraints?.modelDigest;
+    if (pin && digest) {
+      if (task.model !== pin) return { ok: false, reason: "Hard pin model was replaced." };
+      const actual = this.laya.digestFor(pin);
+      if (!actual) return { ok: false, reason: "Hard pin digest was not observed from the local runtime. No other model was selected." };
+      if (actual !== digest) return { ok: false, reason: "Hard pin digest does not match the installed model. No other model was selected." };
+    }
+    if (task.constraints?.preferredLocalModel && !pin && task.model !== task.constraints.preferredLocalModel) {
+      return { ok: false, reason: "Preferred local model was replaced. No authorized alternate was selected." };
+    }
     const fresh = codexCompatibilityFresh(provider, Date.now());
     return fresh.ok
       ? { ok: true }
@@ -1250,7 +1273,7 @@ export class TaskManager {
           policy,
         ),
     }); } catch (error) {
-      if ((input.override && input.override !== "auto") || input.modelOverride || constraints.modelExact) {
+      if ((input.override && input.override !== "auto") || input.modelOverride || constraints.modelExact || constraints.preferredLocalModel) {
         this.emit(this.db.event("model.approval_required", null, "Selected model unavailable or ineligible; owner approval is required before any alternative."));
         throw new ModelApprovalRequired(error instanceof Error ? error.message : undefined);
       }
@@ -1351,6 +1374,26 @@ export class TaskManager {
       if (advice) {
         decision.decision_assistance = { source: "jev", action: outcome.action, confidence: advice.confidence, changed: !!assistanceRecord?.adopted };
         this.lastAssistance = { at: Date.now(), source: "jev", action: outcome.action, detail: outcome.reason, recommended: advice.recommendedKey, confidence: advice.confidence };
+      }
+    }
+    if (constraints.preferredLocalModel && !constraints.modelExact && !input.modelOverride) {
+      const preference = constraints.preferredLocalModel;
+      if (selection) {
+        const chosen = preferEligibleLocal(pipeline.selection.order, preference);
+        if (!chosen) {
+          this.emit(this.db.event("model.approval_required", null, "Preferred local model is unavailable; no alternate was selected."));
+          throw new ModelApprovalRequired(`Preferred local model ${preference} is not eligible. No authorized alternate was selected.`);
+        }
+        if (routed.model !== chosen.model) {
+          routed = { provider: chosen.provider, model: chosen.model, effort: chosen.effort };
+          decision.recommended_provider = routed.provider;
+          decision.recommended_model = routed.model;
+          decision.selection_reason = `PREFERRED: ${preference} is the onboarding model and is eligible. This is not a hard pin.`;
+          launchedModelId = chosen.model;
+        }
+      } else if (routed.model !== preference) {
+        this.emit(this.db.event("model.approval_required", null, "Preferred local model is unavailable; no alternate was selected."));
+        throw new ModelApprovalRequired(`Preferred local model ${preference} is unavailable. No authorized alternate was selected.`);
       }
     }
     const task: OrchTask = {

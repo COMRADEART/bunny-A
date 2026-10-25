@@ -121,6 +121,11 @@ export class LayaRegistry {
     if (digests) this.installed = digests;
   }
 
+  /** Last digest the local runtime reported for this model name. Null means it was not observed. */
+  digestFor(model: string): string | null {
+    return this.installed.get(model) ?? null;
+  }
+
   /** Benchmarks for the build currently installed under each name; results for a replaced build no longer count. */
   benchmarks(model?: string): LayaBenchmark[] {
     const rows = (model
