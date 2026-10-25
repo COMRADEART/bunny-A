@@ -20,6 +20,7 @@ export function LocalPerformance() {
   const queued = tasks.filter((row) => row.state === "queued" || row.state === "waiting_for_approval").length;
   const view = projectLocalPerformance({
     model: task?.provider === "ollama" ? task.model : null,
+    digest: task?.servedModel?.digest ?? null,
     mode,
     agents: null,
     taskState: !seen ? null : task ? taskStatus(task).label : "idle",

@@ -185,10 +185,13 @@ export class OllamaAdapter implements ProviderAdapter {
     const done = Promise.resolve().then(async()=>{await hooks.beforeDispatch?.();if(controller.signal.aborted)return {ok:false,stopped:true,output:"",error:"Stopped before local inference.",log:"Stopped before local inference.",receipt:null,dispatched:false as const};hooks.event("agent.started", `Ollama generation requested · ${task.model}.`);return execute({ taskId: task.id, provider: this.id, model: task.model, prompt: task.prompt, localOnly: !!(task.constraints?.localOnly || task.constraints?.offlineOnly), ...(task.constraints?.contextTokens ? { numCtx: task.constraints.contextTokens } : {}), ...(task.constraints?.outputTokens ? { numPredict: task.constraints.outputTokens } : {}), ...(task.constraints?.responseFormat ? { format: task.constraints.responseFormat } : {}) }, { stream: (text) => hooks.output(text), signal: controller.signal, timeoutMs: task.maxRuntimeMs });}).then((result) => {
       // M-A-3 T11: Ollama's own final message is the receipt: served model, token counts and durations. Counts are
       // provider-reported, never estimated; when the provider sends no final message nothing is recorded.
-      if (result.ok && result.receipt) {
-        hooks.event("provider.receipt", JSON.stringify({ kind: "ollama-generate", ...result.receipt }));
-        if (result.receipt.promptEvalCount !== null && result.receipt.evalCount !== null)
-          hooks.usage?.({ inputTokens: result.receipt.promptEvalCount, outputTokens: result.receipt.evalCount, cachedInputTokens: 0, source: "ollama /api/generate final message (provider-reported counts; no cost)" });
+      if (result.receipt) hooks.event("provider.receipt", JSON.stringify({ kind: "ollama-generate", ...result.receipt }));
+      const pinnedDigest = task.constraints?.modelDigest;
+      if (result.ok && result.receipt && pinnedDigest && result.receipt.digest !== pinnedDigest) {
+        result = { ...result, ok: false, error: result.receipt.digest ? "Served digest does not match the hard pin." : "Hard pin digest was not observed from the local runtime. No other model was selected." };
+      }
+      if (result.ok && result.receipt && result.receipt.promptEvalCount !== null && result.receipt.evalCount !== null) {
+        hooks.usage?.({ inputTokens: result.receipt.promptEvalCount, outputTokens: result.receipt.evalCount, cachedInputTokens: 0, source: "ollama /api/generate final message (provider-reported counts; no cost)" });
       }
       if (result.ok) hooks.event("agent.completed", result.log); else if (!result.stopped) hooks.event("agent.error", result.error ?? result.log);
       return { ...result, output: result.output ?? "" };

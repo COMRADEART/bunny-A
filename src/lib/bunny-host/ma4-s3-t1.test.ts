@@ -10,6 +10,7 @@ import { ModelCapabilityRegistry } from "./model-capability.server.ts";
 import { TaskManager } from "./manager.server.ts";
 import { saveOnboarding } from "./ma4/owner-product.server.ts";
 import { composeTeam } from "./ma4/coordinator.ts";
+import { digestFromTags } from "../orch/exec.server.ts";
 import type { ProviderAdapter } from "./contracts.ts";
 import type { ProviderId, ProviderLive } from "../orch/types.ts";
 import {
@@ -27,6 +28,7 @@ import {
   hardwareFromProbe,
   onMemoryFailure,
   orderQueue,
+  hostExecutionPlan,
   preferEligibleLocal,
   projectLocalPerformance,
   reservationsFor,
@@ -151,6 +153,8 @@ test("context, replanning, handoffs, and verification stay bounded", () => {
   const view = projectLocalPerformance({ model: null, cpuPercent: null, queue: null });
   assert.ok(view.rows.every((row) => row.value === "unavailable" || row.label === "Queue"));
   assert.equal(view.rows.find((row) => row.label === "VRAM")?.value, "unavailable");
+  const named = projectLocalPerformance({ model: "qwen:7b", digest: null });
+  assert.equal(named.rows.find((row) => row.label === "Served digest")?.measured, false);
   assert.equal(retainTelemetry([], { category: "C0", strategy: "direct", agents: 1, modelCalls: 1, queueWaitMs: null, firstTokenMs: null, inferenceMs: null, verification: "unavailable", outcome: "completed" }).length, 1);
 });
 
@@ -192,6 +196,18 @@ test("the Host applies a saved onboarding preference on a local task", async () 
     assert.equal(task.model, "qwen2.5-coder:7b");
     assert.equal(task.constraints?.preferredLocalModel, "qwen2.5-coder:7b");
     assert.equal(task.constraints?.modelExact, undefined);
+    assert.equal(task.executionPlan?.complexity, "C0");
+    assert.equal(task.executionPlan?.team, null);
+    assert.equal(task.mission, undefined);
+    const tool = manager.submit({ prompt: "Read NOTES.md", mode: "fast", constraints: { localOnly: true } });
+    assert.equal(tool.executionPlan?.complexity, "C1");
+    assert.deepEqual(tool.executionPlan?.roles, ["tool"]);
+    assert.equal(tool.executionPlan?.team, null);
+    const planned = manager.submit({ prompt: "Inspect several files and propose a patch.", mode: "fast", constraints: { localOnly: true } });
+    assert.deepEqual(planned.executionPlan?.team, ["Planner", "Worker"]);
+    const consequential = manager.submit({ prompt: "Deploy the production service.", mode: "fast", constraints: { localOnly: true } });
+    assert.deepEqual(consequential.executionPlan?.team, ["Planner", "Worker", "Reviewer"]);
+    assert.equal(consequential.mission, undefined);
   } finally {
     db.close();
     rmSync(dir, { recursive: true, force: true });
@@ -231,6 +247,24 @@ const holdout: [string, ComplexityClass][] = [
   ["Wipe the production cache.", "C3"],
   ...Array.from({ length: 9 }, (_, i) => [`Delete production shard ${i}.`, "C3"] as [string, ComplexityClass]),
 ];
+
+test("a model proposal cannot widen the Host execution plan", () => {
+  const kept = hostExecutionPlan("Deploy the production service.", { complexity: "C0", roles: ["direct"], source: "model" });
+  assert.equal(kept.complexity, "C3");
+  assert.equal(kept.teamCapabilities?.includes("review"), true);
+  assert.match(kept.escalation ?? "", /Host baseline/);
+  const status = hostExecutionPlan("What HTTP status code means Not Found?");
+  assert.equal(status.complexity, "C0");
+  assert.equal(status.teamCapabilities, null);
+});
+
+test("a served digest is recorded only when one runtime tag matches the name", () => {
+  const digest = "abc123";
+  assert.equal(digestFromTags([{ name: "qwen:7b", digest }], "qwen:7b"), digest);
+  assert.equal(digestFromTags([{ name: "qwen:7b" }], "qwen:7b"), null);
+  assert.equal(digestFromTags([{ name: "qwen:7b", digest }, { name: "qwen:7b", digest: "other" }], "qwen:7b"), null);
+  assert.equal(assertServedIdentity({ mode: "PREFERRED", provider: "ollama", id: "qwen:7b", digest, reason: "", authorization: "owner-preference", disclosedAlternate: false }, { id: "qwen:7b", digest: null }).ok, true);
+});
 
 test("synthetic development and holdout sets cover the four classes and stay out of the classifier", () => {
   assert.ok(development.length >= 40);
