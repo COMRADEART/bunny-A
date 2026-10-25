@@ -98,6 +98,11 @@ export function inspectAndroidReleaseArtifact(repoRoot, apkPathOverride = null) 
   const allowBackup = xml.match(/android:allowBackup="([^"]+)"/)?.[1] === "true";
   const usesCleartextTraffic = xml.match(/android:usesCleartextTraffic="([^"]+)"/)?.[1] === "true";
   const permissions = [...xml.matchAll(/<uses-permission\s+android:name="([^"]+)"/g)].map((m) => m[1]);
+  // INTERNET is the network permission. POST_NOTIFICATIONS is the Android 13 runtime notice permission.
+  // Anything else fails the allowlist. The old internet-only flag stays false once notices are declared.
+  const declaredPermissionAllowlist = ["android.permission.INTERNET", "android.permission.POST_NOTIFICATIONS"];
+  const matchesDeclaredAllowlist = permissions.length === declaredPermissionAllowlist.length
+    && declaredPermissionAllowlist.every((name) => permissions.includes(name));
 
   const defaultApkPath = apkPathOverride
     ? resolve(apkPathOverride)
@@ -126,6 +131,8 @@ export function inspectAndroidReleaseArtifact(repoRoot, apkPathOverride = null) 
       usesCleartextTraffic,
       permissions,
       leastPrivilegeInternetOnly: permissions.length === 1 && permissions[0] === "android.permission.INTERNET",
+      declaredPermissionAllowlist,
+      matchesDeclaredAllowlist,
     },
     artifact: {
       path: defaultApkPath,
