@@ -7,6 +7,7 @@ import { MissionSettings } from "./mission";
 import { AiModelsSettings } from "./ai-models";
 import { NotificationFrequencySetting, VoicePersonalization } from "./voice-personalization";
 import { ThemeGallery } from "./theme-gallery";
+import { LocalPerformance } from "./local-performance";
 
 const GROUPS = [
   "General",
@@ -202,6 +203,7 @@ export function Settings() {
               >
                 <span className="caption">Off</span>
               </Setting>
+              <LocalPerformance />
               <HostCare />
             </>
           ) : (

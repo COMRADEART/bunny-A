@@ -16,8 +16,9 @@ const STATUS: Record<string,string>={not_installed:"is not installed",authentica
 export function runsLocally(provider: Pick<ProviderLive,"local_or_cloud"|"remoteModels"> | undefined, model: string | null | undefined): boolean {
   return !!provider && provider.local_or_cloud === "local" && !!model && !(provider.remoteModels ?? []).includes(model) && !/(:|-)cloud$/i.test(model);
 }
-/** The model a local-only task should use: the current one when it is local, otherwise the first local model. */
-export function localModel(provider: ProviderLive): string | null {
+/** The model a local-only task should use. A listed local preference wins. Otherwise the current local model, otherwise the first local model. */
+export function localModel(provider: ProviderLive, preference?: string | null): string | null {
+  if (preference && (provider.models ?? []).includes(preference) && runsLocally(provider, preference)) return preference;
   return runsLocally(provider, provider.current_model) ? provider.current_model : (provider.models ?? []).find((model) => runsLocally(provider, model)) ?? null;
 }
 /** Hard eligibility. A provider failing any rule is excluded outright; scores never override it. */
@@ -54,8 +55,16 @@ function usageNote(provider: ProviderLive): string | null {
 }
 export function bunnyRoute(input: { prompt: string; mode: Mode; providers: ProviderLive[]; override?: ProviderId | "auto"; constraints?: TaskConstraints; learned?: (provider: ProviderId, type: string) => number; policyId?: string }): RouteDecision {
   const constraints = inferredConstraints(input.prompt,input.constraints);
-  const pool = input.providers.filter(provider => !eligibility(provider,constraints));
+  let pool = input.providers.filter(provider => !eligibility(provider,constraints));
   if (!pool.length) throw new Error(`No ready executor can satisfy this task's hard constraints. ${input.providers.map(provider => eligibility(provider, constraints)).filter(Boolean).join(" ")}`);
+  const exactLocal = constraints.modelExact && pool.some((provider) => (provider.models ?? []).includes(constraints.modelExact!) && runsLocally(provider, constraints.modelExact)) ? constraints.modelExact : null;
+  const preference = constraints.modelExact ? null : constraints.preferredLocalModel ?? null;
+  const requestedLocal = exactLocal ?? preference;
+  if (requestedLocal && (constraints.localOnly || constraints.offlineOnly)) {
+    const holders = pool.filter((provider) => (provider.models ?? []).includes(requestedLocal) && runsLocally(provider, requestedLocal));
+    if (!holders.length) throw new Error(exactLocal ? `Hard-pinned local model ${exactLocal} is unavailable. No substitute was selected.` : `Preferred local model ${preference} is unavailable. No authorized alternate was selected.`);
+    pool = holders;
+  }
   if (input.override && input.override !== "auto" && !pool.some(provider=>provider.id===input.override)) throw new Error(`Selected executor is not eligible for this task. ${input.providers.find(provider => provider.id === input.override) ? eligibility(input.providers.find(provider => provider.id === input.override)!, constraints) : "Provider was not found."}`);
   const features = analyze(input.prompt,input.mode);
   const learned = new Map(pool.map(live=>[live.id,input.learned?.(live.id,features.task_type) ?? 0]));
@@ -65,10 +74,13 @@ export function bunnyRoute(input: { prompt: string; mode: Mode; providers: Provi
   const chosenLive = pool.find(provider=>provider.id===chosen)!;
   const decision = routeTask({...input,providers:pool,override: chosen});
   // A local-only task never inherits a cloud-hosted default model from a local service.
-  const local = constraints.localOnly || constraints.offlineOnly ? localModel(chosenLive) : null;
+  const local = constraints.localOnly || constraints.offlineOnly ? localModel(chosenLive, requestedLocal) : null;
+  if (requestedLocal && (constraints.localOnly || constraints.offlineOnly) && local !== requestedLocal) {
+    throw new Error(exactLocal ? `Hard-pinned local model ${exactLocal} is unavailable. No substitute was selected.` : `Preferred local model ${preference} is unavailable. No authorized alternate was selected.`);
+  }
   const substituted = local && local!==decision.recommended_model ? decision.recommended_model : null;
   if (local) decision.recommended_model = local;
-  const excluded = input.providers.filter(provider=>!pool.includes(provider)).map(provider=>({provider:provider.id,reason:eligibility(provider,constraints)!}));
+  const excluded = input.providers.filter(provider=>!pool.includes(provider)).map(provider=>({provider:provider.id,reason:eligibility(provider,constraints) ?? (preference ? `Preferred local model ${preference} is not served by this provider.` : "Not eligible.")}));
   const requirements = requirementsOf(constraints);
   const delta = learned.get(chosen) ?? 0;
   const reasons = [
@@ -76,6 +88,7 @@ export function bunnyRoute(input: { prompt: string; mode: Mode; providers: Provi
     `${chosenLive.name} is installed and ${chosenLive.availability} (probed on this Host).`,
     requirements.length ? `Hard requirements met: ${requirements.join(", ")}.` : "No hard requirements beyond a ready provider.",
     substituted ? `Local only: using local model ${decision.recommended_model}, not the cloud-hosted default ${substituted}.` : null,
+    preference && local === preference ? `Preferred local model ${preference}. This onboarding choice is not a hard pin.` : null,
     `${features.task_type} task, complexity ${features.complexity.toFixed(2)}, ${input.mode} weights.`,
     delta ? `Verified history adjusts ${chosenLive.name} by ${delta >= 0 ? "+" : ""}${delta.toFixed(3)}.` : "No history weight yet (needs at least 5 recorded outcomes for this task type).",
     usageNote(chosenLive),
