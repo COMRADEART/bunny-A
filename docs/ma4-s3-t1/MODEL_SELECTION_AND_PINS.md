@@ -10,7 +10,7 @@ Onboarding stored `selectedLocalModel = qwen2.5-coder:7b`. The local router ran 
 
 | Name | Meaning | Failure |
 | --- | --- | --- |
-| Preference | Owner's preferred local model for a class of work | If it is missing, stop unless an authorized alternate was explicitly allowed, and disclose that alternate |
+| Preference | Owner's preferred local model for a class of work | If it is missing, stop and list other authorized local models. Nothing is selected until the owner picks one |
 | Execution selection | The model this task will run | Recorded with provider, id, digest when known, mode, and reason |
 | Hard pin | Exact id and digest | Digest or id mismatch selects nothing |
 

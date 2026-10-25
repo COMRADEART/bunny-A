@@ -16,6 +16,7 @@ const sourcePath = join(root, "native/voice/BunnyVoiceWorker.cs");
 const skip = process.platform === "win32" ? false : "the voice worker is Windows-only";
 const SPEECH = "did the tests pass in my last mission";
 const sha = p => createHash("sha256").update(readFileSync(p)).digest("hex");
+const shaSource = p => createHash("sha256").update(readFileSync(p, "utf8").replace(/\r\n/g, "\n")).digest("hex");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 function session(args = []) {
@@ -75,7 +76,7 @@ test("build record matches the source and the compiled worker", { skip }, () => 
   assert.equal(record.schema, "bunny-voice-worker-build/1");
   assert.equal(record.protocol, "bunny-voice/1");
   assert.equal(record.architecture, "windows-x64");
-  assert.equal(record.sourceSha256, sha(sourcePath));
+  assert.equal(record.sourceSha256, shaSource(sourcePath));
   assert.equal(record.binarySha256, sha(exe));
   assert.match(record.systemSpeech.path, /System\.Speech\.dll$/);
   assert.match(record.compiler.version, /Visual C# Compiler/);

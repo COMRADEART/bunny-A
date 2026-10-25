@@ -80,8 +80,13 @@ test("model policy separates preference, auto-local, and hard pin", () => {
   const preferred = selectExecutionModel({ mode: "PREFERRED", preference: { id: "qwen2.5-coder:7b" }, pool });
   assert.equal(preferred.ok && preferred.record.disclosedAlternate, false);
   assert.equal(selectExecutionModel({ mode: "PREFERRED", preference: { id: "missing:7b" }, pool }).ok, false);
-  const alternate = selectExecutionModel({ mode: "PREFERRED", preference: { id: "missing:7b" }, pool, allowAuthorizedAlternate: true });
+  const offered = selectExecutionModel({ mode: "PREFERRED", preference: { id: "missing:7b" }, pool, allowAuthorizedAlternate: true });
+  assert.equal(offered.ok, false);
+  assert.equal(offered.ok === false && offered.choices.some((choice) => choice.id === "qwen2.5-coder:7b"), true);
+  const alternate = selectExecutionModel({ mode: "PREFERRED", preference: { id: "missing:7b" }, pool, allowAuthorizedAlternate: true, acceptedAlternateId: "qwen2.5-coder:7b" });
+  assert.equal(alternate.ok && alternate.record.id, "qwen2.5-coder:7b");
   assert.equal(alternate.ok && alternate.record.disclosedAlternate, true);
+  assert.equal(selectExecutionModel({ mode: "PREFERRED", preference: { id: "qwen2.5-coder:7b", digest: "sha256:qwen2.5-coder:7b" }, pool: [local("qwen2.5-coder:7b", { digest: null })] }).ok, false);
   const unauthorized = selectExecutionModel({ mode: "AUTO_LOCAL", pool: [local("secret:7b", { authorized: false }), { provider: "ollama", id: "cloud:7b", digest: "sha256:cloud", local: false, authorized: true, workingMemoryBytes: 1 }] });
   assert.equal(unauthorized.ok, false);
   const auto = selectExecutionModel({ mode: "AUTO_LOCAL", pool });
