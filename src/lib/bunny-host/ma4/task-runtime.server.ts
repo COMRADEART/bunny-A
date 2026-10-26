@@ -80,6 +80,8 @@ export type RuntimeDeps = {
   /** MA4-S2-T2: a task reached a terminal state (its task-scoped browser session is closed). */
   onTerminal?(taskId: string): void;
   roots?: { get(id: string): { id: string; path: string } | null };
+  /** Look up digest for a model id, ensuring non-null served model identity in outcomes. */
+  modelDigest?: (model: string) => string | null;
 };
 type Active = { lease: Lease; abort: AbortController; done: Promise<void>; children: Set<ChildProcess> };
 const WORKSTATION = "workstation";
@@ -213,18 +215,36 @@ export class PersistentTaskRuntime {
         queueTimeMs = Math.max(0, claimedTrans.at - record.createdAt);
       }
 
+      const modelId = record.envelope.models[0] ?? "local-default";
+      const modelDigest = this.deps.modelDigest ? this.deps.modelDigest(modelId) : null;
+
+      const specMap = new Map(record.spec.steps.map(s => [s.id, s]));
+
+      const actualToolCount = record.steps.filter(s => {
+        const specStep = specMap.get(s.id);
+        const executor = specStep ? facts.get(specStep.kind) : undefined;
+        return s.attempts > 0 && (executor?.sideEffect || !executor?.gpu);
+      }).length;
+
+      const rolesInvoked: S2Role[] = [];
+      if (record.steps.some(s => s.attempts > 0 && (specMap.get(s.id)?.kind === "local.generate" || specMap.get(s.id)?.kind === "file.read"))) rolesInvoked.push("Worker");
+      if (record.steps.some(s => s.attempts > 0 && specMap.get(s.id)?.kind === "local.test")) rolesInvoked.push("Tester");
+      if (record.steps.some(s => s.attempts > 0 && specMap.get(s.id)?.kind === "local.review")) rolesInvoked.push("Reviewer");
+      if (record.steps.some(s => s.attempts > 0 && (specMap.get(s.id)?.kind.includes("plan") || specMap.get(s.id)?.kind.startsWith("plan")))) rolesInvoked.push("Planner");
+      if (rolesInvoked.length === 0) rolesInvoked.push("Worker");
+
       const outcome = createOutcomeRecord({
         taskId: record.id,
         projectId: record.projectId,
         taskClass,
         taskText: record.spec.title,
         acceptanceContract: `${record.spec.acceptance.description}\n${record.spec.acceptance.requiredSteps.join(", ")}`,
-        approvedModel: { id: record.envelope.models[0] ?? "local-default", digest: null },
-        observedModel: { id: record.envelope.models[0] ?? "local-default", digest: null },
-        rolesInvoked: ["Worker", ...(record.spec.steps.some(s => s.kind === "local.test") ? ["Tester" as const] : []), ...(record.spec.steps.some(s => s.kind === "local.review") ? ["Reviewer" as const] : []), ...(record.spec.steps.some(s => s.kind.includes("plan")) ? ["Planner" as const] : [])],
+        approvedModel: { id: modelId, digest: modelDigest },
+        observedModel: { id: modelId, digest: modelDigest },
+        rolesInvoked,
         modelCallCount: record.usage.modelCalls,
-        toolCallCount: record.spec.steps.filter(s => facts.get(s.kind)?.sideEffect || !facts.get(s.kind)?.gpu).length,
-        planningAttempts: record.spec.steps.filter(s => s.kind.includes("plan")).length,
+        toolCallCount: actualToolCount,
+        planningAttempts: record.spec.steps.filter(s => s.kind.includes("plan") && (record.steps.find(x => x.id === s.id)?.attempts ?? 0) > 0).length,
         executionAttempts: record.steps.reduce((acc, s) => acc + s.attempts, 0),
         verifiedArtifactHashes,
         testProcessReceipts: testReceipts,
