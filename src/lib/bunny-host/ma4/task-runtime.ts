@@ -1,3 +1,4 @@
+import type { TruthState } from "../../orch/types.ts";
 /**
  * MA4-S2-T1 persistent task vocabulary: the durable task state machine, the immutable task specification, the owner's
  * authorization envelope and the user-facing display states. Pure: the store persists, the runtime executes. Nothing
@@ -220,6 +221,7 @@ export type TaskView = {
   activity: Activity | null;
   /** The action waiting for permission, without its preview or local detail (inspect it on the workstation). */
   pendingAction: Pick<ActionProposal, "actionId" | "stepId" | "kind" | "connector" | "target" | "summary" | "effects" | "reversible" | "payloadSha256" | "expiresAt"> | null;
+  truthState?: TruthState;
   corrupt?: false;
 };
 /** Derived from the trusted record only. */
@@ -248,6 +250,30 @@ export function taskView(task: TaskRecord, version: number): TaskView {
     models: [...new Set(task.spec.steps.flatMap(s => s.model ? [s.model] : []))], dependsOn: task.spec.dependsOn,
     evidence: task.steps.flatMap(s => s.outputSha256 ? [{ stepId: s.id, outputSha256: s.outputSha256 }] : []),
     activity: activityOf(task),
+    truthState: truthStateOf(task),
     pendingAction: task.pendingAction ? (({ actionId, stepId, kind, connector, target, summary, effects, reversible, payloadSha256, expiresAt }) => ({ actionId, stepId, kind, connector, target, summary, effects, reversible, payloadSha256, expiresAt }))(task.pendingAction) : null,
   };
+}
+
+export function truthStateOf(task: Pick<TaskRecord, "state" | "steps" | "pendingAction">): TruthState {
+  switch (task.state) {
+    case "CREATED": return "Proposed";
+    case "VALIDATED":
+    case "QUEUED":
+    case "RESUMING": return "Queued";
+    case "AWAITING_APPROVAL": return "Awaiting approval";
+    case "PAUSED": return "Paused";
+    case "COMPLETED": return "Completed";
+    case "FAILED": return "Failed";
+    case "CANCELLED": return "Cancelled";
+    case "UNCERTAIN": return "Uncertain";
+    case "RUNNING": {
+      const current = task.steps.find(s => s.state === "running" || s.state === "pending");
+      if (!current) return "Working";
+      if (current.id.includes("plan") || current.id.startsWith("plan")) return "Planning";
+      if (current.id.includes("test") || current.id.startsWith("test")) return "Testing";
+      if (current.id.includes("review") || current.id.startsWith("review")) return "Reviewing";
+      return "Working";
+    }
+  }
 }

@@ -484,6 +484,24 @@ export function Approval({ task, phone = false }: { task: OrchTask; phone?: bool
           </details>
         ) : null}
       </details>
+
+      {task.proposal || task.executionPlan?.complexity === "C2" || task.executionPlan?.complexity === "C3" ? (
+        <div className="proposal-card glass" style={{ margin: "12px 0", padding: "10px", borderRadius: "8px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+            <strong>Agent Workflow Proposal</strong>
+            <span className="count-pill">{task.executionPlan?.complexity ?? "C2"} Coordinated</span>
+          </div>
+          <p className="caption" style={{ marginBottom: "6px" }}>
+            The Host prepared a bounded multi-agent execution envelope for your review.
+          </p>
+          <ul className="fact-list" style={{ fontSize: "12px", lineHeight: "1.5" }}>
+            <li><strong>Resources:</strong> {task.proposal?.resources.roots.length ? task.proposal.resources.roots.join(", ") : "Project workspace"}</li>
+            <li><strong>Roles &amp; Actions:</strong> {task.proposal?.actions.map(a => a.kind).join(", ") || (task.executionPlan?.roles.join(", ") ?? "Planner, Worker")}</li>
+            <li><strong>Models:</strong> {task.model} (pinned local)</li>
+            <li><strong>Expected effects:</strong> {task.proposal?.expectedEffects.join("; ") || "Read files, generate grounded response, deterministic verification"}</li>
+          </ul>
+        </div>
+      ) : null}
       <div className="actions">
         <button
           type="button"

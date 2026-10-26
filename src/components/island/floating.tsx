@@ -258,6 +258,37 @@ export function FloatingIsland({ now }: { now: number }) {
             <BunnyOrb state={orb} />
           </button>
           <span className="island-divider" />
+        {active.length > 0 ? (
+          <div
+            className={`island-active-agents ${store.appearance.position === "left" ? "notch-vertical-top" : "notch-horizontal-left"}`}
+            aria-label="Active agents"
+            style={{
+              display: "flex",
+              flexDirection: store.appearance.position === "left" ? "column" : "row",
+              gap: "4px",
+              padding: "2px 6px",
+              alignItems: "center"
+            }}
+          >
+            {active.slice(0, 3).map((t) => (
+              <span
+                key={t.id}
+                className="agent-indicator-pill"
+                title={`${t.title}: ${t.truthState ?? t.state}`}
+                style={{
+                  fontSize: "11px",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                  background: t.truthState === "Testing" ? "rgba(79, 140, 255, 0.2)" : t.truthState === "Reviewing" ? "rgba(147, 83, 211, 0.2)" : "rgba(255, 255, 255, 0.1)",
+                  color: "inherit"
+                }}
+              >
+                {t.truthState ?? "Working"}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
           {store.appearance.idle === "clock" && !expanded ? (
             <time className="island-clock">
               {now

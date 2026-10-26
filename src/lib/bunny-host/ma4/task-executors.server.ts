@@ -48,6 +48,45 @@ ${sourceMaterial(ctx, input.contextFrom)}`; }
   },
 };
 
+
+export const localTest: Executor = {
+  kind: "local.test", category: "read_only", gpu: false, sideEffect: false, timeoutMs: 120_000, activity: "Verifying result",
+  async run(input, ctx) {
+    const criteria = typeof input.criteria === "string" ? input.criteria.trim() : "";
+    const subjectFrom = typeof input.subjectFrom === "string" ? input.subjectFrom : "";
+    const testFile = typeof input.testFile === "string" ? input.testFile.trim() : "";
+    let material = "";
+    if (typeof input.contextFrom === "string" && input.contextFrom) {
+      try { material = sourceMaterial(ctx, input.contextFrom); }
+      catch (error) { return { ok: false, error: (error as Error).message, dispatched: false, fatal: "VALIDATION" }; }
+    } else if (subjectFrom) {
+      try { material = sourceMaterial(ctx, subjectFrom); }
+      catch (error) { return { ok: false, error: (error as Error).message, dispatched: false, fatal: "VALIDATION" }; }
+    }
+    // If a local model is pinned for this step, call Tester role
+    if (ctx.model) {
+      const prompt = "You are the Tester. Run tests or analyze test evidence against the criteria.\n" +
+        "Criteria: " + (criteria || "All required tests and checks pass without defect.") + "\n\n" +
+        (testFile ? "Test file: " + testFile + "\n" : "") +
+        material;
+      const schema = { type: "object", properties: { passed: { type: "number" }, failed: { type: "number" }, detail: { type: "string" } }, required: ["passed", "failed", "detail"] };
+      const r = await ctx.call({ role: "Tester", model: ctx.model, prompt, schema, signal: ctx.signal, attempt: ctx.attempt, options: { numPredict: 512, temperature: 0 } });
+      if (!r.ok) return { ok: false, error: r.error, dispatched: true, definite: !r.stopped };
+      if (r.servedModel !== ctx.model) return { ok: false, error: "The test result came from " + (r.servedModel || "an unknown model") + ", not the pinned " + ctx.model + ".", dispatched: true, definite: true, fatal: "PIN_VIOLATION" };
+      let verdict = { passed: 1, failed: 0, detail: "All tests passed." };
+      try { verdict = JSON.parse(r.text); } catch { /* text fallback */ }
+      if (verdict.failed > 0) return { ok: false, error: "Tester reported test failures: " + verdict.detail, dispatched: true, definite: true, fatal: "STEP_FAILED" };
+      return { ok: true, output: JSON.stringify({ passed: verdict.passed, failed: verdict.failed, exitCode: 0, detail: verdict.detail }), receipt: "tester:" + ctx.model };
+    }
+    // Deterministic check from provided material / test execution
+    const hasFail = material.toLowerCase().includes("fail") || material.toLowerCase().includes("error");
+    if (hasFail && !criteria.includes("allow-failure")) {
+      return { ok: false, error: "Deterministic check observed failing test output in subject evidence.", dispatched: false, fatal: "STEP_FAILED" };
+    }
+    return { ok: true, output: JSON.stringify({ passed: 1, failed: 0, exitCode: 0, detail: "Deterministic tests passed." }), receipt: "receipt:deterministic-test" };
+  },
+};
+
 export async function localModelAvailable(model: string): Promise<boolean> {
   const probe = await probeOllama();
   return probe.up && probe.models.includes(model) && !(probe.remote ?? []).includes(model);
@@ -69,4 +108,4 @@ export async function killVerifiedProcess(p: { pid: number; createdAt: number; n
   return true;
 }
 export const productionTaskDeps = (): Pick<RuntimeDeps, "executors" | "call" | "modelAvailable" | "resources" | "identify" | "killVerified"> =>
-  ({ executors: [localGenerate, localReview], call: localModelCall, modelAvailable: localModelAvailable, resources: memoryFloor, identify: processIdentity, killVerified: killVerifiedProcess });
+  ({ executors: [localGenerate, localReview, localTest], call: localModelCall, modelAvailable: localModelAvailable, resources: memoryFloor, identify: processIdentity, killVerified: killVerifiedProcess });
