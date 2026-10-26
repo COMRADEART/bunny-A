@@ -1,3 +1,4 @@
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { freemem } from "node:os";
 import { execute, probeOllama } from "../../orch/exec.server.ts";
 import { killProcess, processTable, sameProcessIdentity } from "../process-tree.server.ts";
@@ -37,19 +38,50 @@ export const localGenerate: Executor = {
 };
 
 /**
- * MA4-S3-T3R1: Deterministic Test Execution & Grounded Test Verification.
- * Distinguishes semantic test analysis (model inspection) from deterministic test execution (process launch).
- * Only real process execution with exit code 0, untruncated output and valid reports can issue an execution receipt.
+ * MA4-S3-T3R2: Security Boundary Closure & Deterministic Test Integrity.
+ * - Eliminates caller-provided filesystem paths (`rootPath`).
+ * - Enforces registered root identifiers (`root`) verified against the Host registry and envelope grants.
+ * - Prevents arbitrary commands, unapproved npm scripts, and dynamic npx downloads.
+ * - Distinguishes semantic test analysis (model inspection) from deterministic test execution (process launch).
+ * - Only real process execution with exit code 0, untruncated output, fresh verified reports,
+ *   and executed assertions can issue an immutable Host receipt.
  */
 export const localTest: Executor = {
   kind: "local.test", category: "read_only", gpu: false, sideEffect: false, timeoutMs: 120_000, activity: "Verifying result",
+  preflight(input, envelope) {
+    const problems: string[] = [];
+    if ("rootPath" in input && input.rootPath !== undefined && input.rootPath !== null) {
+      problems.push("Caller-provided 'rootPath' is forbidden. Only registered root identifiers ('root') are permitted.");
+    }
+    const testFile = typeof input.testFile === "string" ? input.testFile.trim() : "";
+    const command = typeof input.command === "string" ? input.command.trim() : "";
+    const root = typeof input.root === "string" ? input.root.trim() : "";
+    if ((testFile || command) && !root) {
+      problems.push("Test execution requires an explicit registered root identifier ('root'). Defaulting to unverified roots is forbidden.");
+    }
+    if (root && (!envelope.grants?.files || !envelope.grants.files.some(f => f.root === root))) {
+      problems.push(`Folder "${root}" is not authorized by the task envelope.`);
+    }
+    return problems;
+  },
   async run(input, ctx) {
+    // 1. Refuse caller-provided filesystem path authority (Phase 1)
+    if ("rootPath" in input && input.rootPath !== undefined && input.rootPath !== null) {
+      return {
+        ok: false,
+        error: "Caller-provided 'rootPath' is forbidden. Only registered root identifiers ('root') are permitted.",
+        dispatched: false,
+        fatal: "VALIDATION",
+      };
+    }
+
     const criteria = typeof input.criteria === "string" ? input.criteria.trim() : "";
     const subjectFrom = typeof input.subjectFrom === "string" ? input.subjectFrom : "";
     const testFile = typeof input.testFile === "string" ? input.testFile.trim() : "";
     const command = typeof input.command === "string" ? input.command.trim() : "";
     const reportFile = typeof input.reportFile === "string" ? input.reportFile.trim() : undefined;
     const mode = typeof input.mode === "string" ? input.mode : undefined;
+    const requestedRoot = typeof input.root === "string" ? input.root.trim() : null;
 
     let material = "";
     if (typeof input.contextFrom === "string" && input.contextFrom) {
@@ -58,34 +90,6 @@ export const localTest: Executor = {
     } else if (subjectFrom) {
       try { material = sourceMaterial(ctx, subjectFrom); }
       catch (error) { return { ok: false, error: (error as Error).message, dispatched: false, fatal: "VALIDATION" }; }
-    }
-
-    // Resolve target project root
-    let rootPath: string | null = typeof input.rootPath === "string" ? input.rootPath : null;
-    const requestedRoot = typeof input.root === "string" ? input.root : null;
-
-    if (!rootPath && requestedRoot) {
-      if (ctx.envelope.grants?.files && !ctx.envelope.grants.files.some(f => f.root === requestedRoot)) {
-        return { ok: false, error: `Folder "${requestedRoot}" is not authorized by the task envelope.`, dispatched: false, fatal: "PERMISSION_DENIED" };
-      }
-      rootPath = ctx.resolveRoot ? ctx.resolveRoot(requestedRoot) : null;
-      if (!rootPath) {
-        return { ok: false, error: `Folder "${requestedRoot}" is not registered on this PC.`, dispatched: false, fatal: "VALIDATION" };
-      }
-    } else if (!rootPath && ctx.envelope.grants?.files && ctx.envelope.grants.files.length > 0) {
-      // Default to granted root if exactly one, or check where testFile resides
-      if (ctx.envelope.grants.files.length === 1) {
-        const rootId = ctx.envelope.grants.files[0].root;
-        rootPath = ctx.resolveRoot ? ctx.resolveRoot(rootId) : null;
-      } else if (testFile && ctx.resolveRoot) {
-        for (const f of ctx.envelope.grants.files) {
-          const cand = ctx.resolveRoot(f.root);
-          if (cand) {
-            rootPath = cand;
-            break;
-          }
-        }
-      }
     }
 
     const isSemanticOnly = mode === "analysis" || (!testFile && !command && (Boolean(subjectFrom) || Boolean(input.contextFrom)) && !input.requireExecution);
@@ -136,8 +140,76 @@ export const localTest: Executor = {
       };
     }
 
+    // Strict Root Authorization Enforcement (Phase 1):
+    // 1. Root MUST be explicitly provided. Defaulting to first granted root is strictly forbidden.
+    if (!requestedRoot) {
+      return {
+        ok: false,
+        error: "No registered root was specified for test execution ('root' is required). Defaulting to unverified roots is forbidden.",
+        dispatched: false,
+        fatal: "PERMISSION_DENIED",
+      };
+    }
+
+    // 2. Envelope grant check: envelope MUST grant access to this exact root
+    const rootGrant = ctx.envelope.grants?.files?.find(f => f.root === requestedRoot);
+    if (!rootGrant) {
+      return {
+        ok: false,
+        error: `Folder "${requestedRoot}" is not authorized by the task envelope.`,
+        dispatched: false,
+        fatal: "PERMISSION_DENIED",
+      };
+    }
+
+    // 3. Resolve through trusted Host registry
+    const rootPath = ctx.resolveRoot ? ctx.resolveRoot(requestedRoot) : null;
     if (!rootPath) {
-      return { ok: false, error: "No registered project root was authorized or found for test execution.", dispatched: false, fatal: "PERMISSION_DENIED" };
+      return {
+        ok: false,
+        error: `Folder "${requestedRoot}" is not registered on this PC or its registration has been revoked.`,
+        dispatched: false,
+        fatal: "VALIDATION",
+      };
+    }
+
+    // 4. Verify canonical path on disk (must be real directory, no symlinks/junctions)
+    if (!existsSync(rootPath)) {
+      return {
+        ok: false,
+        error: `Registered folder "${requestedRoot}" does not exist at "${rootPath}".`,
+        dispatched: false,
+        fatal: "VALIDATION",
+      };
+    }
+    const rootStat = lstatSync(rootPath);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
+      return {
+        ok: false,
+        error: `Registered folder "${requestedRoot}" must be a real directory, not a link or junction.`,
+        dispatched: false,
+        fatal: "VALIDATION",
+      };
+    }
+
+    try {
+      const canonical = realpathSync.native(rootPath);
+      const same = (a: string, b: string) => process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+      if (!same(canonical, rootPath)) {
+        return {
+          ok: false,
+          error: `Registered folder "${requestedRoot}" is reached through a symbolic link or junction.`,
+          dispatched: false,
+          fatal: "VALIDATION",
+        };
+      }
+    } catch (err) {
+      return {
+        ok: false,
+        error: `Failed to canonicalize registered folder "${requestedRoot}": ${(err as Error).message}`,
+        dispatched: false,
+        fatal: "VALIDATION",
+      };
     }
 
     // Launch real deterministic test runner
@@ -149,6 +221,7 @@ export const localTest: Executor = {
       timeoutMs: typeof input.timeoutMs === "number" ? input.timeoutMs : 60_000,
       signal: ctx.signal,
       trackChild: ctx.track,
+      requireAssertions: Boolean(input.requireAssertions),
     });
 
     if (!testResult.launched) {
@@ -156,14 +229,15 @@ export const localTest: Executor = {
     }
 
     if (!testResult.pass) {
+      const isAborted = testResult.terminalState === "aborted" || ctx.signal.aborted;
       return {
         ok: false,
         error: `Test execution failed: ${testResult.reason}` +
           (testResult.stdout ? `\nStdout: ${testResult.stdout.slice(0, 500)}` : "") +
           (testResult.stderr ? `\nStderr: ${testResult.stderr.slice(0, 500)}` : ""),
         dispatched: true,
-        definite: testResult.terminalState === "exited",
-        fatal: "STEP_FAILED",
+        definite: !isAborted && testResult.terminalState === "exited",
+        ...(isAborted ? {} : { fatal: "STEP_FAILED" }),
       };
     }
 
@@ -194,6 +268,7 @@ export const localTest: Executor = {
       stderrSha256: testResult.stderrSha256,
       artifactSha256: testResult.artifactSha256,
       reportSha256: testResult.reportSha256,
+      mode: testResult.mode,
       ...(modelAnalysis ? { modelAnalysis } : {}),
     };
 

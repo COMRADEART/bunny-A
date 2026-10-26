@@ -460,6 +460,7 @@ async function openHost(
   const FEEDBACK_ACTIONS = new Set(["feedback.opt_in", "feedback.opt_out", "feedback.status", "feedback.preview", "feedback.submit", "feedback.list", "feedback.export", "feedback.clear", "feedback.delete", "onboarding.get", "onboarding.save", "notification.decide", "notification.prefs", "diagnostics.health"]);
   const ptasks = new PersistentTaskRuntime({
     store: new TaskStore(db),
+    roots: connected.roots,
     ...productionTaskDeps(),
     ...options.ptasks,
     executors: [...(options.ptasks?.executors ?? productionTaskDeps().executors), ...connected.executors],
@@ -482,6 +483,7 @@ async function openHost(
     emit: (type, detail) => manager.emit(db.event(type, null, detail)),
     now: options.proactive?.now, maxSleepMs: options.proactive?.maxSleepMs,
   });
+  manager.setExecutionRuntime({ ptasks, connected, proactive });
   const projects = new ProjectService(missions, agents);
   // M-A-3 T13.3: Personal Agent ownership, profiles and conversations. Context only; it owns no execution.
   const personalContext = new PersonalAgentContextStore(db);

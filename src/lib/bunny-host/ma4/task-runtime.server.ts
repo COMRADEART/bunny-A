@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import type { ChildProcess } from "node:child_process";
 import { isTrustedLocalActor } from "../../bunny-missions/authorization.server.ts";
 import { CHECKPOINT_SECRET_PATTERNS } from "../agent-checkpoint.server.ts";
@@ -91,19 +93,33 @@ export class PersistentTaskRuntime {
   private channels = new Map<string, CoordinatorChannel>();
   channelOf(id: string): CoordinatorChannel | null { return this.channels.get(id) ?? null; }
   resolveRoot(rootId: string): string | null {
+    let rawPath: string | null = null;
     if (this.deps.roots) {
       const r = this.deps.roots.get(rootId);
-      if (r) return r.path;
+      if (r) rawPath = r.path;
     }
+    if (!rawPath) {
+      try {
+        const row = this.store.db.prepare("SELECT value FROM settings WHERE key='ma4_connector_file_roots_v1'").get() as { value: string } | undefined;
+        if (row?.value) {
+          const parsed = JSON.parse(row.value) as Array<{ id: string; path: string }>;
+          const found = parsed.find(x => x.id === rootId);
+          if (found?.path) rawPath = found.path;
+        }
+      } catch {}
+    }
+    if (!rawPath) return null;
     try {
-      const row = this.store.db.prepare("SELECT value FROM settings WHERE key='ma4_connector_file_roots_v1'").get() as { value: string } | undefined;
-      if (row?.value) {
-        const parsed = JSON.parse(row.value) as Array<{ id: string; path: string }>;
-        const found = parsed.find(x => x.id === rootId);
-        if (found?.path) return found.path;
-      }
-    } catch {}
-    return null;
+      if (!existsSync(rawPath)) return null;
+      const st = lstatSync(rawPath);
+      if (!st.isDirectory() || st.isSymbolicLink()) return null;
+      const canonical = realpathSync.native(rawPath);
+      const same = (a: string, b: string) => process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+      if (!same(canonical, resolve(rawPath))) return null;
+      return canonical;
+    } catch {
+      return null;
+    }
   }
 
 
