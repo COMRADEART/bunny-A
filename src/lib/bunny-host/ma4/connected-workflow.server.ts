@@ -13,6 +13,10 @@ import type { Executor, StepContext } from "./task-runtime.server.ts";
  * instructions — so text in a file or web page cannot add a step, a recipient or a permission.
  */
 export const CONNECTED_TEAM = composeTeam({ capabilities: ["planning", "code-generation", "review"], memory: false });
+export const C3_CONNECTED_TEAM = composeTeam({ capabilities: ["planning", "code-generation", "test-generation", "review"], memory: false });
+
+const TEST_ASK = /\b(?:tests?|testing|test suite|unit tests?|test run|failing tests|why the tests are failing)\b/i;
+export function testRequested(request: string): boolean { return TEST_ASK.test(request); }
 
 const STEP_LIST = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}(,[A-Za-z0-9][A-Za-z0-9._:-]{0,79}){0,7}$/;
 /** Earlier step results as fenced data. A connected result keeps its own trust label; model output is "model". */
@@ -82,6 +86,9 @@ export function intentProblems(spec: TaskSpec, request: string, envelope: Pick<E
   const byId = new Map(spec.steps.map(s => [s.id, s]));
   const reviews = spec.steps.filter(s => s.kind === "local.review"), wantReview = reviewRequested(request);
   if (reviews.length && !wantReview) hard.push("The owner did not ask for a check: remove the local.review step.");
+  const tests = spec.steps.filter(s => s.kind === "local.test"), wantTest = testRequested(request);
+  if (tests.length && !wantTest) hard.push("The owner did not ask for testing: remove the local.test step.");
+  if (!tests.length && wantTest && envelope.capabilities.includes("local.test")) soft.push("The owner asked for tests to be checked or run: add a local.test step.");
   for (const r of reviews) {
     const subject = byId.get(String(r.input.subjectFrom ?? ""));
     if (subject?.kind !== "local.generate") hard.push(`Review step ${r.id} must check the result of a local.generate step (subjectFrom), not ${subject ? `a ${subject.kind} step` : "a missing step"}.`);
@@ -129,7 +136,8 @@ export async function planConnectedTask(o: { request: string; projectId: string;
     `Pinned local models: ${o.envelope.models.join(", ") || "none"}.`,
   ].join("\n");
   const review = reviewRequested(o.request);
-  const offered = o.catalog.filter(c => review || c.kind !== "local.review");
+  const wantTest = testRequested(o.request);
+  const offered = o.catalog.filter(c => (review || c.kind !== "local.review") && (wantTest || c.kind !== "local.test"));
   const catalog = offered.map(c => `- ${c.kind}: ${c.summary}. Inputs: ${c.inputs.join(", ") || "none"}.${c.consequential ? " Needs the owner's approval when it runs." : ""}`).join("\n");
   const rules = [
     "Read every file the owner names with its own file.read step (root: a folder above; path: the file name).",

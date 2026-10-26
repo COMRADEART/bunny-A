@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { ChildProcess } from "node:child_process";
 import { isTrustedLocalActor } from "../../bunny-missions/authorization.server.ts";
 import { CHECKPOINT_SECRET_PATTERNS } from "../agent-checkpoint.server.ts";
-import { gateCalls } from "./coordinator.ts";
+import { gateCalls, coordinatorChannel, type CoordinatorChannel } from "./coordinator.ts";
+import type { S2Role } from "./collaboration.ts";
 import type { ModelCall } from "./coding-workflow.server.ts";
 import { approvalRequired, canonical, EnvelopeSchema, sha256, TaskSpecSchema, taskView, TERMINAL_TASK_STATES, validateTask, type ActionApproval, type ActionProposal, type BlockCode, type CorruptTaskView, type Envelope, type ExecutorFacts, type TaskFailureCode, type TaskRecord, type TaskState, type TaskView } from "./task-runtime.ts";
 import { StaleLeaseError, TaskConflictError, type Lease, type NotificationKind, type ProcessIdentity, type TaskPolicy, type TaskStore, type Update, type Updated } from "./task-store.server.ts";
@@ -85,6 +86,9 @@ export class PersistentTaskRuntime {
   private executors: Map<string, Executor>;
   private active = new Map<string, Active>();
   private served = new Map<string, number>();
+  private channels = new Map<string, CoordinatorChannel>();
+  channelOf(id: string): CoordinatorChannel | null { return this.channels.get(id) ?? null; }
+
   private gate: ReturnType<typeof gateCalls>;
   private timer: ReturnType<typeof setInterval> | null = null;
   private pending: ReturnType<typeof setImmediate> | null = null;
@@ -512,6 +516,28 @@ export class PersistentTaskRuntime {
   private async step(id: string, record: TaskRecord, index: number, a: Active, commit: (c: Omit<Update, "now" | "lease" | "actor">) => Updated, stop: (to: TaskState, reason: string, extra?: Partial<Omit<Update, "now" | "lease" | "actor" | "to" | "reason">>) => Updated, fault: (p: FaultPoint) => void) {
     const spec = record.spec.steps[index], state = record.steps[index], executor = this.executors.get(spec.kind)!;
     const key = `${id}:${spec.id}`, op = this.store.operation(key), now = this.now();
+    let role: S2Role = "Worker";
+    if (spec.kind === "local.test") role = "Tester";
+    else if (spec.kind === "local.review") role = "Reviewer";
+    else if (spec.id.includes("plan") || spec.id.startsWith("plan")) role = "Planner";
+
+    let ch = this.channels.get(id);
+    if (!ch) {
+      ch = coordinatorChannel({
+        taskId: id,
+        requirementsSha256: record.specSha256,
+        members: ["Coordinator", "Planner", "Worker", "Tester", "Reviewer"],
+        deadlineAt: record.envelope.expiresAt,
+        budget: {
+          modelCalls: record.envelope.budgets.maxModelCalls,
+          toolCalls: 256,
+          tokens: 200_000,
+        },
+        now: () => this.now(),
+      });
+      this.channels.set(id, ch);
+    }
+
     const succeed = (output: string, receipt: string | null, reason: string) => commit({ reason, operation: { key, stepId: spec.id, category: executor.category, state: "succeeded", receipt },
       output: { stepId: spec.id, content: output }, checkpoint: { phase: "step_succeeded", step: spec.id },
       // A step's approval is spent by its success; it never carries over to another run.
@@ -535,6 +561,22 @@ export class PersistentTaskRuntime {
     }
     if (record.usage.workMs >= record.envelope.budgets.maxWallMs) { stop("FAILED", "time budget exhausted", { mutate: r => { r.failure = { code: "BUDGET_EXHAUSTED", detail: "The task used its working-time budget." }; }, notify: [this.note("failed", record, "used its working-time budget")] }); return; }
 
+    
+    const inAdmission = ch.send("Coordinator", role, spec.id, {
+      requirementsSha256: record.specSha256,
+      capabilities: role === "Tester" ? ["test-generation"] : role === "Reviewer" ? ["review"] : role === "Planner" ? ["planning"] : ["code-generation"],
+      content: JSON.stringify(spec.input).slice(0, 10_000),
+      trust: "host",
+      validation: "verified",
+      cost: { modelCalls: executor.gpu ? 1 : 0, toolCalls: executor.sideEffect ? 1 : 0, tokens: 500 },
+    });
+    if (!inAdmission.ok) {
+      stop("FAILED", "handoff admission refused", {
+        mutate: r => { r.failure = { code: "VALIDATION", detail: `Coordinator handoff refused: ${inAdmission.reason}` }; },
+        notify: [this.note("failed", record, "handoff refused by Coordinator")],
+      });
+      return;
+    }
     fault("before-operation-start");
     // Durable intent BEFORE the effect, under this worker's fence.
     commit({ reason: `step ${spec.id} attempt ${state.attempts + 1} started`, operation: { key, stepId: spec.id, category: executor.category, state: "started", start: true },
@@ -550,7 +592,28 @@ export class PersistentTaskRuntime {
     fault("after-effect");
     if (this.dead) return;
     const workMs = Math.max(0, this.now() - started);
-    if (result.ok) { commit({ reason: "work time", mutate: r => { r.usage.workMs += workMs; } }); succeed(result.output, result.receipt ?? null, `step ${spec.id} succeeded`); fault("after-receipt"); return; }
+    if (result.ok) {
+      const reg = ch.register(result.output);
+      const outAdmission = ch.send(role, "Coordinator", spec.id, {
+        requirementsSha256: record.specSha256,
+        capabilities: role === "Tester" ? ["test-generation"] : role === "Reviewer" ? ["review"] : role === "Planner" ? ["planning"] : ["code-generation"],
+        content: result.output.slice(0, 10_000),
+        artifacts: [{ kind: role === "Tester" ? "tests" : role === "Reviewer" ? "review" : role === "Planner" ? "plan" : "source", sha256: reg.sha256, bytes: reg.bytes }],
+        trust: "model",
+        validation: "schema-valid",
+      });
+      if (!outAdmission.ok) {
+        stop("FAILED", "role handoff refused", {
+          mutate: r => { r.failure = { code: "VALIDATION", detail: `Handoff from ${role} refused: ${outAdmission.reason}` }; },
+          notify: [this.note("failed", record, `handoff from ${role} refused by Coordinator`)],
+        });
+        return;
+      }
+      commit({ reason: "work time", mutate: r => { r.usage.workMs += workMs; } });
+      succeed(result.output, result.receipt ?? null, `step ${spec.id} succeeded`);
+      fault("after-receipt");
+      return;
+    }
     if ("proposal" in result) {
       const proposal = result.proposal;
       stop("AWAITING_APPROVAL", `action needs your permission: ${proposal.summary}`, { operation: { key, stepId: spec.id, category: executor.category, state: "failed" },

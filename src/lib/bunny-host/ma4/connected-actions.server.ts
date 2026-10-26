@@ -50,6 +50,8 @@ export function connectedActions(deps: { db: HostDatabase; dataDirectory: string
       input: { type: "object", properties: { prompt: { type: "string" }, contextFrom: { type: "string" }, maxTokens: { type: "integer", minimum: 16, maximum: 2048 } }, required: ["prompt"], additionalProperties: false } },
     { kind: "local.review", summary: "check a step's result against criteria (Reviewer)", inputs: ["criteria", "subjectFrom", "contextFrom"], consequential: false,
       input: { type: "object", properties: { criteria: { type: "string" }, subjectFrom: { type: "string" }, contextFrom: { type: "string" } }, required: ["criteria", "subjectFrom"], additionalProperties: false } },
+    { kind: "local.test", summary: "run tests or checks (Tester)", inputs: ["criteria", "subjectFrom", "contextFrom", "testFile"], consequential: false,
+      input: { type: "object", properties: { criteria: { type: "string" }, subjectFrom: { type: "string" }, contextFrom: { type: "string" }, testFile: { type: "string" } }, additionalProperties: false } },
     ...connectors.map(c => ({ kind: c.contract.kind, summary: summaryOf(c.contract), inputs: inputsOf(c.contract), consequential: c.contract.consequential, input: inputSchemaOf(c.contract) })),
   ];
   return { ledger, roots, browser, connectors, executors, catalog, close: () => browser.closeAll() };

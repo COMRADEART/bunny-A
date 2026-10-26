@@ -296,6 +296,92 @@ export type OrchTask = {
   };
   /** Model name and digest observed from the local runtime after the served name matched. Null digest means the name was not matched to a runtime digest. */
   servedModel?: { name: string; digest: string | null };
+  /** MA4-S3-T3: Owner-controlled task proposal for requests requiring tool use or agent coordination. */
+  proposal?: TaskProposal | null;
+  /** MA4-S3-T3: Linked persistent task identifier when approved and running via PersistentTaskRuntime. */
+  persistentTaskId?: string | null;
+  /** MA4-S3-T3: Real tool execution receipt and evidence (C1 tool operation). */
+  toolExecution?: ToolExecutionRecord | null;
+  /** MA4-S3-T3: Multi-agent execution tracking and evidence (C2/C3 workflows). */
+  agentExecution?: AgentExecutionRecord | null;
+  /** MA4-S3-T3: Observable Host truth state for real-time visibility. */
+  truthState?: TruthState | null;
+};
+
+export type TruthState =
+  | "Proposed"
+  | "Awaiting approval"
+  | "Queued"
+  | "Planning"
+  | "Working"
+  | "Testing"
+  | "Reviewing"
+  | "Paused"
+  | "Completed"
+  | "Failed"
+  | "Cancelled"
+  | "Uncertain";
+
+export type TaskProposal = {
+  proposalId: string;
+  taskId: string;
+  complexity: "C0" | "C1" | "C2" | "C3";
+  title: string;
+  spec: Record<string, SchemaJson>;
+  envelope: Record<string, SchemaJson>;
+  resources: {
+    roots: string[];
+    origins: string[];
+    services: string[];
+  };
+  actions: { kind: string; summary: string; consequential: boolean }[];
+  models: { role: string; model: string; pinned: boolean }[];
+  expectedEffects: string[];
+  status: "draft" | "presented" | "authorized" | "rejected";
+  createdAt: number;
+  authorizedAt?: number | null;
+};
+
+export type ToolExecutionRecord = {
+  tool: string;
+  target?: string | null;
+  input: Record<string, SchemaJson>;
+  output: string | null;
+  sha256: string | null;
+  receipt: string | null;
+  dispatched: boolean;
+  executed: boolean;
+  verified: boolean;
+  error: string | null;
+  at: number;
+};
+
+export type AgentExecutionRecord = {
+  persistentTaskId: string;
+  team: ("Planner" | "Worker" | "Tester" | "Reviewer")[];
+  activeRole: string | null;
+  truthState: TruthState;
+  steps: {
+    id: string;
+    kind: string;
+    role: string;
+    state: "pending" | "running" | "succeeded" | "failed" | "uncertain";
+    outputSha256: string | null;
+  }[];
+  handoffs: {
+    id: string;
+    from: string;
+    to: string;
+    ok: boolean;
+    trust: string | null;
+    reason: string | null;
+  }[];
+  evidence: {
+    stepId: string;
+    kind: string;
+    sha256: string;
+    receipt: string;
+  }[];
 };
 
 /** Determinate only when the provider published a finite plan; otherwise indeterminate. Never time-based. */

@@ -335,6 +335,7 @@ type Island = Preferences & {
   stopAgent: (id: string) => Promise<void>;
   /** M-A-3 T11: the Coordinator approves the reviewed team plan by its exact reference, or asks the Planner to revise it. */
   approveTeamPlan: (coordinatorId: string, planReference: string | null) => Promise<void>;
+  runWithAgents: (id: string) => Promise<void>;
   reviseTeamPlan: (coordinatorId: string, note: string) => Promise<void>;
   createTeam: (input: {
     objective: string;
@@ -1842,6 +1843,10 @@ export const useIsland = create<Island>((set, get) => {
     },
     stop: async (id) => {
       await command("stop", { id }, id);
+    },
+    runWithAgents: async (id: string) => {
+      set({ decisionTaskId: null });
+      await command("task.run_with_agents", { id }, id);
     },
     pause: () => get().note("Pause unsupported by these executors."),
     resume: () => get().note("Live resume unsupported; route a new task for review."),

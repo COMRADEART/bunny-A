@@ -6,7 +6,7 @@ import { HostDatabase } from "./persistence.server.ts";
 import { TaskStore } from "./ma4/task-store.server.ts";
 import { PersistentTaskRuntime, type FaultPoint } from "./ma4/task-runtime.server.ts";
 import { connectedActions, type ConnectedActions } from "./ma4/connected-actions.server.ts";
-import { localGenerate } from "./ma4/task-executors.server.ts";
+import { localGenerate, localTest } from "./ma4/task-executors.server.ts";
 import { localReview } from "./ma4/connected-workflow.server.ts";
 import { SyntheticWorkspace, type ServiceProvider } from "./ma4/connectors/services.server.ts";
 import type { ModelCall } from "./ma4/coding-workflow.server.ts";
@@ -54,7 +54,7 @@ export async function rig(o: { services?: ServiceProvider | null; allowLoopback?
   const model = o.model ?? fakeModel();
   let n = 0;
   const make = (connected: ConnectedActions, faults?: (point: FaultPoint, taskId: string) => void) => new PersistentTaskRuntime({
-    store, executors: [localGenerate, localReview, ...connected.executors], call: model.call, modelAvailable: async m => m === MODEL,
+    store, executors: [localGenerate, localReview, localTest, ...connected.executors], call: model.call, modelAvailable: async m => m === MODEL,
     uiAttached: o.uiAttached ?? (() => true), instanceId: `host-${++n}`, exclusive: true, now: o.now, faults, maintenanceMs: 60_000,
     onTerminal: id => void connected.browser.close(id).catch(() => undefined),
   });
