@@ -36,6 +36,7 @@ export type StepContext = {
   approval: ActionApproval | null;
   outputOf(stepId: string): string | null;
   now(): number;
+  resolveRoot?(rootId: string): string | null;
 };
 export type Executor = ExecutorFacts & {
   timeoutMs: number;
@@ -73,6 +74,7 @@ export type RuntimeDeps = {
   exclusive?: boolean;
   /** MA4-S2-T2: a task reached a terminal state (its task-scoped browser session is closed). */
   onTerminal?(taskId: string): void;
+  roots?: { get(id: string): { id: string; path: string } | null };
 };
 type Active = { lease: Lease; abort: AbortController; done: Promise<void>; children: Set<ChildProcess> };
 const WORKSTATION = "workstation";
@@ -88,6 +90,22 @@ export class PersistentTaskRuntime {
   private served = new Map<string, number>();
   private channels = new Map<string, CoordinatorChannel>();
   channelOf(id: string): CoordinatorChannel | null { return this.channels.get(id) ?? null; }
+  resolveRoot(rootId: string): string | null {
+    if (this.deps.roots) {
+      const r = this.deps.roots.get(rootId);
+      if (r) return r.path;
+    }
+    try {
+      const row = this.store.db.prepare("SELECT value FROM settings WHERE key='ma4_connector_file_roots_v1'").get() as { value: string } | undefined;
+      if (row?.value) {
+        const parsed = JSON.parse(row.value) as Array<{ id: string; path: string }>;
+        const found = parsed.find(x => x.id === rootId);
+        if (found?.path) return found.path;
+      }
+    } catch {}
+    return null;
+  }
+
 
   private gate: ReturnType<typeof gateCalls>;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -587,7 +605,7 @@ export class PersistentTaskRuntime {
     let result: StepResult;
     try {
       result = await executor.run(spec.input, { taskId: id, stepId: spec.id, attempt: state.attempts + 1, idempotencyKey: key, model: spec.model, signal, call: this.gate.call, track: child => this.track(id, a, child),
-        envelope: record.envelope, approval: record.actionApprovals?.find(x => x.stepId === spec.id) ?? null, outputOf: stepId => this.store.output(id, stepId)?.content ?? null, now: () => this.now() });
+        envelope: record.envelope, approval: record.actionApprovals?.find(x => x.stepId === spec.id) ?? null, outputOf: stepId => this.store.output(id, stepId)?.content ?? null, now: () => this.now(), resolveRoot: (rootId: string) => this.resolveRoot(rootId) });
     } catch (error) { result = { ok: false, error: shortError(error), dispatched: true, definite: false }; }
     fault("after-effect");
     if (this.dead) return;

@@ -44,7 +44,7 @@ export type Rig = {
   close(): Promise<void>;
 };
 
-export async function rig(o: { services?: ServiceProvider | null; allowLoopback?: boolean; model?: ReturnType<typeof fakeModel>; uiAttached?: () => boolean; faults?: (point: FaultPoint, taskId: string) => void; now?: () => number } = {}): Promise<Rig> {
+export async function rig(o: { services?: ServiceProvider | null; allowLoopback?: boolean; model?: ReturnType<typeof fakeModel>; uiAttached?: () => boolean; faults?: (point: FaultPoint, taskId: string) => void; now?: () => number; call?: ModelCall; modelAvailable?: (m: string) => Promise<boolean> } = {}): Promise<Rig> {
   // Not os.tmpdir(): on Windows that is inside %LOCALAPPDATA%, which (correctly) can never be granted as a folder.
   mkdirSync(TEST_BASE, { recursive: true });
   const dir = mkdtempSync(join(TEST_BASE, "rig-")), data = join(dir, "data");
@@ -52,9 +52,11 @@ export async function rig(o: { services?: ServiceProvider | null; allowLoopback?
   const db = new HostDatabase(join(data, "host.sqlite"));
   const store = new TaskStore(db);
   const model = o.model ?? fakeModel();
+  const call = o.call ?? model.call;
+  const modelAvailable = o.modelAvailable ?? (async (m: string) => m === MODEL);
   let n = 0;
   const make = (connected: ConnectedActions, faults?: (point: FaultPoint, taskId: string) => void) => new PersistentTaskRuntime({
-    store, executors: [localGenerate, localReview, localTest, ...connected.executors], call: model.call, modelAvailable: async m => m === MODEL,
+    store, executors: [localGenerate, localReview, localTest, ...connected.executors], call, modelAvailable,
     uiAttached: o.uiAttached ?? (() => true), instanceId: `host-${++n}`, exclusive: true, now: o.now, faults, maintenanceMs: 60_000,
     onTerminal: id => void connected.browser.close(id).catch(() => undefined),
   });
@@ -79,7 +81,7 @@ export async function rig(o: { services?: ServiceProvider | null; allowLoopback?
   return r;
 }
 
-type Step = { id: string; kind: string; input?: Record<string, unknown>; model?: string };
+type Step = { id: string; kind: string; input?: Record<string, unknown>; model?: string | null };
 /** An envelope that grants exactly the step kinds used (the envelope caps capabilities at 16). */
 export const envelope = (steps: Step[], grants: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
   capabilities: [...new Set(steps.map(s => s.kind))], providers: ["ollama"], localOnly: true, models: [MODEL], projectScopes: ["p1"], sideEffects: false, background: false,
