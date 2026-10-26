@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { HostDatabase } from "../persistence.server.ts";
 import { scanCheckpointJson } from "../agent-checkpoint.server.ts";
 import { canonical, EnvelopeSchema, sha256, TASK_SCHEMA_VERSION, TASK_STATES, taskCanTransition, TaskSpecSchema, TERMINAL_TASK_STATES, type OperationCategory, type TaskRecord, type TaskState } from "./task-runtime.ts";
+import { ExecutionOutcomeRecordSchema, type ExecutionOutcomeRecord, isVerifiedSuccess } from "./outcome-measurement.ts";
 
 /**
  * MA4-S2-T1 durable task store: additive tables on the Host's own SQLite file. Every change is one BEGIN IMMEDIATE
@@ -86,6 +87,8 @@ export class TaskStore {
       CREATE TABLE IF NOT EXISTS ma4_task_outputs(task_id TEXT NOT NULL,step_id TEXT NOT NULL,sha256 TEXT NOT NULL,content TEXT NOT NULL,PRIMARY KEY(task_id,step_id));
       CREATE TABLE IF NOT EXISTS ma4_task_processes(task_id TEXT NOT NULL,pid INTEGER NOT NULL,created_at INTEGER NOT NULL,name TEXT NOT NULL,PRIMARY KEY(pid,created_at));
       CREATE TABLE IF NOT EXISTS ma4_task_notifications(key TEXT PRIMARY KEY,task_id TEXT NOT NULL,kind TEXT NOT NULL,text TEXT NOT NULL,at INTEGER NOT NULL,delivered INTEGER NOT NULL,acknowledged INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS ma4_task_outcomes(task_id TEXT PRIMARY KEY,project_id TEXT NOT NULL,task_class TEXT NOT NULL,status TEXT NOT NULL,verified INTEGER NOT NULL,model_calls INTEGER NOT NULL,tool_calls INTEGER NOT NULL,execution_ms INTEGER NOT NULL,record TEXT NOT NULL,created_at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS ma4_task_outcomes_project ON ma4_task_outcomes(project_id, created_at);
       INSERT OR IGNORE INTO migrations(key) VALUES('${TASK_RUNTIME_MIGRATION}');`);
     // Versioned schema: a database written by a newer runtime is refused rather than misread.
     const row = host.db.prepare("SELECT value FROM settings WHERE key='ma4_task_runtime_schema'").get() as { value: string } | undefined;
@@ -236,6 +239,49 @@ export class TaskStore {
   }
   acknowledge(key: string): boolean { return this.db.prepare("UPDATE ma4_task_notifications SET acknowledged=1 WHERE key=?").run(key).changes === 1; }
 
+  recordOutcome(outcome: ExecutionOutcomeRecord): void {
+    const verified = isVerifiedSuccess(outcome) ? 1 : 0;
+    this.db.prepare(`
+      INSERT OR REPLACE INTO ma4_task_outcomes (
+        task_id, project_id, task_class, status, verified, model_calls, tool_calls, execution_ms, record, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      outcome.taskId,
+      outcome.projectId,
+      outcome.taskClass,
+      outcome.status,
+      verified,
+      outcome.modelCallCount,
+      outcome.toolCallCount,
+      outcome.executionTimeMs,
+      JSON.stringify(outcome),
+      outcome.createdAt,
+    );
+  }
+
+  getOutcome(taskId: string): ExecutionOutcomeRecord | null {
+    const row = this.db.prepare("SELECT record FROM ma4_task_outcomes WHERE task_id = ?").get(taskId) as { record: string } | undefined;
+    if (!row) return null;
+    try {
+      return ExecutionOutcomeRecordSchema.parse(JSON.parse(row.record));
+    } catch {
+      return null;
+    }
+  }
+
+  listOutcomes(projectId?: string, limit = 100): ExecutionOutcomeRecord[] {
+    const rows = (projectId
+      ? this.db.prepare("SELECT record FROM ma4_task_outcomes WHERE project_id = ? ORDER BY created_at DESC LIMIT ?").all(projectId, limit)
+      : this.db.prepare("SELECT record FROM ma4_task_outcomes ORDER BY created_at DESC LIMIT ?").all(limit)) as { record: string }[];
+    const res: ExecutionOutcomeRecord[] = [];
+    for (const r of rows) {
+      try {
+        res.push(ExecutionOutcomeRecordSchema.parse(JSON.parse(r.record)));
+      } catch {}
+    }
+    return res;
+  }
+
   policy(): TaskPolicy {
     const row = this.db.prepare("SELECT value FROM settings WHERE key='ma4_task_policy_v1'").get() as { value: string } | undefined;
     // Unreadable policy fails closed to the defaults (no background work, no automatic resume).
@@ -260,7 +306,7 @@ export class TaskStore {
     const doomed = terminal.filter((t, i) => i >= RETAIN_TERMINAL_TASKS || t.updated_at < now - RETAIN_TERMINAL_MS).map(t => t.id);
     if (!doomed.length) return 0;
     this.tx(() => {
-      for (const id of doomed) for (const table of ["ma4_task_transitions", "ma4_task_operations", "ma4_task_checkpoints", "ma4_task_outputs", "ma4_task_notifications", "ma4_task_processes", "ma4_tasks"])
+      for (const id of doomed) for (const table of ["ma4_task_transitions", "ma4_task_operations", "ma4_task_checkpoints", "ma4_task_outputs", "ma4_task_notifications", "ma4_task_processes", "ma4_task_outcomes", "ma4_tasks"])
         this.db.prepare(`DELETE FROM ${table} WHERE ${table === "ma4_tasks" ? "id" : "task_id"}=?`).run(id);
     });
     return doomed.length;

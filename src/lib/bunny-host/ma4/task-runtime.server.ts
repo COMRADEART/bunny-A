@@ -8,6 +8,9 @@ import { gateCalls, coordinatorChannel, type CoordinatorChannel } from "./coordi
 import type { S2Role } from "./collaboration.ts";
 import type { ModelCall } from "./coding-workflow.server.ts";
 import { approvalRequired, canonical, EnvelopeSchema, sha256, TaskSpecSchema, taskView, TERMINAL_TASK_STATES, validateTask, type ActionApproval, type ActionProposal, type BlockCode, type CorruptTaskView, type Envelope, type ExecutorFacts, type TaskFailureCode, type TaskRecord, type TaskState, type TaskView } from "./task-runtime.ts";
+import { createOutcomeRecord, classifyOutcomeStatus, type FailureTaxonomy } from "./outcome-measurement.ts";
+import { classifyErrorToTaxonomy } from "./failure-recovery.ts";
+import type { ComplexityClass } from "./s3t1.ts";
 import { StaleLeaseError, TaskConflictError, type Lease, type NotificationKind, type ProcessIdentity, type TaskPolicy, type TaskStore, type Update, type Updated } from "./task-store.server.ts";
 
 /**
@@ -162,9 +165,101 @@ export class PersistentTaskRuntime {
     const result = this.store.update(id, { ...change, notify });
     for (const n of result.notified) if (n.delivered) this.emit("ptask.notification", `${n.kind}: ${n.text}`, id);
     this.emit("ptask.changed", `${result.record.spec.title}: ${result.record.state}`, id);
-    if (TERMINAL_TASK_STATES.includes(result.record.state)) try { this.deps.onTerminal?.(id); } catch { /* cleanup never blocks a commit */ }
+    if (TERMINAL_TASK_STATES.includes(result.record.state)) {
+      try { this.recordTerminalOutcome(result.record); } catch { /* outcome recording never blocks a commit */ }
+      try { this.deps.onTerminal?.(id); } catch { /* cleanup never blocks a commit */ }
+    }
     return result;
   }
+  private recordTerminalOutcome(record: TaskRecord): void {
+    try {
+      const ops = this.store.operations(record.id);
+      const transitions = this.store.transitions(record.id);
+      const facts = this.facts();
+
+      let taskClass: ComplexityClass = "C2";
+      if (record.spec.steps.length === 0) taskClass = "C0";
+      else if (record.spec.steps.length === 1 && !facts.get(record.spec.steps[0].kind)?.gpu) taskClass = "C1";
+      else if (record.spec.steps.some(s => s.kind === "local.test" || s.kind === "local.review")) taskClass = "C3";
+
+      const testReceipts: string[] = [];
+      for (const op of ops) {
+        if (op.receipt) testReceipts.push(op.receipt);
+      }
+      const exitCodes = record.steps.some(s => s.state === "failed") ? [1] : [0];
+      const verifiedArtifactHashes = record.steps.flatMap(s => s.outputSha256 && s.state === "succeeded" ? [s.outputSha256] : []);
+
+      const contractMet = record.state === "COMPLETED" && record.spec.acceptance.requiredSteps.every(s => record.steps.find(x => x.id === s)?.state === "succeeded");
+      const status = classifyOutcomeStatus({
+        terminalState: record.state,
+        contractMet,
+        failureCode: record.failure?.code,
+        uncertainOperation: record.uncertainOperation,
+        cancelled: record.controls.cancelRequested || record.state === "CANCELLED",
+      });
+
+      let failureTaxonomy: FailureTaxonomy | null = null;
+      if (record.failure?.code) {
+        failureTaxonomy = classifyErrorToTaxonomy(`${record.failure.code}: ${record.failure.detail}`);
+      } else if (record.state === "UNCERTAIN") {
+        failureTaxonomy = "UNCERTAIN_IRREVERSIBLE";
+      } else if (record.state === "CANCELLED" || record.controls.cancelRequested) {
+        failureTaxonomy = "CANCELLATION";
+      }
+
+      let queueTimeMs = 0;
+      const claimedTrans = transitions.find(t => t.to === "RUNNING");
+      if (claimedTrans) {
+        queueTimeMs = Math.max(0, claimedTrans.at - record.createdAt);
+      }
+
+      const outcome = createOutcomeRecord({
+        taskId: record.id,
+        projectId: record.projectId,
+        taskClass,
+        taskText: record.spec.title,
+        acceptanceContract: `${record.spec.acceptance.description}\n${record.spec.acceptance.requiredSteps.join(", ")}`,
+        approvedModel: { id: record.envelope.models[0] ?? "local-default", digest: null },
+        observedModel: { id: record.envelope.models[0] ?? "local-default", digest: null },
+        rolesInvoked: ["Worker", ...(record.spec.steps.some(s => s.kind === "local.test") ? ["Tester" as const] : []), ...(record.spec.steps.some(s => s.kind === "local.review") ? ["Reviewer" as const] : []), ...(record.spec.steps.some(s => s.kind.includes("plan")) ? ["Planner" as const] : [])],
+        modelCallCount: record.usage.modelCalls,
+        toolCallCount: record.spec.steps.filter(s => facts.get(s.kind)?.sideEffect || !facts.get(s.kind)?.gpu).length,
+        planningAttempts: record.spec.steps.filter(s => s.kind.includes("plan")).length,
+        executionAttempts: record.steps.reduce((acc, s) => acc + s.attempts, 0),
+        verifiedArtifactHashes,
+        testProcessReceipts: testReceipts,
+        status,
+        failureTaxonomy,
+        queueTimeMs,
+        executionTimeMs: record.usage.workMs,
+        hostVerified: {
+          testReceipts,
+          exitCodes,
+          fileModifications: ops.filter(o => o.category === "irreversible" || o.category === "idempotent").map(o => o.stepId),
+          stateTransitions: transitions.map(t => `${t.from ?? "none"}->${t.to}`),
+          completedContracts: contractMet,
+          permissionsGranted: [...record.envelope.projectScopes],
+        },
+        modelGenerated: {
+          plans: [],
+          summaries: [],
+          proposedRepairs: [],
+          confidenceSelfReported: null,
+        },
+        userFeedback: {
+          rating: null,
+          corrections: [],
+          accepted: null,
+        },
+        now: this.now(),
+      });
+
+      this.store.recordOutcome(outcome);
+    } catch {
+      // outcome recording failure must not throw
+    }
+  }
+
   private note(kind: NotificationKind, record: TaskRecord, text: string, discriminator = ""): NonNullable<Update["notify"]>[number] {
     return { key: `${record.id}:${kind}${discriminator ? `:${discriminator}` : ""}`, kind, text: `${record.spec.title}: ${text}`, deliver: true };
   }
