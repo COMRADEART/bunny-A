@@ -55,23 +55,63 @@ export function planSchedule(pins: Record<AgentRole, string>, resources: { vramG
 }
 
 /**
- * Bounded model-call gate: at most `maxConcurrent` calls in flight, a per-call timeout, cancellation. It records peak
- * concurrency and model switches so the schedule's effect is measured, not assumed.
+ * Bounded model-call gate: at most `maxConcurrent` calls in flight, a per-call timeout, cancellation.
+ * It records peak concurrency and model switches so the schedule's effect is measured, not assumed.
+ * MA4-S3-T4: wait states handle abort/cancellation immediately without slot acquisition or model-switch side effects.
  */
 export function gateCalls(call: ModelCall, limits: { maxConcurrent: number; timeoutMs: number }) {
   let active = 0, peak = 0, switches = 0, last: string | null = null;
-  const waiting: (() => void)[] = [];
+  type Waiter = { resolve: () => void; reject: (err: unknown) => void; signal: AbortSignal; onAbort?: () => void };
+  const waiting: Waiter[] = [];
+
+  const wakeNext = () => {
+    while (waiting.length > 0) {
+      const next = waiting.shift()!;
+      if (next.onAbort) next.signal.removeEventListener("abort", next.onAbort);
+      if (!next.signal.aborted) {
+        next.resolve();
+        return;
+      }
+    }
+  };
+
   const gated: ModelCall = async request => {
+    const started = Date.now();
     if (request.signal.aborted) return { ok: false, error: "Stopped.", stopped: true, durationMs: 0 };
-    if (active >= limits.maxConcurrent) await new Promise<void>(resolve => waiting.push(resolve));
+    if (active >= limits.maxConcurrent) {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const waiter: Waiter = { resolve, reject, signal: request.signal };
+          const onAbort = () => {
+            const idx = waiting.indexOf(waiter);
+            if (idx >= 0) waiting.splice(idx, 1);
+            reject(new Error("Stopped."));
+          };
+          waiter.onAbort = onAbort;
+          request.signal.addEventListener("abort", onAbort, { once: true });
+          waiting.push(waiter);
+        });
+      } catch {
+        return { ok: false, error: "Stopped.", stopped: true, durationMs: Date.now() - started };
+      }
+    }
+    if (request.signal.aborted) {
+      wakeNext();
+      return { ok: false, error: "Stopped.", stopped: true, durationMs: Date.now() - started };
+    }
     active++; peak = Math.max(peak, active);
     if (last !== null && last !== request.model) switches++;
     last = request.model;
     const timeout = AbortSignal.timeout(limits.timeoutMs);
     try { return await call({ ...request, signal: AbortSignal.any([request.signal, timeout]) }); }
-    finally { active--; waiting.shift()?.(); }
+    finally { active--; wakeNext(); }
   };
-  return { call: gated, stats: () => ({ peakConcurrent: peak, modelSwitches: switches }) };
+  return {
+    call: gated,
+    stats: () => ({ peakConcurrent: peak, modelSwitches: switches }),
+    waitingCount: () => waiting.length,
+    activeCount: () => active,
+  };
 }
 
 /**
