@@ -24,7 +24,9 @@ Local test logs are under the ignored `test-results/ma4/t5r1` directory. The
 native preview is an incomplete development artifact and is not a replacement
 for the existing application.
 
-The full local regression has reported a worker lifecycle timeout. The same
-isolated worker test also timed out on the untouched `08a22c5` baseline in this
-environment. Its cause has not been established; local full-regression success
-is not claimed.
+The full local regression failed six tests when an isolated copy of Node lacked
+its bundled npm CLI. The same worker test also failed on the untouched
+`08a22c5` baseline with that incomplete runtime. After restoring the matching
+npm CLI beside the isolated Node executable, all six failed tests passed in
+targeted reruns. A fresh full-suite rerun is still required; local full-regression
+success is not claimed.
