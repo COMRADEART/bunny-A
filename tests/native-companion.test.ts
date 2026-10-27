@@ -47,52 +47,18 @@ test("Android Companion 3: Consequential approvals are refused to mobile compani
   assert.equal(APPROVAL_ON_HOST, "Approval required on Windows Host.");
 });
 
-test("Android Companion 4: 300-ms polling loop is distinguished from streaming", () => {
-  const POLLING_INTERVAL_MS = 300;
-  const pollTimestamps = [0, 305, 610, 915, 1220];
-  const intervals: number[] = [];
-  for (let i = 1; i < pollTimestamps.length; i++) {
-    intervals.push(pollTimestamps[i] - pollTimestamps[i - 1]);
-  }
-  const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-  assert.ok(Math.abs(avgInterval - POLLING_INTERVAL_MS) < 50, "Average interval must match 300ms polling contract");
-  assert.notEqual(avgInterval, 0, "Polling intervals are discrete, not continuous streaming");
-});
+// R1R2: former tests 4–7 were removed. 4–6 asserted on local variables (no product code ran); 7 was a source regex.
+// Keystore erasure is now exercised against real java.security.KeyStore behaviour in android/tests/KeystoreErasureTest.java
+// (run by scripts/build-android.ps1 in CI). Physical Android Keystore deletion remains NOT TESTED.
 
-test("Android Companion 5: Device revocation invalidates session credentials", () => {
-  const device = { id: "dev-phone-1", revokedAt: null as number | null };
-  assert.equal(device.revokedAt, null, "Device starts active");
-  device.revokedAt = Date.now();
-  assert.ok(device.revokedAt > 0, "Device is marked revoked");
-  const isAuthenticated = device.revokedAt === null;
-  assert.equal(isAuthenticated, false, "Revoked device is no longer authenticated");
-});
-
-test("Android Companion 6: Device cancellation halts active task without orphan execution", () => {
-  let taskState = "running";
-  const cancelFromDevice = (actor: string) => {
-    assertDeviceAction("stop");
-    taskState = "stopped";
-  };
-  cancelFromDevice("device");
-  assert.equal(taskState, "stopped", "Device cancellation cleanly sets stopped state");
-});
-
-test("Android Companion 7: Keystore erasure contract removes both preferences and Keystore entry", () => {
-  const storeSource = readFileSync(join(process.cwd(), "android/app/src/main/java/com/routeragent/jev/NativeSessionStore.java"), "utf8");
-  assert.match(storeSource, /KeyStore\.getInstance\("AndroidKeyStore"\)/, "Must access AndroidKeyStore");
-  assert.match(storeSource, /store\.deleteEntry\(ALIAS\)/, "Must explicitly call deleteEntry to erase key from Keystore");
-  assert.match(storeSource, /preferences\.edit\(\)\.remove\("session"\)/, "Must remove session preferences");
-});
-
-test("Android Companion 8: WebView launcher is preserved for upgrade compatibility", () => {
+test("Android Companion 8 (source check): WebView launcher is declared in the manifest", () => {
   const manifest = readFileSync(join(process.cwd(), "android/app/src/main/AndroidManifest.xml"), "utf8");
   assert.match(manifest, /MainActivity/, "MainActivity must exist in manifest");
   assert.match(manifest, /android\.intent\.action\.MAIN/, "Main action intent-filter must be present");
   assert.match(manifest, /NativeCompanionActivity/, "NativeCompanionActivity must be registered");
 });
 
-test("Android Companion 9: Native companion client rejects unencrypted plaintext storage", () => {
+test("Android Companion 9 (source check): session storage source uses AES/GCM and no plaintext token key", () => {
   const storeSource = readFileSync(join(process.cwd(), "android/app/src/main/java/com/routeragent/jev/NativeSessionStore.java"), "utf8");
   assert.match(storeSource, /AES\/GCM\/NoPadding/, "Must use AES/GCM encryption for stored session tokens");
   assert.doesNotMatch(storeSource, /preferences\.edit\(\)\.putString\("token"/, "Plaintext token must never be written to SharedPreferences");

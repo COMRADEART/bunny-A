@@ -572,7 +572,9 @@ public final class NativeCompanionActivity extends Activity {
                 .setTitle("Forget this device?")
                 .setMessage("Removes local credentials from Android Keystore.")
                 .setNegativeButton("Keep",null).setPositiveButton("Forget",(dialog,which) -> {
-                    if(store.clear()){session=null;pairing(null);}
+                    boolean cleared=store.clear();
+                    session=null;
+                    pairing(cleared ? null : "This phone could not confirm erasing its local key. Clear Bunny A's app data in Android Settings to finish.");
                 }).show()),12);
     }
 
@@ -586,7 +588,7 @@ public final class NativeCompanionActivity extends Activity {
                 boolean cleared=store.clear();
                 post(() -> {
                     session=null;
-                    pairing(cleared ? "Device revoked and unpaired successfully." : "Revocation confirmed on Host.");
+                    pairing(cleared ? "Device revoked and unpaired successfully." : "Revoked on the workstation, but this phone could not confirm erasing its local key. Clear Bunny A's app data in Android Settings.");
                 });
             } catch(Exception ex){
                 post(() -> {

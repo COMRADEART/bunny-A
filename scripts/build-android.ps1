@@ -64,6 +64,8 @@ $helperSources = @(Get-ChildItem -LiteralPath (Join-Path $workspace 'android/too
 Run-Checked 'javac' (@('-encoding','UTF-8','-classpath',$apksig,'-d',$helpers) + $helperSources)
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/ServerAddress.java'),(Join-Path $workspace 'android/tests/ServerAddressTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ServerAddressTest')
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/KeystoreErasure.java'),(Join-Path $workspace 'android/tests/KeystoreErasureTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.KeystoreErasureTest')
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/NativeCookiePolicy.java'),(Join-Path $workspace 'android/tests/NativeCookiePolicyTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.NativeCookiePolicyTest')
 $unsigned = Join-Path $buildDirectory 'unsigned.apk'
