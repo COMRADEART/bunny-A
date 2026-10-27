@@ -23,3 +23,8 @@ into a public endpoint or bypass the Action Broker.
 Local test logs are under the ignored `test-results/ma4/t5r1` directory. The
 native preview is an incomplete development artifact and is not a replacement
 for the existing application.
+
+The full local regression has reported a worker lifecycle timeout. The same
+isolated worker test also timed out on the untouched `08a22c5` baseline in this
+environment. Its cause has not been established; local full-regression success
+is not claimed.
