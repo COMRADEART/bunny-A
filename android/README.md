@@ -7,12 +7,12 @@ On first launch, enter the computer's HTTPS origin. No remote address is embedde
 in the APK. Bunny-A and Ollama run on the computer; model weights are not included.
 This app cannot turn a remote-desktop connection into an HTTPS tunnel.
 
-The client saves only the connection origin in private preferences and keeps
-web task history in its own WebView storage. It does not sync desktop history.
-It requests only Internet access. Cleartext traffic, mixed content, file/content
+The legacy client saves the connection origin in private preferences and keeps
+web task history in its own WebView storage. The native preview stores its paired
+device credential encrypted with Android Keystore; see `NATIVE_PREVIEW.md`.
+The manifest requests Internet and notification permissions. Cleartext traffic, mixed content, file/content
 access and third-party cookies are disabled; invalid certificates are rejected.
-There is no JavaScript-to-native bridge. Browser-initiated HTTPS sign-in redirects
-can remain in the WebView; user-selected external links open the system browser.
+There is no JavaScript-to-native bridge. Cross-origin navigation and network resources are blocked in the legacy WebView. Tunnel sign-in that depends on an embedded cross-origin redirect is therefore not supported by this draft. No JavaScript-to-native notification bridge is attached.
 
 ## Build
 

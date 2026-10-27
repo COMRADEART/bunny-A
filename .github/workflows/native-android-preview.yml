@@ -1,0 +1,32 @@
+name: native-android-preview
+
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'scripts/build-android.ps1'
+      - 'scripts/prepare-android-native-tools.ps1'
+      - '.github/workflows/native-android-preview.yml'
+  push:
+    branches: ['codex/ma4-s3-t5-native-android']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build native Android preview
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21.0.11'
+      - name: Prepare verified Android build tools
+        shell: pwsh
+        run: ./scripts/prepare-android-native-tools.ps1
+      - name: Build and verify development APK
+        shell: pwsh
+        run: ./scripts/build-android.ps1

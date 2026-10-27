@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiBunnyEventsRouteImport } from './routes/api/bunny-events'
+import { Route as ApiBunnyNativeV1StateRouteImport } from './routes/api/bunny-native-v1-state'
 import { Route as ApiBunnyPairRouteImport } from './routes/api/bunny-pair'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const ApiBunnyEventsRoute = ApiBunnyEventsRouteImport.update({
   path: '/api/bunny-events',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBunnyNativeV1StateRoute = ApiBunnyNativeV1StateRouteImport.update({
+  id: '/api/bunny-native-v1-state',
+  path: '/api/bunny-native-v1-state',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBunnyPairRoute = ApiBunnyPairRouteImport.update({
   id: '/api/bunny-pair',
   path: '/api/bunny-pair',
@@ -32,30 +38,41 @@ const ApiBunnyPairRoute = ApiBunnyPairRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/bunny-events': typeof ApiBunnyEventsRoute
+  '/api/bunny-native-v1-state': typeof ApiBunnyNativeV1StateRoute
   '/api/bunny-pair': typeof ApiBunnyPairRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/bunny-events': typeof ApiBunnyEventsRoute
+  '/api/bunny-native-v1-state': typeof ApiBunnyNativeV1StateRoute
   '/api/bunny-pair': typeof ApiBunnyPairRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/bunny-events': typeof ApiBunnyEventsRoute
+  '/api/bunny-native-v1-state': typeof ApiBunnyNativeV1StateRoute
   '/api/bunny-pair': typeof ApiBunnyPairRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/bunny-events' | '/api/bunny-pair'
+  fullPaths:
+    '/' | '/api/bunny-events' | '/api/bunny-native-v1-state' | '/api/bunny-pair'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/bunny-events' | '/api/bunny-pair'
-  id: '__root__' | '/' | '/api/bunny-events' | '/api/bunny-pair'
+  to:
+    '/' | '/api/bunny-events' | '/api/bunny-native-v1-state' | '/api/bunny-pair'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/bunny-events'
+    | '/api/bunny-native-v1-state'
+    | '/api/bunny-pair'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiBunnyEventsRoute: typeof ApiBunnyEventsRoute
+  ApiBunnyNativeV1StateRoute: typeof ApiBunnyNativeV1StateRoute
   ApiBunnyPairRoute: typeof ApiBunnyPairRoute
 }
 
@@ -75,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBunnyEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/bunny-native-v1-state': {
+      id: '/api/bunny-native-v1-state'
+      path: '/api/bunny-native-v1-state'
+      fullPath: '/api/bunny-native-v1-state'
+      preLoaderRoute: typeof ApiBunnyNativeV1StateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/bunny-pair': {
       id: '/api/bunny-pair'
       path: '/api/bunny-pair'
@@ -88,6 +112,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiBunnyEventsRoute: ApiBunnyEventsRoute,
+  ApiBunnyNativeV1StateRoute: ApiBunnyNativeV1StateRoute,
   ApiBunnyPairRoute: ApiBunnyPairRoute,
 }
 export const routeTree = rootRouteImport

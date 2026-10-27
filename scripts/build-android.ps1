@@ -22,6 +22,23 @@ $keytool = Join-Path $jdkRoot 'bin/keytool.exe'
 foreach ($required in @($platformJar,$aapt,$apksig,$r8)) {
   if (-not (Test-Path -LiteralPath $required)) { throw ('Missing Android build tool: '+$required) }
 }
+$toolchain = Get-Content -LiteralPath (Join-Path $workspace 'android/native-preview-toolchain.json') -Raw | ConvertFrom-Json
+if ($toolchain.schema -ne 'bunny-android-preview-toolchain.v1') { throw 'Unexpected Android toolchain lock schema.' }
+$javaVersionLine = $javaReport | Select-String '^\s*java.version\s*='
+$actualJavaVersion = ($javaVersionLine.ToString() -split '=',2)[1].Trim()
+if ($actualJavaVersion -ne $toolchain.javaVersion) { throw ('Java version does not match the Android toolchain lock: ' + $actualJavaVersion) }
+try {
+  $ErrorActionPreference = 'Continue'
+  $javacVersion = (& javac -version 2>&1 | Out-String).Trim()
+  $javacExit = $LASTEXITCODE
+} finally { $ErrorActionPreference = $previousErrorPreference }
+if ($javacExit -ne 0 -or $javacVersion -ne ('javac ' + $toolchain.javaVersion)) { throw ('javac version does not match the Android toolchain lock: ' + $javacVersion) }
+$hashes = @{ androidJar=$platformJar; r8Jar=$r8; apksigJar=$apksig; aapt2Exe=$aapt }
+foreach ($name in $hashes.Keys) {
+  $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $hashes[$name]).Hash.ToLowerInvariant()
+  if ($actual -ne $toolchain.sha256.$name) { throw ('Android build tool hash mismatch: '+$name) }
+}
+
 function Run-Checked([string]$Program,[string[]]$Arguments) {
   & $Program @Arguments
   if ($LASTEXITCODE -ne 0) { throw ('Build command failed: '+$Program) }
@@ -47,6 +64,8 @@ $helperSources = @(Get-ChildItem -LiteralPath (Join-Path $workspace 'android/too
 Run-Checked 'javac' (@('-encoding','UTF-8','-classpath',$apksig,'-d',$helpers) + $helperSources)
 Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/ServerAddress.java'),(Join-Path $workspace 'android/tests/ServerAddressTest.java'))
 Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.ServerAddressTest')
+Run-Checked 'javac' @('--release','8','-d',$tests,(Join-Path $sourceDirectory 'java/com/routeragent/jev/NativeCookiePolicy.java'),(Join-Path $workspace 'android/tests/NativeCookiePolicyTest.java'))
+Run-Checked 'java' @('-cp',$tests,'com.routeragent.jev.NativeCookiePolicyTest')
 $unsigned = Join-Path $buildDirectory 'unsigned.apk'
 Run-Checked 'java' @('-cp',$helpers,'PackageApk',$resourceApk,(Join-Path $dex 'classes.dex'),$unsigned)
 $signingDirectory = Join-Path $tools 'signing'
