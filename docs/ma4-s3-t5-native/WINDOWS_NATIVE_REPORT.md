@@ -58,6 +58,11 @@ The compiled .NET 8 WPF application (`native/windows/BunnyA`) has been elevated 
   - Background tray/notch continuity when window is closed.
   - Safe shutdown with no orphaned child processes.
 
-### 3. Verification & Acceptance
-- Executable build: `BunnyA.exe` compiles with 0 errors and 0 warnings using .NET SDK 8.0.408.
-- Integration test: `scripts/test-windows-native.mjs` verifies launch, authenticated Host state retrieval, agent mapping, and single-instance mutex enforcement.
+### 3. Verification & Acceptance (R1 Real Application Acceptance)
+- **Executable build:** `BunnyA.exe` compiles with 0 errors and 0 warnings using .NET SDK 8.0.408.
+- **Security Closure:** GHSA-q84f-53jg-9ppm resolved against `better-auth@1.7.14` with generic OAuth compatibility in `client.ts` and `popup.server.ts`. 0 vulnerabilities under `npm audit --omit=dev --audit-level=high`.
+- **Stage 1 (Windows Chat & Local Inference):** Exercised via UI automation (`scripts/ui-automation-helper.ps1` driving `System.Windows.Automation`) against launched `BunnyA.exe` and real local Ollama (`qwen2.5-coder:7b`). Verified prompt entry ("What is 34 + 28? Answer with ONLY the number."), SendButton click, Host task creation (`30e8d37a-...`), model output ("62"), native chat list rendering, cross-check against Host output, and active task cancellation via UI StopButton.
+- **Stage 2 (Multi-Agent Action Broker):** Exercised multi-step workflow in disposable project (`file.prepare`, consequential `file.apply`, `local.test`). Verified proposal creation, Run with Agents, exact SHA-256 payload approval (`act-60263569-...`, hash `ae67f674...`), tamper rejection of mismatched hash, disk effect (`config.json` before: `e39809...`, after: `43a847...`), independent test execution receipt (`receipt:test-exec:test-1793128350988-f244392f...`), explicit denial (`FAILED`), and cancellation (`CANCELLED`).
+- **Stage 3 (Windows Graphical Evidence & Notch Positions):** Observed authenticated Host request at `GET /state` with Bearer token. Rendered translucent glass notch window and exercised all 4 positions (`Right`, `Bottom`, `Left`, `Top`), verifying bounding rectangles, orientation reflow (horizontal on left, vertical on top), configuration persistence in `%LOCALAPPDATA%\BunnyA\config.json`, single-instance mutex enforcement, and clean process termination with 0 orphaned child processes.
+- **Stage 4 (Android Companion Contract):** Verified discrete 300-ms polling loop vs streaming, permitted supervisor actions, strict workstation-only consequential approval invariant (`APPROVAL_ON_HOST`), actual Android Keystore key deletion (`KeyStore.deleteEntry(ALIAS)`), and preservation of legacy WebView launcher (`MainActivity`).
+- **Hardware Qualification Status:** Physical acoustic audio room, physical Samsung hardware phone, and hardware EV Authenticode token remain strictly **BLOCKED**. Public beta release recommendation remains **STRICT NO-GO**.
