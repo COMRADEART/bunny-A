@@ -185,10 +185,19 @@ export class PersistentTaskRuntime {
       else if (record.spec.steps.some(s => s.kind === "local.test" || s.kind === "local.review")) taskClass = "C3";
 
       const testReceipts: string[] = [];
+      const toolReceipts: string[] = [];
       for (const op of ops) {
-        if (op.receipt) testReceipts.push(op.receipt);
+        if (op.receipt) {
+          if (op.receipt.startsWith("receipt:test-exec:")) {
+            testReceipts.push(op.receipt);
+          } else {
+            toolReceipts.push(op.receipt);
+          }
+        }
       }
-      const exitCodes = record.steps.some(s => s.state === "failed") ? [1] : [0];
+      const exitCodes = testReceipts.length > 0
+        ? (record.steps.some(s => s.state === "failed") ? [1] : [0])
+        : [];
       const verifiedArtifactHashes = record.steps.flatMap(s => s.outputSha256 && s.state === "succeeded" ? [s.outputSha256] : []);
 
       const contractMet = record.state === "COMPLETED" && record.spec.acceptance.requiredSteps.every(s => record.steps.find(x => x.id === s)?.state === "succeeded");
@@ -225,6 +234,12 @@ export class PersistentTaskRuntime {
         const executor = specStep ? facts.get(specStep.kind) : undefined;
         return s.attempts > 0 && (executor?.sideEffect || !executor?.gpu);
       }).length;
+      let evidenceCategory: "oracle_validation" | "tool_execution" | "process_test" = "oracle_validation";
+      if (testReceipts.length > 0) {
+        evidenceCategory = "process_test";
+      } else if (actualToolCount > 0 || toolReceipts.length > 0) {
+        evidenceCategory = "tool_execution";
+      }
 
       const rolesInvoked: S2Role[] = [];
       if (record.steps.some(s => s.attempts > 0 && (specMap.get(s.id)?.kind === "local.generate" || specMap.get(s.id)?.kind === "file.read"))) rolesInvoked.push("Worker");
@@ -259,6 +274,8 @@ export class PersistentTaskRuntime {
           stateTransitions: transitions.map(t => `${t.from ?? "none"}->${t.to}`),
           completedContracts: contractMet,
           permissionsGranted: [...record.envelope.projectScopes],
+          evidenceCategory,
+          toolExecutionReceipts: toolReceipts,
         },
         modelGenerated: {
           plans: [],
