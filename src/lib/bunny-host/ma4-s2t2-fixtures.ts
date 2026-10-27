@@ -57,7 +57,8 @@ export async function rig(o: { services?: ServiceProvider | null; allowLoopback?
   let n = 0;
   const make = (connected: ConnectedActions, faults?: (point: FaultPoint, taskId: string) => void) => new PersistentTaskRuntime({
     store, executors: [localGenerate, localReview, localTest, ...connected.executors], call, modelAvailable,
-    uiAttached: o.uiAttached ?? (() => true), instanceId: `host-${++n}`, exclusive: true, now: o.now, faults, maintenanceMs: 60_000,
+    // The heartbeat must renew the 30 s lease while a slow real-time step runs (a cold browser launch can exceed 30 s).
+    uiAttached: o.uiAttached ?? (() => true), instanceId: `host-${++n}`, exclusive: true, now: o.now, faults, maintenanceMs: 10_000,
     onTerminal: id => connected.browser.close(id),
   });
   const connected = connectedActions({ db, dataDirectory: data, protectedPaths: [data], allowLoopback: o.allowLoopback ?? false, services: o.services ?? null });
