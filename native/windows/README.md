@@ -17,7 +17,10 @@ The offline state and Refresh button have been observed in an actual WPF window.
 A separate run connected to an authenticated disposable Host and displayed its
 task snapshot. Selecting Cancel in the WPF window cancelled a controlled test
 task; the Host confirmed `CANCELLED`. The Host used an isolated database and a
-fixture executor, with no model invocation.
+fixture executor, with no model invocation. The preview polls the Host every
+three seconds; in this fixture run, selection remained on an unchanged task
+across a refresh and cancellation updated the displayed state. Polling and
+keyboard focus have not undergone full accessibility qualification.
 Accessibility and installation/upgrade have not been qualified. Do not replace
 the existing Island or launcher with this preview. All consumer release gates
 remain open.

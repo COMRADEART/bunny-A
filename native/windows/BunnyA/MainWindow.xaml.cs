@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace BunnyA;
 
@@ -18,14 +19,17 @@ public partial class MainWindow : Window
     }
     private sealed record Credentials(int Port, string Token);
     private readonly HttpClient client = new(new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false }) { Timeout = TimeSpan.FromSeconds(5) };
+    private readonly DispatcherTimer refreshTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+    private readonly CancellationTokenSource lifetime = new();
     private string? hostId, hostEpoch;
-    private bool busy;
+    private bool busy, closed, needsReview;
 
     public MainWindow()
     {
         InitializeComponent();
-        Loaded += async (_, _) => await RefreshAsync();
-        Closed += (_, _) => client.Dispose();
+        refreshTimer.Tick += async (_, _) => { if (!busy && !needsReview) await RefreshAsync(); };
+        Loaded += async (_, _) => { await RefreshAsync(); if (!closed) refreshTimer.Start(); };
+        Closed += (_, _) => { closed = true; refreshTimer.Stop(); lifetime.Cancel(); client.Dispose(); lifetime.Dispose(); };
     }
     private static async Task<Credentials> ReadCredentialsAsync()
     {
@@ -51,15 +55,16 @@ public partial class MainWindow : Window
         CancelButton.IsEnabled = !value && hostId is not null && hostEpoch is not null && Tasks.SelectedItem is TaskRow { CanCancel: true };
     }
     private void Tasks_SelectionChanged(object sender, SelectionChangedEventArgs e) => SetBusy(busy);
-    private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshAsync();
-    private async Task RefreshAsync()
+    private async void Refresh_Click(object sender, RoutedEventArgs e) { needsReview = false; await RefreshAsync(); }
+    private async Task RefreshAsync(bool force = false)
     {
+        if (closed || (busy && !force)) return;
         SetBusy(true);
         try
         {
             var credentials = await ReadCredentialsAsync();
             using var request = Request(HttpMethod.Get, credentials, "/state");
-            using var response = await client.SendAsync(request);
+            using var response = await client.SendAsync(request, lifetime.Token);
             response.EnsureSuccessStatusCode();
             using var state = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
             var identity = state.RootElement.GetProperty("hostIdentity");
@@ -79,20 +84,31 @@ public partial class MainWindow : Window
                 if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(status)) throw new InvalidOperationException("Invalid task snapshot.");
                 rows.Add(new TaskRow(id, title ?? "Task", status));
             }
+            if (closed) return;
+            var sameHost = hostId == newHostId && hostEpoch == newEpoch;
+            var selectedId = sameHost ? (Tasks.SelectedItem as TaskRow)?.Id : null;
+            var unchanged = sameHost && (rows.Count == 0
+                ? Tasks.Items.Count == 1 && Tasks.Items[0] is string message && message == "No tasks in the current Host snapshot."
+                : Tasks.Items.Count == rows.Count && Tasks.Items.Cast<object>().SequenceEqual(rows.Cast<object>()));
             hostId = newHostId; hostEpoch = newEpoch;
-            Tasks.Items.Clear();
-            foreach (var row in rows) Tasks.Items.Add(row);
-            if (rows.Count == 0) Tasks.Items.Add("No tasks in the current Host snapshot.");
+            if (!unchanged)
+            {
+                Tasks.Items.Clear();
+                foreach (var row in rows) Tasks.Items.Add(row);
+                if (selectedId is not null) Tasks.SelectedItem = rows.Find(row => row.Id == selectedId);
+                if (rows.Count == 0) Tasks.Items.Add("No tasks in the current Host snapshot.");
+            }
             ConnectionStatus.Text = "Connected to the local Host";
         }
         catch (Exception ex) when (ExpectedFailure(ex))
         {
+            if (closed) return;
             hostId = null; hostEpoch = null;
             Tasks.Items.Clear();
             Tasks.Items.Add("Tasks are unavailable until the Host connects.");
             ConnectionStatus.Text = "Host unavailable. Check the workstation connection and try again.";
         }
-        finally { SetBusy(false); }
+        finally { if (!closed) SetBusy(false); }
     }
     private async void Cancel_Click(object sender, RoutedEventArgs e)
     {
@@ -104,16 +120,18 @@ public partial class MainWindow : Window
             var credentials = await ReadCredentialsAsync();
             using var request = Request(HttpMethod.Post, credentials, "/command");
             request.Content = JsonContent.Create(new { action = "ptask.cancel", data = new { id = selected.Id }, expect = new { hostId = expectedHost, epoch = expectedEpoch }, operationId = Guid.NewGuid().ToString() });
-            using var response = await client.SendAsync(request);
+            using var response = await client.SendAsync(request, lifetime.Token);
             response.EnsureSuccessStatusCode();
-            await RefreshAsync();
+            await RefreshAsync(force: true);
         }
         catch (Exception ex) when (ExpectedFailure(ex))
         {
+            if (closed) return;
             // A lost response may mean the Host applied the command. Never retry it automatically.
+            needsReview = true;
             hostId = null; hostEpoch = null;
             ConnectionStatus.Text = "Cancellation outcome is unknown or refused. Refresh to inspect the Host before acting again.";
         }
-        finally { SetBusy(false); }
+        finally { if (!closed) SetBusy(false); }
     }
 }
