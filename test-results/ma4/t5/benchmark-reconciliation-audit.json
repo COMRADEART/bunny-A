@@ -1,0 +1,208 @@
+{
+  "milestone": "MA4-S3-T5",
+  "experimentVersion": "bunny-ma4-s3-t5-reconciliation.v1",
+  "executedAt": "2026-10-27T03:49:56.686Z",
+  "datasetReconciliation": {
+    "frozenVersion": "bunny-ma4-s3-t4r1-frozen-60.v1",
+    "totalTasks": 60,
+    "codeImplementationSplit": {
+      "dev": 30,
+      "held-out": 30
+    },
+    "historicalDocClaim": {
+      "dev": 40,
+      "held-out": 20
+    },
+    "reconciliationFinding": "DOCUMENTATION_ERRATUM_CORRECTED",
+    "notes": "The code definition in live-benchmark.server.ts has always held 30 dev / 30 held-out across all 4 categories (8+7+8+7 dev, 7+8+7+8 held-out = 30/30). The 40/20 prose statement in T4R2 doc is formally superseded."
+  },
+  "passRateReconciliation": {
+    "historicalT4R1Result": {
+      "passRate": "90.0% (54/60)",
+      "runType": "Empirical execution against local model (qwen2.5-coder:7b)",
+      "defectDetail": "6 tasks failed due to formatting strictness or missing model assertions under zero-shot prompting"
+    },
+    "historicalT4R2ComparisonA": {
+      "passRate": "100.0% (60/60)",
+      "runType": "Controlled Policy Ablation (isolating Reviewer scheduling cost)",
+      "condition": "Structural policy ablation under oracle-matching mock outputs to isolate marginal cost of 29 Reviewer calls"
+    },
+    "reconciliationFinding": "DIFFERING_EVALUATION_OBJECTIVES_DISCLOSED",
+    "notes": "T4R1 evaluated live model completion accuracy (54/60). T4R2 Comparison A evaluated the marginal cost of discretionary Reviewer scheduling (89 vs 60 calls) holding correctness invariant under controlled policy ablation. Both are preserved and clearly labeled."
+  },
+  "tripartiteEvidenceAccounting": {
+    "totalFrozenTasks": 60,
+    "oracle_validation": 30,
+    "tool_execution": 30,
+    "process_test": 0,
+    "notes": "Strict separation: 30 tasks rely on text oracle validation (C0 + C3); 30 tasks execute authorized Host tools (C1 + C2). 0 synthetic process receipts."
+  },
+  "claimedProcessTestDisposition": {
+    "totalClaimedInT4R2Doc": 12,
+    "evaluatedTasks": [
+      {
+        "id": "REP-01",
+        "name": "Failing Off-by-One Loop Repair",
+        "split": "dev",
+        "sourceFiles": [
+          "broken.js"
+        ],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task contains source file (broken.js), but lacks a deterministic Node.js test runner file (.test.ts / .test.js).",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-02",
+        "name": "Null Pointer Guard Repair",
+        "split": "dev",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-03",
+        "name": "Broken JSON Syntax Repair",
+        "split": "dev",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-04",
+        "name": "Destructive Command Refusal & Safe Alternative",
+        "split": "dev",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-05",
+        "name": "SQL Injection Vulnerability Remediation",
+        "split": "dev",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-06",
+        "name": "Unclosed Resource Handle Fix",
+        "split": "dev",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-07",
+        "name": "Unhandled Promise Rejection Repair",
+        "split": "dev",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-08",
+        "name": "Strict Equality Operator Fix",
+        "split": "held-out",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-09",
+        "name": "Type Interface Property Name Fix",
+        "split": "held-out",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-10",
+        "name": "Regex Greedy Quantifier Boundary Repair",
+        "split": "held-out",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-11",
+        "name": "Array Index Out of Bounds Safeguard",
+        "split": "held-out",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-12",
+        "name": "Floating Point Rounding Error Remedy",
+        "split": "held-out",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-13",
+        "name": "Unsafe Path Traversal Rejection",
+        "split": "held-out",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-14",
+        "name": "Missing Await on Async Function",
+        "split": "held-out",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      },
+      {
+        "id": "REP-15",
+        "name": "Infinite Recursion Base Case Addition",
+        "split": "held-out",
+        "sourceFiles": [],
+        "testFiles": [],
+        "status": "BLOCKED_MISSING_FIXTURE",
+        "reason": "Task is text-only prompt and validator; contains no reference test fixture in the frozen dataset.",
+        "processReceiptGenerated": false
+      }
+    ],
+    "verdict": "BLOCKED_MISSING_FIXTURE",
+    "findings": "The 12 repair tasks in the frozen benchmark dataset lack .test.js/.test.ts files. In accordance with milestone directive ('If all twelve claimed process-test cases are not actually executable under the approved test profile, classify the missing cases as BLOCKED or NOT TESTED. Do not manufacture results'), these 12 cases are truthfully classified as BLOCKED (MISSING_TEST_FIXTURE) rather than manufacturing receipts."
+  },
+  "osProcessExecutionQualification": {
+    "runner": "executeDeterministicTest",
+    "executable": "c:\\Program Files\\nodejs\\node.exe",
+    "profile": "Node Mode A (--experimental-strip-types, --test)",
+    "demonstratedReceipt": "receipt:test-exec:test-1793072996567-e1cc674a:7ca71a7649e731845bd301f69edfc2ac696a22fdfd57cba1f9dd99d30e974c8b",
+    "verifiedCryptographically": true,
+    "exitCode": 0
+  },
+  "auditDurationMs": 121.5377
+}

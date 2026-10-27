@@ -3,10 +3,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { create, fakeModel, result, rig, type Rig } from "./ma4-s2t2-fixtures.ts";
 import type { TaskView } from "./ma4/task-runtime.ts";
+import { BrowserSessions } from "./ma4/connectors/browser.server.ts";
 
 type Site = { server: Server; origin: string; hits: string[] };
 type Reply = { status?: number; headers?: Record<string, string>; body?: string };
@@ -65,6 +67,40 @@ async function fixture() {
   return { a, b, host, async close() { await close(a); await close(b); await close(host); } };
 }
 const origins = (...o: string[]) => ({ origins: o });
+
+test("browser cleanup is shared by repeated close calls and failures remain visible", async () => {
+  const dataDirectory = mkdtempSync(join(tmpdir(), "bunny-close-contract-"));
+  const sessions = new BrowserSessions({ dataDirectory, allowLoopback: true });
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  let calls = 0;
+  try {
+    await sessions.with("ptask-delayed", [], async cap => { cap.close = () => { calls++; return pending; }; });
+    const first = sessions.close("ptask-delayed");
+    assert.equal(sessions.close("ptask-delayed"), first);
+    assert.equal(sessions.open(), 1, "closing is still owned and counted");
+    assert.equal(existsSync(join(dataDirectory, "browser-tasks", "ptask-delayed")), true);
+    release(); await first;
+    assert.equal(calls, 1);
+    assert.equal(sessions.open(), 0);
+    assert.equal(existsSync(join(dataDirectory, "browser-tasks", "ptask-delayed")), false);
+
+    await sessions.with("ptask-failure", [], async cap => { cap.close = async () => { throw new Error("close failed"); }; });
+    await assert.rejects(sessions.close("ptask-failure"), /close failed/);
+    assert.equal(sessions.open(), 1, "failed cleanup cannot be reported as closed");
+    let finishOther!: () => void;
+    const otherPending = new Promise<void>(resolve => { finishOther = resolve; });
+    await sessions.with("ptask-other", [], async cap => { cap.close = () => otherPending; });
+    let settled = false;
+    const shutdown = sessions.closeAll().finally(() => { settled = true; });
+    void shutdown.catch(() => undefined);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(settled, false, "one failed close must not skip waiting for another task");
+    finishOther();
+    await assert.rejects(shutdown, /Browser session cleanup failed/);
+    assert.equal(sessions.open(), 1, "only the failed session remains owned");
+  } finally { rmSync(dataDirectory, { recursive: true, force: true }); }
+});
 
 test("T2-W1 reads a granted page: text, headings, in-scope links and form structure — never values, cookies or hidden fields", { timeout: 120_000 }, async (t) => {
   if (!(await needBrowser(t))) return;
@@ -152,7 +188,7 @@ test("T2-W5 sessions are task-scoped: no cookie crosses tasks, no download is sa
     const dl = create(r, [{ id: "d", kind: "browser.open", input: { url: `${f.a.origin}/download` } }], origins(f.a.origin));
     const dv = await r.run(dl.id) as TaskView;
     assert.notEqual(dv.state, "COMPLETED");
-    for (let i = 0; i < 50 && r.connected.browser.open() > 0; i++) await new Promise(res => setTimeout(res, 50));
+    await r.rt.waitForCleanup(dl.id);
     assert.equal(r.connected.browser.open(), 0, "every task's browser closed with its task");
     const profiles = join(r.data, "browser-tasks");
     const left = existsSync(profiles) ? readdirSync(profiles, { recursive: true }).map(String) : [];
@@ -173,7 +209,32 @@ test("T2-W6 cancelling a task mid-browse closes its browser and leaves no proces
     r.rt.cancel(task.id, "workstation");
     await r.run(task.id);
     assert.equal((r.rt.view(task.id) as TaskView).state, "CANCELLED");
-    for (let i = 0; i < 100 && r.connected.browser.open() > 0; i++) await new Promise(res => setTimeout(res, 50));
+    await r.rt.waitForCleanup(task.id);
     assert.equal(r.connected.browser.open(), 0);
   } finally { await r.close(); await f.close(); await close(slow); }
+});
+
+test("cancelling an in-flight navigation releases the owned browser and profile", { timeout: 120_000 }, async (t) => {
+  if (!(await needBrowser(t))) return;
+  let received!: () => void;
+  const request = new Promise<void>(resolve => { received = resolve; });
+  const server = createServer((_req, _res) => { received(); });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const r = await rig({ allowLoopback: true });
+  try {
+    const task = create(r, [{ id: "open", kind: "browser.open", input: { url: origin } }], origins(origin));
+    r.rt.wake();
+    await Promise.race([request, new Promise<never>((_, reject) => { const timer = setTimeout(() => reject(new Error("navigation did not reach fixture")), 20_000); timer.unref(); })]);
+    r.rt.cancel(task.id, "workstation");
+    const view = await r.run(task.id);
+    assert.equal(view.state, "CANCELLED");
+    await r.rt.waitForCleanup(task.id);
+    assert.equal(r.connected.browser.open(), 0);
+    assert.equal(existsSync(join(r.data, "browser-tasks", task.id)), false);
+  } finally {
+    server.closeAllConnections();
+    await r.close();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
 });

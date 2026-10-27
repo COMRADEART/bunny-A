@@ -465,7 +465,7 @@ async function openHost(
     ...options.ptasks,
     executors: [...(options.ptasks?.executors ?? productionTaskDeps().executors), ...connected.executors],
     // A task's browser session (and its profile) ends with the task.
-    onTerminal: (taskId) => void connected.browser.close(taskId).catch(() => undefined),
+    onTerminal: (taskId) => connected.browser.close(taskId),
     instanceId: manager.instanceId,
     uiAttached: () => workstationClients.streams > 0 || Date.now() - workstationClients.seen < 20_000,
     // MA4-S2-T3: a task change wakes the proactive engine (settling scheduled runs, goal progress) without polling.
@@ -2358,13 +2358,14 @@ async function openHost(
     missions.deactivate();
     closed = (async () => {
       const ownedCleanup = stopOwnedChildren();
+      const taskCleanupErrors: unknown[] = [];
       try {
         // M-A-3 T10: release the microphone and speaker before anything else stops.
         await voice.close().catch(() => undefined);
         // MA4-S2-T1: running task steps stop and are handed to recovery with their durable state intact.
         await proactive.close().catch(() => undefined);
-        await ptasks.close().catch(() => undefined);
-        await connected.close().catch(() => undefined);
+        await ptasks.close().catch(error => { taskCleanupErrors.push(error); });
+        await connected.close().catch(error => { taskCleanupErrors.push(error); });
         await Promise.allSettled(
           [...manager.sessions.keys()].map((id) =>
             containment.health.operationalState === "draining"
@@ -2393,6 +2394,7 @@ async function openHost(
       process.off("SIGTERM", signalClose);
       process.off("SIGINT", signalClose);
       if (containment.health.operationalState !== "draining") options.removeProcessHandlers?.();
+      if (taskCleanupErrors.length) throw new AggregateError(taskCleanupErrors, "Task resource cleanup failed during Host shutdown.");
     })();
     return closed;
   };

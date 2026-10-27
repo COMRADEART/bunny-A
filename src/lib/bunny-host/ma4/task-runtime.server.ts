@@ -77,8 +77,8 @@ export type RuntimeDeps = {
   faults?(point: FaultPoint, taskId: string): void;
   /** This runtime is the only one on its database (the Host holds its port): at startup, every foreign lease is a dead Host's. */
   exclusive?: boolean;
-  /** MA4-S2-T2: a task reached a terminal state (its task-scoped browser session is closed). */
-  onTerminal?(taskId: string): void;
+  /** Terminal state is durable before resource cleanup; the returned promise represents cleanup completion. */
+  onTerminal?(taskId: string): void | Promise<void>;
   roots?: { get(id: string): { id: string; path: string } | null };
   /** Look up digest for a model id, ensuring non-null served model identity in outcomes. */
   modelDigest?: (model: string) => string | null;
@@ -94,6 +94,7 @@ export class PersistentTaskRuntime {
   private deps: RuntimeDeps;
   private executors: Map<string, Executor>;
   private active = new Map<string, Active>();
+  private terminalCleanup = new Map<string, Promise<void>>();
   private served = new Map<string, number>();
   private channels = new Map<string, CoordinatorChannel>();
   channelOf(id: string): CoordinatorChannel | null { return this.channels.get(id) ?? null; }
@@ -169,7 +170,18 @@ export class PersistentTaskRuntime {
     this.emit("ptask.changed", `${result.record.spec.title}: ${result.record.state}`, id);
     if (TERMINAL_TASK_STATES.includes(result.record.state)) {
       try { this.recordTerminalOutcome(result.record); } catch { /* outcome recording never blocks a commit */ }
-      try { this.deps.onTerminal?.(id); } catch { /* cleanup never blocks a commit */ }
+      if (!this.terminalCleanup.has(id) && this.deps.onTerminal) {
+        let cleanup: Promise<void>;
+        try { cleanup = Promise.resolve(this.deps.onTerminal(id)); }
+        catch (error) { cleanup = Promise.reject(error); }
+        const tracked: Promise<void> = cleanup.then(() => { if (this.terminalCleanup.get(id) === tracked) this.terminalCleanup.delete(id); }, error => {
+          this.emit("ptask.cleanup_error", shortError(error), id);
+          throw error;
+        });
+        this.terminalCleanup.set(id, tracked);
+        // Record failures until observed, without an unhandled rejection in the synchronous write path.
+        void tracked.catch(() => undefined);
+      }
     }
     return result;
   }
@@ -501,6 +513,7 @@ export class PersistentTaskRuntime {
     this.pending = null;
     for (const a of this.active.values()) a.abort.abort("host-shutdown");
     await Promise.allSettled([...this.active.values()].map(a => a.done));
+    await Promise.all(this.terminalCleanup.values());
   }
   /** Test seam: the Host dies now. Nothing more is written; leases stay as they were, exactly like a killed process. */
   crash(): void {
@@ -510,7 +523,12 @@ export class PersistentTaskRuntime {
     this.pending = null;
     for (const a of this.active.values()) a.abort.abort("crash");
   }
-  async idle(): Promise<void> { while (this.active.size || this.pending) { await Promise.allSettled([...this.active.values()].map(a => a.done)); await new Promise(r => setImmediate(r)); } }
+  /** A terminal task is not evidence of resource disposal. This barrier rejects on cleanup failure. */
+  async waitForCleanup(taskId: string): Promise<void> { await this.terminalCleanup.get(taskId); }
+  async idle(): Promise<void> {
+    while (this.active.size || this.pending) { await Promise.allSettled([...this.active.values()].map(a => a.done)); await new Promise(r => setImmediate(r)); }
+    await Promise.all(this.terminalCleanup.values());
+  }
 
   wake(): void {
     if (this.closed || this.pending) return;

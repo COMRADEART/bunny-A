@@ -58,7 +58,7 @@ export async function rig(o: { services?: ServiceProvider | null; allowLoopback?
   const make = (connected: ConnectedActions, faults?: (point: FaultPoint, taskId: string) => void) => new PersistentTaskRuntime({
     store, executors: [localGenerate, localReview, localTest, ...connected.executors], call, modelAvailable,
     uiAttached: o.uiAttached ?? (() => true), instanceId: `host-${++n}`, exclusive: true, now: o.now, faults, maintenanceMs: 60_000,
-    onTerminal: id => void connected.browser.close(id).catch(() => undefined),
+    onTerminal: id => connected.browser.close(id),
   });
   const connected = connectedActions({ db, dataDirectory: data, protectedPaths: [data], allowLoopback: o.allowLoopback ?? false, services: o.services ?? null });
   const r: Rig = {
