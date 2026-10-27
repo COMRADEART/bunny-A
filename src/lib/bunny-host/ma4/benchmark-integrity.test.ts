@@ -378,10 +378,18 @@ test("negative test 12: process identity or authorization changes is refused", a
 
 test("model identity: fail-closed Ollama verification rejects unapproved, malformed, or remote cloud models", async () => {
   // 1. Unapproved model
-  const unapproved = await lookupOllamaModelDigest("nonexistent-model:99b", "http://127.0.0.1:11434");
+  const unapproved = await lookupOllamaModelDigest("nonexistent-model:99b", "http://127.0.0.1:11434", {
+    inventoryFixture: [{ name: "other-model:7b", digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }],
+  });
   assert.equal(unapproved.verified, false);
   assert.equal(unapproved.status, "unapproved_model");
   assert.equal(unapproved.observedDigest, null);
+
+  // 1b. Offline/unreachable daemon fails closed
+  const offline = await lookupOllamaModelDigest("any-model:7b", "http://127.0.0.1:19999");
+  assert.equal(offline.verified, false);
+  assert.equal(offline.status, "unavailable");
+  assert.equal(offline.observedDigest, null);
 
   // 2. Remote cloud model rejected for local-only benchmark
   const cloudFixture = [
@@ -406,11 +414,18 @@ test("model identity: fail-closed Ollama verification rejects unapproved, malfor
   assert.equal(simRes.status, "simulated");
   assert.equal(simRes.isSimulated, true);
 
-  // 4. Real local model verification succeeds with exact digest
+  // 4. Physical daemon check (verifies exact digest if Ollama is running, or fails closed if offline in CI)
   const realRes = await lookupOllamaModelDigest(BENCHMARK_MODEL, "http://127.0.0.1:11434");
-  assert.equal(realRes.verified, true);
-  assert.equal(realRes.isSimulated, false);
-  assert.equal(realRes.observedDigest, BENCHMARK_MODEL_DIGEST);
+  if (realRes.status === "verified") {
+    assert.equal(realRes.verified, true);
+    assert.equal(realRes.isSimulated, false);
+    assert.equal(realRes.observedDigest, BENCHMARK_MODEL_DIGEST);
+  } else {
+    assert.equal(realRes.verified, false);
+    assert.equal(realRes.isSimulated, false);
+    assert.equal(realRes.status, "unavailable");
+    assert.equal(realRes.observedDigest, null);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

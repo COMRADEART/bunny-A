@@ -978,7 +978,7 @@ export async function lookupOllamaModelDigest(
         approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
         actuallyServedModel: null,
         observedDigest: null,
-        status: "unavailable",
+        status: "unapproved_model",
         verified: false,
         isSimulated: true,
         error: "Model '" + model + "' not found in simulated Ollama inventory",
