@@ -94,13 +94,13 @@ async function main() {
       const hasReferenceFiles = Boolean(task.referenceFiles && Object.keys(task.referenceFiles).length > 0);
       const refCount = task.referenceFiles ? Object.keys(task.referenceFiles).length : 0;
       
-      let trueEvidenceCategory = "oracle_validation";
+      let classBasedCategory = "oracle_validation";
       if (task.taskClass === "C0") {
-        trueEvidenceCategory = "oracle_validation";
+        classBasedCategory = "oracle_validation";
       } else if (task.taskClass === "C1" || task.taskClass === "C2") {
-        trueEvidenceCategory = "tool_execution";
+        classBasedCategory = "tool_execution";
       } else {
-        trueEvidenceCategory = "oracle_validation";
+        classBasedCategory = "oracle_validation";
       }
 
       return {
@@ -114,21 +114,21 @@ async function main() {
         hasValidator: Boolean(task.validator),
         hasExpectedPattern: Boolean(task.expectedPattern),
         hasExpectedSubstring: Boolean(task.expectedOutputSubstring),
-        trueEvidenceCategory,
+        classBasedCategory,
       };
     });
 
     const categoryBreakdown = {
-      oracle_validation: evidenceAudit.filter(t => t.trueEvidenceCategory === "oracle_validation").length,
-      tool_execution: evidenceAudit.filter(t => t.trueEvidenceCategory === "tool_execution").length,
-      process_test: evidenceAudit.filter(t => t.trueEvidenceCategory === "process_test").length,
+      oracle_validation: evidenceAudit.filter(t => t.classBasedCategory === "oracle_validation").length,
+      tool_execution: evidenceAudit.filter(t => t.classBasedCategory === "tool_execution").length,
+      process_test: evidenceAudit.filter(t => t.classBasedCategory === "process_test").length,
     };
-    console.log(`  Actual Evidence Categories in Benchmark:`, categoryBreakdown);
+    console.log(`  Task-class categories (not execution evidence):`, categoryBreakdown);
 
     // -------------------------------------------------------------
     // SECTION 4: Audit of the Claimed 12 "Process Test" Cases
     // -------------------------------------------------------------
-    console.log("\n[Section 4] Auditing the 12 Claimed Process-Test Cases from T4R2...");
+    console.log("\n[Section 4] Auditing all repair-category fixtures; T4R2's claimed twelve are not identified...");
     const c3RepairTasks = FROZEN_BENCHMARK_TASKS.filter(t => t.category === "repair-verification");
     console.log(`  Total Repair Tasks in Benchmark: ${c3RepairTasks.length} (REP-01 to REP-15)`);
 
@@ -342,22 +342,24 @@ async function main() {
     // -------------------------------------------------------------
     const summary = {
       milestone: "MA4-S3-T5",
-      experimentVersion: "bunny-ma4-s3-t5-reconciliation.v1",
+      experimentVersion: "bunny-ma4-s3-t5-reconciliation.v2",
       executedAt: new Date().toISOString(),
       datasetReconciliation,
       passRateReconciliation,
-      tripartiteEvidenceAccounting: {
+      taskClassBasedClassification: {
         totalFrozenTasks: 60,
         oracle_validation: categoryBreakdown.oracle_validation,
         tool_execution: categoryBreakdown.tool_execution,
         process_test: categoryBreakdown.process_test,
-        notes: "Strict separation: 30 tasks rely on text oracle validation (C0 + C3); 30 tasks execute authorized Host tools (C1 + C2). 0 synthetic process receipts.",
+        notes: "Classification by task class only; it does not demonstrate that these individual tasks executed tools or processes in this run.",
       },
       claimedProcessTestDisposition: {
         totalClaimedInT4R2Doc: 12,
+        claimedTaskIds: null,
+        repairCategoryCount: c3RepairTasks.length,
         evaluatedTasks: repairProcessAudit,
-        verdict: "BLOCKED_MISSING_FIXTURE",
-        findings: "The 12 repair tasks in the frozen benchmark dataset lack .test.js/.test.ts files. In accordance with milestone directive ('If all twelve claimed process-test cases are not actually executable under the approved test profile, classify the missing cases as BLOCKED or NOT TESTED. Do not manufacture results'), these 12 cases are truthfully classified as BLOCKED (MISSING_TEST_FIXTURE) rather than manufacturing receipts.",
+        verdict: "PARTIAL_ORIGINAL_IDS_UNRESOLVED",
+        findings: "T4R2 claimed twelve process-verified tasks but did not identify their task IDs in the cited reports. This audit examines all fifteen repair-category tasks, not an identified set of twelve. Each inspected repair task lacks a test fixture in the frozen dataset; this is not evidence of historical OS process execution.",
       },
       osProcessExecutionQualification: {
         runner: "executeDeterministicTest",
@@ -372,10 +374,10 @@ async function main() {
 
     const outDir = join(process.cwd(), "test-results/ma4/t5");
     mkdirSync(outDir, { recursive: true });
-    const outFile = join(outDir, "benchmark-reconciliation-audit.json");
+    const outFile = join(outDir, "benchmark-reconciliation-audit.v2.json");
     writeFileSync(outFile, JSON.stringify(summary, null, 2), "utf8");
     console.log(`\nAudit record written successfully to: ${outFile}`);
-    console.log("=== MANDATORY BENCHMARK RECONCILIATION COMPLETE: PASS ===");
+    console.log("=== FIXTURE AUDIT COMPLETE; ORIGINAL TWELVE TASK IDS REMAIN UNRESOLVED ===");
 
   } finally {
     try {

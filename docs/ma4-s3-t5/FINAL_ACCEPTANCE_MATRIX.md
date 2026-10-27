@@ -1,5 +1,12 @@
 # BUNNY A — MA4-S3-T5: FINAL ACCEPTANCE MATRIX (26 GATES)
 
+> **Historical report, not a current release verdict.** The consumer runner used
+> predefined success values for desktop, workflows, security and accessibility.
+> Its 22 PASS / 4 BLOCKED total is not supported by observed consumer execution.
+> The version 2 qualification runner records only the geometry contract it
+> executes and marks unperformed native, device, audio and signing gates blocked.
+> A revised evidence-backed 26-gate matrix remains outstanding. Public beta is NO-GO.
+
 **Milestone:** MA4-S3-T5  
 **Product:** Bunny A by LOKAM  
 **Scope:** Windows Desktop, Glass Notch, Multi-Agent Runtime, Voice, Android Companion, Security, Packaging  

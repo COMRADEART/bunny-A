@@ -29,6 +29,8 @@ const input = (name: string, type: ActionManifest["inputs"][number]["type"], req
 export class BrowserCapability implements CapabilityAdapter {
   dataDirectory: string; headless: boolean; allowLoopback: boolean;
   context: PwContext | null = null; starting: Promise<PwContext> | null = null; channel: string | null = null;
+  private closing: Promise<void> | null = null;
+  private acquiring = new Set<Promise<unknown>>();
   tabs = new Map<string, PwPage>(); current: string | null = null; idle: ReturnType<typeof setTimeout> | null = null;
   containment:HostContainment;
   asyncFailure:SafeError|null=null;
@@ -66,6 +68,7 @@ export class BrowserCapability implements CapabilityAdapter {
     return { availability: "available" as const, detail: `Isolated Bunny profile at ${join(this.dataDirectory, "browser-profile")}; launches bundled Chromium, else installed Chrome, else Edge${this.channel ? ` (last used: ${this.channel})` : ""}.` };
   }
   async ensure(): Promise<PwContext> {
+    if (this.closing) throw new Error("Browser is closing.");
     if (this.context) return this.context;
     this.starting ??= (async () => {
       const { chromium } = await import("playwright") as unknown as { chromium: { launchPersistentContext(dir: string, options: Record<string, unknown>): Promise<PwContext> } };
@@ -73,9 +76,11 @@ export class BrowserCapability implements CapabilityAdapter {
       const errors: string[] = [];
       this.proxy = await checkingProxy(this.network);
       for (const channel of [undefined, "chrome", "msedge"]) {
+        let launched: PwContext | null = null;
         try {
           const context = await chromium.launchPersistentContext(profile, { headless: this.headless, acceptDownloads: !this.network.allowedOrigins, serviceWorkers: "block", proxy: { server: this.proxy.url, bypass: "<-loopback>" },
             args: ["--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1"], ...(channel ? { channel } : {}) });
+          launched = context;
           this.channel = channel ?? "bundled chromium";
           if (this.network.allowedOrigins) await context.routeWebSocket("**/*", route => route.close());
           // Every request — subresources and redirects included — is checked, not just the first URL.
@@ -89,7 +94,11 @@ export class BrowserCapability implements CapabilityAdapter {
           });
           for (const page of context.pages()) await page.close().catch(() => {});
           this.context = context; return context;
-        } catch (error) { errors.push(`${channel ?? "bundled"}: ${(error instanceof Error ? error.message : String(error)).split("\n")[0]}`); }
+        } catch (error) {
+          // A browser may have launched before route setup failed; do not lose ownership of it.
+          if (launched) { this.context = launched; await launched.close(); this.context = null; }
+          errors.push(`${channel ?? "bundled"}: ${(error instanceof Error ? error.message : String(error)).split("\n")[0]}`);
+        }
       }
       await this.proxy.close(); this.proxy = null;
       throw new Error(`No browser could be launched (${errors.join("; ")}).`);
@@ -97,14 +106,19 @@ export class BrowserCapability implements CapabilityAdapter {
     return this.starting;
   }
   keepAlive() { if (this.idle) clearTimeout(this.idle); this.idle = setTimeout(() => this.containment.background({subsystem:"browser"},()=>this.close(),undefined,"SUBSYSTEM_FAILURE"), 5 * 60_000); this.idle.unref?.(); }
-  async page(tabId?: unknown): Promise<{ id: string; page: PwPage }> {
-    const context = await this.ensure();
-    const id = typeof tabId === "string" && tabId ? tabId : this.current;
-    if (id && this.tabs.has(id) && !this.tabs.get(id)!.isClosed()) { this.current = id; return { id, page: this.tabs.get(id)! }; }
-    if (typeof tabId === "string" && tabId) throw new Error(`Unknown or closed tab ${tabId}.`);
-    if (this.network.allowedOrigins && this.tabs.size >= 3) throw new Error("Mission tab limit reached.");
-    const page = await context.newPage(); const created = crypto.randomUUID().slice(0, 8);
-    this.tabs.set(created, page); this.current = created; return { id: created, page };
+  page(tabId?: unknown): Promise<{ id: string; page: PwPage }> {
+    const acquiring = (async () => {
+      const context = await this.ensure();
+      const id = typeof tabId === "string" && tabId ? tabId : this.current;
+      if (id && this.tabs.has(id) && !this.tabs.get(id)!.isClosed()) { this.current = id; return { id, page: this.tabs.get(id)! }; }
+      if (typeof tabId === "string" && tabId) throw new Error(`Unknown or closed tab ${tabId}.`);
+      if (this.network.allowedOrigins && this.tabs.size >= 3) throw new Error("Mission tab limit reached.");
+      const page = await context.newPage(); const created = crypto.randomUUID().slice(0, 8);
+      this.tabs.set(created, page); this.current = created; return { id: created, page };
+    })();
+    this.acquiring.add(acquiring);
+    void acquiring.then(() => this.acquiring.delete(acquiring), () => this.acquiring.delete(acquiring));
+    return acquiring;
   }
   locate(page: PwPage, params: Record<string, unknown>): { locator: PwLocator; how: string } {
     const s = (key: string) => (typeof params[key] === "string" && params[key] ? params[key] as string : null);
@@ -158,6 +172,7 @@ export class BrowserCapability implements CapabilityAdapter {
     return result;
   }
   async perform(action: string, params: Record<string, unknown>, context: ExecutionContext): Promise<CapabilityResult> {
+    context.signal.throwIfAborted();
     this.keepAlive();
     const timeout = Math.min(context.timeoutMs, 60_000);
     const evidenceOf = async (page: PwPage) => ({ url: page.url(), title: await page.title().catch(() => ""), retrievedAt: new Date().toISOString() });
@@ -175,6 +190,7 @@ export class BrowserCapability implements CapabilityAdapter {
         : safeUrl(String(params.url ?? ""), this.allowLoopback);
       if (action === "browser.search" && !String(params.query ?? "").trim()) throw new Error("query is required.");
       const { id, page } = await this.page(params.tabId);
+      context.signal.throwIfAborted();
       const response = await page.goto(target.toString(), { waitUntil: "domcontentloaded", timeout });
       if (await response?.headerValue("x-bunny-browser-blocked")) throw new Error("Bunny Browser blocked a private DNS destination or redirect before connection.");
       const finalUrl = safeUrl(page.url(), this.allowLoopback); // a redirect to a private host is refused too
@@ -187,6 +203,7 @@ export class BrowserCapability implements CapabilityAdapter {
       return { ok: decoded.length > 0, status: decoded.length ? "succeeded" : "failed", summary: decoded.length ? `${decoded.length} results for "${String(params.query)}".` : "The search page returned no parseable results.", output: { query: params.query, tabId: id, results: decoded, ...facts }, evidence: [`${facts.url} · ${facts.retrievedAt} · ${decoded.length} results`], artifacts: [{ type: "research_note", title: `Search: ${String(params.query).slice(0, 80)}`, inline: note, mediaType: "text/markdown" }], ...(decoded.length ? {} : { errorCategory: "capability_failed" as const }) };
     }
     const { id, page } = await this.page(params.tabId);
+    context.signal.throwIfAborted();
     if (action === "browser.read") {
       const max = Math.max(500, Math.min(100_000, Number(params.maxChars ?? 20_000) || 20_000));
       const data = await page.evaluate((limit: number) => ({ text: (document.body?.innerText ?? "").slice(0, limit), headings: [...document.querySelectorAll("h1,h2,h3")].slice(0, 40).map((node) => (node as HTMLElement).innerText.trim()).filter(Boolean) }), max);
@@ -253,11 +270,31 @@ export class BrowserCapability implements CapabilityAdapter {
     }
     return { ok: false, status: "unsupported", summary: `${action} is not supported.`, output: null, evidence: [] };
   }
-  async close() {
-    await Promise.all([...this.sessions.values()].map(session => session.close())); this.sessions.clear();
-    if (this.idle) clearTimeout(this.idle);
-    const context = this.context; this.context = null; this.tabs.clear(); this.current = null;
-    await context?.close().catch(() => {});
-    await this.proxy?.close(); this.proxy = null;
+  close(): Promise<void> {
+    if (this.closing) return this.closing;
+    const done = (async () => {
+      const failures: unknown[] = [];
+      const children = [...this.sessions.entries()];
+      const results = await Promise.allSettled(children.map(([, session]) => session.close()));
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") this.sessions.delete(children[index][0]);
+        else failures.push(result.reason);
+      });
+      if (this.idle) clearTimeout(this.idle);
+      // A cancellation can arrive while Chromium is starting. Wait until ownership is known.
+      await Promise.allSettled([...this.acquiring]);
+      if (this.starting) await this.starting.catch(() => undefined);
+      if (this.context) {
+        try { await this.context.close(); this.context = null; this.tabs.clear(); this.current = null; }
+        catch (error) { failures.push(error); }
+      }
+      if (this.proxy) {
+        try { await this.proxy.close(); this.proxy = null; }
+        catch (error) { failures.push(error); }
+      }
+      if (failures.length) throw new AggregateError(failures, "Browser capability cleanup failed.");
+    })().finally(() => { this.closing = null; });
+    this.closing = done;
+    return done;
   }
 }

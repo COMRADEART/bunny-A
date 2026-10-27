@@ -27,7 +27,9 @@ export class BrowserSessions {
   constructor(deps: Deps) { this.deps = deps; }
   get allowLoopback() { return this.deps.allowLoopback; }
   /** One serialized session per task; a different origin set gets a fresh, empty profile. */
-  async with<T>(taskId: string, origins: string[], work: (cap: BrowserCapability) => Promise<T>): Promise<T> {
+  async with<T>(taskId: string, origins: string[], work: (cap: BrowserCapability) => Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (this.closing.has(taskId)) throw new Error("This task's browser is closing.");
+    signal?.throwIfAborted();
     const key = JSON.stringify([...origins].sort());
     let session = this.sessions.get(taskId);
     if (session && session.origins !== key) { await this.close(taskId); session = undefined; }
@@ -44,26 +46,42 @@ export class BrowserSessions {
     let release!: () => void;
     active.tail = new Promise<void>(r => { release = r; });
     await previous;
-    try { return await work(active.cap); } finally { release(); }
+    let abortClose: Promise<void> | undefined;
+    const abort = () => { abortClose ??= active.cap.close(); void abortClose.catch(() => undefined); };
+    try {
+      signal?.throwIfAborted();
+      signal?.addEventListener("abort", abort, { once: true });
+      signal?.throwIfAborted();
+      return await work(active.cap);
+    } finally {
+      signal?.removeEventListener("abort", abort);
+      try { await abortClose; } finally { release(); }
+    }
   }
-  private closing = new Set<Promise<void>>();
+  private closing = new Map<string, Promise<void>>();
   /** Ends a task's session: the browser exits first, then its profile (cookies, storage, cache) is deleted. */
   close(taskId: string): Promise<void> {
+    const existing = this.closing.get(taskId);
+    if (existing) return existing;
     const session = this.sessions.get(taskId);
     if (!session) return Promise.resolve();
-    this.sessions.delete(taskId);
     const done = (async () => {
-      await session.tail.catch(() => undefined);
-      await session.cap.close().catch(() => undefined);
+      await session.tail;
+      await session.cap.close();
       rmSync(session.profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-    })().finally(() => this.closing.delete(done));
-    this.closing.add(done);
+      this.sessions.delete(taskId);
+    })().finally(() => this.closing.delete(taskId));
+    this.closing.set(taskId, done);
     return done;
   }
   /** Host shutdown: also waits for closes already in flight (a task that just ended). */
-  async closeAll() { await Promise.allSettled([...[...this.sessions.keys()].map(id => this.close(id)), ...this.closing]); }
+  async closeAll() {
+    const results = await Promise.allSettled([...this.sessions.keys()].map(id => this.close(id)));
+    const failures = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+    if (failures.length) throw new AggregateError(failures, "Browser session cleanup failed.");
+  }
   /** Sessions with a live browser or one still shutting down. */
-  open() { return this.sessions.size + this.closing.size; }
+  open() { return this.sessions.size; }
 }
 
 type Snapshot = { url: string; title: string; text: string; headings: string[]; links: { text: string; href: string }[]; forms: { index: number; action: string; method: string; fields: { name: string; type: string; label: string }[] }[] };
@@ -105,11 +123,12 @@ export function browserConnectors(sessions: BrowserSessions): Connector<never>[]
     if (!inScope(url, origins)) return { ok: false, error: `${originOf(url)} is not granted to this task.`, dispatched: false, denied: true };
     return sessions.with(ctx.taskId, origins, async cap => {
       const nav = await cap.perform("browser.navigate", { url }, execution(ctx, sessions.deps.dataDirectory));
+      ctx.signal.throwIfAborted();
       const { page } = await cap.page();
       if (!inScope(page.url(), origins)) return { ok: false, error: `The page moved to ${originOf(page.url())}, which is not granted; nothing from it was read.`, dispatched: false, denied: true };
       if (!nav.ok) return { ok: false, error: nav.summary, dispatched: true, definite: true };
       return { ok: true, result: await read(page, (nav.output as { status?: number | null }).status ?? null, maxChars, origins) };
-    });
+    }, ctx.signal);
   };
   const read = async (page: Awaited<ReturnType<BrowserCapability["page"]>>["page"], status: number | null, maxChars: number, origins: string[]) => {
     const s = await snapshot(page, maxChars);
@@ -137,7 +156,7 @@ export function browserConnectors(sessions: BrowserSessions): Connector<never>[]
         const { page } = await cap.page();
         const s = await snapshot(page, 0);
         return s.links.find(l => l.text.toLowerCase() === i.linkText.toLowerCase()) ?? s.links.find(l => l.text.toLowerCase().includes(i.linkText.toLowerCase())) ?? null;
-      });
+      }, ctx.signal);
       if (!target) return { ok: false, error: `No link "${i.linkText}" on the current page (open a page first).`, dispatched: false };
       return visit(target.href, i.maxChars, ctx);
     },
@@ -155,7 +174,7 @@ export function browserConnectors(sessions: BrowserSessions): Connector<never>[]
         const r = await cap.perform("browser.extract", { selector: i.selector, attribute: i.attribute, limit: i.limit }, execution(ctx, sessions.deps.dataDirectory));
         if (!r.ok) return { ok: false, error: r.summary, dispatched: false };
         return { ok: true, result: { url: page.url(), selector: i.selector, items: ((r.output as { items: string[] }).items ?? []).map(s => s.slice(0, 500)) } };
-      });
+      }, ctx.signal);
     },
   };
   const prepareForm: Connector<{ form: number; values: string }> = {
@@ -175,7 +194,7 @@ export function browserConnectors(sessions: BrowserSessions): Connector<never>[]
         const fills = Object.entries(values).flatMap(([name, value]) => { const f = fields.get(name); return f && f.type !== "password" && f.type !== "file" ? [{ field: name, type: f.type, value: String(value).slice(0, 500) }] : []; });
         return { ok: true, result: { url: page.url(), action: inScope(form.action, ctx.grants.origins) ? form.action : `(outside the grant: ${originOf(form.action)})`, method: form.method, fills,
           unknown: Object.keys(values).filter(n => !fields.has(n) || ["password", "file"].includes(fields.get(n)!.type)), submitted: false as const, note: "Prepared only. Nothing was typed into the page and nothing was submitted." } };
-      });
+      }, ctx.signal);
     },
   };
   return [open, follow, extract, prepareForm] as unknown as Connector<never>[];
