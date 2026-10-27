@@ -40,7 +40,10 @@ PR #53 establishes native Android companion parity with the compiled Windows app
 
 ### 3. Toolchain & Signing Verification
 - Compiled with Java 21, AAPT2 9.4.1, R8 9.4.28, android.jar (API 35).
-- APK signed with verified v2/v3 signatures.
+- APK signed with verified v2/v3 signatures: `Bunny-A-Android-v3.apk` (SHA-256: `86A6A00AA65423639618142BC624B957F02777FD316660A93B9B12C1D87AC515`).
 - Local certificate fingerprint: `acc0ee6f63769f18a91074a7755af54bab17c4dfc30c5541c965699fd1f548e6`.
-- Automated test suites: `NativeCookiePolicyTest` passed; `native-companion.test.ts` passed (8/8 checks).
+- Automated test suites: `NativeCookiePolicyTest` passed; `ServerAddressTest` (21 checks) passed; `native-companion.test.ts` passed (9/9 contract checks).
+- Keystore actual key deletion implemented via `KeyStore.deleteEntry(ALIAS)` and verified in `NativeSessionStore.clear()`.
+- Discrete 300-ms HTTP polling loop formally distinguished from streaming.
+- Existing WebView launcher (`MainActivity`) preserved alongside `NativeCompanionActivity` in `AndroidManifest.xml`.
 - Physical Samsung phone pairing remains truthfully marked **BLOCKED** pending laboratory hardware qualification.

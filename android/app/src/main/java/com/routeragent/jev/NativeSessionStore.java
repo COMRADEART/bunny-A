@@ -52,5 +52,15 @@ final class NativeSessionStore {
         if (!token.matches("[A-Za-z0-9_-]{43}") || hostId.isEmpty()) throw new IllegalStateException("Protected session is invalid.");
         return new Session(origin,token,hostId);
     }
-    boolean clear() { return preferences.edit().remove("session").commit(); }
+    boolean clear() {
+        boolean prefsCleared = preferences.edit().remove("session").commit();
+        try {
+            KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+            store.load(null);
+            if (store.containsAlias(ALIAS)) {
+                store.deleteEntry(ALIAS);
+            }
+        } catch (Exception ignored) {}
+        return prefsCleared;
+    }
 }
