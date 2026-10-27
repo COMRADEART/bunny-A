@@ -338,12 +338,37 @@ public final class NativeCompanionActivity extends Activity {
         }
     }
 
+    private void updateLastChatMessage(String sender, String text) {
+        if (!chatHistory.isEmpty()) {
+            int lastIdx = chatHistory.size() - 1;
+            ChatMessage last = chatHistory.get(lastIdx);
+            if (!last.isUser) {
+                chatHistory.set(lastIdx, new ChatMessage(sender, text, false));
+                if (activeTab == 1) showChatTab();
+                return;
+            }
+        }
+        chatHistory.add(new ChatMessage(sender, text, false));
+        if (activeTab == 1) showChatTab();
+    }
+
     // ==========================================
     // 2. CHAT TAB (A2)
     // ==========================================
     private void showChatTab() {
         LinearLayout body = page("Companion Conversation");
         add(body, text("Chat with your local AI via the authorized workstation Host.", 13, MUTED), 6);
+
+        // Workstation Authority Invariant Banner
+        LinearLayout banner = new LinearLayout(this);
+        banner.setOrientation(LinearLayout.VERTICAL);
+        banner.setBackground(surface(Color.rgb(36, 46, 68), 8));
+        banner.setPadding(dp(12), dp(8), dp(12), dp(8));
+        TextView bannerTitle = text("🛡️ Workstation Authority Invariant", 11, ACCENT);
+        bannerTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        banner.addView(bannerTitle);
+        banner.addView(text("Paired companion permits monitoring, task stopping, and local tool-free chat queries. Consequential file, shell, and git approvals must be granted on the Windows Host.", 11, MUTED));
+        add(body, banner, 10);
 
         // Chat messages box
         LinearLayout chatBox = new LinearLayout(this);
@@ -392,38 +417,95 @@ public final class NativeCompanionActivity extends Activity {
             if(prompt.isEmpty()) return;
             input.setText("");
             chatHistory.add(new ChatMessage("You", prompt, true));
+            chatHistory.add(new ChatMessage("Bunny", "Submitting query to workstation…", false));
             showChatTab();
 
             worker.execute(() -> {
                 try {
                     JSONObject res = client.command(session, "submit", new JSONObject().put("prompt", prompt).put("mode", "fast"));
-                    String reply = "Task started on workstation.";
-                    if(res.has("task")) {
-                        activeInferenceTaskId = res.getJSONObject("task").optString("id", null);
+                    JSONObject task = res.optJSONObject("task");
+                    if (task == null) {
+                        post(() -> updateLastChatMessage("Bunny", "Workstation refused query submission."));
+                        return;
                     }
-                    post(() -> {
-                        chatHistory.add(new ChatMessage("Bunny", reply, false));
-                        showChatTab();
-                    });
+                    String taskId = task.getString("id");
+                    activeInferenceTaskId = taskId;
+                    String taskState = task.optString("state", "");
+
+                    if ("waiting_for_approval".equals(taskState)) {
+                        try {
+                            client.command(session, "approve", new JSONObject().put("id", taskId));
+                            post(() -> updateLastChatMessage("Bunny", "Executing local model inference…"));
+                        } catch (Exception ex) {
+                            post(() -> updateLastChatMessage("Bunny", "Task waiting for approval on workstation. (Consequential tools require workstation review)."));
+                            return;
+                        }
+                    }
+
+                    long start = System.currentTimeMillis();
+                    long timeout = 60000;
+                    boolean settled = false;
+                    while (!destroyed && (System.currentTimeMillis() - start < timeout)) {
+                        Thread.sleep(300);
+                        JSONObject stateDoc = client.state(session);
+                        latestSnapshot = stateDoc;
+                        JSONArray tasks = stateDoc.optJSONArray("tasks");
+                        if (tasks != null) {
+                            for (int i = 0; i < tasks.length(); i++) {
+                                JSONObject t = tasks.optJSONObject(i);
+                                if (t != null && taskId.equals(t.optString("id"))) {
+                                    String curState = t.optString("state", "");
+                                    String model = t.optString("model", "local model");
+                                    if ("completed".equals(curState)) {
+                                        String out = t.optString("output", "");
+                                        String reply = out.isEmpty() ? "(Model completed with empty output)" : out;
+                                        post(() -> updateLastChatMessage("Bunny (" + model + ")", reply));
+                                        settled = true;
+                                        break;
+                                    } else if ("failed".equals(curState)) {
+                                        String err = t.optString("error", "Task execution failed.");
+                                        post(() -> updateLastChatMessage("Bunny (" + model + ")", "Inference failed: " + err));
+                                        settled = true;
+                                        break;
+                                    } else if ("stopped".equals(curState)) {
+                                        post(() -> updateLastChatMessage("Bunny (" + model + ")", "Task was stopped by user."));
+                                        settled = true;
+                                        break;
+                                    } else if ("running".equals(curState)) {
+                                        long elapsedSec = (System.currentTimeMillis() - start) / 1000;
+                                        post(() -> updateLastChatMessage("Bunny (" + model + ")", "Generating response (" + elapsedSec + "s)…"));
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        if (settled) break;
+                    }
+                    if (!settled && !destroyed) {
+                        post(() -> updateLastChatMessage("Bunny", "Inference timed out waiting for workstation response."));
+                    }
                 } catch(Exception ex) {
-                    post(() -> {
-                        chatHistory.add(new ChatMessage("System", "Error: " + ex.getMessage(), false));
-                        showChatTab();
-                    });
+                    post(() -> updateLastChatMessage("System", "Error: " + ex.getMessage()));
                 }
             });
         });
 
         Button stopBtn = button("Stop", false, v -> {
             if(activeInferenceTaskId != null) {
+                String tid = activeInferenceTaskId;
                 worker.execute(() -> {
                     try {
-                        client.command(session, "stop", new JSONObject().put("id", activeInferenceTaskId));
+                        client.command(session, "stop", new JSONObject().put("id", tid));
                         post(() -> {
-                            chatHistory.add(new ChatMessage("System", "Stop requested on workstation.", false));
+                            chatHistory.add(new ChatMessage("System", "Stop requested on workstation for task " + tid.substring(0, Math.min(8, tid.length())), false));
                             showChatTab();
                         });
-                    } catch(Exception ignored) {}
+                    } catch(Exception ex) {
+                        post(() -> {
+                            chatHistory.add(new ChatMessage("System", "Stop failed: " + ex.getMessage(), false));
+                            showChatTab();
+                        });
+                    }
                 });
             }
         });
