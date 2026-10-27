@@ -58,6 +58,7 @@ test("Android Companion 8 (source check): WebView launcher is declared in the ma
   assert.match(manifest, /NativeCompanionActivity/, "NativeCompanionActivity must be registered");
 });
 
+test("Android Companion 9: Native companion client rejects unencrypted plaintext storage", () => {
 test("Android Companion 9 (source check): session storage source uses AES/GCM and no plaintext token key", () => {
   const storeSource = readFileSync(join(process.cwd(), "android/app/src/main/java/com/routeragent/jev/NativeSessionStore.java"), "utf8");
   assert.match(storeSource, /AES\/GCM\/NoPadding/, "Must use AES/GCM encryption for stored session tokens");

@@ -1,0 +1,560 @@
+<Window x:Class="BunnyA.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Bunny A — Native Workstation"
+        Width="1160" Height="780" MinWidth="850" MinHeight="580"
+        Background="{StaticResource BackgroundBrush}"
+        Foreground="{StaticResource TextBrush}"
+        FontFamily="Segoe UI"
+        FontSize="14">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <!-- Navigation Sidebar -->
+      <ColumnDefinition Width="240"/>
+      <!-- Main Content Area -->
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <!-- LEFT SIDEBAR -->
+    <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Padding="16,20">
+      <DockPanel>
+        <!-- App Header Branding -->
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,24">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Border Width="36" Height="36" CornerRadius="18" Background="#26304D" BorderThickness="1" BorderBrush="{StaticResource ActionBrush}" Margin="0,0,10,0">
+              <Image Source="pack://application:,,,/Assets/characters/bunny.hero.png" Stretch="Uniform" Margin="3"/>
+            </Border>
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="BUNNY A" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextBrush}"/>
+              <TextBlock Text="LOKAM · Native Workstation" FontSize="11" Foreground="{StaticResource MutedBrush}"/>
+            </StackPanel>
+          </StackPanel>
+
+          <!-- Host Connection Capsule -->
+          <Border Background="{StaticResource ElevatedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,6" Margin="0,16,0,0">
+            <StackPanel>
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Ellipse x:Name="HostStatusDot" Width="8" Height="8" Fill="{StaticResource WarningBrush}" Margin="0,0,8,0"/>
+                <TextBlock x:Name="HostStatusText" Text="Connecting to Host…" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+              </StackPanel>
+              <TextBlock x:Name="HostEpochText" Text="Epoch: -" FontSize="10" Foreground="{StaticResource SubtleBrush}" Margin="16,2,0,0"/>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- Notch Controls & Bottom Actions -->
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
+          <Button x:Name="ToggleNotchButton" Content="💎 Show Glass Notch" Click="ToggleNotch_Click" Margin="0,0,0,8"/>
+          <Button x:Name="RefreshAllButton" Content="🔄 Refresh State" Click="RefreshAll_Click"/>
+          <Button x:Name="QuitButton" Content="⏻ Quit Bunny A" Click="Quit_Click" Margin="0,8,0,0"/>
+        </StackPanel>
+
+        <!-- Navigation Menu Items -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel x:Name="NavButtonsPanel">
+            <Button x:Name="NavChat" Content="💬  Chat &amp; Conversation" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Chat" Style="{StaticResource PrimaryButtonStyle}" Margin="0,2"/>
+            <Button x:Name="NavAgents" Content="🛡️  Agent Dashboard" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Agents" Margin="0,2"/>
+            <Button x:Name="NavProjects" Content="📁  Projects &amp; Tasks" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Projects" Margin="0,2"/>
+            <Button x:Name="NavApprovals" Content="⚖️  Approval Center" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Approvals" Margin="0,2"/>
+            <Button x:Name="NavVoice" Content="🎙️  Voice Studio" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Voice" Margin="0,2"/>
+            <Button x:Name="NavHistory" Content="📜  Task History" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="History" Margin="0,2"/>
+            <Button x:Name="NavLotus" Content="🪷  Lotus Memory" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Lotus" Margin="0,2"/>
+            <Button x:Name="NavModels" Content="🧠  Models &amp; AI" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Models" Margin="0,2"/>
+            <Button x:Name="NavDevices" Content="📱  Device Pairing" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Devices" Margin="0,2"/>
+            <Button x:Name="NavSettings" Content="⚙️  Settings &amp; Policy" HorizontalContentAlignment="Left" Click="NavButton_Click" Tag="Settings" Margin="0,2"/>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <!-- RIGHT CONTENT AREA -->
+    <Grid Grid.Column="1" Margin="24">
+      <!-- 1. CHAT & CONVERSATION SCREEN -->
+      <Grid x:Name="ScreenChat" Visibility="Visible">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Screen Header -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,14">
+          <TextBlock Text="AI Conversation" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <TextBlock Text="Model: " VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
+            <ComboBox x:Name="ChatModelCombo" Width="180" Background="{StaticResource ElevatedBrush}" Foreground="{StaticResource TextBrush}" Margin="6,0,12,0" AutomationProperties.Name="Chat model"/>
+            <CheckBox x:Name="LocalOnlyCheck" Content="Local only" VerticalAlignment="Center" Foreground="{StaticResource TextBrush}" Margin="0,0,12,0" ToolTip="Run only on a local model, offline. The Host refuses instead of using a hosted provider."/>
+            <Button Content="New Chat" Padding="12,4" MinHeight="32" Click="NewChat_Click"/>
+          </StackPanel>
+        </DockPanel>
+
+        <!-- Speaker Identity Picker (Bunny or Personal Agent 1-4) -->
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="12,8" Margin="0,0,0,12">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Talking to:" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0" FontSize="13"/>
+            <RadioButton x:Name="RadioSpeakerBunny" Content="Bunny (Main)" IsChecked="True" Foreground="{StaticResource TextBrush}" Margin="0,0,14,0" Checked="Speaker_Changed"/>
+            <RadioButton x:Name="RadioSpeakerGada" Content="Gada (Slot 1)" Foreground="{StaticResource TextBrush}" Margin="0,0,14,0" Checked="Speaker_Changed"/>
+            <RadioButton x:Name="RadioSpeakerSpear" Content="Spear (Slot 2)" Foreground="{StaticResource TextBrush}" Margin="0,0,14,0" Checked="Speaker_Changed"/>
+            <RadioButton x:Name="RadioSpeakerChakra" Content="Chakra (Slot 3)" Foreground="{StaticResource TextBrush}" Margin="0,0,14,0" Checked="Speaker_Changed"/>
+            <RadioButton x:Name="RadioSpeakerSword" Content="Sword (Slot 4)" Foreground="{StaticResource TextBrush}" Margin="0,0,14,0" Checked="Speaker_Changed"/>
+          </StackPanel>
+        </Border>
+
+        <!-- Message History List -->
+        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,14">
+          <ListBox x:Name="ChatHistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{Binding BubbleBackground}" BorderBrush="{Binding BubbleBorder}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,4" MaxWidth="750" HorizontalAlignment="{Binding Alignment}">
+                  <StackPanel>
+                    <DockPanel Margin="0,0,0,4">
+                      <TextBlock Text="{Binding Sender}" FontWeight="Bold" FontSize="12" Foreground="{Binding SenderColor}"/>
+                      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding Status}" FontSize="10" Foreground="{StaticResource GlowBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding Model}" FontSize="11" Foreground="{StaticResource SubtleBrush}"/>
+                      </StackPanel>
+                    </DockPanel>
+                    <TextBox Text="{Binding Text}" TextWrapping="Wrap" IsReadOnly="True" BorderThickness="0" Background="Transparent" Foreground="{StaticResource TextBrush}" FontSize="14" FontFamily="Segoe UI"/>
+                    <Button Content="Copy" HorizontalAlignment="Right" Padding="8,2" MinHeight="24" FontSize="11" Margin="0,4,0,0" Click="CopyMessage_Click" Tag="{Binding Text}"/>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+
+        <!-- Prompt Input and Action Row -->
+        <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="PromptInput" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="56" MaxHeight="120" VerticalScrollBarVisibility="Auto" KeyDown="PromptInput_KeyDown" ToolTip="Type your prompt or question here (Press Enter to Send, Shift+Enter for newline)"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="10,0,0,0">
+              <Button x:Name="SendButton" Content="Send" Style="{StaticResource PrimaryButtonStyle}" MinHeight="42" Padding="20,8" Margin="0,0,8,0" Click="SendPrompt_Click"/>
+              <Button x:Name="StopButton" Content="Stop" Style="{StaticResource DangerButtonStyle}" MinHeight="42" Padding="14,8" Margin="0,0,8,0" IsEnabled="False" Click="StopInference_Click"/>
+              <Button x:Name="DelegateButton" Content="Delegate to Agent" Style="{StaticResource {x:Type Button}}" MinHeight="42" Padding="12,8" ToolTip="Submit this prompt as an autonomous task to the Agent Coordinator" Click="DelegatePrompt_Click"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+      </Grid>
+
+      <!-- 2. AGENT DASHBOARD SCREEN -->
+      <Grid x:Name="ScreenAgents" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Agent Coordinator &amp; Personal Agents" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <!-- 4 Character Cards with Approved Weapons -->
+        <Grid Grid.Row="1" Margin="0,0,0,18">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+
+          <!-- GADA CARD -->
+          <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,0,8,0">
+            <StackPanel HorizontalAlignment="Center">
+              <Border Width="64" Height="64" CornerRadius="32" Background="#1E2A4D" BorderThickness="2" BorderBrush="#3550D6" HorizontalAlignment="Center">
+                <Image Source="pack://application:,,,/Assets/characters/gada.compact.png" Stretch="Uniform" Margin="8"/>
+              </Border>
+              <TextBlock Text="GADA" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" Margin="0,8,0,2"/>
+              <TextBlock Text="Worker · Coding &amp; Execution" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
+              <Border x:Name="GadaStatusChip" Background="#263450" CornerRadius="8" Padding="8,3" Margin="0,8,0,0" HorizontalAlignment="Center">
+                <TextBlock x:Name="GadaStatusText" Text="IDLE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GlowBrush}"/>
+              </Border>
+            </StackPanel>
+          </Border>
+
+          <!-- SPEAR CARD -->
+          <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14" Margin="4,0,4,0">
+            <StackPanel HorizontalAlignment="Center">
+              <Border Width="64" Height="64" CornerRadius="32" Background="#1E2A4D" BorderThickness="2" BorderBrush="#2C3652" HorizontalAlignment="Center">
+                <Image Source="pack://application:,,,/Assets/characters/spear.compact.png" Stretch="Uniform" Margin="8"/>
+              </Border>
+              <TextBlock Text="SPEAR" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" Margin="0,8,0,2"/>
+              <TextBlock Text="Tester · Test Verification" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
+              <Border x:Name="SpearStatusChip" Background="#263450" CornerRadius="8" Padding="8,3" Margin="0,8,0,0" HorizontalAlignment="Center">
+                <TextBlock x:Name="SpearStatusText" Text="IDLE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GlowBrush}"/>
+              </Border>
+            </StackPanel>
+          </Border>
+
+          <!-- CHAKRA CARD -->
+          <Border Grid.Column="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14" Margin="4,0,4,0">
+            <StackPanel HorizontalAlignment="Center">
+              <Border Width="64" Height="64" CornerRadius="32" Background="#1E2A4D" BorderThickness="2" BorderBrush="#2C3652" HorizontalAlignment="Center">
+                <Image Source="pack://application:,,,/Assets/characters/chakra.compact.png" Stretch="Uniform" Margin="8"/>
+              </Border>
+              <TextBlock Text="VISHNU CHAKRA" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" Margin="0,8,0,2"/>
+              <TextBlock Text="Reviewer · Security &amp; Audit" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
+              <Border x:Name="ChakraStatusChip" Background="#263450" CornerRadius="8" Padding="8,3" Margin="0,8,0,0" HorizontalAlignment="Center">
+                <TextBlock x:Name="ChakraStatusText" Text="IDLE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GlowBrush}"/>
+              </Border>
+            </StackPanel>
+          </Border>
+
+          <!-- SWORD CARD -->
+          <Border Grid.Column="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14" Margin="8,0,0,0">
+            <StackPanel HorizontalAlignment="Center">
+              <Border Width="64" Height="64" CornerRadius="32" Background="#1E2A4D" BorderThickness="2" BorderBrush="#2C3652" HorizontalAlignment="Center">
+                <Image Source="pack://application:,,,/Assets/characters/sword.compact.png" Stretch="Uniform" Margin="8"/>
+              </Border>
+              <TextBlock Text="SWORD" FontWeight="Bold" FontSize="15" HorizontalAlignment="Center" Margin="0,8,0,2"/>
+              <TextBlock Text="Planner · Architecture" FontSize="11" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Center"/>
+              <Border x:Name="SwordStatusChip" Background="#263450" CornerRadius="8" Padding="8,3" Margin="0,8,0,0" HorizontalAlignment="Center">
+                <TextBlock x:Name="SwordStatusText" Text="IDLE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource GlowBrush}"/>
+              </Border>
+            </StackPanel>
+          </Border>
+        </Grid>
+
+        <!-- Active Tasks & Execution Steps Detail -->
+        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
+          <DockPanel>
+            <TextBlock Text="Active Tasks &amp; Workflow Execution" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,0">
+              <Button x:Name="RunWithAgentsButton" Content="⚡ Run with Agents" Style="{StaticResource PrimaryButtonStyle}" Click="RunWithAgents_Click" Margin="0,0,8,0"/>
+              <Button x:Name="CancelActiveTaskButton" Content="Cancel Task" Style="{StaticResource DangerButtonStyle}" Click="CancelSelectedTask_Click" Margin="0,0,8,0"/>
+              <Button x:Name="PauseTaskButton" Content="Pause Task" Click="PauseSelectedTask_Click" Margin="0,0,8,0"/>
+              <Button x:Name="ResumeTaskButton" Content="Resume Task" Click="ResumeSelectedTask_Click"/>
+            </StackPanel>
+            <ListBox x:Name="ActiveTasksList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="ActiveTasksList_SelectionChanged"/>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <!-- 3. PROJECTS & TASK EXECUTION SCREEN -->
+      <Grid x:Name="ScreenProjects" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Projects &amp; Workspaces" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <!-- Project Submission Box -->
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,16">
+          <StackPanel>
+            <TextBlock Text="Register New Workspace Folder" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,10"/>
+            <Grid Margin="0,0,0,12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="NewProjectPathInput" Margin="0,0,10,0" ToolTip="Full path to local project folder"/>
+              <Button Grid.Column="1" Content="Browse…" Click="BrowseProjectFolder_Click" Margin="0,0,8,0"/>
+              <Button Grid.Column="1" Content="Register Workspace" Style="{StaticResource PrimaryButtonStyle}" Click="RegisterProject_Click" Margin="90,0,0,0"/>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Submit Multi-Agent Task Box -->
+        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,16">
+          <StackPanel>
+            <TextBlock Text="Submit Multi-Agent Task to Project" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,6"/>
+            <TextBlock Text="The Agent Coordinator creates an execution plan with Planner, Worker, and Tester agents." FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+            <Grid Margin="0,0,0,8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="ProjectMissionObjectiveInput" MinHeight="38" TextWrapping="Wrap" Margin="0,0,10,0" ToolTip="Enter multi-agent mission objective"/>
+              <Button Grid.Column="1" Content="⚡ Propose Plan" Style="{StaticResource PrimaryButtonStyle}" Click="ProposeProjectMission_Click"/>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Registered Projects List -->
+        <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
+          <DockPanel>
+            <TextBlock Text="Registered Project Roots" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
+            <ListBox x:Name="ProjectsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <!-- 4. APPROVAL CENTER SCREEN (Workstation-only) -->
+      <Grid x:Name="ScreenApprovals" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Consequential Action Approval Center" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <Grid Grid.Row="1">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="340"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+
+          <!-- Pending Approvals List -->
+          <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,0,12,0">
+            <DockPanel>
+              <TextBlock Text="Pending Approvals" FontWeight="SemiBold" FontSize="15" DockPanel.Dock="Top" Margin="0,0,0,10"/>
+              <ListBox x:Name="PendingApprovalsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" SelectionChanged="PendingApprovalsList_SelectionChanged"/>
+            </DockPanel>
+          </Border>
+
+          <!-- Inspection Details Pane -->
+          <Border Grid.Column="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel x:Name="ApprovalDetailsPanel" Visibility="Visible">
+                <TextBlock x:Name="ApprovalOpKind" Text="Operation: -" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource GlowBrush}"/>
+                <TextBlock x:Name="ApprovalTaskTitle" Text="Task: -" FontSize="13" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,14"/>
+
+                <Border Background="{StaticResource ElevatedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,14">
+                  <StackPanel>
+                    <TextBlock Text="Exact Permission Scope:" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="ApprovalScopeText" Text="-" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                    
+                    <TextBlock Text="Exact Payload SHA-256 (Action Broker Bound):" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                    <TextBlock x:Name="ApprovalPayloadShaText" Text="-" FontFamily="Consolas" FontSize="11" Foreground="{StaticResource GlowBrush}" TextWrapping="Wrap"/>
+
+                    <TextBlock Text="Expected Side Effects:" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                    <TextBlock x:Name="ApprovalEffectsText" Text="-" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </Border>
+
+                <!-- Proposed Diff Box -->
+                <TextBlock Text="Proposed Diff / Code Changes:" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <Border Background="#080B12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" MinHeight="140" Margin="0,0,0,16">
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="220">
+                    <TextBlock x:Name="ApprovalDiffText" Text="No diff content available for this action." FontFamily="Consolas" FontSize="12" Foreground="#86E8AB"/>
+                  </ScrollViewer>
+                </Border>
+
+                <!-- Approval Decision Controls -->
+                <StackPanel Orientation="Horizontal">
+                  <Button x:Name="ApproveActionButton" Content="✓ Approve Consequential Action" Style="{StaticResource SuccessButtonStyle}" MinHeight="44" Padding="22,8" Margin="0,0,12,0" Click="ApproveAction_Click"/>
+                  <Button x:Name="DenyActionButton" Content="✗ Deny Action" Style="{StaticResource DangerButtonStyle}" MinHeight="44" Padding="20,8" Click="DenyAction_Click"/>
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </Border>
+        </Grid>
+      </Grid>
+
+      <!-- 5. VOICE STUDIO SCREEN -->
+      <Grid x:Name="ScreenVoice" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Local-First Real-Time Voice Studio" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <!-- Hardware & Audio Controls Panel -->
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,16">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Microphone Selection -->
+            <StackPanel Grid.Column="0" Margin="0,0,16,0">
+              <TextBlock Text="Microphone Input Device" FontWeight="SemiBold" Margin="0,0,0,6"/>
+              <ComboBox x:Name="VoiceMicCombo" Background="{StaticResource ElevatedBrush}" Foreground="{StaticResource TextBrush}"/>
+            </StackPanel>
+
+            <!-- Speaker Selection -->
+            <StackPanel Grid.Column="1" Margin="0,0,16,0">
+              <TextBlock Text="Speaker Output Device" FontWeight="SemiBold" Margin="0,0,0,6"/>
+              <ComboBox x:Name="VoiceSpeakerCombo" Background="{StaticResource ElevatedBrush}" Foreground="{StaticResource TextBrush}"/>
+            </StackPanel>
+
+            <!-- Voice Session Toggle -->
+            <StackPanel Grid.Column="2" VerticalAlignment="Bottom">
+              <Button x:Name="VoiceSessionButton" Content="🎙️ Open Voice Session" Style="{StaticResource PrimaryButtonStyle}" Click="ToggleVoiceSession_Click"/>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Duplex Voice Controls & Transcript -->
+        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
+          <DockPanel>
+            <!-- Controls Bar -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,14">
+              <Button x:Name="ListenStartButton" Content="Start Listening" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,10,0" Click="VoiceListenStart_Click"/>
+              <Button x:Name="ListenEndButton" Content="Stop Listening" Margin="0,0,10,0" Click="VoiceListenEnd_Click"/>
+              <Button x:Name="VoiceBargeInButton" Content="⚡ Barge-In (Interrupt)" Style="{StaticResource DangerButtonStyle}" Margin="0,0,10,0" Click="VoiceInterrupt_Click"/>
+              <Button x:Name="VoiceMuteButton" Content="Mute Mic" Click="VoiceMute_Click"/>
+            </StackPanel>
+
+            <TextBlock Text="Live Voice Transcription &amp; Dialogue" FontSize="15" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,8"/>
+            <TextBox x:Name="VoiceTranscriptBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Background="#0C101A" BorderBrush="{StaticResource BorderBrush}" Padding="14" FontFamily="Consolas" FontSize="13"/>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <!-- 6. TASK HISTORY SCREEN -->
+      <Grid x:Name="ScreenHistory" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Task Execution History &amp; Reconciliations" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,0">
+              <TextBlock Text="Reconcile Uncertain Task:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+              <Button Content="Mark as Happened" Margin="0,0,8,0" Click="ReconcileHappened_Click"/>
+              <Button Content="Mark as Not Happened" Margin="0,0,8,0" Click="ReconcileNotHappened_Click"/>
+              <Button Content="Abandon" Style="{StaticResource DangerButtonStyle}" Click="ReconcileAbandon_Click"/>
+            </StackPanel>
+            <ListBox x:Name="TaskHistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <!-- 7. LOTUS MEMORY SCREEN -->
+      <Grid x:Name="ScreenLotus" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Lotus Memory Store (3-Layer Persistence)" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <!-- Add Memory Form -->
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,0,0,16">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="140"/>
+              <ColumnDefinition Width="140"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="LotusLayerCombo" SelectedIndex="0" Margin="0,0,10,0" ToolTip="Layer">
+              <ComboBoxItem Content="central"/>
+              <ComboBoxItem Content="project"/>
+              <ComboBoxItem Content="agent"/>
+            </ComboBox>
+            <TextBox Grid.Column="1" x:Name="LotusKeyInput" Margin="0,0,10,0" ToolTip="Memory Key"/>
+            <TextBox Grid.Column="2" x:Name="LotusValueInput" Margin="0,0,10,0" ToolTip="Memory Value"/>
+            <Button Grid.Column="3" Content="Remember Note" Style="{StaticResource PrimaryButtonStyle}" Click="LotusRemember_Click"/>
+          </Grid>
+        </Border>
+
+        <!-- Stored Memories List -->
+        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
+              <TextBox x:Name="LotusSearchInput" Width="300" Margin="0,0,10,0" ToolTip="Search query"/>
+              <Button Content="Recall / Search" Click="LotusRecall_Click" Margin="0,0,10,0"/>
+              <Button Content="Forget Selected" Style="{StaticResource DangerButtonStyle}" Click="LotusForget_Click"/>
+            </StackPanel>
+            <ListBox x:Name="LotusMemoriesList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <!-- 8. MODELS & PROVIDERS SCREEN -->
+      <Grid x:Name="ScreenModels" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Models, Providers &amp; Intelligence" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,16">
+              <Button Content="Discover Ollama Models" Style="{StaticResource PrimaryButtonStyle}" Margin="0,0,12,0" Click="DiscoverModels_Click"/>
+              <Button Content="Test AI Connection" Click="TestModelConnection_Click"/>
+            </StackPanel>
+            <ListBox x:Name="ModelsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <!-- 9. DEVICE PAIRING SCREEN -->
+      <Grid x:Name="ScreenDevices" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Android Companion &amp; Device Pairing" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <!-- Pair New Device Box -->
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,16">
+          <StackPanel>
+            <TextBlock Text="Pair a New Native Android Companion" FontWeight="SemiBold" FontSize="16" Margin="0,0,0,6"/>
+            <TextBlock Text="Generates an ephemeral one-time pairing code valid for 10 minutes over the secure HTTPS bridge." Foreground="{StaticResource MutedBrush}" Margin="0,0,0,12"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <Button Content="🔑 Generate 10-Min Pairing Code" Style="{StaticResource PrimaryButtonStyle}" Click="GeneratePairingCode_Click" Margin="0,0,14,0"/>
+              <Border Background="{StaticResource ElevatedBrush}" BorderBrush="{StaticResource GlowBrush}" BorderThickness="1" CornerRadius="8" Padding="14,6">
+                <TextBlock x:Name="PairingCodeDisplay" Text="Click generate to create pairing code" FontFamily="Consolas" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextBrush}"/>
+              </Border>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Paired Devices List -->
+        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
+          <DockPanel>
+            <TextBlock Text="Paired Companion Devices" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
+            <Button x:Name="RevokeDeviceButton" Content="Revoke Selected Device" Style="{StaticResource DangerButtonStyle}" DockPanel.Dock="Bottom" HorizontalAlignment="Left" Margin="0,12,0,0" Click="RevokeDevice_Click"/>
+            <ListBox x:Name="PairedDevicesList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <!-- 10. SETTINGS & POLICY SCREEN -->
+      <Grid x:Name="ScreenSettings" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Workstation Settings &amp; Execution Policies" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="20">
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <!-- Notch Edge Settings -->
+              <TextBlock Text="Movable Glass Notch Configuration" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+              <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
+                <TextBlock Text="Dock Edge:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <ComboBox x:Name="SettingsNotchEdgeCombo" Width="140" SelectedIndex="0" SelectionChanged="NotchEdgeCombo_SelectionChanged">
+                  <ComboBoxItem Content="Top"/>
+                  <ComboBoxItem Content="Bottom"/>
+                  <ComboBoxItem Content="Left"/>
+                  <ComboBoxItem Content="Right"/>
+                </ComboBox>
+              </StackPanel>
+
+              <!-- Thermal & Autostop Policy -->
+              <TextBlock Text="Thermal Policy &amp; Safety Autostop" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+              <CheckBox x:Name="AutoStopThermalCheck" Content="Auto-stop tasks if CPU or GPU reaches critical thermal threshold" Foreground="{StaticResource TextBrush}" IsChecked="True" Margin="0,0,0,18"/>
+
+              <!-- Background Persistence Policy -->
+              <TextBlock Text="Background Task Policy" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+              <CheckBox x:Name="ResumeOnStartCheck" Content="Automatically resume incomplete tasks when Bunny A starts" Foreground="{StaticResource TextBrush}" IsChecked="True" Margin="0,0,18,0"/>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+      </Grid>
+    </Grid>
+  </Grid>
+</Window>

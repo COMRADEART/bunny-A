@@ -1,0 +1,26 @@
+name: native-windows-preview
+
+on:
+  pull_request:
+    paths:
+      - 'native/windows/**'
+      - '.github/workflows/native-windows-preview.yml'
+  push:
+    branches: ['codex/ma4-s3-t5-native-windows']
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build WPF preview
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.408'
+      - name: Restore and build without package feeds
+        shell: pwsh
+        run: ./native/windows/build.ps1
