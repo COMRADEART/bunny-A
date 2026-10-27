@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
+import { writeEvidence } from "./evidence-guard.mjs";
 import { startHost } from "../src/lib/bunny-host/http.server.ts";
 import { rig, envelope, spec } from "../src/lib/bunny-host/ma4-s2t2-fixtures.ts";
 import {
@@ -35,7 +36,8 @@ host.server.prependListener("request", (req) => {
   if (req.url === "/state" && req.headers.authorization) {
     observedClientAuthRequest = {
       url: req.url,
-      authHeader: req.headers.authorization,
+      // R1R2: record only whether the header matched; the bearer value never leaves the request.
+      authenticated: req.headers.authorization === `Bearer ${host.token}`,
       userAgent: req.headers["user-agent"] ?? "BunnyA",
       timestamp: Date.now()
     };
@@ -119,7 +121,7 @@ try {
     await new Promise(r => setTimeout(r, 200));
   }
   assert.ok(observedClientAuthRequest, "Host must observe authenticated /state request from live WPF client");
-  assert.equal(observedClientAuthRequest.authHeader, `Bearer ${host.token}`);
+  assert.equal(observedClientAuthRequest.authenticated, true);
   console.log("[PASS] Stage 1: Live client authenticated successfully against Host:", observedClientAuthRequest);
 
   // Give UI 1.5s to fully render controls
@@ -234,7 +236,7 @@ try {
     observedAuthenticatedHostRequest: observedClientAuthRequest,
     verified: true
   };
-  writeFileSync(join(EVIDENCE_DIR, "stage1-real-conversation.json"), JSON.stringify(stage1Evidence, null, 2));
+  writeEvidence(join(EVIDENCE_DIR, "stage1-real-conversation.json"), stage1Evidence, [host.token]);
 
   // ================================================================================
   // STAGE 2: REAL MULTI-AGENT ACTION BROKER & CONSEQUENTIAL FILE OPERATIONS
@@ -395,7 +397,7 @@ test("config.json contains updated state", () => {
       cancellationTested: { taskId: view3.id, state: cancelledView.state },
       verified: true
     };
-    writeFileSync(join(EVIDENCE_DIR, "stage2-agent-journey.json"), JSON.stringify(stage2Evidence, null, 2));
+    writeEvidence(join(EVIDENCE_DIR, "stage2-agent-journey.json"), stage2Evidence, [host.token]);
     console.log("[PASS] Stage 2: Multi-agent Action Broker acceptance fully verified.");
   } finally {
     await r.close();
@@ -484,7 +486,7 @@ test("config.json contains updated state", () => {
     },
     verified: true
   };
-  writeFileSync(join(EVIDENCE_DIR, "stage3-wpf-notch.json"), JSON.stringify(stage3Evidence, null, 2));
+  writeEvidence(join(EVIDENCE_DIR, "stage3-wpf-notch.json"), stage3Evidence, [host.token]);
 
   // ================================================================================
   // STAGE 4: ANDROID NATIVE COMPANION CORRECTNESS VERIFICATION
@@ -545,7 +547,7 @@ test("config.json contains updated state", () => {
     webViewLauncherPreserved: true,
     verified: true
   };
-  writeFileSync(join(EVIDENCE_DIR, "stage4-android-companion.json"), JSON.stringify(stage4Evidence, null, 2));
+  writeEvidence(join(EVIDENCE_DIR, "stage4-android-companion.json"), stage4Evidence, [host.token]);
   console.log("[PASS] Stage 4: Android native companion correctness gaps closed.");
 
 } finally {
