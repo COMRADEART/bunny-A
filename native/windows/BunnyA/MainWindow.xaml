@@ -104,11 +104,14 @@
           <ListBox x:Name="ChatHistoryList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>
               <DataTemplate>
-                <Border Background="{Binding IsUser, Converter={x:Null}}" CornerRadius="10" Padding="14,10" Margin="0,4" MaxWidth="750" HorizontalAlignment="{Binding IsUser, Converter={x:Null}}">
+                <Border Background="{Binding BubbleBackground}" BorderBrush="{Binding BubbleBorder}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="0,4" MaxWidth="750" HorizontalAlignment="{Binding Alignment}">
                   <StackPanel>
                     <DockPanel Margin="0,0,0,4">
-                      <TextBlock Text="{Binding Sender}" FontWeight="Bold" FontSize="12" Foreground="{StaticResource GlowBrush}"/>
-                      <TextBlock Text="{Binding Model}" FontSize="11" Foreground="{StaticResource SubtleBrush}" HorizontalAlignment="Right"/>
+                      <TextBlock Text="{Binding Sender}" FontWeight="Bold" FontSize="12" Foreground="{Binding SenderColor}"/>
+                      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding Status}" FontSize="10" Foreground="{StaticResource GlowBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding Model}" FontSize="11" Foreground="{StaticResource SubtleBrush}"/>
+                      </StackPanel>
                     </DockPanel>
                     <TextBox Text="{Binding Text}" TextWrapping="Wrap" IsReadOnly="True" BorderThickness="0" Background="Transparent" Foreground="{StaticResource TextBrush}" FontSize="14" FontFamily="Segoe UI"/>
                     <Button Content="Copy" HorizontalAlignment="Right" Padding="8,2" MinHeight="24" FontSize="11" Margin="0,4,0,0" Click="CopyMessage_Click" Tag="{Binding Text}"/>
@@ -217,6 +220,7 @@
           <DockPanel>
             <TextBlock Text="Active Tasks &amp; Workflow Execution" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,12,0,0">
+              <Button x:Name="RunWithAgentsButton" Content="⚡ Run with Agents" Style="{StaticResource PrimaryButtonStyle}" Click="RunWithAgents_Click" Margin="0,0,8,0"/>
               <Button x:Name="CancelActiveTaskButton" Content="Cancel Task" Style="{StaticResource DangerButtonStyle}" Click="CancelSelectedTask_Click" Margin="0,0,8,0"/>
               <Button x:Name="PauseTaskButton" Content="Pause Task" Click="PauseSelectedTask_Click" Margin="0,0,8,0"/>
               <Button x:Name="ResumeTaskButton" Content="Resume Task" Click="ResumeSelectedTask_Click"/>
@@ -229,6 +233,7 @@
       <!-- 3. PROJECTS & TASK EXECUTION SCREEN -->
       <Grid x:Name="ScreenProjects" Visibility="Collapsed">
         <Grid.RowDefinitions>
+          <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="*"/>
@@ -252,8 +257,24 @@
           </StackPanel>
         </Border>
 
+        <!-- Submit Multi-Agent Task Box -->
+        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,0,0,16">
+          <StackPanel>
+            <TextBlock Text="Submit Multi-Agent Task to Project" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,6"/>
+            <TextBlock Text="The Agent Coordinator creates an execution plan with Planner, Worker, and Tester agents." FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,10"/>
+            <Grid Margin="0,0,0,8">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="ProjectMissionObjectiveInput" MinHeight="38" TextWrapping="Wrap" Margin="0,0,10,0" ToolTip="Enter multi-agent mission objective"/>
+              <Button Grid.Column="1" Content="⚡ Propose Plan" Style="{StaticResource PrimaryButtonStyle}" Click="ProposeProjectMission_Click"/>
+            </Grid>
+          </StackPanel>
+        </Border>
+
         <!-- Registered Projects List -->
-        <Border Grid.Row="2" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
+        <Border Grid.Row="3" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="12" Padding="18">
           <DockPanel>
             <TextBlock Text="Registered Project Roots" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/>
             <ListBox x:Name="ProjectsList" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"/>

@@ -132,11 +132,146 @@ public partial class MainWindow : Window
             // Push state snapshot to Notch
             notchWindow?.UpdateSnapshot(root);
 
-            // 1. Process Tasks (Persistent Tasks runtime)
+            // 1. Process Tasks and Missions
             var activeTasks = new List<TaskRow>();
             var historyTasks = new List<TaskRow>();
             var pendingApprovals = new List<PendingApprovalItem>();
 
+            // 1a. Process Host OrchTasks
+            if (root.TryGetProperty("tasks", out var orchTasksArr) && orchTasksArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var task in orchTasksArr.EnumerateArray())
+                {
+                    var id = task.GetProperty("id").GetString() ?? "";
+                    var title = task.TryGetProperty("title", out var tp) ? tp.GetString() ?? "Task" : "Task";
+                    var state = task.GetProperty("state").GetString() ?? "UNKNOWN";
+                    var provider = task.TryGetProperty("provider", out var prov) ? prov.GetString() : null;
+                    var model = task.TryGetProperty("model", out var md) ? md.GetString() : null;
+                    var error = task.TryGetProperty("error", out var er) ? er.GetString() : null;
+                    var canCancel = state is "queued" or "routing" or "waiting_for_approval" or "running";
+
+                    var row = new TaskRow(id, title, state.ToUpperInvariant(), Model: $"{provider} · {model}", Error: error, CanCancel: canCancel);
+
+                    if (state is "completed" or "failed" or "stopped")
+                    {
+                        historyTasks.Add(row);
+                    }
+                    else
+                    {
+                        activeTasks.Add(row);
+                    }
+
+                    if (state == "waiting_for_approval")
+                    {
+                        pendingApprovals.Add(new PendingApprovalItem(
+                            TaskId: id,
+                            TaskTitle: title,
+                            ActionId: id,
+                            OperationKind: "task.approve",
+                            Summary: $"Task Model Launch: {title}",
+                            PayloadSha256: "-",
+                            Category: "task_launch",
+                            Reversible: true,
+                            ExpiresAt: 0,
+                            Scope: task.TryGetProperty("cwd", out var cwd) ? cwd.GetString() ?? "Local" : "Local",
+                            ProposedDiff: task.TryGetProperty("prompt", out var pr) ? pr.GetString() ?? "" : "",
+                            ExpectedEffects: $"Executes local model inference on {provider ?? "Ollama"}"
+                        ));
+                    }
+                }
+            }
+
+            // 1b. Process Host Missions
+            if (root.TryGetProperty("missions", out var missionsObj) &&
+                missionsObj.TryGetProperty("missions", out var missionsArr) &&
+                missionsArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var mission in missionsArr.EnumerateArray())
+                {
+                    var mId = mission.GetProperty("id").GetString() ?? "";
+                    var mTitle = mission.TryGetProperty("title", out var mt) ? mt.GetString() ?? "Mission" : "Mission";
+                    var mState = mission.GetProperty("state").GetString() ?? "UNKNOWN";
+                    var canCancel = mState is "draft" or "planning" or "waiting_for_approval" or "ready" or "running" or "waiting_for_user" or "verifying";
+
+                    var row = new TaskRow(mId, $"[Mission] {mTitle}", mState.ToUpperInvariant(), Role: "Agent Coordinator", CanCancel: canCancel);
+
+                    if (mState is "completed" or "failed" or "stopped")
+                    {
+                        historyTasks.Add(row);
+                    }
+                    else
+                    {
+                        activeTasks.Add(row);
+                    }
+
+                    if (mState == "waiting_for_approval")
+                    {
+                        pendingApprovals.Add(new PendingApprovalItem(
+                            TaskId: mId,
+                            TaskTitle: mTitle,
+                            ActionId: mId,
+                            OperationKind: "mission.approve",
+                            Summary: $"Multi-Agent Execution Plan: {mTitle}",
+                            PayloadSha256: mission.TryGetProperty("planReference", out var pr) ? pr.GetString() ?? "-" : "-",
+                            Category: "agent_plan",
+                            Reversible: true,
+                            ExpiresAt: 0,
+                            Scope: $"Mission {mId} Envelope",
+                            ProposedDiff: mission.TryGetProperty("objective", out var obj) ? obj.GetString() ?? "" : "",
+                            ExpectedEffects: "Approves autonomous multi-agent plan and begins execution"
+                        ));
+                    }
+
+                    // Check mission requests for consequential approvals
+                    if (mission.TryGetProperty("requests", out var reqsArr) && reqsArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var req in reqsArr.EnumerateArray())
+                        {
+                            if (req.TryGetProperty("resolvedAt", out var resAt) && resAt.ValueKind != JsonValueKind.Null)
+                                continue;
+
+                            var reqId = req.GetProperty("id").GetString() ?? "";
+                            var action = req.GetProperty("action").GetString() ?? "operation";
+                            var reason = req.TryGetProperty("reason", out var r) ? r.GetString() ?? "" : "";
+                            var risk = req.TryGetProperty("risk", out var rk) ? rk.GetString() ?? "WRITE" : "WRITE";
+
+                            string sha256 = "-";
+                            string diff = reason;
+                            string scope = $"Mission {mId} / Step {(req.TryGetProperty("stepId", out var stp) ? stp.GetString() : "")}";
+
+                            if (req.TryGetProperty("promotion", out var promo) && promo.ValueKind == JsonValueKind.Object)
+                            {
+                                sha256 = promo.TryGetProperty("contentHash", out var ch) ? ch.GetString() ?? "-" : "-";
+                                var dest = promo.TryGetProperty("destination", out var dst) ? dst.GetString() ?? "" : "";
+                                diff = $"Staged Destination: {dest}\nSHA-256: {sha256}\n{reason}";
+                                scope = $"Promote File: {dest}";
+                            }
+                            else if (req.TryGetProperty("desktopOperation", out var dOp) && dOp.ValueKind == JsonValueKind.Object)
+                            {
+                                sha256 = dOp.TryGetProperty("digest", out var dg) ? dg.GetString() ?? "-" : "-";
+                                scope = dOp.TryGetProperty("cwd", out var cwd) ? cwd.GetString() ?? scope : scope;
+                            }
+
+                            pendingApprovals.Add(new PendingApprovalItem(
+                                TaskId: mId,
+                                TaskTitle: mTitle,
+                                ActionId: reqId,
+                                OperationKind: action,
+                                Summary: reason,
+                                PayloadSha256: sha256,
+                                Category: "consequential",
+                                Reversible: false,
+                                ExpiresAt: 0,
+                                Scope: scope,
+                                ProposedDiff: diff,
+                                ExpectedEffects: $"Consequential {action} ({risk} risk) requiring workstation approval."
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // 1c. Add persistentTasks if present
             if (root.TryGetProperty("persistentTasks", out var ptasks) &&
                 ptasks.TryGetProperty("tasks", out var tasksArr) &&
                 tasksArr.ValueKind == JsonValueKind.Array)
@@ -144,6 +279,8 @@ public partial class MainWindow : Window
                 foreach (var task in tasksArr.EnumerateArray())
                 {
                     var id = task.GetProperty("id").GetString() ?? "";
+                    if (activeTasks.Any(x => x.Id == id) || historyTasks.Any(x => x.Id == id)) continue;
+
                     var title = task.GetProperty("title").GetString() ?? "Task";
                     var state = task.GetProperty("state").GetString() ?? "UNKNOWN";
                     var canCancel = state is "VALIDATED" or "AWAITING_APPROVAL" or "QUEUED" or "RUNNING" or "PAUSED" or "RESUMING";
@@ -272,11 +409,11 @@ public partial class MainWindow : Window
             }
 
             // 5. Process Models
+            var models = new List<ModelItem>();
             if (root.TryGetProperty("intelligence", out var intel) &&
                 intel.TryGetProperty("models", out var modelsArr) &&
                 modelsArr.ValueKind == JsonValueKind.Array)
             {
-                var models = new List<ModelItem>();
                 foreach (var m in modelsArr.EnumerateArray())
                 {
                     var id = m.GetProperty("id").GetString() ?? "";
@@ -285,13 +422,33 @@ public partial class MainWindow : Window
                     var avail = m.TryGetProperty("available", out var a) && a.GetBoolean();
                     models.Add(new ModelItem(id, name, provider, avail, false, $"{provider} · {(avail ? "Ready" : "Offline")}"));
                 }
-                ModelsList.ItemsSource = models;
+            }
 
-                if (ChatModelCombo.Items.Count == 0 && models.Count > 0)
+            if (root.TryGetProperty("providers", out var provArr) && provArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var p in provArr.EnumerateArray())
                 {
-                    ChatModelCombo.ItemsSource = models.Select(m => m.Id).ToList();
-                    ChatModelCombo.SelectedIndex = 0;
+                    var pId = p.TryGetProperty("id", out var pi) ? pi.GetString() ?? "" : "";
+                    if (p.TryGetProperty("models", out var pModels) && pModels.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var pm in pModels.EnumerateArray())
+                        {
+                            var mName = pm.GetString() ?? "";
+                            if (!string.IsNullOrEmpty(mName) && !models.Any(x => x.Id == mName))
+                            {
+                                models.Add(new ModelItem(mName, mName, pId, true, false, $"{pId} · Ready"));
+                            }
+                        }
+                    }
                 }
+            }
+
+            ModelsList.ItemsSource = models;
+
+            if (ChatModelCombo.Items.Count == 0 && models.Count > 0)
+            {
+                ChatModelCombo.ItemsSource = models.Select(m => m.Id).ToList();
+                ChatModelCombo.SelectedIndex = 0;
             }
 
             // 6. Process Paired Devices
@@ -362,6 +519,25 @@ public partial class MainWindow : Window
 
     private void SendPrompt_Click(object sender, RoutedEventArgs e) => SendPrompt();
 
+    private void UpdateChatMessage(string id, string text, string status, string? model = null)
+    {
+        for (int i = 0; i < chatMessages.Count; i++)
+        {
+            if (chatMessages[i].Id == id)
+            {
+                chatMessages[i] = chatMessages[i] with
+                {
+                    Text = text,
+                    Status = status,
+                    Model = model ?? chatMessages[i].Model
+                };
+                ChatHistoryList.ItemsSource = chatMessages.ToList();
+                ChatHistoryList.ScrollIntoView(chatMessages[i]);
+                break;
+            }
+        }
+    }
+
     private async void SendPrompt()
     {
         var prompt = PromptInput.Text.Trim();
@@ -373,15 +549,29 @@ public partial class MainWindow : Window
 
         var userMsg = new ChatMessage(Guid.NewGuid().ToString(), "You", prompt, true, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
         chatMessages.Add(userMsg);
-        ChatHistoryList.ItemsSource = chatMessages.ToList();
-        ChatHistoryList.ScrollIntoView(userMsg);
 
-        try
+        var model = ChatModelCombo.SelectedItem as string;
+        var aiMsgId = Guid.NewGuid().ToString();
+
+        if (selectedSpeakerSlot == 0)
         {
-            if (selectedSpeakerSlot == 0)
+            // Main Bunny real Ollama model execution
+            var aiMsg = new ChatMessage(
+                aiMsgId,
+                "Bunny",
+                "Submitting task to Host execution engine…",
+                false,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                Model: string.IsNullOrEmpty(model) ? "Auto" : model,
+                Status: "Submitting"
+            );
+            chatMessages.Add(aiMsg);
+            ChatHistoryList.ItemsSource = chatMessages.ToList();
+            ChatHistoryList.ScrollIntoView(aiMsg);
+
+            try
             {
-                // Main Bunny submit conversation
-                var model = ChatModelCombo.SelectedItem as string;
+                // 1. Submit task to Host
                 var res = await hostClient.SendCommandAsync("submit", new
                 {
                     prompt = prompt,
@@ -389,28 +579,141 @@ public partial class MainWindow : Window
                     modelOverride = string.IsNullOrEmpty(model) ? null : model
                 }, lifetime.Token);
 
-                string responseText = "Task submitted to Bunny Host.";
-                if (res.TryGetProperty("task", out var taskObj))
+                if (!res.TryGetProperty("task", out var taskObj))
                 {
-                    activeInferenceTaskId = taskObj.GetProperty("id").GetString();
-                    responseText = $"Task {activeInferenceTaskId} started. Monitoring response…";
+                    UpdateChatMessage(aiMsgId, "Host refused task submission without task identity.", "Refused", model);
+                    return;
                 }
 
-                var replyMsg = new ChatMessage(Guid.NewGuid().ToString(), "Bunny", responseText, false, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Model: model ?? "Host Default");
-                chatMessages.Add(replyMsg);
-            }
-            else
-            {
-                // Talk to Personal Agent directly (Gada, Spear, Chakra, Sword)
-                var agentName = selectedSpeakerSlot switch
-                {
-                    1 => "Gada",
-                    2 => "Spear",
-                    3 => "Vishnu Chakra",
-                    4 => "Sword",
-                    _ => "Agent"
-                };
+                var taskId = taskObj.GetProperty("id").GetString() ?? "";
+                activeInferenceTaskId = taskId;
+                var taskState = taskObj.TryGetProperty("state", out var sp) ? sp.GetString() ?? "" : "";
 
+                UpdateChatMessage(aiMsgId, $"Task {taskId[..Math.Min(8, taskId.Length)]}… created. Approving execution…", "Approving", model);
+
+                // 2. Approve execution to launch local model
+                if (taskState == "waiting_for_approval")
+                {
+                    await hostClient.SendCommandAsync("approve", new { id = taskId }, lifetime.Token);
+                    UpdateChatMessage(aiMsgId, "Executing local model inference…", "Running", model);
+                }
+
+                // 3. Follow real execution progress and retrieve verified model output
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var maxWait = TimeSpan.FromSeconds(120);
+
+                while (!lifetime.Token.IsCancellationRequested && stopwatch.Elapsed < maxWait)
+                {
+                    await Task.Delay(250, lifetime.Token);
+
+                    var stateDoc = await hostClient.GetStateAsync(lifetime.Token);
+                    var root = stateDoc.RootElement;
+                    notchWindow?.UpdateSnapshot(root);
+
+                    JsonElement? matchedTask = null;
+                    if (root.TryGetProperty("tasks", out var tasksArr) && tasksArr.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var t in tasksArr.EnumerateArray())
+                        {
+                            if (t.GetProperty("id").GetString() == taskId)
+                            {
+                                matchedTask = t;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (matchedTask.HasValue)
+                    {
+                        var curState = matchedTask.Value.GetProperty("state").GetString() ?? "";
+                        var modelUsed = matchedTask.Value.TryGetProperty("model", out var m) ? m.GetString() : model;
+                        var providerUsed = matchedTask.Value.TryGetProperty("provider", out var p) ? p.GetString() : "ollama";
+
+                        if (curState == "completed")
+                        {
+                            var output = matchedTask.Value.TryGetProperty("output", out var o) ? o.GetString() ?? "" : "";
+                            string usageInfo = "";
+                            if (matchedTask.Value.TryGetProperty("usage", out var u) && u.ValueKind == JsonValueKind.Object)
+                            {
+                                var inTok = u.TryGetProperty("inputTokens", out var it) ? it.GetInt32() : 0;
+                                var outTok = u.TryGetProperty("outputTokens", out var ot) ? ot.GetInt32() : 0;
+                                usageInfo = $" · {inTok} in / {outTok} out";
+                            }
+
+                            UpdateChatMessage(
+                                aiMsgId,
+                                string.IsNullOrEmpty(output) ? "(Model completed with empty output)" : output,
+                                "Completed",
+                                $"{providerUsed} · {modelUsed}{usageInfo}"
+                            );
+                            break;
+                        }
+                        else if (curState == "failed")
+                        {
+                            var err = matchedTask.Value.TryGetProperty("error", out var e) ? e.GetString() : "Task execution failed.";
+                            UpdateChatMessage(aiMsgId, $"Inference failed: {err}", "Failed", $"{providerUsed} · {modelUsed}");
+                            break;
+                        }
+                        else if (curState == "stopped")
+                        {
+                            UpdateChatMessage(aiMsgId, "Task was stopped by user.", "Cancelled", $"{providerUsed} · {modelUsed}");
+                            break;
+                        }
+                        else if (curState == "running")
+                        {
+                            UpdateChatMessage(aiMsgId, $"Model {modelUsed} generating ({stopwatch.Elapsed.Seconds}s)…", "Generating", $"{providerUsed} · {modelUsed}");
+                        }
+                    }
+                }
+
+                if (stopwatch.Elapsed >= maxWait)
+                {
+                    UpdateChatMessage(aiMsgId, "Inference timed out waiting for response.", "Timeout", model);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                UpdateChatMessage(aiMsgId, "Inference cancelled.", "Cancelled", model);
+            }
+            catch (Exception ex)
+            {
+                UpdateChatMessage(aiMsgId, $"Host error: {ex.Message}", "Error", model);
+            }
+            finally
+            {
+                activeInferenceTaskId = null;
+                SendButton.IsEnabled = true;
+                StopButton.IsEnabled = false;
+                await RefreshAllStateAsync(force: true);
+            }
+        }
+        else
+        {
+            // Personal Agent context conversation (Gada, Spear, Chakra, Sword)
+            var agentName = selectedSpeakerSlot switch
+            {
+                1 => "Gada",
+                2 => "Spear",
+                3 => "Vishnu Chakra",
+                4 => "Sword",
+                _ => "Agent"
+            };
+
+            var aiMsg = new ChatMessage(
+                aiMsgId,
+                agentName,
+                "Consulting personal agent facts…",
+                false,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                Model: $"Personal Agent (Slot {selectedSpeakerSlot})",
+                Status: "Querying"
+            );
+            chatMessages.Add(aiMsg);
+            ChatHistoryList.ItemsSource = chatMessages.ToList();
+            ChatHistoryList.ScrollIntoView(aiMsg);
+
+            try
+            {
                 var res = await hostClient.SendCommandAsync("personal_agent.converse", new
                 {
                     slot = selectedSpeakerSlot,
@@ -418,29 +721,29 @@ public partial class MainWindow : Window
                 }, lifetime.Token);
 
                 string replyText = "No response recorded.";
-                if (res.TryGetProperty("reply", out var repProp) && repProp.TryGetProperty("text", out var tProp))
+                if (res.TryGetProperty("data", out var dataObj) &&
+                    dataObj.TryGetProperty("reply", out var repObj) &&
+                    repObj.TryGetProperty("text", out var tProp))
                 {
                     replyText = tProp.GetString() ?? replyText;
                 }
+                else if (res.TryGetProperty("reply", out var repProp) && repProp.TryGetProperty("text", out var t2Prop))
+                {
+                    replyText = t2Prop.GetString() ?? replyText;
+                }
 
-                var replyMsg = new ChatMessage(Guid.NewGuid().ToString(), agentName, replyText, false, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), Model: "Host Knowledge Base");
-                chatMessages.Add(replyMsg);
+                UpdateChatMessage(aiMsgId, replyText, "Answered", $"Personal Agent Context (Slot {selectedSpeakerSlot})");
             }
-
-            ChatHistoryList.ItemsSource = chatMessages.ToList();
-            if (chatMessages.Count > 0) ChatHistoryList.ScrollIntoView(chatMessages[^1]);
-            await RefreshAllStateAsync(force: true);
-        }
-        catch (Exception ex)
-        {
-            var errMsg = new ChatMessage(Guid.NewGuid().ToString(), "System", $"[Error] {ex.Message}", false, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
-            chatMessages.Add(errMsg);
-            ChatHistoryList.ItemsSource = chatMessages.ToList();
-        }
-        finally
-        {
-            SendButton.IsEnabled = true;
-            StopButton.IsEnabled = false;
+            catch (Exception ex)
+            {
+                UpdateChatMessage(aiMsgId, $"Agent error: {ex.Message}", "Error");
+            }
+            finally
+            {
+                SendButton.IsEnabled = true;
+                StopButton.IsEnabled = false;
+                await RefreshAllStateAsync(force: true);
+            }
         }
     }
 
@@ -450,17 +753,63 @@ public partial class MainWindow : Window
         {
             try
             {
-                await hostClient.SendCommandAsync("stop", new { id = activeInferenceTaskId });
+                await hostClient.SendCommandAsync("stop", new
+                {
+                    id = activeInferenceTaskId,
+                    reason = "User cancelled inference from native UI."
+                });
             }
-            catch { }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "Stop Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
     }
 
-    private void DelegatePrompt_Click(object sender, RoutedEventArgs e)
+    private async void DelegatePrompt_Click(object sender, RoutedEventArgs e)
     {
         var prompt = PromptInput.Text.Trim();
-        if (string.IsNullOrEmpty(prompt)) return;
-        SelectTab("Projects");
+        if (string.IsNullOrEmpty(prompt) || !hostClient.IsConnected) return;
+
+        PromptInput.Clear();
+        SendButton.IsEnabled = false;
+
+        try
+        {
+            var res = await hostClient.SendCommandAsync("mission.create", new
+            {
+                objective = prompt,
+                mode = "fast"
+            }, lifetime.Token);
+
+            string missionId = "";
+            if (res.TryGetProperty("mission", out var mObj) && mObj.TryGetProperty("id", out var idProp))
+            {
+                missionId = idProp.GetString() ?? "";
+            }
+
+            var replyMsg = new ChatMessage(
+                Guid.NewGuid().ToString(),
+                "Agent Coordinator",
+                $"Multi-agent mission {missionId} created. The Planner Agent is preparing execution steps.\nSwitch to Agent Dashboard to review the plan.",
+                false,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                Model: "Planner (Gada/Sword)"
+            );
+            chatMessages.Add(replyMsg);
+            ChatHistoryList.ItemsSource = chatMessages.ToList();
+
+            SelectTab("Agents");
+            await RefreshAllStateAsync(force: true);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Agent delegation failed: {ex.Message}", "Delegation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            SendButton.IsEnabled = true;
+        }
     }
 
     private void CopyMessage_Click(object sender, RoutedEventArgs e)
@@ -481,6 +830,28 @@ public partial class MainWindow : Window
         CancelActiveTaskButton.IsEnabled = hasSelection;
         PauseTaskButton.IsEnabled = hasSelection;
         ResumeTaskButton.IsEnabled = hasSelection;
+        RunWithAgentsButton.IsEnabled = hasSelection;
+    }
+
+    private async void RunWithAgents_Click(object sender, RoutedEventArgs e)
+    {
+        if (ActiveTasksList.SelectedItem is TaskRow row)
+        {
+            try
+            {
+                await hostClient.SendCommandAsync("mission.approve", new { id = row.Id, start = true });
+                await RefreshAllStateAsync(force: true);
+                MessageBox.Show(this, $"Mission {row.Id} approved and launched with Agents.", "Agent Workflow Started", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "Launch Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        else
+        {
+            MessageBox.Show(this, "Select an active mission or task from the list above first.", "Select Task", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private async void CancelSelectedTask_Click(object sender, RoutedEventArgs e)
@@ -489,7 +860,21 @@ public partial class MainWindow : Window
         {
             try
             {
-                await hostClient.SendCommandAsync("ptask.cancel", new { id = row.Id });
+                try
+                {
+                    await hostClient.SendCommandAsync("stop", new { id = row.Id, reason = "User cancelled task from native UI." });
+                }
+                catch
+                {
+                    try
+                    {
+                        await hostClient.SendCommandAsync("mission.stop", new { id = row.Id });
+                    }
+                    catch
+                    {
+                        await hostClient.SendCommandAsync("ptask.cancel", new { id = row.Id });
+                    }
+                }
                 await RefreshAllStateAsync(force: true);
             }
             catch (Exception ex)
@@ -563,12 +948,32 @@ public partial class MainWindow : Window
         {
             try
             {
-                await hostClient.SendCommandAsync("action.approve", new
+                if (app.OperationKind == "mission.approve")
                 {
-                    id = app.TaskId,
-                    actionId = app.ActionId,
-                    payloadSha256 = app.PayloadSha256
-                });
+                    await hostClient.SendCommandAsync("mission.approve", new { id = app.TaskId, start = true });
+                }
+                else if (app.OperationKind == "task.approve")
+                {
+                    await hostClient.SendCommandAsync("approve", new { id = app.TaskId });
+                }
+                else if (app.Category == "consequential")
+                {
+                    await hostClient.SendCommandAsync("mission.respond", new
+                    {
+                        requestId = app.ActionId,
+                        decision = "allow_once"
+                    });
+                }
+                else
+                {
+                    await hostClient.SendCommandAsync("action.approve", new
+                    {
+                        id = app.TaskId,
+                        actionId = app.ActionId,
+                        payloadSha256 = app.PayloadSha256
+                    });
+                }
+
                 MessageBox.Show(this, "Consequential action approved and released to Host execution engine.", "Action Approved", MessageBoxButton.OK, MessageBoxImage.Information);
                 await RefreshAllStateAsync(force: true);
             }
@@ -585,11 +990,31 @@ public partial class MainWindow : Window
         {
             try
             {
-                await hostClient.SendCommandAsync("action.deny", new
+                if (app.OperationKind == "mission.approve")
                 {
-                    id = app.TaskId,
-                    actionId = app.ActionId
-                });
+                    await hostClient.SendCommandAsync("mission.stop", new { id = app.TaskId });
+                }
+                else if (app.OperationKind == "task.approve")
+                {
+                    await hostClient.SendCommandAsync("stop", new { id = app.TaskId, reason = "User denied task approval." });
+                }
+                else if (app.Category == "consequential")
+                {
+                    await hostClient.SendCommandAsync("mission.respond", new
+                    {
+                        requestId = app.ActionId,
+                        decision = "deny"
+                    });
+                }
+                else
+                {
+                    await hostClient.SendCommandAsync("action.deny", new
+                    {
+                        id = app.TaskId,
+                        actionId = app.ActionId
+                    });
+                }
+
                 MessageBox.Show(this, "Consequential action denied. The task will safely fail closed.", "Action Denied", MessageBoxButton.OK, MessageBoxImage.Information);
                 await RefreshAllStateAsync(force: true);
             }
@@ -700,13 +1125,52 @@ public partial class MainWindow : Window
             var name = Path.GetFileName(path);
             if (string.IsNullOrEmpty(name)) name = "Project";
 
-            await hostClient.SendCommandAsync("project.create", new { path, name });
+            if (Directory.Exists(path))
+            {
+                await hostClient.SendCommandAsync("project.add", new { path, name, description = "Registered workspace folder" });
+            }
+            else
+            {
+                await hostClient.SendCommandAsync("project.create", new { name, confirmed = true });
+            }
+
             NewProjectPathInput.Clear();
             await RefreshAllStateAsync(force: true);
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "Project Registration Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void ProposeProjectMission_Click(object sender, RoutedEventArgs e)
+    {
+        var objective = ProjectMissionObjectiveInput.Text.Trim();
+        if (string.IsNullOrEmpty(objective) || !hostClient.IsConnected) return;
+
+        string? projectId = null;
+        if (ProjectsList.SelectedItem is ProjectItem proj)
+        {
+            projectId = proj.Id;
+        }
+
+        try
+        {
+            var res = await hostClient.SendCommandAsync("mission.create", new
+            {
+                objective,
+                mode = "fast",
+                projectId
+            }, lifetime.Token);
+
+            ProjectMissionObjectiveInput.Clear();
+            SelectTab("Agents");
+            await RefreshAllStateAsync(force: true);
+            MessageBox.Show(this, "Multi-agent mission plan proposed. Review the steps in the Agent Dashboard and select 'Run with Agents'.", "Plan Proposed", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"Plan proposal failed: {ex.Message}", "Proposal Error", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

@@ -15,7 +15,7 @@ public sealed class HostClient : IDisposable
 {
     private readonly HttpClient client = new(new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false })
     {
-        Timeout = TimeSpan.FromSeconds(10)
+        Timeout = TimeSpan.FromSeconds(30)
     };
 
     public string? HostId { get; private set; }

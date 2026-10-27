@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Windows;
+using System.Windows.Media;
 
 namespace BunnyA.Models;
 
@@ -77,7 +79,19 @@ public sealed record ChatMessage(
     long Timestamp,
     string? Model = null,
     string? Status = null
-);
+)
+{
+    public HorizontalAlignment Alignment => IsUser ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+    public SolidColorBrush BubbleBackground => IsUser 
+        ? new SolidColorBrush(Color.FromRgb(34, 46, 74)) 
+        : new SolidColorBrush(Color.FromRgb(22, 28, 44));
+    public SolidColorBrush BubbleBorder => IsUser 
+        ? new SolidColorBrush(Color.FromRgb(58, 76, 120)) 
+        : new SolidColorBrush(Color.FromRgb(38, 50, 78));
+    public SolidColorBrush SenderColor => IsUser 
+        ? new SolidColorBrush(Color.FromRgb(121, 170, 255)) 
+        : new SolidColorBrush(Color.FromRgb(134, 232, 171));
+}
 
 public sealed record ProjectItem(
     string Id,

@@ -70,11 +70,66 @@ public partial class NotchWindow : Window
             string? activeId = null;
             bool hasApproval = false;
 
-            if (root.TryGetProperty("persistentTasks", out var ptasks) &&
-                ptasks.TryGetProperty("tasks", out var tasksArr) &&
-                tasksArr.ValueKind == JsonValueKind.Array)
+            // 1. Check Host tasks (OrchTasks)
+            if (root.TryGetProperty("tasks", out var tasksArr) && tasksArr.ValueKind == JsonValueKind.Array)
             {
                 foreach (var t in tasksArr.EnumerateArray())
+                {
+                    var state = t.GetProperty("state").GetString() ?? "";
+                    if (state == "waiting_for_approval")
+                    {
+                        hasApproval = true;
+                    }
+                    if (state is "running" or "routing")
+                    {
+                        activeTitle = t.TryGetProperty("title", out var titleProp) ? titleProp.GetString() : "Task running";
+                        activeState = state.ToUpperInvariant();
+                        activeId = t.GetProperty("id").GetString();
+                        canCancel = true;
+                        break;
+                    }
+                }
+            }
+
+            // 2. Check Host missions
+            if (root.TryGetProperty("missions", out var missionsObj) &&
+                missionsObj.TryGetProperty("missions", out var missionsArr) &&
+                missionsArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var m in missionsArr.EnumerateArray())
+                {
+                    var state = m.GetProperty("state").GetString() ?? "";
+                    if (state is "waiting_for_approval" or "waiting_for_user")
+                    {
+                        hasApproval = true;
+                    }
+                    if (m.TryGetProperty("requests", out var reqs) && reqs.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var req in reqs.EnumerateArray())
+                        {
+                            if (req.TryGetProperty("resolvedAt", out var ra) && ra.ValueKind == JsonValueKind.Null)
+                            {
+                                hasApproval = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (activeTitle == null && state is "planning" or "running" or "waiting_for_user" or "verifying")
+                    {
+                        activeTitle = m.TryGetProperty("title", out var titleProp) ? titleProp.GetString() : "Mission running";
+                        activeState = state.ToUpperInvariant();
+                        activeId = m.GetProperty("id").GetString();
+                        canCancel = true;
+                    }
+                }
+            }
+
+            // 3. Fallback to persistentTasks
+            if (activeTitle == null && root.TryGetProperty("persistentTasks", out var ptasks) &&
+                ptasks.TryGetProperty("tasks", out var ptasksArr) &&
+                ptasksArr.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var t in ptasksArr.EnumerateArray())
                 {
                     var state = t.GetProperty("state").GetString() ?? "";
                     if (state is "AWAITING_APPROVAL")
@@ -194,10 +249,26 @@ public partial class NotchWindow : Window
         {
             try
             {
-                await hostClient.SendCommandAsync("ptask.cancel", new { id = taskId });
+                await hostClient.SendCommandAsync("stop", new { id = taskId, reason = "User stopped from notch." });
                 QuickStopButton.Visibility = Visibility.Collapsed;
             }
-            catch { }
+            catch
+            {
+                try
+                {
+                    await hostClient.SendCommandAsync("mission.stop", new { id = taskId });
+                    QuickStopButton.Visibility = Visibility.Collapsed;
+                }
+                catch
+                {
+                    try
+                    {
+                        await hostClient.SendCommandAsync("ptask.cancel", new { id = taskId });
+                        QuickStopButton.Visibility = Visibility.Collapsed;
+                    }
+                    catch { }
+                }
+            }
         }
     }
 }
