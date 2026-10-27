@@ -37,6 +37,67 @@ export type AdaptivePlanResult = {
 
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
 
+export type VerifiedArtifactCacheEntry = {
+  sha256: string;
+  sourceContentHash: string;
+  projectScope: string;
+  verificationContractHash: string;
+  modelPin: string | null;
+  expiresAt: number;
+  valid: boolean;
+  success: boolean;
+};
+
+/**
+ * Validates whether a previously stored artifact may be reused under strict Host safety invariants.
+ * Any mismatch in scope, source hash, verification contract, expiration, model pin, or validity
+ * strictly invalidates reuse and requires re-execution.
+ */
+export function evaluateArtifactReuse(input: {
+  step: TaskSpec["steps"][number];
+  projectScope: string;
+  contractHash: string;
+  envelope: Envelope;
+  cachedEntry?: VerifiedArtifactCacheEntry | { sha256: string; valid: boolean } | null;
+  now?: number;
+  tampered?: boolean;
+}): { reusable: boolean; reason: string } {
+  if (!input.cachedEntry) {
+    return { reusable: false, reason: "No earlier artifact exists in cache." };
+  }
+  const entry = input.cachedEntry;
+  if ("success" in entry && !entry.success) {
+    return { reusable: false, reason: "Failed previous execution: artifact was not verified successful." };
+  }
+  if (!entry.valid || input.tampered) {
+    return { reusable: false, reason: "Tampered or invalid artifact: content hash or signature verification failed." };
+  }
+  const now = input.now ?? Date.now();
+  if ("expiresAt" in entry && entry.expiresAt <= now) {
+    return { reusable: false, reason: "Expired cache entry." };
+  }
+  if ("projectScope" in entry && entry.projectScope !== input.projectScope) {
+    return { reusable: false, reason: `Different project scope: cached under ${entry.projectScope}, requested under ${input.projectScope}.` };
+  }
+  if ("verificationContractHash" in entry && entry.verificationContractHash !== input.contractHash) {
+    return { reusable: false, reason: "Different verification contract: acceptance criteria have changed." };
+  }
+  if (!input.envelope.capabilities.includes(input.step.kind)) {
+    return { reusable: false, reason: "Changed authorization: task envelope no longer grants this capability." };
+  }
+  if ("modelPin" in entry && entry.modelPin && input.step.model && entry.modelPin !== input.step.model) {
+    return { reusable: false, reason: `Modified model pin: cached on ${entry.modelPin}, step specifies ${input.step.model}.` };
+  }
+  if ("sourceContentHash" in entry) {
+    const currentContentHash = sha256(JSON.stringify(input.step.input));
+    if (entry.sourceContentHash !== currentContentHash) {
+      return { reusable: false, reason: "Changed source file or step input: content hash differs from cached artifact." };
+    }
+  }
+
+  return { reusable: true, reason: "Verified artifact cache hit: all safety and provenance criteria met." };
+}
+
 /**
  * Enhanced C0-C3 adaptive classifier.
  * Preserves Host authority and safety baselines while minimizing unnecessary model and agent calls.
@@ -123,7 +184,8 @@ export function validateAndOptimizePlanGraph(input: {
   spec: TaskSpec;
   envelope: Envelope;
   facts: ReadonlyMap<string, ExecutorFacts>;
-  knownArtifacts?: ReadonlyMap<string, { sha256: string; valid: boolean }>;
+  knownArtifacts?: ReadonlyMap<string, VerifiedArtifactCacheEntry | { sha256: string; valid: boolean }>;
+  now?: number;
 }): {
   ok: boolean;
   optimizedSpec: TaskSpec;
@@ -215,12 +277,24 @@ export function validateAndOptimizePlanGraph(input: {
   });
 
   // 5. Check reusable verified artifacts
+  const contractHash = sha256(input.spec.acceptance.description + ":" + input.spec.acceptance.requiredSteps.join(","));
+  const projectScope = input.envelope.projectScopes[0] ?? input.spec.projectId;
   if (input.knownArtifacts) {
     for (const step of prunedSteps) {
       const stepSig = sha256(JSON.stringify({ kind: step.kind, input: step.input }));
       const known = input.knownArtifacts.get(stepSig);
-      if (known?.valid) {
-        reusedArtifacts.push({ stepId: step.id, artifactHash: known.sha256 });
+      if (known) {
+        const evalRes = evaluateArtifactReuse({
+          step,
+          projectScope,
+          contractHash,
+          envelope: input.envelope,
+          cachedEntry: known,
+          now: input.now,
+        });
+        if (evalRes.reusable) {
+          reusedArtifacts.push({ stepId: step.id, artifactHash: known.sha256 });
+        }
       }
     }
   }
