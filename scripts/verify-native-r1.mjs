@@ -56,6 +56,7 @@ function runPsHelper(action, args = {}) {
   if (args.pid) psArgs.push("-ProcessId", String(args.pid));
   if (args.prompt) psArgs.push("-PromptText", args.prompt);
   if (args.edge) psArgs.push("-ExpectedEdge", args.edge);
+  if (args.configPath) psArgs.push("-ConfigPath", args.configPath);
 
   const res = spawnSync("powershell.exe", psArgs, { encoding: "utf8" });
   if (res.status !== 0) {
@@ -84,8 +85,8 @@ try {
   writeFileSync(credPath, JSON.stringify({ port, token: host.token }), "utf8");
 
   // Ensure config.json starts with NotchEdge: "Top" for deterministic edge cycling
-  const configDir = join(process.env.LOCALAPPDATA, "BunnyA");
-  mkdirSync(configDir, { recursive: true });
+  // R1R2: an isolated config directory; this script used to overwrite the owner's %LOCALAPPDATA%\BunnyA\config.json.
+  const configDir = mkdtempSync(join(tmpdir(), "bunny-config-r1-"));
   const cfgPath = join(configDir, "config.json");
   let cfgObj = {};
   try {
@@ -107,7 +108,8 @@ try {
   const app = spawn(exePath, [], {
     env: {
       ...process.env,
-      BUNNY_HOST_CREDENTIALS_FILE: credPath
+      BUNNY_HOST_CREDENTIALS_FILE: credPath,
+      BUNNY_CONFIG_DIRECTORY: configDir
     },
     stdio: "pipe"
   });
@@ -421,7 +423,7 @@ test("config.json contains updated state", () => {
   const edgeSequence = ["Right", "Bottom", "Left", "Top"];
   for (const targetEdge of edgeSequence) {
     console.log(`[STAGE 3] Cycling dock edge to: ${targetEdge}...`);
-    const edgeResult = runPsHelper("cycle_dock_edge", { pid: app.pid, edge: targetEdge });
+    const edgeResult = runPsHelper("cycle_dock_edge", { pid: app.pid, edge: targetEdge, configPath: cfgPath });
     console.log(`[STAGE 3] Edge result for ${targetEdge}:`, edgeResult);
     assert.equal(edgeResult.edge, targetEdge, `Persisted edge must equal ${targetEdge}`);
     assert.ok(edgeResult.width > 0 && edgeResult.height > 0, "Notch must have positive rendered dimensions");
@@ -449,6 +451,7 @@ test("config.json contains updated state", () => {
     env: {
       ...process.env,
       BUNNY_HOST_CREDENTIALS_FILE: credPath,
+      BUNNY_CONFIG_DIRECTORY: configDir,
       BUNNY_SILENT_SINGLE_INSTANCE: "1"
     },
     stdio: "ignore"

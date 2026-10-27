@@ -1,0 +1,68 @@
+{
+  "approve": {
+    "taskId": "ptask-2c7c3d01-f658-4a30-b068-bd860896e2e2",
+    "actionId": "act-04eded87-cc30-46f2-a515-6f66d43e285d",
+    "hostPayloadSha256": "c63991785b46aa0173e211f1aab03028c8cf21090c2380c2477df25750ce04c6",
+    "uiPayloadSha256": "c63991785b46aa0173e211f1aab03028c8cf21090c2380c2477df25750ce04c6",
+    "uiOperation": "Operation: file.apply",
+    "beforeSha256": "7343cfef0ce09677cead36165deb0c48537d42de4273b61f83fdf343c650dd58",
+    "afterSha256": "5f54d62876ce612e1e1565651ca2df19274f0d1f843359d67047e5e56d940740",
+    "uiDialog": {
+      "invoked": "ApproveActionButton",
+      "dialogTitle": "Action Approved",
+      "dialogText": "Consequential action approved and released to Host execution engine."
+    },
+    "finalState": "COMPLETED",
+    "testReceipt": "receipt:test-exec:test-1793134206889-ed16635a:c610a218886b61eee00f14197913a08f8a6122931e30a9e0396477ecdc8fed2f",
+    "testExitCode": 0,
+    "actionReceipts": 6,
+    "ledgerVerified": {
+      "ok": true,
+      "entries": 6
+    }
+  },
+  "incorrectHash": {
+    "channel": "Host command (same contract the UI calls)",
+    "httpStatus": 400,
+    "refusal": "The action changed since you reviewed it; nothing was approved. Inspect it again.",
+    "stateAfter": "AWAITING_APPROVAL"
+  },
+  "deny": {
+    "taskId": "ptask-4839f0ad-901a-4ead-b14b-2baa0e60d853",
+    "uiDialog": {
+      "invoked": "DenyActionButton",
+      "dialogTitle": "Action Denied",
+      "dialogText": "Consequential action denied. The task will safely fail closed."
+    },
+    "finalState": "FAILED",
+    "fileUnchanged": true
+  },
+  "staleIdentity": {
+    "taskId": "ptask-bd0a66cc-5297-477e-b236-18e08d3d5f8e",
+    "uiShowedRow": true,
+    "uiDialog": {
+      "invoked": "ApproveActionButton",
+      "dialogTitle": "Approval Failed",
+      "dialogText": "Approval Refused: [REFUSED] The task is CANCELLED; this action needs AWAITING_APPROVAL."
+    },
+    "finalState": "CANCELLED",
+    "fileUnchanged": true
+  },
+  "cancellation": {
+    "channel": "Host command",
+    "taskId": "ptask-bd0a66cc-5297-477e-b236-18e08d3d5f8e",
+    "httpStatus": 200
+  },
+  "restart": {
+    "stateAfterRestart": "AWAITING_APPROVAL",
+    "pendingActionSurvived": true,
+    "epochChanged": true,
+    "uiDialog": {
+      "invoked": "ApproveActionButton",
+      "dialogTitle": "Action Approved",
+      "dialogText": "Consequential action approved and released to Host execution engine."
+    },
+    "finalState": "COMPLETED",
+    "fileAfter": "{\"state\":\"updated\"}"
+  }
+}

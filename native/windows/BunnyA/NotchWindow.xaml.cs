@@ -41,6 +41,7 @@ public partial class NotchWindow : Window
             HorizontalLayout.Visibility = Visibility.Visible;
             VerticalLayout.Visibility = Visibility.Collapsed;
             NotchBorder.CornerRadius = new CornerRadius(24);
+            UpdateLayout(); // ActualWidth/Height must describe the new layout, not the previous orientation.
 
             Left = workArea.Left + (workArea.Width - Math.Max(ActualWidth, 420)) / 2;
             Top = edge == "Top" ? workArea.Top : workArea.Bottom - Math.Max(ActualHeight, 60);
@@ -50,6 +51,7 @@ public partial class NotchWindow : Window
             HorizontalLayout.Visibility = Visibility.Collapsed;
             VerticalLayout.Visibility = Visibility.Visible;
             NotchBorder.CornerRadius = new CornerRadius(20);
+            UpdateLayout();
 
             Top = workArea.Top + (workArea.Height - Math.Max(ActualHeight, 220)) / 2;
             Left = edge == "Left" ? workArea.Left : workArea.Right - Math.Max(ActualWidth, 60);

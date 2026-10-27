@@ -27,6 +27,8 @@ public partial class MainWindow : Window
     private int selectedSpeakerSlot = 0; // 0 = Bunny, 1 = Gada, 2 = Spear, 3 = Chakra, 4 = Sword
     private string? activeInferenceTaskId;
     private readonly List<ChatMessage> chatMessages = new();
+    private List<ModelItem> chatModels = new();
+    private bool exiting;
 
     public MainWindow()
     {
@@ -45,6 +47,7 @@ public partial class MainWindow : Window
         Closing += (_, e) =>
         {
             // Keep app running in tray/notch unless explicitly exiting
+            if (exiting) return;
             e.Cancel = true;
             Hide();
         };
@@ -88,6 +91,13 @@ public partial class MainWindow : Window
         {
             SelectTab(tabName);
         }
+    }
+
+    private void Quit_Click(object sender, RoutedEventArgs e)
+    {
+        // The only clean exit: closing the window just hides it to the notch.
+        exiting = true;
+        Application.Current.Shutdown(0);
     }
 
     private void ToggleNotch_Click(object sender, RoutedEventArgs e)
@@ -315,7 +325,8 @@ public partial class MainWindow : Window
                             OperationKind: kind,
                             Summary: summary,
                             PayloadSha256: sha,
-                            Category: "consequential",
+                            // Not "consequential": that category answers mission requests via mission.respond.
+                            Category: "action",
                             Reversible: reversible,
                             ExpiresAt: expiresAt,
                             Scope: $"Task {id} Envelope",
@@ -371,16 +382,17 @@ public partial class MainWindow : Window
             }
 
             // 3. Process Projects
-            if (root.TryGetProperty("projects", out var proj) &&
-                proj.TryGetProperty("projects", out var projArr) &&
+            // /state.projects is an array. Reading it as an object threw here and aborted every later section,
+            // leaving the chat model picker empty so chats silently fell back to Host auto-routing (R1R2).
+            if (root.TryGetProperty("projects", out var projArr) &&
                 projArr.ValueKind == JsonValueKind.Array)
             {
                 var projects = new List<ProjectItem>();
                 foreach (var p in projArr.EnumerateArray())
                 {
                     var id = p.GetProperty("id").GetString() ?? "";
-                    var name = p.GetProperty("name").GetString() ?? id;
-                    var path = p.GetProperty("path").GetString() ?? "";
+                    var name = p.TryGetProperty("name", out var nm) ? nm.GetString() ?? id : id;
+                    var path = p.TryGetProperty("path", out var pth) ? pth.GetString() ?? "" : "";
                     var created = p.TryGetProperty("createdAt", out var cr) ? cr.GetInt64() : 0;
                     projects.Add(new ProjectItem(id, name, path, created, 0));
                 }
@@ -447,7 +459,9 @@ public partial class MainWindow : Window
 
             if (ChatModelCombo.Items.Count == 0 && models.Count > 0)
             {
-                ChatModelCombo.ItemsSource = models.Select(m => m.Id).ToList();
+                // R1R2: default to Host routing; silently pinning models[0] sent chats to whatever listed first.
+                chatModels = models;
+                ChatModelCombo.ItemsSource = new[] { "Auto" }.Concat(models.Select(m => m.Id)).ToList();
                 ChatModelCombo.SelectedIndex = 0;
             }
 
@@ -551,6 +565,9 @@ public partial class MainWindow : Window
         chatMessages.Add(userMsg);
 
         var model = ChatModelCombo.SelectedItem as string;
+        if (model == "Auto") model = null;
+        var selectedProvider = model == null ? null : chatModels.FirstOrDefault(m => m.Id == model)?.Provider;
+        var localOnly = LocalOnlyCheck.IsChecked == true;
         var aiMsgId = Guid.NewGuid().ToString();
 
         if (selectedSpeakerSlot == 0)
@@ -572,12 +589,16 @@ public partial class MainWindow : Window
             try
             {
                 // 1. Submit task to Host
-                var res = await hostClient.SendCommandAsync("submit", new
+                // The Host enforces local/offline-only at routing, launch and failover; it refuses rather than substitutes.
+                var submit = new Dictionary<string, object?>
                 {
-                    prompt = prompt,
-                    mode = "fast",
-                    modelOverride = string.IsNullOrEmpty(model) ? null : model
-                }, lifetime.Token);
+                    ["prompt"] = prompt,
+                    ["mode"] = "fast",
+                    ["override"] = selectedProvider ?? "auto",
+                    ["modelOverride"] = model,
+                };
+                if (localOnly) submit["constraints"] = new { localOnly = true, offlineOnly = true };
+                var res = await hostClient.SendCommandAsync("submit", submit, lifetime.Token);
 
                 if (!res.TryGetProperty("task", out var taskObj))
                 {
@@ -627,7 +648,15 @@ public partial class MainWindow : Window
                     {
                         var curState = matchedTask.Value.GetProperty("state").GetString() ?? "";
                         var modelUsed = matchedTask.Value.TryGetProperty("model", out var m) ? m.GetString() : model;
-                        var providerUsed = matchedTask.Value.TryGetProperty("provider", out var p) ? p.GetString() : "ollama";
+                        var providerUsed = matchedTask.Value.TryGetProperty("provider", out var p) ? p.GetString() : null;
+
+                        // Defence in depth: a pinned local chat never shows an answer from a different provider.
+                        if (selectedProvider != null && providerUsed != null && providerUsed != selectedProvider)
+                        {
+                            await hostClient.SendCommandAsync("stop", new { id = taskId, reason = "Route changed from the selected provider." }, lifetime.Token);
+                            UpdateChatMessage(aiMsgId, $"Refused: the Host routed this chat to {providerUsed}, not the selected {selectedProvider}.", "Refused", $"{providerUsed} · {modelUsed}");
+                            break;
+                        }
 
                         if (curState == "completed")
                         {

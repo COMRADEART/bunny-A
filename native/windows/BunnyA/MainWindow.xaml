@@ -46,6 +46,7 @@
         <StackPanel DockPanel.Dock="Bottom" Margin="0,16,0,0">
           <Button x:Name="ToggleNotchButton" Content="💎 Show Glass Notch" Click="ToggleNotch_Click" Margin="0,0,0,8"/>
           <Button x:Name="RefreshAllButton" Content="🔄 Refresh State" Click="RefreshAll_Click"/>
+          <Button x:Name="QuitButton" Content="⏻ Quit Bunny A" Click="Quit_Click" Margin="0,8,0,0"/>
         </StackPanel>
 
         <!-- Navigation Menu Items -->
@@ -82,7 +83,8 @@
           <TextBlock Text="AI Conversation" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <TextBlock Text="Model: " VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
-            <ComboBox x:Name="ChatModelCombo" Width="180" Background="{StaticResource ElevatedBrush}" Foreground="{StaticResource TextBrush}" Margin="6,0,12,0"/>
+            <ComboBox x:Name="ChatModelCombo" Width="180" Background="{StaticResource ElevatedBrush}" Foreground="{StaticResource TextBrush}" Margin="6,0,12,0" AutomationProperties.Name="Chat model"/>
+            <CheckBox x:Name="LocalOnlyCheck" Content="Local only" VerticalAlignment="Center" Foreground="{StaticResource TextBrush}" Margin="0,0,12,0" ToolTip="Run only on a local model, offline. The Host refuses instead of using a hosted provider."/>
             <Button Content="New Chat" Padding="12,4" MinHeight="32" Click="NewChat_Click"/>
           </StackPanel>
         </DockPanel>

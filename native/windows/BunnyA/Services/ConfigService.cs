@@ -16,10 +16,10 @@ public sealed record AppConfiguration
 
 public static class ConfigService
 {
-    private static readonly string ConfigDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "BunnyA"
-    );
+    // BUNNY_CONFIG_DIRECTORY isolates acceptance runs from the owner's real settings.
+    private static readonly string ConfigDir = Environment.GetEnvironmentVariable("BUNNY_CONFIG_DIRECTORY") is { Length: > 0 } dir
+        ? dir
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BunnyA");
     private static readonly string ConfigPath = Path.Combine(ConfigDir, "config.json");
 
     public static AppConfiguration Load()
