@@ -21,7 +21,13 @@ import {
   isVerifiedSuccess,
   summarizeOutcomeRecords,
   type ExecutionOutcomeRecord,
+  type EvidenceCategory,
 } from "./outcome-measurement.ts";
+import {
+  executeDeterministicTest,
+  verifyTestReceipt,
+  type DeterministicTestResult,
+} from "./test-runner.server.ts";
 import type { ComplexityClass } from "./s3t1.ts";
 import { ResourceAwareModelScheduler, reportNpuStatus } from "./resource-scheduler.ts";
 import type { Envelope, TaskSpec, ExecutorFacts } from "./task-runtime.ts";
@@ -718,11 +724,49 @@ export type BenchmarkRunResult = {
   toolCalls: number;
   durationMs: number;
   vramPeakBytes: number | null;
+  vramSnapshotMaxBytes: number | null;
   vramUsedBytes: number | null;
   vramFreeBytes: number | null;
   gpuUtilPercent: number | null;
   executionOrderIndex: number;
+  evidenceCategory: EvidenceCategory;
   outcomeRecord: ExecutionOutcomeRecord;
+  error?: string;
+};
+
+export type GpuTelemetrySample = {
+  timestamp: number;
+  available: boolean;
+  unavailableReason?: string;
+  source: "nvidia-smi" | "fixture" | "unavailable";
+  name: string | null;
+  gpuName: string | null;
+  totalVramBytes: number | null;
+  freeVramBytes: number | null;
+  usedVramBytes: number | null;
+  gpuUtilPercent: number | null;
+  valid: boolean;
+};
+
+export type ModelIdentityStatus =
+  | "verified"
+  | "unavailable"
+  | "missing_digest"
+  | "malformed_digest"
+  | "digest_mismatch"
+  | "unapproved_model"
+  | "remote_model_rejected"
+  | "served_model_mismatch"
+  | "simulated";
+
+export type ModelIdentityResult = {
+  requestedModel: string;
+  approvedModel: { id: string; digest: string | null };
+  actuallyServedModel: { id: string; digest: string | null } | null;
+  observedDigest: string | null;
+  status: ModelIdentityStatus;
+  verified: boolean;
+  isSimulated: boolean;
   error?: string;
 };
 
@@ -730,6 +774,7 @@ export type PairedBenchmarkReport = {
   version: typeof FROZEN_BENCHMARK_VERSION;
   model: string;
   modelDigest: string;
+  identityVerification: ModelIdentityResult;
   evaluatedAt: number;
   totalTasks: number;
   devTasksCount: number;
@@ -758,6 +803,39 @@ export type PairedBenchmarkReport = {
     modelCallEfficiencyImprovement: number;
     latencyReductionMs: number;
   };
+  comparisonA_policyAblation: {
+    description: string;
+    candidate: {
+      passedCount: number;
+      passRate: number;
+      totalModelCalls: number;
+      modelCallsPerSuccess: number;
+      totalToolCalls: number;
+      avgDurationMs: number;
+      reusedArtifactCount: number;
+      redundantStepsEliminated: number;
+    };
+    ablationBaseline: {
+      passedCount: number;
+      passRate: number;
+      totalModelCalls: number;
+      modelCallsPerSuccess: number;
+      totalToolCalls: number;
+      avgDurationMs: number;
+    };
+    delta: {
+      passRateGain: number;
+      modelCallEfficiencyImprovement: number;
+      latencyReductionMs: number;
+    };
+    reviewerOverheadNotice: string;
+  };
+  comparisonB_historicalProduction: {
+    targetMilestone: string;
+    targetCommit: string;
+    status: "BLOCKED_NOT_COMPARABLE";
+    reason: string;
+  };
   pairedDifferences: {
     bothPass: number;
     bothFail: number;
@@ -772,20 +850,28 @@ export type PairedBenchmarkReport = {
   resourceObservations: {
     coldLoadMs: number;
     warmLoadMs: number;
-    peakVramBytes: number;
-    freeVramBytes: number;
-    totalVramBytes: number;
-    gpuName: string;
+    peakVramBytes: number | null;
+    snapshotMaxVramBytes: number | null;
+    freeVramBytes: number | null;
+    totalVramBytes: number | null;
+    gpuName: string | null;
     npuStatus: string;
+    telemetryAvailable: boolean;
   };
   measuredHardwareTelemetry: {
-    gpuName: string;
-    totalVramBytes: number;
+    status: "MEASURED" | "UNAVAILABLE";
+    unavailableReason?: string;
+    source: "nvidia-smi" | "fixture" | "unavailable";
+    gpuName: string | null;
+    totalVramBytes: number | null;
     measuredRuns: number;
-    averageVramUsedBytes: number;
-    peakVramUsedBytes: number;
-    averageGpuUtilPercent: number;
+    averageVramUsedBytes: number | null;
+    snapshotMaxVramUsedBytes: number | null;
+    continuousPeakVramUsedBytes: null;
+    samplingMode: "pre_post_snapshots";
+    averageGpuUtilPercent: number | null;
     averageFreeRamBytes: number;
+    peakVramUsedBytes: number | null;
   };
   runs: BenchmarkRunResult[];
 };
@@ -794,15 +880,30 @@ const execFileAsync = promisify(execFile);
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
 
 /**
- * Collects real time-stamped hardware telemetry from NVIDIA SMI and Windows OS.
+ * Collects truthful, measured hardware telemetry from NVIDIA SMI.
+ * Never fabricates device identity, VRAM usage or GPU utilization when observation fails.
  */
-export async function sampleGpuTelemetry(): Promise<{
-  name: string;
-  totalVramBytes: number;
-  freeVramBytes: number;
-  usedVramBytes: number;
-  gpuUtilPercent: number;
-}> {
+export async function sampleGpuTelemetry(options?: {
+  fixture?: Partial<GpuTelemetrySample> | null;
+}): Promise<GpuTelemetrySample> {
+  if (options?.fixture) {
+    const available = options.fixture.available ?? true;
+    const fixtureName = available ? (options.fixture.gpuName ?? options.fixture.name ?? "Simulated GPU") : null;
+    return {
+      timestamp: options.fixture.timestamp ?? Date.now(),
+      available,
+      unavailableReason: options.fixture.unavailableReason,
+      source: "fixture",
+      name: fixtureName,
+      gpuName: fixtureName,
+      totalVramBytes: available ? (options.fixture.totalVramBytes ?? 6141 * 1024 * 1024) : null,
+      usedVramBytes: available ? (options.fixture.usedVramBytes ?? 4081 * 1024 * 1024) : null,
+      freeVramBytes: available ? (options.fixture.freeVramBytes ?? 2060 * 1024 * 1024) : null,
+      gpuUtilPercent: available ? (options.fixture.gpuUtilPercent ?? 0) : null,
+      valid: options.fixture.valid ?? available,
+    };
+  }
+
   try {
     const tool = pathTool("nvidia-smi") ?? "nvidia-smi.exe";
     const { stdout } = await execFileAsync(tool, [
@@ -811,41 +912,221 @@ export async function sampleGpuTelemetry(): Promise<{
     ]);
     const parts = stdout.trim().split(",").map(s => s.trim());
     if (parts.length >= 5) {
-      const totalMiB = parseFloat(parts[1]) || 6141;
-      const freeMiB = parseFloat(parts[2]) || 1840;
-      const usedMiB = parseFloat(parts[3]) || 4081;
-      const utilPercent = parseFloat(parts[4]) || 0;
-      return {
-        name: parts[0],
-        totalVramBytes: Math.round(totalMiB * 1024 * 1024),
-        freeVramBytes: Math.round(freeMiB * 1024 * 1024),
-        usedVramBytes: Math.round(usedMiB * 1024 * 1024),
-        gpuUtilPercent: utilPercent,
-      };
+      const totalMiB = parseFloat(parts[1]);
+      const freeMiB = parseFloat(parts[2]);
+      const usedMiB = parseFloat(parts[3]);
+      const utilPercent = parseFloat(parts[4]);
+      if (!isNaN(totalMiB) && !isNaN(freeMiB) && !isNaN(usedMiB) && !isNaN(utilPercent)) {
+        return {
+          timestamp: Date.now(),
+          available: true,
+          source: "nvidia-smi",
+          name: parts[0],
+          gpuName: parts[0],
+          totalVramBytes: Math.round(totalMiB * 1024 * 1024),
+          freeVramBytes: Math.round(freeMiB * 1024 * 1024),
+          usedVramBytes: Math.round(usedMiB * 1024 * 1024),
+          gpuUtilPercent: utilPercent,
+          valid: true,
+        };
+      }
     }
-  } catch {}
-  return {
-    name: "NVIDIA GeForce RTX 4050 Laptop GPU",
-    totalVramBytes: 6141 * 1024 * 1024,
-    freeVramBytes: 1840 * 1024 * 1024,
-    usedVramBytes: 4081 * 1024 * 1024,
-    gpuUtilPercent: 0,
-  };
+    return {
+      timestamp: Date.now(),
+      available: false,
+      unavailableReason: "Failed to parse numeric telemetry fields from nvidia-smi",
+      source: "unavailable",
+      name: null,
+      gpuName: null,
+      totalVramBytes: null,
+      freeVramBytes: null,
+      usedVramBytes: null,
+      gpuUtilPercent: null,
+      valid: false,
+    };
+  } catch (err) {
+    return {
+      timestamp: Date.now(),
+      available: false,
+      unavailableReason: err instanceof Error ? err.message : String(err),
+      source: "unavailable",
+      name: null,
+      gpuName: null,
+      totalVramBytes: null,
+      freeVramBytes: null,
+      usedVramBytes: null,
+      gpuUtilPercent: null,
+      valid: false,
+    };
+  }
 }
 
 /**
- * Resolves the genuine model digest from Ollama tags API.
+ * Resolves the genuine model digest from Ollama tags API with strict fail-closed verification.
+ * Never substitutes a predefined or hardcoded digest upon query failure.
  */
-export async function getOllamaModelDigest(model: string, endpoint = "http://127.0.0.1:11434"): Promise<string> {
-  try {
-    const tagsRes = await fetch(`${endpoint}/api/tags`, { signal: AbortSignal.timeout(3000) });
-    if (tagsRes.ok) {
-      const tagsData = (await tagsRes.json()) as { models?: Array<{ name: string; digest: string }> };
-      const found = tagsData.models?.find(m => m.name === model || m.name.startsWith(model) || model.startsWith(m.name));
-      if (found?.digest) return found.digest;
+export async function lookupOllamaModelDigest(
+  model: string,
+  endpoint = "http://127.0.0.1:11434",
+  options?: { signal?: AbortSignal; inventoryFixture?: Array<{ name: string; digest: string; remote_host?: string; remote_model?: string }> }
+): Promise<ModelIdentityResult> {
+  if (options?.inventoryFixture) {
+    const found = options.inventoryFixture.find(m => m.name === model || m.name === (model + ":latest"));
+    if (!found) {
+      return {
+        requestedModel: model,
+        approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
+        actuallyServedModel: null,
+        observedDigest: null,
+        status: "unavailable",
+        verified: false,
+        isSimulated: true,
+        error: "Model '" + model + "' not found in simulated Ollama inventory",
+      };
     }
-  } catch {}
-  return BENCHMARK_MODEL_DIGEST;
+    if ((found as { remote_host?: string; remote_model?: string }).remote_host || (found as { remote_host?: string; remote_model?: string }).remote_model) {
+      return {
+        requestedModel: model,
+        approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
+        actuallyServedModel: null,
+        observedDigest: null,
+        status: "remote_model_rejected",
+        verified: false,
+        isSimulated: true,
+        error: "Remote cloud model '" + model + "' rejected for local-only benchmark task",
+      };
+    }
+    if (!found.digest || !/^[0-9a-f]{64}$/.test(found.digest)) {
+      return {
+        requestedModel: model,
+        approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
+        actuallyServedModel: null,
+        observedDigest: found.digest ?? null,
+        status: "malformed_digest",
+        verified: false,
+        isSimulated: true,
+        error: "Model '" + model + "' returned malformed digest in simulated inventory",
+      };
+    }
+    return {
+      requestedModel: model,
+      approvedModel: { id: model, digest: found.digest },
+      actuallyServedModel: { id: model, digest: found.digest },
+      observedDigest: found.digest,
+      status: "simulated",
+      verified: true,
+      isSimulated: true,
+    };
+  }
+
+  if (model.startsWith("mock") || model === "mock") {
+    const mockDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    return {
+      requestedModel: model,
+      approvedModel: { id: model, digest: mockDigest },
+      actuallyServedModel: { id: model, digest: mockDigest },
+      observedDigest: mockDigest,
+      status: "simulated",
+      verified: true,
+      isSimulated: true,
+    };
+  }
+
+
+
+  try {
+    const tagsRes = await fetch(endpoint + "/api/tags", { signal: options?.signal ?? AbortSignal.timeout(3000) });
+    if (!tagsRes.ok) {
+      return {
+        requestedModel: model,
+        approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
+        actuallyServedModel: null,
+        observedDigest: null,
+        status: "unavailable",
+        verified: false,
+        isSimulated: false,
+        error: "Ollama HTTP " + tagsRes.status + ": " + tagsRes.statusText,
+      };
+    }
+    const tagsData = (await tagsRes.json()) as { models?: Array<{ name: string; model?: string; digest: string }> };
+    if (!tagsData.models || !Array.isArray(tagsData.models)) {
+      return {
+        requestedModel: model,
+        approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
+        actuallyServedModel: null,
+        observedDigest: null,
+        status: "unavailable",
+        verified: false,
+        isSimulated: false,
+        error: "Malformed Ollama tags response",
+      };
+    }
+    const found = tagsData.models.find(m => m.name === model || m.name === (model + ":latest") || m.model === model);
+    if (!found) {
+      return {
+        requestedModel: model,
+        approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
+        actuallyServedModel: null,
+        observedDigest: null,
+        status: "unapproved_model",
+        verified: false,
+        isSimulated: false,
+        error: "Model '" + model + "' not found in local Ollama inventory",
+      };
+    }
+    if ((found as { remote_host?: string; remote_model?: string }).remote_host || (found as { remote_host?: string; remote_model?: string }).remote_model) {
+      return {
+        requestedModel: model,
+        approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
+        actuallyServedModel: null,
+        observedDigest: null,
+        status: "remote_model_rejected",
+        verified: false,
+        isSimulated: false,
+        error: "Remote cloud model '" + model + "' rejected for local-only benchmark task",
+      };
+    }
+    if (!found.digest || !/^[0-9a-f]{64}$/.test(found.digest)) {
+      return {
+        requestedModel: model,
+        approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
+        actuallyServedModel: null,
+        observedDigest: found.digest ?? null,
+        status: "malformed_digest",
+        verified: false,
+        isSimulated: false,
+        error: "Model '" + model + "' returned malformed digest",
+      };
+    }
+    return {
+      requestedModel: model,
+      approvedModel: { id: model, digest: found.digest },
+      actuallyServedModel: { id: model, digest: found.digest },
+      observedDigest: found.digest,
+      status: "verified",
+      verified: true,
+      isSimulated: false,
+    };
+  } catch (err) {
+    return {
+      requestedModel: model,
+      approvedModel: { id: model, digest: BENCHMARK_MODEL_DIGEST },
+      actuallyServedModel: null,
+      observedDigest: null,
+      status: "unavailable",
+      verified: false,
+      isSimulated: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function getOllamaModelDigest(model: string, endpoint = "http://127.0.0.1:11434"): Promise<string> {
+  const result = await lookupOllamaModelDigest(model, endpoint);
+  if (!result.verified || !result.observedDigest) {
+    throw new Error("Fail-closed model identity check failed: " + (result.error ?? result.status));
+  }
+  return result.observedDigest;
 }
 
 export function createOllamaModelCall(endpoint = "http://127.0.0.1:11434"): ModelCall {
@@ -1038,8 +1319,8 @@ async function executeHostWorkflow(input: {
     sideEffect: false,
     timeoutMs: 30_000,
     async run(stepInput, ctx) {
-      toolCallCount++;
-      // Real deterministic test evaluation
+      // Independent text/AST oracle validation: evaluates model output against expectations
+      // Note: Oracle validation produces NO process execution receipt or exit code
       let testPassed = false;
       if (input.task.validator) {
         testPassed = input.task.validator(generatedText, input.task.referenceFiles ?? {});
@@ -1050,11 +1331,10 @@ async function executeHostWorkflow(input: {
       }
 
       if (!testPassed) {
-        return { ok: false, error: "Deterministic test assertions failed", dispatched: true, definite: true, fatal: "STEP_FAILED" };
+        return { ok: false, error: "Oracle assertions failed", dispatched: true, definite: true, fatal: "STEP_FAILED" };
       }
-      const testReceipt = sha256(`test-execution-receipt:${input.task.id}:${generatedText.slice(0, 60)}`);
-      genuineTestReceipts.push(testReceipt);
-      return { ok: true, output: "TESTS_PASSED", receipt: testReceipt };
+      // Truthful: return oracle validation output without synthesizing a test execution receipt
+      return { ok: true, output: "ORACLE_VALIDATED" };
     },
   };
 
@@ -1208,7 +1488,15 @@ async function executeHostWorkflow(input: {
     passed = generatedText.includes(input.task.expectedOutputSubstring);
   }
 
-  // Construct truthful ExecutionOutcomeRecord (no synthetic receipts!)
+  // Truthful evidence classification:
+  // If genuine process test receipts were recorded, classify as process_test.
+  // Otherwise, if host tools executed, classify as tool_execution.
+  // Otherwise, classify as pure oracle_validation.
+  const hasProcessReceipts = genuineTestReceipts.length > 0;
+  const evidenceCategory: EvidenceCategory = hasProcessReceipts
+    ? "process_test"
+    : (toolCallCount > 0 ? "tool_execution" : "oracle_validation");
+
   const outcomeRecord = matchedOutcome ?? createOutcomeRecord({
     taskId: view.id,
     projectId: "bench-project",
@@ -1224,10 +1512,11 @@ async function executeHostWorkflow(input: {
     executionTimeMs: durationMs,
     status: passed ? "success" : "failure",
     failureTaxonomy: passed ? null : "STEP_FAILED",
-    testProcessReceipts: genuineTestReceipts, // Strictly from real process test executions
+    testProcessReceipts: genuineTestReceipts,
     hostVerified: {
+      evidenceCategory,
       testReceipts: genuineTestReceipts,
-      exitCodes: passed ? [0] : [1],
+      exitCodes: hasProcessReceipts ? (passed ? [0] : [1]) : [],
       fileModifications: [],
       stateTransitions: ["QUEUED", "RUNNING", passed ? "COMPLETED" : "FAILED"],
       completedContracts: passed,
@@ -1270,11 +1559,17 @@ async function executeHostWorkflow(input: {
       modelCalls: modelCallCount,
       toolCalls: toolCallCount,
       durationMs,
-      vramPeakBytes: Math.max(preGpu.usedVramBytes, postGpu.usedVramBytes),
-      vramUsedBytes: postGpu.usedVramBytes,
-      vramFreeBytes: postGpu.freeVramBytes,
-      gpuUtilPercent: postGpu.gpuUtilPercent,
+      vramPeakBytes: (preGpu.available && postGpu.available && preGpu.usedVramBytes !== null && postGpu.usedVramBytes !== null)
+        ? Math.max(preGpu.usedVramBytes, postGpu.usedVramBytes)
+        : null,
+      vramSnapshotMaxBytes: (preGpu.available && postGpu.available && preGpu.usedVramBytes !== null && postGpu.usedVramBytes !== null)
+        ? Math.max(preGpu.usedVramBytes, postGpu.usedVramBytes)
+        : null,
+      vramUsedBytes: postGpu.available ? postGpu.usedVramBytes : null,
+      vramFreeBytes: postGpu.available ? postGpu.freeVramBytes : null,
+      gpuUtilPercent: postGpu.available ? postGpu.gpuUtilPercent : null,
       executionOrderIndex: input.orderIndex,
+      evidenceCategory,
       outcomeRecord,
       error: passed ? undefined : "Output failed independent oracle verification",
     },
@@ -1292,6 +1587,8 @@ export async function runLiveBenchmark(options: {
   model?: string;
   tasks?: readonly BenchmarkTask[];
   call?: ModelCall;
+  inventoryFixture?: Array<{ name: string; digest: string }>;
+  gpuFixture?: Partial<GpuTelemetrySample> | null;
   onProgress?: (index: number, total: number, task: BenchmarkTask, system: string) => void;
 }): Promise<PairedBenchmarkReport> {
   const endpoint = options.endpoint ?? "http://127.0.0.1:11434";
@@ -1299,7 +1596,11 @@ export async function runLiveBenchmark(options: {
   const tasks = options.tasks ?? FROZEN_BENCHMARK_TASKS;
   const call = options.call ?? createOllamaModelCall(endpoint);
 
-  const modelDigest = await getOllamaModelDigest(model, endpoint);
+  const idResult = await lookupOllamaModelDigest(model, endpoint, { inventoryFixture: options.inventoryFixture });
+  if (!idResult.verified || !idResult.observedDigest) {
+    throw new Error("Fail-closed model identity check failed: " + (idResult.error ?? idResult.status));
+  }
+  const modelDigest = idResult.observedDigest;
 
   // Initialize ResourceAwareModelScheduler and measure cold/warm loading
   const scheduler = new ResourceAwareModelScheduler({ maxVramBytes: 6141 * 1024 * 1024 });
@@ -1442,14 +1743,16 @@ export async function runLiveBenchmark(options: {
   }
 
   const vramSamples = runs.map(r => r.vramUsedBytes).filter((b): b is number => b !== null && b > 0);
-  const avgVram = vramSamples.length ? Math.round(vramSamples.reduce((a, b) => a + b, 0) / vramSamples.length) : 4081 * 1024 * 1024;
-  const peakVram = vramSamples.length ? Math.max(...vramSamples) : 4081 * 1024 * 1024;
-  const totalVram = 6141 * 1024 * 1024;
+  const avgVram = vramSamples.length ? Math.round(vramSamples.reduce((a, b) => a + b, 0) / vramSamples.length) : null;
+  const snapshotMaxVram = vramSamples.length ? Math.max(...vramSamples) : null;
+  const initGpu = await sampleGpuTelemetry({ fixture: options.gpuFixture });
+  const totalVram = initGpu.available ? initGpu.totalVramBytes : null;
 
   return {
     version: FROZEN_BENCHMARK_VERSION,
     model,
     modelDigest,
+    identityVerification: idResult,
     evaluatedAt: Date.now(),
     totalTasks: tasks.length,
     devTasksCount: tasks.filter(t => t.split === "dev").length,
@@ -1478,6 +1781,39 @@ export async function runLiveBenchmark(options: {
       modelCallEfficiencyImprovement: baseModelCalls - candModelCalls,
       latencyReductionMs: baseAvgDuration - candAvgDuration,
     },
+    comparisonA_policyAblation: {
+      description: "Controlled policy ablation measuring discretionary Reviewer scheduling & DAG optimization within identical runtime",
+      candidate: {
+        passedCount: candPassed,
+        passRate: candPassed / (candRuns.length || 1),
+        totalModelCalls: candModelCalls,
+        modelCallsPerSuccess: candPassed ? candModelCalls / candPassed : 0,
+        totalToolCalls: candToolCalls,
+        avgDurationMs: candAvgDuration,
+        reusedArtifactCount: reusedArtifactCountTotal,
+        redundantStepsEliminated: redundantStepsEliminatedTotal,
+      },
+      ablationBaseline: {
+        passedCount: basePassed,
+        passRate: basePassed / (baseRuns.length || 1),
+        totalModelCalls: baseModelCalls,
+        modelCallsPerSuccess: basePassed ? baseModelCalls / basePassed : 0,
+        totalToolCalls: baseToolCalls,
+        avgDurationMs: baseAvgDuration,
+      },
+      delta: {
+        passRateGain: (candPassed - basePassed) / (tasks.length || 1),
+        modelCallEfficiencyImprovement: baseModelCalls - candModelCalls,
+        latencyReductionMs: baseAvgDuration - candAvgDuration,
+      },
+      reviewerOverheadNotice: "Baseline reflects fixed-overhead policy with injected Reviewer on C2/C3 steps; candidate reflects adaptive planning with discretionary review and DAG pruning. Skipping Reviewer constitutes efficiency only when verification contract did not require reviewer assertions.",
+    },
+    comparisonB_historicalProduction: {
+      targetMilestone: "MA4-S3-T3R2",
+      targetCommit: "4d19781ce73b9e4a5d8481ff2438883626244f2b",
+      status: "BLOCKED_NOT_COMPARABLE",
+      reason: "Historical pre-T4 production runtime lacked the 60-task frozen benchmark harness, PersistentTaskRuntime DAG integration, and tripartite outcome measurement. Running this benchmark directly on pre-T4 requires invasive modifications to historical source that defeat objective historical comparison.",
+    },
     pairedDifferences: {
       bothPass,
       bothFail,
@@ -1488,20 +1824,28 @@ export async function runLiveBenchmark(options: {
     resourceObservations: {
       coldLoadMs,
       warmLoadMs,
-      peakVramBytes: peakVram,
-      freeVramBytes: totalVram - peakVram,
+      peakVramBytes: snapshotMaxVram,
+      snapshotMaxVramBytes: snapshotMaxVram,
+      freeVramBytes: initGpu.available && initGpu.freeVramBytes ? initGpu.freeVramBytes : null,
       totalVramBytes: totalVram,
-      gpuName: "NVIDIA GeForce RTX 4050 Laptop GPU",
-      npuStatus: npuInfo.detected ? `${npuInfo.name} (Ollama unsupported)` : "none",
+      gpuName: initGpu.gpuName,
+      npuStatus: npuInfo.detected ? (npuInfo.name + " (Ollama unsupported)") : "none",
+      telemetryAvailable: initGpu.available,
     },
     measuredHardwareTelemetry: {
-      gpuName: "NVIDIA GeForce RTX 4050 Laptop GPU",
+      status: initGpu.available ? "MEASURED" : "UNAVAILABLE",
+      unavailableReason: initGpu.unavailableReason,
+      source: initGpu.source,
+      gpuName: initGpu.gpuName,
       totalVramBytes: totalVram,
-      measuredRuns: runs.length,
+      measuredRuns: vramSamples.length,
       averageVramUsedBytes: avgVram,
-      peakVramUsedBytes: peakVram,
-      averageGpuUtilPercent: 0,
+      snapshotMaxVramUsedBytes: snapshotMaxVram,
+      continuousPeakVramUsedBytes: null,
+      samplingMode: "pre_post_snapshots",
+      averageGpuUtilPercent: initGpu.available ? initGpu.gpuUtilPercent : null,
       averageFreeRamBytes: freemem(),
+      peakVramUsedBytes: snapshotMaxVram,
     },
     runs,
   };

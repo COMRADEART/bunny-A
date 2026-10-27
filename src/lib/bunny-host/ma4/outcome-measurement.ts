@@ -55,6 +55,13 @@ export function isRecoverableFailure(failure: FailureTaxonomy): boolean {
  * Derived strictly from actual process exit codes, cryptographic receipts, filesystem checks,
  * and immutable Host state transitions.
  */
+export const EVIDENCE_CATEGORIES = [
+  "oracle_validation",
+  "tool_execution",
+  "process_test",
+] as const;
+export type EvidenceCategory = (typeof EVIDENCE_CATEGORIES)[number];
+
 export const HostVerifiedEvidenceSchema = z.object({
   testReceipts: z.array(z.string()),
   exitCodes: z.array(z.number().int()),
@@ -63,6 +70,21 @@ export const HostVerifiedEvidenceSchema = z.object({
   completedContracts: z.boolean(),
   permissionsGranted: z.array(z.string()),
   assertionsExecuted: z.number().int().nonnegative().optional(),
+  evidenceCategory: z.enum(EVIDENCE_CATEGORIES).optional(),
+  toolExecutionReceipts: z.array(z.string()).optional(),
+  processDetails: z.object({
+    executable: z.string(),
+    profile: z.string(),
+    projectRoot: z.string(),
+    executionId: z.string(),
+    terminalState: z.string(),
+    exitCode: z.number().int().nullable(),
+    stdoutSha256: z.string(),
+    stderrSha256: z.string(),
+    reportSha256: z.string().nullable(),
+    artifactSha256: z.string().nullable(),
+    journalOperationKey: z.string().nullable().optional(),
+  }).strict().optional(),
 }).strict();
 export type HostVerifiedEvidence = z.infer<typeof HostVerifiedEvidenceSchema>;
 
@@ -159,8 +181,26 @@ export function isVerifiedSuccess(record: ExecutionOutcomeRecord): boolean {
   if (record.status !== "success") return false;
   if (!record.evidence.hostVerified.completedContracts) return false;
   if (record.failureTaxonomy !== null) return false;
-  const exitCodes = record.evidence.hostVerified.exitCodes;
-  if (exitCodes.some(code => code !== 0)) return false;
+
+  const category = record.evidence.hostVerified.evidenceCategory;
+  if (category === "process_test") {
+    // Process test execution MUST have genuine receipts starting with receipt:test-exec:
+    if (!record.testProcessReceipts || record.testProcessReceipts.length === 0) return false;
+    if (!record.evidence.hostVerified.testReceipts || record.evidence.hostVerified.testReceipts.length === 0) return false;
+    for (const r of record.testProcessReceipts) {
+      if (!r.startsWith("receipt:test-exec:")) return false;
+    }
+    const exitCodes = record.evidence.hostVerified.exitCodes;
+    if (!exitCodes || exitCodes.length === 0 || exitCodes.some(code => code !== 0)) return false;
+  } else if (category === "oracle_validation") {
+    // Oracle validation must NOT claim process test receipts or process exit codes!
+    if (record.testProcessReceipts && record.testProcessReceipts.length > 0) return false;
+    if (record.evidence.hostVerified.testReceipts && record.evidence.hostVerified.testReceipts.length > 0) return false;
+  } else {
+    const exitCodes = record.evidence.hostVerified.exitCodes;
+    if (exitCodes.some(code => code !== 0)) return false;
+  }
+
   if (record.approvedModel.digest && record.observedModel?.digest) {
     if (record.approvedModel.digest !== record.observedModel.digest) return false;
   }
@@ -240,6 +280,25 @@ export function createOutcomeRecord(input: {
   const taskSha256 = sha256(input.taskText);
   const contractSha256 = sha256(input.acceptanceContract);
 
+  const evidenceCategory: EvidenceCategory = input.hostVerified.evidenceCategory ?? (
+    (input.testProcessReceipts && input.testProcessReceipts.some(r => r.startsWith("receipt:test-exec:")))
+      ? "process_test"
+      : ((input.toolCallCount > 0 || (input.hostVerified.fileModifications && input.hostVerified.fileModifications.length > 0)) ? "tool_execution" : "oracle_validation")
+  );
+
+  let verifiedTestReceipts = (input.testProcessReceipts ?? []).filter(r => typeof r === "string");
+  let hostTestReceipts = (input.hostVerified.testReceipts ?? []).filter(r => typeof r === "string");
+  let hostExitCodes = (input.hostVerified.exitCodes ?? []).filter(c => typeof c === "number");
+
+  if (evidenceCategory === "oracle_validation") {
+    verifiedTestReceipts = [];
+    hostTestReceipts = [];
+    hostExitCodes = [];
+  } else if (evidenceCategory === "process_test") {
+    verifiedTestReceipts = verifiedTestReceipts.filter(r => r.startsWith("receipt:test-exec:"));
+    hostTestReceipts = hostTestReceipts.filter(r => r.startsWith("receipt:test-exec:"));
+  }
+
   const sanitizedPlans = (input.modelGenerated?.plans ?? []).map(redactOutcomeSecrets);
   const sanitizedSummaries = (input.modelGenerated?.summaries ?? []).map(redactOutcomeSecrets);
   const sanitizedRepairs = (input.modelGenerated?.proposedRepairs ?? []).map(redactOutcomeSecrets);
@@ -259,7 +318,7 @@ export function createOutcomeRecord(input: {
     planningAttempts: Math.max(0, input.planningAttempts ?? 1),
     executionAttempts: Math.max(0, input.executionAttempts ?? 1),
     verifiedArtifactHashes: input.verifiedArtifactHashes ?? [],
-    testProcessReceipts: input.testProcessReceipts ?? [],
+    testProcessReceipts: verifiedTestReceipts,
     status: input.status,
     failureTaxonomy: input.failureTaxonomy ?? null,
     queueTimeMs: Math.max(0, input.queueTimeMs),
@@ -268,7 +327,12 @@ export function createOutcomeRecord(input: {
     resourceObservations: input.resourceObservations ?? null,
     repairInfo: input.repairInfo ?? null,
     evidence: {
-      hostVerified: input.hostVerified,
+      hostVerified: {
+        ...input.hostVerified,
+        evidenceCategory,
+        testReceipts: hostTestReceipts,
+        exitCodes: hostExitCodes,
+      },
       modelGenerated: {
         plans: sanitizedPlans,
         summaries: sanitizedSummaries,
