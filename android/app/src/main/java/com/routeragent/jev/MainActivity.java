@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -31,6 +32,8 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import java.io.ByteArrayInputStream;
+import java.util.Collections;
 
 public final class MainActivity extends Activity {
     private static final int BG = Color.rgb(11, 16, 27);
@@ -140,6 +143,7 @@ public final class MainActivity extends Activity {
                 connect(normalized);
             } catch (IllegalArgumentException ex) { address.setError(ex.getMessage()); }
         }), 24);
+        add(content, button("Try native preview", false, view -> startActivity(new Intent(this, NativeCompanionActivity.class))), 12);
         add(content, button("Connection help", false, view -> new AlertDialog.Builder(this)
                 .setTitle("Remote connection")
                 .setMessage("In Bunny Island, choose Phone to find your HTTPS address and one-time pairing code.\n\nConnect to that address here, then enter the code on the pairing page. Codes expire after 10 minutes. You can revoke this device from the workstation dashboard.\n\nThe workstation must be awake. Task execution and agent credentials stay on the workstation. This APK supports any configured HTTPS gateway; it does not embed a temporary tunnel address.")
@@ -177,7 +181,7 @@ public final class MainActivity extends Activity {
         progress.setMax(100);
         root.addView(progress, new LinearLayout.LayoutParams(-1, dp(4)));
         web = new WebView(this);
-        web.addJavascriptInterface(new BunnyNotifications(this, url, web), "BunnyNotify");
+        // No JavaScript-to-native bridge: legacy WebView frames cannot be granted native authority.
         web.setBackgroundColor(BG);
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -195,13 +199,23 @@ public final class MainActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String destination = request.getUrl().toString();
-                if (!"https".equalsIgnoreCase(request.getUrl().getScheme())) return true;
-                if (request.hasGesture() && !ServerAddress.sameOrigin(serverUrl, destination)) {
-                    openBrowser(destination);
+                if (!ServerAddress.sameOrigin(serverUrl, destination)) {
+                    if (request.isForMainFrame()) showFailure("A cross-origin navigation was blocked. Return to the configured companion address.");
                     return true;
                 }
-                // HTTPS redirects may be the trusted tunnel's sign-in flow.
                 return false;
+            }
+            @Override public void onPageStarted(WebView view, String pageUrl, Bitmap favicon) {
+                if (!ServerAddress.sameOrigin(serverUrl, pageUrl)) {
+                    view.stopLoading();
+                    showFailure("A cross-origin navigation was blocked. Return to the configured companion address.");
+                }
+            }
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (!ServerAddress.sameOrigin(serverUrl, request.getUrl().toString())) {
+                    return new WebResourceResponse("text/plain", "utf-8", 403, "Blocked", Collections.emptyMap(), new ByteArrayInputStream(new byte[0]));
+                }
+                return null;
             }
             @Override public void onPageFinished(WebView view, String pageUrl) {
                 progress.setVisibility(View.GONE);
