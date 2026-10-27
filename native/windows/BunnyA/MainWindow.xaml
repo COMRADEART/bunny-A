@@ -1,0 +1,12 @@
+<Window x:Class="BunnyA.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Bunny A" Width="960" Height="680" MinWidth="600" MinHeight="450" Background="{StaticResource BackgroundBrush}" Foreground="{StaticResource TextBrush}" FontFamily="Segoe UI" FontSize="14">
+  <Grid Margin="32">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <StackPanel><TextBlock Text="BUNNY A  /  LOKAM · NATIVE PREVIEW" FontSize="13" Foreground="{StaticResource MutedBrush}"/><TextBlock Text="Your workspace" FontSize="30" FontWeight="SemiBold" Margin="0,8,0,0"/><TextBlock Text="Preview: view and cancel tasks. Conversation and approvals are not yet available here." Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/></StackPanel>
+    <Border Grid.Row="1" Background="{StaticResource PanelBrush}" CornerRadius="16" Padding="20" Margin="0,24,0,16">
+      <StackPanel><TextBlock Text="Host connection" FontWeight="SemiBold"/><TextBlock x:Name="ConnectionStatus" Text="Connecting…" Margin="0,8,0,0" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/><Button x:Name="RefreshButton" Content="Refresh" HorizontalAlignment="Left" Click="Refresh_Click"/></StackPanel>
+    </Border>
+    <Border Grid.Row="2" Background="{StaticResource PanelBrush}" CornerRadius="16" Padding="20">
+      <DockPanel><TextBlock Text="Current tasks" FontSize="19" FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,12"/><Button x:Name="CancelButton" Content="Cancel selected task" IsEnabled="False" DockPanel.Dock="Bottom" HorizontalAlignment="Left" Click="Cancel_Click"/><ListBox x:Name="Tasks" Background="Transparent" Foreground="{StaticResource TextBrush}" BorderThickness="0" AutomationProperties.Name="Current tasks" SelectionChanged="Tasks_SelectionChanged"/></DockPanel>
+    </Border>
+  </Grid>
+</Window>
