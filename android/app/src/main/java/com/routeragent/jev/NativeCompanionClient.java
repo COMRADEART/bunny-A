@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import javax.net.ssl.HttpsURLConnection;
 
 /** HTTPS only; no redirects and no workstation credentials or shell commands. */
@@ -54,6 +55,18 @@ final class NativeCompanionClient {
             JSONObject snapshot=body.getJSONObject("snapshot");
             if(!session.hostId.equals(snapshot.getJSONObject("hostIdentity").getString("hostId"))) throw new SecurityException("Host identity changed; pair again.");
             return snapshot;
+        } finally { c.disconnect(); }
+    }
+    JSONObject command(NativeSessionStore.Session session, String action, JSONObject data) throws Exception {
+        HttpsURLConnection c=open(session.origin,"api/bunny-native-v1-state","POST");
+        try {
+            c.setRequestProperty("Cookie","bunny_device="+session.token);
+            JSONObject payload=new JSONObject();
+            payload.put("action",action);
+            payload.put("data",data==null ? new JSONObject() : data);
+            payload.put("operationId",UUID.randomUUID().toString());
+            sendJson(c,payload);
+            return response(c);
         } finally { c.disconnect(); }
     }
     void revoke(NativeSessionStore.Session session) throws Exception {

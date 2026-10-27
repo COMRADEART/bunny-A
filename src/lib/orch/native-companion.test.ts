@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { nativeCompanionState } from "./native-companion.server.ts";
+import { nativeCompanionState, nativeCompanionCommand } from "./native-companion.server.ts";
 import { authorizeBridge } from "./host-bridge.server.ts";
 import { startHost } from "../bunny-host/http.server.ts";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -95,4 +95,47 @@ test("native state preserves Host rate limiting without returning internal detai
   assert.equal(response.status,429);
   const body=await response.json() as {code:string;error:string};
   assert.equal(body.code,"RATE_LIMITED"); assert.equal(body.error.includes("internal detail"),false);
+});
+
+
+test("native companion command forwards authorized device command and returns schema", async () => {
+  let forwardedAction = "";
+  let forwardedToken = "";
+  const fetchHost: typeof fetch = async (_input, init) => {
+    forwardedToken = new Headers(init?.headers).get("authorization") ?? "";
+    forwardedAction = JSON.parse(String(init?.body)).action;
+    return Response.json({ ok: true, taskId: "task-01" });
+  };
+  const deps = {
+    authorize: () => ({ local: false, token: "device-fixture" }),
+    hostPort: () => 43119,
+    fetchHost,
+  };
+  const req = new Request("https://companion.example/api/bunny-native-v1-state", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "submit", data: { prompt: "Hello companion" } }),
+  });
+  const res = await nativeCompanionCommand(req, deps);
+  assert.equal(res.status, 200);
+  assert.equal(forwardedToken, "Bearer device-fixture");
+  assert.equal(forwardedAction, "submit");
+  const json = (await res.json()) as { schema: string; ok: boolean };
+  assert.equal(json.schema, "bunny.native.command.v1");
+  assert.equal(json.ok, true);
+});
+
+test("native companion command refuses local callers", async () => {
+  const deps = {
+    authorize: () => ({ local: true, token: "token" }),
+    hostPort: () => 43119,
+    fetchHost: fetch,
+  };
+  const req = new Request("https://companion.example/api/bunny-native-v1-state", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "submit" }),
+  });
+  const res = await nativeCompanionCommand(req, deps);
+  assert.equal(res.status, 403);
 });
