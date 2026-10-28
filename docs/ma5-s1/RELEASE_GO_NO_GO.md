@@ -17,3 +17,7 @@ Release gates that must be cleared independently before any beta:
 5. Release signing for both platforms, kept outside the repository.
 6. Cross-machine reproducibility of the Windows build.
 7. The open MA4 quality findings (G7 quality, skills/memory gains).
+
+## S1R1
+
+S1R1 fixed installer ownership and command-outcome truthfulness, and added fault tests (S1R1_FINAL_ACCEPTANCE.md). It does not clear any of the release gates above. Android device acceptance in particular is still BLOCKED. Public beta remains **NO-GO**; merge is **GO for independent review** once the final-SHA checks pass.

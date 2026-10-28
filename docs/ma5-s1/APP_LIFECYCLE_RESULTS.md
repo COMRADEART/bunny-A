@@ -29,3 +29,19 @@ available):
 
 Runtime behaviour (backgrounding, rotation, process death, network loss) is **NOT TESTED**; see
 PHYSICAL_TEST_STATUS.md.
+
+## S1R1: interrupted commands and the install lifecycle
+
+- **Windows.** A command whose connection fails after it was sent, or whose sender is cancelled (including the app
+  closing mid-command), is reported as outcome unknown. It is never reported as cancelled or not run. The Host is
+  asked once, by the original operation id, and the command is never re-sent. Scenarios W1–W12 and R1–R2 are in
+  S1R1_COMMAND_OUTCOME_INTEGRITY.md.
+- **Android (JVM transport tests only).** After an interrupted command, a fresh state read succeeds and the command is
+  not re-sent (A10). Stop is answered on its own connection while a refresh is stalled (A11). The Activity's own
+  onStart/onStop behaviour on a device is still **NOT TESTED**.
+- **Development install.**
+  - The real candidate was re-run with the S1R1 installer: install, launch, replacement refused while running,
+    replacement after Quit with settings kept, relaunch, uninstall with settings and the user project kept, foreign
+    folder refused (`evidence/s1r1/candidate-lifecycle.json`).
+  - Injected failures after the backup and after the swap restore the previous install byte for byte
+    (S1R1_INSTALLER_OWNERSHIP.md).

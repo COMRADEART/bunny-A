@@ -24,3 +24,11 @@ Each verdict cites observed evidence. A description of a feature is never counte
 | S1-G18 | Required hosted CI jobs pass on final commit | **Decided in PR #59** | This file belongs to the final commit and cannot cite that commit's runs. The exact final-head run IDs and conclusions are in the PR description and the final report |
 | S1-G19 | No unsupported or fabricated PASS claims | **PASS** | Every PASS above cites recorded evidence. Untested items are marked NOT TESTED or BLOCKED. Screenshots: none produced; evidence is UIA and Host JSON |
 | S1-G20 | Final engineering and release decisions separated | **PASS** | ENGINEERING_REPORT.md (merge) vs RELEASE_GO_NO_GO.md (release NO-GO) |
+
+## S1R1 corrections
+
+The S1R1 gates (R1-G1 to R1-G16), with evidence, are in S1R1_FINAL_ACCEPTANCE.md. They do not change any S1 verdict above, with these clarifications:
+
+- S1-G5 and S1-G14 were re-run on the S1R1 binary (`ma5s1-2026-10-28T15-15-45-913Z`): all stage flags true, no failures.
+- S1-G12: the install lifecycle was re-run with the ownership-checking installer, and passed.
+- S1-G17: the security rows added for S1R1 are in SECURITY_REGRESSION.md.

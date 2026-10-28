@@ -42,6 +42,27 @@ for the removed WebView and the new Windows behaviour.
 Unchanged by design: Host, gateway, routing, models and pins, memory injection, Planner/Worker selection, voice
 permission boundaries, approvals, signing verification.
 
+## S1R1 corrections (same PR, after independent review of `e094a26`)
+
+Three defects found in review were fixed, each with real fault tests and a before/after reproduction. Two more
+were found while testing.
+
+| Defect | Fix | Evidence |
+|---|---|---|
+| The installer replaced any existing destination; only uninstall looked at the marker | Proof of ownership (marker schema + product + exact install root + no unlisted entries) before update **and** uninstall; junctions and links refused; archive entries confined to staging; candidate tree = manifest; optional `-ExpectedSha256`; rollback restores the previous install | S1R1_INSTALLER_OWNERSHIP.md: 6/6 tests; e094a26 replaced an unrelated folder |
+| Windows treated the ledger's `unknown` as "did not run", `failed` as "refused … nothing changed", and `refused` as "did not run" | Truthful classification; Host identity and epoch both required before asking the ledger; `HostFailure.Failed` for partial effects; cancellation after sending is outcome unknown | S1R1_COMMAND_OUTCOME_INTEGRITY.md: 114 scripted + 10 real-Host checks |
+| Android said "Nothing was sent" for failures while sending, and "Not done" after sending | `HostExchange`: only a `connect()` failure is "not sent"; everything after is `OUTCOME_UNKNOWN` with the original operation id; `FAILED` means "may have partly applied" | S1R1_NETWORK_FAULT_TESTS.md: 35 checks |
+| *(found in testing)* A direct `FAILED` / `HOST_UNAVAILABLE` answer was shown as "Host refused" on Windows and as "Not done" on Android | Classified as partly applied on both clients | W4, A8 |
+| *(found in testing)* Android's send had no streaming mode, so the HTTP stack could replay the POST. On the JVM the command arrived twice | `setFixedLengthStreamingMode` | A3 (exactly one receipt); before-repro shows two |
+
+Files: `install-dev-candidate.ps1`, `HostClient.cs`, `MainWindow.xaml.cs`, `HostExchange.java` (new),
+`NativeCompanionClient.java`, `NativeCompanionActivity.java`. Tests added: `scripts/ma5-s1r1-installer.test.mjs`,
+`native/windows/BunnyA.OutcomeTests/`, `scripts/verify-ma5-s1r1-outcome.mjs`, `android/tests/HostExchangeTest.java`.
+CI wiring: `scripts/build-android.ps1`, `.github/workflows/native-windows-preview.yml`.
+
+No Host, gateway, routing, approval-policy or device-authority code changed in S1R1. UI layout is unchanged; only
+outcome texts and dialog titles changed. Final acceptance: S1R1_FINAL_ACCEPTANCE.md.
+
 ## Verdicts
 
 | Area | Verdict |

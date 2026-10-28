@@ -1,0 +1,26 @@
+MA5-S1R1 before-fix reproductions (2026-10-28, local Windows 11). Each ran the e094a26 code unchanged against the same
+faults the new tests inject. The harnesses were scratch-only and are not part of the PR.
+
+== Windows HostClient.cs (git show e094a26:native/windows/BunnyA/Services/HostClient.cs + FaultHost.cs) ==
+BEFORE ledger unknown (record expired / never matched): shown="The connection ended after the request was sent; Bunny A did not retry it. The Host has no record of operation 065a0d6a-5fb5-4441-b65e-7345114aecf6; it did not run."
+BEFORE ledger failed (partial effect): shown="The connection ended after the request was sent; Bunny A did not retry it. The Host recorded it as refused (operation 7e202f99-39c8-4cd3-934f-ff8d2a7959ef); nothing changed."
+BEFORE ledger refused: shown="The connection ended after the request was sent; Bunny A did not retry it. The Host has no record of operation 8fc50fa4-0ac2-4e9b-93c0-f9ab621d72c4; it did not run."
+BEFORE Host answers FAILED directly: kind=Refused (UI: "Host refused: …" / "REFUSED BY HOST") shown="Host command failed. Inspect operation state before retrying."
+
+== Android send/classify (e094a26 sendJson + response catch arms, JVM HttpURLConnection, HostExchangeTest.FaultServer) ==
+BEFORE RESET_MID_BODY: shown="NETWORK: The workstation could not be reached." + dialog title "Not done"; server requests started=2 fullyReceived=0
+BEFORE RESET_AFTER_BODY: shown="NETWORK: The workstation could not be reached." + dialog title "Not done"; server requests started=2 fullyReceived=2
+BEFORE CLOSE_AFTER_BODY: shown="NETWORK: The workstation could not be reached." + dialog title "Not done"; server requests started=2 fullyReceived=2
+(fullyReceived=2: the JDK HTTP stack silently re-sent the POST; the command reached the server twice.)
+
+== Installer (BUNNY_S1R1_INSTALLER=<e094a26 install-dev-candidate.ps1> node --test scripts/ma5-s1r1-installer.test.mjs) ==
+✖ S1R1 installer 1-2 (marker format: no product/installRoot identity)
+✖ S1R1 installer 3-6  install over unrelated folder: must be refused, got: {"installed":"…\\Programs\\BunnyA-DevCandidate","version":"0.5.1","replacedPrevious":true,…}
+✖ S1R1 installer 7-8  package hash differs from -ExpectedSha256: must be refused, got: {"installed":…,"version":"0.5.2","replacedPrevious":true,…}
+✖ S1R1 installer 9    install through a junction is refused
+✖ S1R1 installer 10-11 after-backup: the fault fired   (no fault hook in e094a26; not a defect)
+✔ S1R1 installer 12-13 (uninstall marker check and protected-folder check already existed)
+pass 1, fail 5
+
+== After the fix ==
+Installer 6/6 pass. Windows OutcomeTests: scripted 114/114 and real Host 10/10. Android HostExchangeTest: 35 checks passed.
