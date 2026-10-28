@@ -96,6 +96,29 @@ test("T2-X15 a stale worker whose lease was taken over cannot commit a connected
   } finally { await r.close(); }
 });
 
+test("T2-X20 the rig's heartbeat renews the 30 s lease while one step outlasts it, so the step still commits (T2-W1)", async (t) => {
+  // Fake heartbeat timer and fake clock in lockstep: 40 s pass in a few milliseconds, longer than the lease but shorter
+  // than the old 60 s heartbeat that let the lease lapse under a slow browser launch.
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  let release!: () => void, started!: () => void;
+  const hold = new Promise<void>(res => { release = res; }), running = new Promise<void>(res => { started = res; });
+  const w = workspace();
+  const list = w.mail.list;
+  w.mail.list = async (...a) => { started(); await hold; return list(...a); };
+  let now = Date.now();
+  const r = await rig({ services: w, now: () => now });
+  try {
+    const task = create(r, [{ id: "ls", kind: "email.list", input: { account: "me@example.test" } }], { services: [{ connector: "email", account: "me@example.test", access: "read" }] });
+    r.rt.wake();
+    await running;
+    for (let i = 0; i < 4; i++) { now += 10_000; t.mock.timers.tick(10_000); await new Promise(res => setImmediate(res)); }
+    release();
+    const v = await r.run(task.id);
+    assert.equal(v.state, "COMPLETED", JSON.stringify(v.failure));
+    assert.ok(r.store.output(task.id, "ls"), "the long step's result was committed under a live lease");
+  } finally { await r.close(); }
+});
+
 test("T2-X16 a task can only read its own steps' results; another task's (or project's) material is unreachable", async () => {
   const model = fakeModel();
   const r = await rig({ model });
